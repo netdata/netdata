@@ -1,0 +1,330 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Nagios collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds. This is the effective execution resolution for checks and retries.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "How often Netdata retries failed automatic detection jobs, in seconds. Set to 0 to disable retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "plugin": {
+        "title": "Plugin path",
+        "description": "Absolute path to the Nagios-compatible check script or executable to run. The command should return exit code 0, 1, 2, or 3 and may print performance data after `|`.",
+        "type": "string"
+      },
+      "args": {
+        "title": "Arguments",
+        "description": "Arguments passed to the check command after macro expansion.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Argument",
+          "type": "string"
+        }
+      },
+      "arg_values": {
+        "title": "Argument macros",
+        "description": "Values exposed as `NAGIOS_ARG1` .. `NAGIOS_ARG32` for macro substitution and environment export.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Argument macro value",
+          "type": "string"
+        },
+        "maxItems": 32
+      },
+      "environment": {
+        "title": "Environment",
+        "description": "Extra environment variables added on top of the collector's limited execution baseline. The check does not inherit the full Netdata process environment.",
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Maximum time allowed for one check execution, in seconds. If the check exceeds this limit, the job state becomes `timeout`.",
+        "type": "number",
+        "minimum": 0.001,
+        "default": 5
+      },
+      "check_interval": {
+        "title": "Check interval",
+        "description": "Requested interval between regular checks, in seconds.",
+        "type": "number",
+        "minimum": 0.001,
+        "default": 300
+      },
+      "retry_interval": {
+        "title": "Retry interval",
+        "description": "Requested interval between retry attempts while the check is in a soft non-OK state, in seconds.",
+        "type": "number",
+        "minimum": 0.001,
+        "default": 60
+      },
+      "max_check_attempts": {
+        "title": "Max check attempts",
+        "description": "Maximum number of attempts before a non-OK result is treated as a hard state.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 3
+      },
+      "inter_check_jitter": {
+        "title": "Inter-check jitter",
+        "description": "Random delay added to scheduled runs, in seconds.",
+        "type": "number",
+        "minimum": 0,
+        "default": 0
+      },
+      "check_period": {
+        "title": "Check period",
+        "description": "Named time period that controls when checks are allowed to run. Use `24x7` for always-on execution. Outside the allowed period, the check does not execute and the public job state becomes `paused`.",
+        "type": "string",
+        "default": "24x7"
+      },
+      "time_periods": {
+        "title": "Time periods",
+        "description": "Custom named schedules local to this job. `check_period` can reference any name defined here.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Time period",
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "description": "Unique time period name referenced from `check_period`.",
+              "type": "string"
+            },
+            "alias": {
+              "title": "Alias",
+              "description": "Human-readable label for this time period.",
+              "type": "string"
+            },
+            "exclude": {
+              "title": "Exclude",
+              "description": "Names of other periods to subtract from this one.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "title": "Excluded period",
+                "type": "string"
+              }
+            },
+            "rules": {
+              "title": "Rules",
+              "description": "Allow rules for this time period.",
+              "type": "array",
+              "items": {
+                "title": "Rule",
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "title": "Type",
+                    "description": "Rule type.",
+                    "type": "string",
+                    "enum": [
+                      "weekly",
+                      "nth_weekday",
+                      "date"
+                    ],
+                    "default": "weekly"
+                  },
+                  "days": {
+                    "title": "Days",
+                    "description": "Weekdays used by `weekly` rules. If omitted, all days are allowed.",
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "sunday",
+                        "monday",
+                        "tuesday",
+                        "wednesday",
+                        "thursday",
+                        "friday",
+                        "saturday"
+                      ]
+                    }
+                  },
+                  "ranges": {
+                    "title": "Ranges",
+                    "description": "Allowed time ranges in `HH:MM-HH:MM` format.",
+                    "type": "array",
+                    "items": {
+                      "title": "Time range",
+                      "type": "string"
+                    },
+                    "minItems": 1
+                  },
+                  "weekday": {
+                    "title": "Weekday",
+                    "description": "Weekday used by `nth_weekday` rules.",
+                    "type": "string",
+                    "enum": [
+                      "sunday",
+                      "monday",
+                      "tuesday",
+                      "wednesday",
+                      "thursday",
+                      "friday",
+                      "saturday"
+                    ]
+                  },
+                  "nth": {
+                    "title": "Nth occurrence",
+                    "description": "Month occurrence used by `nth_weekday` rules.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  },
+                  "dates": {
+                    "title": "Dates",
+                    "description": "Explicit dates used by `date` rules, in `YYYY-MM-DD` format.",
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "title": "Date",
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "ranges"
+                ]
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "name",
+            "rules"
+          ]
+        }
+      },
+      "working_directory": {
+        "title": "Working directory",
+        "description": "Optional working directory used when running the check command.",
+        "type": "string"
+      },
+      "custom_vars": {
+        "title": "Custom variables",
+        "description": "Custom service variables exported as `NAGIOS__SERVICE*` environment variables.",
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "notes": {
+        "title": "Notes",
+        "description": "Optional free-form notes for this job.",
+        "type": "string"
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      }
+    },
+    "required": [
+      "plugin"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "plugin": {
+      "ui:placeholder": "/usr/lib/nagios/plugins/check_ping"
+    },
+    "args": {
+      "ui:listFlavour": "list"
+    },
+    "arg_values": {
+      "ui:listFlavour": "list",
+      "ui:help": "These values are exported as `NAGIOS_ARG1` .. `NAGIOS_ARG32`."
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (for example 1.5 for 1.5 seconds). String durations are also accepted in raw config files."
+    },
+    "check_interval": {
+      "ui:help": "Requested regular check interval. Actual execution cannot be faster than `update_every`."
+    },
+    "retry_interval": {
+      "ui:help": "Requested retry interval after non-OK results. Actual execution cannot be faster than `update_every`."
+    },
+    "inter_check_jitter": {
+      "ui:help": "Adds up to this many seconds of random delay to each scheduled run."
+    },
+    "check_period": {
+      "ui:placeholder": "24x7"
+    },
+    "time_periods": {
+      "ui:listFlavour": "list"
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "plugin",
+            "args",
+            "arg_values",
+            "timeout",
+            "vnode",
+            "autodetection_retry"
+          ]
+        },
+        {
+          "title": "Scheduling",
+          "fields": [
+            "check_interval",
+            "retry_interval",
+            "max_check_attempts",
+            "inter_check_jitter",
+            "check_period",
+            "time_periods"
+          ]
+        },
+        {
+          "title": "Runtime",
+          "fields": [
+            "working_directory",
+            "environment",
+            "custom_vars",
+            "notes"
+          ]
+        }
+      ]
+    }
+  }
+}

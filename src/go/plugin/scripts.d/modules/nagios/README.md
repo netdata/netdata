@@ -1,1 +1,0 @@
-integrations/nagios_plugins.md

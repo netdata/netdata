@@ -35,6 +35,7 @@ func (m *runtimeServiceMock) UnregisterComponent(name string) {
 }
 
 func (m *runtimeServiceMock) RegisterProducer(string, func() error) error { return nil }
+func (m *runtimeServiceMock) UnregisterProducer(string)                   {}
 
 func (m *runtimeServiceMock) snapshot() ([]runtimecomp.ComponentConfig, []string) {
 	m.mu.Lock()
