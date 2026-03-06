@@ -1,0 +1,209 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-azure_monitor
+      plugin_name: go.d.plugin
+      module_name: azure_monitor
+      monitored_instance:
+        name: Azure Monitor
+        link: https://learn.microsoft.com/azure/azure-monitor/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+      keywords:
+        - azure
+        - monitor
+        - cloud
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Azure resources through Azure Monitor Metrics API.
+
+          It discovers resources with Azure Resource Graph and collects metrics in batches,
+          grouped by region and profile.
+        method_description: |
+          The collector uses Azure SDK clients for:
+          - authentication (Entra ID)
+          - resource discovery (Resource Graph)
+          - metrics collection (Azure Monitor Metrics batch API)
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          The monitoring principal needs read access to Azure Resource Graph and Azure Monitor metrics for target resources.
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: |
+            Azure Monitor granularity is typically 1 minute.
+        performance_impact:
+          description: |
+            The collector uses bounded request concurrency and batches resources/metrics to reduce API load.
+    setup:
+      prerequisites:
+        list:
+          - title: Create and authorize Azure principal
+            description: |
+              Grant a service principal (or managed identity) read permissions for:
+              - Azure Resource Graph
+              - Azure Monitor metrics on target resources
+      configuration:
+        file:
+          name: go.d/azure_monitor.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval (seconds). Must be at least 60.
+              default_value: 60
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Autodetection retry interval (seconds). Set 0 to disable.
+              default_value: 0
+              required: false
+              group: Collection
+            - name: subscription_id
+              description: Azure subscription ID.
+              default_value: ""
+              required: true
+              group: Target
+            - name: cloud
+              description: Azure cloud environment (`public`, `government`, `china`).
+              default_value: public
+              required: false
+              group: Target
+            - name: discovery_every
+              description: Resource discovery interval in seconds.
+              default_value: 300
+              required: false
+              group: Collection
+            - name: query_offset
+              description: Offset in seconds used for metric query windows.
+              default_value: 180
+              required: false
+              group: Collection
+            - name: max_concurrency
+              description: Maximum concurrent batch queries.
+              default_value: 4
+              required: false
+              group: Limits
+            - name: max_batch_resources
+              description: Maximum resources per Azure Monitor batch request.
+              default_value: 50
+              required: false
+              group: Limits
+            - name: max_metrics_per_query
+              description: Maximum metrics per Azure Monitor batch request.
+              default_value: 20
+              required: false
+              group: Limits
+            - name: profiles
+              description: Enabled built-in profile names.
+              default_value: "all defaults"
+              required: false
+              group: Profiles
+            - name: custom_profiles
+              description: User-defined custom profiles.
+              default_value: "[]"
+              required: false
+              group: Profiles
+            - name: resource_groups
+              description: Optional resource-group filter.
+              default_value: "[]"
+              required: false
+              group: Filters
+            - name: auth.mode
+              description: Authentication mode (`service_principal`, `managed_identity`, `default`).
+              default_value: default
+              required: true
+              group: Authentication
+            - name: auth.tenant_id
+              description: Entra tenant ID for `service_principal` mode.
+              default_value: ""
+              required: false
+              group: Authentication
+            - name: auth.client_id
+              description: Entra client ID for `service_principal` mode.
+              default_value: ""
+              required: false
+              group: Authentication
+            - name: auth.client_secret
+              description: Entra client secret for `service_principal` mode.
+              default_value: ""
+              required: false
+              group: Authentication
+            - name: auth.managed_identity_client_id
+              description: Optional user-assigned managed identity client ID.
+              default_value: ""
+              required: false
+              group: Authentication
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Service principal
+              description: Collect built-in Azure profiles with service principal authentication.
+              config: |
+                jobs:
+                  - name: prod
+                    subscription_id: "<subscription-id>"
+                    auth:
+                      mode: service_principal
+                      tenant_id: "<tenant-id>"
+                      client_id: "<client-id>"
+                      client_secret: "<client-secret>"
+            - name: Managed identity
+              description: Use managed identity from an Azure VM/VMSS/AKS node.
+              config: |
+                jobs:
+                  - name: prod
+                    subscription_id: "<subscription-id>"
+                    auth:
+                      mode: managed_identity
+            - name: Custom profile
+              description: Monitor a custom Azure resource type and metric list.
+              config: |
+                jobs:
+                  - name: custom
+                    subscription_id: "<subscription-id>"
+                    profiles: []
+                    custom_profiles:
+                      - name: redis
+                        resource_type: Microsoft.Cache/Redis
+                        metrics:
+                          - name: connectedclients
+                            aggregations: [average]
+                            time_grain: PT1M
+                    auth:
+                      mode: default
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Metric contexts and dimensions are generated from enabled profiles and Azure metric definitions.
+      availability: []
+      scopes: []
