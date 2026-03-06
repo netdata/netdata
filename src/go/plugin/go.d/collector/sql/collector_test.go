@@ -142,6 +142,39 @@ func TestCollector_Init_ConfigValidation(t *testing.T) {
 			},
 			wantFail: true,
 		},
+		"azure_ad with unsupported driver fails": {
+			setup: func(c *Collector) {
+				c.Driver = "mysql"
+				c.DSN = "user:pass@tcp(localhost:3306)/"
+				c.FunctionOnly = true
+				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
+				c.AzureAD.Enabled = true
+				c.AzureAD.Mode = "default"
+			},
+			wantFail: true,
+		},
+		"azure_ad service principal missing secret fails": {
+			setup: func(c *Collector) {
+				c.Driver = "pgx"
+				c.DSN = "postgres://user@localhost/db"
+				c.FunctionOnly = true
+				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
+				c.AzureAD.Enabled = true
+				c.AzureAD.Mode = "service_principal"
+				c.AzureAD.TenantID = "tenant"
+				c.AzureAD.ClientID = "client"
+			},
+			wantFail: true,
+		},
+		"azuresql driver accepted": {
+			setup: func(c *Collector) {
+				c.Driver = "azuresql"
+				c.DSN = "sqlserver://example.database.windows.net?database=master&fedauth=ActiveDirectoryDefault"
+				c.FunctionOnly = true
+				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
+			},
+			wantFail: false,
+		},
 	}
 
 	for name, tc := range tests {

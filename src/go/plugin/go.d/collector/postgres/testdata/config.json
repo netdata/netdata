@@ -3,6 +3,7 @@
   "update_every": 123,
   "autodetection_retry": 123,
   "dsn": "ok",
+  "azure_ad": {},
   "timeout": 123.123,
   "collect_databases_matching": "ok",
   "transaction_time_histogram": [

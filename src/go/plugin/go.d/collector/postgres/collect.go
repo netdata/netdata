@@ -127,6 +127,14 @@ func (c *Collector) collect() (map[string]int64, error) {
 }
 
 func (c *Collector) openPrimaryConnection() (*sql.DB, error) {
+	if c.AzureAD.Enabled {
+		cfg, err := pgx.ParseConfig(c.DSN)
+		if err != nil {
+			return nil, fmt.Errorf("error on parsing DSN [%s]: %v", c.DSN, err)
+		}
+		return c.openAzureADConnection(cfg, "Postgres database")
+	}
+
 	db, err := sql.Open("pgx", c.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("error on opening a connection with the Postgres database [%s]: %v", c.DSN, err)
@@ -154,6 +162,12 @@ func (c *Collector) openSecondaryConnection(dbname string) (*sql.DB, string, err
 	}
 
 	cfg.Database = dbname
+
+	if c.AzureAD.Enabled {
+		db, err := c.openAzureADConnection(cfg, fmt.Sprintf("secondary Postgres database [%s]", dbname))
+		return db, "", err
+	}
+
 	connStr := stdlib.RegisterConnConfig(cfg)
 
 	db, err := sql.Open("pgx", connStr)
@@ -176,6 +190,37 @@ func (c *Collector) openSecondaryConnection(dbname string) (*sql.DB, string, err
 	}
 
 	return db, connStr, nil
+}
+
+func (c *Collector) openAzureADConnection(cfg *pgx.ConnConfig, target string) (*sql.DB, error) {
+	if c.azureTokenProvider == nil {
+		return nil, fmt.Errorf("azure token provider is not initialized for %s", target)
+	}
+
+	db := stdlib.OpenDB(*cfg, stdlib.OptionBeforeConnect(c.azureADBeforeConnect))
+
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxLifetime(10 * time.Minute)
+
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("error on pinging the %s: %v", target, err)
+	}
+
+	return db, nil
+}
+
+func (c *Collector) azureADBeforeConnect(ctx context.Context, cfg *pgx.ConnConfig) error {
+	token, _, err := c.azureTokenProvider.Token(ctx)
+	if err != nil {
+		return err
+	}
+	cfg.Password = token
+	return nil
 }
 
 func (c *Collector) isSuperUser() bool { return c.superUser != nil && *c.superUser }

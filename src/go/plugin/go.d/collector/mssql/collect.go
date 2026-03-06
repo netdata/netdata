@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
 )
 
 // noLatencySentinel is the value SQL Server returns when no latency data is available
@@ -56,7 +58,17 @@ func (c *Collector) collect() (map[string]int64, error) {
 }
 
 func (c *Collector) openConnection() (*sql.DB, error) {
-	db, err := sql.Open("sqlserver", c.DSN)
+	driverName := azureauth.MSSQLDriver(c.AzureAD)
+	dsn := c.DSN
+	if c.AzureAD.Enabled {
+		var err error
+		dsn, err = azureauth.BuildMSSQLAzureADDSN(c.DSN, c.AzureAD)
+		if err != nil {
+			return nil, fmt.Errorf("error preparing Azure AD SQL Server DSN: %v", err)
+		}
+	}
+
+	db, err := sql.Open(driverName, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("error opening connection: %v", err)
 	}

@@ -35,8 +35,8 @@ This collector supports collecting metrics from multiple instances of this integ
 
 PostgreSQL can be monitored further using the following other integrations:
 
-- [Applications](/src/collectors/apps.plugin/integrations/applications.md)
-- [Containers](/src/collectors/cgroups.plugin/integrations/containers.md)
+- Applications
+- Containers
 
 ### Default Behavior
 
@@ -529,6 +529,12 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Collection** | update_every | Data collection interval (seconds). | 1 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | dsn | Postgres connection string (DSN). See [DSN syntax](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING). | postgres://postgres:postgres@127.0.0.1:5432/postgres | yes |
+|  | azure_ad.enabled | Enable Microsoft Entra (Azure AD) token authentication for Azure Database for PostgreSQL. | no | no |
+|  | azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). | default | no |
+|  | azure_ad.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
+|  | azure_ad.client_id | Azure client ID. Required for `service_principal`; optional for user-assigned managed identity. |  | no |
+|  | azure_ad.client_secret | Azure client secret for `service_principal` mode. |  | no |
+|  | azure_ad.managed_identity_client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
 |  | timeout | Query timeout (seconds). | 2 | no |
 | **Filters** | collect_databases_matching | Database selector. Controls which databases are included. Uses [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#simple-patterns-matcher). |  | no |
 | **Limits** | max_db_tables | Maximum number of tables per database to collect metrics for (0 = no limit). | 50 | no |
@@ -613,6 +619,43 @@ Connect to PostgreSQL using a Unix socket with a non-default port (5433).
 jobs:
   - name: local
     dsn: 'host=/var/run/postgresql port=5433 dbname=postgres user=netdata'
+
+```
+</details>
+
+###### Azure Database for PostgreSQL with service principal
+
+Use Microsoft Entra service principal authentication.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: azure_postgres_sp
+    dsn: 'postgresql://netdata@myserver.postgres.database.azure.com:5432/postgres?sslmode=require'
+    azure_ad:
+      enabled: true
+      mode: service_principal
+      tenant_id: "00000000-0000-0000-0000-000000000000"
+      client_id: "11111111-1111-1111-1111-111111111111"
+      client_secret: "super-secret-value"
+
+```
+</details>
+
+###### Azure Database for PostgreSQL with managed identity
+
+Use managed identity authentication (system-assigned by default).
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: azure_postgres_mi
+    dsn: 'postgresql://netdata@myserver.postgres.database.azure.com:5432/postgres?sslmode=require'
+    azure_ad:
+      enabled: true
+      mode: managed_identity
 
 ```
 </details>

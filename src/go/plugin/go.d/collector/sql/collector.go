@@ -12,7 +12,10 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
 )
+
+const azurePostgreSQLAADScope = "https://ossrdbms-aad.database.windows.net/.default"
 
 //go:embed "config_schema.json"
 var configSchema string
@@ -52,6 +55,8 @@ type Collector struct {
 	seenCharts map[string]bool
 
 	funcTable *funcTable
+
+	azureTokenProvider *azureauth.TokenProvider
 }
 
 func (c *Collector) Configuration() any {
@@ -68,6 +73,21 @@ func (c *Collector) Charts() *collectorapi.Charts {
 func (c *Collector) Init(context.Context) error {
 	if err := c.validateConfig(); err != nil {
 		return err
+	}
+	if c.AzureAD.Enabled && c.Driver == "pgx" {
+		cred, err := c.AzureAD.NewCredential()
+		if err != nil {
+			return err
+		}
+		provider, err := azureauth.NewTokenProvider(
+			cred,
+			[]string{azurePostgreSQLAADScope},
+			azureauth.DefaultTokenRefreshMargin,
+		)
+		if err != nil {
+			return err
+		}
+		c.azureTokenProvider = provider
 	}
 
 	c.funcTable = newFuncTable(c)

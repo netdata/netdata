@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
 )
 
 type Config struct {
@@ -19,6 +20,7 @@ type Config struct {
 	Driver  string           `yaml:"driver" json:"driver"`
 	DSN     string           `yaml:"dsn" json:"dsn"`
 	Timeout confopt.Duration `yaml:"timeout" json:"timeout"`
+	AzureAD azureauth.Config `yaml:"azure_ad,omitempty" json:"azure_ad,omitempty"`
 
 	StaticLabels map[string]string   `yaml:"static_labels,omitempty" json:"static_labels"`
 	Queries      []ConfigQueryDef    `yaml:"queries,omitempty" json:"queries"`
@@ -129,6 +131,17 @@ func (c *Collector) validateConfig() error {
 	}
 	if c.DSN == "" {
 		errs = append(errs, errors.New("dsn required"))
+	}
+	if err := c.AzureAD.Validate(); err != nil {
+		errs = append(errs, err)
+	}
+	if c.AzureAD.Enabled {
+		switch c.Driver {
+		case "pgx", "sqlserver", "azuresql":
+		default:
+			errs = append(errs, fmt.Errorf("azure_ad is supported only for drivers %q, %q and %q",
+				"pgx", "sqlserver", "azuresql"))
+		}
 	}
 
 	if c.FunctionOnly {
