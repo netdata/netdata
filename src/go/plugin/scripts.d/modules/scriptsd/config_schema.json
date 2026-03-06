@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "scripts.d v2 collector skeleton configuration",
+  "type": "object",
+  "properties": {
+    "vnode": {
+      "type": "string"
+    },
+    "update_every": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "additionalProperties": true
+}

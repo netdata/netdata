@@ -28,6 +28,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/nagios"
 	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/scheduler"
+	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/scriptsd"
 )
 
 func init() {
