@@ -1,0 +1,72 @@
+version: v1
+context_namespace: scriptsd
+engine:
+  autogen:
+    enabled: true
+    max_type_id_len: 200
+    expire_after_success_cycles: 3
+groups:
+  - family: Job
+    metrics:
+      - scriptsd.job.state.ok
+      - scriptsd.job.state.warning
+      - scriptsd.job.state.critical
+      - scriptsd.job.state.unknown
+      - scriptsd.job.attempt
+      - scriptsd.job.max_attempts
+    charts:
+      - id: job_state
+        title: Job State
+        context: job_state
+        units: state
+        instances:
+          by_labels: [nagios_scheduler, nagios_job]
+        dimensions:
+          - selector: scriptsd.job.state.ok
+            name: ok
+          - selector: scriptsd.job.state.warning
+            name: warning
+          - selector: scriptsd.job.state.critical
+            name: critical
+          - selector: scriptsd.job.state.unknown
+            name: unknown
+      - id: job_attempts
+        title: Job Attempts
+        context: job_attempts
+        units: attempts
+        instances:
+          by_labels: [nagios_scheduler, nagios_job]
+        dimensions:
+          - selector: scriptsd.job.attempt
+            name: attempt
+          - selector: scriptsd.job.max_attempts
+            name: max_attempts
+
+  - family: Scheduler
+    metrics:
+      - scriptsd.scheduler.running
+      - scriptsd.scheduler.queued
+      - scriptsd.scheduler.scheduled
+      - scriptsd.scheduler.started
+      - scriptsd.scheduler.finished
+      - scriptsd.scheduler.skipped
+    charts:
+      - id: scheduler_jobs
+        title: Scheduler Jobs
+        context: scheduler_jobs
+        units: jobs
+        instances:
+          by_labels: [nagios_scheduler]
+        dimensions:
+          - selector: scriptsd.scheduler.running
+            name: running
+          - selector: scriptsd.scheduler.queued
+            name: queued
+          - selector: scriptsd.scheduler.scheduled
+            name: scheduled
+          - selector: scriptsd.scheduler.started
+            name: started
+          - selector: scriptsd.scheduler.finished
+            name: finished
+          - selector: scriptsd.scheduler.skipped
+            name: skipped

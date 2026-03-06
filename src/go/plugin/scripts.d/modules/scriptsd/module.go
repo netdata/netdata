@@ -13,21 +13,8 @@ import (
 //go:embed config_schema.json
 var configSchema string
 
-const placeholderChartTemplate = `
-version: v1
-groups:
-  - family: ScriptsD
-    metrics:
-      - scriptsd.placeholder
-    charts:
-      - id: scriptsd_placeholder
-        title: scripts.d Placeholder
-        context: scriptsd.placeholder
-        units: value
-        dimensions:
-          - selector: scriptsd.placeholder
-            name: placeholder
-`
+//go:embed charts.yaml
+var scriptsdChartTemplateV2 string
 
 func init() {
 	collectorapi.Register("scriptsd", collectorapi.Creator{
@@ -75,4 +62,4 @@ func (c *Collector) Cleanup(context.Context) {}
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
-func (c *Collector) ChartTemplateYAML() string { return placeholderChartTemplate }
+func (c *Collector) ChartTemplateYAML() string { return scriptsdChartTemplateV2 }
