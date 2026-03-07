@@ -112,7 +112,7 @@ static inline void cleanup_exited_pids(void) {
 #endif
 
 #if (PROCESSES_HAVE_FDS == 1)
-            for(size_t c = 0; c < p->fds_size; c++)
+            for(size_t c = 0; c < p->fds_max; c++)
                 if(p->fds[c].fd > 0) {
                     file_descriptor_not_used(p->fds[c].fd);
                     clear_pid_fd(&p->fds[c]);

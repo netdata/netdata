@@ -306,6 +306,8 @@ bool apps_os_read_pid_fds_linux(struct pid_stat *p, void *ptr __maybe_unused) {
     // at the end, to free them
     make_all_pid_fds_negative(p);
 
+    uint32_t fds_max = 0;
+
     while((de = readdir(fds))) {
         // we need only files with numeric names
 
@@ -315,6 +317,9 @@ bool apps_os_read_pid_fds_linux(struct pid_stat *p, void *ptr __maybe_unused) {
         // get its number
         int fdid = (int) str2l(de->d_name);
         if(unlikely(fdid < 0)) continue;
+
+        if(likely((uint32_t)(fdid + 1) > fds_max))
+            fds_max = (uint32_t)(fdid + 1);
 
         // check if the fds array is small
         if(unlikely((size_t)fdid >= p->fds_size)) {
@@ -416,6 +421,13 @@ bool apps_os_read_pid_fds_linux(struct pid_stat *p, void *ptr __maybe_unused) {
     }
 
     closedir(fds);
+
+    // expand fds_max to cover any newly seen higher fds,
+    // but do not shrink it yet - cleanup_negative_pid_fds()
+    // needs the old range to find and release negated entries
+    // from fds that were closed since the last iteration.
+    if(fds_max > p->fds_max)
+        p->fds_max = fds_max;
 
     return true;
 }

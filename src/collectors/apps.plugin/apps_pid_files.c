@@ -162,7 +162,7 @@ void aggregate_pid_fds_on_targets(struct pid_stat *p) {
     p->openfds.eventpolls = 0;
     p->openfds.other = 0;
 
-    uint32_t c, size = p->fds_size;
+    uint32_t c, size = p->fds_max;
     struct pid_fd *fds = p->fds;
     for(c = 0; c < size ;c++) {
         int fd = fds[c].fd;
@@ -407,7 +407,7 @@ void clear_pid_fd(struct pid_fd *pfd) {
 }
 
 void make_all_pid_fds_negative(struct pid_stat *p) {
-    struct pid_fd *pfd = p->fds, *pfdend = &p->fds[p->fds_size];
+    struct pid_fd *pfd = p->fds, *pfdend = &p->fds[p->fds_max];
     while(pfd < pfdend) {
         pfd->fd = -(pfd->fd);
         pfd++;
@@ -415,7 +415,8 @@ void make_all_pid_fds_negative(struct pid_stat *p) {
 }
 
 static inline void cleanup_negative_pid_fds(struct pid_stat *p) {
-    struct pid_fd *pfd = p->fds, *pfdend = &p->fds[p->fds_size];
+    struct pid_fd *pfd = p->fds, *pfdend = &p->fds[p->fds_max];
+    uint32_t fds_max = 0;
 
     while(pfd < pfdend) {
         int fd = pfd->fd;
@@ -424,9 +425,13 @@ static inline void cleanup_negative_pid_fds(struct pid_stat *p) {
             file_descriptor_not_used(-(fd));
             clear_pid_fd(pfd);
         }
+        else if(fd > 0)
+            fds_max = (uint32_t)(pfd - p->fds) + 1;
 
         pfd++;
     }
+
+    p->fds_max = fds_max;
 }
 
 void init_pid_fds(struct pid_stat *p, size_t first, size_t size) {
