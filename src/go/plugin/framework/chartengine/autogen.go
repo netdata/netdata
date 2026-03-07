@@ -46,9 +46,10 @@ type autogenRoleBuilder func(
 ) (autogenRoute, bool, error)
 
 var autogenSourceBuilders = map[metrix.MetricKind]autogenSourceBuilder{
-	metrix.MetricKindHistogram: buildHistogramAutogenRoute,
-	metrix.MetricKindSummary:   buildSummaryAutogenRoute,
-	metrix.MetricKindStateSet:  buildStateSetAutogenRoute,
+	metrix.MetricKindHistogram:  buildHistogramAutogenRoute,
+	metrix.MetricKindSummary:    buildSummaryAutogenRoute,
+	metrix.MetricKindStateSet:   buildStateSetAutogenRoute,
+	metrix.MetricKindMeasureSet: buildMeasureSetAutogenRoute,
 }
 
 var histogramRoleBuilders = map[metrix.FlattenRole]autogenRoleBuilder{
@@ -432,6 +433,92 @@ func buildStateSetAutogenRoute(
 		contextName:       metricName,
 		staticDimension:   false,
 	}, true, nil
+}
+
+func buildMeasureSetAutogenRoute(
+	metricName string,
+	labels metrix.LabelView,
+	meta metrix.SeriesMeta,
+	policy AutogenPolicy,
+	typeIDPrefix string,
+) (autogenRoute, bool, error) {
+	if meta.FlattenRole != metrix.FlattenRoleMeasureSetField {
+		return autogenRoute{}, false, nil
+	}
+	sourceName, fieldName, ok, err := resolveMeasureSetAutogenSource(metricName, labels)
+	if err != nil {
+		return autogenRoute{}, false, err
+	}
+	if !ok {
+		return autogenRoute{}, false, nil
+	}
+	chartID := buildJoinedLabelAutogenID(sourceName, labels, map[string]struct{}{
+		sourceName: {},
+	})
+	if !fitsTypeIDBudget(policy.MaxTypeIDLen, typeIDPrefix, chartID) {
+		return autogenRoute{}, false, nil
+	}
+	algorithm := program.AlgorithmAbsolute
+	units := getAutogenGaugeUnits(sourceName)
+	if meta.Kind == metrix.MetricKindCounter {
+		algorithm = program.AlgorithmIncremental
+		units = getAutogenCounterUnits(sourceName)
+	}
+	return autogenRoute{
+		chartID:           chartID,
+		chartName:         sourceName,
+		dimensionName:     fieldName,
+		dimensionKeyLabel: sourceName,
+		algorithm:         algorithm,
+		units:             units,
+		chartType:         chartTypeFromUnits(units),
+		family:            getAutogenChartFamily(sourceName),
+		contextName:       sourceName,
+		staticDimension:   false,
+	}, true, nil
+}
+
+func resolveMeasureSetAutogenSource(metricName string, labels metrix.LabelView) (string, string, bool, error) {
+	if strings.TrimSpace(metricName) == "" {
+		return "", "", false, nil
+	}
+	if labels == nil {
+		return "", "", false, nil
+	}
+
+	var (
+		sourceName string
+		fieldName  string
+		found      bool
+		ambiguous  bool
+	)
+	labels.Range(func(key, value string) bool {
+		if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
+			return true
+		}
+		suffix := "_" + value
+		if !strings.HasSuffix(metricName, suffix) {
+			return true
+		}
+		if strings.TrimSuffix(metricName, suffix) != key {
+			return true
+		}
+		if found {
+			ambiguous = true
+			return false
+		}
+		found = true
+		sourceName = key
+		fieldName = value
+		return true
+	})
+	if ambiguous {
+		return "", "", false, fmt.Errorf("chartengine: ambiguous measureset flattened identity for %q", metricName)
+	}
+	if !found {
+		return "", "", false, nil
+	}
+	return sourceName, fieldName, true, nil
 }
 
 func buildScalarAutogenRoute(

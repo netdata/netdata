@@ -226,6 +226,8 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 		"BuildPlanAutogenCreatesChartForUnmatchedGauge":                {run: runTestBuildPlanAutogenCreatesChartForUnmatchedGauge},
 		"BuildPlanAutogenCreatesChartForUnmatchedStateSet":             {run: runTestBuildPlanAutogenCreatesChartForUnmatchedStateSet},
 		"BuildPlanAutogenKeepsStateSetUnitsWhenMetricMetaUnitIsSet":    {run: runTestBuildPlanAutogenKeepsStateSetUnitsWhenMetricMetaUnitIsSet},
+		"BuildPlanAutogenCreatesChartForUnmatchedMeasureSetGauge":      {run: runTestBuildPlanAutogenCreatesChartForUnmatchedMeasureSetGauge},
+		"BuildPlanAutogenCreatesChartForUnmatchedMeasureSetCounter":    {run: runTestBuildPlanAutogenCreatesChartForUnmatchedMeasureSetCounter},
 		"BuildPlanTemplateWinsOnAutogenChartIDCollisionAcrossSeries":   {run: runTestBuildPlanTemplateWinsOnAutogenChartIDCollisionAcrossSeries},
 		"BuildPlanAutogenRemovalLifecycleExpiry":                       {run: runTestBuildPlanAutogenRemovalLifecycleExpiry},
 		"BuildPlanFirstWriterWinsAndAccumulatesRepeatedRoutes":         {run: runTestBuildPlanFirstWriterWinsAndAccumulatesRepeatedRoutes},
@@ -1512,6 +1514,170 @@ groups:
 	assert.Equal(t, "Service mode", create.Meta.Title)
 	assert.Equal(t, "Service", create.Meta.Family)
 	assert.Equal(t, "state", create.Meta.Units)
+}
+
+func runTestBuildPlanAutogenCreatesChartForUnmatchedMeasureSetGauge(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	ms := store.Write().SnapshotMeter("svc").MeasureSetGauge(
+		"latency_seconds",
+		metrix.WithMeasureSetFields(
+			metrix.FieldSpec{Name: "value"},
+			metrix.FieldSpec{Name: "ratio", Float: true},
+		),
+		metrix.WithDescription("Latency"),
+		metrix.WithChartFamily("Service"),
+		metrix.WithUnit("seconds"),
+	)
+
+	cc.BeginCycle()
+	ms.ObservePoint(metrix.MeasureSetPoint{Values: []metrix.SampleValue{1.5, 0.5}})
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	assert.Equal(t, []ActionKind{
+		ActionCreateChart,
+		ActionCreateDimension,
+		ActionCreateDimension,
+		ActionUpdateChart,
+	}, actionKinds(plan.Actions))
+
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "svc.latency_seconds", create.ChartID)
+	assert.Equal(t, "Latency", create.Meta.Title)
+	assert.Equal(t, "Service", create.Meta.Family)
+	assert.Equal(t, "svc.latency_seconds", create.Meta.Context)
+	assert.Equal(t, "seconds", create.Meta.Units)
+	_, hasFieldLabel := create.Labels["svc.latency_seconds"]
+	assert.False(t, hasFieldLabel)
+
+	dims := map[string]CreateDimensionAction{}
+	for _, action := range plan.Actions {
+		dim, ok := action.(CreateDimensionAction)
+		if !ok || dim.ChartID != "svc.latency_seconds" {
+			continue
+		}
+		dims[dim.Name] = dim
+	}
+	require.Len(t, dims, 2)
+	assert.Equal(t, program.AlgorithmAbsolute, dims["value"].Algorithm)
+	assert.False(t, dims["value"].Float)
+	assert.Equal(t, program.AlgorithmAbsolute, dims["ratio"].Algorithm)
+	assert.True(t, dims["ratio"].Float)
+
+	update := findUpdateAction(plan)
+	require.NotNil(t, update)
+	require.Len(t, update.Values, 2)
+	names := map[string]struct{}{}
+	for _, value := range update.Values {
+		names[value.Name] = struct{}{}
+	}
+	assert.Contains(t, names, "ratio")
+	assert.Contains(t, names, "value")
+}
+
+func runTestBuildPlanAutogenCreatesChartForUnmatchedMeasureSetCounter(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	ms := store.Write().SnapshotMeter("svc").MeasureSetCounter(
+		"requests_total",
+		metrix.WithMeasureSetFields(
+			metrix.FieldSpec{Name: "ok"},
+			metrix.FieldSpec{Name: "failed"},
+		),
+		metrix.WithDescription("Requests"),
+		metrix.WithChartFamily("Service"),
+		metrix.WithUnit("requests"),
+	)
+
+	cc.BeginCycle()
+	ms.ObserveTotalPoint(metrix.MeasureSetPoint{Values: []metrix.SampleValue{10, 2}})
+	cc.CommitCycleSuccess()
+
+	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	assert.Equal(t, []ActionKind{
+		ActionCreateChart,
+		ActionCreateDimension,
+		ActionCreateDimension,
+		ActionUpdateChart,
+	}, actionKinds(plan.Actions))
+
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, "svc.requests_total", create.ChartID)
+	assert.Equal(t, "Requests", create.Meta.Title)
+	assert.Equal(t, "Service", create.Meta.Family)
+	assert.Equal(t, "svc.requests_total", create.Meta.Context)
+	assert.Equal(t, "requests/s", create.Meta.Units)
+	_, hasFieldLabel := create.Labels["svc.requests_total"]
+	assert.False(t, hasFieldLabel)
+
+	dims := map[string]CreateDimensionAction{}
+	for _, action := range plan.Actions {
+		dim, ok := action.(CreateDimensionAction)
+		if !ok || dim.ChartID != "svc.requests_total" {
+			continue
+		}
+		dims[dim.Name] = dim
+	}
+	require.Len(t, dims, 2)
+	assert.Equal(t, program.AlgorithmIncremental, dims["ok"].Algorithm)
+	assert.Equal(t, program.AlgorithmIncremental, dims["failed"].Algorithm)
+	assert.False(t, dims["ok"].Float)
+	assert.False(t, dims["failed"].Float)
+
+	update := findUpdateAction(plan)
+	require.NotNil(t, update)
+	require.Len(t, update.Values, 2)
+	names := map[string]struct{}{}
+	for _, value := range update.Values {
+		names[value.Name] = struct{}{}
+	}
+	assert.Contains(t, names, "failed")
+	assert.Contains(t, names, "ok")
 }
 
 func runTestBuildPlanTemplateWinsOnAutogenChartIDCollisionAcrossSeries(t *testing.T) {

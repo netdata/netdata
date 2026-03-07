@@ -4,6 +4,7 @@ package chartengine
 
 import (
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
@@ -28,6 +29,9 @@ func TestAutogenRouteBuilderScenarios(t *testing.T) {
 		},
 		"build state-set autogen route": {
 			run: runTestBuildStateSetAutogenRoute,
+		},
+		"build measure-set autogen route": {
+			run: runTestBuildMeasureSetAutogenRoute,
 		},
 	}
 
@@ -207,6 +211,72 @@ func runTestBuildStateSetAutogenRoute(t *testing.T) {
 			assert.Equal(t, "service_status", route.dimensionKeyLabel)
 			assert.Equal(t, "state", route.units)
 			assert.Equal(t, program.AlgorithmAbsolute, route.algorithm)
+			assert.False(t, route.staticDimension)
+		})
+	}
+}
+
+func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
+	tests := map[string]struct {
+		metricName string
+		labels     map[string]string
+		meta       metrix.SeriesMeta
+		wantID     string
+		wantDim    string
+		wantAlg    program.Algorithm
+		wantUnits  string
+	}{
+		"MeasureSet gauge uses synthetic field label and absolute algorithm": {
+			metricName: "service_latency_seconds_value",
+			labels: map[string]string{
+				"instance":                "db1",
+				"service_latency_seconds": "value",
+			},
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindGauge,
+				SourceKind:  metrix.MetricKindMeasureSet,
+				FlattenRole: metrix.FlattenRoleMeasureSetField,
+			},
+			wantID:    "service_latency_seconds-instance=db1",
+			wantDim:   "value",
+			wantAlg:   program.AlgorithmAbsolute,
+			wantUnits: "seconds",
+		},
+		"MeasureSet counter uses synthetic field label and incremental algorithm": {
+			metricName: "svc_requests_total_ok",
+			labels: map[string]string{
+				"instance":           "db1",
+				"svc_requests_total": "ok",
+			},
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindCounter,
+				SourceKind:  metrix.MetricKindMeasureSet,
+				FlattenRole: metrix.FlattenRoleMeasureSetField,
+			},
+			wantID:    "svc_requests_total-instance=db1",
+			wantDim:   "ok",
+			wantAlg:   program.AlgorithmIncremental,
+			wantUnits: "requests/s",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			route, ok, err := buildMeasureSetAutogenRoute(
+				tc.metricName,
+				sortedLabelView(tc.labels),
+				tc.meta,
+				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				"",
+			)
+			require.NoError(t, err)
+			require.True(t, ok)
+
+			assert.Equal(t, tc.wantID, route.chartID)
+			assert.Equal(t, tc.wantDim, route.dimensionName)
+			assert.Equal(t, tc.wantAlg, route.algorithm)
+			assert.Equal(t, tc.wantUnits, route.units)
+			assert.Equal(t, strings.TrimSuffix(tc.metricName, "_"+tc.wantDim), route.dimensionKeyLabel)
 			assert.False(t, route.staticDimension)
 		})
 	}
