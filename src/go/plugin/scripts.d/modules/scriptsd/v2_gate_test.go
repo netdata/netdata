@@ -5,6 +5,7 @@ package scriptsd
 import (
 	"context"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -35,10 +36,13 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	router := newPerfdataRouter(64)
 	warnLow := 100.0
 	warnHigh := 500.0
+	critLow := 200.0
+	critHigh := 900.0
 	samples := router.route("default", "gate_job", []output.PerfDatum{
 		{
 			Label: "latency", Unit: "ms", Value: 120,
 			Warn: &output.ThresholdRange{Inclusive: true, Low: &warnLow, High: &warnHigh},
+			Crit: &output.ThresholdRange{Inclusive: true, Low: &critLow, High: &critHigh},
 		},
 		{Label: "throughput", Unit: "KB", Value: 30},
 		{Label: "wire_rate", Unit: "kb", Value: 80},
@@ -59,6 +63,8 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	assertNear(t, byName["perf_generic_custom_value"], 3.14)
 	assertNear(t, byName["perf_time_latency_warn_low"], 0.1)
 	assertNear(t, byName["perf_time_latency_warn_high"], 0.5)
+	assertNear(t, byName["perf_time_latency_crit_low"], 0.2)
+	assertNear(t, byName["perf_time_latency_crit_high"], 0.9)
 	assertNear(t, byName["perf_generic_dup_one_value"], 11)
 
 	assertString(t, byUnit["perf_time_latency_value"], "seconds")
@@ -88,6 +94,12 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	assertMetricMeta(t, reader, "scriptsd.perf_percent_free_pct_value", "%", true)
 	assertMetricMeta(t, reader, "scriptsd.perf_counter_requests_value", "c", true)
 	assertMetricMeta(t, reader, "scriptsd.perf_generic_custom_value", "generic", true)
+	assertMetricMeta(t, reader, "scriptsd.perf_time_latency_warn_low", "seconds", true)
+	assertMetricMeta(t, reader, "scriptsd.perf_time_latency_warn_high", "seconds", true)
+	assertMetricMeta(t, reader, "scriptsd.perf_time_latency_warn_defined", "state", false)
+	assertMetricMeta(t, reader, "scriptsd.perf_time_latency_crit_low", "seconds", true)
+	assertMetricMeta(t, reader, "scriptsd.perf_time_latency_crit_high", "seconds", true)
+	assertMetricMeta(t, reader, "scriptsd.perf_time_latency_crit_defined", "state", false)
 
 	_ = router.route("default", "gate_job", []output.PerfDatum{
 		{Label: "latency", Unit: "%", Value: 1}, // unit drift: time -> percent
@@ -201,6 +213,10 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 		if removeActionsCount(plan3.Actions) == 0 {
 			t.Fatalf("expected remove actions on cycle 3 after failed-attempt gap")
 		}
+		assertPlanHasUpdateAndRemoveForTargets(t, plan3,
+			"scriptsd.perf_bytes_a_value",
+			"scriptsd.perf_bytes_b_value",
+		)
 		plan4 := emit(false)
 		if removeActionsCount(plan4.Actions) != 0 {
 			t.Fatalf("expected no additional remove actions on cycle 4")
@@ -315,6 +331,37 @@ func assertMetricMeta(t *testing.T, reader metrix.Reader, metricName, unit strin
 	}
 	if meta.Float != isFloat {
 		t.Fatalf("unexpected float metadata for %q: got=%t want=%t", metricName, meta.Float, isFloat)
+	}
+}
+
+func assertPlanHasUpdateAndRemoveForTargets(t *testing.T, plan chartengine.Plan, updateMetricPrefix, removeMetricPrefix string) {
+	t.Helper()
+
+	hasUpdate := false
+	hasRemove := false
+
+	for _, action := range plan.Actions {
+		switch a := action.(type) {
+		case chartengine.UpdateChartAction:
+			if strings.HasPrefix(a.ChartID, updateMetricPrefix) {
+				hasUpdate = true
+			}
+		case chartengine.RemoveDimensionAction:
+			if strings.HasPrefix(a.ChartID, removeMetricPrefix) {
+				hasRemove = true
+			}
+		case chartengine.RemoveChartAction:
+			if strings.HasPrefix(a.ChartID, removeMetricPrefix) {
+				hasRemove = true
+			}
+		}
+	}
+
+	if !hasUpdate {
+		t.Fatalf("expected update action for %q", updateMetricPrefix)
+	}
+	if !hasRemove {
+		t.Fatalf("expected remove action for %q", removeMetricPrefix)
 	}
 }
 
