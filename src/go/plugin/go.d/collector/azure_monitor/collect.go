@@ -45,6 +45,7 @@ func (c *Collector) initInstruments(plan *runtimePlan) error {
 }
 
 func (c *Collector) collect(ctx context.Context) error {
+	prevFetchCounter := c.discovery.FetchCounter
 	resources, err := c.refreshDiscovery(ctx, false)
 	if err != nil {
 		return fmt.Errorf("resource discovery: %w", err)
@@ -53,12 +54,26 @@ func (c *Collector) collect(ctx context.Context) error {
 		return nil
 	}
 
+	// Prune caches when discovery refreshes and the resource set may have changed.
+	if c.discovery.FetchCounter != prevFetchCounter {
+		c.pruneStaleResources(resources)
+	}
+
 	now := c.now()
 	tasks := c.buildQueryTasks(resources, now)
 
-	// Re-observe cached values for series not updated this cycle.
-	// This prevents the metrix store from evicting series that belong
-	// to non-due time grains (e.g., PT30M/PT1H collected less frequently).
+	// Collect the set of instruments that were due this cycle.
+	// Used to distinguish "not updated because grain was not due" (safe to replay)
+	// from "not updated because task failed" (should not replay — masks failures).
+	dueInstruments := make(map[string]bool)
+	for _, task := range tasks {
+		for _, m := range task.MetricSubset {
+			for _, agg := range m.Aggregations {
+				dueInstruments[m.InstrumentByAgg[agg]] = true
+			}
+		}
+	}
+
 	observedThisCycle := make(map[string]bool, len(c.lastObserved))
 
 	if len(tasks) > 0 {
@@ -112,8 +127,14 @@ func (c *Collector) collect(ctx context.Context) error {
 		}
 	}
 
+	// Re-observe cached values only for non-due instruments.
+	// This keeps slow-grain series (PT30M/PT1H) alive in the metrix store
+	// without masking failures for instruments that were due but failed.
 	for key, obs := range c.lastObserved {
 		if observedThisCycle[key] {
+			continue
+		}
+		if dueInstruments[obs.instrument] {
 			continue
 		}
 		vec, ok := c.runtimePlan.Instruments[obs.instrument]
@@ -124,6 +145,33 @@ func (c *Collector) collect(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// pruneStaleResources removes cache entries for resources no longer in the discovery set.
+func (c *Collector) pruneStaleResources(current []resourceInfo) {
+	activeUIDs := make(map[string]struct{}, len(current))
+	for _, r := range current {
+		activeUIDs[r.UID] = struct{}{}
+	}
+
+	// labelValues[0] is resource_uid (matches labelKeys order).
+	for key, obs := range c.lastObserved {
+		if len(obs.labelValues) > 0 {
+			if _, ok := activeUIDs[obs.labelValues[0]]; !ok {
+				delete(c.lastObserved, key)
+			}
+		}
+	}
+
+	for key := range c.accumulators {
+		// Key format: instrument + "\x00" + uid + "\x00" + name + "\x00" + ...
+		parts := strings.SplitN(key, "\x00", 3)
+		if len(parts) >= 2 {
+			if _, ok := activeUIDs[parts[1]]; !ok {
+				delete(c.accumulators, key)
+			}
+		}
+	}
 }
 
 func (c *Collector) buildQueryTasks(resources []resourceInfo, now time.Time) []queryTask {
