@@ -148,16 +148,12 @@ func (c profileCatalog) defaultProfileNames() []string {
 }
 
 func (c profileCatalog) resolve(profileNames []string) ([]ProfileConfig, error) {
-	selected := profileNames
-	if len(selected) == 0 {
-		selected = c.defaultProfileNames()
-	}
-	if len(selected) == 0 {
+	if len(profileNames) == 0 {
 		return nil, errors.New("no Azure Monitor profiles selected")
 	}
 
-	profiles := make([]ProfileConfig, 0, len(selected))
-	for _, name := range selected {
+	profiles := make([]ProfileConfig, 0, len(profileNames))
+	for _, name := range profileNames {
 		key := stringsLowerTrim(name)
 		prof, ok := c.byName[key]
 		if !ok {
@@ -166,6 +162,27 @@ func (c profileCatalog) resolve(profileNames []string) ([]ProfileConfig, error) 
 		profiles = append(profiles, prof)
 	}
 	return profiles, nil
+}
+
+// profilesForResourceTypes returns profile names whose resource_type matches
+// any of the discovered Azure resource types. Used by auto-discovery.
+func (c profileCatalog) profilesForResourceTypes(types map[string]struct{}) []string {
+	if len(types) == 0 {
+		return nil
+	}
+
+	var names []string
+	for name, prof := range c.byName {
+		rt := stringsLowerTrim(prof.ResourceType)
+		if rt == "" {
+			continue
+		}
+		if _, ok := types[rt]; ok {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
 }
 
 func profileKeyFromFilename(name string) string {

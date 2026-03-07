@@ -32,6 +32,42 @@ func (c *Collector) refreshDiscovery(ctx context.Context, force bool) ([]resourc
 	return resources, nil
 }
 
+// discoverResourceTypes queries Azure Resource Graph to find all resource types
+// present in the subscription. Used by auto-discovery to determine which profiles to activate.
+func (c *Collector) discoverResourceTypes(ctx context.Context) (map[string]struct{}, error) {
+	query := "resources | summarize count() by type"
+	types := make(map[string]struct{})
+
+	var skipToken *string
+	for {
+		req := armResourceGraphQuery(c.SubscriptionID, query, skipToken)
+		resp, err := c.resourceGraph.Resources(ctx, req, nil)
+		if err != nil {
+			return nil, fmt.Errorf("resource graph query: %w", err)
+		}
+
+		rows, err := parseResourceGraphObjectArray(resp.Data)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, row := range rows {
+			t := stringsLowerTrim(asString(row["type"]))
+			if t != "" {
+				types[t] = struct{}{}
+			}
+		}
+
+		if resp.SkipToken == nil || stringsTrim(*resp.SkipToken) == "" {
+			break
+		}
+		token := stringsTrim(*resp.SkipToken)
+		skipToken = &token
+	}
+
+	return types, nil
+}
+
 func (c *Collector) discoverResources(ctx context.Context) ([]resourceInfo, map[string][]resourceInfo, error) {
 	resourceTypes := make([]string, 0, len(c.runtimePlan.Profiles))
 	seenTypes := map[string]struct{}{}

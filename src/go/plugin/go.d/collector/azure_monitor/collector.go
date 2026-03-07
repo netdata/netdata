@@ -74,8 +74,9 @@ type Collector struct {
 	cloudCfg      azcloud.Configuration
 	resourceGraph resourceGraphClient
 
-	runtimePlan *runtimePlan
-	profiles    profileCatalog
+	runtimePlan  *runtimePlan
+	profiles     profileCatalog
+	autoDiscover bool
 
 	discovery discoveryState
 
@@ -95,7 +96,7 @@ type Collector struct {
 
 func (c *Collector) Configuration() any { return c.Config }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	c.Config.applyDefaults()
 
 	catalog, err := c.loadProfileCatalog()
@@ -103,9 +104,13 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("load profiles catalog: %w", err)
 	}
 	c.profiles = catalog
-	if len(c.Config.Profiles) == 0 {
-		c.Config.Profiles = c.profiles.defaultProfileNames()
+
+	c.autoDiscover, c.Config.Profiles = extractAutoKeyword(c.Config.Profiles)
+
+	if !c.autoDiscover && len(c.Config.Profiles) == 0 {
+		return errors.New("no profiles configured; use 'auto' for auto-discovery or specify profile names")
 	}
+
 	if err := c.Config.validate(); err != nil {
 		return fmt.Errorf("config validation: %w", err)
 	}
@@ -127,6 +132,19 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("create resource graph client: %w", err)
 	}
 	c.resourceGraph = rgClient
+
+	if c.autoDiscover {
+		types, err := c.discoverResourceTypes(ctx)
+		if err != nil {
+			return fmt.Errorf("auto-discover resource types: %w", err)
+		}
+		matched := c.profiles.profilesForResourceTypes(types)
+		c.Config.Profiles = mergeProfileNames(c.Config.Profiles, matched)
+		if len(c.Config.Profiles) == 0 {
+			return errors.New("auto-discovery found no Azure resources matching any known profile")
+		}
+		c.Infof("auto-discovery resolved profiles: %v", c.Config.Profiles)
+	}
 
 	plan, err := c.buildRuntimePlan()
 	if err != nil {
@@ -186,6 +204,41 @@ func (c *Collector) createCredential() (azcore.TokenCredential, error) {
 	default:
 		return nil, fmt.Errorf("unsupported auth.mode: %q", c.Auth.Mode)
 	}
+}
+
+func extractAutoKeyword(profiles []string) (bool, []string) {
+	auto := false
+	filtered := make([]string, 0, len(profiles))
+	for _, p := range profiles {
+		if stringsLowerTrim(p) == profileAutoKeyword {
+			auto = true
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+	return auto, filtered
+}
+
+func mergeProfileNames(explicit, discovered []string) []string {
+	seen := make(map[string]struct{}, len(explicit)+len(discovered))
+	merged := make([]string, 0, len(explicit)+len(discovered))
+	for _, name := range explicit {
+		key := stringsLowerTrim(name)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		merged = append(merged, name)
+	}
+	for _, name := range discovered {
+		key := stringsLowerTrim(name)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		merged = append(merged, name)
+	}
+	return merged
 }
 
 func defaultNewResourceGraphClient(subscriptionID string, cred azcore.TokenCredential, cloudCfg azcloud.Configuration) (resourceGraphClient, error) {
