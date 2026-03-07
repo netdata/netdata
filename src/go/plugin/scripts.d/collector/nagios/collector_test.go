@@ -140,10 +140,6 @@ func (f *fakeRegistry) Detach(_ *schedulers.SchedulerJobHandle) {
 	f.detached++
 }
 
-func (f *fakeRegistry) Collect(string) map[string]int64 {
-	return nil
-}
-
 func (f *fakeRegistry) Snapshot(name string) (runtime.SchedulerSnapshot, bool) {
 	s, ok := f.snapshots[name]
 	return s, ok

@@ -70,10 +70,6 @@ func (h *runtimeHost) detach(jobID string) {
 	h.mu.Unlock()
 }
 
-func (h *runtimeHost) collectMetrics() map[string]int64 {
-	return h.sched.CollectMetrics()
-}
-
 func (h *runtimeHost) collectSnapshot() runtime.SchedulerSnapshot {
 	return h.sched.Snapshot()
 }

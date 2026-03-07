@@ -12,8 +12,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	ndexec "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/charts"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
 	runtimepkg "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
 	specpkg "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
@@ -28,22 +26,23 @@ const (
 )
 
 func TestMockPluginsProduceExpectedStatesAndPerfdata(t *testing.T) {
-	sched, emitter, metas := startTestScheduler(t, []specpkg.JobSpec{
+	sched, emitter := startTestScheduler(t, []specpkg.JobSpec{
 		newJobSpec(t, "mock_ok", "check_mock_ok.sh", nil),
 		newJobSpec(t, "mock_warn", "check_mock_warn.sh", func(sp *specpkg.JobSpec) { sp.MaxCheckAttempts = 1 }),
 		newJobSpec(t, "mock_crit", "check_mock_crit.sh", func(sp *specpkg.JobSpec) { sp.MaxCheckAttempts = 1 }),
 	})
 	waitForJobs(t, emitter, []string{"mock_ok", "mock_warn", "mock_crit"})
 
-	metrics := sched.CollectMetrics()
-	assertMetricEquals(t, metrics, metas["mock_ok"], "state", "ok", 1)
-	assertMetricEquals(t, metrics, metas["mock_warn"], "state", "warning", 1)
-	assertMetricEquals(t, metrics, metas["mock_crit"], "state", "critical", 1)
+	snapshot := sched.Snapshot()
+	assertJobState(t, snapshot, "mock_ok", "OK")
+	assertJobState(t, snapshot, "mock_warn", "WARNING")
+	assertJobState(t, snapshot, "mock_crit", "CRITICAL")
 
-	// perfdata hidden dims exist
-	labelID := ids.Sanitize("value")
-	ck := metas["mock_ok"].PerfdataMetricID(labelID, "warn_defined")
-	require.Equal(t, int64(1), metrics[ck], "warn metadata missing")
+	okJob := findJobSnapshot(t, snapshot, "mock_ok")
+	valueDatum := findPerfDatum(t, okJob.PerfSamples, "value")
+	require.NotNil(t, valueDatum.Warn, "warn threshold missing")
+	require.NotNil(t, valueDatum.Crit, "crit threshold missing")
+	require.Equal(t, 42.0, valueDatum.Value)
 }
 
 func TestMockPluginMacrosExposeExpectedValues(t *testing.T) {
@@ -83,12 +82,11 @@ func TestMockSlowPluginRaisesSkipMetric(t *testing.T) {
 		sp.CheckInterval = 200 * time.Millisecond
 		sp.RetryInterval = 200 * time.Millisecond
 	})
-	sched, _, _ := startTestScheduler(t, []specpkg.JobSpec{spec})
+	sched, _ := startTestScheduler(t, []specpkg.JobSpec{spec})
 	time.Sleep(2500 * time.Millisecond)
-	metrics := sched.CollectMetrics()
-	key := charts.SchedulerMetricKey(testScheduler, charts.ChartSchedulerRate, "skipped")
-	if metrics[key] == 0 {
-		t.Fatalf("scheduler skip counter not incremented: %d", metrics[key])
+	snapshot := sched.Snapshot()
+	if snapshot.Skipped == 0 {
+		t.Fatalf("scheduler skip counter not incremented: %d", snapshot.Skipped)
 	}
 }
 
@@ -178,7 +176,7 @@ func findResult(t *testing.T, results []runtimepkg.ExecutionResult, jobName stri
 	return runtimepkg.ExecutionResult{}
 }
 
-func startTestScheduler(t *testing.T, jobs []specpkg.JobSpec) (*runtimepkg.Scheduler, *recordingEmitter, map[string]charts.JobIdentity) {
+func startTestScheduler(t *testing.T, jobs []specpkg.JobSpec) (*runtimepkg.Scheduler, *recordingEmitter) {
 	t.Helper()
 	ensureNdRun(t)
 	emitter := newRecordingEmitter()
@@ -186,10 +184,6 @@ func startTestScheduler(t *testing.T, jobs []specpkg.JobSpec) (*runtimepkg.Sched
 	workers := len(jobs)
 	if workers == 0 {
 		workers = 1
-	}
-	identities := make(map[string]charts.JobIdentity, len(jobs))
-	for _, job := range jobs {
-		identities[job.Name] = charts.NewJobIdentity(testScheduler, job)
 	}
 	sched, err := runtimepkg.NewScheduler(runtimepkg.SchedulerConfig{
 		Workers:       workers,
@@ -214,7 +208,7 @@ func startTestScheduler(t *testing.T, jobs []specpkg.JobSpec) (*runtimepkg.Sched
 		cancel()
 		sched.Stop()
 	})
-	return sched, emitter, identities
+	return sched, emitter
 }
 
 func vnodeLookup(spec specpkg.JobSpec) runtimepkg.VnodeInfo {
@@ -287,10 +281,32 @@ func ensureNdRun(t *testing.T) {
 	})
 }
 
-func assertMetricEquals(t *testing.T, metrics map[string]int64, meta charts.JobIdentity, chart, dim string, want int64) {
-	key := meta.TelemetryMetricID(chart, dim)
-	got := metrics[key]
-	if got != want {
-		t.Fatalf("metric %s = %d, want %d (metrics=%v)", key, got, want, metrics)
+func findJobSnapshot(t *testing.T, snapshot runtimepkg.SchedulerSnapshot, name string) runtimepkg.JobMetricsSnapshot {
+	t.Helper()
+	for _, job := range snapshot.Jobs {
+		if job.JobName == name {
+			return job
+		}
 	}
+	t.Fatalf("job snapshot not found: %s", name)
+	return runtimepkg.JobMetricsSnapshot{}
+}
+
+func assertJobState(t *testing.T, snapshot runtimepkg.SchedulerSnapshot, jobName, wantState string) {
+	t.Helper()
+	job := findJobSnapshot(t, snapshot, jobName)
+	if job.State != wantState {
+		t.Fatalf("unexpected state for %s: got=%s want=%s", jobName, job.State, wantState)
+	}
+}
+
+func findPerfDatum(t *testing.T, samples []output.PerfDatum, label string) output.PerfDatum {
+	t.Helper()
+	for _, sample := range samples {
+		if sample.Label == label {
+			return sample
+		}
+	}
+	t.Fatalf("perf datum not found: %s", label)
+	return output.PerfDatum{}
 }

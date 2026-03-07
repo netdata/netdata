@@ -60,10 +60,6 @@ func (h *fakeHost) detach(jobID string) {
 	delete(h.jobs, jobID)
 }
 
-func (h *fakeHost) collectMetrics() map[string]int64 {
-	return map[string]int64{"jobs": int64(len(h.jobs))}
-}
-
 func (h *fakeHost) collectSnapshot() runtime.SchedulerSnapshot {
 	jobs := make([]runtime.JobMetricsSnapshot, 0, len(h.jobs))
 	for id, reg := range h.jobs {

@@ -93,11 +93,6 @@ func DetachJob(handle *JobHandle) {
 	defaultManager.detachJob(handle)
 }
 
-// CollectMetrics returns runtime metrics for the given scheduler.
-func CollectMetrics(name string) map[string]int64 {
-	return defaultManager.collectMetrics(name)
-}
-
 func (m *manager) applyDefinition(def Definition, log *logger.Logger) error {
 	if def.Name == "" {
 		return fmt.Errorf("scheduler name is required")
@@ -213,16 +208,6 @@ func (m *manager) detachJob(handle *JobHandle) {
 		return
 	}
 	host.detach(handle.jobID)
-}
-
-func (m *manager) collectMetrics(name string) map[string]int64 {
-	m.mu.RLock()
-	host := m.hosts[name]
-	m.mu.RUnlock()
-	if host == nil {
-		return nil
-	}
-	return host.collectMetrics()
 }
 
 func normalizeDefinition(def Definition) Definition {

@@ -38,7 +38,6 @@ type SchedulerRegistry interface {
 	Remove(name string) error
 	Attach(name string, reg runtime.JobRegistration, log *logger.Logger) (*SchedulerJobHandle, error)
 	Detach(handle *SchedulerJobHandle)
-	Collect(name string) map[string]int64
 	Snapshot(name string) (runtime.SchedulerSnapshot, bool)
 	Get(name string) (Definition, bool)
 	All() []Definition
@@ -48,7 +47,6 @@ type schedulerHost interface {
 	stop()
 	attach(reg runtime.JobRegistration) (string, error)
 	detach(jobID string)
-	collectMetrics() map[string]int64
 	collectSnapshot() runtime.SchedulerSnapshot
 	jobCount() int
 	snapshotJobs() map[string]runtime.JobRegistration
@@ -242,17 +240,6 @@ func (r *Registry) Detach(handle *SchedulerJobHandle) {
 		return
 	}
 	entry.host.detach(handle.jobID)
-}
-
-// Collect returns current runtime metrics for one scheduler.
-func (r *Registry) Collect(name string) map[string]int64 {
-	r.mu.RLock()
-	entry := r.entries[name]
-	r.mu.RUnlock()
-	if entry == nil {
-		return nil
-	}
-	return entry.host.collectMetrics()
 }
 
 // Snapshot returns a typed scheduler snapshot for v2 collectors.
