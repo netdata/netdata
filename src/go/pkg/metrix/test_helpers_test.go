@@ -44,5 +44,5 @@ func mustNoDelta(t *testing.T, r Reader, name string, labels Labels) {
 }
 
 func measureSetFieldLabels(metricName, field string) Labels {
-	return Labels{measureSetFieldLabel: field}
+	return Labels{MeasureSetFieldLabel: field}
 }

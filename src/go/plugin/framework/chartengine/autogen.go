@@ -13,7 +13,6 @@ import (
 
 const (
 	autogenTemplatePrefix = "__autogen__:"
-	measureSetFieldLabel  = "measure_field"
 )
 
 type autogenRoute struct {
@@ -269,12 +268,12 @@ func buildHistogramBucketAutogenRoute(
 	if baseName == "" {
 		baseName = metricName
 	}
-	upperBound, ok := labels.Get(histogramBucketLabel)
+	upperBound, ok := labels.Get(metrix.HistogramBucketLabel)
 	if !ok || strings.TrimSpace(upperBound) == "" {
 		return autogenRoute{}, false, nil
 	}
 	chartID := buildJoinedLabelAutogenID(baseName, labels, map[string]struct{}{
-		histogramBucketLabel: {},
+		metrix.HistogramBucketLabel: {},
 	})
 	if !fitsTypeIDBudget(policy.MaxTypeIDLen, typeIDPrefix, chartID) {
 		return autogenRoute{}, false, nil
@@ -283,7 +282,7 @@ func buildHistogramBucketAutogenRoute(
 		chartID:           chartID,
 		chartName:         baseName,
 		dimensionName:     "bucket_" + upperBound,
-		dimensionKeyLabel: histogramBucketLabel,
+		dimensionKeyLabel: metrix.HistogramBucketLabel,
 		algorithm:         program.AlgorithmIncremental,
 		units:             "observations/s",
 		chartType:         program.ChartTypeLine,
@@ -325,12 +324,12 @@ func buildSummaryQuantileAutogenRoute(
 	policy AutogenPolicy,
 	typeIDPrefix string,
 ) (autogenRoute, bool, error) {
-	quantile, ok := labels.Get(summaryQuantileLabel)
+	quantile, ok := labels.Get(metrix.SummaryQuantileLabel)
 	if !ok || strings.TrimSpace(quantile) == "" {
 		return autogenRoute{}, false, nil
 	}
 	chartID := buildJoinedLabelAutogenID(metricName, labels, map[string]struct{}{
-		summaryQuantileLabel: {},
+		metrix.SummaryQuantileLabel: {},
 	})
 	if !fitsTypeIDBudget(policy.MaxTypeIDLen, typeIDPrefix, chartID) {
 		return autogenRoute{}, false, nil
@@ -340,7 +339,7 @@ func buildSummaryQuantileAutogenRoute(
 		chartID:           chartID,
 		chartName:         metricName,
 		dimensionName:     "quantile_" + quantile,
-		dimensionKeyLabel: summaryQuantileLabel,
+		dimensionKeyLabel: metrix.SummaryQuantileLabel,
 		algorithm:         program.AlgorithmAbsolute,
 		units:             units,
 		chartType:         chartTypeFromUnits(units),
@@ -451,7 +450,7 @@ func buildMeasureSetAutogenRoute(
 		return autogenRoute{}, false, nil
 	}
 	chartID := buildJoinedLabelAutogenID(sourceName, labels, map[string]struct{}{
-		measureSetFieldLabel: {},
+		metrix.MeasureSetFieldLabel: {},
 	})
 	if !fitsTypeIDBudget(policy.MaxTypeIDLen, typeIDPrefix, chartID) {
 		return autogenRoute{}, false, nil
@@ -466,7 +465,7 @@ func buildMeasureSetAutogenRoute(
 		chartID:           chartID,
 		chartName:         sourceName,
 		dimensionName:     fieldName,
-		dimensionKeyLabel: measureSetFieldLabel,
+		dimensionKeyLabel: metrix.MeasureSetFieldLabel,
 		algorithm:         algorithm,
 		units:             units,
 		chartType:         chartTypeFromUnits(units),
@@ -484,7 +483,7 @@ func resolveMeasureSetAutogenSource(metricName string, labels metrix.LabelView) 
 		return "", "", false
 	}
 
-	fieldName, ok := labels.Get(measureSetFieldLabel)
+	fieldName, ok := labels.Get(metrix.MeasureSetFieldLabel)
 	if !ok || strings.TrimSpace(fieldName) == "" {
 		return "", "", false
 	}

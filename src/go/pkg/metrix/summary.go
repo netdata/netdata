@@ -10,7 +10,7 @@ import (
 	"strconv"
 )
 
-const summaryQuantileLabel = "quantile"
+const SummaryQuantileLabel = "quantile"
 const defaultSummaryReservoirSize = 1024
 const initialSummaryReservoirCapacity = 64
 
@@ -90,7 +90,7 @@ func (c *storeCore) recordSummaryObservePoint(desc *instrumentDescriptor, point 
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, summaryQuantileLabel) {
+	if labelsContainKey(labels, SummaryQuantileLabel) {
 		panic(errSummaryLabelKey)
 	}
 
@@ -130,7 +130,7 @@ func (c *storeCore) recordSummaryObserve(desc *instrumentDescriptor, value Sampl
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, summaryQuantileLabel) {
+	if labelsContainKey(labels, SummaryQuantileLabel) {
 		panic(errSummaryLabelKey)
 	}
 

@@ -127,7 +127,7 @@ func runTestBuildHistogramBucketAutogenRoute(t *testing.T) {
 
 			assert.Equal(t, tc.wantID, route.chartID)
 			assert.Equal(t, tc.wantDim, route.dimensionName)
-			assert.Equal(t, histogramBucketLabel, route.dimensionKeyLabel)
+			assert.Equal(t, metrix.HistogramBucketLabel, route.dimensionKeyLabel)
 			assert.Equal(t, program.AlgorithmIncremental, route.algorithm)
 			assert.False(t, route.staticDimension)
 		})
@@ -166,7 +166,7 @@ func runTestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 
 			assert.Equal(t, tc.wantID, route.chartID)
 			assert.Equal(t, tc.wantDim, route.dimensionName)
-			assert.Equal(t, summaryQuantileLabel, route.dimensionKeyLabel)
+			assert.Equal(t, metrix.SummaryQuantileLabel, route.dimensionKeyLabel)
 			assert.Equal(t, program.AlgorithmAbsolute, route.algorithm)
 			assert.False(t, route.staticDimension)
 		})
@@ -230,7 +230,7 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 			metricName: "service_latency_seconds_value",
 			labels: map[string]string{
 				"instance":           "db1",
-				measureSetFieldLabel: "value",
+				metrix.MeasureSetFieldLabel: "value",
 			},
 			meta: metrix.SeriesMeta{
 				Kind:        metrix.MetricKindGauge,
@@ -247,7 +247,7 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 			metricName: "svc_requests_total_ok",
 			labels: map[string]string{
 				"instance":           "db1",
-				measureSetFieldLabel: "ok",
+				metrix.MeasureSetFieldLabel: "ok",
 			},
 			meta: metrix.SeriesMeta{
 				Kind:        metrix.MetricKindCounter,
@@ -265,7 +265,7 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 			labels: map[string]string{
 				"instance":           "db1",
 				"svc_requests":       "total_ok",
-				measureSetFieldLabel: "ok",
+				metrix.MeasureSetFieldLabel: "ok",
 			},
 			meta: metrix.SeriesMeta{
 				Kind:        metrix.MetricKindCounter,
@@ -295,7 +295,7 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 			metricName: "svc_requests_total_ok",
 			labels: map[string]string{
 				"instance":           "db1",
-				measureSetFieldLabel: "failed",
+				metrix.MeasureSetFieldLabel: "failed",
 			},
 			meta: metrix.SeriesMeta{
 				Kind:        metrix.MetricKindCounter,
@@ -325,7 +325,7 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 			assert.Equal(t, tc.wantDim, route.dimensionName)
 			assert.Equal(t, tc.wantAlg, route.algorithm)
 			assert.Equal(t, tc.wantUnits, route.units)
-			assert.Equal(t, measureSetFieldLabel, route.dimensionKeyLabel)
+			assert.Equal(t, metrix.MeasureSetFieldLabel, route.dimensionKeyLabel)
 			assert.False(t, route.staticDimension)
 		})
 	}

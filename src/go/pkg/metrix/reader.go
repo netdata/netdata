@@ -233,7 +233,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 		for _, lbl := range src.labels {
 			labelsMap[lbl.Key] = lbl.Value
 		}
-		labelsMap[histogramBucketLabel] = formatHistogramBucketLabel(ub)
+		labelsMap[HistogramBucketLabel] = formatHistogramBucketLabel(ub)
 
 		labels, labelsKey, err := canonicalizeLabels(labelsMap)
 		if err != nil {
@@ -271,7 +271,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 	for _, lbl := range src.labels {
 		infMap[lbl.Key] = lbl.Value
 	}
-	infMap[histogramBucketLabel] = formatHistogramBucketLabel(math.Inf(1))
+	infMap[HistogramBucketLabel] = formatHistogramBucketLabel(math.Inf(1))
 	infLabels, infLabelsKey, err := canonicalizeLabels(infMap)
 	if err == nil {
 		infName := src.name + "_bucket"
@@ -380,7 +380,7 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 		for _, lbl := range src.labels {
 			labelsMap[lbl.Key] = lbl.Value
 		}
-		labelsMap[summaryQuantileLabel] = formatSummaryQuantileLabel(q)
+		labelsMap[SummaryQuantileLabel] = formatSummaryQuantileLabel(q)
 
 		labels, labelsKey, err := canonicalizeLabels(labelsMap)
 		if err != nil {
@@ -481,7 +481,7 @@ func appendFlattenedMeasureSetSeries(dst *readSnapshot, src *committedSeries) {
 		for _, lbl := range src.labels {
 			labelsMap[lbl.Key] = lbl.Value
 		}
-		labelsMap[measureSetFieldLabel] = field.Name
+		labelsMap[MeasureSetFieldLabel] = field.Name
 
 		labels, labelsKey, err := canonicalizeLabels(labelsMap)
 		if err != nil {

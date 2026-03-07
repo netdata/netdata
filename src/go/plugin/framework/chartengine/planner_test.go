@@ -1570,7 +1570,7 @@ groups:
 	assert.Equal(t, "Service", create.Meta.Family)
 	assert.Equal(t, "svc.latency_seconds", create.Meta.Context)
 	assert.Equal(t, "seconds", create.Meta.Units)
-	_, hasFieldLabel := create.Labels[measureSetFieldLabel]
+	_, hasFieldLabel := create.Labels[metrix.MeasureSetFieldLabel]
 	assert.False(t, hasFieldLabel)
 
 	dims := map[string]CreateDimensionAction{}
@@ -1652,7 +1652,7 @@ groups:
 	assert.Equal(t, "Service", create.Meta.Family)
 	assert.Equal(t, "svc.requests_total", create.Meta.Context)
 	assert.Equal(t, "requests/s", create.Meta.Units)
-	_, hasFieldLabel := create.Labels[measureSetFieldLabel]
+	_, hasFieldLabel := create.Labels[metrix.MeasureSetFieldLabel]
 	assert.False(t, hasFieldLabel)
 
 	dims := map[string]CreateDimensionAction{}

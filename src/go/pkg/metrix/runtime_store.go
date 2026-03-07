@@ -205,7 +205,7 @@ func (r *runtimeStoreBackend) recordHistogramObserve(desc *instrumentDescriptor,
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, histogramBucketLabel) {
+	if labelsContainKey(labels, HistogramBucketLabel) {
 		panic(errHistogramLabelKey)
 	}
 
@@ -244,7 +244,7 @@ func (r *runtimeStoreBackend) recordSummaryObserve(desc *instrumentDescriptor, v
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, summaryQuantileLabel) {
+	if labelsContainKey(labels, SummaryQuantileLabel) {
 		panic(errSummaryLabelKey)
 	}
 
@@ -313,7 +313,7 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeSetPoint(desc *instrumentDesc
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, measureSetFieldLabel) {
+	if labelsContainKey(labels, MeasureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
 	key := makeSeriesKey(desc.name, labelsKey)
@@ -337,7 +337,7 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeAddPoint(desc *instrumentDesc
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, measureSetFieldLabel) {
+	if labelsContainKey(labels, MeasureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
 	key := makeSeriesKey(desc.name, labelsKey)
@@ -367,7 +367,7 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeSetField(desc *instrumentDesc
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, measureSetFieldLabel) {
+	if labelsContainKey(labels, MeasureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
 	key := makeSeriesKey(desc.name, labelsKey)
@@ -398,7 +398,7 @@ func (r *runtimeStoreBackend) recordMeasureSetCounterAddPoint(desc *instrumentDe
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, measureSetFieldLabel) {
+	if labelsContainKey(labels, MeasureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
 	key := makeSeriesKey(desc.name, labelsKey)
