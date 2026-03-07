@@ -50,13 +50,13 @@ func (c *Collector) collect(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("resource discovery: %w", err)
 	}
-	if len(resources) == 0 {
-		return nil
-	}
-
 	// Prune caches when discovery refreshes and the resource set may have changed.
 	if c.discovery.FetchCounter != prevFetchCounter {
 		c.pruneStaleResources(resources)
+	}
+
+	if len(resources) == 0 {
+		return nil
 	}
 
 	now := c.now()

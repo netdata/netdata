@@ -135,6 +135,13 @@ func buildProfileRuntime(p ProfileConfig) (*profileRuntime, error) {
 	// Set AccumulateAgg based on chart algorithms.
 	// Metrics with total/count aggregation in incremental charts are accumulated as counters.
 	// Metrics in absolute charts (e.g. percentage gauges) are not accumulated.
+	// A metric+aggregation pair must not appear in both incremental and absolute charts.
+	type aggAlgo struct {
+		accumulate bool
+		chartID    string
+	}
+	seenAggAlgo := make(map[string]aggAlgo) // key: "metricName\x00agg"
+
 	for _, ch := range p.Charts {
 		algo := stringsLowerTrim(ch.Algorithm)
 		if algo == "" {
@@ -145,14 +152,26 @@ func buildProfileRuntime(p ProfileConfig) (*profileRuntime, error) {
 			if agg != "total" && agg != "count" {
 				continue
 			}
-			m, ok := metricByName[stringsLowerTrim(dim.Metric)]
+			metricKey := stringsLowerTrim(dim.Metric)
+			m, ok := metricByName[metricKey]
 			if !ok {
 				continue
 			}
+
+			acc := algo == "incremental"
+			key := metricKey + "\x00" + agg
+			if prev, exists := seenAggAlgo[key]; exists && prev.accumulate != acc {
+				return nil, fmt.Errorf(
+					"metric %q aggregation %q used with conflicting algorithms in charts %q (incremental) and %q (absolute)",
+					dim.Metric, agg, prev.chartID, ch.ID,
+				)
+			}
+			seenAggAlgo[key] = aggAlgo{accumulate: acc, chartID: ch.ID}
+
 			if m.AccumulateAgg == nil {
 				m.AccumulateAgg = make(map[string]bool, len(m.Aggregations))
 			}
-			if algo == "incremental" {
+			if acc {
 				m.AccumulateAgg[agg] = true
 			}
 		}
