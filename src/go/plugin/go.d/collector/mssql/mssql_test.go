@@ -23,6 +23,17 @@ func TestCollector_Init_EmptyDSN(t *testing.T) {
 	assert.Error(t, c.Init(context.Background()))
 }
 
+func TestCollector_Init_InvalidAzureADConfig(t *testing.T) {
+	c := New()
+	c.AzureAD.Enabled = true
+	c.AzureAD.Mode = "service_principal"
+	c.AzureAD.ClientID = "client-id"
+	c.AzureAD.TenantID = "tenant-id"
+	// Missing client_secret.
+
+	assert.Error(t, c.Init(context.Background()))
+}
+
 func TestCollector_Configuration(t *testing.T) {
 	c := New()
 

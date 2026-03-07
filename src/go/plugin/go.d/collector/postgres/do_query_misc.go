@@ -106,7 +106,9 @@ func (c *Collector) doQueryQueryableDatabases() error {
 			c.Warning(err)
 			conn.connErrors++
 			_ = db.Close()
-			stdlib.UnregisterConnConfig(connStr)
+			if connStr != "" {
+				stdlib.UnregisterConnConfig(connStr)
+			}
 			continue
 		}
 
@@ -115,7 +117,9 @@ func (c *Collector) doQueryQueryableDatabases() error {
 			c.Warning(err)
 			conn.connErrors++
 			_ = db.Close()
-			stdlib.UnregisterConnConfig(connStr)
+			if connStr != "" {
+				stdlib.UnregisterConnConfig(connStr)
+			}
 			continue
 		}
 
@@ -124,7 +128,9 @@ func (c *Collector) doQueryQueryableDatabases() error {
 				dbname, tables, c.MaxDBTables, indexes, c.MaxDBIndexes)
 			conn.connErrors = connErrMax
 			_ = db.Close()
-			stdlib.UnregisterConnConfig(connStr)
+			if connStr != "" {
+				stdlib.UnregisterConnConfig(connStr)
+			}
 			continue
 		}
 

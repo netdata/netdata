@@ -5,12 +5,16 @@ package sql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
@@ -162,9 +166,26 @@ func (c *Collector) evalStatusWhen(sw *ConfigStatusWhen, value string) bool {
 }
 
 func (c *Collector) openConnection(ctx context.Context) error {
-	db, err := sql.Open(c.Driver, c.DSN)
+	driverName := c.Driver
+	dsn := c.DSN
+
+	if c.AzureAD.Enabled {
+		switch c.Driver {
+		case "pgx":
+			return c.openPostgresAzureADConnection(ctx)
+		case "sqlserver", "azuresql":
+			var err error
+			dsn, err = azureauth.BuildMSSQLAzureADDSN(c.DSN, c.AzureAD)
+			if err != nil {
+				return fmt.Errorf("prepare Azure AD SQL Server DSN: %w", err)
+			}
+			driverName = azureauth.MSSQLAzureDriverName
+		}
+	}
+
+	db, err := sql.Open(driverName, dsn)
 	if err != nil {
-		return fmt.Errorf("open %s: %w (dsn=%s)", c.Driver, err, redactDSN(c.DSN))
+		return fmt.Errorf("open %s: %w (dsn=%s)", driverName, err, redactDSN(dsn))
 	}
 
 	db.SetConnMaxLifetime(10 * time.Minute)
@@ -178,10 +199,48 @@ func (c *Collector) openConnection(ctx context.Context) error {
 
 	if err := db.PingContext(pingCtx); err != nil {
 		_ = db.Close()
-		return fmt.Errorf("ping %s: %w (dsn=%s)", c.Driver, err, redactDSN(c.DSN))
+		return fmt.Errorf("ping %s: %w (dsn=%s)", driverName, err, redactDSN(dsn))
 	}
 
 	c.db = db
+	return nil
+}
+
+func (c *Collector) openPostgresAzureADConnection(ctx context.Context) error {
+	if c.azureTokenProvider == nil {
+		return errors.New("azure token provider is not initialized for pgx")
+	}
+
+	cfg, err := pgx.ParseConfig(c.DSN)
+	if err != nil {
+		return fmt.Errorf("parse pgx DSN: %w", err)
+	}
+
+	db := stdlib.OpenDB(*cfg, stdlib.OptionBeforeConnect(c.azureADBeforeConnect))
+	db.SetConnMaxLifetime(10 * time.Minute)
+
+	pingCtx := ctx
+	cancel := func() {}
+	if d := c.Timeout.Duration(); d > 0 {
+		pingCtx, cancel = context.WithTimeout(ctx, d)
+	}
+	defer cancel()
+
+	if err := db.PingContext(pingCtx); err != nil {
+		_ = db.Close()
+		return fmt.Errorf("ping pgx: %w (dsn=%s)", err, redactDSN(c.DSN))
+	}
+
+	c.db = db
+	return nil
+}
+
+func (c *Collector) azureADBeforeConnect(ctx context.Context, cfg *pgx.ConnConfig) error {
+	token, _, err := c.azureTokenProvider.Token(ctx)
+	if err != nil {
+		return err
+	}
+	cfg.Password = token
 	return nil
 }
 

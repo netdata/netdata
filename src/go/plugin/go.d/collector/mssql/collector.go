@@ -13,8 +13,10 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
 
 	_ "github.com/microsoft/go-mssqldb"
+	_ "github.com/microsoft/go-mssqldb/azuread"
 )
 
 //go:embed "config_schema.json"
@@ -62,6 +64,7 @@ type Config struct {
 	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
 	DSN         string           `yaml:"dsn" json:"dsn"`
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	AzureAD     azureauth.Config `yaml:"azure_ad,omitempty" json:"azure_ad,omitempty"`
 	Functions   FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
 }
 
@@ -167,6 +170,9 @@ func (c *Collector) Configuration() any {
 func (c *Collector) Init(context.Context) error {
 	if c.DSN == "" {
 		return errors.New("config: dsn not set")
+	}
+	if err := c.AzureAD.Validate(); err != nil {
+		return err
 	}
 	c.Debugf("using DSN [%s]", c.DSN)
 

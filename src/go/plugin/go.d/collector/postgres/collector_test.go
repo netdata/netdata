@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -112,6 +113,19 @@ func TestCollector_Init(t *testing.T) {
 		"Fail when DSN not set": {
 			wantFail: true,
 			config:   Config{DSN: ""},
+		},
+		"Fail on invalid Azure AD configuration": {
+			wantFail: true,
+			config: Config{
+				DSN: "postgresql://netdata@127.0.0.1:5432/postgres",
+				AzureAD: azureauth.Config{
+					Enabled:  true,
+					Mode:     "service_principal",
+					TenantID: "tenant-id",
+					ClientID: "client-id",
+					// Missing client_secret.
+				},
+			},
 		},
 	}
 

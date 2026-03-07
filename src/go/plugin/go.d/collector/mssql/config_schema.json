@@ -17,6 +17,51 @@
         "type": "string",
         "default": "sqlserver://localhost:1433"
       },
+      "azure_ad": {
+        "title": "Azure AD",
+        "description": "Optional Microsoft Entra (Azure AD) authentication settings for Azure SQL.",
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "description": "Enable Azure AD authentication and switch to azuresql driver mode.",
+            "type": "boolean",
+            "default": false
+          },
+          "mode": {
+            "title": "Mode",
+            "description": "Azure AD credential mode.",
+            "type": "string",
+            "enum": [
+              "service_principal",
+              "managed_identity",
+              "default"
+            ],
+            "default": "default"
+          },
+          "tenant_id": {
+            "title": "Tenant ID",
+            "description": "Azure tenant ID. Required for service_principal mode.",
+            "type": "string"
+          },
+          "client_id": {
+            "title": "Client ID",
+            "description": "Service principal client ID for service_principal mode.",
+            "type": "string"
+          },
+          "client_secret": {
+            "title": "Client Secret",
+            "description": "Service principal client secret for service_principal mode.",
+            "type": "string",
+            "sensitive": true
+          },
+          "managed_identity_client_id": {
+            "title": "Managed Identity Client ID",
+            "description": "Optional client ID of a user-assigned managed identity.",
+            "type": "string"
+          }
+        }
+      },
       "vnode": {
         "title": "Virtual Node",
         "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
@@ -149,6 +194,14 @@
     "timeout": {
       "ui:help": "Accepts decimals for sub-second granularity (e.g., 0.5 for 500ms)."
     },
+    "azure_ad": {
+      "mode": {
+        "ui:help": "Use `service_principal`, `managed_identity`, or `default` credential chain."
+      },
+      "client_secret": {
+        "ui:widget": "password"
+      }
+    },
     "functions": {
       "top_queries": {
         "disabled": {
@@ -186,6 +239,7 @@
           "fields": [
             "update_every",
             "dsn",
+            "azure_ad",
             "timeout",
             "vnode"
           ]
