@@ -183,8 +183,7 @@ Obsoletes: %{name}-data
 
 # Build dependencies
 #
-BuildRequires: gcc
-BuildRequires: gcc-c++
+BuildRequires: clang
 BuildRequires: make
 BuildRequires: git-core
 BuildRequires: cmake
@@ -375,6 +374,9 @@ advanced correlations and fast root cause analysis, native horizontal scalabilit
 %setup -q -n "%{name}-%{version}"
 
 %build
+%define __cc clang
+%define __cxx clang++
+export CFLAGS="%{optflags} -Wno-unused-command-line-argument -Wno-unknown-warning-option"
 # Conf step
 %cmake -G Ninja \
 	-DCMAKE_INSTALL_PREFIX=/ \

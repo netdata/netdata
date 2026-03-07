@@ -32,7 +32,12 @@ RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
    BUILD_ARCH="${BUILD_ARCH:-"$(uname -m)"}" && \
    /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='${BUILD_ARCH}'" > ./system/.install-type && \
-   CFLAGS="$(packaging/docker/gen-cflags.sh)" LDFLAGS="-Wl,--gc-sections" ./netdata-installer.sh --dont-wait --dont-start-it \
+   CC=clang CXX=clang++ \
+   CFLAGS="$(packaging/docker/gen-cflags.sh)" \
+   LDFLAGS="-Wl,--gc-sections" \
+   ./netdata-installer.sh \
+   --dont-wait \
+   --dont-start-it \
    --use-system-protobuf \
    --disable-ebpf \
    --enable-plugin-otel \
