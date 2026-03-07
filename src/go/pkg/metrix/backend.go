@@ -20,6 +20,7 @@ type meterBackend interface {
 	recordMeasureSetGaugeObservePoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet)
 	recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet)
 	recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, delta MeasureSetPoint, sets []LabelSet)
+	recordMeasureSetGaugeSetField(desc *instrumentDescriptor, field string, value SampleValue, sets []LabelSet)
 	recordMeasureSetCounterObserveTotalPoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet)
 	recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, delta MeasureSetPoint, sets []LabelSet)
 }

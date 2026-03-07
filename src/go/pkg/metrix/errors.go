@@ -28,6 +28,8 @@ var (
 	errMeasureSetLabelKey   = errors.New("metrix: measureset flatten label key collides with existing label")
 	errMeasureSetSchema     = errors.New("metrix: measureset schema is missing")
 	errMeasureSetPoint      = errors.New("metrix: invalid measureset point")
+	errMeasureSetFields     = errors.New("metrix: invalid measureset fields")
+	errMeasureSetField      = errors.New("metrix: unknown measureset field")
 	errRuntimeSnapshotWrite = errors.New("metrix: runtime store supports stateful writes only")
 	errRuntimeFreshness     = errors.New("metrix: runtime store freshness is fixed to FreshnessCommitted")
 	errRuntimeWindowCycle   = errors.New("metrix: runtime store does not support window=cycle")

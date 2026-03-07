@@ -232,6 +232,7 @@ type StateSetInstrument interface {
 
 type SnapshotMeasureSetGauge interface {
 	ObservePoint(p MeasureSetPoint, labels ...LabelSet)
+	ObserveFields(fields map[string]SampleValue, labels ...LabelSet)
 }
 
 type SnapshotMeasureSetGaugeVec interface {
@@ -241,6 +242,7 @@ type SnapshotMeasureSetGaugeVec interface {
 
 type SnapshotMeasureSetCounter interface {
 	ObserveTotalPoint(p MeasureSetPoint, labels ...LabelSet)
+	ObserveTotalFields(fields map[string]SampleValue, labels ...LabelSet)
 }
 
 type SnapshotMeasureSetCounterVec interface {
@@ -250,7 +252,11 @@ type SnapshotMeasureSetCounterVec interface {
 
 type StatefulMeasureSetGauge interface {
 	SetPoint(p MeasureSetPoint, labels ...LabelSet)
+	SetFields(fields map[string]SampleValue, labels ...LabelSet)
+	SetField(field string, value SampleValue, labels ...LabelSet)
 	AddPoint(delta MeasureSetPoint, labels ...LabelSet)
+	AddFields(delta map[string]SampleValue, labels ...LabelSet)
+	AddField(field string, delta SampleValue, labels ...LabelSet)
 }
 
 type StatefulMeasureSetGaugeVec interface {
@@ -260,6 +266,8 @@ type StatefulMeasureSetGaugeVec interface {
 
 type StatefulMeasureSetCounter interface {
 	AddPoint(delta MeasureSetPoint, labels ...LabelSet)
+	AddFields(delta map[string]SampleValue, labels ...LabelSet)
+	AddField(field string, delta SampleValue, labels ...LabelSet)
 }
 
 type StatefulMeasureSetCounterVec interface {

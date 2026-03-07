@@ -105,20 +105,52 @@ func (m *snapshotMeasureSetGaugeInstrument) ObservePoint(p MeasureSetPoint, labe
 	m.backend.recordMeasureSetGaugeObservePoint(m.desc, p, appendLabelSets(m.base, labels))
 }
 
+func (m *snapshotMeasureSetGaugeInstrument) ObserveFields(fields map[string]SampleValue, labels ...LabelSet) {
+	m.ObservePoint(measureSetPointFromFields(fields, m.desc.measureSet), labels...)
+}
+
 func (m *snapshotMeasureSetCounterInstrument) ObserveTotalPoint(p MeasureSetPoint, labels ...LabelSet) {
 	m.backend.recordMeasureSetCounterObserveTotalPoint(m.desc, p, appendLabelSets(m.base, labels))
+}
+
+func (m *snapshotMeasureSetCounterInstrument) ObserveTotalFields(fields map[string]SampleValue, labels ...LabelSet) {
+	m.ObserveTotalPoint(measureSetPointFromFields(fields, m.desc.measureSet), labels...)
 }
 
 func (m *statefulMeasureSetGaugeInstrument) SetPoint(p MeasureSetPoint, labels ...LabelSet) {
 	m.backend.recordMeasureSetGaugeSetPoint(m.desc, p, appendLabelSets(m.base, labels))
 }
 
+func (m *statefulMeasureSetGaugeInstrument) SetFields(fields map[string]SampleValue, labels ...LabelSet) {
+	m.SetPoint(measureSetPointFromFields(fields, m.desc.measureSet), labels...)
+}
+
+func (m *statefulMeasureSetGaugeInstrument) SetField(field string, value SampleValue, labels ...LabelSet) {
+	m.backend.recordMeasureSetGaugeSetField(m.desc, field, value, appendLabelSets(m.base, labels))
+}
+
 func (m *statefulMeasureSetGaugeInstrument) AddPoint(delta MeasureSetPoint, labels ...LabelSet) {
 	m.backend.recordMeasureSetGaugeAddPoint(m.desc, delta, appendLabelSets(m.base, labels))
 }
 
+func (m *statefulMeasureSetGaugeInstrument) AddFields(delta map[string]SampleValue, labels ...LabelSet) {
+	m.AddPoint(measureSetPointFromFields(delta, m.desc.measureSet), labels...)
+}
+
+func (m *statefulMeasureSetGaugeInstrument) AddField(field string, delta SampleValue, labels ...LabelSet) {
+	m.AddPoint(singleMeasureSetPoint(field, delta, m.desc.measureSet), labels...)
+}
+
 func (m *statefulMeasureSetCounterInstrument) AddPoint(delta MeasureSetPoint, labels ...LabelSet) {
 	m.backend.recordMeasureSetCounterAddPoint(m.desc, delta, appendLabelSets(m.base, labels))
+}
+
+func (m *statefulMeasureSetCounterInstrument) AddFields(delta map[string]SampleValue, labels ...LabelSet) {
+	m.AddPoint(measureSetPointFromFields(delta, m.desc.measureSet), labels...)
+}
+
+func (m *statefulMeasureSetCounterInstrument) AddField(field string, delta SampleValue, labels ...LabelSet) {
+	m.AddPoint(singleMeasureSetPoint(field, delta, m.desc.measureSet), labels...)
 }
 
 func normalizeMeasureSetPoint(point MeasureSetPoint, schema *measureSetSchema) []SampleValue {
@@ -135,6 +167,49 @@ func normalizeMeasureSetPoint(point MeasureSetPoint, schema *measureSetSchema) [
 		values[i] = v
 	}
 	return values
+}
+
+func measureSetPointFromFields(fields map[string]SampleValue, schema *measureSetSchema) MeasureSetPoint {
+	return MeasureSetPoint{Values: normalizeMeasureSetFields(fields, schema)}
+}
+
+func normalizeMeasureSetFields(fields map[string]SampleValue, schema *measureSetSchema) []SampleValue {
+	if schema == nil {
+		panic(errMeasureSetSchema)
+	}
+	if len(fields) != len(schema.fields) {
+		panic(errMeasureSetFields)
+	}
+
+	values := make([]SampleValue, len(schema.fields))
+	for field, value := range fields {
+		idx, ok := schema.index[field]
+		if !ok {
+			panic(errMeasureSetField)
+		}
+		mustFiniteSample(value)
+		values[idx] = value
+	}
+	return values
+}
+
+func singleMeasureSetPoint(field string, value SampleValue, schema *measureSetSchema) MeasureSetPoint {
+	values := make([]SampleValue, len(schema.fields))
+	idx := mustMeasureSetFieldIndex(field, schema)
+	mustFiniteSample(value)
+	values[idx] = value
+	return MeasureSetPoint{Values: values}
+}
+
+func mustMeasureSetFieldIndex(field string, schema *measureSetSchema) int {
+	if schema == nil {
+		panic(errMeasureSetSchema)
+	}
+	idx, ok := schema.index[field]
+	if !ok {
+		panic(errMeasureSetField)
+	}
+	return idx
 }
 
 func normalizeMeasureSetCounterDelta(delta MeasureSetPoint, schema *measureSetSchema) []SampleValue {
@@ -235,6 +310,55 @@ func (c *storeCore) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, de
 	for i, deltaValue := range values {
 		entry.values[i] += deltaValue
 	}
+}
+
+func (c *storeCore) recordMeasureSetGaugeSetField(desc *instrumentDescriptor, field string, value SampleValue, sets []LabelSet) {
+	schema := desc.measureSet
+	if schema == nil || schema.semantics != MeasureSetSemanticsGauge {
+		panic(errMeasureSetSchema)
+	}
+
+	fieldIndex := mustMeasureSetFieldIndex(field, schema)
+	mustFiniteSample(value)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.active == nil {
+		panic(errCycleInactive)
+	}
+
+	labels, labelsKey, err := labelsFromSet(sets, c)
+	if err != nil {
+		panic(err)
+	}
+	if labelsContainKey(labels, measureSetFieldLabel) {
+		panic(errMeasureSetLabelKey)
+	}
+
+	key := makeSeriesKey(desc.name, labelsKey)
+	entry, ok := c.active.measureSetGauges[key]
+	if !ok {
+		baseline := make([]SampleValue, len(schema.fields))
+		if existing := c.snapshot.Load().series[key]; existing != nil {
+			baseline = append(baseline[:0], existing.measureSetValues...)
+			if len(baseline) != len(schema.fields) {
+				baseline = make([]SampleValue, len(schema.fields))
+			}
+		}
+		entry = &stagedMeasureSet{
+			key:       key,
+			name:      desc.name,
+			labels:    labels,
+			labelsKey: labelsKey,
+			desc:      desc,
+			values:    baseline,
+		}
+		c.active.measureSetGauges[key] = entry
+	} else if len(entry.values) == 0 {
+		entry.values = make([]SampleValue, len(schema.fields))
+	}
+	entry.values[fieldIndex] = value
 }
 
 func (c *storeCore) recordMeasureSetCounterObserveTotalPoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet) {

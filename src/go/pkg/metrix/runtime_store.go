@@ -354,6 +354,34 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeAddPoint(desc *instrumentDesc
 	})
 }
 
+func (r *runtimeStoreBackend) recordMeasureSetGaugeSetField(desc *instrumentDescriptor, field string, value SampleValue, sets []LabelSet) {
+	schema := desc.measureSet
+	if schema == nil || schema.semantics != MeasureSetSemanticsGauge {
+		panic(errMeasureSetSchema)
+	}
+
+	fieldIndex := mustMeasureSetFieldIndex(field, schema)
+	mustFiniteSample(value)
+
+	labels, labelsKey, err := labelsFromSet(sets, r)
+	if err != nil {
+		panic(err)
+	}
+	if labelsContainKey(labels, measureSetFieldLabel) {
+		panic(errMeasureSetLabelKey)
+	}
+	key := makeSeriesKey(desc.name, labelsKey)
+	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
+		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
+		if len(series.measureSetValues) == 0 {
+			series.measureSetValues = make([]SampleValue, len(schema.fields))
+		}
+		series.measureSetValues[fieldIndex] = value
+		series.meta.LastSeenSuccessSeq = seq
+		series.runtimeLastSeenUnixNano = nowUnixNano
+	})
+}
+
 func (r *runtimeStoreBackend) recordMeasureSetCounterObserveTotalPoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
 	panic(errRuntimeSnapshotWrite)
 }

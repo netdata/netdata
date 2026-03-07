@@ -133,7 +133,10 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				)
 
 				cc.BeginCycle()
-				ms.ObservePoint(MeasureSetPoint{Values: []SampleValue{1.5, 0.5}})
+				ms.ObserveFields(map[string]SampleValue{
+					"value": 1.5,
+					"ratio": 0.5,
+				})
 				cc.CommitCycleSuccess()
 
 				mustMeasureSet(t, s.Read(), "svc.latency", nil, []SampleValue{1.5, 0.5})
@@ -208,19 +211,28 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				)
 
 				cc.BeginCycle()
-				ms.ObserveTotalPoint(MeasureSetPoint{Values: []SampleValue{100, 40}})
+				ms.ObserveTotalFields(map[string]SampleValue{
+					"ok":     100,
+					"failed": 40,
+				})
 				cc.CommitCycleSuccess()
 				mustMeasureSet(t, s.Read(), "svc.requests", nil, []SampleValue{100, 40})
 				mustNoDelta(t, s.Read(ReadFlatten()), "svc.requests_ok", measureSetFieldLabels("svc.requests", "ok"))
 
 				cc.BeginCycle()
-				ms.ObserveTotalPoint(MeasureSetPoint{Values: []SampleValue{150, 50}})
+				ms.ObserveTotalFields(map[string]SampleValue{
+					"ok":     150,
+					"failed": 50,
+				})
 				cc.CommitCycleSuccess()
 				mustDelta(t, s.Read(ReadFlatten()), "svc.requests_ok", measureSetFieldLabels("svc.requests", "ok"), 50)
 				mustDelta(t, s.Read(ReadFlatten()), "svc.requests_failed", measureSetFieldLabels("svc.requests", "failed"), 10)
 
 				cc.BeginCycle()
-				ms.ObserveTotalPoint(MeasureSetPoint{Values: []SampleValue{20, 5}})
+				ms.ObserveTotalFields(map[string]SampleValue{
+					"ok":     20,
+					"failed": 5,
+				})
 				cc.CommitCycleSuccess()
 				mustDelta(t, s.Read(ReadFlatten()), "svc.requests_ok", measureSetFieldLabels("svc.requests", "ok"), 20)
 				mustDelta(t, s.Read(ReadFlatten()), "svc.requests_failed", measureSetFieldLabels("svc.requests", "failed"), 5)
@@ -236,20 +248,20 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				)
 
 				cc.BeginCycle()
-				ms.ObserveTotalPoint(MeasureSetPoint{Values: []SampleValue{10}})
+				ms.ObserveTotalFields(map[string]SampleValue{"done": 10})
 				cc.CommitCycleSuccess()
 
 				cc.BeginCycle()
-				ms.ObserveTotalPoint(MeasureSetPoint{Values: []SampleValue{20}})
+				ms.ObserveTotalFields(map[string]SampleValue{"done": 20})
 				cc.CommitCycleSuccess()
 				mustDelta(t, s.Read(ReadFlatten()), "svc.jobs_done", measureSetFieldLabels("svc.jobs", "done"), 10)
 
 				cc.BeginCycle()
-				ms.ObserveTotalPoint(MeasureSetPoint{Values: []SampleValue{30}})
+				ms.ObserveTotalFields(map[string]SampleValue{"done": 30})
 				cc.AbortCycle()
 
 				cc.BeginCycle()
-				ms.ObserveTotalPoint(MeasureSetPoint{Values: []SampleValue{40}})
+				ms.ObserveTotalFields(map[string]SampleValue{"done": 40})
 				cc.CommitCycleSuccess()
 				mustNoDelta(t, s.Read(ReadFlatten()), "svc.jobs_done", measureSetFieldLabels("svc.jobs", "done"))
 			},
@@ -315,6 +327,94 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 					ms.AddPoint(MeasureSetPoint{Values: []SampleValue{1, -1}})
 				})
 				cc.AbortCycle()
+			},
+		},
+		"snapshot MeasureSet named full writes require exact field set": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				ms := s.Write().SnapshotMeter("svc").MeasureSetGauge(
+					"latency",
+					WithMeasureSetFields(
+						MeasureFieldSpec{Name: "value"},
+						MeasureFieldSpec{Name: "max"},
+					),
+				)
+
+				cc.BeginCycle()
+				expectPanic(t, func() {
+					ms.ObserveFields(map[string]SampleValue{"value": 1})
+				})
+				cc.AbortCycle()
+
+				cc.BeginCycle()
+				expectPanic(t, func() {
+					ms.ObserveFields(map[string]SampleValue{
+						"value": 1,
+						"max":   2,
+						"min":   0,
+					})
+				})
+				cc.AbortCycle()
+			},
+		},
+		"stateful MeasureSet gauge named writes support full and singular updates": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				ms := s.Write().StatefulMeter("svc").MeasureSetGauge(
+					"usage",
+					WithMeasureSetFields(
+						MeasureFieldSpec{Name: "value"},
+						MeasureFieldSpec{Name: "limit"},
+					),
+				)
+
+				cc.BeginCycle()
+				ms.SetFields(map[string]SampleValue{
+					"value": 10,
+					"limit": 20,
+				})
+				cc.CommitCycleSuccess()
+
+				cc.BeginCycle()
+				ms.SetField("value", 15)
+				ms.AddField("limit", 3)
+				cc.CommitCycleSuccess()
+
+				mustMeasureSet(t, s.Read(), "svc.usage", nil, []SampleValue{15, 23})
+				mustValue(t, s.Read(ReadFlatten()), "svc.usage_value", measureSetFieldLabels("svc.usage", "value"), 15)
+				mustValue(t, s.Read(ReadFlatten()), "svc.usage_limit", measureSetFieldLabels("svc.usage", "limit"), 23)
+			},
+		},
+		"stateful MeasureSet counter named writes support full and singular deltas": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				ms := s.Write().StatefulMeter("svc").MeasureSetCounter(
+					"events",
+					WithMeasureSetFields(
+						MeasureFieldSpec{Name: "ok"},
+						MeasureFieldSpec{Name: "failed"},
+					),
+				)
+
+				cc.BeginCycle()
+				ms.AddFields(map[string]SampleValue{
+					"ok":     5,
+					"failed": 1,
+				})
+				cc.CommitCycleSuccess()
+				mustNoDelta(t, s.Read(ReadFlatten()), "svc.events_ok", measureSetFieldLabels("svc.events", "ok"))
+
+				cc.BeginCycle()
+				ms.AddField("ok", 2)
+				ms.AddField("failed", 3)
+				cc.CommitCycleSuccess()
+
+				mustMeasureSet(t, s.Read(), "svc.events", nil, []SampleValue{7, 4})
+				mustDelta(t, s.Read(ReadFlatten()), "svc.events_ok", measureSetFieldLabels("svc.events", "ok"), 2)
+				mustDelta(t, s.Read(ReadFlatten()), "svc.events_failed", measureSetFieldLabels("svc.events", "failed"), 3)
 			},
 		},
 		"MeasureSet direct read returns a copy": {
