@@ -23,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/secretresolver"
 	"gopkg.in/yaml.v2"
 )
 
@@ -669,6 +670,23 @@ func newConfigModule(creator collectorapi.Creator) (configModule, error) {
 }
 
 func applyConfig(cfg confgroup.Config, module any) error {
+	cfgResolved, err := cfg.Clone()
+	if err != nil {
+		return fmt.Errorf("cloning config: %w", err)
+	}
+	if err := secretresolver.Resolve(cfgResolved); err != nil {
+		return fmt.Errorf("resolving secrets: %w", err)
+	}
+	bs, err := yaml.Marshal(cfgResolved)
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal(bs, module)
+}
+
+// applyConfigRaw applies config without resolving secrets.
+// Used by dyncfg get to avoid exposing resolved secret values.
+func applyConfigRaw(cfg confgroup.Config, module any) error {
 	bs, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err

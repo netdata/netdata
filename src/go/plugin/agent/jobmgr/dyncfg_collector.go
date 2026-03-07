@@ -337,7 +337,7 @@ func (m *Manager) dyncfgCmdGet(fn dyncfg.Function) {
 		return
 	}
 
-	if err := applyConfig(entry.Cfg, mod); err != nil {
+	if err := applyConfigRaw(entry.Cfg, mod); err != nil {
 		m.Warningf("dyncfg: %s: module %s job %s failed to apply config: %v", cmd, mn, jn, err)
 		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
 		return
