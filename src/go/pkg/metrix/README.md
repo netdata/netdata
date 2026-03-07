@@ -94,10 +94,30 @@
 
 ### Writers
 
-| Mode     | Gauge-like family                             | Counter-like family                             |
-|----------|-----------------------------------------------|-------------------------------------------------|
-| Snapshot | `MeasureSetGauge(...).ObservePoint(...)`      | `MeasureSetCounter(...).ObserveTotalPoint(...)` |
-| Stateful | `MeasureSetGauge(...).SetPoint/AddPoint(...)` | `MeasureSetCounter(...).AddPoint(...)`          |
+| Mode     | Gauge-like family                                                                                                               | Counter-like family                                                                                           |
+|----------|---------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| Snapshot | `MeasureSetGauge(...).ObservePoint(...)` or preferred `ObserveFields(...)`                                                      | `MeasureSetCounter(...).ObserveTotalPoint(...)` or preferred `ObserveTotalFields(...)`                       |
+| Stateful | `MeasureSetGauge(...).SetPoint(...)`, `AddPoint(...)`, `SetFields(...)`, `AddFields(...)`, `SetField(...)`, `AddField(...)`    | `MeasureSetCounter(...).AddPoint(...)`, `AddFields(...)`, `AddField(...)`                                    |
+
+### Phase-1 write contract
+
+- **Preferred collector-facing API** — use named write helpers instead of raw positional `MeasureSetPoint` values whenever practical.
+- **Snapshot handles** support:
+  - full-family positional writes (`ObservePoint(...)`, `ObserveTotalPoint(...)`)
+  - full-family named writes (`ObserveFields(...)`, `ObserveTotalFields(...)`)
+- **Stateful handles** support:
+  - full-family positional writes
+  - full-family named writes
+  - singular field writes (`SetField(...)`, `AddField(...)`)
+- **Snapshot singular field writes do not exist in phase 1.**
+  - `MeasureSet` still models one sampled family point per collect cycle in snapshot mode.
+  - Partial snapshot field visibility/completeness semantics are intentionally deferred.
+- **Named full-family writes require the exact declared field set.**
+  - Missing fields panic.
+  - Unknown extra fields panic.
+- **Stateful singular field writes update only the addressed field.**
+  - Gauge-like `SetField(...)` overwrites one field on top of the committed/staged family.
+  - Gauge-like `AddField(...)` and counter-like `AddField(...)` apply a delta to one field.
 
 ### Schema example
 
@@ -105,17 +125,47 @@
 store := metrix.NewCollectorStore()
 meter := store.Write().SnapshotMeter("svc")
 latency := meter.MeasureSetGauge(
-"latency",
-metrix.WithMeasureSetFields(
-metrix.MeasureFieldSpec{Name: "value"},
-metrix.MeasureFieldSpec{Name: "ratio", Float: true},
-),
-metrix.WithUnit("seconds"),
+	"latency",
+	metrix.WithMeasureSetFields(
+		metrix.MeasureFieldSpec{Name: "value"},
+		metrix.MeasureFieldSpec{Name: "ratio", Float: true},
+	),
+	metrix.WithUnit("seconds"),
 )
-latency.ObservePoint(metrix.MeasureSetPoint{Values: []metrix.SampleValue{1.5, 0.5}})
+latency.ObserveFields(map[string]metrix.SampleValue{
+	"value": 1.5,
+	"ratio": 0.5,
+})
 ```
 
 Re-registering the same metric name with a different `MeasureSet` schema is rejected like other structured families.
+
+### Stateful singular-write example
+
+```go
+store := metrix.NewRuntimeStore()
+meter := store.Write().StatefulMeter("svc")
+usage := meter.MeasureSetGauge(
+	"usage",
+	metrix.WithMeasureSetFields(
+		metrix.MeasureFieldSpec{Name: "value"},
+		metrix.MeasureFieldSpec{Name: "limit"},
+	),
+)
+
+usage.SetFields(map[string]metrix.SampleValue{
+	"value": 10,
+	"limit": 20,
+})
+usage.SetField("value", 15)
+usage.AddField("limit", 3)
+```
+
+This yields a committed `MeasureSet` point equivalent to:
+
+```go
+metrix.MeasureSetPoint{Values: []metrix.SampleValue{15, 23}}
+```
 
 ## Read Modes
 
@@ -188,6 +238,7 @@ see [how-to-write-a-collector.md](/src/go/plugin/go.d/docs/how-to-write-a-collec
 - **Runtime writes** — `RuntimeStore` rejects snapshot-mode instrument registration with an error.
   Calling snapshot-mode record methods (`ObserveTotal`, `ObservePoint`) **panics**.
 - **MeasureSet runtime writes** — `RuntimeStore` supports both gauge-like and counter-like `MeasureSet` families, but only through `StatefulMeter(...)`.
+- **MeasureSet named writes** — `ObserveFields(...)`, `ObserveTotalFields(...)`, `SetFields(...)`, and `AddFields(...)` require the exact declared field set. Snapshot singular field writes are intentionally absent in phase 1.
 - **Window/freshness coupling** — Stateful histogram/summary with `WindowCycle` requires (and silently forces) `FreshnessCycle`. Setting an explicit non-Cycle freshness with `WindowCycle` returns an error.
 - **Schema stability** — Re-registering an existing metric name with different kind/mode/schema returns an error (or panics in strict runtime paths).
 - **MeasureSet flatten naming** — Flattened `MeasureSet` series use per-field metric names like `<name>_<field>` and also carry a synthetic `measure_field=<field>` label.
