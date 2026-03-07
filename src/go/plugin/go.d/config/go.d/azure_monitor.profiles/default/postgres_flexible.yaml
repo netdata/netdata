@@ -31,7 +31,7 @@ metrics:
     time_grain: PT1M
   - name: tps
     units: transactions/s
-    aggregations: [average]
+    aggregations: [total]
     time_grain: PT1M
   - name: deadlocks
     units: deadlocks/s
@@ -185,14 +185,14 @@ charts:
     type: line
     priority: 1070
     units: transactions/s
-    algorithm: absolute
+    algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
       - metric: tps
-        aggregation: average
-        name: average
+        aggregation: total
+        name: total
 
   - id: am_azure_postgres_flexible__deadlocks
     title: Azure PostgreSQL Flexible Server Deadlocks
@@ -201,7 +201,7 @@ charts:
     type: line
     priority: 1080
     units: deadlocks/s
-    algorithm: absolute
+    algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
@@ -217,7 +217,7 @@ charts:
     type: line
     priority: 1090
     units: transactions/s
-    algorithm: absolute
+    algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
@@ -233,7 +233,7 @@ charts:
     type: line
     priority: 1100
     units: transactions/s
-    algorithm: absolute
+    algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
@@ -265,7 +265,7 @@ charts:
     type: line
     priority: 1120
     units: bytes/s
-    algorithm: absolute
+    algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
@@ -281,7 +281,7 @@ charts:
     type: line
     priority: 1130
     units: bytes/s
-    algorithm: absolute
+    algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
