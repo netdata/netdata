@@ -3,6 +3,152 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Prometheus collector configuration.",
     "type": "object",
+    "definitions": {
+      "selector_expr": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "allow": {
+            "title": "Allow",
+            "description": "Allow time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus/selector#readme).",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Selector",
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "deny": {
+            "title": "Deny",
+            "description": "Deny time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus/selector#readme).",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Selector",
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "relabel_rules": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Relabel rule",
+          "type": "object",
+          "properties": {
+            "source_labels": {
+              "title": "Source labels",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "regex": {
+              "title": "Regex",
+              "type": "string"
+            },
+            "target_label": {
+              "title": "Target label",
+              "type": "string"
+            },
+            "replacement": {
+              "title": "Replacement",
+              "type": "string"
+            },
+            "action": {
+              "title": "Action",
+              "type": "string",
+              "enum": [
+                "replace",
+                "labelmap",
+                "labeldrop",
+                "labelkeep"
+              ]
+            }
+          }
+        }
+      },
+      "context_rules": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Context rule",
+          "type": "object",
+          "properties": {
+            "match": {
+              "title": "Match",
+              "type": "string"
+            },
+            "context": {
+              "title": "Context",
+              "type": "string"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "units": {
+              "title": "Units",
+              "type": "string"
+            },
+            "type": {
+              "title": "Chart type",
+              "type": "string",
+              "enum": [
+                "line",
+                "area",
+                "stacked",
+                "heatmap"
+              ]
+            }
+          },
+          "required": [
+            "match"
+          ]
+        }
+      },
+      "dimension_rules": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Dimension rule",
+          "type": "object",
+          "properties": {
+            "match": {
+              "title": "Match",
+              "type": "string"
+            },
+            "dimension": {
+              "title": "Dimension template",
+              "description": "Dimension name template (for example `${status}` or `value`). Reserved labels `${quantile}` and `${le}` are not allowed.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "match",
+            "dimension"
+          ]
+        }
+      }
+    },
     "properties": {
       "update_every": {
         "title": "Update every",
@@ -59,36 +205,40 @@
       "selector": {
         "title": "Selectors",
         "description": "Configuration for selecting and filtering a set of time series using Prometheus selectors. If left empty, no filtering is applied.",
+        "$ref": "#/definitions/selector_expr"
+      },
+      "selector_groups": {
+        "title": "Selector groups",
+        "description": "Apply multiple selector/rules pipelines within a single scrape. Each group can have its own selector and customization rules. Mutually exclusive with top-level selector/label_relabel/context_rules/dimension_rules.",
         "type": [
-          "object",
+          "array",
           "null"
         ],
-        "properties": {
-          "allow": {
-            "title": "Allow",
-            "description": "Allow time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus/selector#readme).",
-            "type": [
-              "array",
-              "null"
-            ],
-            "items": {
-              "title": "Selector",
+        "items": {
+          "title": "Selector group",
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Group name",
               "type": "string"
             },
-            "uniqueItems": true
-          },
-          "deny": {
-            "title": "Deny",
-            "description": "Deny time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/pkg/prometheus/selector#readme).",
-            "type": [
-              "array",
-              "null"
-            ],
-            "items": {
-              "title": "Selector",
-              "type": "string"
+            "selector": {
+              "title": "Selectors",
+              "description": "Group-specific selector. If empty, all scraped metrics are eligible for this group.",
+              "$ref": "#/definitions/selector_expr"
             },
-            "uniqueItems": true
+            "label_relabel": {
+              "title": "Label relabel",
+              "$ref": "#/definitions/relabel_rules"
+            },
+            "context_rules": {
+              "title": "Context rules",
+              "$ref": "#/definitions/context_rules"
+            },
+            "dimension_rules": {
+              "title": "Dimension rules",
+              "$ref": "#/definitions/dimension_rules"
+            }
           }
         }
       },
@@ -127,7 +277,7 @@
             },
             "uniqueItems": true
           },
-          "Counter": {
+          "counter": {
             "title": "As Counter",
             "description": "Untyped metrics matching any [pattern](https://golang.org/pkg/path/filepath/#Match) will be processed as Counter.",
             "type": [
@@ -141,6 +291,21 @@
             "uniqueItems": true
           }
         }
+      },
+      "label_relabel": {
+        "title": "Label relabel",
+        "description": "Transform label sets before chart IDs and chart labels are generated.",
+        "$ref": "#/definitions/relabel_rules"
+      },
+      "context_rules": {
+        "title": "Context rules",
+        "description": "Override context, title, units, and chart type by metric family name regex.",
+        "$ref": "#/definitions/context_rules"
+      },
+      "dimension_rules": {
+        "title": "Dimension rules",
+        "description": "Group multiple Gauge, Counter, Summary, or Histogram series into a single multi-dimensional chart.",
+        "$ref": "#/definitions/dimension_rules"
       },
       "username": {
         "title": "Username",
@@ -226,6 +391,94 @@
     },
     "required": [
       "url"
+    ],
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "selector_groups": {
+              "type": "array",
+              "minItems": 1
+            }
+          },
+          "required": [
+            "selector_groups"
+          ]
+        },
+        "then": {
+          "not": {
+            "anyOf": [
+              {
+                "properties": {
+                  "selector": {
+                    "type": "object",
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "allow": {
+                            "type": "array",
+                            "minItems": 1
+                          }
+                        },
+                        "required": [
+                          "allow"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "deny": {
+                            "type": "array",
+                            "minItems": 1
+                          }
+                        },
+                        "required": [
+                          "deny"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "selector"
+                ]
+              },
+              {
+                "properties": {
+                  "label_relabel": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "label_relabel"
+                ]
+              },
+              {
+                "properties": {
+                  "context_rules": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "context_rules"
+                ]
+              },
+              {
+                "properties": {
+                  "dimension_rules": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "dimension_rules"
+                ]
+              }
+            ]
+          }
+        }
+      }
     ]
   },
   "uiSchema": {
@@ -251,7 +504,8 @@
         {
           "title": "Selectors",
           "fields": [
-            "selector"
+            "selector",
+            "selector_groups"
           ]
         },
         {
@@ -265,6 +519,14 @@
           "title": "Untyped fallback",
           "fields": [
             "fallback_type"
+          ]
+        },
+        {
+          "title": "Customization",
+          "fields": [
+            "label_relabel",
+            "context_rules",
+            "dimension_rules"
           ]
         },
         {
@@ -314,6 +576,9 @@
     },
     "selector": {
       "ui:help": "The logic is as follows: `(allow1 OR allow2) AND !(deny1 OR deny2)`."
+    },
+    "selector_groups": {
+      "ui:help": "Each group gets its own selector + relabel/context/dimension rules, while metrics are fetched once per job. Do not combine with top-level selector/label_relabel/context_rules/dimension_rules."
     },
     "username": {
       "ui:widget": "password"
