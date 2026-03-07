@@ -38,6 +38,7 @@ type Reader interface {
 	Histogram(name string, labels Labels) (HistogramPoint, bool)
 	Summary(name string, labels Labels) (SummaryPoint, bool)
 	StateSet(name string, labels Labels) (StateSetPoint, bool)
+	MeasureSet(name string, labels Labels) (MeasureSetPoint, bool)
 	SeriesMeta(name string, labels Labels) (SeriesMeta, bool)
 	// MetricMeta resolves metadata by metric name in the active reader view.
 	// With Read(ReadFlatten()), lookups use flattened scalar series names.
@@ -94,6 +95,8 @@ type SnapshotMeter interface {
 	Histogram(name string, opts ...InstrumentOption) SnapshotHistogram
 	Summary(name string, opts ...InstrumentOption) SnapshotSummary
 	StateSet(name string, opts ...InstrumentOption) StateSetInstrument
+	MeasureSetGauge(name string, opts ...InstrumentOption) SnapshotMeasureSetGauge
+	MeasureSetCounter(name string, opts ...InstrumentOption) SnapshotMeasureSetCounter
 	LabelSet(labels ...Label) LabelSet
 }
 
@@ -104,6 +107,8 @@ type SnapshotVecMeter interface {
 	Histogram(name string, opts ...InstrumentOption) SnapshotHistogramVec
 	Summary(name string, opts ...InstrumentOption) SnapshotSummaryVec
 	StateSet(name string, opts ...InstrumentOption) SnapshotStateSetVec
+	MeasureSetGauge(name string, opts ...InstrumentOption) SnapshotMeasureSetGaugeVec
+	MeasureSetCounter(name string, opts ...InstrumentOption) SnapshotMeasureSetCounterVec
 }
 
 // StatefulMeter declares stateful-mode instruments under a metric-name prefix.
@@ -117,6 +122,8 @@ type StatefulMeter interface {
 	Histogram(name string, opts ...InstrumentOption) StatefulHistogram
 	Summary(name string, opts ...InstrumentOption) StatefulSummary
 	StateSet(name string, opts ...InstrumentOption) StateSetInstrument
+	MeasureSetGauge(name string, opts ...InstrumentOption) StatefulMeasureSetGauge
+	MeasureSetCounter(name string, opts ...InstrumentOption) StatefulMeasureSetCounter
 	LabelSet(labels ...Label) LabelSet
 }
 
@@ -127,6 +134,8 @@ type StatefulVecMeter interface {
 	Histogram(name string, opts ...InstrumentOption) StatefulHistogramVec
 	Summary(name string, opts ...InstrumentOption) StatefulSummaryVec
 	StateSet(name string, opts ...InstrumentOption) StatefulStateSetVec
+	MeasureSetGauge(name string, opts ...InstrumentOption) StatefulMeasureSetGaugeVec
+	MeasureSetCounter(name string, opts ...InstrumentOption) StatefulMeasureSetCounterVec
 }
 
 // SnapshotGauge writes sampled absolute values; last write wins in a cycle.
@@ -219,6 +228,51 @@ type StatefulSummaryVec interface {
 type StateSetInstrument interface {
 	ObserveStateSet(p StateSetPoint, labels ...LabelSet)
 	Enable(actives ...string)
+}
+
+type SnapshotMeasureSetGauge interface {
+	ObservePoint(p MeasureSetPoint, labels ...LabelSet)
+	ObserveFields(fields map[string]SampleValue, labels ...LabelSet)
+}
+
+type SnapshotMeasureSetGaugeVec interface {
+	GetWithLabelValues(labelValues ...string) (SnapshotMeasureSetGauge, error)
+	WithLabelValues(labelValues ...string) SnapshotMeasureSetGauge
+}
+
+type SnapshotMeasureSetCounter interface {
+	ObserveTotalPoint(p MeasureSetPoint, labels ...LabelSet)
+	ObserveTotalFields(fields map[string]SampleValue, labels ...LabelSet)
+}
+
+type SnapshotMeasureSetCounterVec interface {
+	GetWithLabelValues(labelValues ...string) (SnapshotMeasureSetCounter, error)
+	WithLabelValues(labelValues ...string) SnapshotMeasureSetCounter
+}
+
+type StatefulMeasureSetGauge interface {
+	SetPoint(p MeasureSetPoint, labels ...LabelSet)
+	SetFields(fields map[string]SampleValue, labels ...LabelSet)
+	SetField(field string, value SampleValue, labels ...LabelSet)
+	AddPoint(delta MeasureSetPoint, labels ...LabelSet)
+	AddFields(delta map[string]SampleValue, labels ...LabelSet)
+	AddField(field string, delta SampleValue, labels ...LabelSet)
+}
+
+type StatefulMeasureSetGaugeVec interface {
+	GetWithLabelValues(labelValues ...string) (StatefulMeasureSetGauge, error)
+	WithLabelValues(labelValues ...string) StatefulMeasureSetGauge
+}
+
+type StatefulMeasureSetCounter interface {
+	AddPoint(delta MeasureSetPoint, labels ...LabelSet)
+	AddFields(delta map[string]SampleValue, labels ...LabelSet)
+	AddField(field string, delta SampleValue, labels ...LabelSet)
+}
+
+type StatefulMeasureSetCounterVec interface {
+	GetWithLabelValues(labelValues ...string) (StatefulMeasureSetCounter, error)
+	WithLabelValues(labelValues ...string) StatefulMeasureSetCounter
 }
 
 // SnapshotStateSetVec provides labeled series handles for snapshot statesets.

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
@@ -380,7 +381,7 @@ func metricKindsFromNames(names []string) []string {
 func supportsRuntimeInferredDimension(meta metrixselector.Meta) bool {
 	for _, key := range meta.ConstrainedLabelKeys {
 		switch key {
-		case histogramBucketLabel, summaryQuantileLabel:
+		case metrix.HistogramBucketLabel, metrix.SummaryQuantileLabel:
 			return true
 		}
 	}

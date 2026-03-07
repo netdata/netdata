@@ -142,6 +142,26 @@ type statefulStateSetVec struct {
 	cache *vecCache[*statefulStateSetInstrument]
 }
 
+// snapshotMeasureSetGaugeVec caches snapshot MeasureSet gauge series handles by vec label values.
+type snapshotMeasureSetGaugeVec struct {
+	cache *vecCache[*snapshotMeasureSetGaugeInstrument]
+}
+
+// snapshotMeasureSetCounterVec caches snapshot MeasureSet counter series handles by vec label values.
+type snapshotMeasureSetCounterVec struct {
+	cache *vecCache[*snapshotMeasureSetCounterInstrument]
+}
+
+// statefulMeasureSetGaugeVec caches stateful MeasureSet gauge series handles by vec label values.
+type statefulMeasureSetGaugeVec struct {
+	cache *vecCache[*statefulMeasureSetGaugeInstrument]
+}
+
+// statefulMeasureSetCounterVec caches stateful MeasureSet counter series handles by vec label values.
+type statefulMeasureSetCounterVec struct {
+	cache *vecCache[*statefulMeasureSetCounterInstrument]
+}
+
 // GaugeVec declares or reuses a snapshot gauge and exposes a label-values lookup API.
 func (m *snapshotMeter) GaugeVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotGaugeVec {
 	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindGauge, modeSnapshot, opts...)
@@ -294,6 +314,70 @@ func (m *statefulMeter) StateSetVec(name string, labelKeys []string, opts ...Ins
 	return &statefulStateSetVec{
 		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulStateSetInstrument {
 			return &statefulStateSetInstrument{
+				backend: m.backend,
+				desc:    desc,
+				base:    appendVecSet(base, vecSet),
+			}
+		}),
+	}
+}
+
+// MeasureSetGaugeVec declares or reuses a snapshot MeasureSet gauge and exposes a label-values lookup API.
+func (m *snapshotMeter) MeasureSetGaugeVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotMeasureSetGaugeVec {
+	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindMeasureSet, modeSnapshot, appendMeasureSetSemantics(opts, MeasureSetSemanticsGauge)...)
+	keys := mustNormalizeVecLabelKeys(labelKeys)
+	base := appendLabelSets(m.sets, nil)
+	return &snapshotMeasureSetGaugeVec{
+		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *snapshotMeasureSetGaugeInstrument {
+			return &snapshotMeasureSetGaugeInstrument{
+				backend: m.backend,
+				desc:    desc,
+				base:    appendVecSet(base, vecSet),
+			}
+		}),
+	}
+}
+
+// MeasureSetCounterVec declares or reuses a snapshot MeasureSet counter and exposes a label-values lookup API.
+func (m *snapshotMeter) MeasureSetCounterVec(name string, labelKeys []string, opts ...InstrumentOption) SnapshotMeasureSetCounterVec {
+	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindMeasureSet, modeSnapshot, appendMeasureSetSemantics(opts, MeasureSetSemanticsCounter)...)
+	keys := mustNormalizeVecLabelKeys(labelKeys)
+	base := appendLabelSets(m.sets, nil)
+	return &snapshotMeasureSetCounterVec{
+		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *snapshotMeasureSetCounterInstrument {
+			return &snapshotMeasureSetCounterInstrument{
+				backend: m.backend,
+				desc:    desc,
+				base:    appendVecSet(base, vecSet),
+			}
+		}),
+	}
+}
+
+// MeasureSetGaugeVec declares or reuses a stateful MeasureSet gauge and exposes a label-values lookup API.
+func (m *statefulMeter) MeasureSetGaugeVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulMeasureSetGaugeVec {
+	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindMeasureSet, modeStateful, appendMeasureSetSemantics(opts, MeasureSetSemanticsGauge)...)
+	keys := mustNormalizeVecLabelKeys(labelKeys)
+	base := appendLabelSets(m.sets, nil)
+	return &statefulMeasureSetGaugeVec{
+		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulMeasureSetGaugeInstrument {
+			return &statefulMeasureSetGaugeInstrument{
+				backend: m.backend,
+				desc:    desc,
+				base:    appendVecSet(base, vecSet),
+			}
+		}),
+	}
+}
+
+// MeasureSetCounterVec declares or reuses a stateful MeasureSet counter and exposes a label-values lookup API.
+func (m *statefulMeter) MeasureSetCounterVec(name string, labelKeys []string, opts ...InstrumentOption) StatefulMeasureSetCounterVec {
+	desc := mustRegisterInstrument(m.backend, metricName(m.prefix, name), kindMeasureSet, modeStateful, appendMeasureSetSemantics(opts, MeasureSetSemanticsCounter)...)
+	keys := mustNormalizeVecLabelKeys(labelKeys)
+	base := appendLabelSets(m.sets, nil)
+	return &statefulMeasureSetCounterVec{
+		cache: newVecCache(m.backend, base, keys, func(base []LabelSet, vecSet LabelSet) *statefulMeasureSetCounterInstrument {
+			return &statefulMeasureSetCounterInstrument{
 				backend: m.backend,
 				desc:    desc,
 				base:    appendVecSet(base, vecSet),
@@ -475,6 +559,78 @@ func (v *statefulStateSetVec) GetWithLabelValues(labelValues ...string) (StateSe
 
 // WithLabelValues returns a stateful stateset handle and panics on invalid label values.
 func (v *statefulStateSetVec) WithLabelValues(labelValues ...string) StateSetInstrument {
+	inst, err := v.GetWithLabelValues(labelValues...)
+	if err != nil {
+		panic(err)
+	}
+	return inst
+}
+
+// GetWithLabelValues returns a snapshot MeasureSet gauge handle for the provided vec label values.
+func (v *snapshotMeasureSetGaugeVec) GetWithLabelValues(labelValues ...string) (SnapshotMeasureSetGauge, error) {
+	inst, err := v.cache.get(labelValues...)
+	if err != nil {
+		return nil, err
+	}
+	return inst, nil
+}
+
+// WithLabelValues returns a snapshot MeasureSet gauge handle and panics on invalid label values.
+func (v *snapshotMeasureSetGaugeVec) WithLabelValues(labelValues ...string) SnapshotMeasureSetGauge {
+	inst, err := v.GetWithLabelValues(labelValues...)
+	if err != nil {
+		panic(err)
+	}
+	return inst
+}
+
+// GetWithLabelValues returns a snapshot MeasureSet counter handle for the provided vec label values.
+func (v *snapshotMeasureSetCounterVec) GetWithLabelValues(labelValues ...string) (SnapshotMeasureSetCounter, error) {
+	inst, err := v.cache.get(labelValues...)
+	if err != nil {
+		return nil, err
+	}
+	return inst, nil
+}
+
+// WithLabelValues returns a snapshot MeasureSet counter handle and panics on invalid label values.
+func (v *snapshotMeasureSetCounterVec) WithLabelValues(labelValues ...string) SnapshotMeasureSetCounter {
+	inst, err := v.GetWithLabelValues(labelValues...)
+	if err != nil {
+		panic(err)
+	}
+	return inst
+}
+
+// GetWithLabelValues returns a stateful MeasureSet gauge handle for the provided vec label values.
+func (v *statefulMeasureSetGaugeVec) GetWithLabelValues(labelValues ...string) (StatefulMeasureSetGauge, error) {
+	inst, err := v.cache.get(labelValues...)
+	if err != nil {
+		return nil, err
+	}
+	return inst, nil
+}
+
+// WithLabelValues returns a stateful MeasureSet gauge handle and panics on invalid label values.
+func (v *statefulMeasureSetGaugeVec) WithLabelValues(labelValues ...string) StatefulMeasureSetGauge {
+	inst, err := v.GetWithLabelValues(labelValues...)
+	if err != nil {
+		panic(err)
+	}
+	return inst
+}
+
+// GetWithLabelValues returns a stateful MeasureSet counter handle for the provided vec label values.
+func (v *statefulMeasureSetCounterVec) GetWithLabelValues(labelValues ...string) (StatefulMeasureSetCounter, error) {
+	inst, err := v.cache.get(labelValues...)
+	if err != nil {
+		return nil, err
+	}
+	return inst, nil
+}
+
+// WithLabelValues returns a stateful MeasureSet counter handle and panics on invalid label values.
+func (v *statefulMeasureSetCounterVec) WithLabelValues(labelValues ...string) StatefulMeasureSetCounter {
 	inst, err := v.GetWithLabelValues(labelValues...)
 	if err != nil {
 		panic(err)
