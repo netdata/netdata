@@ -79,4 +79,5 @@ jobs:
 ## Notes
 
 - Azure Monitor metrics are not per-second. Minimum granularity is typically `PT1M`.
-- The collector uses absolute chart algorithms because Azure values are already pre-aggregated.
+- Gauge metrics (average, maximum, minimum) use absolute chart algorithms.
+- Counter metrics (total, count) are accumulated and use incremental chart algorithms so Netdata computes accurate per-second rates.

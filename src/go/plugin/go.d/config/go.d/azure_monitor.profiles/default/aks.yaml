@@ -14,12 +14,12 @@ metrics:
     aggregations: [average]
     time_grain: PT1M
   - name: node_network_in_bytes
-    units: bytes/s
-    aggregations: [total]
+    units: bytes
+    aggregations: [average]
     time_grain: PT1M
   - name: node_network_out_bytes
-    units: bytes/s
-    aggregations: [total]
+    units: bytes
+    aggregations: [average]
     time_grain: PT1M
 charts:
   - id: am_azure_aks__node_cpu_usage_millicores
@@ -76,15 +76,15 @@ charts:
     family: Network
     type: line
     priority: 1030
-    units: bytes/s
-    algorithm: incremental
+    units: bytes
+    algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
       - metric: node_network_in_bytes
-        aggregation: total
-        name: total
+        aggregation: average
+        name: average
 
   - id: am_azure_aks__node_network_out_bytes
     title: Azure Kubernetes Service Cluster Node Network Egress
@@ -92,12 +92,12 @@ charts:
     family: Network
     type: line
     priority: 1040
-    units: bytes/s
-    algorithm: incremental
+    units: bytes
+    algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
       - metric: node_network_out_bytes
-        aggregation: total
-        name: total
+        aggregation: average
+        name: average

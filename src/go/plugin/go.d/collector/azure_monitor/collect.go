@@ -91,7 +91,7 @@ func (c *Collector) collect(ctx context.Context) error {
 		values := labelValues(sample.Labels)
 
 		value := sample.Value
-		if sample.Aggregation == "total" {
+		if sample.Aggregation == "total" || sample.Aggregation == "count" {
 			key := sample.Instrument + "\x00" + strings.Join(values, "\x00")
 			c.accumulators[key] += value
 			value = c.accumulators[key]
