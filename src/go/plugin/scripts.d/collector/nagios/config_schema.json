@@ -54,9 +54,6 @@
       "type": "integer",
       "minimum": 1
     },
-    "vnode": {
-      "type": "string"
-    },
     "update_every": {
       "type": "integer",
       "minimum": 1

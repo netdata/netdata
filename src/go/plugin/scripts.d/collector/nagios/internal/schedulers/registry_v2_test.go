@@ -279,3 +279,55 @@ func TestRegistryDetachIgnoresStaleGenerationHandle(t *testing.T) {
 		t.Fatalf("remove after current-generation detach failed: %v", err)
 	}
 }
+
+func TestRegistryEnsureNoopKeepsHandleGenerationStable(t *testing.T) {
+	reg := newRegistryWithFactory(&fakeHostFactory{})
+	def := Definition{
+		Name:           "noop",
+		Workers:        2,
+		QueueSize:      4,
+		LoggingEnabled: true,
+		Logging: runtime.OTLPEmitterConfig{
+			Endpoint: "http://otel:4317",
+			Timeout:  time.Second,
+			UseTLS:   false,
+			Headers:  map[string]string{},
+		},
+	}
+	if err := reg.Ensure(def, nil); err != nil {
+		t.Fatalf("ensure failed: %v", err)
+	}
+	handle, err := reg.Attach("noop", runtime.JobRegistration{Spec: testRegJobSpec("job1")}, nil)
+	if err != nil {
+		t.Fatalf("attach failed: %v", err)
+	}
+
+	reg.mu.RLock()
+	beforeEntry := reg.entries["noop"]
+	beforeHost := beforeEntry.host
+	beforeGen := beforeEntry.generation
+	reg.mu.RUnlock()
+
+	if err := reg.Ensure(def, nil); err != nil {
+		t.Fatalf("noop ensure failed: %v", err)
+	}
+
+	reg.mu.RLock()
+	afterEntry := reg.entries["noop"]
+	afterHost := afterEntry.host
+	afterGen := afterEntry.generation
+	reg.mu.RUnlock()
+
+	if beforeHost != afterHost {
+		t.Fatalf("expected no-op ensure to keep host instance")
+	}
+	if beforeGen != afterGen {
+		t.Fatalf("expected no-op ensure to keep generation: before=%d after=%d", beforeGen, afterGen)
+	}
+
+	// Existing handle should still be valid after no-op ensure.
+	reg.Detach(handle)
+	if err := reg.Remove("noop"); err != nil {
+		t.Fatalf("remove after detach failed: %v", err)
+	}
+}

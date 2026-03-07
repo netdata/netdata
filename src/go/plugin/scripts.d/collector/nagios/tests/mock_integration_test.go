@@ -54,7 +54,7 @@ func TestMockPluginMacrosExposeExpectedValues(t *testing.T) {
 	if spec.Vnode == "" {
 		t.Fatalf("vnode not set on job spec")
 	}
-	_, emitter, _ := startTestScheduler(t, []specpkg.JobSpec{spec})
+	_, emitter := startTestScheduler(t, []specpkg.JobSpec{spec})
 	results := waitForResults(t, emitter, 1)
 	require.NoError(t, results[0].Err)
 	output := string(results[0].Output)
@@ -69,7 +69,7 @@ func TestMockPluginMacrosExposeExpectedValues(t *testing.T) {
 }
 
 func TestMockPluginHandlesLongOutputAndLogs(t *testing.T) {
-	_, emitter, _ := startTestScheduler(t, []specpkg.JobSpec{newJobSpec(t, "mock_long", "check_mock_long.sh", nil)})
+	_, emitter := startTestScheduler(t, []specpkg.JobSpec{newJobSpec(t, "mock_long", "check_mock_long.sh", nil)})
 	results := waitForResults(t, emitter, 1)
 	longOut := results[0].Parsed.LongOutput
 	require.Contains(t, longOut, "line-one details")

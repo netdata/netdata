@@ -141,6 +141,10 @@ func (r *Registry) Ensure(def Definition, log *logger.Logger) error {
 		}
 		return nil
 	}
+	if reflect.DeepEqual(existingDef, norm) {
+		// No-op update: keep host/generation stable so existing handles remain valid.
+		return nil
+	}
 
 	jobs := entry.host.snapshotJobs()
 	newHost, err := r.hostFactory.New(norm, log)
@@ -246,11 +250,16 @@ func (r *Registry) Detach(handle *SchedulerJobHandle) {
 func (r *Registry) Snapshot(name string) (runtime.SchedulerSnapshot, bool) {
 	r.mu.RLock()
 	entry := r.entries[name]
-	r.mu.RUnlock()
 	if entry == nil {
+		r.mu.RUnlock()
 		return runtime.SchedulerSnapshot{}, false
 	}
-	return entry.host.collectSnapshot(), true
+	host := entry.host
+	r.mu.RUnlock()
+	if host == nil {
+		return runtime.SchedulerSnapshot{}, false
+	}
+	return host.collectSnapshot(), true
 }
 
 // Get returns a normalized definition by name.
