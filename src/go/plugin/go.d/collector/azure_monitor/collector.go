@@ -58,6 +58,7 @@ func New() *Collector {
 		nextCollectByGrain: make(map[string]time.Time),
 		metricsClients:     make(map[string]metricsQueryClient),
 		accumulators:       make(map[string]float64),
+		lastObserved:       make(map[string]lastObservation),
 	}
 	return c
 }
@@ -88,6 +89,7 @@ type Collector struct {
 	metricsClients   map[string]metricsQueryClient
 
 	accumulators       map[string]float64
+	lastObserved       map[string]lastObservation
 	nextCollectByGrain map[string]time.Time
 }
 
@@ -158,6 +160,7 @@ func (c *Collector) Cleanup(context.Context) {
 	defer c.metricsClientsMu.Unlock()
 	c.metricsClients = make(map[string]metricsQueryClient)
 	c.accumulators = make(map[string]float64)
+	c.lastObserved = make(map[string]lastObservation)
 }
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }

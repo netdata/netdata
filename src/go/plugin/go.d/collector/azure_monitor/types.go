@@ -70,6 +70,9 @@ type metricRuntime struct {
 	TimeGrainEvery  time.Duration
 	Aggregations    []string
 	InstrumentByAgg map[string]string
+	// AccumulateAgg tracks which aggregations should be accumulated as counters.
+	// Set during plan building: true when the chart using this metric+agg has algorithm=incremental.
+	AccumulateAgg map[string]bool
 }
 
 type discoveryState struct {
@@ -101,15 +104,21 @@ type queryTask struct {
 }
 
 type metricSample struct {
-	Instrument  string
-	Labels      metrix.Labels
-	Value       float64
-	Aggregation string
+	Instrument string
+	Labels     metrix.Labels
+	Value      float64
+	Accumulate bool
 }
 
 type taskResult struct {
 	Samples []metricSample
 	Err     error
+}
+
+type lastObservation struct {
+	instrument  string
+	labelValues []string
+	value       float64
 }
 
 func stringsLowerTrim(v string) string {
