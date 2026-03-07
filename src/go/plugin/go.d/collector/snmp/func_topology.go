@@ -306,6 +306,13 @@ func snmpTopologyPresentation() *topology.Presentation {
 			"snmp":    {Label: "SNMP", ColorSlot: "primary"},
 			"probable": {Label: "Probable", ColorSlot: "dim"},
 		},
+		PortFields: []topology.PresentationPortField{
+			{Key: "type", Label: "Type"},
+			{Key: "role", Label: "Role"},
+			{Key: "status", Label: "Status"},
+			{Key: "mode", Label: "Mode"},
+			{Key: "sources", Label: "Sources"},
+		},
 		PortTypes: map[string]topology.PresentationPortType{
 			"lldp":           {Label: "lldp/cdp", ColorSlot: "accent"},
 			"switch_facing":  {Label: "switch-facing", ColorSlot: "primary"},
