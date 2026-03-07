@@ -97,7 +97,7 @@ password: "${cmd:/usr/bin/op read op://vault/netdata-mysql/password}"
 
 :::important
 
-For security, the command path must be absolute (e.g., `/usr/bin/vault`, not just `vault`). Commands have a 10-second timeout.
+For security, the command path must be absolute (e.g., `/usr/bin/vault`, not just `vault`). Commands have a 10-second timeout. Arguments are split by whitespace — if an argument contains spaces, use a wrapper script.
 
 :::
 
