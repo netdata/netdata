@@ -208,6 +208,8 @@ func flattenSnapshot(src *readSnapshot) *readSnapshot {
 			appendFlattenedSummarySeries(dst, s)
 		case kindStateSet:
 			appendFlattenedStateSetSeries(dst, s)
+		case kindMeasureSet:
+			appendFlattenedMeasureSetSeries(dst, s)
 		}
 	}
 
@@ -458,6 +460,71 @@ func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
 				FlattenRoleStateSetState,
 			),
 		}
+	}
+}
+
+func appendFlattenedMeasureSetSeries(dst *readSnapshot, src *committedSeries) {
+	schema := src.desc.measureSet
+	if schema == nil || len(src.measureSetValues) != len(schema.fields) {
+		return
+	}
+
+	kind := MetricKindGauge
+	descKind := kindGauge
+	if schema.semantics == MeasureSetSemanticsCounter {
+		kind = MetricKindCounter
+		descKind = kindCounter
+	}
+
+	for i, field := range schema.fields {
+		labelsMap := make(map[string]string, len(src.labels))
+		for _, lbl := range src.labels {
+			labelsMap[lbl.Key] = lbl.Value
+		}
+
+		labels, labelsKey, err := canonicalizeLabels(labelsMap)
+		if err != nil {
+			continue
+		}
+
+		name := src.name + "_" + field.Name
+		key := makeSeriesKey(name, labelsKey)
+		meta := src.desc.meta
+		meta.Float = field.Float
+
+		series := &committedSeries{
+			id:        SeriesID(key),
+			hash64:    seriesIDHash(SeriesID(key)),
+			key:       key,
+			name:      name,
+			labels:    labels,
+			labelsKey: labelsKey,
+			desc: &instrumentDescriptor{
+				name:      name,
+				kind:      descKind,
+				mode:      src.desc.mode,
+				freshness: src.desc.freshness,
+				window:    src.desc.window,
+				meta:      meta,
+			},
+			value: src.measureSetValues[i],
+			meta: flattenedSeriesMeta(
+				src.meta,
+				kind,
+				MetricKindMeasureSet,
+				FlattenRoleMeasureSetField,
+			),
+		}
+		if schema.semantics == MeasureSetSemanticsCounter {
+			series.counterCurrent = src.measureSetValues[i]
+			series.counterCurrentSeq = src.measureSetCurrentSeq
+			if src.measureSetHasPrev && len(src.measureSetPreviousValues) == len(schema.fields) {
+				series.counterHasPrev = true
+				series.counterPrevious = src.measureSetPreviousValues[i]
+				series.counterPreviousSeq = src.measureSetPreviousSeq
+			}
+		}
+		dst.series[key] = series
 	}
 }
 

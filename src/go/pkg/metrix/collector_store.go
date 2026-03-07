@@ -100,7 +100,11 @@ type committedSeries struct {
 	stateSetValues map[string]bool
 
 	// MeasureSet current sample (used by MeasureSet()).
-	measureSetValues []SampleValue
+	measureSetValues         []SampleValue
+	measureSetPreviousValues []SampleValue
+	measureSetHasPrev        bool
+	measureSetCurrentSeq     uint64
+	measureSetPreviousSeq    uint64
 
 	meta SeriesMeta
 }
@@ -116,12 +120,14 @@ type readSnapshot struct {
 }
 
 type cycleFrame struct {
-	seq        uint64
-	gauges     map[string]*stagedGauge
-	counters   map[string]*stagedCounter
-	histograms map[string]*stagedHistogram
-	summaries  map[string]*stagedSummary
-	stateSet   map[string]*stagedStateSet
+	seq                uint64
+	gauges             map[string]*stagedGauge
+	counters           map[string]*stagedCounter
+	histograms         map[string]*stagedHistogram
+	summaries          map[string]*stagedSummary
+	stateSet           map[string]*stagedStateSet
+	measureSetGauges   map[string]*stagedMeasureSet
+	measureSetCounters map[string]*stagedMeasureSet
 }
 
 type storeCore struct {
@@ -228,12 +234,14 @@ func (c *storeCycleController) BeginCycle() {
 
 	c.core.sequence++
 	c.core.active = &cycleFrame{
-		seq:        c.core.sequence,
-		gauges:     make(map[string]*stagedGauge),
-		counters:   make(map[string]*stagedCounter),
-		histograms: make(map[string]*stagedHistogram),
-		summaries:  make(map[string]*stagedSummary),
-		stateSet:   make(map[string]*stagedStateSet),
+		seq:                c.core.sequence,
+		gauges:             make(map[string]*stagedGauge),
+		counters:           make(map[string]*stagedCounter),
+		histograms:         make(map[string]*stagedHistogram),
+		summaries:          make(map[string]*stagedSummary),
+		stateSet:           make(map[string]*stagedStateSet),
+		measureSetGauges:   make(map[string]*stagedMeasureSet),
+		measureSetCounters: make(map[string]*stagedMeasureSet),
 	}
 }
 
@@ -342,6 +350,30 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
 
 		series.stateSetValues = cloneStateMap(staged.states)
+		markSeriesSeen(series, c.core.active.seq, successSeq)
+	}
+
+	for key, staged := range c.core.active.measureSetGauges {
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
+		series.measureSetValues = append(series.measureSetValues[:0], staged.values...)
+		markSeriesSeen(series, c.core.active.seq, successSeq)
+	}
+
+	for key, staged := range c.core.active.measureSetCounters {
+		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
+
+		if series.desc != nil && series.desc.kind == kindMeasureSet && series.desc.measureSet != nil && series.desc.measureSet.semantics == MeasureSetSemanticsCounter && series.measureSetCurrentSeq > 0 {
+			series.measureSetPreviousValues = append(series.measureSetPreviousValues[:0], series.measureSetValues...)
+			series.measureSetPreviousSeq = series.measureSetCurrentSeq
+			series.measureSetHasPrev = true
+		} else {
+			series.measureSetPreviousValues = nil
+			series.measureSetPreviousSeq = 0
+			series.measureSetHasPrev = false
+		}
+
+		series.measureSetValues = append(series.measureSetValues[:0], staged.values...)
+		series.measureSetCurrentSeq = c.core.active.seq
 		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
@@ -631,6 +663,9 @@ func cloneCommittedSeries(s *committedSeries) *committedSeries {
 	}
 	if len(s.measureSetValues) > 0 {
 		cp.measureSetValues = append([]SampleValue(nil), s.measureSetValues...)
+	}
+	if len(s.measureSetPreviousValues) > 0 {
+		cp.measureSetPreviousValues = append([]SampleValue(nil), s.measureSetPreviousValues...)
 	}
 	if len(s.histogramCumulative) > 0 {
 		cp.histogramCumulative = append([]SampleValue(nil), s.histogramCumulative...)

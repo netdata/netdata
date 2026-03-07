@@ -301,20 +301,91 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeObservePoint(_ *instrumentDes
 	panic(errRuntimeSnapshotWrite)
 }
 
-func (r *runtimeStoreBackend) recordMeasureSetGaugeSetPoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
-	panic(errMeasureSetPending)
+func (r *runtimeStoreBackend) recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet) {
+	schema := desc.measureSet
+	if schema == nil || schema.semantics != MeasureSetSemanticsGauge {
+		panic(errMeasureSetSchema)
+	}
+
+	values := normalizeMeasureSetPoint(point, schema)
+
+	labels, labelsKey, err := labelsFromSet(sets, r)
+	if err != nil {
+		panic(err)
+	}
+	key := makeSeriesKey(desc.name, labelsKey)
+	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
+		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
+		series.measureSetValues = append(series.measureSetValues[:0], values...)
+		series.meta.LastSeenSuccessSeq = seq
+		series.runtimeLastSeenUnixNano = nowUnixNano
+	})
 }
 
-func (r *runtimeStoreBackend) recordMeasureSetGaugeAddPoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
-	panic(errMeasureSetPending)
+func (r *runtimeStoreBackend) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, delta MeasureSetPoint, sets []LabelSet) {
+	schema := desc.measureSet
+	if schema == nil || schema.semantics != MeasureSetSemanticsGauge {
+		panic(errMeasureSetSchema)
+	}
+
+	values := normalizeMeasureSetPoint(delta, schema)
+
+	labels, labelsKey, err := labelsFromSet(sets, r)
+	if err != nil {
+		panic(err)
+	}
+	key := makeSeriesKey(desc.name, labelsKey)
+	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
+		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
+		if len(series.measureSetValues) == 0 {
+			series.measureSetValues = make([]SampleValue, len(schema.fields))
+		}
+		for i, deltaValue := range values {
+			series.measureSetValues[i] += deltaValue
+		}
+		series.meta.LastSeenSuccessSeq = seq
+		series.runtimeLastSeenUnixNano = nowUnixNano
+	})
 }
 
 func (r *runtimeStoreBackend) recordMeasureSetCounterObserveTotalPoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
 	panic(errRuntimeSnapshotWrite)
 }
 
-func (r *runtimeStoreBackend) recordMeasureSetCounterAddPoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
-	panic(errMeasureSetPending)
+func (r *runtimeStoreBackend) recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, delta MeasureSetPoint, sets []LabelSet) {
+	schema := desc.measureSet
+	if schema == nil || schema.semantics != MeasureSetSemanticsCounter {
+		panic(errMeasureSetSchema)
+	}
+
+	values := normalizeMeasureSetCounterDelta(delta, schema)
+
+	labels, labelsKey, err := labelsFromSet(sets, r)
+	if err != nil {
+		panic(err)
+	}
+	key := makeSeriesKey(desc.name, labelsKey)
+	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
+		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
+		if len(series.measureSetValues) == 0 {
+			series.measureSetValues = make([]SampleValue, len(schema.fields))
+		}
+		if series.measureSetCurrentSeq > 0 {
+			series.measureSetPreviousValues = append(series.measureSetPreviousValues[:0], series.measureSetValues...)
+			series.measureSetPreviousSeq = series.measureSetCurrentSeq
+			series.measureSetHasPrev = true
+		} else {
+			series.measureSetPreviousValues = nil
+			series.measureSetPreviousSeq = 0
+			series.measureSetHasPrev = false
+		}
+		for i, deltaValue := range values {
+			series.measureSetValues[i] += deltaValue
+		}
+		series.measureSetCurrentSeq++
+		series.meta.LastSeenSuccessSeq = seq
+		series.runtimeLastSeenUnixNano = nowUnixNano
+	})
 }
 
 func (r *runtimeStoreBackend) commitRuntimeWrite(apply func(old, next *readSnapshot, seq uint64, nowUnixNano int64)) {

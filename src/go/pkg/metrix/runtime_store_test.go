@@ -109,6 +109,39 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				mustValue(t, fr, "runtime.mode", Labels{"runtime.mode": "operational"}, 1)
 			},
 		},
+		"runtime MeasureSet gauge and counter are readable and flattenable": {
+			run: func(t *testing.T) {
+				s := NewRuntimeStore()
+				m := s.Write().StatefulMeter("runtime")
+				g := m.MeasureSetGauge(
+					"usage",
+					WithMeasureSetFields(
+						FieldSpec{Name: "value"},
+						FieldSpec{Name: "limit"},
+					),
+				)
+				c := m.MeasureSetCounter(
+					"events",
+					WithMeasureSetFields(
+						FieldSpec{Name: "ok"},
+						FieldSpec{Name: "failed"},
+					),
+				)
+
+				g.SetPoint(MeasureSetPoint{Values: []SampleValue{10, 20}})
+				g.AddPoint(MeasureSetPoint{Values: []SampleValue{1, 2}})
+				mustMeasureSet(t, s.Read(), "runtime.usage", nil, []SampleValue{11, 22})
+				mustValue(t, s.Read(ReadFlatten()), "runtime.usage_value", nil, 11)
+				mustValue(t, s.Read(ReadFlatten()), "runtime.usage_limit", nil, 22)
+
+				c.AddPoint(MeasureSetPoint{Values: []SampleValue{5, 1}})
+				mustNoDelta(t, s.Read(ReadFlatten()), "runtime.events_ok", nil)
+				c.AddPoint(MeasureSetPoint{Values: []SampleValue{2, 3}})
+				mustMeasureSet(t, s.Read(), "runtime.events", nil, []SampleValue{7, 4})
+				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_ok", nil, 2)
+				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_failed", nil, 3)
+			},
+		},
 		"runtime counter is thread-safe for concurrent writers": {
 			run: func(t *testing.T) {
 				s := NewRuntimeStore()

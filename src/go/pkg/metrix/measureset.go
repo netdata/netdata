@@ -2,6 +2,16 @@
 
 package metrix
 
+// stagedMeasureSet holds one in-cycle MeasureSet sample for a single series identity.
+type stagedMeasureSet struct {
+	key       string
+	name      string
+	labels    []Label
+	labelsKey string
+	desc      *instrumentDescriptor
+	values    []SampleValue
+}
+
 // snapshotMeasureSetGaugeInstrument writes sampled MeasureSet gauge points.
 type snapshotMeasureSetGaugeInstrument struct {
 	backend meterBackend
@@ -109,22 +119,192 @@ func (m *statefulMeasureSetCounterInstrument) AddPoint(delta MeasureSetPoint, la
 	m.backend.recordMeasureSetCounterAddPoint(m.desc, delta, appendLabelSets(m.base, labels))
 }
 
-func (c *storeCore) recordMeasureSetGaugeObservePoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
-	panic(errMeasureSetPending)
+func normalizeMeasureSetPoint(point MeasureSetPoint, schema *measureSetSchema) []SampleValue {
+	if schema == nil {
+		panic(errMeasureSetSchema)
+	}
+	if len(point.Values) != len(schema.fields) {
+		panic(errMeasureSetPoint)
+	}
+
+	values := make([]SampleValue, len(point.Values))
+	for i, v := range point.Values {
+		mustFiniteSample(v)
+		values[i] = v
+	}
+	return values
 }
 
-func (c *storeCore) recordMeasureSetGaugeSetPoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
-	panic(errMeasureSetPending)
+func normalizeMeasureSetCounterDelta(delta MeasureSetPoint, schema *measureSetSchema) []SampleValue {
+	values := normalizeMeasureSetPoint(delta, schema)
+	for _, v := range values {
+		if v < 0 {
+			panic(errCounterNegativeDelta)
+		}
+	}
+	return values
 }
 
-func (c *storeCore) recordMeasureSetGaugeAddPoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
-	panic(errMeasureSetPending)
+func (c *storeCore) recordMeasureSetGaugeObservePoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet) {
+	c.recordMeasureSetGaugeSetPoint(desc, point, sets)
 }
 
-func (c *storeCore) recordMeasureSetCounterObserveTotalPoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
-	panic(errMeasureSetPending)
+func (c *storeCore) recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet) {
+	schema := desc.measureSet
+	if schema == nil || schema.semantics != MeasureSetSemanticsGauge {
+		panic(errMeasureSetSchema)
+	}
+
+	values := normalizeMeasureSetPoint(point, schema)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.active == nil {
+		panic(errCycleInactive)
+	}
+
+	labels, labelsKey, err := labelsFromSet(sets, c)
+	if err != nil {
+		panic(err)
+	}
+
+	key := makeSeriesKey(desc.name, labelsKey)
+	entry, ok := c.active.measureSetGauges[key]
+	if !ok {
+		entry = &stagedMeasureSet{
+			key:       key,
+			name:      desc.name,
+			labels:    labels,
+			labelsKey: labelsKey,
+			desc:      desc,
+		}
+		c.active.measureSetGauges[key] = entry
+	}
+	entry.values = append(entry.values[:0], values...)
 }
 
-func (c *storeCore) recordMeasureSetCounterAddPoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
-	panic(errMeasureSetPending)
+func (c *storeCore) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, delta MeasureSetPoint, sets []LabelSet) {
+	schema := desc.measureSet
+	if schema == nil || schema.semantics != MeasureSetSemanticsGauge {
+		panic(errMeasureSetSchema)
+	}
+
+	values := normalizeMeasureSetPoint(delta, schema)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.active == nil {
+		panic(errCycleInactive)
+	}
+
+	labels, labelsKey, err := labelsFromSet(sets, c)
+	if err != nil {
+		panic(err)
+	}
+
+	key := makeSeriesKey(desc.name, labelsKey)
+	entry, ok := c.active.measureSetGauges[key]
+	if !ok {
+		baseline := make([]SampleValue, len(schema.fields))
+		if existing := c.snapshot.Load().series[key]; existing != nil {
+			baseline = append(baseline[:0], existing.measureSetValues...)
+			if len(baseline) != len(schema.fields) {
+				baseline = make([]SampleValue, len(schema.fields))
+			}
+		}
+		entry = &stagedMeasureSet{
+			key:       key,
+			name:      desc.name,
+			labels:    labels,
+			labelsKey: labelsKey,
+			desc:      desc,
+			values:    baseline,
+		}
+		c.active.measureSetGauges[key] = entry
+	}
+	for i, deltaValue := range values {
+		entry.values[i] += deltaValue
+	}
+}
+
+func (c *storeCore) recordMeasureSetCounterObserveTotalPoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet) {
+	schema := desc.measureSet
+	if schema == nil || schema.semantics != MeasureSetSemanticsCounter {
+		panic(errMeasureSetSchema)
+	}
+
+	values := normalizeMeasureSetPoint(point, schema)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.active == nil {
+		panic(errCycleInactive)
+	}
+
+	labels, labelsKey, err := labelsFromSet(sets, c)
+	if err != nil {
+		panic(err)
+	}
+
+	key := makeSeriesKey(desc.name, labelsKey)
+	entry, ok := c.active.measureSetCounters[key]
+	if !ok {
+		entry = &stagedMeasureSet{
+			key:       key,
+			name:      desc.name,
+			labels:    labels,
+			labelsKey: labelsKey,
+			desc:      desc,
+		}
+		c.active.measureSetCounters[key] = entry
+	}
+	entry.values = append(entry.values[:0], values...)
+}
+
+func (c *storeCore) recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, delta MeasureSetPoint, sets []LabelSet) {
+	schema := desc.measureSet
+	if schema == nil || schema.semantics != MeasureSetSemanticsCounter {
+		panic(errMeasureSetSchema)
+	}
+
+	values := normalizeMeasureSetCounterDelta(delta, schema)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.active == nil {
+		panic(errCycleInactive)
+	}
+
+	labels, labelsKey, err := labelsFromSet(sets, c)
+	if err != nil {
+		panic(err)
+	}
+
+	key := makeSeriesKey(desc.name, labelsKey)
+	entry, ok := c.active.measureSetCounters[key]
+	if !ok {
+		baseline := make([]SampleValue, len(schema.fields))
+		if existing := c.snapshot.Load().series[key]; existing != nil {
+			baseline = append(baseline[:0], existing.measureSetValues...)
+			if len(baseline) != len(schema.fields) {
+				baseline = make([]SampleValue, len(schema.fields))
+			}
+		}
+		entry = &stagedMeasureSet{
+			key:       key,
+			name:      desc.name,
+			labels:    labels,
+			labelsKey: labelsKey,
+			desc:      desc,
+			values:    baseline,
+		}
+		c.active.measureSetCounters[key] = entry
+	}
+	for i, deltaValue := range values {
+		entry.values[i] += deltaValue
+	}
 }
