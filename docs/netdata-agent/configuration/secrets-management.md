@@ -8,11 +8,21 @@ Secret references work with both YAML configuration files and the [Dynamic Confi
 
 :::tip
 
-**TL;DR** — Replace any plain-text secret in a collector config with a reference like `${env:MYSQL_PASSWORD}` or `${file:/run/secrets/db_pass}`. Netdata resolves it at job startup.
+**TL;DR** — Replace any plain-text secret in a collector config with a reference like `${env:MYSQL_PASSWORD}`, `${file:/run/secrets/db_pass}`, or `${vault:secret/data/myapp#password}`. Netdata resolves it at job startup.
 
 :::
 
 ## Supported Methods
+
+| Method | Syntax | Use Case |
+|--------|--------|----------|
+| Environment variable | `${env:VAR_NAME}` or `${VAR_NAME}` | systemd, Docker, K8s env injection |
+| File | `${file:/path/to/secret}` | K8s mounted secrets, Docker secrets, vault sidecars |
+| External command | `${cmd:/usr/bin/command args}` | Any vault CLI |
+| HashiCorp Vault | `${vault:path#key}` | Native Vault API integration |
+| AWS Secrets Manager | `${aws-sm:secret-name#key}` | Native AWS API integration |
+| Azure Key Vault | `${azure-kv:vault-name/secret-name}` | Native Azure API integration |
+| GCP Secret Manager | `${gcp-sm:project/secret}` | Native GCP API integration |
 
 ### Environment Variables
 
@@ -56,15 +66,9 @@ This works with:
 - Docker secrets (`/run/secrets/`)
 - Any vault sidecar that writes secrets to the filesystem
 
-### External Commands (Coming Soon)
+### External Commands
 
-:::note
-
-External command references are planned for a future release and are not yet available.
-
-:::
-
-Execute any command and use its stdout as the secret value, using the `${cmd:/usr/bin/command args}` syntax:
+Execute any command and use its stdout as the secret value using the `${cmd:/path/to/command args}` syntax:
 
 ```yaml
 jobs:
@@ -72,7 +76,118 @@ jobs:
     password: "${cmd:/usr/bin/vault kv get -field=password secret/netdata/mysql}"
 ```
 
-This will support any vault CLI — HashiCorp Vault, AWS CLI, Azure CLI, and others.
+This works with any vault that has a CLI:
+
+```yaml
+# HashiCorp Vault
+password: "${cmd:/usr/bin/vault kv get -field=password secret/netdata/mysql}"
+
+# AWS CLI
+password: "${cmd:/usr/bin/aws secretsmanager get-secret-value --secret-id netdata/mysql --query SecretString --output text}"
+
+# Azure CLI
+password: "${cmd:/usr/bin/az keyvault secret show --name mysql-pass --vault-name myvault --query value -o tsv}"
+
+# GCP CLI
+password: "${cmd:/usr/bin/gcloud secrets versions access latest --secret=mysql-pass}"
+
+# 1Password CLI
+password: "${cmd:/usr/bin/op read op://vault/netdata-mysql/password}"
+```
+
+:::important
+
+For security, the command path must be absolute (e.g., `/usr/bin/vault`, not just `vault`). Commands have a 10-second timeout.
+
+:::
+
+### HashiCorp Vault
+
+Access secrets directly from HashiCorp Vault using the `${vault:path#key}` syntax:
+
+```yaml
+jobs:
+  - name: prod
+    password: "${vault:secret/data/netdata/mysql#password}"
+```
+
+The part before `#` is the Vault API path, and the part after `#` is the key within the secret data. Both KV v1 and KV v2 secret engines are supported.
+
+**Required environment variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `VAULT_ADDR` | Vault server address (e.g., `https://vault.example.com`) |
+| `VAULT_TOKEN` | Authentication token |
+
+**Optional environment variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `VAULT_TOKEN_FILE` | Path to file containing the token (fallback: `~/.vault-token`) |
+| `VAULT_NAMESPACE` | Vault namespace (for Vault Enterprise) |
+| `VAULT_SKIP_VERIFY` | Set to `true` or `1` to skip TLS certificate verification |
+
+### AWS Secrets Manager
+
+Access secrets directly from AWS Secrets Manager using the `${aws-sm:secret-name}` syntax:
+
+```yaml
+jobs:
+  - name: prod
+    # Return the full SecretString
+    dsn: "${aws-sm:netdata/mysql-dsn}"
+
+    # Parse SecretString as JSON and extract a specific key
+    password: "${aws-sm:netdata/mysql#password}"
+```
+
+**Authentication** (tried in order):
+
+1. Environment variables: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, optional `AWS_SESSION_TOKEN`
+2. ECS container credentials: automatic when `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` is set
+3. EC2 Instance Metadata Service (IMDS v2): automatic on EC2 instances with an IAM role
+
+**Required environment variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `AWS_DEFAULT_REGION` or `AWS_REGION` | AWS region (e.g., `us-east-1`) |
+
+### Azure Key Vault
+
+Access secrets directly from Azure Key Vault using the `${azure-kv:vault-name/secret-name}` syntax:
+
+```yaml
+jobs:
+  - name: prod
+    password: "${azure-kv:my-keyvault/mysql-password}"
+```
+
+**Authentication** (tried in order):
+
+1. Client credentials: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` (all three required)
+2. Managed Identity: automatic on Azure VMs/containers. If `AZURE_CLIENT_ID` is set (without the other two), it selects a specific user-assigned managed identity.
+
+### GCP Secret Manager
+
+Access secrets directly from GCP Secret Manager using the `${gcp-sm:project/secret}` syntax:
+
+```yaml
+jobs:
+  - name: prod
+    password: "${gcp-sm:my-project/mysql-password}"
+
+    # Access a specific version
+    password: "${gcp-sm:my-project/mysql-password/2}"
+```
+
+If no version is specified, `latest` is used.
+
+**Authentication** (tried in order):
+
+1. Metadata server: automatic on GCE/GKE instances with Workload Identity
+2. Service account JSON: set `GOOGLE_APPLICATION_CREDENTIALS` to the path of a service account JSON key file
 
 ## How It Works
 
@@ -92,8 +207,8 @@ Create an environment file with your secrets and reference it from a systemd dro
 ```ini
 # /etc/netdata/secrets.env
 MYSQL_PASSWORD=supersecret
-PGUSER=netdata
-PGPASSWORD=s3cret
+VAULT_ADDR=https://vault.example.com
+VAULT_TOKEN=hvs.CAESIJlU...
 ```
 
 Create a drop-in override for the Netdata service:
@@ -191,24 +306,22 @@ spec:
 
 The resulting Kubernetes Secret can then be injected as environment variables or mounted as files — both of which Netdata can resolve.
 
-## Vault Integrations
+## Vault Integration Summary
 
-The following table shows how popular vault solutions can provide secrets to Netdata through environment variables or files:
-
-| Vault | Method | How |
-|-------|--------|-----|
-| HashiCorp Vault | Env/File | Vault Agent sidecar, Vault CSI Provider, or Vault CLI in init container |
-| AWS Secrets Manager | Env/File | External Secrets Operator, or AWS Secrets CSI Driver |
-| Azure Key Vault | Env/File | External Secrets Operator, or Azure Key Vault CSI Driver |
-| GCP Secret Manager | Env/File | External Secrets Operator, or GCP Secret CSI Driver |
-| CyberArk | Env/File | Conjur sidecar, CyberArk Secrets Provider |
-| 1Password | Env/File | 1Password Connect, or `op` CLI in init script |
-| Doppler | Env | Doppler CLI or Kubernetes Operator |
-| Infisical | Env/File | Infisical Agent or Kubernetes Operator |
+| Vault | Native Support | Via `${cmd:...}` | Via Env/File |
+|-------|---------------|-------------------|--------------|
+| HashiCorp Vault | `${vault:path#key}` | `${cmd:/usr/bin/vault ...}` | Vault Agent sidecar |
+| AWS Secrets Manager | `${aws-sm:name#key}` | `${cmd:/usr/bin/aws ...}` | External Secrets Operator |
+| Azure Key Vault | `${azure-kv:vault/name}` | `${cmd:/usr/bin/az ...}` | External Secrets Operator |
+| GCP Secret Manager | `${gcp-sm:project/name}` | `${cmd:/usr/bin/gcloud ...}` | External Secrets Operator |
+| CyberArk | — | `${cmd:/usr/bin/conjur ...}` | Conjur sidecar |
+| 1Password | — | `${cmd:/usr/bin/op read ...}` | 1Password Connect |
+| Doppler | — | `${cmd:/usr/bin/doppler ...}` | Doppler CLI injection |
+| Infisical | — | `${cmd:/usr/bin/infisical ...}` | Infisical Agent |
 
 :::tip
 
-You do not need a specific Netdata plugin for any of these vaults. As long as the vault solution can inject secrets as **environment variables** or **files**, Netdata can consume them.
+Every vault solution is supported. Use native integration for the simplest setup, `${cmd:...}` for any vault with a CLI, or environment variable/file injection via sidecars and operators.
 
 :::
 
@@ -231,6 +344,18 @@ Verify the file path exists and that the `netdata` user has read access to it:
 ```bash
 sudo -u netdata cat /path/to/secret/file
 ```
+
+**Error: "command path must be absolute"**
+
+The `${cmd:...}` provider requires an absolute path to the command. Use the full path (e.g., `/usr/bin/vault` not just `vault`).
+
+**Error: "VAULT_ADDR environment variable is not set"**
+
+The `${vault:...}` provider requires `VAULT_ADDR` and `VAULT_TOKEN` (or a token file) to be set. See [HashiCorp Vault](#hashicorp-vault) for details.
+
+**Error: "AWS region not set"**
+
+The `${aws-sm:...}` provider requires `AWS_DEFAULT_REGION` or `AWS_REGION`. On EC2/ECS, credentials are obtained automatically from the instance metadata service.
 
 **Job keeps restarting but secrets are not available yet**
 

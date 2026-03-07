@@ -1,0 +1,237 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package secretresolver
+
+import (
+	"crypto"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"time"
+)
+
+var gcpHTTPClient = &http.Client{Timeout: 10 * time.Second}
+var gcpMetadataHTTPClient = &http.Client{Timeout: 2 * time.Second}
+
+func resolveGCPSM(ref, original string) (string, error) {
+	project, rest, ok := strings.Cut(ref, "/")
+	if !ok || project == "" || rest == "" {
+		return "", fmt.Errorf("resolving secret '%s': reference must be in format 'project/secret' or 'project/secret/version'", original)
+	}
+
+	secret, version, hasVersion := strings.Cut(rest, "/")
+	if !hasVersion || version == "" {
+		version = "latest"
+	}
+
+	token, err := gcpGetAccessToken(original)
+	if err != nil {
+		return "", err
+	}
+
+	secretURL := fmt.Sprintf(
+		"https://secretmanager.googleapis.com/v1/projects/%s/secrets/%s/versions/%s:access",
+		project, secret, version,
+	)
+
+	req, err := http.NewRequest(http.MethodGet, secretURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("resolving secret '%s': creating request: %w", original, err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := gcpHTTPClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("resolving secret '%s': request failed: %w", original, err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("resolving secret '%s': reading response: %w", original, err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("resolving secret '%s': GCP Secret Manager returned HTTP %d: %s", original, resp.StatusCode, truncateBody(body))
+	}
+
+	var result struct {
+		Payload struct {
+			Data string `json:"data"`
+		} `json:"payload"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("resolving secret '%s': parsing response: %w", original, err)
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(result.Payload.Data)
+	if err != nil {
+		return "", fmt.Errorf("resolving secret '%s': decoding secret data: %w", original, err)
+	}
+
+	return string(decoded), nil
+}
+
+func gcpGetAccessToken(original string) (string, error) {
+	// Try metadata server first (GCE/GKE).
+	token, err := gcpGetTokenMetadata()
+	if err == nil {
+		return token, nil
+	}
+
+	// Fall back to service account JSON.
+	token, err = gcpGetTokenServiceAccount()
+	if err != nil {
+		return "", fmt.Errorf("resolving secret '%s': cannot obtain GCP access token: %w", original, err)
+	}
+
+	return token, nil
+}
+
+func gcpGetTokenMetadata() (string, error) {
+	req, err := http.NewRequest(http.MethodGet,
+		"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token", nil)
+	if err != nil {
+		return "", fmt.Errorf("creating metadata token request: %w", err)
+	}
+	req.Header.Set("Metadata-Flavor", "Google")
+
+	resp, err := gcpMetadataHTTPClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("metadata token request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("reading metadata token response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("metadata token request returned HTTP %d: %s", resp.StatusCode, truncateBody(body))
+	}
+
+	var result struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("parsing metadata token response: %w", err)
+	}
+
+	if result.AccessToken == "" {
+		return "", fmt.Errorf("metadata token response missing access_token")
+	}
+
+	return result.AccessToken, nil
+}
+
+func gcpGetTokenServiceAccount() (string, error) {
+	credFile := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	if credFile == "" {
+		return "", fmt.Errorf("GOOGLE_APPLICATION_CREDENTIALS is not set")
+	}
+
+	data, err := os.ReadFile(credFile)
+	if err != nil {
+		return "", fmt.Errorf("reading service account file '%s': %w", credFile, err)
+	}
+
+	var sa struct {
+		ClientEmail string `json:"client_email"`
+		PrivateKey  string `json:"private_key"`
+		TokenURI    string `json:"token_uri"`
+	}
+	if err := json.Unmarshal(data, &sa); err != nil {
+		return "", fmt.Errorf("parsing service account JSON: %w", err)
+	}
+
+	if sa.ClientEmail == "" || sa.PrivateKey == "" || sa.TokenURI == "" {
+		return "", fmt.Errorf("service account JSON missing required fields (client_email, private_key, token_uri)")
+	}
+
+	now := time.Now().Unix()
+
+	signedJWT, err := gcpCreateSignedJWT(sa.ClientEmail, sa.TokenURI, sa.PrivateKey, now)
+	if err != nil {
+		return "", err
+	}
+
+	form := url.Values{
+		"grant_type": {"urn:ietf:params:oauth:grant-type:jwt-bearer"},
+		"assertion":  {signedJWT},
+	}
+
+	resp, err := gcpHTTPClient.PostForm(sa.TokenURI, form)
+	if err != nil {
+		return "", fmt.Errorf("token exchange request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("reading token exchange response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("token exchange returned HTTP %d: %s", resp.StatusCode, truncateBody(body))
+	}
+
+	var result struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("parsing token exchange response: %w", err)
+	}
+
+	if result.AccessToken == "" {
+		return "", fmt.Errorf("token exchange response missing access_token")
+	}
+
+	return result.AccessToken, nil
+}
+
+func gcpCreateSignedJWT(clientEmail, tokenURI, privateKeyPEM string, nowUnix int64) (string, error) {
+	header := `{"alg":"RS256","typ":"JWT"}`
+	claims := fmt.Sprintf(
+		`{"iss":"%s","scope":"https://www.googleapis.com/auth/cloud-platform","aud":"%s","iat":%d,"exp":%d}`,
+		clientEmail, tokenURI, nowUnix, nowUnix+3600,
+	)
+
+	headerB64 := base64.RawURLEncoding.EncodeToString([]byte(header))
+	claimsB64 := base64.RawURLEncoding.EncodeToString([]byte(claims))
+	unsigned := headerB64 + "." + claimsB64
+
+	block, _ := pem.Decode([]byte(privateKeyPEM))
+	if block == nil {
+		return "", fmt.Errorf("failed to decode PEM private key")
+	}
+
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return "", fmt.Errorf("parsing private key: %w", err)
+	}
+
+	rsaKey, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return "", fmt.Errorf("private key is not RSA")
+	}
+
+	hashed := sha256.Sum256([]byte(unsigned))
+	sig, err := rsa.SignPKCS1v15(nil, rsaKey, crypto.SHA256, hashed[:])
+	if err != nil {
+		return "", fmt.Errorf("signing JWT: %w", err)
+	}
+
+	sigB64 := base64.RawURLEncoding.EncodeToString(sig)
+
+	return unsigned + "." + sigB64, nil
+}

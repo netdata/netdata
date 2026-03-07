@@ -122,6 +122,16 @@ func resolveRef(ref, original string) (string, error) {
 		return resolveEnv(name, original)
 	case "file":
 		return resolveFile(name, original)
+	case "cmd":
+		return resolveCmd(name, original)
+	case "vault":
+		return resolveVault(name, original)
+	case "aws-sm":
+		return resolveAWSSM(name, original)
+	case "azure-kv":
+		return resolveAzureKV(name, original)
+	case "gcp-sm":
+		return resolveGCPSM(name, original)
 	default:
 		return "", fmt.Errorf("resolving secret '%s': unknown secret provider '%s'", original, scheme)
 	}

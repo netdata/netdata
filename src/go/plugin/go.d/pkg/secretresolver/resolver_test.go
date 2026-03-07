@@ -116,12 +116,12 @@ func TestResolve_LowercaseLeftAlone(t *testing.T) {
 
 func TestResolve_UnknownSchemeError(t *testing.T) {
 	cfg := map[string]any{
-		"val": "${vault:secret/data/pass}",
+		"val": "${nosuchprovider:secret/data/pass}",
 	}
 
 	err := Resolve(cfg)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unknown secret provider 'vault'")
+	assert.Contains(t, err.Error(), "unknown secret provider 'nosuchprovider'")
 }
 
 func TestResolve_MissingEnvVarError(t *testing.T) {
