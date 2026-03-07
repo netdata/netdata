@@ -27,7 +27,6 @@ var (
 	errStateSetLabelKey     = errors.New("metrix: stateset flatten label key collides with existing label")
 	errMeasureSetSchema     = errors.New("metrix: measureset schema is missing")
 	errMeasureSetPoint      = errors.New("metrix: invalid measureset point")
-	errMeasureSetPending    = errors.New("metrix: measureset write support is not implemented yet")
 	errRuntimeSnapshotWrite = errors.New("metrix: runtime store supports stateful writes only")
 	errRuntimeFreshness     = errors.New("metrix: runtime store freshness is fixed to FreshnessCommitted")
 	errRuntimeWindowCycle   = errors.New("metrix: runtime store does not support window=cycle")
