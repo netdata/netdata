@@ -48,6 +48,9 @@ The following items are complete and verified via tests:
 
 ## Progress (Agent)
 
+- 2026-03-02: Started PR `netdata/netdata#21702` triage for Costa request: investigate failing CI jobs and high-volume review comments; gather concrete evidence (failed checks, logs, comment threads), map to repo paths, propose fix sequence, then implement and re-test.
+- 2026-03-02: Collected concrete CI failure evidence from latest PR run (`2026-03-02`): `Go toolchain tests` failed on `TestWatcher_Run/change_file` in `src/go/plugin/agent/discovery/file/watch_test.go` (flake-like; local `go test -race -count=20 -run TestWatcher_Run ./plugin/agent/discovery/file` passed), and `Packages` RPM matrix failed consistently with `Installed (but unpackaged) file(s) found: /usr/sbin/topology-ip-intel-downloader` (for example job `65382016464`).
+- 2026-03-02: Applied Costa decision that `topology-ip-intel-downloader` belongs to `plugin-netflow`: moved install ownership (binary + cleanup hooks + `topology-ip-intel.yaml`) to `plugin-netflow`, removed it from `plugin-go`, and updated Go toolchain gating so NetFlow builds still configure when `ENABLE_PLUGIN_NETFLOW=On` and `ENABLE_PLUGIN_GO=Off`. Verified generated `cmake_install.cmake` now places downloader assets under `plugin-netflow` only.
 - 2026-02-04: **Completed Costa request** — updated `.github/workflows/snmp-netflow-sim-tests.yml` to run only when SNMP/NetFlow/IPFIX/sFlow-related files change; improved snmpsim fixture selection (LLDP `lldpRemSysName` + CDP `cdpCacheDeviceId`) for reliable CI; fixed LLDP/CDP profiles to use valid scalar metrics and ensured `lldpRemEntry`/`cdpCacheEntry` use existing numeric columns so topology rows are emitted. Manual integration tests run locally with snmpsim + stress pcaps: `go test -tags=integration ./plugin/go.d/collector/snmp ./plugin/go.d/collector/netflow` **PASS**.
 - 2026-02-04: Ran `gofmt -w` across all Go files in the repo as requested.
 - 2026-02-04: Re-verified implementation completeness; ran unit + integration-tag tests with real-device fixtures (`go test -count=1 ./plugin/go.d/collector/snmp ./plugin/go.d/collector/netflow ./plugin/go.d/agent/jobmgr ./pkg/funcapi ./tools/topology-flow-merge`, `go test -count=1 -tags=integration ./plugin/go.d/collector/netflow ./plugin/go.d/collector/snmp`, and `go test -v -count=1 -tags=integration ./plugin/go.d/collector/snmp`). NetFlow integration replay passed; SNMP integration is env-gated and skipped without `NETDATA_SNMPSIM_ENDPOINT`/`NETDATA_SNMPSIM_COMMUNITIES`. Verified deps `gopacket` and `goflow2/v2` are latest via `go list -m -u ...` (no updates).
@@ -60,6 +63,45 @@ The following items are complete and verified via tests:
 - 2026-02-04: Re-ran targeted Go tests with real-device fixtures (`go test -count=1 ./plugin/go.d/collector/snmp ./plugin/go.d/collector/netflow ./plugin/go.d/agent/jobmgr ./pkg/funcapi ./tools/topology-flow-merge`); all pass. Verified module versions via `go list -m -u github.com/google/gopacket github.com/netsampler/goflow2/v2` (no updates available).
 - 2026-02-04: Completed NetFlow collector (v5/v9/IPFIX/sFlow) + flow aggregation + flows function + charts + docs/config/schema + merge CLI; added real-device testdata (LibreNMS snmprec + Akvorado pcaps) with attribution.
 - 2026-02-03: Implemented topology/flows response types + schema support + SNMP topology function/cache + LLDP/CDP profiles + charts + docs + tests.
+
+---
+
+## PR 21702 CI & Comments Triage (2026-03-02)
+
+### TL;DR
+- User request: check PR `https://github.com/netdata/netdata/pull/21702` because CI fails and there are many comments.
+- Objective: produce a concrete, file-level/actionable triage, then fix what can be fixed in this repo.
+
+### Analysis (in progress)
+- Existing branch/work appears to already include topology + netflow code used by PR 21702.
+- Need fresh GitHub evidence for:
+  - failing CI checks and exact failing jobs/log excerpts,
+  - unresolved review comments (especially blocking / requested changes),
+  - whether failures are code regressions vs flaky/environmental.
+
+### Decisions
+- 2026-03-02 (Costa): `topology-ip-intel-downloader` must be part of the `plugin-netflow` plugin/package (not `netdata` and not `plugin-go`).
+- If conflicting reviewer asks require design-level tradeoffs, prepare numbered options with implications/risks and ask Costa.
+
+### Plan
+1. Pull PR metadata, check statuses, and failing check details.
+2. Pull all issue/review comments and classify by severity and affected files.
+3. Reproduce failing checks locally where possible.
+4. Implement scoped fixes and rerun targeted tests.
+5. Summarize what remains (if any) and recommend merge path.
+
+### Implied Decisions
+- Use this existing TODO file (`TODO-SNMP-TOPOLOGY-NETFLOW.md`) as the task tracker because it already tracks the same feature/PR scope.
+
+### Testing Requirements
+- Reproduce failing CI tasks locally when practical.
+- Run targeted Go tests for touched packages and integration tags where relevant.
+
+### Documentation Updates Required
+- Re-check if code fixes alter behavior, APIs, or schemas documented in:
+  - `src/go/plugin/go.d/collector/snmp/README.md`
+  - `src/go/plugin/go.d/collector/netflow/README.md`
+  - `src/plugins.d/FUNCTION_UI_SCHEMA.json` docs/tooling notes
 
 ---
 

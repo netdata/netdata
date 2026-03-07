@@ -1504,6 +1504,360 @@ static void network_viewer_topology_function(
     }
     buffer_json_array_close(wb); // required_params
 
+    // presentation metadata
+    buffer_json_member_add_object(wb, "presentation");
+    {
+        buffer_json_member_add_object(wb, "actor_types");
+        {
+            buffer_json_member_add_object(wb, "self");
+            {
+                buffer_json_member_add_string(wb, "label", "This host");
+                buffer_json_member_add_string(wb, "color_slot", "self");
+                buffer_json_member_add_boolean(wb, "border", true);
+                buffer_json_member_add_boolean(wb, "size_by_links", true);
+
+                buffer_json_member_add_array(wb, "summary_fields");
+                {
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "key", "hostname");
+                    buffer_json_member_add_string(wb, "label", "Hostname");
+                    buffer_json_member_add_array(wb, "sources");
+                    buffer_json_add_array_item_string(wb, "attributes.hostname");
+                    buffer_json_array_close(wb);
+                    buffer_json_object_close(wb);
+
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "key", "local_ip_count");
+                    buffer_json_member_add_string(wb, "label", "Local IPs");
+                    buffer_json_member_add_array(wb, "sources");
+                    buffer_json_add_array_item_string(wb, "attributes.local_ip_count");
+                    buffer_json_array_close(wb);
+                    buffer_json_object_close(wb);
+
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "key", "observed_sockets");
+                    buffer_json_member_add_string(wb, "label", "Sockets");
+                    buffer_json_member_add_array(wb, "sources");
+                    buffer_json_add_array_item_string(wb, "attributes.observed_sockets");
+                    buffer_json_array_close(wb);
+                    buffer_json_object_close(wb);
+                }
+                buffer_json_array_close(wb); // summary_fields
+
+                buffer_json_member_add_object(wb, "tables");
+                {
+                    buffer_json_member_add_object(wb, "links");
+                    {
+                        buffer_json_member_add_string(wb, "label", "Connections");
+                        buffer_json_member_add_string(wb, "source", "links");
+                        buffer_json_member_add_array(wb, "columns");
+                        {
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "key", "remoteLabel");
+                            buffer_json_member_add_string(wb, "label", "Remote");
+                            buffer_json_member_add_string(wb, "type", "actor_link");
+                            buffer_json_object_close(wb);
+
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "key", "protocol");
+                            buffer_json_member_add_string(wb, "label", "Protocol");
+                            buffer_json_object_close(wb);
+
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "key", "direction");
+                            buffer_json_member_add_string(wb, "label", "Direction");
+                            buffer_json_object_close(wb);
+                        }
+                        buffer_json_array_close(wb); // columns
+                    }
+                    buffer_json_object_close(wb); // links table
+                }
+                buffer_json_object_close(wb); // tables
+
+                buffer_json_member_add_array(wb, "modal_tabs");
+                {
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "id", "info");
+                    buffer_json_member_add_string(wb, "label", "Info");
+                    buffer_json_object_close(wb);
+                }
+                buffer_json_array_close(wb); // modal_tabs
+            }
+            buffer_json_object_close(wb); // self
+
+            buffer_json_member_add_object(wb, "process");
+            {
+                buffer_json_member_add_string(wb, "label", "Process");
+                buffer_json_member_add_string(wb, "color_slot", "primary");
+                buffer_json_member_add_boolean(wb, "border", true);
+                buffer_json_member_add_boolean(wb, "size_by_links", true);
+                buffer_json_member_add_boolean(wb, "show_port_bullets", true);
+
+                buffer_json_member_add_array(wb, "summary_fields");
+                {
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "key", "display_name");
+                    buffer_json_member_add_string(wb, "label", "Process");
+                    buffer_json_member_add_array(wb, "sources");
+                    buffer_json_add_array_item_string(wb, "attributes.display_name");
+                    buffer_json_array_close(wb);
+                    buffer_json_object_close(wb);
+
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "key", "cmdline");
+                    buffer_json_member_add_string(wb, "label", "Command");
+                    buffer_json_member_add_array(wb, "sources");
+                    buffer_json_add_array_item_string(wb, "attributes.cmdline");
+                    buffer_json_array_close(wb);
+                    buffer_json_object_close(wb);
+
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "key", "socket_count");
+                    buffer_json_member_add_string(wb, "label", "Sockets");
+                    buffer_json_member_add_array(wb, "sources");
+                    buffer_json_add_array_item_string(wb, "attributes.socket_count");
+                    buffer_json_array_close(wb);
+                    buffer_json_object_close(wb);
+
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "key", "local_ip");
+                    buffer_json_member_add_string(wb, "label", "Local IP");
+                    buffer_json_member_add_array(wb, "sources");
+                    buffer_json_add_array_item_string(wb, "attributes.local_ip");
+                    buffer_json_array_close(wb);
+                    buffer_json_object_close(wb);
+
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "key", "user");
+                    buffer_json_member_add_string(wb, "label", "User");
+                    buffer_json_member_add_array(wb, "sources");
+                    buffer_json_add_array_item_string(wb, "labels.user");
+                    buffer_json_array_close(wb);
+                    buffer_json_object_close(wb);
+                }
+                buffer_json_array_close(wb); // summary_fields
+
+                buffer_json_member_add_object(wb, "tables");
+                {
+                    buffer_json_member_add_object(wb, "sockets");
+                    {
+                        buffer_json_member_add_string(wb, "label", "Sockets");
+                        buffer_json_member_add_string(wb, "source", "data");
+                        buffer_json_member_add_boolean(wb, "bullet_source", true);
+                        buffer_json_member_add_uint64(wb, "order", 0);
+                        buffer_json_member_add_array(wb, "columns");
+                        {
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "key", "remote");
+                            buffer_json_member_add_string(wb, "label", "Remote");
+                            buffer_json_object_close(wb);
+
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "key", "protocol");
+                            buffer_json_member_add_string(wb, "label", "Protocol");
+                            buffer_json_member_add_string(wb, "type", "badge");
+                            buffer_json_object_close(wb);
+
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "key", "direction");
+                            buffer_json_member_add_string(wb, "label", "Direction");
+                            buffer_json_member_add_string(wb, "type", "badge");
+                            buffer_json_object_close(wb);
+
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "key", "state");
+                            buffer_json_member_add_string(wb, "label", "State");
+                            buffer_json_member_add_string(wb, "type", "badge");
+                            buffer_json_object_close(wb);
+                        }
+                        buffer_json_array_close(wb); // columns
+                    }
+                    buffer_json_object_close(wb); // sockets table
+
+                    buffer_json_member_add_object(wb, "links");
+                    {
+                        buffer_json_member_add_string(wb, "label", "Connections");
+                        buffer_json_member_add_string(wb, "source", "links");
+                        buffer_json_member_add_uint64(wb, "order", 1);
+                        buffer_json_member_add_array(wb, "columns");
+                        {
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "key", "remoteLabel");
+                            buffer_json_member_add_string(wb, "label", "Remote");
+                            buffer_json_member_add_string(wb, "type", "actor_link");
+                            buffer_json_object_close(wb);
+
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "key", "protocol");
+                            buffer_json_member_add_string(wb, "label", "Protocol");
+                            buffer_json_object_close(wb);
+
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "key", "direction");
+                            buffer_json_member_add_string(wb, "label", "Direction");
+                            buffer_json_object_close(wb);
+
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "key", "state");
+                            buffer_json_member_add_string(wb, "label", "State");
+                            buffer_json_object_close(wb);
+                        }
+                        buffer_json_array_close(wb); // columns
+                    }
+                    buffer_json_object_close(wb); // links table
+                }
+                buffer_json_object_close(wb); // tables
+
+                buffer_json_member_add_array(wb, "modal_tabs");
+                {
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "id", "info");
+                    buffer_json_member_add_string(wb, "label", "Info");
+                    buffer_json_object_close(wb);
+                }
+                buffer_json_array_close(wb); // modal_tabs
+            }
+            buffer_json_object_close(wb); // process
+
+            buffer_json_member_add_object(wb, "endpoint");
+            {
+                buffer_json_member_add_string(wb, "label", "Endpoint");
+                buffer_json_member_add_string(wb, "color_slot", "derived");
+                buffer_json_member_add_boolean(wb, "border", true);
+
+                buffer_json_member_add_array(wb, "summary_fields");
+                {
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "key", "display_name");
+                    buffer_json_member_add_string(wb, "label", "IP Address");
+                    buffer_json_member_add_array(wb, "sources");
+                    buffer_json_add_array_item_string(wb, "attributes.display_name");
+                    buffer_json_add_array_item_string(wb, "match.ip_addresses.0");
+                    buffer_json_array_close(wb);
+                    buffer_json_object_close(wb);
+
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "key", "socket_count");
+                    buffer_json_member_add_string(wb, "label", "Sockets");
+                    buffer_json_member_add_array(wb, "sources");
+                    buffer_json_add_array_item_string(wb, "attributes.socket_count");
+                    buffer_json_array_close(wb);
+                    buffer_json_object_close(wb);
+
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "key", "address_space");
+                    buffer_json_member_add_string(wb, "label", "Address Space");
+                    buffer_json_member_add_array(wb, "sources");
+                    buffer_json_add_array_item_string(wb, "labels.address_space");
+                    buffer_json_array_close(wb);
+                    buffer_json_object_close(wb);
+                }
+                buffer_json_array_close(wb); // summary_fields
+
+                buffer_json_member_add_object(wb, "tables");
+                {
+                    buffer_json_member_add_object(wb, "links");
+                    {
+                        buffer_json_member_add_string(wb, "label", "Connections");
+                        buffer_json_member_add_string(wb, "source", "links");
+                        buffer_json_member_add_array(wb, "columns");
+                        {
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "key", "remoteLabel");
+                            buffer_json_member_add_string(wb, "label", "Remote");
+                            buffer_json_member_add_string(wb, "type", "actor_link");
+                            buffer_json_object_close(wb);
+
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "key", "protocol");
+                            buffer_json_member_add_string(wb, "label", "Protocol");
+                            buffer_json_object_close(wb);
+
+                            buffer_json_add_array_item_object(wb);
+                            buffer_json_member_add_string(wb, "key", "direction");
+                            buffer_json_member_add_string(wb, "label", "Direction");
+                            buffer_json_object_close(wb);
+                        }
+                        buffer_json_array_close(wb); // columns
+                    }
+                    buffer_json_object_close(wb); // links table
+                }
+                buffer_json_object_close(wb); // tables
+
+                buffer_json_member_add_array(wb, "modal_tabs");
+                {
+                    buffer_json_add_array_item_object(wb);
+                    buffer_json_member_add_string(wb, "id", "info");
+                    buffer_json_member_add_string(wb, "label", "Info");
+                    buffer_json_object_close(wb);
+                }
+                buffer_json_array_close(wb); // modal_tabs
+            }
+            buffer_json_object_close(wb); // endpoint
+        }
+        buffer_json_object_close(wb); // actor_types
+
+        buffer_json_member_add_object(wb, "link_types");
+        {
+            buffer_json_member_add_object(wb, "ownership");
+            {
+                buffer_json_member_add_string(wb, "label", "Ownership");
+                buffer_json_member_add_string(wb, "color_slot", "muted");
+                buffer_json_member_add_boolean(wb, "dash", true);
+            }
+            buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, "socket");
+            {
+                buffer_json_member_add_string(wb, "label", "Socket");
+                buffer_json_member_add_string(wb, "color_slot", "primary");
+                buffer_json_member_add_double(wb, "width", 1.5);
+            }
+            buffer_json_object_close(wb);
+        }
+        buffer_json_object_close(wb); // link_types
+
+        buffer_json_member_add_object(wb, "legend");
+        {
+            buffer_json_member_add_array(wb, "actors");
+            {
+                buffer_json_add_array_item_object(wb);
+                buffer_json_member_add_string(wb, "type", "self");
+                buffer_json_member_add_string(wb, "label", "This host");
+                buffer_json_object_close(wb);
+
+                buffer_json_add_array_item_object(wb);
+                buffer_json_member_add_string(wb, "type", "process");
+                buffer_json_member_add_string(wb, "label", "Process");
+                buffer_json_object_close(wb);
+
+                buffer_json_add_array_item_object(wb);
+                buffer_json_member_add_string(wb, "type", "endpoint");
+                buffer_json_member_add_string(wb, "label", "Endpoint");
+                buffer_json_object_close(wb);
+            }
+            buffer_json_array_close(wb); // actors
+
+            buffer_json_member_add_array(wb, "links");
+            {
+                buffer_json_add_array_item_object(wb);
+                buffer_json_member_add_string(wb, "type", "ownership");
+                buffer_json_member_add_string(wb, "label", "Ownership");
+                buffer_json_object_close(wb);
+
+                buffer_json_add_array_item_object(wb);
+                buffer_json_member_add_string(wb, "type", "socket");
+                buffer_json_member_add_string(wb, "label", "Socket");
+                buffer_json_object_close(wb);
+            }
+            buffer_json_array_close(wb); // links
+        }
+        buffer_json_object_close(wb); // legend
+
+        buffer_json_member_add_string(wb, "actor_click_behavior", "highlight_connections");
+    }
+    buffer_json_object_close(wb); // presentation
+
     NV_TOPOLOGY_CONTEXT ctx = {
         .now_ut = now_ut,
         .options = options,
@@ -1661,6 +2015,40 @@ static void network_viewer_topology_function(
                                 buffer_json_member_add_string(wb, "actor_class", "process");
                             }
                             buffer_json_object_close(wb);
+
+                            // per-actor sockets data table (drives bullets)
+                            buffer_json_member_add_object(wb, "tables");
+                            {
+                                buffer_json_member_add_array(wb, "sockets");
+                                {
+                                    NV_TOPOLOGY_LINK *link;
+                                    dfe_start_read(ctx.links, link) {
+                                        bool match;
+                                        if(ctx.options.processes_by_pid)
+                                            match = (link->pid == (uint64_t)pa->pid &&
+                                                     link->uid == (uint64_t)pa->uid &&
+                                                     link->net_ns_inode == pa->net_ns_inode &&
+                                                     strcmp(link->process, pa->process) == 0);
+                                        else
+                                            match = (strcmp(link->process, pa->process) == 0);
+
+                                        if(!match) continue;
+
+                                        char remote[128];
+                                        snprintf(remote, sizeof(remote), "%s:%u", link->remote_ip, link->remote_port);
+
+                                        buffer_json_add_array_item_object(wb);
+                                        buffer_json_member_add_string(wb, "remote", remote);
+                                        buffer_json_member_add_string(wb, "protocol", link->protocol);
+                                        buffer_json_member_add_string(wb, "direction", link->direction);
+                                        buffer_json_member_add_string(wb, "state", link->state);
+                                        buffer_json_object_close(wb);
+                                    }
+                                    dfe_done(link);
+                                }
+                                buffer_json_array_close(wb); // sockets
+                            }
+                            buffer_json_object_close(wb); // tables
                         }
                         buffer_json_object_close(wb);
                     }
@@ -1795,6 +2183,7 @@ static void network_viewer_topology_function(
                         {
                             buffer_json_member_add_string(wb, "layer", NETWORK_TOPOLOGY_LAYER);
                             buffer_json_member_add_string(wb, "protocol", "ownership");
+                            buffer_json_member_add_string(wb, "link_type", "ownership");
                             buffer_json_member_add_string(wb, "direction", "contains");
                             buffer_json_member_add_string(wb, "state", "active");
                             buffer_json_member_add_string(wb, "src_actor_id", src_actor_id);
@@ -1947,6 +2336,7 @@ static void network_viewer_topology_function(
                         {
                             buffer_json_member_add_string(wb, "layer", NETWORK_TOPOLOGY_LAYER);
                             buffer_json_member_add_string(wb, "protocol", link->protocol);
+                            buffer_json_member_add_string(wb, "link_type", "socket");
                             buffer_json_member_add_string(wb, "direction", link->direction);
                             buffer_json_member_add_string(wb, "state", link->state);
                             buffer_json_member_add_string(wb, "src_actor_id", process_actor_id);

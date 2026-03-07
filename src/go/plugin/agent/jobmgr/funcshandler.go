@@ -210,6 +210,10 @@ func (m *Manager) handleMethodFuncInfo(moduleName, methodID string, fn functions
 		"required_params": m.buildRequiredParams(moduleName, methodParams, includeJobParam),
 	}
 
+	if methodCfg.Presentation != nil {
+		resp["presentation"] = methodCfg.Presentation
+	}
+
 	m.respondJSON(fn, resp)
 }
 
@@ -622,6 +626,10 @@ func (m *Manager) handleJobMethodFuncInfo(moduleName, jobName, methodID string, 
 		"help":            help,
 		"accepted_params": buildJobMethodAcceptedParams(methodParams),
 		"required_params": buildJobMethodRequiredParams(methodParams),
+	}
+
+	if methodCfg.Presentation != nil {
+		resp["presentation"] = methodCfg.Presentation
 	}
 
 	m.respondJSON(fn, resp)

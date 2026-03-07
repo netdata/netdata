@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
 )
 
 func applySNMPTopologyOutputPolicies(data *topologyData, options topologyQueryOptions) {
@@ -180,7 +182,7 @@ func suppressUnlinkedInferredEndpoints(data *topologyData) int {
 }
 
 func isManagedSNMPDeviceActor(actor topologyActor) bool {
-	if !strings.EqualFold(strings.TrimSpace(actor.ActorType), "device") {
+	if !topologyengine.IsDeviceActorType(actor.ActorType) {
 		return false
 	}
 	if strings.ToLower(strings.TrimSpace(actor.Source)) != "snmp" {
@@ -328,7 +330,7 @@ func collapseActorsByIP(data *topologyData) int {
 }
 
 func compareCollapseActorPriority(left, right topologyActor) int {
-	if leftDevice, rightDevice := strings.EqualFold(strings.TrimSpace(left.ActorType), "device"), strings.EqualFold(strings.TrimSpace(right.ActorType), "device"); leftDevice != rightDevice {
+	if leftDevice, rightDevice := topologyengine.IsDeviceActorType(left.ActorType), topologyengine.IsDeviceActorType(right.ActorType); leftDevice != rightDevice {
 		if leftDevice {
 			return -1
 		}

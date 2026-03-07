@@ -204,6 +204,7 @@ type topologyDevicePortEvidence struct {
 	hasSTP             bool
 	hasPeer            bool
 	hasBridgeLink      bool
+	isLAG              bool
 	stpStates          map[string]struct{}
 	neighbors          map[string]topologyPortNeighborStatus
 }
@@ -464,6 +465,7 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 	sortTopologyLinks(links)
 	applyTopologyDisplayNames(actors, links, opts.ResolveDNSName)
 	assignTopologyActorIDsAndLinkEndpoints(actors, links)
+	enrichTopologyPortTablesWithLinkCounts(actors, links)
 	linkCounts := summarizeTopologyLinks(links)
 	probableLinks := 0
 	for _, link := range links {
@@ -1228,6 +1230,7 @@ func projectSegmentTopology(
 			out.links = append(out.links, topology.Link{
 				Layer:        layer,
 				Protocol:     "bridge",
+				LinkType:     "bridge",
 				Direction:    "bidirectional",
 				Src:          adjacencySideToEndpoint(device, localPort, ifIndexByDeviceName, ifaceByDeviceIndex),
 				Dst:          segmentEndpoint,
@@ -1290,6 +1293,7 @@ func projectSegmentTopology(
 								out.links = append(out.links, topology.Link{
 									Layer:        layer,
 									Protocol:     "fdb",
+									LinkType:     "fdb",
 									Direction:    "bidirectional",
 									Src:          segmentEndpoint,
 									Dst:          adjacencySideToEndpoint(matchedDevice, "", ifIndexByDeviceName, ifaceByDeviceIndex),
@@ -1350,6 +1354,7 @@ func projectSegmentTopology(
 							out.links = append(out.links, topology.Link{
 								Layer:        layer,
 								Protocol:     "fdb",
+								LinkType:     "fdb",
 								Direction:    "bidirectional",
 								Src:          adjacencySideToEndpoint(device, localPort, ifIndexByDeviceName, ifaceByDeviceIndex),
 								Dst:          topology.LinkEndpoint{Match: endpointMatch},
@@ -1396,6 +1401,7 @@ func projectSegmentTopology(
 			out.links = append(out.links, topology.Link{
 				Layer:        layer,
 				Protocol:     "fdb",
+				LinkType:     "fdb",
 				Direction:    "bidirectional",
 				Src:          segmentEndpoint,
 				Dst:          topology.LinkEndpoint{Match: endpointMatch},
@@ -3877,8 +3883,8 @@ func normalizedTopologyActorIPs(actor topology.Actor) []string {
 }
 
 func compareTopologyActorCollapsePriority(left, right topology.Actor) int {
-	leftDevice := strings.EqualFold(strings.TrimSpace(left.ActorType), "device")
-	rightDevice := strings.EqualFold(strings.TrimSpace(right.ActorType), "device")
+	leftDevice := IsDeviceActorType(left.ActorType)
+	rightDevice := IsDeviceActorType(right.ActorType)
 	if leftDevice != rightDevice {
 		if leftDevice {
 			return -1
@@ -4446,6 +4452,7 @@ func adjacencyToTopologyLink(
 	link := topology.Link{
 		Layer:        layer,
 		Protocol:     protocol,
+		LinkType:     protocol,
 		Direction:    "unidirectional",
 		Src:          src,
 		Dst:          dst,
@@ -4620,6 +4627,11 @@ func buildTopologyDeviceInterfaceSummaries(
 			TopologyRole:   "unknown",
 			RoleConfidence: "low",
 		})
+
+		if isTopologyLAGInterfaceType(ifType) {
+			evidence := ensureTopologyPortEvidence(col.portEvidence, iface.IfIndex)
+			evidence.isLAG = true
+		}
 	}
 
 	managedAliasOwners := buildFDBAliasOwnerMap(reporterAliases)
@@ -5221,6 +5233,9 @@ func classifyTopologyPortRole(evidence *topologyDevicePortEvidence) (role string
 	if evidence.hasFDBManagedAlias {
 		sources = append(sources, "fdb_managed_alias")
 	}
+	if evidence.isLAG {
+		sources = append(sources, "lag_interface")
+	}
 
 	switch {
 	case evidence.hasPeer || evidence.hasBridgeLink:
@@ -5229,6 +5244,10 @@ func classifyTopologyPortRole(evidence *topologyDevicePortEvidence) (role string
 	case evidence.hasSTP && evidence.hasFDBManagedAlias:
 		// STP alone is not sufficient to mark switch-facing; require corroborating
 		// managed-alias FDB evidence on the same port.
+		role = "switch_facing"
+		confidence = "medium"
+	case evidence.isLAG && evidence.hasFDB:
+		// LAG interfaces with FDB evidence are infrastructure uplinks.
 		role = "switch_facing"
 		confidence = "medium"
 	case evidence.hasFDB && len(evidence.fdbEndpointIDs) == 1 && !evidence.hasSTP:
@@ -5242,6 +5261,15 @@ func classifyTopologyPortRole(evidence *topologyDevicePortEvidence) (role string
 		confidence = "low"
 	}
 	return role, confidence, sources
+}
+
+func isTopologyLAGInterfaceType(ifType string) bool {
+	switch strings.ToLower(strings.TrimSpace(ifType)) {
+	case "ieee8023adlag", "lag", "bond":
+		return true
+	default:
+		return false
+	}
 }
 
 func intCountMapToAny(in map[string]int) map[string]any {
@@ -5411,14 +5439,127 @@ func deviceToTopologyActor(
 		attrs["if_statuses"] = ifaceSummary.portStatuses
 	}
 
+	var tables map[string][]map[string]any
+	if len(ifaceSummary.portStatuses) > 0 {
+		rows := make([]map[string]any, 0, len(ifaceSummary.portStatuses))
+		for _, ps := range ifaceSummary.portStatuses {
+			row := make(map[string]any, len(ps)+2)
+			for k, v := range ps {
+				switch k {
+				case "if_name":
+					row["name"] = v
+				case "if_type":
+					row["port_type"] = v
+				default:
+					row[k] = v
+				}
+			}
+			if neighbors, ok := ps["neighbors"]; ok {
+				switch nb := neighbors.(type) {
+				case []map[string]any:
+					row["neighbor_count"] = len(nb)
+				case []any:
+					row["neighbor_count"] = len(nb)
+				}
+			}
+			rows = append(rows, row)
+		}
+		tables = map[string][]map[string]any{"ports": rows}
+	}
+
 	return topology.Actor{
-		ActorType:  "device",
+		ActorType:  resolveDeviceActorType(dev.Labels),
 		Layer:      layer,
 		Source:     source,
 		Match:      match,
 		Attributes: pruneTopologyAttributes(attrs),
 		Labels:     cloneStringMap(dev.Labels),
+		Tables:     tables,
 	}
+}
+
+var deviceCategoryToActorType = map[string]string{
+	"router":                      "router",
+	"gateway":                     "router",
+	"layer 3 switch":              "router",
+	"voip gateway":                "router",
+	"switch":                      "switch",
+	"bridge":                      "switch",
+	"hub":                         "switch",
+	"sanswitch":                   "switch",
+	"sanbridge":                   "switch",
+	"bridge/extender":             "switch",
+	"firewall":                    "firewall",
+	"security":                    "firewall",
+	"access point":                "access_point",
+	"wireless":                    "access_point",
+	"wireless lan controller":     "access_point",
+	"extender":                    "access_point",
+	"radio":                       "access_point",
+	"server":                      "server",
+	"file server":                 "server",
+	"application":                 "server",
+	"desktop":                     "server",
+	"blade system":                "server",
+	"storage":                     "storage",
+	"nas":                         "storage",
+	"self-contained nas":          "storage",
+	"nas head":                    "storage",
+	"tape library":                "storage",
+	"load balancer":               "load_balancer",
+	"wan accelerator":             "load_balancer",
+	"web caching":                 "load_balancer",
+	"proxy server":                "load_balancer",
+	"content":                     "load_balancer",
+	"printer":                     "printer",
+	"ip phone":                    "phone",
+	"voip":                        "phone",
+	"gsm":                         "phone",
+	"mobile":                      "phone",
+	"ups":                         "ups",
+	"pdu":                         "ups",
+	"power":                       "ups",
+	"video":                       "camera",
+	"media":                       "camera",
+	"media exchange":              "camera",
+	"sensor":                      "camera",
+	"other":                       "device",
+	"network device":              "device",
+	"management":                  "server",
+	"management controller":       "server",
+	"dslam":                       "switch",
+	"access server":               "server",
+	"pon":                         "switch",
+	"console":                     "server",
+	"module":                      "device",
+	"plc":                         "device",
+	"sre module":                  "server",
+	"chassis manager":             "server",
+	"snmp managed device":         "device",
+}
+
+var deviceActorTypes = func() map[string]struct{} {
+	s := map[string]struct{}{"device": {}}
+	for _, v := range deviceCategoryToActorType {
+		s[v] = struct{}{}
+	}
+	return s
+}()
+
+func resolveDeviceActorType(labels map[string]string) string {
+	cat := strings.TrimSpace(labels["type"])
+	if cat == "" {
+		return "device"
+	}
+	if at, ok := deviceCategoryToActorType[strings.ToLower(cat)]; ok {
+		return at
+	}
+	return "device"
+}
+
+func IsDeviceActorType(actorType string) bool {
+	_, ok := deviceActorTypes[strings.ToLower(strings.TrimSpace(actorType))]
+	return ok
 }
 
 func adjacencySideToEndpoint(dev Device, port string, ifIndexByDeviceName map[string]int, ifaceByDeviceIndex map[string]Interface) topology.LinkEndpoint {
@@ -6192,6 +6333,49 @@ func resolveTopologyEndpointActorID(match topology.Match, byCanonicalMatch map[s
 	return ""
 }
 
+func enrichTopologyPortTablesWithLinkCounts(actors []topology.Actor, links []topology.Link) {
+	type actorPort struct {
+		actorID  string
+		portName string
+	}
+	counts := make(map[actorPort]int, len(links)*2)
+
+	for _, link := range links {
+		if link.SrcActorID != "" {
+			if ifName, ok := link.Src.Attributes["if_name"]; ok {
+				name := strings.TrimSpace(fmt.Sprintf("%v", ifName))
+				if name != "" {
+					counts[actorPort{link.SrcActorID, name}]++
+				}
+			}
+		}
+		if link.DstActorID != "" {
+			if ifName, ok := link.Dst.Attributes["if_name"]; ok {
+				name := strings.TrimSpace(fmt.Sprintf("%v", ifName))
+				if name != "" {
+					counts[actorPort{link.DstActorID, name}]++
+				}
+			}
+		}
+	}
+
+	for i := range actors {
+		portRows := actors[i].Tables["ports"]
+		if len(portRows) == 0 {
+			continue
+		}
+		for j := range portRows {
+			name := strings.TrimSpace(fmt.Sprintf("%v", portRows[j]["name"]))
+			if name == "" {
+				continue
+			}
+			if c := counts[actorPort{actors[i].ActorID, name}]; c > 0 {
+				portRows[j]["link_count"] = c
+			}
+		}
+	}
+}
+
 func canonicalTopologyPrimaryMACKey(match topology.Match) string {
 	set := make(map[string]struct{}, len(match.MacAddresses)+len(match.ChassisIDs))
 	for _, value := range match.MacAddresses {
@@ -6387,7 +6571,7 @@ func applyTopologyDisplayNames(actors []topology.Actor, links []topology.Link, l
 		if matchKey := canonicalTopologyMatchKey(actors[i].Match); matchKey != "" {
 			displayByMatchKey[matchKey] = display.name
 		}
-		if actors[i].ActorType == "device" {
+		if IsDeviceActorType(actors[i].ActorType) {
 			if deviceID := topologyActorDeviceID(actors[i]); deviceID != "" {
 				deviceDisplayByID[deviceID] = display.name
 			}

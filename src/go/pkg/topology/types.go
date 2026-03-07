@@ -22,15 +22,16 @@ type Match struct {
 }
 
 type Actor struct {
-	ActorID     string            `json:"actor_id,omitempty"`
-	ActorType   string            `json:"actor_type"`
-	Layer       string            `json:"layer"`
-	Source      string            `json:"source"`
-	Match       Match             `json:"match"`
-	ParentMatch *Match            `json:"parent_match,omitempty"`
-	Attributes  map[string]any    `json:"attributes,omitempty"`
-	Derived     map[string]any    `json:"derived,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
+	ActorID     string                       `json:"actor_id,omitempty"`
+	ActorType   string                       `json:"actor_type"`
+	Layer       string                       `json:"layer"`
+	Source      string                       `json:"source"`
+	Match       Match                        `json:"match"`
+	ParentMatch *Match                       `json:"parent_match,omitempty"`
+	Attributes  map[string]any               `json:"attributes,omitempty"`
+	Derived     map[string]any               `json:"derived,omitempty"`
+	Labels      map[string]string            `json:"labels,omitempty"`
+	Tables      map[string][]map[string]any  `json:"tables,omitempty"`
 }
 
 type LinkEndpoint struct {
@@ -41,6 +42,7 @@ type LinkEndpoint struct {
 type Link struct {
 	Layer        string         `json:"layer"`
 	Protocol     string         `json:"protocol"`
+	LinkType     string         `json:"link_type"`
 	Direction    string         `json:"direction,omitempty"`
 	State        string         `json:"state,omitempty"`
 	SrcActorID   string         `json:"src_actor_id,omitempty"`
@@ -50,6 +52,81 @@ type Link struct {
 	DiscoveredAt *time.Time     `json:"discovered_at,omitempty"`
 	LastSeen     *time.Time     `json:"last_seen,omitempty"`
 	Metrics      map[string]any `json:"metrics,omitempty"`
+}
+
+// Presentation defines how the UI should render this topology.
+// Sent in the info response, not in data responses.
+
+type PresentationSummaryField struct {
+	Key     string   `json:"key"`
+	Label   string   `json:"label"`
+	Sources []string `json:"sources"`
+}
+
+type PresentationTableColumn struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	Type  string `json:"type,omitempty"`
+}
+
+type PresentationTable struct {
+	Label        string                    `json:"label"`
+	Source       string                    `json:"source"`
+	BulletSource bool                     `json:"bullet_source,omitempty"`
+	Order        int                       `json:"order,omitempty"`
+	Columns      []PresentationTableColumn `json:"columns"`
+}
+
+type PresentationModalTab struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	Type  string `json:"type,omitempty"`
+}
+
+type PresentationActorType struct {
+	Label           string                       `json:"label"`
+	ColorSlot       string                       `json:"color_slot"`
+	Opacity         float64                      `json:"opacity,omitempty"`
+	Border          bool                         `json:"border"`
+	SizeByLinks     bool                         `json:"size_by_links,omitempty"`
+	ShowPortBullets bool                         `json:"show_port_bullets,omitempty"`
+	IconSVG         string                       `json:"icon_svg,omitempty"`
+	SummaryFields   []PresentationSummaryField   `json:"summary_fields"`
+	Tables          map[string]PresentationTable `json:"tables"`
+	ModalTabs       []PresentationModalTab       `json:"modal_tabs"`
+}
+
+type PresentationLinkType struct {
+	Label     string  `json:"label"`
+	ColorSlot string  `json:"color_slot"`
+	Opacity   float64 `json:"opacity,omitempty"`
+	Width     float64 `json:"width,omitempty"`
+	Dash      bool    `json:"dash,omitempty"`
+}
+
+type PresentationPortType struct {
+	Label     string  `json:"label"`
+	ColorSlot string  `json:"color_slot"`
+	Opacity   float64 `json:"opacity,omitempty"`
+}
+
+type PresentationLegendEntry struct {
+	Type  string `json:"type"`
+	Label string `json:"label"`
+}
+
+type PresentationLegend struct {
+	Actors []PresentationLegendEntry `json:"actors"`
+	Links  []PresentationLegendEntry `json:"links"`
+	Ports  []PresentationLegendEntry `json:"ports,omitempty"`
+}
+
+type Presentation struct {
+	ActorTypes         map[string]PresentationActorType `json:"actor_types"`
+	LinkTypes          map[string]PresentationLinkType  `json:"link_types"`
+	PortTypes          map[string]PresentationPortType  `json:"port_types,omitempty"`
+	Legend             PresentationLegend               `json:"legend"`
+	ActorClickBehavior string                           `json:"actor_click_behavior"`
 }
 
 type FlowExporter struct {
