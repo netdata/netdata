@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
 const (
@@ -66,14 +68,37 @@ type ProfileConfig struct {
 	ResourceType    string         `yaml:"resource_type" json:"resource_type,omitempty"`
 	MetricNamespace string         `yaml:"metric_namespace,omitempty" json:"metric_namespace,omitempty"`
 	Metrics         []MetricConfig `yaml:"metrics" json:"metrics,omitempty"`
+	Charts          []ProfileChart `yaml:"charts" json:"charts,omitempty"`
 }
 
 type MetricConfig struct {
 	Name         string   `yaml:"name" json:"name,omitempty"`
-	DisplayName  string   `yaml:"display_name,omitempty" json:"display_name,omitempty"`
 	Units        string   `yaml:"units,omitempty" json:"units,omitempty"`
 	Aggregations []string `yaml:"aggregations,omitempty" json:"aggregations,omitempty"`
 	TimeGrain    string   `yaml:"time_grain,omitempty" json:"time_grain,omitempty"`
+}
+
+type ProfileChart struct {
+	ID            string                  `yaml:"id" json:"id,omitempty"`
+	Title         string                  `yaml:"title" json:"title,omitempty"`
+	Context       string                  `yaml:"context" json:"context,omitempty"`
+	Family        string                  `yaml:"family,omitempty" json:"family,omitempty"`
+	Units         string                  `yaml:"units" json:"units,omitempty"`
+	Algorithm     string                  `yaml:"algorithm,omitempty" json:"algorithm,omitempty"`
+	Type          string                  `yaml:"type,omitempty" json:"type,omitempty"`
+	Priority      int                     `yaml:"priority,omitempty" json:"priority,omitempty"`
+	LabelPromoted []string                `yaml:"label_promotion,omitempty" json:"label_promotion,omitempty"`
+	Instances     *charttpl.Instances     `yaml:"instances,omitempty" json:"instances,omitempty"`
+	Lifecycle     *charttpl.Lifecycle     `yaml:"lifecycle,omitempty" json:"lifecycle,omitempty"`
+	Dimensions    []ProfileChartDimension `yaml:"dimensions" json:"dimensions,omitempty"`
+}
+
+type ProfileChartDimension struct {
+	Metric        string                     `yaml:"metric" json:"metric,omitempty"`
+	Aggregation   string                     `yaml:"aggregation" json:"aggregation,omitempty"`
+	Name          string                     `yaml:"name,omitempty" json:"name,omitempty"`
+	NameFromLabel string                     `yaml:"name_from_label,omitempty" json:"name_from_label,omitempty"`
+	Options       *charttpl.DimensionOptions `yaml:"options,omitempty" json:"options,omitempty"`
 }
 
 func (c *Config) applyDefaults() {
@@ -199,6 +224,9 @@ func (p ProfileConfig) validate(prefix string) error {
 	if len(p.Metrics) == 0 {
 		errs = append(errs, fmt.Errorf("%s: 'metrics' must contain at least one metric", prefix))
 	}
+	if len(p.Charts) == 0 {
+		errs = append(errs, fmt.Errorf("%s: 'charts' must contain at least one chart", prefix))
+	}
 
 	seenMetricNames := map[string]struct{}{}
 	for j, m := range p.Metrics {
@@ -213,6 +241,21 @@ func (p ProfileConfig) validate(prefix string) error {
 			errs = append(errs, fmt.Errorf("%s: duplicate metric name '%s'", prefix, m.Name))
 		}
 		seenMetricNames[name] = struct{}{}
+	}
+
+	seenChartIDs := map[string]struct{}{}
+	for i, ch := range p.Charts {
+		if err := ch.validate(prefix, i); err != nil {
+			errs = append(errs, err)
+		}
+		id := stringsLowerTrim(ch.ID)
+		if id == "" {
+			continue
+		}
+		if _, ok := seenChartIDs[id]; ok {
+			errs = append(errs, fmt.Errorf("%s: duplicate chart id '%s'", prefix, ch.ID))
+		}
+		seenChartIDs[id] = struct{}{}
 	}
 
 	return errors.Join(errs...)
@@ -247,6 +290,62 @@ func (m MetricConfig) validate(profilePrefix string, idx int) error {
 		}
 		seen[agg] = struct{}{}
 	}
+	return errors.Join(errs...)
+}
+
+func (c ProfileChart) validate(profilePrefix string, idx int) error {
+	prefix := fmt.Sprintf("%s.charts[%d]", profilePrefix, idx)
+	var errs []error
+
+	if stringsTrim(c.ID) == "" {
+		errs = append(errs, fmt.Errorf("%s: 'id' is required", prefix))
+	}
+	if stringsTrim(c.Title) == "" {
+		errs = append(errs, fmt.Errorf("%s: 'title' is required", prefix))
+	}
+	if stringsTrim(c.Context) == "" {
+		errs = append(errs, fmt.Errorf("%s: 'context' is required", prefix))
+	}
+	if stringsTrim(c.Units) == "" {
+		errs = append(errs, fmt.Errorf("%s: 'units' is required", prefix))
+	}
+	if len(c.Dimensions) == 0 {
+		errs = append(errs, fmt.Errorf("%s: 'dimensions' must contain at least one dimension", prefix))
+	}
+
+	seenNames := map[string]struct{}{}
+	for i, d := range c.Dimensions {
+		if err := d.validate(prefix, i); err != nil {
+			errs = append(errs, err)
+		}
+		name := stringsLowerTrim(d.Name)
+		if name == "" {
+			continue
+		}
+		if _, ok := seenNames[name]; ok {
+			errs = append(errs, fmt.Errorf("%s: duplicate dimension name '%s'", prefix, d.Name))
+			continue
+		}
+		seenNames[name] = struct{}{}
+	}
+
+	return errors.Join(errs...)
+}
+
+func (d ProfileChartDimension) validate(chartPrefix string, idx int) error {
+	prefix := fmt.Sprintf("%s.dimensions[%d]", chartPrefix, idx)
+	var errs []error
+
+	if stringsTrim(d.Metric) == "" {
+		errs = append(errs, fmt.Errorf("%s: 'metric' is required", prefix))
+	}
+	if normalizeAggregation(d.Aggregation) == "" {
+		errs = append(errs, fmt.Errorf("%s: 'aggregation' must be one of average, minimum, maximum, total, count", prefix))
+	}
+	if stringsTrim(d.Name) != "" && stringsTrim(d.NameFromLabel) != "" {
+		errs = append(errs, fmt.Errorf("%s: only one of 'name' and 'name_from_label' may be set", prefix))
+	}
+
 	return errors.Join(errs...)
 }
 

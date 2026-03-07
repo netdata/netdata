@@ -49,3 +49,195 @@ metrics:
     units: requests/s
     aggregations: [total]
     time_grain: PT1M
+charts:
+  - id: am_azure_cosmos_db__totalrequests
+    title: Azure Cosmos DB Account Total Requests
+    context: cosmos_db.total_requests
+    family: Throughput
+    type: line
+    priority: 1000
+    units: requests/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalRequests
+        aggregation: total
+        name: total
+
+  - id: am_azure_cosmos_db__totalrequestunits
+    title: Azure Cosmos DB Account Total Request Units
+    context: cosmos_db.total_request_units
+    family: Throughput
+    type: line
+    priority: 1010
+    units: RU/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalRequestUnits
+        aggregation: total
+        name: total
+
+  - id: am_azure_cosmos_db__normalizedruconsumption
+    title: Azure Cosmos DB Account Normalized RU Consumption
+    context: cosmos_db.normalized_ru_consumption
+    family: Utilization
+    type: line
+    priority: 1020
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: NormalizedRUConsumption
+        aggregation: average
+        name: average
+
+  - id: am_azure_cosmos_db__serversidelatencydirect
+    title: Azure Cosmos DB Account Direct Server-Side Latency
+    context: cosmos_db.server_side_latency_direct
+    family: Latency
+    type: line
+    priority: 1030
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ServerSideLatencyDirect
+        aggregation: average
+        name: average
+
+  - id: am_azure_cosmos_db__serversidelatencygateway
+    title: Azure Cosmos DB Account Gateway Server-Side Latency
+    context: cosmos_db.server_side_latency_gateway
+    family: Latency
+    type: line
+    priority: 1040
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ServerSideLatencyGateway
+        aggregation: average
+        name: average
+
+  - id: am_azure_cosmos_db__replicationlatency
+    title: Azure Cosmos DB Account Replication Latency
+    context: cosmos_db.replication_latency
+    family: Replication
+    type: line
+    priority: 1050
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ReplicationLatency
+        aggregation: average
+        name: average
+
+  - id: am_azure_cosmos_db__datausage
+    title: Azure Cosmos DB Account Data Usage
+    context: cosmos_db.data_usage
+    family: Capacity
+    type: line
+    priority: 1060
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: DataUsage
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_cosmos_db__documentcount
+    title: Azure Cosmos DB Account Document Count
+    context: cosmos_db.document_count
+    family: Capacity
+    type: line
+    priority: 1070
+    units: documents
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: DocumentCount
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_cosmos_db__provisionedthroughput
+    title: Azure Cosmos DB Account Provisioned Throughput
+    context: cosmos_db.provisioned_throughput
+    family: Throughput
+    type: line
+    priority: 1080
+    units: RU/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ProvisionedThroughput
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_cosmos_db__serviceavailability
+    title: Azure Cosmos DB Account Service Availability
+    context: cosmos_db.service_availability
+    family: Availability
+    type: line
+    priority: 1090
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ServiceAvailability
+        aggregation: average
+        name: average
+
+  - id: am_azure_cosmos_db__mongorequests
+    title: Azure Cosmos DB Account Mongo Requests
+    context: cosmos_db.mongo_requests
+    family: Throughput
+    type: line
+    priority: 1100
+    units: requests/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: MongoRequests
+        aggregation: total
+        name: total
+
+  - id: am_azure_cosmos_db__cassandrarequests
+    title: Azure Cosmos DB Account Cassandra Requests
+    context: cosmos_db.cassandra_requests
+    family: Throughput
+    type: line
+    priority: 1110
+    units: requests/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CassandraRequests
+        aggregation: total
+        name: total

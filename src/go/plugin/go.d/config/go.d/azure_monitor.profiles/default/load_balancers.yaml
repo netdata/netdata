@@ -21,3 +21,83 @@ metrics:
     units: connections
     aggregations: [average]
     time_grain: PT1M
+charts:
+  - id: am_azure_load_balancers__vipavailability
+    title: Azure Load Balancer VIP Availability
+    context: load_balancers.vip_availability
+    family: Availability
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: VipAvailability
+        aggregation: average
+        name: average
+
+  - id: am_azure_load_balancers__bytecount
+    title: Azure Load Balancer Byte Throughput
+    context: load_balancers.byte_count
+    family: Throughput
+    type: line
+    priority: 1010
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ByteCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_load_balancers__packetcount
+    title: Azure Load Balancer Packet Throughput
+    context: load_balancers.packet_count
+    family: Throughput
+    type: line
+    priority: 1020
+    units: packets/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: PacketCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_load_balancers__syncount
+    title: Azure Load Balancer SYN Requests
+    context: load_balancers.syn_count
+    family: Requests
+    type: line
+    priority: 1030
+    units: requests/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SYNCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_load_balancers__snatconnectioncount
+    title: Azure Load Balancer SNAT Connection Count
+    context: load_balancers.snat_connection_count
+    family: Connections
+    type: line
+    priority: 1040
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SnatConnectionCount
+        aggregation: average
+        name: average

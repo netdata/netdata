@@ -19,6 +19,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
 var supportedTimeGrains = map[string]time.Duration{
@@ -65,18 +66,16 @@ type profileRuntime struct {
 	ResourceType    string
 	MetricNamespace string
 	Metrics         []*metricRuntime
+	Charts          []charttpl.Chart
 }
 
 type metricRuntime struct {
-	Name             string
-	DisplayName      string
-	Units            string
-	TimeGrain        string
-	TimeGrainEvery   time.Duration
-	Aggregations     []string
-	InstrumentByAgg  map[string]string
-	ChartID          string
-	ChartContextPart string
+	Name            string
+	Units           string
+	TimeGrain       string
+	TimeGrainEvery  time.Duration
+	Aggregations    []string
+	InstrumentByAgg map[string]string
 }
 
 type discoveryState struct {

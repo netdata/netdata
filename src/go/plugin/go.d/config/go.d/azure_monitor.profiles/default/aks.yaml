@@ -21,3 +21,83 @@ metrics:
     units: bytes/s
     aggregations: [total]
     time_grain: PT1M
+charts:
+  - id: am_azure_aks__node_cpu_usage_millicores
+    title: Azure Kubernetes Service Cluster Node CPU Usage
+    context: aks.node_cpu_usage_millicores
+    family: Utilization
+    type: line
+    priority: 1000
+    units: millicores
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: node_cpu_usage_millicores
+        aggregation: average
+        name: average
+
+  - id: am_azure_aks__node_memory_working_set_bytes
+    title: Azure Kubernetes Service Cluster Node Memory Working Set
+    context: aks.node_memory_working_set_bytes
+    family: Utilization
+    type: line
+    priority: 1010
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: node_memory_working_set_bytes
+        aggregation: average
+        name: average
+
+  - id: am_azure_aks__node_disk_usage_bytes
+    title: Azure Kubernetes Service Cluster Node Disk Usage
+    context: aks.node_disk_usage_bytes
+    family: Utilization
+    type: line
+    priority: 1020
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: node_disk_usage_bytes
+        aggregation: average
+        name: average
+
+  - id: am_azure_aks__node_network_in_bytes
+    title: Azure Kubernetes Service Cluster Node Network Ingress
+    context: aks.node_network_in_bytes
+    family: Network
+    type: line
+    priority: 1030
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: node_network_in_bytes
+        aggregation: total
+        name: total
+
+  - id: am_azure_aks__node_network_out_bytes
+    title: Azure Kubernetes Service Cluster Node Network Egress
+    context: aks.node_network_out_bytes
+    family: Network
+    type: line
+    priority: 1040
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: node_network_out_bytes
+        aggregation: total
+        name: total

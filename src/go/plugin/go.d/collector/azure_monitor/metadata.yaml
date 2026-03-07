@@ -200,7 +200,7 @@ modules:
         title: Metrics
         enabled: false
       description: |
-        Metric contexts and dimensions are generated from enabled profiles and Azure metric definitions.
+        Metric contexts and chart dimensions are defined by enabled Azure Monitor profiles.
       availability: []
       scopes: []
 

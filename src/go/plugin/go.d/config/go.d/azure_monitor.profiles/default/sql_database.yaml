@@ -29,3 +29,115 @@ metrics:
     units: percentage
     aggregations: [average]
     time_grain: PT1M
+charts:
+  - id: am_azure_sql_database__cpu_percent
+    title: Azure SQL Database CPU Utilization
+    context: sql_database.cpu_percent
+    family: Utilization
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cpu_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_database__dtu_consumption_percent
+    title: Azure SQL Database DTU Consumption
+    context: sql_database.dtu_consumption_percent
+    family: Utilization
+    type: line
+    priority: 1010
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: dtu_consumption_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_database__storage_percent
+    title: Azure SQL Database Storage Utilization
+    context: sql_database.storage_percent
+    family: Utilization
+    type: line
+    priority: 1020
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: storage_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_database__sessions_percent
+    title: Azure SQL Database Sessions Utilization
+    context: sql_database.sessions_percent
+    family: Utilization
+    type: line
+    priority: 1030
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: sessions_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_database__workers_percent
+    title: Azure SQL Database Workers Utilization
+    context: sql_database.workers_percent
+    family: Utilization
+    type: line
+    priority: 1040
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: workers_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_database__physical_data_read_percent
+    title: Azure SQL Database Physical Data Read Utilization
+    context: sql_database.physical_data_read_percent
+    family: Utilization
+    type: line
+    priority: 1050
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: physical_data_read_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_database__log_write_percent
+    title: Azure SQL Database Log Write Utilization
+    context: sql_database.log_write_percent
+    family: Utilization
+    type: line
+    priority: 1060
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: log_write_percent
+        aggregation: average
+        name: average

@@ -212,6 +212,35 @@ func TestCollector_TimeGrainScheduling(t *testing.T) {
 				Metrics: []MetricConfig{
 					{Name: "UsedCapacity", Aggregations: []string{"average"}, TimeGrain: "PT5M", Units: "bytes"},
 				},
+				Charts: []ProfileChart{
+					{
+						ID:        "am_storage_slow_used_capacity",
+						Title:     "Azure Storage Slow Used Capacity",
+						Context:   "storage_slow.used_capacity",
+						Family:    "Capacity",
+						Type:      "line",
+						Priority:  1000,
+						Units:     "bytes",
+						Algorithm: "absolute",
+						LabelPromoted: []string{
+							"resource_name",
+							"resource_group",
+							"region",
+							"resource_type",
+							"profile",
+						},
+						Instances: &charttpl.Instances{
+							ByLabels: []string{"resource_uid"},
+						},
+						Dimensions: []ProfileChartDimension{
+							{
+								Metric:      "UsedCapacity",
+								Aggregation: "average",
+								Name:        "average",
+							},
+						},
+					},
+				},
 			},
 		},
 		stockProfileSet: map[string]struct{}{
@@ -256,12 +285,50 @@ func TestBuildRuntimePlan_DetectsProfileCollision(t *testing.T) {
 			"redis_upper": {
 				Name:         "Azure Redis Cache",
 				ResourceType: "Microsoft.Cache/Redis",
-				Metrics:      []MetricConfig{{Name: "connectedclients", Aggregations: []string{"average"}, TimeGrain: "PT1M"}},
+				Metrics:      []MetricConfig{{Name: "connectedclients", Aggregations: []string{"average"}, TimeGrain: "PT1M", Units: "connections"}},
+				Charts: []ProfileChart{
+					{
+						ID:        "am_collision_chart",
+						Title:     "Azure Redis Cache Connected Clients",
+						Context:   "redis.connected_clients_upper",
+						Family:    "Connections",
+						Type:      "line",
+						Priority:  1000,
+						Units:     "connections",
+						Algorithm: "absolute",
+						Dimensions: []ProfileChartDimension{
+							{
+								Metric:      "connectedclients",
+								Aggregation: "average",
+								Name:        "average",
+							},
+						},
+					},
+				},
 			},
 			"redis_lower": {
 				Name:         "azure redis cache",
 				ResourceType: "Microsoft.Cache/Redis",
-				Metrics:      []MetricConfig{{Name: "cachehits", Aggregations: []string{"average"}, TimeGrain: "PT1M"}},
+				Metrics:      []MetricConfig{{Name: "cachehits", Aggregations: []string{"average"}, TimeGrain: "PT1M", Units: "hits/s"}},
+				Charts: []ProfileChart{
+					{
+						ID:        "am_collision_chart",
+						Title:     "Azure Redis Cache Hits",
+						Context:   "redis.cache_hits_lower",
+						Family:    "Throughput",
+						Type:      "line",
+						Priority:  1010,
+						Units:     "hits/s",
+						Algorithm: "absolute",
+						Dimensions: []ProfileChartDimension{
+							{
+								Metric:      "cachehits",
+								Aggregation: "average",
+								Name:        "average",
+							},
+						},
+					},
+				},
 			},
 		},
 		stockProfileSet: map[string]struct{}{
