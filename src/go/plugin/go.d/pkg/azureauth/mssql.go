@@ -41,8 +41,12 @@ func BuildMSSQLAzureADDSN(baseDSN string, cfg Config) (string, error) {
 	}
 
 	q := u.Query()
-	q.Del("fedauth")
-	q.Del("user id")
+	for key := range q {
+		switch strings.ToLower(key) {
+		case "fedauth", "user id", "password":
+			q.Del(key)
+		}
+	}
 
 	switch cfg.normalizedMode() {
 	case ModeServicePrincipal:

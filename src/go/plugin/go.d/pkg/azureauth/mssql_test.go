@@ -101,6 +101,40 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 		}
 	})
 
+	t.Run("cleans mixed-case stale params", func(t *testing.T) {
+		stale := "sqlserver://olduser:oldpass@localhost:1433?database=master&FedAuth=old&User+ID=old&Password=old"
+		cfg := Config{
+			Enabled: true,
+			Mode:    ModeDefault,
+		}
+
+		dsn, err := BuildMSSQLAzureADDSN(stale, cfg)
+		if err != nil {
+			t.Fatalf("BuildMSSQLAzureADDSN() unexpected error: %v", err)
+		}
+
+		u, err := url.Parse(dsn)
+		if err != nil {
+			t.Fatalf("url.Parse() unexpected error: %v", err)
+		}
+
+		if got := u.Query().Get("FedAuth"); got != "" {
+			t.Fatalf("stale FedAuth not removed: %q", got)
+		}
+		if got := u.Query().Get("User ID"); got != "" {
+			t.Fatalf("stale User ID not removed: %q", got)
+		}
+		if got := u.Query().Get("Password"); got != "" {
+			t.Fatalf("stale Password not removed: %q", got)
+		}
+		if got := u.Query().Get("fedauth"); got != "ActiveDirectoryDefault" {
+			t.Fatalf("unexpected fedauth: %q", got)
+		}
+		if u.User != nil {
+			t.Fatalf("expected no user info for default credential")
+		}
+	})
+
 	t.Run("invalid scheme", func(t *testing.T) {
 		cfg := Config{Enabled: true, Mode: ModeDefault}
 		_, err := BuildMSSQLAzureADDSN("server=localhost;database=master", cfg)
