@@ -65,6 +65,27 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	assertString(t, byUnit["perf_counter_requests_value"], "c")
 	assertString(t, byUnit["perf_generic_custom_value"], "generic")
 
+	store := metrix.NewCollectorStore()
+	cc := gateCycleController(t, store)
+	cc.BeginCycle()
+	sm := store.Write().SnapshotMeter("scriptsd")
+	labels := sm.LabelSet(
+		metrix.Label{Key: "nagios_scheduler", Value: "default"},
+		metrix.Label{Key: "nagios_job", Value: "gate_job"},
+	)
+	for _, sample := range samples {
+		sm.Gauge(sample.name, metrix.WithUnit(sample.unit), metrix.WithFloat(sample.float)).Observe(sample.value, labels)
+	}
+	cc.CommitCycleSuccess()
+
+	reader := store.Read(metrix.ReadRaw())
+	assertMetricMeta(t, reader, "scriptsd.perf_time_latency_value", "seconds", true)
+	assertMetricMeta(t, reader, "scriptsd.perf_bytes_throughput_value", "bytes", true)
+	assertMetricMeta(t, reader, "scriptsd.perf_bits_wire_rate_value", "bits", true)
+	assertMetricMeta(t, reader, "scriptsd.perf_percent_free_pct_value", "%", true)
+	assertMetricMeta(t, reader, "scriptsd.perf_counter_requests_value", "c", true)
+	assertMetricMeta(t, reader, "scriptsd.perf_generic_custom_value", "generic", true)
+
 	_ = router.route("default", "gate_job", []output.PerfDatum{
 		{Label: "latency", Unit: "%", Value: 1}, // unit drift: time -> percent
 	})
@@ -113,6 +134,30 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 		t.Fatalf("expected create chart action on first cycle")
 	}
 
+	// Failed cycle assertion: abort must not remove existing charts/dimensions.
+	cc := gateCycleController(t, store)
+	cc.BeginCycle()
+	sm := store.Write().SnapshotMeter("scriptsd")
+	ls := sm.LabelSet(
+		metrix.Label{Key: "nagios_scheduler", Value: "default"},
+		metrix.Label{Key: "nagios_job", Value: "gate_job"},
+	)
+	sm.Gauge("perf_bytes_a_value", metrix.WithUnit("bytes"), metrix.WithFloat(true)).Observe(1, ls)
+	cc.AbortCycle()
+	if status := store.Read(metrix.ReadRaw()).CollectMeta().LastAttemptStatus; status != metrix.CollectStatusFailed {
+		t.Fatalf("expected failed collect status after abort, got %q", status)
+	}
+	planFailed, err := engine.BuildPlan(store.Read(metrix.ReadFlatten()))
+	if err != nil {
+		t.Fatalf("build plan after abort: %v", err)
+	}
+	if removeActionsCount(planFailed.Actions) != 0 {
+		t.Fatalf("expected no remove actions on aborted cycle")
+	}
+
+	// Re-establish both perf series, then validate success-cycle churn/removal behavior.
+	_ = emit(true)
+
 	plan2 := emit(false)
 	if removeActionsCount(plan2.Actions) != 0 {
 		t.Fatalf("expected no remove actions on cycle 2")
@@ -151,12 +196,17 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 			samples := router.route("default", "gate_job", []output.PerfDatum{
 				{Label: "sample", Unit: tc.unit, Value: tc.raw},
 			})
-			got := sampleMap(samples)
-			var candidate float64
+			var (
+				candidate    float64
+				candidateKey string
+				candidateMet perfMetricSample
+			)
 			found := false
-			for name, v := range got {
-				if len(name) >= 6 && name[len(name)-6:] == "_value" {
-					candidate = v
+			for _, sample := range samples {
+				if len(sample.name) >= 6 && sample.name[len(sample.name)-6:] == "_value" {
+					candidate = sample.value
+					candidateKey = sample.name
+					candidateMet = sample
 					found = true
 					break
 				}
@@ -175,6 +225,15 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 			if rel > 0.001 {
 				t.Fatalf("relative error too high: got=%f want=%f rel=%f", candidate, displayV1, rel)
 			}
+
+			store := metrix.NewCollectorStore()
+			cc := gateCycleController(t, store)
+			cc.BeginCycle()
+			sm := store.Write().SnapshotMeter("scriptsd")
+			sm.Gauge(candidateKey, metrix.WithUnit(candidateMet.unit), metrix.WithFloat(candidateMet.float)).
+				Observe(candidate, sm.LabelSet())
+			cc.CommitCycleSuccess()
+			assertMetricMeta(t, store.Read(metrix.ReadRaw()), "scriptsd."+candidateKey, candidateMet.unit, candidateMet.float)
 		})
 	}
 }
@@ -200,6 +259,20 @@ func gateCycleController(t *testing.T, store metrix.CollectorStore) metrix.Cycle
 		t.Fatalf("store does not expose cycle control")
 	}
 	return managed.CycleController()
+}
+
+func assertMetricMeta(t *testing.T, reader metrix.Reader, metricName, unit string, isFloat bool) {
+	t.Helper()
+	meta, ok := reader.MetricMeta(metricName)
+	if !ok {
+		t.Fatalf("missing metric metadata for %q", metricName)
+	}
+	if meta.Unit != unit {
+		t.Fatalf("unexpected unit for %q: got=%q want=%q", metricName, meta.Unit, unit)
+	}
+	if meta.Float != isFloat {
+		t.Fatalf("unexpected float metadata for %q: got=%t want=%t", metricName, meta.Float, isFloat)
+	}
 }
 
 func TestV2Gate_SmokeCollect(t *testing.T) {

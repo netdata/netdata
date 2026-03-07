@@ -5,6 +5,7 @@ package schedulers
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -64,9 +65,19 @@ func (h *fakeHost) collectMetrics() map[string]int64 {
 }
 
 func (h *fakeHost) collectSnapshot() runtime.SchedulerSnapshot {
+	jobs := make([]runtime.JobMetricsSnapshot, 0, len(h.jobs))
+	for id, reg := range h.jobs {
+		jobs = append(jobs, runtime.JobMetricsSnapshot{
+			JobID:   id,
+			JobName: reg.Spec.Name,
+		})
+	}
+	sort.Slice(jobs, func(i, j int) bool { return jobs[i].JobID < jobs[j].JobID })
+
 	return runtime.SchedulerSnapshot{
 		Scheduler: h.def.Name,
 		Scheduled: int64(len(h.jobs)),
+		Jobs:      jobs,
 	}
 }
 

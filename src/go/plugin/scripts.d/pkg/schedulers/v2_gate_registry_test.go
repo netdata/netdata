@@ -4,6 +4,7 @@ package schedulers
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -11,7 +12,7 @@ import (
 )
 
 func TestV2Gate_G4_SchedulerRegistry(t *testing.T) {
-	t.Run("concurrent attach/detach", func(t *testing.T) {
+	t.Run("concurrent attach/detach with compatible ensure", func(t *testing.T) {
 		reg := newRegistryWithFactory(&fakeHostFactory{})
 		def := Definition{
 			Name:           "gate-concurrent",
@@ -26,7 +27,24 @@ func TestV2Gate_G4_SchedulerRegistry(t *testing.T) {
 
 		const workers = 12
 		const loops = 30
+		const ensureLoops = 60
+
 		var wg sync.WaitGroup
+		errCh := make(chan error, workers+1)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < ensureLoops; i++ {
+				compatible := def
+				compatible.Labels = map[string]string{"generation": strconv.Itoa(i)}
+				if err := reg.Ensure(compatible, nil); err != nil {
+					errCh <- fmt.Errorf("ensure failed: %w", err)
+					return
+				}
+			}
+		}()
+
 		for i := 0; i < workers; i++ {
 			i := i
 			wg.Add(1)
@@ -37,7 +55,7 @@ func TestV2Gate_G4_SchedulerRegistry(t *testing.T) {
 						Spec: testRegJobSpec(fmt.Sprintf("job-%d-%d", i, j)),
 					}, nil)
 					if err != nil {
-						t.Errorf("attach failed: %v", err)
+						errCh <- fmt.Errorf("attach failed: %w", err)
 						return
 					}
 					reg.Detach(handle)
@@ -45,6 +63,29 @@ func TestV2Gate_G4_SchedulerRegistry(t *testing.T) {
 			}()
 		}
 		wg.Wait()
+		close(errCh)
+		for err := range errCh {
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		snapshot, ok := reg.Snapshot("gate-concurrent")
+		if ok && len(snapshot.Jobs) > 0 {
+			reg.mu.RLock()
+			entry := reg.entries["gate-concurrent"]
+			reg.mu.RUnlock()
+			if entry == nil {
+				t.Fatalf("expected scheduler entry for cleanup")
+			}
+			for _, job := range snapshot.Jobs {
+				reg.Detach(&SchedulerJobHandle{
+					scheduler:  "gate-concurrent",
+					jobID:      job.JobID,
+					generation: entry.generation,
+				})
+			}
+		}
 
 		if err := reg.Remove("gate-concurrent"); err != nil {
 			t.Fatalf("remove failed: %v", err)
