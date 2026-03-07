@@ -12,7 +12,7 @@ import (
 
 func (c *Collector) refreshDiscovery(ctx context.Context, force bool) ([]resourceInfo, error) {
 	now := c.now()
-	if !force && len(c.discovery.Resources) > 0 && now.Before(c.discovery.ExpiresAt) {
+	if !force && !c.discovery.FetchedAt.IsZero() && now.Before(c.discovery.ExpiresAt) {
 		return c.discovery.Resources, nil
 	}
 

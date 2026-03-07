@@ -110,17 +110,17 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("config validation: %w", err)
 	}
 
-	cred, err := c.createCredential()
-	if err != nil {
-		return fmt.Errorf("create azure credential: %w", err)
-	}
-	c.credential = cred
-
 	cfg, err := cloudConfigFromName(c.Cloud)
 	if err != nil {
 		return err
 	}
 	c.cloudCfg = cfg
+
+	cred, err := c.createCredential()
+	if err != nil {
+		return fmt.Errorf("create azure credential: %w", err)
+	}
+	c.credential = cred
 
 	rgClient, err := c.newResourceGraph(c.SubscriptionID, c.credential, c.cloudCfg)
 	if err != nil {
@@ -168,17 +168,21 @@ func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 func (c *Collector) ChartTemplateYAML() string { return c.chartTemplate }
 
 func (c *Collector) createCredential() (azcore.TokenCredential, error) {
+	coreOpts := azcore.ClientOptions{Cloud: c.cloudCfg}
+
 	switch stringsLowerTrim(c.Auth.Mode) {
 	case authModeServicePrincipal:
-		return azidentity.NewClientSecretCredential(c.Auth.TenantID, c.Auth.ClientID, c.Auth.ClientSecret, nil)
+		opts := &azidentity.ClientSecretCredentialOptions{ClientOptions: coreOpts}
+		return azidentity.NewClientSecretCredential(c.Auth.TenantID, c.Auth.ClientID, c.Auth.ClientSecret, opts)
 	case authModeManagedIdentity:
+		miOpts := &azidentity.ManagedIdentityCredentialOptions{ClientOptions: coreOpts}
 		if stringsTrim(c.Auth.ManagedIdentityClientID) != "" {
-			opts := &azidentity.ManagedIdentityCredentialOptions{ID: azidentity.ClientID(stringsTrim(c.Auth.ManagedIdentityClientID))}
-			return azidentity.NewManagedIdentityCredential(opts)
+			miOpts.ID = azidentity.ClientID(stringsTrim(c.Auth.ManagedIdentityClientID))
 		}
-		return azidentity.NewManagedIdentityCredential(nil)
+		return azidentity.NewManagedIdentityCredential(miOpts)
 	case authModeDefault, "":
-		return azidentity.NewDefaultAzureCredential(nil)
+		opts := &azidentity.DefaultAzureCredentialOptions{ClientOptions: coreOpts}
+		return azidentity.NewDefaultAzureCredential(opts)
 	default:
 		return nil, fmt.Errorf("unsupported auth.mode: %q", c.Auth.Mode)
 	}
