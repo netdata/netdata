@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/spec"
 )
 
 func TestApplyGetRemove(t *testing.T) {

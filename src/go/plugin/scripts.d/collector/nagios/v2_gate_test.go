@@ -12,7 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/output"
 )
 
 func TestV2Gate_G1_TemplateCompileProof(t *testing.T) {

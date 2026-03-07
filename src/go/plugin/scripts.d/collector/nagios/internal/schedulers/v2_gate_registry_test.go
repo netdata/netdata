@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/runtime"
 )
 
 func TestV2Gate_G4_SchedulerRegistry(t *testing.T) {

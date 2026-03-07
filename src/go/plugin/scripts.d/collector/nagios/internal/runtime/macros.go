@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/spec"
 )
 
 // MacroContext collects all sources needed to substitute Nagios macros and

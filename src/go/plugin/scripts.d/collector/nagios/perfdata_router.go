@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/output"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
 )
 
 const defaultPerfdataMetricKeyBudget = 64

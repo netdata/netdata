@@ -12,10 +12,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/schedulers"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/output"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/schedulers"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/spec"
 )
 
 func TestCollector_ChartTemplateYAML(t *testing.T) {

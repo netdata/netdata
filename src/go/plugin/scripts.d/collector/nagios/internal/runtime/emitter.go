@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/output"
 )
 
 // ResultEmitter receives execution snapshots for downstream logging/OTEL pipelines.

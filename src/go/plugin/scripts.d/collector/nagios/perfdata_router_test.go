@@ -6,7 +6,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/output"
 )
 
 func TestPerfdataRouterRoutesAndCanonicalizesUnits(t *testing.T) {

@@ -2,7 +2,7 @@
 
 package runtime
 
-import "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
+import "github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/spec"
 
 // MacroSource exposes the data required by the macro builder.
 type MacroSource interface {

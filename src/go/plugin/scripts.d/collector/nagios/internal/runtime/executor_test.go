@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/spec"
 )
 
 func TestExecutorSingleFlight(t *testing.T) {

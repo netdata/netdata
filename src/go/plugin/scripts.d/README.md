@@ -91,8 +91,8 @@ config yet.
 ```bash
 cd src/go
 go test ./plugin/scripts.d/collector/nagios -count=1
-go test ./plugin/scripts.d/pkg/schedulers -count=1
-go test ./plugin/scripts.d/pkg/runtime -count=1
+go test ./plugin/scripts.d/collector/nagios/internal/schedulers -count=1
+go test ./plugin/scripts.d/collector/nagios/internal/runtime -count=1
 ```
 
 ## Build

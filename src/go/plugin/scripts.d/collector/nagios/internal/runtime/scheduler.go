@@ -16,8 +16,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/output"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/spec"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/timeperiod"
 )
 

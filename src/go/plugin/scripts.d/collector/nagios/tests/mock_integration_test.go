@@ -12,9 +12,9 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	ndexec "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
-	runtimepkg "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
-	specpkg "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/output"
+	runtimepkg "github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/runtime"
+	specpkg "github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/spec"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/timeperiod"
 	"github.com/stretchr/testify/require"
 )

@@ -5,7 +5,7 @@ package runtime
 import (
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/output"
 )
 
 // SchedulerSnapshot is a typed scheduler state snapshot used by v2 collectors.

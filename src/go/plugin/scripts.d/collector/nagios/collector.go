@@ -9,9 +9,9 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/schedulers"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/schedulers"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/spec"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/timeperiod"
 )
 
