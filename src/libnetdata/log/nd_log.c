@@ -6,6 +6,7 @@
 
 #include "../libnetdata.h"
 #include "nd_log-internals.h"
+#include "nd_log-queue.h"
 #include "../stacktrace/stacktrace.h"
 
 const char *program_name = "";
@@ -149,9 +150,10 @@ void nd_log_register_fatal_final_cb(fatal_event_t cb) {
 // --------------------------------------------------------------------------------------------------------------------
 // high level logger
 
-static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
-                                 ND_LOG_METHOD output, struct nd_log_source *source,
-                                 struct log_field *fields, size_t fields_max) {
+// Synchronous logging - used for critical messages and when async is not available
+static void nd_logger_log_fields_sync(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
+                                      ND_LOG_METHOD output, struct nd_log_source *source,
+                                      struct log_field *fields, size_t fields_max) {
     nd_log_fatal_hook(fields, fields_max);
 
     if(spinlock)
@@ -221,6 +223,127 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
 cleanup:
     if(spinlock)
         spinlock_unlock(spinlock);
+}
+
+// Async logging - formats message and enqueues for background writing
+// Note: rate limiting must be checked by the caller before invoking this function
+static bool nd_logger_log_fields_async(FILE *fp __maybe_unused, ND_LOG_FIELD_PRIORITY priority,
+                                       ND_LOG_METHOD output, struct nd_log_source *source,
+                                       struct log_field *fields, size_t fields_max) {
+    // Pre-format the message into a queue entry (no locks held)
+    // Note: FILE* is looked up at write time from nd_log.sources[source] to handle log rotation
+    struct nd_log_queue_entry entry = {
+        .source = (ND_LOG_SOURCES)(source - nd_log.sources),  // Calculate source index
+        .priority = priority,
+        .method = output,
+        .format = source->format,
+        .syslog_initialized = nd_log.syslog.initialized,
+        .message_len = 0,
+        .message_allocated = NULL,
+    };
+
+    // Format the message based on output method
+    // Note: NDLM_JOURNAL is not supported async - it goes through sync path
+    // Note: NDLM_STDOUT/STDERR are remapped to NDLM_FILE by select_output()
+    CLEAN_BUFFER *wb = buffer_create(1024, NULL);
+
+    if(output == NDLM_FILE) {
+        if(source->format == NDLF_JSON)
+            nd_logger_json(wb, fields, fields_max);
+        else
+            nd_logger_logfmt(wb, fields, fields_max);
+    }
+    else if(output == NDLM_SYSLOG) {
+        // For syslog, use logfmt
+        nd_logger_logfmt(wb, fields, fields_max);
+    }
+    else {
+        return false;
+    }
+
+    // Get formatted message
+    size_t msg_len = buffer_strlen(wb);
+    const char *msg = buffer_tostring(wb);
+
+    // Clamp to maximum size (leaving room for null terminator)
+    if(msg_len >= ND_LOG_QUEUE_MESSAGE_MAX_SIZE)
+        msg_len = ND_LOG_QUEUE_MESSAGE_MAX_SIZE - 1;
+
+    entry.message_len = msg_len;
+
+    // Copy message and ensure null-termination (both branches explicitly add '\0')
+    if(msg_len < ND_LOG_QUEUE_INLINE_SIZE) {
+        // Fits in inline buffer
+        memcpy(entry.message_inline, msg, msg_len);
+        entry.message_inline[msg_len] = '\0';  // Explicit null-termination after truncated content
+        entry.message_allocated = NULL;
+    }
+    else {
+        // Need to allocate - use mallocz (will fatal on failure, which is acceptable)
+        entry.message_allocated = mallocz(msg_len + 1);
+        memcpy(entry.message_allocated, msg, msg_len);
+        entry.message_allocated[msg_len] = '\0';  // Explicit null-termination after truncated content
+    }
+
+    // Enqueue the entry (transfers ownership of allocated pointer)
+    // Note: wb is CLEAN_BUFFER so it auto-frees on return
+    return nd_log_queue_enqueue(&entry);
+}
+
+// Detect when select_output() has remapped to a fallback FILE*.
+// This happens when the configured backend (journal/ETW/WEL) isn't initialized,
+// so select_output() falls back to stderr. For these sources, source->fp is NULL,
+// but the fallback fp points to stderr. The async path looks up fp from source->fp
+// at write time, so using async with a fallback would lose the message.
+static inline bool is_using_fallback_output(ND_LOG_METHOD output, FILE *fp, struct nd_log_source *source) {
+    return (output == NDLM_FILE && fp != source->fp);
+}
+
+// Main entry point - decides between sync and async logging
+static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LOG_FIELD_PRIORITY priority,
+                                 ND_LOG_METHOD output, struct nd_log_source *source,
+                                 struct log_field *fields, size_t fields_max) {
+    // Critical messages (ALERT and above) always go synchronously.
+    // This ensures they are written immediately before potential crash.
+    // Note: nd_logger_log_fields_sync() calls nd_log_fatal_hook() which only
+    // does work when nd_log_fatal_event is true. That flag is only set for
+    // fatal messages (NDLP_ALERT), which always take this sync path.
+    if(priority <= NDLP_ALERT) {
+        nd_logger_log_fields_sync(spinlock, fp, limit, priority, output, source, fields, fields_max);
+        return;
+    }
+
+    // Try async logging if available and appropriate
+    if(nd_log_queue_enabled()) {
+        // For methods we support asynchronously
+        // Note: NDLM_STDOUT/STDERR are remapped to NDLM_FILE by select_output()
+        if(output == NDLM_FILE || output == NDLM_SYSLOG) {
+            // Skip async if using a fallback - async looks up fp at write time from
+            // source->fp, which would be NULL for non-file sources.
+            // SYSLOG is safe because write_entry() handles the fallback internally.
+            bool use_async = !is_using_fallback_output(output, fp, source);
+
+            if(use_async) {
+                // Check rate limits once here, before attempting async.
+                // This avoids double-counting if async fails and we fall through to sync.
+                if(limit && nd_log_limit_reached(source))
+                    return;
+
+                if(nd_logger_log_fields_async(fp, priority, output, source, fields, fields_max))
+                    return;  // Successfully queued
+
+                // Async enqueue failed (queue full) - fall through to sync with limit=false
+                // since we already checked limits above
+                nd_logger_log_fields_sync(spinlock, fp, false, priority, output, source, fields, fields_max);
+                return;
+            }
+        }
+        // Journal and Windows event log still use sync path for now
+        // They require special handling that's harder to serialize
+    }
+
+    // Synchronous logging (no async attempted, or async not applicable)
+    nd_logger_log_fields_sync(spinlock, fp, limit, priority, output, source, fields, fields_max);
 }
 
 static void nd_logger_unset_all_thread_fields(void) {
