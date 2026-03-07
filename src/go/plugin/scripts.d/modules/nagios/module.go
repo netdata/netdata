@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package scriptsd
+package nagios
 
 import (
 	"context"
@@ -19,11 +19,11 @@ import (
 var configSchema string
 
 //go:embed charts.yaml
-var scriptsdChartTemplateV2 string
+var nagiosChartTemplateV2 string
 
 func init() {
 	sharedRegistry := schedulers.NewRegistry()
-	collectorapi.Register("scriptsd", collectorapi.Creator{
+	collectorapi.Register("nagios", collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
@@ -127,7 +127,7 @@ func (c *Collector) Collect(context.Context) error {
 		return nil
 	}
 
-	sm := c.store.Write().SnapshotMeter("scriptsd")
+	sm := c.store.Write().SnapshotMeter("nagios")
 	lbl := sm.LabelSet(metrix.Label{Key: "nagios_scheduler", Value: c.jobSpec.Scheduler})
 
 	observe := func(name string, value float64) {
@@ -194,7 +194,7 @@ func (c *Collector) Cleanup(context.Context) {
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
-func (c *Collector) ChartTemplateYAML() string { return scriptsdChartTemplateV2 }
+func (c *Collector) ChartTemplateYAML() string { return nagiosChartTemplateV2 }
 
 func boolToFloat(v bool) float64 {
 	if v {

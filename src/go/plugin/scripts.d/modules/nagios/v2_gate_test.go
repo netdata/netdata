@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package scriptsd
+package nagios
 
 import (
 	"context"
@@ -77,7 +77,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	store := metrix.NewCollectorStore()
 	cc := gateCycleController(t, store)
 	cc.BeginCycle()
-	sm := store.Write().SnapshotMeter("scriptsd")
+	sm := store.Write().SnapshotMeter("nagios")
 	labels := sm.LabelSet(
 		metrix.Label{Key: "nagios_scheduler", Value: "default"},
 		metrix.Label{Key: "nagios_job", Value: "gate_job"},
@@ -88,18 +88,18 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	cc.CommitCycleSuccess()
 
 	reader := store.Read(metrix.ReadRaw())
-	assertMetricMeta(t, reader, "scriptsd.perf_time_latency_value", "seconds", true)
-	assertMetricMeta(t, reader, "scriptsd.perf_bytes_throughput_value", "bytes", true)
-	assertMetricMeta(t, reader, "scriptsd.perf_bits_wire_rate_value", "bits", true)
-	assertMetricMeta(t, reader, "scriptsd.perf_percent_free_pct_value", "%", true)
-	assertMetricMeta(t, reader, "scriptsd.perf_counter_requests_value", "c", true)
-	assertMetricMeta(t, reader, "scriptsd.perf_generic_custom_value", "generic", true)
-	assertMetricMeta(t, reader, "scriptsd.perf_time_latency_warn_low", "seconds", true)
-	assertMetricMeta(t, reader, "scriptsd.perf_time_latency_warn_high", "seconds", true)
-	assertMetricMeta(t, reader, "scriptsd.perf_time_latency_warn_defined", "state", false)
-	assertMetricMeta(t, reader, "scriptsd.perf_time_latency_crit_low", "seconds", true)
-	assertMetricMeta(t, reader, "scriptsd.perf_time_latency_crit_high", "seconds", true)
-	assertMetricMeta(t, reader, "scriptsd.perf_time_latency_crit_defined", "state", false)
+	assertMetricMeta(t, reader, "nagios.perf_time_latency_value", "seconds", true)
+	assertMetricMeta(t, reader, "nagios.perf_bytes_throughput_value", "bytes", true)
+	assertMetricMeta(t, reader, "nagios.perf_bits_wire_rate_value", "bits", true)
+	assertMetricMeta(t, reader, "nagios.perf_percent_free_pct_value", "%", true)
+	assertMetricMeta(t, reader, "nagios.perf_counter_requests_value", "c", true)
+	assertMetricMeta(t, reader, "nagios.perf_generic_custom_value", "generic", true)
+	assertMetricMeta(t, reader, "nagios.perf_time_latency_warn_low", "seconds", true)
+	assertMetricMeta(t, reader, "nagios.perf_time_latency_warn_high", "seconds", true)
+	assertMetricMeta(t, reader, "nagios.perf_time_latency_warn_defined", "state", false)
+	assertMetricMeta(t, reader, "nagios.perf_time_latency_crit_low", "seconds", true)
+	assertMetricMeta(t, reader, "nagios.perf_time_latency_crit_high", "seconds", true)
+	assertMetricMeta(t, reader, "nagios.perf_time_latency_crit_defined", "state", false)
 
 	_ = router.route("default", "gate_job", []output.PerfDatum{
 		{Label: "latency", Unit: "%", Value: 1}, // unit drift: time -> percent
@@ -134,7 +134,7 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 		emit := func(includeB bool) chartengine.Plan {
 			cc := gateCycleController(t, store)
 			cc.BeginCycle()
-			sm := store.Write().SnapshotMeter("scriptsd")
+			sm := store.Write().SnapshotMeter("nagios")
 			ls := sm.LabelSet(
 				metrix.Label{Key: "nagios_scheduler", Value: "default"},
 				metrix.Label{Key: "nagios_job", Value: "gate_job"},
@@ -164,7 +164,7 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 
 		cc := gateCycleController(t, store)
 		cc.BeginCycle()
-		sm := store.Write().SnapshotMeter("scriptsd")
+		sm := store.Write().SnapshotMeter("nagios")
 		ls := sm.LabelSet(
 			metrix.Label{Key: "nagios_scheduler", Value: "default"},
 			metrix.Label{Key: "nagios_job", Value: "gate_job"},
@@ -198,7 +198,7 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 
 		cc := gateCycleController(t, store)
 		cc.BeginCycle()
-		sm := store.Write().SnapshotMeter("scriptsd")
+		sm := store.Write().SnapshotMeter("nagios")
 		ls := sm.LabelSet(
 			metrix.Label{Key: "nagios_scheduler", Value: "default"},
 			metrix.Label{Key: "nagios_job", Value: "gate_job"},
@@ -214,8 +214,8 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 			t.Fatalf("expected remove actions on cycle 3 after failed-attempt gap")
 		}
 		assertPlanHasUpdateAndRemoveForTargets(t, plan3,
-			"scriptsd.perf_bytes_a_value",
-			"scriptsd.perf_bytes_b_value",
+			"nagios.perf_bytes_a_value",
+			"nagios.perf_bytes_b_value",
 		)
 		plan4 := emit(false)
 		if removeActionsCount(plan4.Actions) != 0 {
@@ -288,11 +288,11 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 			store := metrix.NewCollectorStore()
 			cc := gateCycleController(t, store)
 			cc.BeginCycle()
-			sm := store.Write().SnapshotMeter("scriptsd")
+			sm := store.Write().SnapshotMeter("nagios")
 			sm.Gauge(candidateKey, metrix.WithUnit(candidateMet.unit), metrix.WithFloat(candidateMet.float)).
 				Observe(candidate, sm.LabelSet())
 			cc.CommitCycleSuccess()
-			assertMetricMeta(t, store.Read(metrix.ReadRaw()), "scriptsd."+candidateKey, tc.expectedUnit, true)
+			assertMetricMeta(t, store.Read(metrix.ReadRaw()), "nagios."+candidateKey, tc.expectedUnit, true)
 		})
 	}
 }

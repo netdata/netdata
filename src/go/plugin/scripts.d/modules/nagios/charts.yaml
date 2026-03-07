@@ -1,5 +1,5 @@
 version: v1
-context_namespace: scriptsd
+context_namespace: nagios
 engine:
   autogen:
     enabled: true
@@ -8,12 +8,12 @@ engine:
 groups:
   - family: Job
     metrics:
-      - scriptsd.job.state.ok
-      - scriptsd.job.state.warning
-      - scriptsd.job.state.critical
-      - scriptsd.job.state.unknown
-      - scriptsd.job.attempt
-      - scriptsd.job.max_attempts
+      - nagios.job.state.ok
+      - nagios.job.state.warning
+      - nagios.job.state.critical
+      - nagios.job.state.unknown
+      - nagios.job.attempt
+      - nagios.job.max_attempts
     charts:
       - id: job_state
         title: Job State
@@ -22,13 +22,13 @@ groups:
         instances:
           by_labels: [nagios_scheduler, nagios_job]
         dimensions:
-          - selector: scriptsd.job.state.ok
+          - selector: nagios.job.state.ok
             name: ok
-          - selector: scriptsd.job.state.warning
+          - selector: nagios.job.state.warning
             name: warning
-          - selector: scriptsd.job.state.critical
+          - selector: nagios.job.state.critical
             name: critical
-          - selector: scriptsd.job.state.unknown
+          - selector: nagios.job.state.unknown
             name: unknown
       - id: job_attempts
         title: Job Attempts
@@ -37,19 +37,19 @@ groups:
         instances:
           by_labels: [nagios_scheduler, nagios_job]
         dimensions:
-          - selector: scriptsd.job.attempt
+          - selector: nagios.job.attempt
             name: attempt
-          - selector: scriptsd.job.max_attempts
+          - selector: nagios.job.max_attempts
             name: max_attempts
 
   - family: Scheduler
     metrics:
-      - scriptsd.scheduler.running
-      - scriptsd.scheduler.queued
-      - scriptsd.scheduler.scheduled
-      - scriptsd.scheduler.started
-      - scriptsd.scheduler.finished
-      - scriptsd.scheduler.skipped
+      - nagios.scheduler.running
+      - nagios.scheduler.queued
+      - nagios.scheduler.scheduled
+      - nagios.scheduler.started
+      - nagios.scheduler.finished
+      - nagios.scheduler.skipped
     charts:
       - id: scheduler_jobs
         title: Scheduler Queue
@@ -58,11 +58,11 @@ groups:
         instances:
           by_labels: [nagios_scheduler]
         dimensions:
-          - selector: scriptsd.scheduler.running
+          - selector: nagios.scheduler.running
             name: running
-          - selector: scriptsd.scheduler.queued
+          - selector: nagios.scheduler.queued
             name: queued
-          - selector: scriptsd.scheduler.scheduled
+          - selector: nagios.scheduler.scheduled
             name: scheduled
       - id: scheduler_totals
         title: Scheduler Totals
@@ -71,9 +71,9 @@ groups:
         instances:
           by_labels: [nagios_scheduler]
         dimensions:
-          - selector: scriptsd.scheduler.started
+          - selector: nagios.scheduler.started
             name: started
-          - selector: scriptsd.scheduler.finished
+          - selector: nagios.scheduler.finished
             name: finished
-          - selector: scriptsd.scheduler.skipped
+          - selector: nagios.scheduler.skipped
             name: skipped

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package scriptsd
+package nagios
 
 import (
 	"context"
@@ -83,12 +83,12 @@ func TestCollector_InitCollectCleanup(t *testing.T) {
 	cc.CommitCycleSuccess()
 
 	read := coll.MetricStore().Read(metrix.ReadRaw())
-	assertMetricValue(t, read, "scriptsd.scheduler.running", metrix.Labels{"nagios_scheduler": "default"}, 1)
-	assertMetricValue(t, read, "scriptsd.job.state.ok", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk"}, 1)
-	assertMetricValue(t, read, "scriptsd.perf_bytes_used_value", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk"}, 30000)
-	meta, ok := read.MetricMeta("scriptsd.perf_bytes_used_value")
+	assertMetricValue(t, read, "nagios.scheduler.running", metrix.Labels{"nagios_scheduler": "default"}, 1)
+	assertMetricValue(t, read, "nagios.job.state.ok", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk"}, 1)
+	assertMetricValue(t, read, "nagios.perf_bytes_used_value", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk"}, 30000)
+	meta, ok := read.MetricMeta("nagios.perf_bytes_used_value")
 	if !ok {
-		t.Fatalf("expected metric metadata for scriptsd.perf_bytes_used_value")
+		t.Fatalf("expected metric metadata for nagios.perf_bytes_used_value")
 	}
 	if meta.Unit != "bytes" {
 		t.Fatalf("unexpected unit metadata: %q", meta.Unit)

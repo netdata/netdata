@@ -26,7 +26,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/scriptsd"
+	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/nagios"
 )
 
 func init() {
