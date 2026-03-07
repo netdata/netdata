@@ -4,6 +4,7 @@ package nagios
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/output"
@@ -131,6 +132,30 @@ func TestPerfdataRouterInvalidSamples(t *testing.T) {
 	counters := router.dropCounters()
 	if counters.Invalid != 2 {
 		t.Fatalf("expected 2 invalid drops, got %d", counters.Invalid)
+	}
+}
+
+func TestSanitizeMetricKeyPreservesBoundaryUnderscores(t *testing.T) {
+	cases := []struct {
+		name   string
+		input  string
+		expect string
+	}{
+		{name: "plain", input: "Disk usage", expect: "disk_usage"},
+		{name: "trailing punctuation", input: "Disk usage /", expect: "disk_usage_"},
+	}
+
+	for _, tc := range cases {
+		if got := sanitizeMetricKey(tc.input); got != tc.expect {
+			t.Fatalf("%s: expected %q, got %q", tc.name, tc.expect, got)
+		}
+	}
+}
+
+func TestSanitizeMetricKeyFallsBackForNonAlnum(t *testing.T) {
+	got := sanitizeMetricKey("///")
+	if !strings.HasPrefix(got, "id_") {
+		t.Fatalf("expected fallback id_*, got %q", got)
 	}
 }
 

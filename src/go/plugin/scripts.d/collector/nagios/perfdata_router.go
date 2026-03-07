@@ -3,13 +3,13 @@
 package nagios
 
 import (
+	"crypto/sha1"
 	"fmt"
 	"math"
 	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/output"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
 )
 
 const defaultPerfdataMetricKeyBudget = 64
@@ -163,7 +163,7 @@ func preparePerfDatum(datum output.PerfDatum) (perfPreparedDatum, bool) {
 		return perfPreparedDatum{}, false
 	}
 
-	metricKey := ids.Sanitize(rawLabel)
+	metricKey := sanitizeMetricKey(rawLabel)
 	if metricKey == "" {
 		metricKey = "metric"
 	}
@@ -357,4 +357,45 @@ func unitForClass(class perfUnitClass) string {
 	default:
 		return "generic"
 	}
+}
+
+func sanitizeMetricKey(name string) string {
+	lower := strings.ToLower(name)
+	var b strings.Builder
+	b.Grow(len(lower))
+	lastUnderscore := false
+	hasAlnum := false
+	for _, r := range lower {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			lastUnderscore = false
+			hasAlnum = true
+			continue
+		}
+		if r == '_' || r == '-' || isWhitespace(r) {
+			if !lastUnderscore {
+				b.WriteRune('_')
+				lastUnderscore = true
+			}
+			continue
+		}
+		if !lastUnderscore {
+			b.WriteRune('_')
+			lastUnderscore = true
+		}
+	}
+	result := b.String()
+	if hasAlnum && result != "" {
+		return result
+	}
+	sum := sha1.Sum([]byte(name))
+	return fmt.Sprintf("id_%x", sum[:6])
+}
+
+func isWhitespace(r rune) bool {
+	switch r {
+	case ' ', '\t', '\n', '\r':
+		return true
+	}
+	return false
 }
