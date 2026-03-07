@@ -7,6 +7,7 @@
 #include "pluginsd_functions.h"
 #include "pluginsd_dyncfg.h"
 #include "pluginsd_replication.h"
+#include "database/rrdset-pluginsd-array.h"
 
 #define SERVING_STREAMING(parser) ((parser)->repertoire == PARSER_INIT_STREAMING)
 #define SERVING_PLUGINSD(parser) ((parser)->repertoire == PARSER_INIT_PLUGINSD)
@@ -78,11 +79,43 @@ static ALWAYS_INLINE void rrdset_previous_scope_chart_unlock(PARSER *parser, con
     }
 }
 
-static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keyword) {
+static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keyword, RRDSET *preserve_collector_tid) {
     rrdset_previous_scope_chart_unlock(parser, keyword, true);
 
-    if(parser->user.cleanup_slots && parser->user.st)
-        rrdset_pluginsd_receive_unslot(parser->user.st);
+    RRDSET *st = parser->user.st;
+
+    if(parser->user.cleanup_slots && st)
+        rrdset_pluginsd_receive_unslot(st);
+
+    // Clear collector ownership when scope ends, except when explicitly preserving
+    // it for the currently active chart during same-chart re-scope.
+    //
+    // Safety note:
+    // - Full cleanup (rrdset_pluginsd_receive_unslot_and_cleanup) runs on finalized/teardown paths.
+    // - Host teardown stops the receiver thread before slot/index cleanup.
+    // - During active parser execution, unslot paths are collector-aware and skip when another
+    //   collector tid is active.
+    // Therefore, eager clear here is an ownership handoff between protocol scopes, not a signal
+    // that teardown cleanup may run concurrently with an active collector loop.
+    // Clear collector ownership only if we are the recorded owner (or no owner exists).
+    // If another thread owns this chart, keep its ownership intact and report it.
+    if(st && st != preserve_collector_tid) {
+        pid_t owner_tid = __atomic_load_n(&st->pluginsd.collector_tid, __ATOMIC_ACQUIRE);
+        pid_t self_tid = gettid_cached();
+
+        if(owner_tid == 0 || owner_tid == self_tid)
+            __atomic_store_n(&st->pluginsd.collector_tid, 0, __ATOMIC_RELEASE);
+        else {
+            netdata_log_error(
+                    "PLUGINSD: attempted to clear collector_tid %d for 'host:%s/chart:%s/' "
+                    "from non-owner thread %d during %s",
+                    (int)owner_tid,
+                    rrdhost_hostname(st->rrdhost),
+                    rrdset_id(st),
+                    (int)self_tid,
+                    keyword);
+        }
+    }
 
     parser->user.st = NULL;
     parser->user.cleanup_slots = false;
@@ -91,7 +124,7 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
 
 static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
     RRDSET *old_st = parser->user.st;
-    pid_t old_collector_tid = (old_st) ? old_st->pluginsd.collector_tid : 0;
+    pid_t old_collector_tid = (old_st) ? __atomic_load_n(&old_st->pluginsd.collector_tid, __ATOMIC_ACQUIRE) : 0;
     pid_t my_collector_tid = gettid_cached();
 
     if(unlikely(old_collector_tid)) {
@@ -105,15 +138,17 @@ static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, c
 
             return false;
         }
-
-        old_st->pluginsd.collector_tid = 0;
+        // Don't clear collector_tid here - we still need to access old_st in pluginsd_clear_scope_chart
     }
 
-    st->pluginsd.collector_tid = my_collector_tid;
+    // Set new chart's collector_tid before any access
+    __atomic_store_n(&st->pluginsd.collector_tid, my_collector_tid, __ATOMIC_RELEASE);
 
-    pluginsd_clear_scope_chart(parser, keyword);
+    // Access old_st's array in pluginsd_clear_scope_chart while old_st->collector_tid is still set.
+    // Preserve the new chart tid for the old_st == st re-scope case.
+    pluginsd_clear_scope_chart(parser, keyword, st);
 
-    st->pluginsd.pos = 0;
+    __atomic_store_n(&st->pluginsd.pos, 0, __ATOMIC_RELAXED);
     parser->user.st = st;
     parser->user.cleanup_slots = false;
     parser->user.clabel_count = 0;
@@ -122,49 +157,99 @@ static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, c
 }
 
 static inline void pluginsd_rrddim_put_to_slot(PARSER *parser, RRDSET *st, RRDDIM *rd, ssize_t slot, bool obsolete)  {
-    size_t wanted_size = st->pluginsd.size;
+    // Determine the required array size
+    size_t wanted_size;
 
     if(slot >= 1) {
         st->pluginsd.dims_with_slots = true;
-        wanted_size = slot;
+        wanted_size = (size_t)slot;
     }
     else {
         st->pluginsd.dims_with_slots = false;
         wanted_size = dictionary_entries(st->rrddim_root_index);
     }
 
-    if(wanted_size > st->pluginsd.size) {
-        st->pluginsd.prd_array = reallocz(st->pluginsd.prd_array, wanted_size * sizeof(struct pluginsd_rrddim));
+    // Get current array (if any) to check size
+    // Note: We're the collector thread with collector_tid set, so the array won't be freed under us
+    PRD_ARRAY *current_arr = prd_array_get_unsafe(&st->pluginsd.prd_array);
+    size_t current_size = current_arr ? current_arr->size : 0;
 
-        // initialize the empty slots
-        for(ssize_t i = (ssize_t) wanted_size - 1; i >= (ssize_t) st->pluginsd.size; i--) {
-            st->pluginsd.prd_array[i].rda = NULL;
-            st->pluginsd.prd_array[i].rd = NULL;
-            st->pluginsd.prd_array[i].id = NULL;
+    // Check if we need to grow the array
+    if(wanted_size > current_size) {
+        // Pre-allocate outside the spinlock to keep critical section short.
+        PRD_ARRAY *new_arr = prd_array_create(wanted_size);
+
+        // Serialize grow transfer with unslot/cleanup detach paths.
+        spinlock_lock(&st->pluginsd.spinlock);
+
+        current_arr = prd_array_get_unsafe(&st->pluginsd.prd_array);
+        current_size = current_arr ? current_arr->size : 0;
+
+        // Re-check under lock in case another path changed the array.
+        if(wanted_size > current_size) {
+            // Copy existing entries from old array (if any) and transfer ownership
+            // to the new array by nulling old pointers.
+            if(current_arr) {
+                memcpy(new_arr->entries, current_arr->entries, current_size * sizeof(struct pluginsd_rrddim));
+                for(size_t i = 0; i < current_size; i++) {
+                    current_arr->entries[i].rda = NULL;
+                    current_arr->entries[i].rd = NULL;
+                    current_arr->entries[i].id = NULL;
+                }
+            }
+
+            // Initialize the new slots (callocz already zeroed them, but be explicit)
+            for(size_t i = current_size; i < wanted_size; i++) {
+                new_arr->entries[i].rda = NULL;
+                new_arr->entries[i].rd = NULL;
+                new_arr->entries[i].id = NULL;
+            }
+
+            // Atomically replace the old array with the new one
+            PRD_ARRAY *old_arr = prd_array_replace(&st->pluginsd.prd_array, new_arr);
+
+            // Release the old array if there was one.
+            if(old_arr) {
+                // Release the old array - it will be freed when refcount reaches 0
+                prd_array_release(old_arr);
+            }
+
+            // Update our local pointer to the new array
+            current_arr = new_arr;
+            new_arr = NULL;
+        }
+        else {
+            current_arr = prd_array_get_unsafe(&st->pluginsd.prd_array);
         }
 
-        rrd_slot_memory_added((wanted_size - st->pluginsd.size) * sizeof(struct pluginsd_rrddim));
-        st->pluginsd.size = wanted_size;
+        spinlock_unlock(&st->pluginsd.spinlock);
+
+        // Another path already satisfied growth while we were waiting for the lock.
+        if(new_arr)
+            prd_array_release(new_arr);
     }
 
-    if(st->pluginsd.dims_with_slots) {
-        struct pluginsd_rrddim *prd = &st->pluginsd.prd_array[slot - 1];
+    // Now update the slot entry if we're using slots
+    if(st->pluginsd.dims_with_slots && current_arr && slot >= 1 && (size_t)slot <= current_arr->size) {
+        struct pluginsd_rrddim *prd = &current_arr->entries[slot - 1];
 
         if(prd->rd != rd) {
-            rrddim_acquired_release(prd->rda);
-            prd->rda = NULL;
-            prd->rd = NULL;
-            prd->id = NULL;
+            // Release old reference if any
+            if(prd->rda)
+                rrddim_acquired_release(prd->rda);
 
             prd->rda = rrddim_find_and_acquire(st, string2str(rd->id), true);
             if(unlikely(!prd->rda)) {
-                netdata_log_error("PLUGINSD: failed to acquire dimension '%s' for chart '%s' while updating slot cache",
-                                  rrddim_id(rd), rrdset_id(st));
+                prd->rd = NULL;
+                prd->id = NULL;
+                netdata_log_error("PLUGINSD: failed to refresh slot cache for 'host:%s/chart:%s/dim:%s' (slot %zd)",
+                                  rrdhost_hostname(st->rrdhost), rrdset_id(st), string2str(rd->id), slot);
                 return;
             }
-
-            prd->rd = rrddim_acquired_to_rrddim(prd->rda);
-            prd->id = string2str(prd->rd->id);
+            else {
+                prd->rd = rrddim_acquired_to_rrddim(prd->rda);
+                prd->id = string2str(prd->rd->id);
+            }
         }
 
         if(obsolete)
@@ -179,42 +264,46 @@ static ALWAYS_INLINE RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *s
         return NULL;
     }
 
-    if (unlikely(!st->pluginsd.size)) {
+    // Get the array - we're protected by collector_tid being set, so it won't be freed
+    PRD_ARRAY *arr = prd_array_get_unsafe(&st->pluginsd.prd_array);
+
+    if (unlikely(!arr || !arr->size)) {
         netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s, but the chart has no dimensions.",
                           rrdhost_hostname(host), rrdset_id(st), cmd);
         return NULL;
     }
 
+    size_t prd_size = arr->size;
     struct pluginsd_rrddim *prd;
     RRDDIM *rd;
 
     if(likely(st->pluginsd.dims_with_slots)) {
         // caching with slots
 
-        if(unlikely(slot < 1 || slot > (ssize_t)st->pluginsd.size)) {
-            netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s with slot %zd, but slots in the range [1 - %u] are expected.",
-                              rrdhost_hostname(host), rrdset_id(st), cmd, slot, st->pluginsd.size);
+        if(unlikely(slot < 1 || slot > (ssize_t)prd_size)) {
+            netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s with slot %zd, but slots in the range [1 - %zu] are expected.",
+                              rrdhost_hostname(host), rrdset_id(st), cmd, slot, prd_size);
             return NULL;
         }
 
-        prd = &st->pluginsd.prd_array[slot - 1];
+        prd = &arr->entries[slot - 1];
 
         rd = prd->rd;
         if(likely(rd)) {
 #ifdef NETDATA_INTERNAL_CHECKS
-            if(strcmp(prd->id, dimension) != 0) {
+            if(!prd->id || strcmp(prd->id, dimension) != 0) {
                 ssize_t t;
-                for(t = 0; t < st->pluginsd.size ;t++) {
-                    if (strcmp(st->pluginsd.prd_array[t].id, dimension) == 0)
+                for(t = 0; t < (ssize_t)prd_size ;t++) {
+                    if (arr->entries[t].id && strcmp(arr->entries[t].id, dimension) == 0)
                         break;
                 }
-                if(t >= st->pluginsd.size)
+                if(t >= (ssize_t)prd_size)
                     t = -1;
 
                 internal_fatal(true,
                                "PLUGINSD: expected to find dimension '%s' on slot %zd, but found '%s', "
                                "the right slot is %zd",
-                               dimension, slot, prd->id, t);
+                               dimension, slot, prd->id ? prd->id : "(null)", t);
             }
 #endif
             return rd;
@@ -223,10 +312,12 @@ static ALWAYS_INLINE RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *s
     else {
         // caching without slots
 
-        if(unlikely(st->pluginsd.pos >= st->pluginsd.size))
-            st->pluginsd.pos = 0;
+        uint32_t pos = __atomic_load_n(&st->pluginsd.pos, __ATOMIC_RELAXED);
+        if(unlikely(pos >= prd_size))
+            pos = 0;
 
-        prd = &st->pluginsd.prd_array[st->pluginsd.pos++];
+        __atomic_store_n(&st->pluginsd.pos, pos + 1, __ATOMIC_RELAXED);
+        prd = &arr->entries[pos];
 
         rd = prd->rd;
         if(likely(rd)) {
@@ -316,7 +407,7 @@ static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st,
         host->stream.rcv.pluginsd_chart_slots.size = new_slots;
         spinlock_unlock(&host->stream.rcv.pluginsd_chart_slots.spinlock);
 
-        rrd_slot_memory_added((new_slots - old_slots) * sizeof(uint32_t));
+        rrd_slot_memory_added((new_slots - old_slots) * sizeof(RRDSET *));
     }
 
     host->stream.rcv.pluginsd_chart_slots.array[slot - 1] = st;
