@@ -13,7 +13,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/units"
 )
 
 func TestV2Gate_G1_TemplateCompileProof(t *testing.T) {
@@ -245,8 +244,7 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			router := newPerfdataRouter(64)
-			scale := units.NewScale(tc.unit)
-			displayV1 := float64(scale.Apply(tc.raw)) / float64(scale.Divisor)
+			displayV1 := legacyDisplayValue(tc.unit, tc.raw)
 
 			samples := router.route("default", "gate_job", []output.PerfDatum{
 				{Label: "sample", Unit: tc.unit, Value: tc.raw},
