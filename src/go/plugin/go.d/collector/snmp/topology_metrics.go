@@ -2,6 +2,8 @@
 
 package snmp
 
+import topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
+
 func (c *Collector) collectTopologyMetrics(mx map[string]int64) {
 	if c.topologyCache == nil {
 		return
@@ -22,7 +24,7 @@ func (c *Collector) collectTopologyMetrics(mx map[string]int64) {
 
 	totalDevices := 0
 	for _, actor := range data.Actors {
-		if actor.ActorType == "device" {
+		if topologyengine.IsDeviceActorType(actor.ActorType) {
 			totalDevices++
 		}
 	}

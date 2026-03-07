@@ -180,7 +180,8 @@
         "v": { "type": "integer" },
         "help": { "type": "string" },
         "update_every": { "type": "integer" },
-        "expires": { "type": "integer" }
+        "expires": { "type": "integer" },
+        "presentation": { "$ref": "#/definitions/topology_presentation" }
       },
       "allOf": [
         { "not": { "required": ["columns"] } },
@@ -231,6 +232,156 @@
       },
       "additionalProperties": true
     },
+    "topology_presentation_actor_type": {
+      "type": "object",
+      "required": ["label", "color_slot"],
+      "properties": {
+        "label": { "type": "string" },
+        "color_slot": { "type": "string" },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "border": { "type": "boolean" },
+        "size_by_links": { "type": "boolean" },
+        "show_port_bullets": { "type": "boolean" },
+        "icon_svg": { "type": "string" },
+        "summary_fields": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/topology_presentation_summary_field" }
+        },
+        "tables": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/topology_presentation_table" }
+        },
+        "modal_tabs": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/topology_presentation_modal_tab" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "topology_presentation_link_type": {
+      "type": "object",
+      "required": ["label", "color_slot"],
+      "properties": {
+        "label": { "type": "string" },
+        "color_slot": { "type": "string" },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "width": { "type": "number", "minimum": 0 },
+        "dash": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "topology_presentation_port_type": {
+      "type": "object",
+      "required": ["label", "color_slot"],
+      "properties": {
+        "label": { "type": "string" },
+        "color_slot": { "type": "string" },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": true
+    },
+    "topology_presentation_summary_field": {
+      "type": "object",
+      "required": ["key", "label", "sources"],
+      "properties": {
+        "key": { "type": "string" },
+        "label": { "type": "string" },
+        "sources": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "topology_presentation_table_column": {
+      "type": "object",
+      "required": ["key", "label"],
+      "properties": {
+        "key": { "type": "string" },
+        "label": { "type": "string" },
+        "type": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "topology_presentation_table": {
+      "type": "object",
+      "required": ["label", "source", "columns"],
+      "properties": {
+        "label": { "type": "string" },
+        "source": {
+          "type": "string",
+          "enum": ["data", "links"]
+        },
+        "bullet_source": { "type": "boolean" },
+        "columns": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/topology_presentation_table_column" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "topology_presentation_modal_tab": {
+      "type": "object",
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "type": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "topology_presentation_legend_entry": {
+      "type": "object",
+      "required": ["type", "label"],
+      "properties": {
+        "type": { "type": "string" },
+        "label": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "topology_presentation_legend": {
+      "type": "object",
+      "required": ["actors", "links"],
+      "properties": {
+        "actors": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/topology_presentation_legend_entry" }
+        },
+        "links": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/topology_presentation_legend_entry" }
+        },
+        "ports": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/topology_presentation_legend_entry" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "topology_presentation": {
+      "type": "object",
+      "required": ["actor_types", "link_types", "legend", "actor_click_behavior"],
+      "properties": {
+        "actor_types": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/topology_presentation_actor_type" }
+        },
+        "link_types": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/topology_presentation_link_type" }
+        },
+        "port_types": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/topology_presentation_port_type" }
+        },
+        "legend": { "$ref": "#/definitions/topology_presentation_legend" },
+        "actor_click_behavior": {
+          "type": "string",
+          "enum": ["highlight_connections", "highlight_path"]
+        }
+      },
+      "additionalProperties": true
+    },
     "topology_match": {
       "type": "object",
       "properties": {
@@ -263,7 +414,14 @@
         "parent_match": { "$ref": "#/definitions/topology_match" },
         "attributes": { "type": "object" },
         "derived": { "type": "object" },
-        "labels": { "type": "object" }
+        "labels": { "type": "object" },
+        "tables": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "object" }
+          }
+        }
       },
       "additionalProperties": true
     },
@@ -281,6 +439,7 @@
       "properties": {
         "layer": { "type": "string" },
         "protocol": { "type": "string" },
+        "link_type": { "type": "string" },
         "direction": { "type": "string" },
         "state": { "type": "string" },
         "src_actor_id": { "type": "string" },

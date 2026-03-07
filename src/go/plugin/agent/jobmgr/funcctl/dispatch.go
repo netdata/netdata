@@ -197,7 +197,7 @@ func (c *Controller) handleMethodFuncInfo(moduleName, methodID string, fn functi
 		updateEvery = methodCfg.UpdateEvery
 	}
 
-	c.respondJSON(fn, map[string]any{
+	resp := map[string]any{
 		"v":               3,
 		"update_every":    updateEvery,
 		"status":          200,
@@ -206,7 +206,13 @@ func (c *Controller) handleMethodFuncInfo(moduleName, methodID string, fn functi
 		"help":            help,
 		"accepted_params": buildAcceptedParams(methodParams, includeJobParam),
 		"required_params": c.buildRequiredParams(moduleName, methodParams, includeJobParam),
-	})
+	}
+
+	if methodCfg.Presentation != nil {
+		resp["presentation"] = methodCfg.Presentation
+	}
+
+	c.respondJSON(fn, resp)
 }
 
 func (c *Controller) buildRequiredParams(moduleName string, methodParams []funcapi.ParamConfig, includeJobParam bool) []map[string]any {
@@ -480,7 +486,7 @@ func (c *Controller) handleJobMethodFuncInfo(moduleName, jobName, methodID strin
 		updateEvery = methodCfg.UpdateEvery
 	}
 
-	c.respondJSON(fn, map[string]any{
+	resp := map[string]any{
 		"v":               3,
 		"update_every":    updateEvery,
 		"status":          200,
@@ -489,7 +495,13 @@ func (c *Controller) handleJobMethodFuncInfo(moduleName, jobName, methodID strin
 		"help":            help,
 		"accepted_params": buildJobMethodAcceptedParams(methodParams),
 		"required_params": buildJobMethodRequiredParams(methodParams),
-	})
+	}
+
+	if methodCfg.Presentation != nil {
+		resp["presentation"] = methodCfg.Presentation
+	}
+
+	c.respondJSON(fn, resp)
 }
 
 func (c *Controller) resolveJobMethodParams(ctx context.Context, methodCfg *funcapi.MethodConfig, handler funcapi.MethodHandler, methodID string) ([]funcapi.ParamConfig, bool, error) {
