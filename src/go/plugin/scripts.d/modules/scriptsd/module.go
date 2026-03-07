@@ -21,15 +21,14 @@ var configSchema string
 //go:embed charts.yaml
 var scriptsdChartTemplateV2 string
 
-var sharedSchedulerRegistry schedulers.SchedulerRegistry = schedulers.NewRegistry()
-
 func init() {
+	sharedRegistry := schedulers.NewRegistry()
 	collectorapi.Register("scriptsd", collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		CreateV2: func() collectorapi.CollectorV2 { return New() },
+		CreateV2: func() collectorapi.CollectorV2 { return NewWithRegistry(sharedRegistry) },
 		Config:   func() any { return &Config{} },
 	})
 }
@@ -56,12 +55,12 @@ type Collector struct {
 }
 
 func New() *Collector {
-	return NewWithRegistry(sharedSchedulerRegistry)
+	return NewWithRegistry(nil)
 }
 
 func NewWithRegistry(reg schedulers.SchedulerRegistry) *Collector {
 	if reg == nil {
-		reg = sharedSchedulerRegistry
+		reg = schedulers.NewRegistry()
 	}
 	return &Collector{
 		Config: Config{
