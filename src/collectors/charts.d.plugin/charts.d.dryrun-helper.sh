@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# shellcheck disable=SC2181
-
 # will stop the script for any error
 set -e
 
@@ -25,8 +23,7 @@ myset >"$tmp1"
 myset >"$tmp2"
 
 # make sure they don't differ
-diff "$tmp1" "$tmp2" >/dev/null 2>&1
-if [ $? -ne 0 ]; then
+if ! diff "$tmp1" "$tmp2" >/dev/null 2>&1; then
 	# they differ, we cannot do the check
 	echo >&2 "$me: cannot check with diff."
 	can_diff=0
@@ -38,8 +35,7 @@ myset >"$tmp1"
 # include the plugin and its config
 if [ -f "$conf" ]; then
 	# shellcheck source=/dev/null
-	. "$conf"
-	if [ $? -ne 0 ]; then
+	if ! . "$conf"; then
 		echo >&2 "$me: cannot load config file $conf"
 		rm "$tmp1" "$tmp2"
 		exit 1
@@ -47,8 +43,7 @@ if [ -f "$conf" ]; then
 fi
 
 # shellcheck source=/dev/null
-. "$chart"
-if [ $? -ne 0 ]; then
+if ! . "$chart"; then
 	echo >&2 "$me: cannot load chart file $chart"
 	rm "$tmp1" "$tmp2"
 	exit 1
@@ -60,8 +55,7 @@ myset | grep -v "^$name" >"$tmp2"
 if [ $can_diff -eq 1 ]; then
 	# check if they are different
 	# make sure they don't differ
-	diff "$tmp1" "$tmp2" >&2
-	if [ $? -ne 0 ]; then
+	if ! diff "$tmp1" "$tmp2" >&2; then
 		# they differ
 		rm "$tmp1" "$tmp2"
 		exit 1
