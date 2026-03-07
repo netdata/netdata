@@ -1,0 +1,51 @@
+;
+; Netdata Driver INF File
+;
+[Version]
+Signature="$Windows NT$"
+Class=System
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider=%Provider%
+DriverVer=03/06/2026,1.0.0.0
+CatalogFile=netdata_driver.cat
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+netdata_driver.sys = 1
+
+[Manufacturer]
+%Manufacturer%=DeviceSection,NTamd64
+
+[DeviceSection.NTamd64]
+%DeviceDesc%=DriverInstall,MSR\NetdataDrv
+
+[DriverInstall.NTamd64]
+CopyFiles=DriverCopyFiles
+AddReg=DriverAddReg
+
+[DriverInstall.NTamd64.Services]
+AddService=NetdataDriver,,DriverServiceInstall
+
+[DriverCopyFiles]
+netdata_driver.sys,,,0x100
+
+[DriverAddReg]
+HKR,,,"NetdataDriver"
+
+[DriverServiceInstall]
+DisplayName    = %DeviceDesc%
+ServiceType    = 1
+StartType      = 3
+ErrorControl   = 1
+ServiceBinary  = %12%\netdata_driver.sys
+
+[Strings]
+Provider     = "Netdata"
+Manufacturer = "Netdata"
+DeviceDesc   = "Netdata Driver"
+DiskName     = "Netdata Driver Disk"

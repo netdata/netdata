@@ -8,11 +8,32 @@ $ErrorActionPreference = "Stop"
 
 $msysbash = Get-MSYS2Bash "$msysprefix"
 $env:CHERE_INVOKING = 'yes'
+$driverDir = "C:\msys64\opt\netdata\usr\bin"
+$driverFiles = @(
+    (Join-Path $driverDir "netdata_driver.sys"),
+    (Join-Path $driverDir "netdata_driver.inf"),
+    (Join-Path $driverDir "netdata_driver.cat")
+)
 
 & $msysbash -l "$PSScriptRoot\package-windows.sh"
 
 if ($LastExitcode -ne 0) {
     exit 1
+}
+
+if (-not (Test-Path (Join-Path $driverDir "netdata_driver.cat"))) {
+    & "$PSScriptRoot\generate-driver-catalog.ps1" -DriverDirectory $driverDir
+
+    if ($LastExitCode -ne 0) {
+        exit 1
+    }
+}
+
+foreach ($driverFile in $driverFiles) {
+    if (-not (Test-Path $driverFile)) {
+        Write-Error "Missing required driver packaging file: $driverFile"
+        exit 1
+    }
 }
 
 if ($null -eq $env:BUILD_DIR) {

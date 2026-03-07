@@ -102,6 +102,21 @@
             <ui:WixUI Id="FeatureTree_ViewLicense" />
 
             <SetProperty
+                Id="NDStopService"
+                Value="&quot;[WindowsFolder]System32\sc.exe&quot; stop &quot;Netdata&quot;"
+                Before="NDKillProcess"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="NDStopService"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+
+            <SetProperty
                 Id="NDKillProcess"
                 Value="&quot;[WindowsFolder]System32\taskkill.exe&quot; /T /F /IM netdata.exe"
                 Before="NDKillProcess"
@@ -161,16 +176,77 @@
                 Impersonate="no"
             />
 
+            <SetProperty
+                Id="NDInstallDriverPkg"
+                Value="&quot;[WindowsFolder]System32\pnputil.exe&quot; /add-driver &quot;[TMPDIR]netdata_driver.inf&quot; /install"
+                Before="NDInstallDriverPkg"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="NDInstallDriverPkg"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+            <SetProperty
+                Id="NDDeleteDriverStaging"
+                Value="&quot;[WindowsFolder]System32\cmd.exe&quot; /c del /f /q &quot;[TMPDIR]netdata_driver.sys&quot; &quot;[TMPDIR]netdata_driver.inf&quot; &quot;[TMPDIR]netdata_driver.cat&quot;"
+                Before="NDDeleteDriverStaging"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="NDDeleteDriverStaging"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+
+            <CustomAction
+                Id="NDUninstallDriverPkg"
+                Directory="USRLIBEXECNETDATADIR"
+                ExeCommand='powershell.exe -NoProfile -ExecutionPolicy Bypass -NonInteractive -File &quot;[USRLIBEXECNETDATADIR]\remove-driver-package.ps1&quot;'
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+            <CustomAction
+                Id="NDRollbackDriverPkg"
+                Directory="USRLIBEXECNETDATADIR"
+                ExeCommand='powershell.exe -NoProfile -ExecutionPolicy Bypass -NonInteractive -File &quot;[USRLIBEXECNETDATADIR]\remove-driver-package.ps1&quot;'
+                Execute="rollback"
+                Return="ignore"
+                Impersonate="no"
+            />
+
             <InstallExecuteSequence>
                 <Custom Action="NDConfigureServiceRecovery" After="InstallServices" Condition="NOT REMOVE" />
+                <Custom Action="NDRollbackDriverPkg" Before="NDInstallDriverPkg" Condition="NDDRVINST=1 AND NOT REMOVE" />
+                <Custom Action="NDInstallDriverPkg" After="InstallFiles" Condition="NDDRVINST=1 AND NOT REMOVE" />
+                <Custom Action="NDDeleteDriverStaging" After="NDInstallDriverPkg" Condition="NDDRVINST=1 AND NOT REMOVE" />
 
+                <Custom Action="NDStopService" Before="NDKillProcess" />
                 <Custom Action="NDKillProcess" Before="RemoveFiles" />
-                <Custom Action="NDStopDriverSrv" After="NDKillProcess" />
-                <Custom Action="NDRemoveDriverSrv" After="RemoveFiles" />
+                <Custom Action="NDStopDriverSrv" After="NDKillProcess" Condition="REMOVE=&quot;ALL&quot;" />
+                <Custom Action="NDRemoveDriverSrv" After="NDStopDriverSrv" Condition="REMOVE=&quot;ALL&quot;" />
+                <Custom Action="NDUninstallDriverPkg" After="NDRemoveDriverSrv" Condition="REMOVE=&quot;ALL&quot;" />
             </InstallExecuteSequence>
     </Package>
 
     <Fragment>
+        <UI>
+            <ProgressText Action="NDStopService" Message="Stopping Netdata service before update..." />
+            <ProgressText Action="NDKillProcess" Message="Stopping Netdata service before update..." />
+            <ProgressText Action="NDInstallDriverPkg" Message="Registering Netdata driver package..." />
+            <ProgressText Action="NDDeleteDriverStaging" Message="Cleaning temporary driver staging files..." />
+            <ProgressText Action="NDStopDriverSrv" Message="Stopping Netdata driver service..." />
+            <ProgressText Action="NDRemoveDriverSrv" Message="Removing Netdata driver service..." />
+            <ProgressText Action="NDUninstallDriverPkg" Message="Removing Netdata driver package..." />
+        </UI>
+
             <StandardDirectory Id="System64Folder">
             </StandardDirectory>
 
@@ -181,6 +257,7 @@
                     <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml" />
                     <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll" />
                     <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" />
+                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata_driver.inf" />
                 </Files>
             </ComponentGroup>
 
@@ -252,9 +329,11 @@
                 </File>
             </ComponentGroup>
 
-            <!-- Install netdata driver file -->
+            <!-- Stage netdata driver package files for pnputil registration -->
             <FeatureGroup Id="NetdataDriver">
                 <File Id="NetdataDrv" Name="netdata_driver.sys" Directory="System64Folder" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" Condition="NDDRVINST=1">
+                </File>
+                <File Id="NetdataDrvInf" Name="netdata_driver.inf" Directory="System64Folder" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.inf" Condition="NDDRVINST=1">
                 </File>
             </FeatureGroup>
 
