@@ -226,6 +226,10 @@ sidebar:
                       label: H2O
                       edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-h2o.md
           - meta:
+              label: Secrets Management
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/secrets-management.md
+              description: Use secret references to avoid storing credentials in plain text. Supports environment variables, files, and external vaults.
+          - meta:
               label: Performance Optimization
               edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md
               description: While the Netdata Agent is designed to monitor a system with only 1% CPU, you can optimize its performance for low-resource systems.

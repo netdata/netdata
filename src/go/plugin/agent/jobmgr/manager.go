@@ -18,6 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/secretresolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
@@ -669,6 +670,9 @@ func newConfigModule(creator collectorapi.Creator) (configModule, error) {
 }
 
 func applyConfig(cfg confgroup.Config, module any) error {
+	if err := secretresolver.Resolve(cfg); err != nil {
+		return fmt.Errorf("resolving secrets: %w", err)
+	}
 	bs, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err
