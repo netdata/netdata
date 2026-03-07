@@ -255,6 +255,38 @@ func TestResolve_InternalKeyInNestedMap(t *testing.T) {
 	assert.Equal(t, "plain", sub["normal"])
 }
 
+func TestResolve_EmptyEnvName(t *testing.T) {
+	cfg := map[string]any{
+		"val": "${env:}",
+	}
+
+	err := Resolve(cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "environment variable '' is not set")
+}
+
+func TestResolve_EmptyFileName(t *testing.T) {
+	cfg := map[string]any{
+		"val": "${file:}",
+	}
+
+	err := Resolve(cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "resolving secret")
+}
+
+func TestResolve_MultipleRefsOneFailure(t *testing.T) {
+	t.Setenv("TEST_SECRET_OK", "good")
+
+	cfg := map[string]any{
+		"dsn": "${env:TEST_SECRET_OK}:${env:MISSING_VAR_12345}@host",
+	}
+
+	err := Resolve(cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "MISSING_VAR_12345")
+}
+
 func TestResolve_ArrayInNestedMap(t *testing.T) {
 	t.Setenv("TEST_SECRET_ARR", "val")
 
