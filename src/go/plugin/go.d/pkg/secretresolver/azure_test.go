@@ -82,6 +82,26 @@ func TestResolveAzureKV_EmptySecretName(t *testing.T) {
 	assert.Contains(t, err.Error(), "must be in format 'vault-name/secret-name'")
 }
 
+func TestResolveAzureKV_UnsafeVaultName(t *testing.T) {
+	cfg := map[string]any{
+		"password": "${azure-kv:evil.com#/secret-name}",
+	}
+
+	err := Resolve(cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid vault name")
+}
+
+func TestResolveAzureKV_UnsafeSecretName(t *testing.T) {
+	cfg := map[string]any{
+		"password": "${azure-kv:my-vault/secret?inject=true}",
+	}
+
+	err := Resolve(cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid secret name")
+}
+
 func TestAzureGetTokenClientCredentials_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.NoError(t, r.ParseForm())

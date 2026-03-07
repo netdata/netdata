@@ -49,6 +49,26 @@ func TestResolveGCPSM_EmptySecret(t *testing.T) {
 	assert.Contains(t, err.Error(), "must be in format 'project/secret'")
 }
 
+func TestResolveGCPSM_UnsafeProjectName(t *testing.T) {
+	cfg := map[string]any{
+		"password": "${gcp-sm:evil.com#/my-secret}",
+	}
+
+	err := Resolve(cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid project ID")
+}
+
+func TestResolveGCPSM_UnsafeSecretName(t *testing.T) {
+	cfg := map[string]any{
+		"password": "${gcp-sm:my-project/secret?v=1}",
+	}
+
+	err := Resolve(cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid secret name")
+}
+
 func TestResolveGCPSM_ParseResponse(t *testing.T) {
 	secretData := base64.StdEncoding.EncodeToString([]byte("gcp-secret-value"))
 

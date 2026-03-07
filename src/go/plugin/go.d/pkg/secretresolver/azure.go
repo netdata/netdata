@@ -9,9 +9,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
+
+// reAzureSafeName validates Azure Key Vault and secret names (alphanumeric + hyphens).
+var reAzureSafeName = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
 
 var azureHTTPClient = &http.Client{Timeout: 10 * time.Second}
 var azureIMDSHTTPClient = &http.Client{
@@ -23,6 +27,12 @@ func resolveAzureKV(ref, original string) (string, error) {
 	vaultName, secretName, ok := strings.Cut(ref, "/")
 	if !ok || vaultName == "" || secretName == "" {
 		return "", fmt.Errorf("resolving secret '%s': reference must be in format 'vault-name/secret-name'", original)
+	}
+	if !reAzureSafeName.MatchString(vaultName) {
+		return "", fmt.Errorf("resolving secret '%s': invalid vault name '%s' (must contain only alphanumeric characters and hyphens)", original, vaultName)
+	}
+	if !reAzureSafeName.MatchString(secretName) {
+		return "", fmt.Errorf("resolving secret '%s': invalid secret name '%s' (must contain only alphanumeric characters and hyphens)", original, secretName)
 	}
 
 	token, err := azureGetAccessToken()

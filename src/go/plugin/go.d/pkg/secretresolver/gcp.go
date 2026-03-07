@@ -15,9 +15,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
+
+// reGCPSafeName validates GCP project IDs, secret names, and versions.
+var reGCPSafeName = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 var gcpHTTPClient = &http.Client{Timeout: 10 * time.Second}
 var gcpMetadataHTTPClient = &http.Client{
@@ -34,6 +38,16 @@ func resolveGCPSM(ref, original string) (string, error) {
 	secret, version, hasVersion := strings.Cut(rest, "/")
 	if !hasVersion || version == "" {
 		version = "latest"
+	}
+
+	if !reGCPSafeName.MatchString(project) {
+		return "", fmt.Errorf("resolving secret '%s': invalid project ID '%s'", original, project)
+	}
+	if !reGCPSafeName.MatchString(secret) {
+		return "", fmt.Errorf("resolving secret '%s': invalid secret name '%s'", original, secret)
+	}
+	if !reGCPSafeName.MatchString(version) {
+		return "", fmt.Errorf("resolving secret '%s': invalid version '%s'", original, version)
 	}
 
 	token, err := gcpGetAccessToken(original)
