@@ -142,6 +142,21 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_failed", measureSetFieldLabels("runtime.events", "failed"), 3)
 			},
 		},
+		"runtime MeasureSet flatten label key collision panics": {
+			run: func(t *testing.T) {
+				s := NewRuntimeStore()
+				ms := s.Write().StatefulMeter("runtime").
+					WithLabels(Label{Key: "runtime.usage", Value: "already-present"}).
+					MeasureSetGauge(
+						"usage",
+						WithMeasureSetFields(MeasureFieldSpec{Name: "value"}),
+					)
+
+				expectPanic(t, func() {
+					ms.SetPoint(MeasureSetPoint{Values: []SampleValue{1}})
+				})
+			},
+		},
 		"runtime counter is thread-safe for concurrent writers": {
 			run: func(t *testing.T) {
 				s := NewRuntimeStore()

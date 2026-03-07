@@ -25,6 +25,7 @@ var (
 	errStateSetEnumCount    = errors.New("metrix: stateset enum mode requires exactly one active state")
 	errStateSetUnknownState = errors.New("metrix: stateset point contains undeclared state")
 	errStateSetLabelKey     = errors.New("metrix: stateset flatten label key collides with existing label")
+	errMeasureSetLabelKey   = errors.New("metrix: measureset flatten label key collides with existing label")
 	errMeasureSetSchema     = errors.New("metrix: measureset schema is missing")
 	errMeasureSetPoint      = errors.New("metrix: invalid measureset point")
 	errRuntimeSnapshotWrite = errors.New("metrix: runtime store supports stateful writes only")

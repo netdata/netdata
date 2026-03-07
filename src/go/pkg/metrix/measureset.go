@@ -168,6 +168,9 @@ func (c *storeCore) recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, po
 	if err != nil {
 		panic(err)
 	}
+	if labelsContainKey(labels, desc.name) {
+		panic(errMeasureSetLabelKey)
+	}
 
 	key := makeSeriesKey(desc.name, labelsKey)
 	entry, ok := c.active.measureSetGauges[key]
@@ -202,6 +205,9 @@ func (c *storeCore) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, de
 	labels, labelsKey, err := labelsFromSet(sets, c)
 	if err != nil {
 		panic(err)
+	}
+	if labelsContainKey(labels, desc.name) {
+		panic(errMeasureSetLabelKey)
 	}
 
 	key := makeSeriesKey(desc.name, labelsKey)
@@ -248,6 +254,9 @@ func (c *storeCore) recordMeasureSetCounterObserveTotalPoint(desc *instrumentDes
 	if err != nil {
 		panic(err)
 	}
+	if labelsContainKey(labels, desc.name) {
+		panic(errMeasureSetLabelKey)
+	}
 
 	key := makeSeriesKey(desc.name, labelsKey)
 	entry, ok := c.active.measureSetCounters[key]
@@ -282,6 +291,9 @@ func (c *storeCore) recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, 
 	labels, labelsKey, err := labelsFromSet(sets, c)
 	if err != nil {
 		panic(err)
+	}
+	if labelsContainKey(labels, desc.name) {
+		panic(errMeasureSetLabelKey)
 	}
 
 	key := makeSeriesKey(desc.name, labelsKey)

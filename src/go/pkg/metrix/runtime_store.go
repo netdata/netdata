@@ -313,6 +313,9 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeSetPoint(desc *instrumentDesc
 	if err != nil {
 		panic(err)
 	}
+	if labelsContainKey(labels, desc.name) {
+		panic(errMeasureSetLabelKey)
+	}
 	key := makeSeriesKey(desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
 		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, labels, labelsKey, desc)
@@ -333,6 +336,9 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeAddPoint(desc *instrumentDesc
 	labels, labelsKey, err := labelsFromSet(sets, r)
 	if err != nil {
 		panic(err)
+	}
+	if labelsContainKey(labels, desc.name) {
+		panic(errMeasureSetLabelKey)
 	}
 	key := makeSeriesKey(desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
@@ -363,6 +369,9 @@ func (r *runtimeStoreBackend) recordMeasureSetCounterAddPoint(desc *instrumentDe
 	labels, labelsKey, err := labelsFromSet(sets, r)
 	if err != nil {
 		panic(err)
+	}
+	if labelsContainKey(labels, desc.name) {
+		panic(errMeasureSetLabelKey)
 	}
 	key := makeSeriesKey(desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {

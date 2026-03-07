@@ -254,6 +254,24 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				mustNoDelta(t, s.Read(ReadFlatten()), "svc.jobs_done", measureSetFieldLabels("svc.jobs", "done"))
 			},
 		},
+		"MeasureSet flatten label key collision panics": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				ms := s.Write().SnapshotMeter("svc").
+					WithLabels(Label{Key: "svc.latency", Value: "already-present"}).
+					MeasureSetGauge(
+						"latency",
+						WithMeasureSetFields(MeasureFieldSpec{Name: "value"}),
+					)
+
+				cc.BeginCycle()
+				expectPanic(t, func() {
+					ms.ObservePoint(MeasureSetPoint{Values: []SampleValue{1}})
+				})
+				cc.AbortCycle()
+			},
+		},
 		"stateful MeasureSet counter add accumulates and flattened delta works": {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
