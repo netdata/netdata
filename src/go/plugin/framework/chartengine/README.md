@@ -179,6 +179,23 @@ Default lifecycle policy when template omits lifecycle:
 - the synthetic `measure_field` label is the authoritative field-identity channel; the per-field metric-name suffix remains for `MetricMeta(name)` compatibility
 - gauge-like `MeasureSet` fields autogen with absolute algorithm behavior; counter-like `MeasureSet` fields autogen with incremental algorithm behavior
 
+### Reserved Flattened Label Keys
+
+These label keys are treated specially by chartengine when consuming flattened structured-family or distribution inputs:
+
+| Key / Pattern     | Meaning |
+|-------------------|---------|
+| `le`              | Histogram bucket bound label |
+| `quantile`        | Summary quantile label |
+| `measure_field`   | `MeasureSet` field identity label |
+| `<metric-name>`   | `StateSet` special case: the flattened state name is carried under a synthetic label whose key is the base metric name |
+
+Notes:
+
+- `le`, `quantile`, and `measure_field` are static reserved flattened-label keys in chartengine.
+- `StateSet` is different: it does not use a global static key; it uses the base metric name itself as the synthetic flattened label key.
+- These keys are part of the flatten contract between `metrix` and chartengine. Reusing them as ordinary user labels on those flattened inputs is not supported.
+
 ## Runtime Metrics
 
 `chartengine` self-instruments to a runtime store by default (disable with `WithRuntimeStore(nil)`).
