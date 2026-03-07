@@ -11,9 +11,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -68,9 +66,6 @@ func TestCollector_Init(t *testing.T) {
 			c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
 				return rg, nil
 			}
-			c.newMetricDefinitions = func(string, azcore.TokenCredential, azcloud.Configuration) (metricDefinitionsClient, error) {
-				return mockMetricDefinitions{}, nil
-			}
 			c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
 				return mx, nil
 			}
@@ -90,9 +85,6 @@ func TestCollector_ChartTemplateYAML(t *testing.T) {
 	c.Config = testConfig()
 	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
 		return &mockResourceGraph{}, nil
-	}
-	c.newMetricDefinitions = func(string, azcore.TokenCredential, azcloud.Configuration) (metricDefinitionsClient, error) {
-		return mockMetricDefinitions{}, nil
 	}
 	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
 		return &mockMetricsClient{}, nil
@@ -157,9 +149,6 @@ func TestCollector_Collect(t *testing.T) {
 	c.now = func() time.Time { return now }
 	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
 		return rg, nil
-	}
-	c.newMetricDefinitions = func(string, azcore.TokenCredential, azcloud.Configuration) (metricDefinitionsClient, error) {
-		return mockMetricDefinitions{}, nil
 	}
 	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
 		return mx, nil
@@ -256,9 +245,6 @@ func TestCollector_TimeGrainScheduling(t *testing.T) {
 	}
 	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
 		return rg, nil
-	}
-	c.newMetricDefinitions = func(string, azcore.TokenCredential, azcloud.Configuration) (metricDefinitionsClient, error) {
-		return mockMetricDefinitions{}, nil
 	}
 	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
 		return mx, nil
@@ -369,12 +355,6 @@ func (m *mockResourceGraph) Resources(_ context.Context, _ armresourcegraph.Quer
 		rows = append(rows, r)
 	}
 	return armresourcegraph.ClientResourcesResponse{QueryResponse: armresourcegraph.QueryResponse{Data: rows}}, nil
-}
-
-type mockMetricDefinitions struct{}
-
-func (mockMetricDefinitions) NewListPager(string, *armmonitor.MetricDefinitionsClientListOptions) *runtime.Pager[armmonitor.MetricDefinitionsClientListResponse] {
-	return nil
 }
 
 type mockMetricsClient struct {

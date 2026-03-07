@@ -57,7 +57,7 @@ charts:
     type: line
     priority: 1000
     units: requests/s
-    algorithm: absolute
+    algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
@@ -73,7 +73,7 @@ charts:
     type: line
     priority: 1010
     units: RU/s
-    algorithm: absolute
+    algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
@@ -217,7 +217,7 @@ charts:
     type: line
     priority: 1100
     units: requests/s
-    algorithm: absolute
+    algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
@@ -233,7 +233,7 @@ charts:
     type: line
     priority: 1110
     units: requests/s
-    algorithm: absolute
+    algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]

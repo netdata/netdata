@@ -14,9 +14,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
@@ -32,10 +30,6 @@ var supportedTimeGrains = map[string]time.Duration{
 
 type resourceGraphClient interface {
 	Resources(ctx context.Context, query armresourcegraph.QueryRequest, options *armresourcegraph.ClientResourcesOptions) (armresourcegraph.ClientResourcesResponse, error)
-}
-
-type metricDefinitionsClient interface {
-	NewListPager(resourceURI string, options *armmonitor.MetricDefinitionsClientListOptions) *runtime.Pager[armmonitor.MetricDefinitionsClientListResponse]
 }
 
 type metricsQueryClient interface {
@@ -107,9 +101,10 @@ type queryTask struct {
 }
 
 type metricSample struct {
-	Instrument string
-	Labels     metrix.Labels
-	Value      float64
+	Instrument  string
+	Labels      metrix.Labels
+	Value       float64
+	Aggregation string
 }
 
 type taskResult struct {

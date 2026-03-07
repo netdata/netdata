@@ -89,7 +89,15 @@ func (c *Collector) collect(ctx context.Context) error {
 			continue
 		}
 		values := labelValues(sample.Labels)
-		vec.WithLabelValues(values...).Observe(sample.Value)
+
+		value := sample.Value
+		if sample.Aggregation == "total" {
+			key := sample.Instrument + "\x00" + strings.Join(values, "\x00")
+			c.accumulators[key] += value
+			value = c.accumulators[key]
+		}
+
+		vec.WithLabelValues(values...).Observe(value)
 	}
 
 	return nil
@@ -233,8 +241,11 @@ func (c *Collector) executeTask(ctx context.Context, task queryTask, queryEnd ti
 	interval := task.TimeGrain
 	agg := strings.Join(task.Aggregations, ",")
 
+	reqCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	resp, err := client.QueryResources(
-		ctx,
+		reqCtx,
 		c.SubscriptionID,
 		task.Profile.MetricNamespace,
 		task.MetricNames,
@@ -279,9 +290,10 @@ func (c *Collector) executeTask(ctx context.Context, task queryTask, queryEnd ti
 					continue
 				}
 				samples = append(samples, metricSample{
-					Instrument: runtimeMetric.InstrumentByAgg[aggName],
-					Labels:     labels,
-					Value:      value,
+					Instrument:  runtimeMetric.InstrumentByAgg[aggName],
+					Labels:      labels,
+					Value:       value,
+					Aggregation: aggName,
 				})
 			}
 		}

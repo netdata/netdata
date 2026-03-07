@@ -218,7 +218,7 @@ func stockProfilesDirFromThisFile() string {
 func isDirExists(dir string) bool {
 	fi, err := os.Stat(dir)
 	if err != nil {
-		return !errors.Is(err, fs.ErrNotExist)
+		return false
 	}
 	return fi.Mode().IsDir()
 }

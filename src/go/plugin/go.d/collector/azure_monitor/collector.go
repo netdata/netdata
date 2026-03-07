@@ -13,7 +13,6 @@ import (
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -51,16 +50,15 @@ func New() *Collector {
 				Mode: authModeDefault,
 			},
 		},
-		store:                store,
-		now:                  time.Now,
-		newResourceGraph:     defaultNewResourceGraphClient,
-		newMetricDefinitions: defaultNewMetricDefinitionsClient,
-		newMetricsClient:     defaultNewMetricsClient,
-		loadProfileCatalog:   loadProfileCatalog,
-		nextCollectByGrain:   make(map[string]time.Time),
-		metricsClients:       make(map[string]metricsQueryClient),
+		store:              store,
+		now:                time.Now,
+		newResourceGraph:   defaultNewResourceGraphClient,
+		newMetricsClient:   defaultNewMetricsClient,
+		loadProfileCatalog: loadProfileCatalog,
+		nextCollectByGrain: make(map[string]time.Time),
+		metricsClients:     make(map[string]metricsQueryClient),
+		accumulators:       make(map[string]float64),
 	}
-	c.chartTemplate = c.defaultChartTemplate()
 	return c
 }
 
@@ -74,7 +72,6 @@ type Collector struct {
 	credential    azcore.TokenCredential
 	cloudCfg      azcloud.Configuration
 	resourceGraph resourceGraphClient
-	metricDefs    metricDefinitionsClient
 
 	runtimePlan *runtimePlan
 	profiles    profileCatalog
@@ -83,14 +80,14 @@ type Collector struct {
 
 	now func() time.Time
 
-	newResourceGraph     func(subscriptionID string, cred azcore.TokenCredential, cloud azcloud.Configuration) (resourceGraphClient, error)
-	newMetricDefinitions func(subscriptionID string, cred azcore.TokenCredential, cloud azcloud.Configuration) (metricDefinitionsClient, error)
-	newMetricsClient     func(endpoint string, cred azcore.TokenCredential, cloud azcloud.Configuration) (metricsQueryClient, error)
+	newResourceGraph func(subscriptionID string, cred azcore.TokenCredential, cloud azcloud.Configuration) (resourceGraphClient, error)
+	newMetricsClient func(endpoint string, cred azcore.TokenCredential, cloud azcloud.Configuration) (metricsQueryClient, error)
 	loadProfileCatalog   func() (profileCatalog, error)
 
 	metricsClientsMu syncMapMutex
 	metricsClients   map[string]metricsQueryClient
 
+	accumulators       map[string]float64
 	nextCollectByGrain map[string]time.Time
 }
 
@@ -128,12 +125,6 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("create resource graph client: %w", err)
 	}
 	c.resourceGraph = rgClient
-
-	defClient, err := c.newMetricDefinitions(c.SubscriptionID, c.credential, c.cloudCfg)
-	if err != nil {
-		return fmt.Errorf("create metric definitions client: %w", err)
-	}
-	c.metricDefs = defClient
 
 	plan, err := c.buildRuntimePlan()
 	if err != nil {
@@ -198,14 +189,6 @@ func defaultNewResourceGraphClient(subscriptionID string, cred azcore.TokenCrede
 	return client, nil
 }
 
-func defaultNewMetricDefinitionsClient(subscriptionID string, cred azcore.TokenCredential, cloudCfg azcloud.Configuration) (metricDefinitionsClient, error) {
-	client, err := armmonitor.NewMetricDefinitionsClient(subscriptionID, cred, armClientOptions{Cloud: cloudCfg}.toARM())
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
-}
-
 func defaultNewMetricsClient(endpoint string, cred azcore.TokenCredential, cloudCfg azcloud.Configuration) (metricsQueryClient, error) {
 	client, err := azmetrics.NewClient(endpoint, cred, &azmetrics.ClientOptions{ClientOptions: azcore.ClientOptions{Cloud: cloudCfg}})
 	if err != nil {
@@ -214,6 +197,3 @@ func defaultNewMetricsClient(endpoint string, cred azcore.TokenCredential, cloud
 	return client, nil
 }
 
-func (c *Collector) defaultChartTemplate() string {
-	return "version: v1\ncontext_namespace: azure_monitor\ngroups:\n  - family: Azure Monitor\n    metrics:\n      - azure_monitor_up\n    charts:\n      - id: azure_monitor_up\n        title: Azure Monitor Up\n        context: up\n        units: state\n        algorithm: absolute\n        dimensions:\n          - selector: azure_monitor_up\n            name: up\n"
-}
