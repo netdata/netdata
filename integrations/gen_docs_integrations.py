@@ -6,11 +6,16 @@ import shutil
 import sys
 from pathlib import Path
 
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
 # Registry used to decide which README.md should symlink to which generated file
 symlink_dict = {}
 
 # Mapping of integration id → output file path (repo-relative), populated by write_to_file()
 id_to_path = {}
+
+TEMPLATE_PATH = Path(__file__).parent / "templates"
+_jinja_env = None
 
 
 # -----------------------------
@@ -39,16 +44,222 @@ def cleanup(only_base_paths=None):
             shutil.rmtree(p, ignore_errors=True)
 
 
+def normalize_markdown(md: str) -> str:
+    md = re.sub(r'\{% details open=true summary="(.*?)" %\}', r'<details open><summary>\1</summary>\n', md)
+    md = re.sub(r'\{% details summary="(.*?)" %\}', r'<details><summary>\1</summary>\n', md)
+    md = md.replace("{% /details %}", "</details>\n")
+    return md
+
+
+def strfy(value):
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, str):
+        return " ".join([v.strip() for v in value.strip().split("\n") if v]).replace("|", "/")
+    if value is None:
+        return ""
+    return value
+
+
+def anchorfy(value):
+    if value is None:
+        return ""
+    anchor = str(value).strip().lower()
+    anchor = re.sub(r"[^a-z0-9]+", "-", anchor)
+    anchor = re.sub(r"-{2,}", "-", anchor).strip("-")
+    return anchor
+
+
+def first_sentence(text: str) -> str:
+    if not text:
+        return ""
+    flattened = " ".join(part.strip() for part in text.splitlines() if part.strip())
+    if not flattened:
+        return ""
+    match = re.match(r"^(.*?[.!?])(\s|$)", flattened)
+    if match:
+        return match.group(1).strip()
+    return flattened
+
+
+def get_jinja_env():
+    global _jinja_env
+    if _jinja_env is None:
+        _jinja_env = Environment(
+            loader=FileSystemLoader(TEMPLATE_PATH),
+            autoescape=select_autoescape(),
+            block_start_string="[%", block_end_string="%]",
+            variable_start_string="[[", variable_end_string="]]",
+            comment_start_string="[#", comment_end_string="#]",
+            trim_blocks=True, lstrip_blocks=True,
+        )
+        _jinja_env.globals.update(strfy=strfy)
+    return _jinja_env
+
+
+def function_slug(func_id: str) -> str:
+    return anchorfy(func_id or "")
+
+
+def integration_doc_slug(integration: dict) -> str:
+    monitored = integration.get("meta", {}).get("monitored_instance", {})
+    name = monitored.get("name") or integration.get("id") or "integration"
+    return clean_string(name)
+
+
+def function_tile_filename(integration_slug: str, func_slug: str) -> str:
+    return f"{integration_slug}-{func_slug}.md"
+
+
+def build_repo_root_integration_path(base_path: str, integration_slug: str) -> str:
+    return f"/{base_path}/integrations/{integration_slug}.md"
+
+
+def build_repo_root_function_path(base_path: str, integration_slug: str, func_slug: str) -> str:
+    filename = function_tile_filename(integration_slug, func_slug)
+    return f"/{base_path}/integrations/functions/{filename}"
+
+
+def function_learn_rel_path(collector_learn_rel_path: str, integration: dict) -> str:
+    category_path = ""
+    if collector_learn_rel_path == "Collecting Metrics":
+        category_path = ""
+    elif collector_learn_rel_path.startswith("Collecting Metrics/"):
+        category_path = collector_learn_rel_path[len("Collecting Metrics/"):]
+    elif collector_learn_rel_path:
+        category_path = collector_learn_rel_path
+
+    monitored_name = integration.get("meta", {}).get("monitored_instance", {}).get("name")
+
+    parts = ["Live View"]
+    if category_path:
+        parts.extend([part for part in str(category_path).strip("/").split("/") if part])
+    if monitored_name:
+        parts.append(str(monitored_name).strip())
+    return "/".join(parts)
+
+
+def function_keywords(integration: dict, func: dict):
+    keywords = func.get("keywords")
+    if keywords:
+        return keywords
+    return integration.get("meta", {}).get("keywords")
+
+
+def render_functions_index(integration: dict, base_path: str) -> str:
+    functions = integration.get("functions_data")
+    if not functions:
+        return integration.get("functions", "")
+
+    function_list = functions.get("list")
+    if not function_list:
+        return integration.get("functions", "")
+
+    integration_slug = integration_doc_slug(integration)
+    lines = ["## Functions", ""]
+    description = functions.get("description", "")
+    if description:
+        lines.append(description.strip())
+        lines.append("")
+
+    rendered_links = 0
+    for func in function_list:
+        slug = function_slug(func.get("id"))
+        if not slug:
+            continue
+        rendered_links += 1
+        lines.append(f'<a id="{slug}"></a>')
+        lines.append(f"### {func.get('name', slug)}")
+        lines.append("")
+        summary = first_sentence(func.get("description", ""))
+        if summary:
+            lines.append(summary)
+            lines.append("")
+        lines.append(
+            f"[Full documentation]({build_repo_root_function_path(base_path, integration_slug, slug)})"
+        )
+        lines.append("")
+
+    if rendered_links == 0:
+        return integration.get("functions", "")
+
+    return "\n".join(lines).strip()
+
+
+def render_function_tile(
+    integration: dict,
+    func: dict,
+    meta_yaml: str,
+    learn_rel_path: str,
+    integration_doc_path: str,
+    keywords,
+    community_badge: str,
+) -> str:
+    template = get_jinja_env().get_template("function_tile.md")
+    return template.render(
+        entry=integration,
+        func=func,
+        meta_yaml=meta_yaml,
+        learn_rel_path=learn_rel_path,
+        integration_doc_path=integration_doc_path,
+        keywords=keywords,
+        community_badge=community_badge,
+    )
+
+
+def write_function_tiles(
+    base_path: str,
+    integration: dict,
+    meta_yaml: str,
+    collector_learn_rel_path: str,
+    community_badge: str,
+):
+    functions = integration.get("functions_data")
+    if not functions or not functions.get("list"):
+        return
+
+    int_slug = integration_doc_slug(integration)
+    integration_doc_path = build_repo_root_integration_path(base_path, int_slug)
+    functions_dir = Path(base_path) / "integrations" / "functions"
+    functions_dir.mkdir(parents=True, exist_ok=True)
+
+    for func in functions["list"]:
+        func_slug = function_slug(func.get("id"))
+        if not func_slug:
+            raise ValueError(f"Function id is missing or invalid for integration '{integration.get('id')}'.")
+
+        filename = function_tile_filename(int_slug, func_slug)
+        outfile = functions_dir / filename
+        rendered = render_function_tile(
+            integration,
+            func,
+            meta_yaml,
+            function_learn_rel_path(collector_learn_rel_path, integration),
+            integration_doc_path,
+            function_keywords(integration, func),
+            community_badge,
+        )
+        rendered_clean = normalize_markdown(rendered)
+
+        if outfile.exists():
+            existing = outfile.read_text(encoding="utf-8")
+            if existing != rendered_clean:
+                raise ValueError(
+                    f"Conflicting function tile filename '{filename}' for collector path '{base_path}'. "
+                    f"File '{outfile}' already exists with different content."
+                )
+            continue
+
+        outfile.write_text(rendered_clean, encoding="utf-8")
+
+
 def clean_and_write(md: str, path: Path):
     """
     Convert custom markers to HTML/plain text for GitHub-rendered .md files.
     relatedResource tags are left as-is here; they are resolved in a post-pass
     once id_to_path is fully populated.
     """
-    md = re.sub(r'\{% details open=true summary="(.*?)" %\}', r'<details open><summary>\1</summary>\n', md)
-    md = re.sub(r'\{% details summary="(.*?)" %\}', r'<details><summary>\1</summary>\n', md)
-    md = md.replace("{% /details %}", "</details>\n")
-    path.write_text(md, encoding="utf-8")
+    path.write_text(normalize_markdown(md), encoding="utf-8")
 
 
 def resolve_related_links():
@@ -74,6 +285,53 @@ def resolve_related_links():
 
         md = re.sub(r'\{% relatedResource id="([^"]*)" %\}(.*?)\{% /relatedResource %\}', _resolve, md)
         p.write_text(md, encoding="utf-8")
+
+
+def expected_output_path_for_integration(integration: dict):
+    """
+    Best-effort path prediction used to resolve relatedResource links even in
+    targeted (-c) generation mode where only a subset of files is rewritten.
+    """
+    iid = integration.get("id")
+    itype = integration.get("integration_type")
+    edit_link = integration.get("edit_link")
+    if not iid or not itype or not edit_link:
+        return None
+
+    meta_yaml = edit_link.replace("blob", "edit")
+    base = Path(build_path(meta_yaml))
+    meta = integration.get("meta", {})
+
+    if itype == "collector":
+        name = meta.get("monitored_instance", {}).get("name")
+        if not name:
+            return None
+        return str(base / "integrations" / f"{clean_string(name)}.md")
+
+    if itype in {"exporter", "cloud_notification", "logs", "authentication"}:
+        name = meta.get("name")
+        if not name:
+            return None
+        return str(base / "integrations" / f"{clean_string(name)}.md")
+
+    if itype == "agent_notification":
+        return str(base / "README.md")
+
+    return None
+
+
+def seed_id_to_expected_paths(integrations):
+    """
+    Seed id_to_path with deterministic expected paths for all integrations.
+    Actual writes later overwrite these entries with exact output paths.
+    """
+    for integration in integrations:
+        iid = integration.get("id")
+        if not iid:
+            continue
+        expected = expected_output_path_for_integration(integration)
+        if expected:
+            id_to_path[iid] = expected
 
 
 def build_path(meta_yaml_link: str) -> str:
@@ -212,7 +470,9 @@ endmeta-->
 
             if integration.get("metrics"):
                 md += f"\n{integration['metrics']}\n"
-            if integration.get("functions"):
+            if integration.get("functions_index"):
+                md += f"\n{integration['functions_index']}\n"
+            elif integration.get("functions"):
                 md += f"\n{integration['functions']}\n"
             if integration.get("alerts"):
                 md += f"\n{integration['alerts']}\n"
@@ -399,8 +659,9 @@ def write_to_file(path: str, md: str, meta_yaml: str, sidebar_label: str, commun
             except FileNotFoundError as e:
                 print("Exception in writing to file", e)
 
-            # If there's only one file inside the directory, register it for README symlink
-            if len(list(integrations_dir.iterdir())) == 1:
+            # If there's only one root-level markdown file, register it for README symlink.
+            md_files = [p for p in integrations_dir.iterdir() if p.is_file() and p.suffix == ".md"]
+            if len(md_files) == 1:
                 symlink_dict.update({path: f"integrations/{clean_string(sidebar_label)}.md"})
             else:
                 try:
@@ -521,6 +782,7 @@ def main():
     args = parser.parse_args()
 
     categories, integrations = read_integrations_js("integrations/integrations.js")
+    seed_id_to_expected_paths(integrations)
 
     if args.collector:
         # compute targets and CLEAN ONLY those
@@ -549,11 +811,15 @@ def main():
                 continue
 
         if itype == "collector":
-            meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(
+            collector_meta_yaml = integration.get("edit_link", "").replace("blob", "edit")
+            collector_path = build_path(collector_meta_yaml)
+            integration["functions_index"] = render_functions_index(integration, collector_path)
+
+            meta_yaml, sidebar_label, collector_learn_rel_path, md, community = build_readme_from_integration(
                 integration, categories, mode="collector"
             )
-            path = build_path(meta_yaml)
-            write_to_file(path, md, meta_yaml, sidebar_label, community, integration_id=iid)
+            write_to_file(collector_path, md, meta_yaml, sidebar_label, community, integration_id=iid)
+            write_function_tiles(collector_path, integration, meta_yaml, collector_learn_rel_path, community)
 
         elif itype == "exporter" and not args.collector:
             meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(

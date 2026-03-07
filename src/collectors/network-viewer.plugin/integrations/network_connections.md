@@ -58,42 +58,12 @@ The default configuration for this integration is not expected to impose a signi
 
 This plugin exposes a real-time function for viewing active network connections.
 
-
+<a id="network-connections"></a>
 ### Network Connections
 
 Shows active network connections with protocol details, states, addresses, ports, and performance metrics.
 
-Provides both aggregated and detailed views of TCP and UDP connections for IPv4 and IPv6,
-including connection direction (listen, inbound, outbound, local), process information,
-and TCP performance metrics (RTT, retransmissions).
-
-Connections are classified as system or container based on network namespace.
-
-
-| Aspect | Description |
-|:-------|:------------|
-| Name | `Network-viewer.plugin:network-connections` |
-| Require Cloud | no |
-| Performance |  |
-| Security |  |
-| Availability |  |
-
-#### Prerequisites
-
-No additional configuration is required.
-
-#### Parameters
-
-This function has no parameters.
-
-#### Returns
-
-
-
-| Column | Type | Unit | Visibility | Description |
-|:-------|:-----|:-----|:-----------|:------------|
-
-
+[Full documentation](/src/collectors/network-viewer.plugin/integrations/functions/network_connections-network-connections.md)
 
 ## Alerts
 

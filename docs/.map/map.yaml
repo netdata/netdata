@@ -431,6 +431,11 @@ sidebar:
           description: Learn how Netdata’s SNMP collector uses profiles.
       - type: integration_placeholder
         integration_kind: collectors
+  - meta:
+      label: Live View
+    items:
+      - type: integration_placeholder
+        integration_kind: live_functions
   # Exporting Metrics
   - meta:
       label: Exporting Metrics
