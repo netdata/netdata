@@ -1,17 +1,103 @@
 name: Azure Kubernetes Service Cluster
 resource_type: Microsoft.ContainerService/managedClusters
 metrics:
+  # API Server
+  - name: apiserver_cpu_usage_percentage
+    units: percentage
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: apiserver_memory_usage_percentage
+    units: percentage
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: apiserver_current_inflight_requests
+    units: requests
+    aggregations: [average]
+    time_grain: PT1M
+  # etcd
+  - name: etcd_cpu_usage_percentage
+    units: percentage
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: etcd_memory_usage_percentage
+    units: percentage
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: etcd_database_usage_percentage
+    units: percentage
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  # Pods
+  - name: kube_pod_status_phase
+    units: pods
+    aggregations: [average]
+    time_grain: PT1M
+  - name: kube_pod_status_ready
+    units: pods
+    aggregations: [average]
+    time_grain: PT1M
+  # Capacity
+  - name: kube_node_status_allocatable_cpu_cores
+    units: cores
+    aggregations: [average]
+    time_grain: PT1M
+  - name: kube_node_status_allocatable_memory_bytes
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: kube_node_status_condition
+    units: nodes
+    aggregations: [average]
+    time_grain: PT1M
+  # Autoscaler
+  - name: cluster_autoscaler_cluster_safe_to_autoscale
+    units: state
+    aggregations: [average]
+    time_grain: PT5M
+  - name: cluster_autoscaler_unschedulable_pods_count
+    units: pods
+    aggregations: [average]
+    time_grain: PT5M
+  - name: cluster_autoscaler_unneeded_nodes_count
+    units: nodes
+    aggregations: [average]
+    time_grain: PT5M
+  - name: cluster_autoscaler_scale_down_in_cooldown
+    units: state
+    aggregations: [average]
+    time_grain: PT5M
+  # Nodes
   - name: node_cpu_usage_millicores
     units: millicores
-    aggregations: [average]
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: node_cpu_usage_percentage
+    units: percentage
+    aggregations: [average, maximum]
     time_grain: PT1M
   - name: node_memory_working_set_bytes
     units: bytes
-    aggregations: [average]
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: node_memory_working_set_percentage
+    units: percentage
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: node_memory_rss_bytes
+    units: bytes
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: node_memory_rss_percentage
+    units: percentage
+    aggregations: [average, maximum]
     time_grain: PT1M
   - name: node_disk_usage_bytes
     units: bytes
-    aggregations: [average]
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: node_disk_usage_percentage
+    units: percentage
+    aggregations: [average, maximum]
     time_grain: PT1M
   - name: node_network_in_bytes
     units: bytes
@@ -22,12 +108,260 @@ metrics:
     aggregations: [average]
     time_grain: PT1M
 charts:
-  - id: am_azure_aks__node_cpu_usage_millicores
-    title: Azure Kubernetes Service Cluster Node CPU Usage
-    context: aks.node_cpu_usage_millicores
-    family: Utilization
+  # API Server
+  - id: am_azure_aks__apiserver_cpu
+    title: AKS API Server CPU Utilization
+    context: aks.apiserver_cpu
+    family: API Server
     type: line
     priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: apiserver_cpu_usage_percentage
+        aggregation: average
+        name: average
+      - metric: apiserver_cpu_usage_percentage
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_aks__apiserver_memory
+    title: AKS API Server Memory Utilization
+    context: aks.apiserver_memory
+    family: API Server
+    type: line
+    priority: 1010
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: apiserver_memory_usage_percentage
+        aggregation: average
+        name: average
+      - metric: apiserver_memory_usage_percentage
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_aks__apiserver_inflight_requests
+    title: AKS API Server Inflight Requests
+    context: aks.apiserver_inflight_requests
+    family: API Server
+    type: line
+    priority: 1020
+    units: requests
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: apiserver_current_inflight_requests
+        aggregation: average
+        name: average
+
+  # etcd
+  - id: am_azure_aks__etcd_cpu
+    title: AKS etcd CPU Utilization
+    context: aks.etcd_cpu
+    family: Control Plane
+    type: line
+    priority: 1030
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: etcd_cpu_usage_percentage
+        aggregation: average
+        name: average
+      - metric: etcd_cpu_usage_percentage
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_aks__etcd_memory
+    title: AKS etcd Memory Utilization
+    context: aks.etcd_memory
+    family: Control Plane
+    type: line
+    priority: 1040
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: etcd_memory_usage_percentage
+        aggregation: average
+        name: average
+      - metric: etcd_memory_usage_percentage
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_aks__etcd_database
+    title: AKS etcd Database Utilization
+    context: aks.etcd_database
+    family: Control Plane
+    type: line
+    priority: 1050
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: etcd_database_usage_percentage
+        aggregation: average
+        name: average
+      - metric: etcd_database_usage_percentage
+        aggregation: maximum
+        name: maximum
+
+  # Pods
+  - id: am_azure_aks__pod_status_phase
+    title: AKS Pods by Phase
+    context: aks.pod_status_phase
+    family: Pods
+    type: line
+    priority: 1060
+    units: pods
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: kube_pod_status_phase
+        aggregation: average
+        name: average
+
+  - id: am_azure_aks__pod_status_ready
+    title: AKS Pods in Ready State
+    context: aks.pod_status_ready
+    family: Pods
+    type: line
+    priority: 1070
+    units: pods
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: kube_pod_status_ready
+        aggregation: average
+        name: average
+
+  # Capacity
+  - id: am_azure_aks__allocatable_cpu
+    title: AKS Allocatable CPU Cores
+    context: aks.allocatable_cpu
+    family: Capacity
+    type: line
+    priority: 1080
+    units: cores
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: kube_node_status_allocatable_cpu_cores
+        aggregation: average
+        name: average
+
+  - id: am_azure_aks__allocatable_memory
+    title: AKS Allocatable Memory
+    context: aks.allocatable_memory
+    family: Capacity
+    type: line
+    priority: 1090
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: kube_node_status_allocatable_memory_bytes
+        aggregation: average
+        name: average
+
+  - id: am_azure_aks__node_conditions
+    title: AKS Node Conditions
+    context: aks.node_conditions
+    family: Capacity
+    type: line
+    priority: 1100
+    units: nodes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: kube_node_status_condition
+        aggregation: average
+        name: average
+
+  # Autoscaler
+  - id: am_azure_aks__autoscaler_health
+    title: AKS Cluster Autoscaler Health
+    context: aks.autoscaler_health
+    family: Autoscaler
+    type: line
+    priority: 1110
+    units: state
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cluster_autoscaler_cluster_safe_to_autoscale
+        aggregation: average
+        name: safe_to_autoscale
+      - metric: cluster_autoscaler_scale_down_in_cooldown
+        aggregation: average
+        name: cooldown
+
+  - id: am_azure_aks__autoscaler_unschedulable_pods
+    title: AKS Autoscaler Unschedulable Pods
+    context: aks.autoscaler_unschedulable_pods
+    family: Autoscaler
+    type: line
+    priority: 1120
+    units: pods
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cluster_autoscaler_unschedulable_pods_count
+        aggregation: average
+        name: average
+
+  - id: am_azure_aks__autoscaler_unneeded_nodes
+    title: AKS Autoscaler Unneeded Nodes
+    context: aks.autoscaler_unneeded_nodes
+    family: Autoscaler
+    type: line
+    priority: 1130
+    units: nodes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cluster_autoscaler_unneeded_nodes_count
+        aggregation: average
+        name: average
+
+  # Nodes
+  - id: am_azure_aks__node_cpu_millicores
+    title: AKS Node CPU Usage
+    context: aks.node_cpu_millicores
+    family: Nodes
+    type: line
+    priority: 1140
     units: millicores
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
@@ -37,13 +371,35 @@ charts:
       - metric: node_cpu_usage_millicores
         aggregation: average
         name: average
+      - metric: node_cpu_usage_millicores
+        aggregation: maximum
+        name: maximum
 
-  - id: am_azure_aks__node_memory_working_set_bytes
-    title: Azure Kubernetes Service Cluster Node Memory Working Set
-    context: aks.node_memory_working_set_bytes
-    family: Utilization
+  - id: am_azure_aks__node_cpu_percentage
+    title: AKS Node CPU Percentage
+    context: aks.node_cpu_percentage
+    family: Nodes
     type: line
-    priority: 1010
+    priority: 1150
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: node_cpu_usage_percentage
+        aggregation: average
+        name: average
+      - metric: node_cpu_usage_percentage
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_aks__node_memory_working_set
+    title: AKS Node Memory Working Set
+    context: aks.node_memory_working_set
+    family: Nodes
+    type: line
+    priority: 1160
     units: bytes
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
@@ -53,13 +409,73 @@ charts:
       - metric: node_memory_working_set_bytes
         aggregation: average
         name: average
+      - metric: node_memory_working_set_bytes
+        aggregation: maximum
+        name: maximum
 
-  - id: am_azure_aks__node_disk_usage_bytes
-    title: Azure Kubernetes Service Cluster Node Disk Usage
-    context: aks.node_disk_usage_bytes
-    family: Utilization
+  - id: am_azure_aks__node_memory_working_set_percentage
+    title: AKS Node Memory Working Set Percentage
+    context: aks.node_memory_working_set_percentage
+    family: Nodes
     type: line
-    priority: 1020
+    priority: 1170
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: node_memory_working_set_percentage
+        aggregation: average
+        name: average
+      - metric: node_memory_working_set_percentage
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_aks__node_memory_rss
+    title: AKS Node Memory RSS
+    context: aks.node_memory_rss
+    family: Nodes
+    type: line
+    priority: 1180
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: node_memory_rss_bytes
+        aggregation: average
+        name: average
+      - metric: node_memory_rss_bytes
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_aks__node_memory_rss_percentage
+    title: AKS Node Memory RSS Percentage
+    context: aks.node_memory_rss_percentage
+    family: Nodes
+    type: line
+    priority: 1190
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: node_memory_rss_percentage
+        aggregation: average
+        name: average
+      - metric: node_memory_rss_percentage
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_aks__node_disk_usage
+    title: AKS Node Disk Usage
+    context: aks.node_disk_usage
+    family: Nodes
+    type: line
+    priority: 1200
     units: bytes
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
@@ -69,13 +485,36 @@ charts:
       - metric: node_disk_usage_bytes
         aggregation: average
         name: average
+      - metric: node_disk_usage_bytes
+        aggregation: maximum
+        name: maximum
 
-  - id: am_azure_aks__node_network_in_bytes
-    title: Azure Kubernetes Service Cluster Node Network Ingress
-    context: aks.node_network_in_bytes
+  - id: am_azure_aks__node_disk_percentage
+    title: AKS Node Disk Usage Percentage
+    context: aks.node_disk_percentage
+    family: Nodes
+    type: line
+    priority: 1210
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: node_disk_usage_percentage
+        aggregation: average
+        name: average
+      - metric: node_disk_usage_percentage
+        aggregation: maximum
+        name: maximum
+
+  # Network
+  - id: am_azure_aks__node_network
+    title: AKS Node Network Traffic
+    context: aks.node_network
     family: Network
     type: line
-    priority: 1030
+    priority: 1220
     units: bytes
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
@@ -84,20 +523,7 @@ charts:
     dimensions:
       - metric: node_network_in_bytes
         aggregation: average
-        name: average
-
-  - id: am_azure_aks__node_network_out_bytes
-    title: Azure Kubernetes Service Cluster Node Network Egress
-    context: aks.node_network_out_bytes
-    family: Network
-    type: line
-    priority: 1040
-    units: bytes
-    algorithm: absolute
-    label_promotion: [resource_name, resource_group, region, resource_type, profile]
-    instances:
-      by_labels: [resource_uid]
-    dimensions:
+        name: in
       - metric: node_network_out_bytes
         aggregation: average
-        name: average
+        name: out

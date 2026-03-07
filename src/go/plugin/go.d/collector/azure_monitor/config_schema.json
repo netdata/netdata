@@ -86,14 +86,15 @@
       },
       "profiles": {
         "title": "Profiles",
-        "description": "Profile file keys to enable. Profiles are loaded from go.d/azure_monitor.profiles (user) and go.d/azure_monitor.profiles/default (stock).",
+        "description": "Profile names to enable. Use 'auto' for automatic discovery based on resource types in the subscription. Combine with explicit names: ['auto', 'custom_profile']. Empty list disables collection.",
         "type": [
           "array",
           "null"
         ],
         "items": {
           "type": "string"
-        }
+        },
+        "default": ["auto"]
       },
       "auth": {
         "title": "Authentication",

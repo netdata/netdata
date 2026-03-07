@@ -1,7 +1,12 @@
 name: Azure Logic Apps Workflow
 resource_type: Microsoft.Logic/workflows
 metrics:
+  # Runs
   - name: RunsStarted
+    units: runs/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: RunsCompleted
     units: runs/s
     aggregations: [total]
     time_grain: PT1M
@@ -10,6 +15,10 @@ metrics:
     aggregations: [total]
     time_grain: PT1M
   - name: RunsFailed
+    units: runs/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: RunsCancelled
     units: runs/s
     aggregations: [total]
     time_grain: PT1M
@@ -25,7 +34,20 @@ metrics:
     units: percentage
     aggregations: [total]
     time_grain: PT1M
+  - name: RunThrottledEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: RunStartThrottledEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Actions
   - name: ActionsStarted
+    units: actions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ActionsCompleted
     units: actions/s
     aggregations: [total]
     time_grain: PT1M
@@ -37,7 +59,32 @@ metrics:
     units: actions/s
     aggregations: [total]
     time_grain: PT1M
+  - name: ActionsSkipped
+    units: actions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ActionLatency
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ActionSuccessLatency
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ActionThrottledEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Triggers
   - name: TriggersStarted
+    units: triggers/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TriggersCompleted
+    units: triggers/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TriggersSucceeded
     units: triggers/s
     aggregations: [total]
     time_grain: PT1M
@@ -49,18 +96,68 @@ metrics:
     units: triggers/s
     aggregations: [total]
     time_grain: PT1M
+  - name: TriggersSkipped
+    units: triggers/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TriggerLatency
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: TriggerFireLatency
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: TriggerSuccessLatency
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: TriggerThrottledEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Billing
   - name: TotalBillableExecutions
     units: executions/s
     aggregations: [total]
     time_grain: PT1M
-  - name: RunThrottledEvents
+  - name: BillableActionExecutions
+    units: executions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BillableTriggerExecutions
+    units: executions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BillingUsageNativeOperation
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BillingUsageStandardConnector
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BillingUsageStorageConsumption
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Agent (AI-enabled Logic Apps)
+  - name: AgentLoopExecution
+    units: executions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: CompletionTokenOverflowUsage
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: PromptTokenOverflowUsage
     units: events/s
     aggregations: [total]
     time_grain: PT1M
 charts:
-  - id: am_azure_logic_apps__runsstarted
-    title: Azure Logic Apps Workflow Runs Started
-    context: logic_apps.runs_started
+  - id: am_azure_logic_apps__run_lifecycle
+    title: Azure Logic Apps Run Lifecycle
+    context: logic_apps.run_lifecycle
     family: Runs
     type: line
     priority: 1000
@@ -72,46 +169,26 @@ charts:
     dimensions:
       - metric: RunsStarted
         aggregation: total
-        name: total
+        name: started
+      - metric: RunsCompleted
+        aggregation: total
+        name: completed
+      - metric: RunsSucceeded
+        aggregation: total
+        name: succeeded
+      - metric: RunsFailed
+        aggregation: total
+        name: failed
+      - metric: RunsCancelled
+        aggregation: total
+        name: cancelled
 
-  - id: am_azure_logic_apps__runssucceeded
-    title: Azure Logic Apps Workflow Runs Succeeded
-    context: logic_apps.runs_succeeded
+  - id: am_azure_logic_apps__run_latency
+    title: Azure Logic Apps Run Latency
+    context: logic_apps.run_latency
     family: Runs
     type: line
     priority: 1010
-    units: runs/s
-    algorithm: incremental
-    label_promotion: [resource_name, resource_group, region, resource_type, profile]
-    instances:
-      by_labels: [resource_uid]
-    dimensions:
-      - metric: RunsSucceeded
-        aggregation: total
-        name: total
-
-  - id: am_azure_logic_apps__runsfailed
-    title: Azure Logic Apps Workflow Runs Failed
-    context: logic_apps.runs_failed
-    family: Runs
-    type: line
-    priority: 1020
-    units: runs/s
-    algorithm: incremental
-    label_promotion: [resource_name, resource_group, region, resource_type, profile]
-    instances:
-      by_labels: [resource_uid]
-    dimensions:
-      - metric: RunsFailed
-        aggregation: total
-        name: total
-
-  - id: am_azure_logic_apps__runlatency
-    title: Azure Logic Apps Workflow Run Latency
-    context: logic_apps.run_latency
-    family: Latency
-    type: line
-    priority: 1030
     units: seconds
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
@@ -120,30 +197,17 @@ charts:
     dimensions:
       - metric: RunLatency
         aggregation: average
-        name: average
-
-  - id: am_azure_logic_apps__runsuccesslatency
-    title: Azure Logic Apps Workflow Run Success Latency
-    context: logic_apps.run_success_latency
-    family: Latency
-    type: line
-    priority: 1040
-    units: seconds
-    algorithm: absolute
-    label_promotion: [resource_name, resource_group, region, resource_type, profile]
-    instances:
-      by_labels: [resource_uid]
-    dimensions:
+        name: all
       - metric: RunSuccessLatency
         aggregation: average
-        name: average
+        name: success
 
-  - id: am_azure_logic_apps__runfailurepercentage
-    title: Azure Logic Apps Workflow Run Failure Percentage
-    context: logic_apps.run_failure_percentage
-    family: Reliability
+  - id: am_azure_logic_apps__run_failure_rate
+    title: Azure Logic Apps Run Failure Rate
+    context: logic_apps.run_failure_rate
+    family: Runs
     type: line
-    priority: 1050
+    priority: 1020
     units: percentage
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
@@ -152,14 +216,33 @@ charts:
     dimensions:
       - metric: RunFailurePercentage
         aggregation: total
-        name: total
+        name: failure_rate
 
-  - id: am_azure_logic_apps__actionsstarted
-    title: Azure Logic Apps Workflow Actions Started
-    context: logic_apps.actions_started
+  - id: am_azure_logic_apps__run_throttling
+    title: Azure Logic Apps Run Throttling
+    context: logic_apps.run_throttling
+    family: Runs
+    type: line
+    priority: 1030
+    units: events/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RunThrottledEvents
+        aggregation: total
+        name: during_run
+      - metric: RunStartThrottledEvents
+        aggregation: total
+        name: at_start
+
+  - id: am_azure_logic_apps__action_lifecycle
+    title: Azure Logic Apps Action Lifecycle
+    context: logic_apps.action_lifecycle
     family: Actions
     type: line
-    priority: 1060
+    priority: 1040
     units: actions/s
     algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
@@ -168,46 +251,61 @@ charts:
     dimensions:
       - metric: ActionsStarted
         aggregation: total
-        name: total
-
-  - id: am_azure_logic_apps__actionssucceeded
-    title: Azure Logic Apps Workflow Actions Succeeded
-    context: logic_apps.actions_succeeded
-    family: Actions
-    type: line
-    priority: 1070
-    units: actions/s
-    algorithm: incremental
-    label_promotion: [resource_name, resource_group, region, resource_type, profile]
-    instances:
-      by_labels: [resource_uid]
-    dimensions:
+        name: started
+      - metric: ActionsCompleted
+        aggregation: total
+        name: completed
       - metric: ActionsSucceeded
         aggregation: total
-        name: total
+        name: succeeded
+      - metric: ActionsFailed
+        aggregation: total
+        name: failed
+      - metric: ActionsSkipped
+        aggregation: total
+        name: skipped
 
-  - id: am_azure_logic_apps__actionsfailed
-    title: Azure Logic Apps Workflow Actions Failed
-    context: logic_apps.actions_failed
+  - id: am_azure_logic_apps__action_latency
+    title: Azure Logic Apps Action Latency
+    context: logic_apps.action_latency
     family: Actions
     type: line
-    priority: 1080
-    units: actions/s
+    priority: 1050
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ActionLatency
+        aggregation: average
+        name: all
+      - metric: ActionSuccessLatency
+        aggregation: average
+        name: success
+
+  - id: am_azure_logic_apps__action_throttling
+    title: Azure Logic Apps Action Throttling
+    context: logic_apps.action_throttling
+    family: Actions
+    type: line
+    priority: 1060
+    units: events/s
     algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
-      - metric: ActionsFailed
+      - metric: ActionThrottledEvents
         aggregation: total
         name: total
 
-  - id: am_azure_logic_apps__triggersstarted
-    title: Azure Logic Apps Workflow Triggers Started
-    context: logic_apps.triggers_started
+  - id: am_azure_logic_apps__trigger_lifecycle
+    title: Azure Logic Apps Trigger Lifecycle
+    context: logic_apps.trigger_lifecycle
     family: Triggers
     type: line
-    priority: 1090
+    priority: 1070
     units: triggers/s
     algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
@@ -216,46 +314,67 @@ charts:
     dimensions:
       - metric: TriggersStarted
         aggregation: total
-        name: total
-
-  - id: am_azure_logic_apps__triggersfired
-    title: Azure Logic Apps Workflow Triggers Fired
-    context: logic_apps.triggers_fired
-    family: Triggers
-    type: line
-    priority: 1100
-    units: triggers/s
-    algorithm: incremental
-    label_promotion: [resource_name, resource_group, region, resource_type, profile]
-    instances:
-      by_labels: [resource_uid]
-    dimensions:
+        name: started
+      - metric: TriggersCompleted
+        aggregation: total
+        name: completed
+      - metric: TriggersSucceeded
+        aggregation: total
+        name: succeeded
       - metric: TriggersFired
         aggregation: total
-        name: total
+        name: fired
+      - metric: TriggersFailed
+        aggregation: total
+        name: failed
+      - metric: TriggersSkipped
+        aggregation: total
+        name: skipped
 
-  - id: am_azure_logic_apps__triggersfailed
-    title: Azure Logic Apps Workflow Triggers Failed
-    context: logic_apps.triggers_failed
+  - id: am_azure_logic_apps__trigger_latency
+    title: Azure Logic Apps Trigger Latency
+    context: logic_apps.trigger_latency
     family: Triggers
     type: line
-    priority: 1110
-    units: triggers/s
+    priority: 1080
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TriggerLatency
+        aggregation: average
+        name: all
+      - metric: TriggerFireLatency
+        aggregation: average
+        name: fire
+      - metric: TriggerSuccessLatency
+        aggregation: average
+        name: success
+
+  - id: am_azure_logic_apps__trigger_throttling
+    title: Azure Logic Apps Trigger Throttling
+    context: logic_apps.trigger_throttling
+    family: Triggers
+    type: line
+    priority: 1090
+    units: events/s
     algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
-      - metric: TriggersFailed
+      - metric: TriggerThrottledEvents
         aggregation: total
         name: total
 
-  - id: am_azure_logic_apps__totalbillableexecutions
-    title: Azure Logic Apps Workflow Billable Executions
-    context: logic_apps.total_billable_executions
+  - id: am_azure_logic_apps__billable_executions
+    title: Azure Logic Apps Billable Executions
+    context: logic_apps.billable_executions
     family: Billing
     type: line
-    priority: 1120
+    priority: 1100
     units: executions/s
     algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
@@ -265,19 +384,53 @@ charts:
       - metric: TotalBillableExecutions
         aggregation: total
         name: total
+      - metric: BillableActionExecutions
+        aggregation: total
+        name: actions
+      - metric: BillableTriggerExecutions
+        aggregation: total
+        name: triggers
 
-  - id: am_azure_logic_apps__runthrottledevents
-    title: Azure Logic Apps Workflow Run Throttled Events
-    context: logic_apps.run_throttled_events
-    family: Reliability
+  - id: am_azure_logic_apps__billing_by_type
+    title: Azure Logic Apps Billing by Type
+    context: logic_apps.billing_by_type
+    family: Billing
     type: line
-    priority: 1130
+    priority: 1110
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BillingUsageNativeOperation
+        aggregation: total
+        name: native
+      - metric: BillingUsageStandardConnector
+        aggregation: total
+        name: standard_connector
+      - metric: BillingUsageStorageConsumption
+        aggregation: total
+        name: storage
+
+  - id: am_azure_logic_apps__agent
+    title: Azure Logic Apps AI Agent Activity
+    context: logic_apps.agent
+    family: Agent
+    type: line
+    priority: 1120
     units: events/s
     algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
-      - metric: RunThrottledEvents
+      - metric: AgentLoopExecution
         aggregation: total
-        name: total
+        name: loop_executions
+      - metric: CompletionTokenOverflowUsage
+        aggregation: total
+        name: completion_overflow
+      - metric: PromptTokenOverflowUsage
+        aggregation: total
+        name: prompt_overflow

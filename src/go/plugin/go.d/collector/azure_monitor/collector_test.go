@@ -261,6 +261,162 @@ func TestCollector_TimeGrainScheduling(t *testing.T) {
 	assert.Equal(t, 1, mx.calls())
 }
 
+func TestCollector_InitAutoDiscover(t *testing.T) {
+	rg := &mockResourceGraph{
+		resources: []map[string]any{
+			{"type": "microsoft.dbforpostgresql/flexibleservers", "count_": int64(2)},
+		},
+	}
+
+	c := New()
+	c.Config = testConfig()
+	c.Config.Profiles = []string{"auto"}
+	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
+		return rg, nil
+	}
+	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
+		return &mockMetricsClient{}, nil
+	}
+
+	require.NoError(t, c.Init(context.Background()))
+	assert.True(t, c.autoDiscover)
+	assert.Contains(t, c.Config.Profiles, "postgres_flexible")
+}
+
+func TestCollector_InitAutoDiscoverWithExplicit(t *testing.T) {
+	rg := &mockResourceGraph{
+		resources: []map[string]any{
+			{"type": "microsoft.dbforpostgresql/flexibleservers", "count_": int64(2)},
+		},
+	}
+
+	c := New()
+	c.Config = testConfig()
+	c.Config.Profiles = []string{"auto", "cosmos_db"}
+	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
+		return rg, nil
+	}
+	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
+		return &mockMetricsClient{}, nil
+	}
+
+	require.NoError(t, c.Init(context.Background()))
+	assert.True(t, c.autoDiscover)
+	assert.Contains(t, c.Config.Profiles, "cosmos_db")
+	assert.Contains(t, c.Config.Profiles, "postgres_flexible")
+}
+
+func TestCollector_InitEmptyProfilesFails(t *testing.T) {
+	c := New()
+	c.Config = testConfig()
+	c.Config.Profiles = []string{}
+	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
+		return &mockResourceGraph{}, nil
+	}
+	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
+		return &mockMetricsClient{}, nil
+	}
+
+	err := c.Init(context.Background())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no profiles configured")
+}
+
+func TestCollector_InitAutoDiscoverNoMatchFails(t *testing.T) {
+	rg := &mockResourceGraph{
+		resources: []map[string]any{
+			{"type": "microsoft.web/sites", "count_": int64(3)},
+		},
+	}
+
+	c := New()
+	c.Config = testConfig()
+	c.Config.Profiles = []string{"auto"}
+	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
+		return rg, nil
+	}
+	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
+		return &mockMetricsClient{}, nil
+	}
+
+	err := c.Init(context.Background())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "auto-discovery found no Azure resources")
+}
+
+func TestExtractAutoKeyword(t *testing.T) {
+	tests := map[string]struct {
+		input      []string
+		wantAuto   bool
+		wantRemain []string
+	}{
+		"auto only": {
+			input:      []string{"auto"},
+			wantAuto:   true,
+			wantRemain: []string{},
+		},
+		"auto with explicit": {
+			input:      []string{"auto", "vm", "sql"},
+			wantAuto:   true,
+			wantRemain: []string{"vm", "sql"},
+		},
+		"no auto": {
+			input:      []string{"vm", "sql"},
+			wantAuto:   false,
+			wantRemain: []string{"vm", "sql"},
+		},
+		"empty": {
+			input:      []string{},
+			wantAuto:   false,
+			wantRemain: []string{},
+		},
+		"auto case insensitive": {
+			input:      []string{"AUTO"},
+			wantAuto:   true,
+			wantRemain: []string{},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			gotAuto, gotRemain := extractAutoKeyword(tc.input)
+			assert.Equal(t, tc.wantAuto, gotAuto)
+			assert.Equal(t, tc.wantRemain, gotRemain)
+		})
+	}
+}
+
+func TestMergeProfileNames(t *testing.T) {
+	tests := map[string]struct {
+		explicit   []string
+		discovered []string
+		want       []string
+	}{
+		"no overlap": {
+			explicit:   []string{"vm"},
+			discovered: []string{"sql"},
+			want:       []string{"vm", "sql"},
+		},
+		"overlap deduplicated": {
+			explicit:   []string{"vm", "sql"},
+			discovered: []string{"sql", "redis"},
+			want:       []string{"vm", "sql", "redis"},
+		},
+		"both empty": {
+			explicit:   []string{},
+			discovered: []string{},
+			want:       []string{},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := mergeProfileNames(tc.explicit, tc.discovered)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestBuildRuntimePlan_DetectsProfileCollision(t *testing.T) {
 	c := New()
 	cfg := testConfig()

@@ -1,10 +1,30 @@
 name: Azure Virtual Machine
 resource_type: Microsoft.Compute/virtualMachines
 metrics:
+  # CPU
   - name: Percentage CPU
     units: percentage
     aggregations: [average]
     time_grain: PT1M
+  - name: CPU Credits Consumed
+    units: credits
+    aggregations: [average]
+    time_grain: PT1M
+  - name: CPU Credits Remaining
+    units: credits
+    aggregations: [average]
+    time_grain: PT1M
+  # Memory
+  - name: Available Memory Bytes
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  # Availability
+  - name: VmAvailabilityMetric
+    units: state
+    aggregations: [average]
+    time_grain: PT1M
+  # Network
   - name: Network In Total
     units: bytes/s
     aggregations: [total]
@@ -13,6 +33,15 @@ metrics:
     units: bytes/s
     aggregations: [total]
     time_grain: PT1M
+  - name: Inbound Flows
+    units: flows
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Outbound Flows
+    units: flows
+    aggregations: [average]
+    time_grain: PT1M
+  # Aggregate Disk
   - name: Disk Read Bytes
     units: bytes/s
     aggregations: [total]
@@ -21,11 +50,102 @@ metrics:
     units: bytes/s
     aggregations: [total]
     time_grain: PT1M
+  - name: Disk Read Operations/Sec
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Disk Write Operations/Sec
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  # OS Disk
+  - name: OS Disk Read Bytes/sec
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Write Bytes/sec
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Read Operations/Sec
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Write Operations/Sec
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Queue Depth
+    units: operations
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Latency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Bandwidth Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk IOPS Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Data Disk
+  - name: Data Disk Read Bytes/sec
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Write Bytes/sec
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Read Operations/Sec
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Write Operations/Sec
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Queue Depth
+    units: operations
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Latency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Bandwidth Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk IOPS Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # VM-Level Throttling
+  - name: VM Cached Bandwidth Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: VM Cached IOPS Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: VM Uncached Bandwidth Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: VM Uncached IOPS Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
 charts:
-  - id: am_azure_virtual_machines__percentage_cpu
+  - id: am_azure_virtual_machines__cpu
     title: Azure Virtual Machine CPU Utilization
-    context: virtual_machines.percentage_cpu
-    family: Utilization
+    context: virtual_machines.cpu
+    family: CPU
     type: line
     priority: 1000
     units: percentage
@@ -38,58 +158,61 @@ charts:
         aggregation: average
         name: average
 
-  - id: am_azure_virtual_machines__network_in_total
-    title: Azure Virtual Machine Network Ingress
-    context: virtual_machines.network_in_total
-    family: Network
+  - id: am_azure_virtual_machines__cpu_credits
+    title: Azure Virtual Machine CPU Credits
+    context: virtual_machines.cpu_credits
+    family: CPU
     type: line
     priority: 1010
-    units: bytes/s
-    algorithm: incremental
+    units: credits
+    algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
-      - metric: Network In Total
-        aggregation: total
-        name: total
+      - metric: CPU Credits Consumed
+        aggregation: average
+        name: consumed
+      - metric: CPU Credits Remaining
+        aggregation: average
+        name: remaining
 
-  - id: am_azure_virtual_machines__network_out_total
-    title: Azure Virtual Machine Network Egress
-    context: virtual_machines.network_out_total
-    family: Network
+  - id: am_azure_virtual_machines__memory
+    title: Azure Virtual Machine Available Memory
+    context: virtual_machines.memory
+    family: Memory
     type: line
     priority: 1020
-    units: bytes/s
-    algorithm: incremental
+    units: bytes
+    algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
-      - metric: Network Out Total
-        aggregation: total
-        name: total
+      - metric: Available Memory Bytes
+        aggregation: average
+        name: available
 
-  - id: am_azure_virtual_machines__disk_read_bytes
-    title: Azure Virtual Machine Disk Read Throughput
-    context: virtual_machines.disk_read_bytes
-    family: I/O
+  - id: am_azure_virtual_machines__availability
+    title: Azure Virtual Machine Availability
+    context: virtual_machines.availability
+    family: Availability
     type: line
     priority: 1030
-    units: bytes/s
-    algorithm: incremental
+    units: state
+    algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
-      - metric: Disk Read Bytes
-        aggregation: total
-        name: total
+      - metric: VmAvailabilityMetric
+        aggregation: average
+        name: average
 
-  - id: am_azure_virtual_machines__disk_write_bytes
-    title: Azure Virtual Machine Disk Write Throughput
-    context: virtual_machines.disk_write_bytes
-    family: I/O
+  - id: am_azure_virtual_machines__network_traffic
+    title: Azure Virtual Machine Network Traffic
+    context: virtual_machines.network_traffic
+    family: Network
     type: line
     priority: 1040
     units: bytes/s
@@ -98,6 +221,282 @@ charts:
     instances:
       by_labels: [resource_uid]
     dimensions:
+      - metric: Network In Total
+        aggregation: total
+        name: in
+      - metric: Network Out Total
+        aggregation: total
+        name: out
+
+  - id: am_azure_virtual_machines__network_flows
+    title: Azure Virtual Machine Network Flows
+    context: virtual_machines.network_flows
+    family: Network
+    type: line
+    priority: 1050
+    units: flows
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Inbound Flows
+        aggregation: average
+        name: in
+      - metric: Outbound Flows
+        aggregation: average
+        name: out
+
+  - id: am_azure_virtual_machines__disk_throughput
+    title: Azure Virtual Machine Disk Throughput
+    context: virtual_machines.disk_throughput
+    family: Disk
+    type: line
+    priority: 1060
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Disk Read Bytes
+        aggregation: total
+        name: read
       - metric: Disk Write Bytes
         aggregation: total
-        name: total
+        name: write
+
+  - id: am_azure_virtual_machines__disk_iops
+    title: Azure Virtual Machine Disk IOPS
+    context: virtual_machines.disk_iops
+    family: Disk
+    type: line
+    priority: 1070
+    units: operations/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Disk Read Operations/Sec
+        aggregation: average
+        name: read
+      - metric: Disk Write Operations/Sec
+        aggregation: average
+        name: write
+
+  - id: am_azure_virtual_machines__os_disk_throughput
+    title: Azure Virtual Machine OS Disk Throughput
+    context: virtual_machines.os_disk_throughput
+    family: OS Disk
+    type: line
+    priority: 1080
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OS Disk Read Bytes/sec
+        aggregation: average
+        name: read
+      - metric: OS Disk Write Bytes/sec
+        aggregation: average
+        name: write
+
+  - id: am_azure_virtual_machines__os_disk_iops
+    title: Azure Virtual Machine OS Disk IOPS
+    context: virtual_machines.os_disk_iops
+    family: OS Disk
+    type: line
+    priority: 1090
+    units: operations/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OS Disk Read Operations/Sec
+        aggregation: average
+        name: read
+      - metric: OS Disk Write Operations/Sec
+        aggregation: average
+        name: write
+
+  - id: am_azure_virtual_machines__os_disk_latency
+    title: Azure Virtual Machine OS Disk Latency
+    context: virtual_machines.os_disk_latency
+    family: OS Disk
+    type: line
+    priority: 1100
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OS Disk Latency
+        aggregation: average
+        name: average
+
+  - id: am_azure_virtual_machines__os_disk_queue_depth
+    title: Azure Virtual Machine OS Disk Queue Depth
+    context: virtual_machines.os_disk_queue_depth
+    family: OS Disk
+    type: line
+    priority: 1110
+    units: operations
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OS Disk Queue Depth
+        aggregation: average
+        name: average
+
+  - id: am_azure_virtual_machines__os_disk_throttling
+    title: Azure Virtual Machine OS Disk Throttling
+    context: virtual_machines.os_disk_throttling
+    family: OS Disk
+    type: line
+    priority: 1120
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OS Disk Bandwidth Consumed Percentage
+        aggregation: average
+        name: bandwidth
+      - metric: OS Disk IOPS Consumed Percentage
+        aggregation: average
+        name: iops
+
+  - id: am_azure_virtual_machines__data_disk_throughput
+    title: Azure Virtual Machine Data Disk Throughput
+    context: virtual_machines.data_disk_throughput
+    family: Data Disk
+    type: line
+    priority: 1130
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Data Disk Read Bytes/sec
+        aggregation: average
+        name: read
+      - metric: Data Disk Write Bytes/sec
+        aggregation: average
+        name: write
+
+  - id: am_azure_virtual_machines__data_disk_iops
+    title: Azure Virtual Machine Data Disk IOPS
+    context: virtual_machines.data_disk_iops
+    family: Data Disk
+    type: line
+    priority: 1140
+    units: operations/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Data Disk Read Operations/Sec
+        aggregation: average
+        name: read
+      - metric: Data Disk Write Operations/Sec
+        aggregation: average
+        name: write
+
+  - id: am_azure_virtual_machines__data_disk_latency
+    title: Azure Virtual Machine Data Disk Latency
+    context: virtual_machines.data_disk_latency
+    family: Data Disk
+    type: line
+    priority: 1150
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Data Disk Latency
+        aggregation: average
+        name: average
+
+  - id: am_azure_virtual_machines__data_disk_queue_depth
+    title: Azure Virtual Machine Data Disk Queue Depth
+    context: virtual_machines.data_disk_queue_depth
+    family: Data Disk
+    type: line
+    priority: 1160
+    units: operations
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Data Disk Queue Depth
+        aggregation: average
+        name: average
+
+  - id: am_azure_virtual_machines__data_disk_throttling
+    title: Azure Virtual Machine Data Disk Throttling
+    context: virtual_machines.data_disk_throttling
+    family: Data Disk
+    type: line
+    priority: 1170
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Data Disk Bandwidth Consumed Percentage
+        aggregation: average
+        name: bandwidth
+      - metric: Data Disk IOPS Consumed Percentage
+        aggregation: average
+        name: iops
+
+  - id: am_azure_virtual_machines__vm_cached_throttling
+    title: Azure Virtual Machine Cached IO Throttling
+    context: virtual_machines.vm_cached_throttling
+    family: VM Throttling
+    type: line
+    priority: 1180
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: VM Cached Bandwidth Consumed Percentage
+        aggregation: average
+        name: bandwidth
+      - metric: VM Cached IOPS Consumed Percentage
+        aggregation: average
+        name: iops
+
+  - id: am_azure_virtual_machines__vm_uncached_throttling
+    title: Azure Virtual Machine Uncached IO Throttling
+    context: virtual_machines.vm_uncached_throttling
+    family: VM Throttling
+    type: line
+    priority: 1190
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: VM Uncached Bandwidth Consumed Percentage
+        aggregation: average
+        name: bandwidth
+      - metric: VM Uncached IOPS Consumed Percentage
+        aggregation: average
+        name: iops

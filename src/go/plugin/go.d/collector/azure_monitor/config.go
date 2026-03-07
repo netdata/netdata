@@ -29,6 +29,8 @@ const (
 	authModeDefault          = "default"
 )
 
+const profileAutoKeyword = "auto"
+
 const (
 	cloudPublic     = "public"
 	cloudGovernment = "government"

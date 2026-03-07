@@ -17,6 +17,14 @@ metrics:
     units: bytes/s
     aggregations: [total]
     time_grain: PT1M
+  - name: SuccessE2ELatency
+    units: milliseconds
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: SuccessServerLatency
+    units: milliseconds
+    aggregations: [average, maximum]
+    time_grain: PT1M
   - name: UsedCapacity
     units: bytes
     aggregations: [average]
@@ -54,9 +62,9 @@ charts:
         aggregation: total
         name: total
 
-  - id: am_azure_storage_accounts__ingress
-    title: Azure Storage Account Ingress
-    context: storage_accounts.ingress
+  - id: am_azure_storage_accounts__throughput
+    title: Azure Storage Account Throughput
+    context: storage_accounts.throughput
     family: Throughput
     type: line
     priority: 1020
@@ -68,30 +76,55 @@ charts:
     dimensions:
       - metric: Ingress
         aggregation: total
-        name: total
+        name: ingress
+      - metric: Egress
+        aggregation: total
+        name: egress
 
-  - id: am_azure_storage_accounts__egress
-    title: Azure Storage Account Egress
-    context: storage_accounts.egress
-    family: Throughput
+  - id: am_azure_storage_accounts__e2e_latency
+    title: Azure Storage Account End-to-End Latency
+    context: storage_accounts.e2e_latency
+    family: Latency
     type: line
     priority: 1030
-    units: bytes/s
-    algorithm: incremental
+    units: milliseconds
+    algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
-      - metric: Egress
-        aggregation: total
-        name: total
+      - metric: SuccessE2ELatency
+        aggregation: average
+        name: average
+      - metric: SuccessE2ELatency
+        aggregation: maximum
+        name: maximum
 
-  - id: am_azure_storage_accounts__usedcapacity
+  - id: am_azure_storage_accounts__server_latency
+    title: Azure Storage Account Server Latency
+    context: storage_accounts.server_latency
+    family: Latency
+    type: line
+    priority: 1040
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SuccessServerLatency
+        aggregation: average
+        name: average
+      - metric: SuccessServerLatency
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_storage_accounts__used_capacity
     title: Azure Storage Account Used Capacity
     context: storage_accounts.used_capacity
     family: Capacity
     type: line
-    priority: 1040
+    priority: 1050
     units: bytes
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]

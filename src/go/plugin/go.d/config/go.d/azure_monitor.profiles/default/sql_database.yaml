@@ -1,26 +1,24 @@
 name: Azure SQL Database
 resource_type: Microsoft.Sql/servers/databases
 metrics:
+  # Utilization
   - name: cpu_percent
     units: percentage
-    aggregations: [average]
+    aggregations: [average, maximum]
     time_grain: PT1M
   - name: dtu_consumption_percent
     units: percentage
     aggregations: [average]
     time_grain: PT1M
-  - name: storage_percent
+  - name: sql_instance_cpu_percent
     units: percentage
     aggregations: [average]
     time_grain: PT1M
-  - name: sessions_percent
+  - name: sql_instance_memory_percent
     units: percentage
     aggregations: [average]
     time_grain: PT1M
-  - name: workers_percent
-    units: percentage
-    aggregations: [average]
-    time_grain: PT1M
+  # I/O
   - name: physical_data_read_percent
     units: percentage
     aggregations: [average]
@@ -29,10 +27,115 @@ metrics:
     units: percentage
     aggregations: [average]
     time_grain: PT1M
+  # Resource Limits
+  - name: workers_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: sessions_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: sessions_count
+    units: sessions
+    aggregations: [average]
+    time_grain: PT1M
+  # Availability
+  - name: availability
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Connections
+  - name: connection_successful
+    units: connections/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: connection_failed
+    units: connections/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: connection_failed_user_error
+    units: connections/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: blocked_by_firewall
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Locking
+  - name: deadlock
+    units: deadlocks/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Storage
+  - name: storage
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: allocated_data_storage
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: storage_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: xtp_storage_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Tempdb
+  - name: tempdb_data_size
+    units: KiB
+    aggregations: [average]
+    time_grain: PT1M
+  - name: tempdb_log_size
+    units: KiB
+    aggregations: [average]
+    time_grain: PT1M
+  - name: tempdb_log_used_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Capacity
+  - name: cpu_used
+    units: vCores
+    aggregations: [average]
+    time_grain: PT1M
+  - name: cpu_limit
+    units: vCores
+    aggregations: [average]
+    time_grain: PT1M
+  - name: dtu_used
+    units: DTU
+    aggregations: [average]
+    time_grain: PT1M
+  - name: dtu_limit
+    units: DTU
+    aggregations: [average]
+    time_grain: PT1M
+  # Replication
+  - name: replication_lag_seconds
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Serverless
+  - name: app_cpu_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: app_memory_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: app_cpu_billed
+    units: vCore-seconds/s
+    aggregations: [total]
+    time_grain: PT1M
 charts:
-  - id: am_azure_sql_database__cpu_percent
+  - id: am_azure_sql_database__cpu
     title: Azure SQL Database CPU Utilization
-    context: sql_database.cpu_percent
+    context: sql_database.cpu
     family: Utilization
     type: line
     priority: 1000
@@ -45,13 +148,48 @@ charts:
       - metric: cpu_percent
         aggregation: average
         name: average
+      - metric: cpu_percent
+        aggregation: maximum
+        name: maximum
 
-  - id: am_azure_sql_database__dtu_consumption_percent
-    title: Azure SQL Database DTU Consumption
-    context: sql_database.dtu_consumption_percent
+  - id: am_azure_sql_database__instance_cpu
+    title: Azure SQL Database Instance CPU Utilization
+    context: sql_database.instance_cpu
     family: Utilization
     type: line
     priority: 1010
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: sql_instance_cpu_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_database__instance_memory
+    title: Azure SQL Database Instance Memory Utilization
+    context: sql_database.instance_memory
+    family: Utilization
+    type: line
+    priority: 1020
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: sql_instance_memory_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_database__dtu_consumption
+    title: Azure SQL Database DTU Consumption
+    context: sql_database.dtu_consumption
+    family: Utilization
+    type: line
+    priority: 1030
     units: percentage
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
@@ -62,12 +200,126 @@ charts:
         aggregation: average
         name: average
 
-  - id: am_azure_sql_database__storage_percent
-    title: Azure SQL Database Storage Utilization
-    context: sql_database.storage_percent
+  - id: am_azure_sql_database__io_utilization
+    title: Azure SQL Database I/O Utilization
+    context: sql_database.io_utilization
+    family: I/O
+    type: line
+    priority: 1040
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: physical_data_read_percent
+        aggregation: average
+        name: data_read
+      - metric: log_write_percent
+        aggregation: average
+        name: log_write
+
+  - id: am_azure_sql_database__resource_utilization
+    title: Azure SQL Database Resource Utilization
+    context: sql_database.resource_utilization
     family: Utilization
     type: line
-    priority: 1020
+    priority: 1050
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: workers_percent
+        aggregation: average
+        name: workers
+      - metric: sessions_percent
+        aggregation: average
+        name: sessions
+
+  - id: am_azure_sql_database__availability
+    title: Azure SQL Database Availability
+    context: sql_database.availability
+    family: Availability
+    type: line
+    priority: 1060
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: availability
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_database__connections
+    title: Azure SQL Database Connection Events
+    context: sql_database.connections
+    family: Connections
+    type: line
+    priority: 1070
+    units: connections/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: connection_successful
+        aggregation: total
+        name: successful
+      - metric: connection_failed
+        aggregation: total
+        name: failed_system
+      - metric: connection_failed_user_error
+        aggregation: total
+        name: failed_user
+      - metric: blocked_by_firewall
+        aggregation: total
+        name: firewall_blocked
+
+  - id: am_azure_sql_database__deadlocks
+    title: Azure SQL Database Deadlocks
+    context: sql_database.deadlocks
+    family: Locking
+    type: line
+    priority: 1080
+    units: deadlocks/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: deadlock
+        aggregation: total
+        name: total
+
+  - id: am_azure_sql_database__storage
+    title: Azure SQL Database Storage
+    context: sql_database.storage
+    family: Storage
+    type: line
+    priority: 1090
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: storage
+        aggregation: average
+        name: used
+      - metric: allocated_data_storage
+        aggregation: average
+        name: allocated
+
+  - id: am_azure_sql_database__storage_utilization
+    title: Azure SQL Database Storage Utilization
+    context: sql_database.storage_utilization
+    family: Storage
+    type: line
+    priority: 1100
     units: percentage
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
@@ -78,66 +330,158 @@ charts:
         aggregation: average
         name: average
 
-  - id: am_azure_sql_database__sessions_percent
-    title: Azure SQL Database Sessions Utilization
-    context: sql_database.sessions_percent
-    family: Utilization
+  - id: am_azure_sql_database__tempdb_size
+    title: Azure SQL Database Tempdb Size
+    context: sql_database.tempdb_size
+    family: Tempdb
     type: line
-    priority: 1030
+    priority: 1110
+    units: KiB
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: tempdb_data_size
+        aggregation: average
+        name: data
+      - metric: tempdb_log_size
+        aggregation: average
+        name: log
+
+  - id: am_azure_sql_database__tempdb_log_utilization
+    title: Azure SQL Database Tempdb Log Utilization
+    context: sql_database.tempdb_log_utilization
+    family: Tempdb
+    type: line
+    priority: 1120
     units: percentage
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
-      - metric: sessions_percent
+      - metric: tempdb_log_used_percent
         aggregation: average
         name: average
 
-  - id: am_azure_sql_database__workers_percent
-    title: Azure SQL Database Workers Utilization
-    context: sql_database.workers_percent
-    family: Utilization
+  - id: am_azure_sql_database__vcore_usage
+    title: Azure SQL Database vCore Usage
+    context: sql_database.vcore_usage
+    family: Capacity
     type: line
-    priority: 1040
-    units: percentage
+    priority: 1130
+    units: vCores
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
-      - metric: workers_percent
+      - metric: cpu_used
+        aggregation: average
+        name: used
+      - metric: cpu_limit
+        aggregation: average
+        name: limit
+
+  - id: am_azure_sql_database__dtu_usage
+    title: Azure SQL Database DTU Usage
+    context: sql_database.dtu_usage
+    family: Capacity
+    type: line
+    priority: 1140
+    units: DTU
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: dtu_used
+        aggregation: average
+        name: used
+      - metric: dtu_limit
+        aggregation: average
+        name: limit
+
+  - id: am_azure_sql_database__sessions_count
+    title: Azure SQL Database Sessions Count
+    context: sql_database.sessions_count
+    family: Capacity
+    type: line
+    priority: 1150
+    units: sessions
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: sessions_count
         aggregation: average
         name: average
 
-  - id: am_azure_sql_database__physical_data_read_percent
-    title: Azure SQL Database Physical Data Read Utilization
-    context: sql_database.physical_data_read_percent
-    family: Utilization
+  - id: am_azure_sql_database__replication_lag
+    title: Azure SQL Database Replication Lag
+    context: sql_database.replication_lag
+    family: Replication
     type: line
-    priority: 1050
-    units: percentage
+    priority: 1160
+    units: seconds
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
-      - metric: physical_data_read_percent
+      - metric: replication_lag_seconds
         aggregation: average
         name: average
 
-  - id: am_azure_sql_database__log_write_percent
-    title: Azure SQL Database Log Write Utilization
-    context: sql_database.log_write_percent
-    family: Utilization
+  - id: am_azure_sql_database__xtp_storage
+    title: Azure SQL Database In-Memory OLTP Storage
+    context: sql_database.xtp_storage
+    family: In-Memory OLTP
     type: line
-    priority: 1060
+    priority: 1170
     units: percentage
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
-      - metric: log_write_percent
+      - metric: xtp_storage_percent
         aggregation: average
         name: average
+
+  - id: am_azure_sql_database__serverless_utilization
+    title: Azure SQL Database Serverless Utilization
+    context: sql_database.serverless_utilization
+    family: Serverless
+    type: line
+    priority: 1180
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: app_cpu_percent
+        aggregation: average
+        name: cpu
+      - metric: app_memory_percent
+        aggregation: average
+        name: memory
+
+  - id: am_azure_sql_database__serverless_billing
+    title: Azure SQL Database Serverless Billing
+    context: sql_database.serverless_billing
+    family: Serverless
+    type: line
+    priority: 1190
+    units: vCore-seconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: app_cpu_billed
+        aggregation: total
+        name: total
