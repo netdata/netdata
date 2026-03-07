@@ -188,8 +188,8 @@ If no version is specified, `latest` is used.
 
 **Authentication** (tried in order):
 
-1. Metadata server: automatic on GCE/GKE instances with Workload Identity
-2. Service account JSON: set `GOOGLE_APPLICATION_CREDENTIALS` to the path of a service account JSON key file
+1. Service account JSON: set `GOOGLE_APPLICATION_CREDENTIALS` to the path of a service account JSON key file
+2. Metadata server: automatic on GCE/GKE instances with Workload Identity
 
 ## How It Works
 

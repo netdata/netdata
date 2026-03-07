@@ -4,6 +4,7 @@ package secretresolver
 
 import (
 	"crypto"
+	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -265,7 +266,7 @@ func gcpCreateSignedJWT(clientEmail, tokenURI, privateKeyPEM string, nowUnix int
 	}
 
 	hashed := sha256.Sum256([]byte(unsigned))
-	sig, err := rsa.SignPKCS1v15(nil, rsaKey, crypto.SHA256, hashed[:])
+	sig, err := rsa.SignPKCS1v15(cryptorand.Reader, rsaKey, crypto.SHA256, hashed[:])
 	if err != nil {
 		return "", fmt.Errorf("signing JWT: %w", err)
 	}

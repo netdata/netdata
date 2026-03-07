@@ -57,9 +57,9 @@ func TestResolveGCPSM_UnsafeProjectName(t *testing.T) {
 
 	err := Resolve(cfg)
 	require.Error(t, err)
-	// path traversal blocked because ".." is split into project="evil", secret="path",
-	// and the remaining "../inject" parts cause extra path components in the URL.
-	// The initial "/" after "evil" splits correctly via strings.Cut.
+	// ".." is split: project="evil", secret="path", version="..".
+	// The version fails regex validation.
+	assert.Contains(t, err.Error(), "invalid version")
 }
 
 func TestResolveGCPSM_UnsafeSecretName(t *testing.T) {
@@ -94,19 +94,6 @@ func TestResolveGCPSM_DomainScopedProjectID(t *testing.T) {
 	gcpSecretManagerEndpointOverride = srv.URL
 	defer func() { gcpSecretManagerEndpointOverride = origEndpoint }()
 
-	// Mock the metadata server to return a token.
-	metadataSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]string{
-			"access_token": "test-token",
-		})
-	}))
-	defer metadataSrv.Close()
-
-	origMetaClient := gcpMetadataHTTPClient
-	gcpMetadataHTTPClient = metadataSrv.Client()
-	defer func() { gcpMetadataHTTPClient = origMetaClient }()
-
-	// We can't easily mock the metadata URL, so test through service account path instead.
 	// Generate a temporary service account JSON with a test key.
 	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)

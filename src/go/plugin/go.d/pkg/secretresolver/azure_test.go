@@ -12,8 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResolveAzureKV_ClientCredentials(t *testing.T) {
-	// Token server
+func TestAzureGetTokenClientCredentials_WithEndpointOverride(t *testing.T) {
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
 		assert.NoError(t, r.ParseForm())
@@ -27,29 +26,14 @@ func TestResolveAzureKV_ClientCredentials(t *testing.T) {
 	}))
 	defer tokenSrv.Close()
 
-	// Secret server
-	secretSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "Bearer test-access-token", r.Header.Get("Authorization"))
-
-		json.NewEncoder(w).Encode(map[string]string{
-			"value": "azure-secret-value",
-		})
-	}))
-	defer secretSrv.Close()
-
-	t.Setenv("AZURE_TENANT_ID", "test-tenant")
-	t.Setenv("AZURE_CLIENT_ID", "test-client-id")
-	t.Setenv("AZURE_CLIENT_SECRET", "test-client-secret")
-
 	origClient := azureHTTPClient
-	azureHTTPClient = secretSrv.Client()
+	azureHTTPClient = tokenSrv.Client()
 	defer func() { azureHTTPClient = origClient }()
 
 	origLoginEndpoint := azureLoginEndpointOverride
 	azureLoginEndpointOverride = tokenSrv.URL
 	defer func() { azureLoginEndpointOverride = origLoginEndpoint }()
 
-	// Test the actual function through the resolver with mocked endpoints.
 	token, err := azureGetTokenClientCredentials("test-tenant", "test-client-id", "test-client-secret")
 	require.NoError(t, err)
 	assert.Equal(t, "test-access-token", token)
