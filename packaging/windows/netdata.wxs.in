@@ -171,6 +171,12 @@
     </Package>
 
     <Fragment>
+            <UI>
+                <ProgressText Action="NDKillProcess" Message="Stopping Netdata service before update..." />
+                <ProgressText Action="NDStopDriverSrv" Message="Stopping Netdata driver service..." />
+                <ProgressText Action="NDRemoveDriverSrv" Message="Removing Netdata driver service..." />
+            </UI>
+
             <StandardDirectory Id="System64Folder">
             </StandardDirectory>
 
