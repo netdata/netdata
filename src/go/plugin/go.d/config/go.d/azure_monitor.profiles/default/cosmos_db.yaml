@@ -3,7 +3,7 @@ resource_type: Microsoft.DocumentDB/databaseAccounts
 metrics:
   - name: TotalRequests
     units: requests/s
-    aggregations: [total]
+    aggregations: [count]
     time_grain: PT1M
   - name: TotalRequestUnits
     units: RU/s
@@ -31,7 +31,7 @@ metrics:
     time_grain: PT1H
   - name: DocumentCount
     units: documents
-    aggregations: [maximum]
+    aggregations: [average]
     time_grain: PT1H
   - name: ProvisionedThroughput
     units: RU/s
@@ -43,11 +43,11 @@ metrics:
     time_grain: PT5M
   - name: MongoRequests
     units: requests/s
-    aggregations: [total]
+    aggregations: [count]
     time_grain: PT1M
   - name: CassandraRequests
     units: requests/s
-    aggregations: [total]
+    aggregations: [count]
     time_grain: PT1M
 charts:
   - id: am_azure_cosmos_db__totalrequests
@@ -63,8 +63,8 @@ charts:
       by_labels: [resource_uid]
     dimensions:
       - metric: TotalRequests
-        aggregation: total
-        name: total
+        aggregation: count
+        name: count
 
   - id: am_azure_cosmos_db__totalrequestunits
     title: Azure Cosmos DB Account Total Request Units
@@ -175,8 +175,8 @@ charts:
       by_labels: [resource_uid]
     dimensions:
       - metric: DocumentCount
-        aggregation: maximum
-        name: maximum
+        aggregation: average
+        name: average
 
   - id: am_azure_cosmos_db__provisionedthroughput
     title: Azure Cosmos DB Account Provisioned Throughput
@@ -223,8 +223,8 @@ charts:
       by_labels: [resource_uid]
     dimensions:
       - metric: MongoRequests
-        aggregation: total
-        name: total
+        aggregation: count
+        name: count
 
   - id: am_azure_cosmos_db__cassandrarequests
     title: Azure Cosmos DB Account Cassandra Requests
@@ -239,5 +239,5 @@ charts:
       by_labels: [resource_uid]
     dimensions:
       - metric: CassandraRequests
-        aggregation: total
-        name: total
+        aggregation: count
+        name: count

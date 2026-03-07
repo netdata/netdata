@@ -18,8 +18,8 @@ metrics:
     aggregations: [total]
     time_grain: PT1M
   - name: SnatConnectionCount
-    units: connections
-    aggregations: [average]
+    units: connections/s
+    aggregations: [total]
     time_grain: PT1M
 charts:
   - id: am_azure_load_balancers__vipavailability
@@ -92,12 +92,12 @@ charts:
     family: Connections
     type: line
     priority: 1040
-    units: connections
-    algorithm: absolute
+    units: connections/s
+    algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
       - metric: SnatConnectionCount
-        aggregation: average
-        name: average
+        aggregation: total
+        name: total

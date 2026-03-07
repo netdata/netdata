@@ -14,16 +14,16 @@ metrics:
     aggregations: [total]
     time_grain: PT1M
   - name: RunLatency
-    units: milliseconds
+    units: seconds
     aggregations: [average]
     time_grain: PT1M
   - name: RunSuccessLatency
-    units: milliseconds
+    units: seconds
     aggregations: [average]
     time_grain: PT1M
   - name: RunFailurePercentage
     units: percentage
-    aggregations: [average]
+    aggregations: [total]
     time_grain: PT1M
   - name: ActionsStarted
     units: actions/s
@@ -112,7 +112,7 @@ charts:
     family: Latency
     type: line
     priority: 1030
-    units: milliseconds
+    units: seconds
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
@@ -128,7 +128,7 @@ charts:
     family: Latency
     type: line
     priority: 1040
-    units: milliseconds
+    units: seconds
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
@@ -145,14 +145,14 @@ charts:
     type: line
     priority: 1050
     units: percentage
-    algorithm: absolute
+    algorithm: incremental
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
     dimensions:
       - metric: RunFailurePercentage
-        aggregation: average
-        name: average
+        aggregation: total
+        name: total
 
   - id: am_azure_logic_apps__actionsstarted
     title: Azure Logic Apps Workflow Actions Started

@@ -157,6 +157,7 @@ func (c *Collector) Cleanup(context.Context) {
 	c.metricsClientsMu.Lock()
 	defer c.metricsClientsMu.Unlock()
 	c.metricsClients = make(map[string]metricsQueryClient)
+	c.accumulators = make(map[string]float64)
 }
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
