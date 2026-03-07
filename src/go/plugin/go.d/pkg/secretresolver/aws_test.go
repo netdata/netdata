@@ -17,7 +17,7 @@ func TestResolveAWSSM_PlainString(t *testing.T) {
 		assert.Equal(t, "secretsmanager.GetSecretValue", r.Header.Get("X-Amz-Target"))
 		assert.Contains(t, r.Header.Get("Authorization"), "AWS4-HMAC-SHA256")
 
-		resp := map[string]string{
+		resp := map[string]any{
 			"SecretString": "my-plain-secret",
 		}
 		json.NewEncoder(w).Encode(resp)
@@ -32,20 +32,45 @@ func TestResolveAWSSM_PlainString(t *testing.T) {
 	awsHTTPClient = srv.Client()
 	defer func() { awsHTTPClient = origClient }()
 
-	// Override the endpoint by replacing the resolve function behavior.
-	// Since we can't easily override the endpoint, we test the SigV4 and parsing logic directly.
-	val, err := awsGetSecretValue(
-		&awsCredentials{
-			accessKeyID:     "AKIAIOSFODNN7EXAMPLE",
-			secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-		},
-		"us-east-1",
-		"myapp/secret",
-		"${aws-sm:myapp/secret}",
-	)
-	// This will fail connecting to real AWS, but we can test credential chain and SigV4.
-	assert.Error(t, err) // expected: can't reach real AWS endpoint
-	_ = val
+	origEndpoint := awsEndpointOverride
+	awsEndpointOverride = srv.URL + "/"
+	defer func() { awsEndpointOverride = origEndpoint }()
+
+	cfg := map[string]any{
+		"password": "${aws-sm:myapp/secret}",
+	}
+
+	require.NoError(t, Resolve(cfg))
+	assert.Equal(t, "my-plain-secret", cfg["password"])
+}
+
+func TestResolveAWSSM_JSONKey(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]any{
+			"SecretString": `{"username":"admin","password":"s3cret"}`,
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	t.Setenv("AWS_ACCESS_KEY_ID", "AKID")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "SECRET")
+	t.Setenv("AWS_DEFAULT_REGION", "us-east-1")
+
+	origClient := awsHTTPClient
+	awsHTTPClient = srv.Client()
+	defer func() { awsHTTPClient = origClient }()
+
+	origEndpoint := awsEndpointOverride
+	awsEndpointOverride = srv.URL + "/"
+	defer func() { awsEndpointOverride = origEndpoint }()
+
+	cfg := map[string]any{
+		"password": "${aws-sm:myapp/secret#password}",
+	}
+
+	require.NoError(t, Resolve(cfg))
+	assert.Equal(t, "s3cret", cfg["password"])
 }
 
 func TestResolveAWSSM_MissingRegion(t *testing.T) {
@@ -112,7 +137,6 @@ func TestAWSGetCredentials_EnvVarsNoSession(t *testing.T) {
 }
 
 func TestAWSSigV4Sign(t *testing.T) {
-	// Test that the SigV4 signing produces a valid Authorization header format.
 	creds := &awsCredentials{
 		accessKeyID:     "AKIDEXAMPLE",
 		secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
@@ -134,7 +158,6 @@ func TestAWSSigV4Sign(t *testing.T) {
 }
 
 func TestAWSCanonicalHeaders(t *testing.T) {
-	// awsCanonicalHeaders expects lowercase keys (matching how headers are built in awsGetSecretValue).
 	headers := map[string]string{
 		"x-amz-date":   "20230101T000000Z",
 		"host":         "example.com",

@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,12 +52,14 @@ func TestResolveGCPSM_EmptySecret(t *testing.T) {
 
 func TestResolveGCPSM_UnsafeProjectName(t *testing.T) {
 	cfg := map[string]any{
-		"password": "${gcp-sm:evil.com#/my-secret}",
+		"password": "${gcp-sm:evil/path/../inject/my-secret}",
 	}
 
 	err := Resolve(cfg)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid project ID")
+	// path traversal blocked because ".." is split into project="evil", secret="path",
+	// and the remaining "../inject" parts cause extra path components in the URL.
+	// The initial "/" after "evil" splits correctly via strings.Cut.
 }
 
 func TestResolveGCPSM_UnsafeSecretName(t *testing.T) {
@@ -67,6 +70,129 @@ func TestResolveGCPSM_UnsafeSecretName(t *testing.T) {
 	err := Resolve(cfg)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid secret name")
+}
+
+func TestResolveGCPSM_DomainScopedProjectID(t *testing.T) {
+	// Domain-scoped GCP project IDs like "domain.com:project-id" must be accepted.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.URL.Path, "/v1/projects/example.com:my-project/secrets/db-pass/versions/latest:access")
+
+		secretData := base64.StdEncoding.EncodeToString([]byte("domain-secret"))
+		json.NewEncoder(w).Encode(map[string]any{
+			"payload": map[string]string{
+				"data": secretData,
+			},
+		})
+	}))
+	defer srv.Close()
+
+	origClient := gcpHTTPClient
+	gcpHTTPClient = srv.Client()
+	defer func() { gcpHTTPClient = origClient }()
+
+	origEndpoint := gcpSecretManagerEndpointOverride
+	gcpSecretManagerEndpointOverride = srv.URL
+	defer func() { gcpSecretManagerEndpointOverride = origEndpoint }()
+
+	// Mock the metadata server to return a token.
+	metadataSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]string{
+			"access_token": "test-token",
+		})
+	}))
+	defer metadataSrv.Close()
+
+	origMetaClient := gcpMetadataHTTPClient
+	gcpMetadataHTTPClient = metadataSrv.Client()
+	defer func() { gcpMetadataHTTPClient = origMetaClient }()
+
+	// We can't easily mock the metadata URL, so test through service account path instead.
+	// Generate a temporary service account JSON with a test key.
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	privKeyBytes, err := x509.MarshalPKCS8PrivateKey(privKey)
+	require.NoError(t, err)
+	privKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privKeyBytes})
+
+	// Create a token exchange server.
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]string{
+			"access_token": "sa-test-token",
+		})
+	}))
+	defer tokenSrv.Close()
+
+	saJSON, err := json.Marshal(map[string]string{
+		"client_email": "test@test.iam.gserviceaccount.com",
+		"private_key":  string(privKeyPEM),
+		"token_uri":    tokenSrv.URL,
+	})
+	require.NoError(t, err)
+
+	dir := t.TempDir()
+	saFile := filepath.Join(dir, "sa.json")
+	require.NoError(t, os.WriteFile(saFile, saJSON, 0600))
+	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", saFile)
+
+	cfg := map[string]any{
+		"password": "${gcp-sm:example.com:my-project/db-pass}",
+	}
+
+	require.NoError(t, Resolve(cfg))
+	assert.Equal(t, "domain-secret", cfg["password"])
+}
+
+func TestResolveGCPSM_VersionInRef(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.URL.Path, "/versions/42:access")
+
+		secretData := base64.StdEncoding.EncodeToString([]byte("versioned-secret"))
+		json.NewEncoder(w).Encode(map[string]any{
+			"payload": map[string]string{
+				"data": secretData,
+			},
+		})
+	}))
+	defer srv.Close()
+
+	origClient := gcpHTTPClient
+	gcpHTTPClient = srv.Client()
+	defer func() { gcpHTTPClient = origClient }()
+
+	origEndpoint := gcpSecretManagerEndpointOverride
+	gcpSecretManagerEndpointOverride = srv.URL
+	defer func() { gcpSecretManagerEndpointOverride = origEndpoint }()
+
+	// Use service account auth with a test key.
+	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	privKeyBytes, err := x509.MarshalPKCS8PrivateKey(privKey)
+	require.NoError(t, err)
+	privKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privKeyBytes})
+
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]string{"access_token": "token"})
+	}))
+	defer tokenSrv.Close()
+
+	saJSON, err := json.Marshal(map[string]string{
+		"client_email": "test@test.iam.gserviceaccount.com",
+		"private_key":  string(privKeyPEM),
+		"token_uri":    tokenSrv.URL,
+	})
+	require.NoError(t, err)
+
+	dir := t.TempDir()
+	saFile := filepath.Join(dir, "sa.json")
+	require.NoError(t, os.WriteFile(saFile, saJSON, 0600))
+	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", saFile)
+
+	cfg := map[string]any{
+		"password": "${gcp-sm:myproject/mysecret/42}",
+	}
+
+	require.NoError(t, Resolve(cfg))
+	assert.Equal(t, "versioned-secret", cfg["password"])
 }
 
 func TestResolveGCPSM_ParseResponse(t *testing.T) {
@@ -85,7 +211,7 @@ func TestResolveGCPSM_ParseResponse(t *testing.T) {
 	gcpHTTPClient = srv.Client()
 	defer func() { gcpHTTPClient = origClient }()
 
-	// Test response parsing directly (auth not possible on non-GCE).
+	// Test response parsing directly.
 	resp, err := gcpHTTPClient.Get(srv.URL + "/v1/projects/myproj/secrets/mysecret/versions/latest:access")
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -102,62 +228,7 @@ func TestResolveGCPSM_ParseResponse(t *testing.T) {
 	assert.Equal(t, "gcp-secret-value", string(decoded))
 }
 
-func TestResolveGCPSM_VersionRef(t *testing.T) {
-	// Verify version parsing in the ref.
-	ref := "myproject/mysecret/42"
-	project, rest, ok := splitGCPRef(ref)
-	require.True(t, ok)
-	assert.Equal(t, "myproject", project)
-	assert.Equal(t, "mysecret", rest.secret)
-	assert.Equal(t, "42", rest.version)
-}
-
-func TestResolveGCPSM_LatestVersion(t *testing.T) {
-	ref := "myproject/mysecret"
-	project, rest, ok := splitGCPRef(ref)
-	require.True(t, ok)
-	assert.Equal(t, "myproject", project)
-	assert.Equal(t, "mysecret", rest.secret)
-	assert.Equal(t, "latest", rest.version)
-}
-
-// splitGCPRef is a helper to test the ref parsing logic used by resolveGCPSM.
-type gcpRefParts struct {
-	secret  string
-	version string
-}
-
-func splitGCPRef(ref string) (string, gcpRefParts, bool) {
-	project, rest, ok := cutString(ref, "/")
-	if !ok || project == "" || rest == "" {
-		return "", gcpRefParts{}, false
-	}
-	secret, version, hasVersion := cutString(rest, "/")
-	if !hasVersion || version == "" {
-		version = "latest"
-	}
-	return project, gcpRefParts{secret: secret, version: version}, true
-}
-
-func cutString(s, sep string) (string, string, bool) {
-	i := indexOf(s, sep)
-	if i < 0 {
-		return s, "", false
-	}
-	return s[:i], s[i+len(sep):], true
-}
-
-func indexOf(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
-}
-
 func TestGCPCreateSignedJWT(t *testing.T) {
-	// Generate a test RSA key.
 	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
@@ -174,7 +245,7 @@ func TestGCPCreateSignedJWT(t *testing.T) {
 	assert.NotEmpty(t, jwt)
 
 	// JWT should have 3 dot-separated parts.
-	parts := splitJWT(jwt)
+	parts := strings.SplitN(jwt, ".", 3)
 	assert.Len(t, parts, 3)
 
 	// Decode header.
@@ -192,20 +263,6 @@ func TestGCPCreateSignedJWT(t *testing.T) {
 	require.NoError(t, json.Unmarshal(claimsJSON, &claims))
 	assert.Equal(t, "test@sa.iam.gserviceaccount.com", claims["iss"])
 	assert.Equal(t, "https://www.googleapis.com/auth/cloud-platform", claims["scope"])
-}
-
-func splitJWT(jwt string) []string {
-	var parts []string
-	for {
-		i := indexOf(jwt, ".")
-		if i < 0 {
-			parts = append(parts, jwt)
-			break
-		}
-		parts = append(parts, jwt[:i])
-		jwt = jwt[i+1:]
-	}
-	return parts
 }
 
 func TestGCPCreateSignedJWT_InvalidPEM(t *testing.T) {

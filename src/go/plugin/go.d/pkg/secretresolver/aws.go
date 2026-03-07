@@ -22,6 +22,9 @@ var awsIMDSHTTPClient = &http.Client{
 	Transport: &http.Transport{Proxy: nil}, // IMDS must never be proxied
 }
 
+// awsEndpointOverride allows tests to override the AWS Secrets Manager endpoint.
+var awsEndpointOverride string
+
 type awsCredentials struct {
 	accessKeyID     string
 	secretAccessKey string
@@ -240,7 +243,11 @@ func awsGetIMDSCredentials() (*awsCredentials, error) {
 }
 
 func awsGetSecretValue(creds *awsCredentials, region, secretName, original string) (string, error) {
-	endpoint := fmt.Sprintf("https://secretsmanager.%s.amazonaws.com/", region)
+	endpoint := awsEndpointOverride
+	host := fmt.Sprintf("secretsmanager.%s.amazonaws.com", region)
+	if endpoint == "" {
+		endpoint = "https://" + host + "/"
+	}
 
 	// Use json.Marshal to safely escape the secret name.
 	secretIDJSON, err := json.Marshal(secretName)
@@ -254,7 +261,7 @@ func awsGetSecretValue(creds *awsCredentials, region, secretName, original strin
 	datestamp := now.Format("20060102")
 
 	headers := map[string]string{
-		"host":         fmt.Sprintf("secretsmanager.%s.amazonaws.com", region),
+		"host":         host,
 		"x-amz-date":   timestamp,
 		"x-amz-target": "secretsmanager.GetSecretValue",
 		"content-type": "application/x-amz-json-1.1",

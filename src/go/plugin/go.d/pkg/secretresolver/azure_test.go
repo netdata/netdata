@@ -45,11 +45,14 @@ func TestResolveAzureKV_ClientCredentials(t *testing.T) {
 	azureHTTPClient = secretSrv.Client()
 	defer func() { azureHTTPClient = origClient }()
 
-	// We can't easily override the token URL in the code, so test the individual functions.
+	origLoginEndpoint := azureLoginEndpointOverride
+	azureLoginEndpointOverride = tokenSrv.URL
+	defer func() { azureLoginEndpointOverride = origLoginEndpoint }()
+
+	// Test the actual function through the resolver with mocked endpoints.
 	token, err := azureGetTokenClientCredentials("test-tenant", "test-client-id", "test-client-secret")
-	// Will fail because it tries to reach login.microsoftonline.com.
-	assert.Error(t, err)
-	_ = token
+	require.NoError(t, err)
+	assert.Equal(t, "test-access-token", token)
 }
 
 func TestResolveAzureKV_InvalidRef(t *testing.T) {
@@ -116,26 +119,17 @@ func TestAzureGetTokenClientCredentials_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	origLoginEndpoint := azureLoginEndpointOverride
+	azureLoginEndpointOverride = srv.URL
+	defer func() { azureLoginEndpointOverride = origLoginEndpoint }()
+
 	origClient := azureHTTPClient
 	azureHTTPClient = srv.Client()
 	defer func() { azureHTTPClient = origClient }()
 
-	// Override the function to use our test server URL.
-	// Since we can't easily do that, test at the HTTP level.
-	resp, err := azureHTTPClient.PostForm(srv.URL, map[string][]string{
-		"client_id":     {"cid"},
-		"client_secret": {"csecret"},
-		"scope":         {"https://vault.azure.net/.default"},
-		"grant_type":    {"client_credentials"},
-	})
+	token, err := azureGetTokenClientCredentials("test-tenant", "cid", "csecret")
 	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	var result struct {
-		AccessToken string `json:"access_token"`
-	}
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&result))
-	assert.Equal(t, "tok123", result.AccessToken)
+	assert.Equal(t, "tok123", token)
 }
 
 func TestAzureGetTokenClientCredentials_HTTPError(t *testing.T) {
@@ -145,15 +139,17 @@ func TestAzureGetTokenClientCredentials_HTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	origLoginEndpoint := azureLoginEndpointOverride
+	azureLoginEndpointOverride = srv.URL
+	defer func() { azureLoginEndpointOverride = origLoginEndpoint }()
+
 	origClient := azureHTTPClient
 	azureHTTPClient = srv.Client()
 	defer func() { azureHTTPClient = origClient }()
 
-	// The actual function hits login.microsoftonline.com, but we verify error handling pattern.
-	resp, err := azureHTTPClient.PostForm(srv.URL, nil)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	_, err := azureGetTokenClientCredentials("test-tenant", "cid", "csecret")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "HTTP 401")
 }
 
 func TestAzureGetAccessToken_NoCredentials(t *testing.T) {

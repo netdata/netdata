@@ -23,6 +23,9 @@ var azureIMDSHTTPClient = &http.Client{
 	Transport: &http.Transport{Proxy: nil}, // IMDS must never be proxied
 }
 
+// azureLoginEndpointOverride allows tests to override the Azure AD login endpoint.
+var azureLoginEndpointOverride string
+
 func resolveAzureKV(ref, original string) (string, error) {
 	vaultName, secretName, ok := strings.Cut(ref, "/")
 	if !ok || vaultName == "" || secretName == "" {
@@ -89,7 +92,10 @@ func azureGetAccessToken() (string, error) {
 }
 
 func azureGetTokenClientCredentials(tenantID, clientID, clientSecret string) (string, error) {
-	tokenURL := fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", tenantID)
+	tokenURL := azureLoginEndpointOverride
+	if tokenURL == "" {
+		tokenURL = fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", tenantID)
+	}
 
 	form := url.Values{
 		"client_id":     {clientID},

@@ -417,7 +417,7 @@ Yes. Netdata supports every vault and secrets management solution. If your vault
 
 **Q: Are secrets stored in plain text anywhere?**
 
-No. Secret references (e.g., `${env:MYSQL_PASSWORD}`) are stored in configuration files and in the Dynamic Configuration Manager. The actual secret values are resolved in memory only when a collector job starts. They are never written to disk, never logged, and never exposed through the API or UI.
+No. Secret references (e.g., `${env:MYSQL_PASSWORD}`) are stored in configuration files and in the Dynamic Configuration Manager. The actual secret values are resolved in memory only when a collector job starts. Netdata never writes resolved secrets to disk, never logs them, and never exposes them through the API or UI. Note that some providers (`${file:...}`, `${env:...}`) read secrets from sources that already exist on the filesystem or in the process environment — those sources are managed by you, not by Netdata.
 
 **Q: Can I use multiple secret references in a single configuration value?**
 

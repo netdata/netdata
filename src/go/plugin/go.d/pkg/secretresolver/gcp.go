@@ -20,7 +20,10 @@ import (
 	"time"
 )
 
-// reGCPSafeName validates GCP project IDs, secret names, and versions.
+// reGCPSafeProjectID validates GCP project IDs, including domain-scoped IDs (e.g., "domain.com:project-id").
+var reGCPSafeProjectID = regexp.MustCompile(`^[a-zA-Z0-9._:-]+$`)
+
+// reGCPSafeName validates GCP secret names and versions.
 var reGCPSafeName = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 var gcpHTTPClient = &http.Client{Timeout: 10 * time.Second}
@@ -28,6 +31,9 @@ var gcpMetadataHTTPClient = &http.Client{
 	Timeout:   2 * time.Second,
 	Transport: &http.Transport{Proxy: nil}, // metadata server must never be proxied
 }
+
+// gcpSecretManagerEndpointOverride allows tests to override the GCP Secret Manager endpoint.
+var gcpSecretManagerEndpointOverride string
 
 func resolveGCPSM(ref, original string) (string, error) {
 	project, rest, ok := strings.Cut(ref, "/")
@@ -40,7 +46,7 @@ func resolveGCPSM(ref, original string) (string, error) {
 		version = "latest"
 	}
 
-	if !reGCPSafeName.MatchString(project) {
+	if !reGCPSafeProjectID.MatchString(project) {
 		return "", fmt.Errorf("resolving secret '%s': invalid project ID '%s'", original, project)
 	}
 	if !reGCPSafeName.MatchString(secret) {
@@ -55,9 +61,13 @@ func resolveGCPSM(ref, original string) (string, error) {
 		return "", err
 	}
 
+	baseURL := gcpSecretManagerEndpointOverride
+	if baseURL == "" {
+		baseURL = "https://secretmanager.googleapis.com"
+	}
 	secretURL := fmt.Sprintf(
-		"https://secretmanager.googleapis.com/v1/projects/%s/secrets/%s/versions/%s:access",
-		project, secret, version,
+		"%s/v1/projects/%s/secrets/%s/versions/%s:access",
+		baseURL, project, secret, version,
 	)
 
 	req, err := http.NewRequest(http.MethodGet, secretURL, nil)
