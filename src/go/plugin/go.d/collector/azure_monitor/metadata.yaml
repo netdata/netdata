@@ -41,7 +41,9 @@ modules:
           The monitoring principal needs read access to Azure Resource Graph and Azure Monitor metrics for target resources.
       default_behavior:
         auto_detection:
-          description: ""
+          description: |
+            When `profiles` includes `auto` (the default), the collector queries Azure Resource Graph
+            to discover which resource types exist in the subscription and enables matching built-in profiles automatically.
         limits:
           description: |
             Azure Monitor granularity is typically 1 minute.
@@ -118,8 +120,8 @@ modules:
               required: false
               group: Limits
             - name: profiles
-              description: Profile file keys to enable. Defaults to all stock profile keys.
-              default_value: "all stock profile keys"
+              description: "Profile names to enable. Use `auto` to discover resource types via Azure Resource Graph and enable matching profiles. Combine with explicit names: `[auto, custom_profile]`."
+              default_value: "[auto]"
               required: false
               group: Profiles
             - name: resource_groups
