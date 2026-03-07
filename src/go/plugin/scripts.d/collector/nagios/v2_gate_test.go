@@ -195,6 +195,8 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 		if removeActionsCount(plan2.Actions) != 0 {
 			t.Fatalf("expected no remove actions on cycle 2")
 		}
+		assertPlanHasUpdateForTarget(t, plan2, "nagios.perf_bytes_a_value")
+		assertPlanHasNoRemoveForTarget(t, plan2, "nagios.perf_bytes_b_value")
 
 		cc := gateCycleController(t, store)
 		cc.BeginCycle()
@@ -362,6 +364,36 @@ func assertPlanHasUpdateAndRemoveForTargets(t *testing.T, plan chartengine.Plan,
 	}
 	if !hasRemove {
 		t.Fatalf("expected remove action for %q", removeMetricPrefix)
+	}
+}
+
+func assertPlanHasUpdateForTarget(t *testing.T, plan chartengine.Plan, updateMetricPrefix string) {
+	t.Helper()
+	for _, action := range plan.Actions {
+		update, ok := action.(chartengine.UpdateChartAction)
+		if !ok {
+			continue
+		}
+		if strings.HasPrefix(update.ChartID, updateMetricPrefix) {
+			return
+		}
+	}
+	t.Fatalf("expected update action for %q", updateMetricPrefix)
+}
+
+func assertPlanHasNoRemoveForTarget(t *testing.T, plan chartengine.Plan, removeMetricPrefix string) {
+	t.Helper()
+	for _, action := range plan.Actions {
+		switch a := action.(type) {
+		case chartengine.RemoveDimensionAction:
+			if strings.HasPrefix(a.ChartID, removeMetricPrefix) {
+				t.Fatalf("unexpected remove dimension action for %q", removeMetricPrefix)
+			}
+		case chartengine.RemoveChartAction:
+			if strings.HasPrefix(a.ChartID, removeMetricPrefix) {
+				t.Fatalf("unexpected remove chart action for %q", removeMetricPrefix)
+			}
+		}
 	}
 }
 

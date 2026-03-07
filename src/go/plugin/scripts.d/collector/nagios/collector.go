@@ -36,8 +36,9 @@ func init() {
 // Config is the initial v2 skeleton config surface.
 type Config struct {
 	spec.JobConfig `yaml:",inline" json:",inline"`
-	Workers        int `yaml:"workers,omitempty" json:"workers"`
-	QueueSize      int `yaml:"queue_size,omitempty" json:"queue_size"`
+	TimePeriods    []timeperiod.Config `yaml:"time_periods,omitempty" json:"time_periods,omitempty"`
+	Workers        int                 `yaml:"workers,omitempty" json:"workers"`
+	QueueSize      int                 `yaml:"queue_size,omitempty" json:"queue_size"`
 }
 
 // Collector is a v2 skeleton collector used as migration scaffold.
@@ -204,7 +205,8 @@ func boolToFloat(v bool) float64 {
 }
 
 func (c *Collector) compileTimePeriods() error {
-	set, err := timeperiod.Compile([]timeperiod.Config{timeperiod.DefaultPeriodConfig()})
+	cfgs := timeperiod.EnsureDefault(append([]timeperiod.Config(nil), c.TimePeriods...))
+	set, err := timeperiod.Compile(cfgs)
 	if err != nil {
 		return err
 	}

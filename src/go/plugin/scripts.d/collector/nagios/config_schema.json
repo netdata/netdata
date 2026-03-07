@@ -6,10 +6,22 @@
     "name": {
       "type": "string"
     },
+    "scheduler": {
+      "type": "string"
+    },
+    "vnode": {
+      "type": "string"
+    },
     "plugin": {
       "type": "string"
     },
     "args": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "arg_values": {
       "type": "array",
       "items": {
         "type": "string"
@@ -23,6 +35,14 @@
     },
     "timeout": {
       "type": "string"
+    },
+    "timeout_state": {
+      "type": "string",
+      "enum": [
+        "critical",
+        "warning",
+        "unknown"
+      ]
     },
     "check_interval": {
       "type": "string"
@@ -41,8 +61,91 @@
       "type": "integer",
       "minimum": 1
     },
-    "scheduler": {
+    "autodetection_retry": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "inter_check_jitter": {
       "type": "string"
+    },
+    "working_directory": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "custom_vars": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "check_period": {
+      "type": "string"
+    },
+    "time_periods": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "alias": {
+            "type": "string"
+          },
+          "exclude": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "days": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "ranges": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "weekday": {
+                  "type": "string"
+                },
+                "nth": {
+                  "type": "integer"
+                },
+                "dates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "ranges"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "name",
+          "rules"
+        ],
+        "additionalProperties": true
+      }
     },
     "workers": {
       "type": "integer",
@@ -53,5 +156,9 @@
       "minimum": 1
     }
   },
+  "required": [
+    "name",
+    "plugin"
+  ],
   "additionalProperties": true
 }
