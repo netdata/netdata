@@ -93,7 +93,7 @@ func TestFlattenSeriesMetaCarriesOriginType(t *testing.T) {
 				assert.Equal(t, MetricKindMeasureSet, rawMeta.SourceKind)
 				assert.Equal(t, FlattenRoleNone, rawMeta.FlattenRole)
 
-				flatMeta, ok := s.Read(ReadFlatten()).SeriesMeta("svc.latency_value", nil)
+				flatMeta, ok := s.Read(ReadFlatten()).SeriesMeta("svc.latency_value", measureSetFieldLabels("svc.latency", "value"))
 				require.True(t, ok)
 				assert.Equal(t, MetricKindGauge, flatMeta.Kind)
 				assert.Equal(t, MetricKindMeasureSet, flatMeta.SourceKind)

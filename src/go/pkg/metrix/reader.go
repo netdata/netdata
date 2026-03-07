@@ -477,10 +477,11 @@ func appendFlattenedMeasureSetSeries(dst *readSnapshot, src *committedSeries) {
 	}
 
 	for i, field := range schema.fields {
-		labelsMap := make(map[string]string, len(src.labels))
+		labelsMap := make(map[string]string, len(src.labels)+1)
 		for _, lbl := range src.labels {
 			labelsMap[lbl.Key] = lbl.Value
 		}
+		labelsMap[src.name] = field.Name
 
 		labels, labelsKey, err := canonicalizeLabels(labelsMap)
 		if err != nil {

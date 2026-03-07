@@ -145,12 +145,14 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				require.Equal(t, FlattenRoleNone, rawMeta.FlattenRole)
 
 				flat := s.Read(ReadFlatten())
-				mustValue(t, flat, "svc.latency_value", nil, 1.5)
-				mustValue(t, flat, "svc.latency_ratio", nil, 0.5)
+				mustValue(t, flat, "svc.latency_value", measureSetFieldLabels("svc.latency", "value"), 1.5)
+				mustValue(t, flat, "svc.latency_ratio", measureSetFieldLabels("svc.latency", "ratio"), 0.5)
+				_, ok = flat.Value("svc.latency_value", nil)
+				require.False(t, ok, "expected flattened MeasureSet scalar lookup without synthetic field label to miss")
 				_, ok = flat.MeasureSet("svc.latency", nil)
 				require.False(t, ok, "expected flattened view to hide typed MeasureSet getter")
 
-				flatMeta, ok := flat.SeriesMeta("svc.latency_ratio", nil)
+				flatMeta, ok := flat.SeriesMeta("svc.latency_ratio", measureSetFieldLabels("svc.latency", "ratio"))
 				require.True(t, ok)
 				require.Equal(t, MetricKindGauge, flatMeta.Kind)
 				require.Equal(t, MetricKindMeasureSet, flatMeta.SourceKind)
@@ -189,8 +191,8 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				cc.BeginCycle()
 				cc.CommitCycleSuccess()
 				mustMeasureSet(t, s.Read(), "svc.usage", nil, []SampleValue{13, 23})
-				mustValue(t, s.Read(ReadFlatten()), "svc.usage_value", nil, 13)
-				mustValue(t, s.Read(ReadFlatten()), "svc.usage_limit", nil, 23)
+				mustValue(t, s.Read(ReadFlatten()), "svc.usage_value", measureSetFieldLabels("svc.usage", "value"), 13)
+				mustValue(t, s.Read(ReadFlatten()), "svc.usage_limit", measureSetFieldLabels("svc.usage", "limit"), 23)
 			},
 		},
 		"snapshot MeasureSet counter flatten delta and reset-aware semantics": {
@@ -209,19 +211,19 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				ms.ObserveTotalPoint(MeasureSetPoint{Values: []SampleValue{100, 40}})
 				cc.CommitCycleSuccess()
 				mustMeasureSet(t, s.Read(), "svc.requests", nil, []SampleValue{100, 40})
-				mustNoDelta(t, s.Read(ReadFlatten()), "svc.requests_ok", nil)
+				mustNoDelta(t, s.Read(ReadFlatten()), "svc.requests_ok", measureSetFieldLabels("svc.requests", "ok"))
 
 				cc.BeginCycle()
 				ms.ObserveTotalPoint(MeasureSetPoint{Values: []SampleValue{150, 50}})
 				cc.CommitCycleSuccess()
-				mustDelta(t, s.Read(ReadFlatten()), "svc.requests_ok", nil, 50)
-				mustDelta(t, s.Read(ReadFlatten()), "svc.requests_failed", nil, 10)
+				mustDelta(t, s.Read(ReadFlatten()), "svc.requests_ok", measureSetFieldLabels("svc.requests", "ok"), 50)
+				mustDelta(t, s.Read(ReadFlatten()), "svc.requests_failed", measureSetFieldLabels("svc.requests", "failed"), 10)
 
 				cc.BeginCycle()
 				ms.ObserveTotalPoint(MeasureSetPoint{Values: []SampleValue{20, 5}})
 				cc.CommitCycleSuccess()
-				mustDelta(t, s.Read(ReadFlatten()), "svc.requests_ok", nil, 20)
-				mustDelta(t, s.Read(ReadFlatten()), "svc.requests_failed", nil, 5)
+				mustDelta(t, s.Read(ReadFlatten()), "svc.requests_ok", measureSetFieldLabels("svc.requests", "ok"), 20)
+				mustDelta(t, s.Read(ReadFlatten()), "svc.requests_failed", measureSetFieldLabels("svc.requests", "failed"), 5)
 			},
 		},
 		"snapshot MeasureSet counter delta unavailable on attempt gap": {
@@ -240,7 +242,7 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				cc.BeginCycle()
 				ms.ObserveTotalPoint(MeasureSetPoint{Values: []SampleValue{20}})
 				cc.CommitCycleSuccess()
-				mustDelta(t, s.Read(ReadFlatten()), "svc.jobs_done", nil, 10)
+				mustDelta(t, s.Read(ReadFlatten()), "svc.jobs_done", measureSetFieldLabels("svc.jobs", "done"), 10)
 
 				cc.BeginCycle()
 				ms.ObserveTotalPoint(MeasureSetPoint{Values: []SampleValue{30}})
@@ -249,7 +251,7 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				cc.BeginCycle()
 				ms.ObserveTotalPoint(MeasureSetPoint{Values: []SampleValue{40}})
 				cc.CommitCycleSuccess()
-				mustNoDelta(t, s.Read(ReadFlatten()), "svc.jobs_done", nil)
+				mustNoDelta(t, s.Read(ReadFlatten()), "svc.jobs_done", measureSetFieldLabels("svc.jobs", "done"))
 			},
 		},
 		"stateful MeasureSet counter add accumulates and flattened delta works": {
@@ -267,15 +269,15 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				cc.BeginCycle()
 				ms.AddPoint(MeasureSetPoint{Values: []SampleValue{5, 1}})
 				cc.CommitCycleSuccess()
-				mustNoDelta(t, s.Read(ReadFlatten()), "svc.events_ok", nil)
+				mustNoDelta(t, s.Read(ReadFlatten()), "svc.events_ok", measureSetFieldLabels("svc.events", "ok"))
 
 				cc.BeginCycle()
 				ms.AddPoint(MeasureSetPoint{Values: []SampleValue{2, 3}})
 				ms.AddPoint(MeasureSetPoint{Values: []SampleValue{1, 0}})
 				cc.CommitCycleSuccess()
 				mustMeasureSet(t, s.Read(), "svc.events", nil, []SampleValue{8, 4})
-				mustDelta(t, s.Read(ReadFlatten()), "svc.events_ok", nil, 3)
-				mustDelta(t, s.Read(ReadFlatten()), "svc.events_failed", nil, 3)
+				mustDelta(t, s.Read(ReadFlatten()), "svc.events_ok", measureSetFieldLabels("svc.events", "ok"), 3)
+				mustDelta(t, s.Read(ReadFlatten()), "svc.events_failed", measureSetFieldLabels("svc.events", "failed"), 3)
 			},
 		},
 		"stateful MeasureSet counter negative add panics": {
