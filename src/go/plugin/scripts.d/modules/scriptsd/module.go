@@ -137,9 +137,9 @@ func (c *Collector) Collect(context.Context) error {
 	observe("scheduler.running", float64(snapshot.Running))
 	observe("scheduler.queued", float64(snapshot.Queued))
 	observe("scheduler.scheduled", float64(snapshot.Scheduled))
-	observe("scheduler.started", float64(snapshot.Started))
-	observe("scheduler.finished", float64(snapshot.Finished))
-	observe("scheduler.skipped", float64(snapshot.Skipped))
+	sm.Counter("scheduler.started").ObserveTotal(float64(snapshot.Started), lbl)
+	sm.Counter("scheduler.finished").ObserveTotal(float64(snapshot.Finished), lbl)
+	sm.Counter("scheduler.skipped").ObserveTotal(float64(snapshot.Skipped), lbl)
 
 	for _, job := range snapshot.Jobs {
 		if c.jobHandle != nil && job.JobID != c.jobHandle.JobID() {

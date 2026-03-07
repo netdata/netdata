@@ -52,7 +52,7 @@ groups:
       - scriptsd.scheduler.skipped
     charts:
       - id: scheduler_jobs
-        title: Scheduler Jobs
+        title: Scheduler Queue
         context: scheduler_jobs
         units: jobs
         instances:
@@ -64,6 +64,13 @@ groups:
             name: queued
           - selector: scriptsd.scheduler.scheduled
             name: scheduled
+      - id: scheduler_totals
+        title: Scheduler Totals
+        context: scheduler_totals
+        units: events
+        instances:
+          by_labels: [nagios_scheduler]
+        dimensions:
           - selector: scriptsd.scheduler.started
             name: started
           - selector: scriptsd.scheduler.finished
