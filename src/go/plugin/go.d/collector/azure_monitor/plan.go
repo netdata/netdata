@@ -132,6 +132,32 @@ func buildProfileRuntime(p ProfileConfig) (*profileRuntime, error) {
 		out.Charts = append(out.Charts, compiled)
 	}
 
+	// Set AccumulateAgg based on chart algorithms.
+	// Metrics with total/count aggregation in incremental charts are accumulated as counters.
+	// Metrics in absolute charts (e.g. percentage gauges) are not accumulated.
+	for _, ch := range p.Charts {
+		algo := stringsLowerTrim(ch.Algorithm)
+		if algo == "" {
+			algo = "absolute"
+		}
+		for _, dim := range ch.Dimensions {
+			agg := normalizeAggregation(dim.Aggregation)
+			if agg != "total" && agg != "count" {
+				continue
+			}
+			m, ok := metricByName[stringsLowerTrim(dim.Metric)]
+			if !ok {
+				continue
+			}
+			if m.AccumulateAgg == nil {
+				m.AccumulateAgg = make(map[string]bool, len(m.Aggregations))
+			}
+			if algo == "incremental" {
+				m.AccumulateAgg[agg] = true
+			}
+		}
+	}
+
 	sort.Slice(out.Metrics, func(i, j int) bool {
 		return out.Metrics[i].Name < out.Metrics[j].Name
 	})

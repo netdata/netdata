@@ -13,7 +13,7 @@ and collects metrics in 1-minute or coarser native Azure time grains.
 ### Required options
 
 - `subscription_id`: Azure subscription ID.
-- `auth.mode`: `service_principal`, `managed_identity`, or `default`.
+- `auth.mode`: `service_principal`, `managed_identity`, or `default` (defaults to `default` when omitted).
 
 ### Important options
 

@@ -145,7 +145,7 @@ charts:
     type: line
     priority: 1050
     units: percentage
-    algorithm: incremental
+    algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]

@@ -55,49 +55,72 @@ func (c *Collector) collect(ctx context.Context) error {
 
 	now := c.now()
 	tasks := c.buildQueryTasks(resources, now)
-	if len(tasks) == 0 {
-		return nil
+
+	// Re-observe cached values for series not updated this cycle.
+	// This prevents the metrix store from evicting series that belong
+	// to non-due time grains (e.g., PT30M/PT1H collected less frequently).
+	observedThisCycle := make(map[string]bool, len(c.lastObserved))
+
+	if len(tasks) > 0 {
+		queryEnd := now.Add(-secondsToDuration(c.QueryOffset))
+		if queryEnd.IsZero() {
+			queryEnd = now
+		}
+
+		results := c.runTasks(ctx, tasks, queryEnd)
+
+		var (
+			allSamples []metricSample
+			errCount   int
+		)
+		for _, res := range results {
+			if res.Err != nil {
+				errCount++
+				c.Warningf("collection task failed: %v", res.Err)
+				continue
+			}
+			allSamples = append(allSamples, res.Samples...)
+		}
+
+		if errCount == len(results) {
+			return errors.New("all Azure Monitor batch queries failed")
+		}
+
+		for _, sample := range allSamples {
+			vec, ok := c.runtimePlan.Instruments[sample.Instrument]
+			if !ok {
+				continue
+			}
+			values := labelValues(sample.Labels)
+
+			value := sample.Value
+			if sample.Accumulate {
+				key := sample.Instrument + "\x00" + strings.Join(values, "\x00")
+				c.accumulators[key] += value
+				value = c.accumulators[key]
+			}
+
+			vec.WithLabelValues(values...).Observe(value)
+
+			obsKey := sample.Instrument + "\x00" + strings.Join(values, "\x00")
+			c.lastObserved[obsKey] = lastObservation{
+				instrument:  sample.Instrument,
+				labelValues: append([]string(nil), values...),
+				value:       value,
+			}
+			observedThisCycle[obsKey] = true
+		}
 	}
 
-	queryEnd := now.Add(-secondsToDuration(c.QueryOffset))
-	if queryEnd.IsZero() {
-		queryEnd = now
-	}
-
-	results := c.runTasks(ctx, tasks, queryEnd)
-
-	var (
-		allSamples []metricSample
-		errCount   int
-	)
-	for _, res := range results {
-		if res.Err != nil {
-			errCount++
-			c.Warningf("collection task failed: %v", res.Err)
+	for key, obs := range c.lastObserved {
+		if observedThisCycle[key] {
 			continue
 		}
-		allSamples = append(allSamples, res.Samples...)
-	}
-
-	if errCount == len(results) {
-		return errors.New("all Azure Monitor batch queries failed")
-	}
-
-	for _, sample := range allSamples {
-		vec, ok := c.runtimePlan.Instruments[sample.Instrument]
+		vec, ok := c.runtimePlan.Instruments[obs.instrument]
 		if !ok {
 			continue
 		}
-		values := labelValues(sample.Labels)
-
-		value := sample.Value
-		if sample.Aggregation == "total" || sample.Aggregation == "count" {
-			key := sample.Instrument + "\x00" + strings.Join(values, "\x00")
-			c.accumulators[key] += value
-			value = c.accumulators[key]
-		}
-
-		vec.WithLabelValues(values...).Observe(value)
+		vec.WithLabelValues(obs.labelValues...).Observe(obs.value)
 	}
 
 	return nil
@@ -290,10 +313,10 @@ func (c *Collector) executeTask(ctx context.Context, task queryTask, queryEnd ti
 					continue
 				}
 				samples = append(samples, metricSample{
-					Instrument:  runtimeMetric.InstrumentByAgg[aggName],
-					Labels:      labels,
-					Value:       value,
-					Aggregation: aggName,
+					Instrument: runtimeMetric.InstrumentByAgg[aggName],
+					Labels:     labels,
+					Value:      value,
+					Accumulate: runtimeMetric.AccumulateAgg[aggName],
 				})
 			}
 		}
