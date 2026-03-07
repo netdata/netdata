@@ -109,16 +109,19 @@ func resolveGCPSM(ref, original string) (string, error) {
 }
 
 func gcpGetAccessToken(original string) (string, error) {
-	// Try metadata server first (GCE/GKE).
-	token, err := gcpGetTokenMetadata()
-	if err == nil {
+	// Try service account JSON first (avoids 2s metadata timeout on non-GCE hosts).
+	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
+		token, err := gcpGetTokenServiceAccount()
+		if err != nil {
+			return "", fmt.Errorf("resolving secret '%s': %w", original, err)
+		}
 		return token, nil
 	}
 
-	// Fall back to service account JSON.
-	token, err = gcpGetTokenServiceAccount()
+	// Fall back to metadata server (GCE/GKE).
+	token, err := gcpGetTokenMetadata()
 	if err != nil {
-		return "", fmt.Errorf("resolving secret '%s': cannot obtain GCP access token: %w", original, err)
+		return "", fmt.Errorf("resolving secret '%s': cannot obtain GCP access token (set GOOGLE_APPLICATION_CREDENTIALS or run on GCE/GKE): %w", original, err)
 	}
 
 	return token, nil

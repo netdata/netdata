@@ -41,6 +41,10 @@ func resolveVault(ref, original string) (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("resolving secret '%s': vault path is empty", original)
 	}
+	// Reject path traversal and query/fragment injection.
+	if strings.Contains(path, "..") || strings.ContainsAny(path, "?#") {
+		return "", fmt.Errorf("resolving secret '%s': vault path contains invalid characters", original)
+	}
 
 	addr := os.Getenv("VAULT_ADDR")
 	if addr == "" {

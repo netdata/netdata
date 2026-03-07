@@ -157,6 +157,26 @@ func TestResolveVault_NoToken(t *testing.T) {
 	assert.Contains(t, err.Error(), "cannot read token file")
 }
 
+func TestResolveVault_PathTraversal(t *testing.T) {
+	cfg := map[string]any{
+		"password": "${vault:secret/../sys/seal#key}",
+	}
+
+	err := Resolve(cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid characters")
+}
+
+func TestResolveVault_QueryInjection(t *testing.T) {
+	cfg := map[string]any{
+		"password": "${vault:secret/data/myapp?list=true#key}",
+	}
+
+	err := Resolve(cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid characters")
+}
+
 func TestResolveVault_MissingHashKey(t *testing.T) {
 	t.Setenv("VAULT_ADDR", "http://localhost:8200")
 	t.Setenv("VAULT_TOKEN", "test-token")

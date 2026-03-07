@@ -343,7 +343,7 @@ Any vault with a command-line interface works with Netdata's `${cmd:...}` provid
 | **Infisical** CLI (`infisical`) | `${cmd:/usr/bin/infisical secrets get DB_PASS --plain}` |
 | **Akeyless** CLI (`akeyless`) | `${cmd:/usr/bin/akeyless get-secret-value -n /myapp/password}` |
 | **Fortanix SDKMS** CLI | `${cmd:/usr/bin/sdkms-cli export-secret --name mypass}` |
-| **EnvKey** CLI (`envkey`) | `${cmd:/usr/bin/envkey source -f json \| ...}` |
+| **EnvKey** CLI (`envkey`) | `${cmd:/usr/local/bin/envkey-get-secret.sh DB_PASS}` |
 | **Passbolt** CLI | `${cmd:/usr/bin/passbolt get secret --id uuid}` |
 | Any custom vault script | `${cmd:/usr/local/bin/my-vault-script.sh get password}` |
 
