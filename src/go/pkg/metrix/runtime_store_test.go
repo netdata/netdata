@@ -116,15 +116,15 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				g := m.MeasureSetGauge(
 					"usage",
 					WithMeasureSetFields(
-						FieldSpec{Name: "value"},
-						FieldSpec{Name: "limit"},
+						MeasureFieldSpec{Name: "value"},
+						MeasureFieldSpec{Name: "limit"},
 					),
 				)
 				c := m.MeasureSetCounter(
 					"events",
 					WithMeasureSetFields(
-						FieldSpec{Name: "ok"},
-						FieldSpec{Name: "failed"},
+						MeasureFieldSpec{Name: "ok"},
+						MeasureFieldSpec{Name: "failed"},
 					),
 				)
 

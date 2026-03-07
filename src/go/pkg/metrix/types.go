@@ -118,7 +118,7 @@ type StateSetPoint struct {
 	States map[string]bool
 }
 
-type FieldSpec struct {
+type MeasureFieldSpec struct {
 	Name  string
 	Float bool
 }
@@ -136,7 +136,7 @@ const (
 
 type MeasureSetSchema struct {
 	Semantics MeasureSetSemantics
-	Fields    []FieldSpec
+	Fields    []MeasureFieldSpec
 }
 
 type StateSetMode int

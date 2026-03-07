@@ -79,8 +79,8 @@ func TestFlattenSeriesMetaCarriesOriginType(t *testing.T) {
 				ms := s.Write().SnapshotMeter("svc").MeasureSetGauge(
 					"latency",
 					WithMeasureSetFields(
-						FieldSpec{Name: "value"},
-						FieldSpec{Name: "limit"},
+						MeasureFieldSpec{Name: "value"},
+						MeasureFieldSpec{Name: "limit"},
 					),
 				)
 				cc.BeginCycle()

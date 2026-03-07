@@ -34,8 +34,8 @@ func TestMeasureSetDeclarationValidation(t *testing.T) {
 				expectPanic(t, func() {
 					_ = s.Write().SnapshotMeter("svc").MeasureSetGauge("latency",
 						WithMeasureSetFields(
-							FieldSpec{Name: "value"},
-							FieldSpec{Name: "value"},
+							MeasureFieldSpec{Name: "value"},
+							MeasureFieldSpec{Name: "value"},
 						),
 					)
 				})
@@ -46,7 +46,7 @@ func TestMeasureSetDeclarationValidation(t *testing.T) {
 				s := NewCollectorStore()
 				expectPanic(t, func() {
 					_ = s.Write().SnapshotMeter("svc").MeasureSetGauge("latency",
-						WithMeasureSetFields(FieldSpec{Name: "   "}),
+						WithMeasureSetFields(MeasureFieldSpec{Name: "   "}),
 					)
 				})
 			},
@@ -56,15 +56,15 @@ func TestMeasureSetDeclarationValidation(t *testing.T) {
 				s := NewCollectorStore()
 				_ = s.Write().SnapshotMeter("svc").MeasureSetGauge("latency",
 					WithMeasureSetFields(
-						FieldSpec{Name: "value"},
-						FieldSpec{Name: "max"},
+						MeasureFieldSpec{Name: "value"},
+						MeasureFieldSpec{Name: "max"},
 					),
 				)
 				expectPanic(t, func() {
 					_ = s.Write().SnapshotMeter("svc").MeasureSetGauge("latency",
 						WithMeasureSetFields(
-							FieldSpec{Name: "value"},
-							FieldSpec{Name: "min"},
+							MeasureFieldSpec{Name: "value"},
+							MeasureFieldSpec{Name: "min"},
 						),
 					)
 				})
@@ -74,11 +74,11 @@ func TestMeasureSetDeclarationValidation(t *testing.T) {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
 				_ = s.Write().SnapshotMeter("svc").MeasureSetGauge("latency",
-					WithMeasureSetFields(FieldSpec{Name: "value", Float: false}),
+					WithMeasureSetFields(MeasureFieldSpec{Name: "value", Float: false}),
 				)
 				expectPanic(t, func() {
 					_ = s.Write().SnapshotMeter("svc").MeasureSetGauge("latency",
-						WithMeasureSetFields(FieldSpec{Name: "value", Float: true}),
+						WithMeasureSetFields(MeasureFieldSpec{Name: "value", Float: true}),
 					)
 				})
 			},
@@ -87,11 +87,11 @@ func TestMeasureSetDeclarationValidation(t *testing.T) {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
 				_ = s.Write().SnapshotMeter("svc").MeasureSetGauge("latency",
-					WithMeasureSetFields(FieldSpec{Name: "value"}),
+					WithMeasureSetFields(MeasureFieldSpec{Name: "value"}),
 				)
 				expectPanic(t, func() {
 					_ = s.Write().SnapshotMeter("svc").MeasureSetCounter("latency",
-						WithMeasureSetFields(FieldSpec{Name: "value"}),
+						WithMeasureSetFields(MeasureFieldSpec{Name: "value"}),
 					)
 				})
 			},
@@ -101,7 +101,7 @@ func TestMeasureSetDeclarationValidation(t *testing.T) {
 				s := NewCollectorStore()
 				expectPanic(t, func() {
 					_ = s.Write().SnapshotMeter("svc").Gauge("latency",
-						WithMeasureSetFields(FieldSpec{Name: "value"}),
+						WithMeasureSetFields(MeasureFieldSpec{Name: "value"}),
 					)
 				})
 			},
@@ -124,8 +124,8 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				ms := s.Write().SnapshotMeter("svc").MeasureSetGauge(
 					"latency",
 					WithMeasureSetFields(
-						FieldSpec{Name: "value"},
-						FieldSpec{Name: "ratio", Float: true},
+						MeasureFieldSpec{Name: "value"},
+						MeasureFieldSpec{Name: "ratio", Float: true},
 					),
 					WithDescription("Latency"),
 					WithChartFamily("Service"),
@@ -173,8 +173,8 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				ms := s.Write().StatefulMeter("svc").MeasureSetGauge(
 					"usage",
 					WithMeasureSetFields(
-						FieldSpec{Name: "value"},
-						FieldSpec{Name: "limit"},
+						MeasureFieldSpec{Name: "value"},
+						MeasureFieldSpec{Name: "limit"},
 					),
 				)
 
@@ -202,8 +202,8 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				ms := s.Write().SnapshotMeter("svc").MeasureSetCounter(
 					"requests",
 					WithMeasureSetFields(
-						FieldSpec{Name: "ok"},
-						FieldSpec{Name: "failed"},
+						MeasureFieldSpec{Name: "ok"},
+						MeasureFieldSpec{Name: "failed"},
 					),
 				)
 
@@ -232,7 +232,7 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				cc := cycleController(t, s)
 				ms := s.Write().SnapshotMeter("svc").MeasureSetCounter(
 					"jobs",
-					WithMeasureSetFields(FieldSpec{Name: "done"}),
+					WithMeasureSetFields(MeasureFieldSpec{Name: "done"}),
 				)
 
 				cc.BeginCycle()
@@ -261,8 +261,8 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				ms := s.Write().StatefulMeter("svc").MeasureSetCounter(
 					"events",
 					WithMeasureSetFields(
-						FieldSpec{Name: "ok"},
-						FieldSpec{Name: "failed"},
+						MeasureFieldSpec{Name: "ok"},
+						MeasureFieldSpec{Name: "failed"},
 					),
 				)
 
@@ -287,8 +287,8 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				ms := s.Write().StatefulMeter("svc").MeasureSetCounter(
 					"events",
 					WithMeasureSetFields(
-						FieldSpec{Name: "ok"},
-						FieldSpec{Name: "failed"},
+						MeasureFieldSpec{Name: "ok"},
+						MeasureFieldSpec{Name: "failed"},
 					),
 				)
 
@@ -305,7 +305,7 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				cc := cycleController(t, s)
 				ms := s.Write().SnapshotMeter("svc").MeasureSetGauge(
 					"latency",
-					WithMeasureSetFields(FieldSpec{Name: "value"}),
+					WithMeasureSetFields(MeasureFieldSpec{Name: "value"}),
 				)
 
 				cc.BeginCycle()
@@ -326,8 +326,8 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				ms := s.Write().SnapshotMeter("svc").MeasureSetGauge(
 					"latency",
 					WithMeasureSetFields(
-						FieldSpec{Name: "value"},
-						FieldSpec{Name: "max"},
+						MeasureFieldSpec{Name: "value"},
+						MeasureFieldSpec{Name: "max"},
 					),
 				)
 

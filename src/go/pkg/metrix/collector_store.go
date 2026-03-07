@@ -59,7 +59,7 @@ type stateSetSchema struct {
 
 type measureSetSchema struct {
 	semantics MeasureSetSemantics
-	fields    []FieldSpec
+	fields    []MeasureFieldSpec
 	index     map[string]int
 }
 
@@ -792,7 +792,7 @@ func buildMeasureSetSchema(cfg instrumentConfig) (*measureSetSchema, error) {
 		return nil, fmt.Errorf("metrix: measureset semantics are missing")
 	}
 
-	fields := make([]FieldSpec, 0, len(cfg.measureSetFields))
+	fields := make([]MeasureFieldSpec, 0, len(cfg.measureSetFields))
 	index := make(map[string]int, len(cfg.measureSetFields))
 	for i, field := range cfg.measureSetFields {
 		name := strings.TrimSpace(field.Name)

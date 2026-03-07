@@ -1541,8 +1541,8 @@ groups:
 	ms := store.Write().SnapshotMeter("svc").MeasureSetGauge(
 		"latency_seconds",
 		metrix.WithMeasureSetFields(
-			metrix.FieldSpec{Name: "value"},
-			metrix.FieldSpec{Name: "ratio", Float: true},
+			metrix.MeasureFieldSpec{Name: "value"},
+			metrix.MeasureFieldSpec{Name: "ratio", Float: true},
 		),
 		metrix.WithDescription("Latency"),
 		metrix.WithChartFamily("Service"),
@@ -1623,8 +1623,8 @@ groups:
 	ms := store.Write().SnapshotMeter("svc").MeasureSetCounter(
 		"requests_total",
 		metrix.WithMeasureSetFields(
-			metrix.FieldSpec{Name: "ok"},
-			metrix.FieldSpec{Name: "failed"},
+			metrix.MeasureFieldSpec{Name: "ok"},
+			metrix.MeasureFieldSpec{Name: "failed"},
 		),
 		metrix.WithDescription("Requests"),
 		metrix.WithChartFamily("Service"),
