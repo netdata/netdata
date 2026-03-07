@@ -74,6 +74,7 @@ jobs:
 - Stock profiles (packaged with Netdata): `/usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/`
 - User profiles and overrides: `/etc/netdata/go.d/azure_monitor.profiles/`
 - User files override stock files when they share the same filename key.
+- Profiles are strict and chart-driven: each profile defines full chart metadata (`id`, `title`, `context`, `family`, `type`, `priority`, `dimensions`, `instances`).
 
 ## Notes
 

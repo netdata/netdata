@@ -21,3 +21,83 @@ metrics:
     units: bytes/s
     aggregations: [total]
     time_grain: PT1M
+charts:
+  - id: am_azure_virtual_machines__percentage_cpu
+    title: Azure Virtual Machine CPU Utilization
+    context: virtual_machines.percentage_cpu
+    family: Utilization
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Percentage CPU
+        aggregation: average
+        name: average
+
+  - id: am_azure_virtual_machines__network_in_total
+    title: Azure Virtual Machine Network Ingress
+    context: virtual_machines.network_in_total
+    family: Network
+    type: line
+    priority: 1010
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Network In Total
+        aggregation: total
+        name: total
+
+  - id: am_azure_virtual_machines__network_out_total
+    title: Azure Virtual Machine Network Egress
+    context: virtual_machines.network_out_total
+    family: Network
+    type: line
+    priority: 1020
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Network Out Total
+        aggregation: total
+        name: total
+
+  - id: am_azure_virtual_machines__disk_read_bytes
+    title: Azure Virtual Machine Disk Read Throughput
+    context: virtual_machines.disk_read_bytes
+    family: I/O
+    type: line
+    priority: 1030
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Disk Read Bytes
+        aggregation: total
+        name: total
+
+  - id: am_azure_virtual_machines__disk_write_bytes
+    title: Azure Virtual Machine Disk Write Throughput
+    context: virtual_machines.disk_write_bytes
+    family: I/O
+    type: line
+    priority: 1040
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Disk Write Bytes
+        aggregation: total
+        name: total

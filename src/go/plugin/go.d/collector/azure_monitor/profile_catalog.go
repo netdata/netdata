@@ -3,6 +3,7 @@
 package azure_monitor
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -120,7 +121,9 @@ func loadProfileFile(path, key string) (ProfileConfig, error) {
 	}
 
 	var cfg ProfileConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(&cfg); err != nil {
 		return ProfileConfig{}, fmt.Errorf("unmarshal profile %q: %w", path, err)
 	}
 

@@ -65,3 +65,259 @@ metrics:
     units: seconds
     aggregations: [average]
     time_grain: PT30M
+charts:
+  - id: am_azure_postgres_flexible__cpu_percent
+    title: Azure PostgreSQL Flexible Server CPU Utilization
+    context: postgres_flexible.cpu_percent
+    family: Utilization
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cpu_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_postgres_flexible__memory_percent
+    title: Azure PostgreSQL Flexible Server Memory Utilization
+    context: postgres_flexible.memory_percent
+    family: Utilization
+    type: line
+    priority: 1010
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: memory_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_postgres_flexible__storage_percent
+    title: Azure PostgreSQL Flexible Server Storage Utilization
+    context: postgres_flexible.storage_percent
+    family: Utilization
+    type: line
+    priority: 1020
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: storage_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_postgres_flexible__iops
+    title: Azure PostgreSQL Flexible Server IOPS
+    context: postgres_flexible.iops
+    family: I/O
+    type: line
+    priority: 1030
+    units: operations/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: iops
+        aggregation: average
+        name: average
+
+  - id: am_azure_postgres_flexible__read_iops
+    title: Azure PostgreSQL Flexible Server Read IOPS
+    context: postgres_flexible.read_iops
+    family: I/O
+    type: line
+    priority: 1040
+    units: operations/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: read_iops
+        aggregation: average
+        name: average
+
+  - id: am_azure_postgres_flexible__write_iops
+    title: Azure PostgreSQL Flexible Server Write IOPS
+    context: postgres_flexible.write_iops
+    family: I/O
+    type: line
+    priority: 1050
+    units: operations/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: write_iops
+        aggregation: average
+        name: average
+
+  - id: am_azure_postgres_flexible__active_connections
+    title: Azure PostgreSQL Flexible Server Active Connections
+    context: postgres_flexible.active_connections
+    family: Connections
+    type: line
+    priority: 1060
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: active_connections
+        aggregation: average
+        name: average
+
+  - id: am_azure_postgres_flexible__tps
+    title: Azure PostgreSQL Flexible Server Transactions Per Second
+    context: postgres_flexible.tps
+    family: Throughput
+    type: line
+    priority: 1070
+    units: transactions/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: tps
+        aggregation: average
+        name: average
+
+  - id: am_azure_postgres_flexible__deadlocks
+    title: Azure PostgreSQL Flexible Server Deadlocks
+    context: postgres_flexible.deadlocks
+    family: Contention
+    type: line
+    priority: 1080
+    units: deadlocks/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: deadlocks
+        aggregation: total
+        name: total
+
+  - id: am_azure_postgres_flexible__xact_commit
+    title: Azure PostgreSQL Flexible Server Committed Transactions
+    context: postgres_flexible.xact_commit
+    family: Throughput
+    type: line
+    priority: 1090
+    units: transactions/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: xact_commit
+        aggregation: total
+        name: total
+
+  - id: am_azure_postgres_flexible__xact_rollback
+    title: Azure PostgreSQL Flexible Server Rolled Back Transactions
+    context: postgres_flexible.xact_rollback
+    family: Throughput
+    type: line
+    priority: 1100
+    units: transactions/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: xact_rollback
+        aggregation: total
+        name: total
+
+  - id: am_azure_postgres_flexible__is_db_alive
+    title: Azure PostgreSQL Flexible Server Database Alive
+    context: postgres_flexible.is_db_alive
+    family: State
+    type: line
+    priority: 1110
+    units: state
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: is_db_alive
+        aggregation: average
+        name: average
+
+  - id: am_azure_postgres_flexible__network_bytes_egress
+    title: Azure PostgreSQL Flexible Server Network Egress
+    context: postgres_flexible.network_bytes_egress
+    family: Network
+    type: line
+    priority: 1120
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: network_bytes_egress
+        aggregation: total
+        name: total
+
+  - id: am_azure_postgres_flexible__network_bytes_ingress
+    title: Azure PostgreSQL Flexible Server Network Ingress
+    context: postgres_flexible.network_bytes_ingress
+    family: Network
+    type: line
+    priority: 1130
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: network_bytes_ingress
+        aggregation: total
+        name: total
+
+  - id: am_azure_postgres_flexible__backup_storage_used
+    title: Azure PostgreSQL Flexible Server Backup Storage Used
+    context: postgres_flexible.backup_storage_used
+    family: Capacity
+    type: line
+    priority: 1140
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: backup_storage_used
+        aggregation: average
+        name: average
+
+  - id: am_azure_postgres_flexible__physical_replication_delay_in_seconds
+    title: Azure PostgreSQL Flexible Server Replication Delay
+    context: postgres_flexible.physical_replication_delay_in_seconds
+    family: Replication
+    type: line
+    priority: 1150
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: physical_replication_delay_in_seconds
+        aggregation: average
+        name: average

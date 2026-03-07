@@ -21,3 +21,83 @@ metrics:
     units: bytes
     aggregations: [average]
     time_grain: PT1H
+charts:
+  - id: am_azure_storage_accounts__availability
+    title: Azure Storage Account Availability
+    context: storage_accounts.availability
+    family: Availability
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Availability
+        aggregation: average
+        name: average
+
+  - id: am_azure_storage_accounts__transactions
+    title: Azure Storage Account Transactions
+    context: storage_accounts.transactions
+    family: Throughput
+    type: line
+    priority: 1010
+    units: transactions/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Transactions
+        aggregation: total
+        name: total
+
+  - id: am_azure_storage_accounts__ingress
+    title: Azure Storage Account Ingress
+    context: storage_accounts.ingress
+    family: Throughput
+    type: line
+    priority: 1020
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Ingress
+        aggregation: total
+        name: total
+
+  - id: am_azure_storage_accounts__egress
+    title: Azure Storage Account Egress
+    context: storage_accounts.egress
+    family: Throughput
+    type: line
+    priority: 1030
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Egress
+        aggregation: total
+        name: total
+
+  - id: am_azure_storage_accounts__usedcapacity
+    title: Azure Storage Account Used Capacity
+    context: storage_accounts.used_capacity
+    family: Capacity
+    type: line
+    priority: 1040
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: UsedCapacity
+        aggregation: average
+        name: average

@@ -38,11 +38,11 @@ func (c *Collector) buildRuntimePlanFromConfig(cfg Config, catalog profileCatalo
 		}
 		seenProfileKeys[p.Key] = struct{}{}
 
-		for _, m := range p.Metrics {
-			if _, ok := seenChartIDs[m.ChartID]; ok {
-				return nil, fmt.Errorf("chart id collision: %s", m.ChartID)
+		for _, ch := range p.Charts {
+			if _, ok := seenChartIDs[ch.ID]; ok {
+				return nil, fmt.Errorf("chart id collision: %s", ch.ID)
 			}
-			seenChartIDs[m.ChartID] = struct{}{}
+			seenChartIDs[ch.ID] = struct{}{}
 		}
 
 		plan.Profiles = append(plan.Profiles, p)
@@ -76,9 +76,11 @@ func buildProfileRuntime(p ProfileConfig) (*profileRuntime, error) {
 		ResourceType:    resourceType,
 		MetricNamespace: metricNamespace,
 		Metrics:         make([]*metricRuntime, 0, len(p.Metrics)),
+		Charts:          make([]charttpl.Chart, 0, len(p.Charts)),
 	}
 
 	seenMetricKeys := map[string]struct{}{}
+	metricByName := make(map[string]*metricRuntime, len(p.Metrics))
 	for _, m := range p.Metrics {
 		metricName := stringsTrim(m.Name)
 		if metricName == "" {
@@ -100,10 +102,6 @@ func buildProfileRuntime(p ProfileConfig) (*profileRuntime, error) {
 			return nil, fmt.Errorf("profile %q metric %q has unsupported time grain %q", name, metricName, grain)
 		}
 
-		displayName := stringsTrim(m.DisplayName)
-		if displayName == "" {
-			displayName = metricName
-		}
 		units := stringsTrim(m.Units)
 		if units == "" {
 			units = "value"
@@ -114,24 +112,84 @@ func buildProfileRuntime(p ProfileConfig) (*profileRuntime, error) {
 			instrumentByAgg[agg] = metricInstrumentName(profileKey, metricKey, agg)
 		}
 
-		out.Metrics = append(out.Metrics, &metricRuntime{
-			Name:             metricName,
-			DisplayName:      displayName,
-			Units:            units,
-			TimeGrain:        grain,
-			TimeGrainEvery:   grainEvery,
-			Aggregations:     aggs,
-			InstrumentByAgg:  instrumentByAgg,
-			ChartID:          chartIDFor(profileKey, metricKey),
-			ChartContextPart: chartContextPart(profileKey, metricKey),
-		})
+		mr := &metricRuntime{
+			Name:            metricName,
+			Units:           units,
+			TimeGrain:       grain,
+			TimeGrainEvery:  grainEvery,
+			Aggregations:    aggs,
+			InstrumentByAgg: instrumentByAgg,
+		}
+		out.Metrics = append(out.Metrics, mr)
+		metricByName[stringsLowerTrim(metricName)] = mr
+	}
+
+	for i, ch := range p.Charts {
+		compiled, err := buildProfileChart(name, ch, metricByName)
+		if err != nil {
+			return nil, fmt.Errorf("profile %q chart[%d]: %w", name, i, err)
+		}
+		out.Charts = append(out.Charts, compiled)
 	}
 
 	sort.Slice(out.Metrics, func(i, j int) bool {
-		return out.Metrics[i].ChartID < out.Metrics[j].ChartID
+		return out.Metrics[i].Name < out.Metrics[j].Name
+	})
+	sort.Slice(out.Charts, func(i, j int) bool {
+		return out.Charts[i].ID < out.Charts[j].ID
 	})
 
 	return out, nil
+}
+
+func buildProfileChart(profileName string, ch ProfileChart, metricByName map[string]*metricRuntime) (charttpl.Chart, error) {
+	dims := make([]charttpl.Dimension, 0, len(ch.Dimensions))
+	for i, dim := range ch.Dimensions {
+		m, ok := metricByName[stringsLowerTrim(dim.Metric)]
+		if !ok {
+			return charttpl.Chart{}, fmt.Errorf("dimension[%d] references unknown metric %q", i, dim.Metric)
+		}
+
+		agg := normalizeAggregation(dim.Aggregation)
+		if agg == "" {
+			return charttpl.Chart{}, fmt.Errorf("dimension[%d] has invalid aggregation %q", i, dim.Aggregation)
+		}
+
+		selector, ok := m.InstrumentByAgg[agg]
+		if !ok {
+			return charttpl.Chart{}, fmt.Errorf(
+				"dimension[%d] references aggregation %q not defined for metric %q in profile %q",
+				i, agg, dim.Metric, profileName,
+			)
+		}
+
+		dims = append(dims, charttpl.Dimension{
+			Selector:      selector,
+			Name:          stringsTrim(dim.Name),
+			NameFromLabel: stringsTrim(dim.NameFromLabel),
+			Options:       dim.Options,
+		})
+	}
+
+	algo := stringsLowerTrim(ch.Algorithm)
+	if algo == "" {
+		algo = "absolute"
+	}
+
+	return charttpl.Chart{
+		ID:            stringsTrim(ch.ID),
+		Title:         stringsTrim(ch.Title),
+		Family:        stringsTrim(ch.Family),
+		Context:       stringsTrim(ch.Context),
+		Units:         stringsTrim(ch.Units),
+		Algorithm:     algo,
+		Type:          stringsLowerTrim(ch.Type),
+		Priority:      ch.Priority,
+		LabelPromoted: append([]string(nil), ch.LabelPromoted...),
+		Instances:     ch.Instances,
+		Lifecycle:     ch.Lifecycle,
+		Dimensions:    dims,
+	}, nil
 }
 
 func buildChartTemplate(plan *runtimePlan) (string, error) {
@@ -145,30 +203,7 @@ func buildChartTemplate(plan *runtimePlan) (string, error) {
 		grp := charttpl.Group{
 			Family:  p.Name,
 			Metrics: profileMetricsList(p),
-			Charts:  make([]charttpl.Chart, 0, len(p.Metrics)),
-		}
-
-		for _, m := range p.Metrics {
-			dims := make([]charttpl.Dimension, 0, len(m.Aggregations))
-			for _, agg := range m.Aggregations {
-				dims = append(dims, charttpl.Dimension{
-					Selector: m.InstrumentByAgg[agg],
-					Name:     agg,
-				})
-			}
-
-			grp.Charts = append(grp.Charts, charttpl.Chart{
-				ID:            m.ChartID,
-				Title:         fmt.Sprintf("%s %s", p.Name, m.DisplayName),
-				Context:       m.ChartContextPart,
-				Units:         m.Units,
-				Algorithm:     "absolute",
-				LabelPromoted: []string{"resource_name", "resource_group", "region", "resource_type", "profile"},
-				Instances: &charttpl.Instances{
-					ByLabels: []string{"resource_uid"},
-				},
-				Dimensions: dims,
-			})
+			Charts:  append([]charttpl.Chart(nil), p.Charts...),
 		}
 
 		spec.Groups = append(spec.Groups, grp)
@@ -198,14 +233,6 @@ func profileKeyFromName(name string) string {
 
 func metricKeyFromName(name string) string {
 	return encodeIDPart(name)
-}
-
-func chartIDFor(profileKey, metricKey string) string {
-	return "am_" + profileKey + "__" + metricKey
-}
-
-func chartContextPart(profileKey, metricKey string) string {
-	return profileKey + "." + metricKey
 }
 
 func metricInstrumentName(profileKey, metricKey, aggregation string) string {
