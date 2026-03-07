@@ -1,0 +1,69 @@
+version: v1
+context_namespace: nagios
+engine:
+  autogen:
+    enabled: true
+    max_type_id_len: 200
+    expire_after_success_cycles: 3
+groups:
+  - family: Job
+    metrics:
+      - nagios.job.state
+      - nagios.job.attempt
+      - nagios.job.max_attempts
+    charts:
+      - id: job_state
+        title: Job State
+        context: job_state
+        units: state
+        instances:
+          by_labels: [nagios_scheduler, nagios_job]
+        dimensions:
+          - selector: nagios.job.state
+      - id: job_attempts
+        title: Job Attempts
+        context: job_attempts
+        units: attempts
+        instances:
+          by_labels: [nagios_scheduler, nagios_job]
+        dimensions:
+          - selector: nagios.job.attempt
+            name: attempt
+          - selector: nagios.job.max_attempts
+            name: max_attempts
+
+  - family: Scheduler
+    metrics:
+      - nagios.scheduler.running
+      - nagios.scheduler.queued
+      - nagios.scheduler.scheduled
+      - nagios.scheduler.started
+      - nagios.scheduler.finished
+      - nagios.scheduler.skipped
+    charts:
+      - id: scheduler_jobs
+        title: Scheduler Queue
+        context: scheduler_jobs
+        units: jobs
+        instances:
+          by_labels: [nagios_scheduler]
+        dimensions:
+          - selector: nagios.scheduler.running
+            name: running
+          - selector: nagios.scheduler.queued
+            name: queued
+          - selector: nagios.scheduler.scheduled
+            name: scheduled
+      - id: scheduler_totals
+        title: Scheduler Totals
+        context: scheduler_totals
+        units: events
+        instances:
+          by_labels: [nagios_scheduler]
+        dimensions:
+          - selector: nagios.scheduler.started
+            name: started
+          - selector: nagios.scheduler.finished
+            name: finished
+          - selector: nagios.scheduler.skipped
+            name: skipped
