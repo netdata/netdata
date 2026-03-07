@@ -135,21 +135,21 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				g.SetField("value", 11)
 				g.AddField("limit", 2)
 				mustMeasureSet(t, s.Read(), "runtime.usage", nil, []SampleValue{11, 22})
-				mustValue(t, s.Read(ReadFlatten()), "runtime.usage_value", measureSetFieldLabels("runtime.usage", "value"), 11)
-				mustValue(t, s.Read(ReadFlatten()), "runtime.usage_limit", measureSetFieldLabels("runtime.usage", "limit"), 22)
+				mustValue(t, s.Read(ReadFlatten()), "runtime.usage_value", measureSetFieldLabels("value"), 11)
+				mustValue(t, s.Read(ReadFlatten()), "runtime.usage_limit", measureSetFieldLabels("limit"), 22)
 
 				c.AddFields(map[string]SampleValue{
 					"ok":     5,
 					"failed": 1,
 				})
-				mustNoDelta(t, s.Read(ReadFlatten()), "runtime.events_ok", measureSetFieldLabels("runtime.events", "ok"))
+				mustNoDelta(t, s.Read(ReadFlatten()), "runtime.events_ok", measureSetFieldLabels("ok"))
 				c.AddField("ok", 2)
-				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_ok", measureSetFieldLabels("runtime.events", "ok"), 2)
-				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_failed", measureSetFieldLabels("runtime.events", "failed"), 0)
+				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_ok", measureSetFieldLabels("ok"), 2)
+				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_failed", measureSetFieldLabels("failed"), 0)
 				c.AddField("failed", 3)
 				mustMeasureSet(t, s.Read(), "runtime.events", nil, []SampleValue{7, 4})
-				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_ok", measureSetFieldLabels("runtime.events", "ok"), 0)
-				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_failed", measureSetFieldLabels("runtime.events", "failed"), 3)
+				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_ok", measureSetFieldLabels("ok"), 0)
+				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_failed", measureSetFieldLabels("failed"), 3)
 			},
 		},
 		"runtime MeasureSet flatten label key collision panics": {

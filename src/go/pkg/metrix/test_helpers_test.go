@@ -43,6 +43,6 @@ func mustNoDelta(t *testing.T, r Reader, name string, labels Labels) {
 	require.False(t, ok, "expected no delta for %s", name)
 }
 
-func measureSetFieldLabels(metricName, field string) Labels {
+func measureSetFieldLabels(field string) Labels {
 	return Labels{MeasureSetFieldLabel: field}
 }
