@@ -229,7 +229,7 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 		"MeasureSet gauge uses synthetic field label and absolute algorithm": {
 			metricName: "service_latency_seconds_value",
 			labels: map[string]string{
-				"instance":           "db1",
+				"instance":                  "db1",
 				metrix.MeasureSetFieldLabel: "value",
 			},
 			meta: metrix.SeriesMeta{
@@ -246,7 +246,7 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 		"MeasureSet counter uses synthetic field label and incremental algorithm": {
 			metricName: "svc_requests_total_ok",
 			labels: map[string]string{
-				"instance":           "db1",
+				"instance":                  "db1",
 				metrix.MeasureSetFieldLabel: "ok",
 			},
 			meta: metrix.SeriesMeta{
@@ -263,8 +263,8 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 		"MeasureSet ignores unrelated matching labels and uses reserved field label": {
 			metricName: "svc_requests_total_ok",
 			labels: map[string]string{
-				"instance":           "db1",
-				"svc_requests":       "total_ok",
+				"instance":                  "db1",
+				"svc_requests":              "total_ok",
 				metrix.MeasureSetFieldLabel: "ok",
 			},
 			meta: metrix.SeriesMeta{
@@ -294,7 +294,7 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 		"MeasureSet with mismatched reserved field label does not route": {
 			metricName: "svc_requests_total_ok",
 			labels: map[string]string{
-				"instance":           "db1",
+				"instance":                  "db1",
 				metrix.MeasureSetFieldLabel: "failed",
 			},
 			meta: metrix.SeriesMeta{
