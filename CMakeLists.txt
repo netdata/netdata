@@ -3069,6 +3069,7 @@ if(OS_WINDOWS)
         configure_file(packaging/windows/eula.rtf eula.rtf COPYONLY)
         configure_file(packaging/windows/Top.bmp Top.bmp COPYONLY)
         configure_file(packaging/windows/BackGround.bmp BackGround.bmp COPYONLY)
+        configure_file(src/collectors/windows.plugin/netdata_driver.inf netdata_driver.inf COPYONLY)
 endif()
 
 add_executable(netdata
