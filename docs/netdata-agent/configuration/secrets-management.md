@@ -318,8 +318,8 @@ Netdata supports **every vault and secrets manager** — either natively, via CL
 |----------------|--------|---------|
 | **HashiCorp Vault** (HCP Vault, Vault Enterprise, Vault OSS) | `${vault:path#key}` | [Configuration](#hashicorp-vault) |
 | **AWS Secrets Manager** | `${aws-sm:name#key}` | [Configuration](#aws-secrets-manager) |
-| **Azure Key Vault** | `${azure-kv:vault/name}` | [Configuration](#azure-key-vault) |
-| **GCP Secret Manager** (Google Cloud) | `${gcp-sm:project/name}` | [Configuration](#gcp-secret-manager) |
+| **Azure Key Vault** | `${azure-kv:vault-name/secret-name}` | [Configuration](#azure-key-vault) |
+| **GCP Secret Manager** (Google Cloud) | `${gcp-sm:project/secret}` | [Configuration](#gcp-secret-manager) |
 
 ### Vaults Supported via CLI (`${cmd:...}`)
 

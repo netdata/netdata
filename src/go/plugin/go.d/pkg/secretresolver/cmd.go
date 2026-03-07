@@ -5,6 +5,7 @@ package secretresolver
 import (
 	"context"
 	"fmt"
+	"io"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -26,6 +27,7 @@ func resolveCmd(cmdLine, original string) (string, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
+	cmd.Stderr = io.Discard
 	out, err := cmd.Output()
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {

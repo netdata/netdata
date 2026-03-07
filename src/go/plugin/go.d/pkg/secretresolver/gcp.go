@@ -228,10 +228,19 @@ func gcpGetTokenServiceAccount() (string, error) {
 
 func gcpCreateSignedJWT(clientEmail, tokenURI, privateKeyPEM string, nowUnix int64) (string, error) {
 	header := `{"alg":"RS256","typ":"JWT"}`
-	claims := fmt.Sprintf(
-		`{"iss":"%s","scope":"https://www.googleapis.com/auth/cloud-platform","aud":"%s","iat":%d,"exp":%d}`,
-		clientEmail, tokenURI, nowUnix, nowUnix+3600,
-	)
+
+	claimsMap := map[string]any{
+		"iss":   clientEmail,
+		"scope": "https://www.googleapis.com/auth/cloud-platform",
+		"aud":   tokenURI,
+		"iat":   nowUnix,
+		"exp":   nowUnix + 3600,
+	}
+	claimsJSON, err := json.Marshal(claimsMap)
+	if err != nil {
+		return "", fmt.Errorf("marshaling JWT claims: %w", err)
+	}
+	claims := string(claimsJSON)
 
 	headerB64 := base64.RawURLEncoding.EncodeToString([]byte(header))
 	claimsB64 := base64.RawURLEncoding.EncodeToString([]byte(claims))
