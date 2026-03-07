@@ -63,7 +63,14 @@ func resolveAWSSM(ref, original string) (string, error) {
 		return "", fmt.Errorf("resolving secret '%s': key '%s' not found in SecretString JSON", original, jsonKey)
 	}
 
-	return fmt.Sprint(val), nil
+	if s, ok := val.(string); ok {
+		return s, nil
+	}
+	b, err := json.Marshal(val)
+	if err != nil {
+		return "", fmt.Errorf("resolving secret '%s': encoding value for key '%s': %w", original, jsonKey, err)
+	}
+	return string(b), nil
 }
 
 func awsGetCredentials() (*awsCredentials, error) {
@@ -291,13 +298,17 @@ func awsGetSecretValue(creds *awsCredentials, region, secretName, original strin
 	}
 
 	var result struct {
-		SecretString string `json:"SecretString"`
+		SecretString *string `json:"SecretString"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return "", fmt.Errorf("resolving secret '%s': parsing response: %w", original, err)
 	}
 
-	return result.SecretString, nil
+	if result.SecretString == nil {
+		return "", fmt.Errorf("resolving secret '%s': SecretString is empty (binary secrets are not supported)", original)
+	}
+
+	return *result.SecretString, nil
 }
 
 // awsSigV4Sign computes an AWS Signature Version 4 Authorization header value.

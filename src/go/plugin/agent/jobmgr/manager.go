@@ -18,12 +18,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/secretresolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/secretresolver"
 	"gopkg.in/yaml.v2"
 )
 
@@ -678,6 +678,16 @@ func applyConfig(cfg confgroup.Config, module any) error {
 		return fmt.Errorf("resolving secrets: %w", err)
 	}
 	bs, err := yaml.Marshal(cfgResolved)
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal(bs, module)
+}
+
+// applyConfigRaw applies config without resolving secrets.
+// Used by dyncfg get to avoid exposing resolved secret values.
+func applyConfigRaw(cfg confgroup.Config, module any) error {
+	bs, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err
 	}
