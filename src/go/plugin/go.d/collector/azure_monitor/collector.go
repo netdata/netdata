@@ -80,9 +80,9 @@ type Collector struct {
 
 	now func() time.Time
 
-	newResourceGraph func(subscriptionID string, cred azcore.TokenCredential, cloud azcloud.Configuration) (resourceGraphClient, error)
-	newMetricsClient func(endpoint string, cred azcore.TokenCredential, cloud azcloud.Configuration) (metricsQueryClient, error)
-	loadProfileCatalog   func() (profileCatalog, error)
+	newResourceGraph   func(subscriptionID string, cred azcore.TokenCredential, cloud azcloud.Configuration) (resourceGraphClient, error)
+	newMetricsClient   func(endpoint string, cred azcore.TokenCredential, cloud azcloud.Configuration) (metricsQueryClient, error)
+	loadProfileCatalog func() (profileCatalog, error)
 
 	metricsClientsMu syncMapMutex
 	metricsClients   map[string]metricsQueryClient
@@ -197,4 +197,3 @@ func defaultNewMetricsClient(endpoint string, cred azcore.TokenCredential, cloud
 	}
 	return client, nil
 }
-
