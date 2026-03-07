@@ -51,11 +51,13 @@ func BuildMSSQLAzureADDSN(baseDSN string, cfg Config) (string, error) {
 	switch cfg.normalizedMode() {
 	case ModeServicePrincipal:
 		q.Set("fedauth", mssqlFedAuthServicePrincipal)
-		userID := cfg.ClientID
+		clientID := strings.TrimSpace(cfg.ClientID)
+		clientSecret := strings.TrimSpace(cfg.ClientSecret)
+		userID := clientID
 		if tenantID := strings.TrimSpace(cfg.TenantID); tenantID != "" {
 			userID = userID + "@" + tenantID
 		}
-		u.User = url.UserPassword(userID, cfg.ClientSecret)
+		u.User = url.UserPassword(userID, clientSecret)
 	case ModeManagedIdentity:
 		q.Set("fedauth", mssqlFedAuthManagedIdentity)
 		u.User = nil

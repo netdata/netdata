@@ -137,3 +137,51 @@ func TestTokenProviderReturnsCredentialError(t *testing.T) {
 		t.Fatalf("expected error")
 	}
 }
+
+func TestTokenProviderFallsBackOnRefreshFailure(t *testing.T) {
+	baseNow := time.Date(2026, time.March, 6, 10, 0, 0, 0, time.UTC)
+	currentNow := baseNow
+	calls := 0
+
+	cred := fakeTokenCredential{
+		getToken: func(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error) {
+			calls++
+			if calls == 1 {
+				return azcore.AccessToken{
+					Token:     "good-token",
+					ExpiresOn: baseNow.Add(10 * time.Minute),
+				}, nil
+			}
+			return azcore.AccessToken{}, errors.New("transient failure")
+		},
+	}
+
+	p, err := NewTokenProvider(cred, []string{"scope"}, 5*time.Minute)
+	if err != nil {
+		t.Fatalf("NewTokenProvider() unexpected error: %v", err)
+	}
+	p.now = func() time.Time { return currentNow }
+
+	// First call succeeds
+	token, _, err := p.Token(context.Background())
+	if err != nil || token != "good-token" {
+		t.Fatalf("first call: unexpected error=%v token=%q", err, token)
+	}
+
+	// Advance into refresh margin but before expiry
+	currentNow = baseNow.Add(6 * time.Minute)
+	token, _, err = p.Token(context.Background())
+	if err != nil {
+		t.Fatalf("expected fallback to cached token, got error: %v", err)
+	}
+	if token != "good-token" {
+		t.Fatalf("expected cached token, got %q", token)
+	}
+
+	// Advance past expiry — should error since no valid cache
+	currentNow = baseNow.Add(11 * time.Minute)
+	_, _, err = p.Token(context.Background())
+	if err == nil {
+		t.Fatalf("expected error when cached token expired and refresh fails")
+	}
+}

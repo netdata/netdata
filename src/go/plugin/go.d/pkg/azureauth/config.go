@@ -71,7 +71,12 @@ func (c Config) NewCredential() (azcore.TokenCredential, error) {
 
 	switch c.normalizedMode() {
 	case ModeServicePrincipal:
-		return azidentity.NewClientSecretCredential(c.TenantID, c.ClientID, c.ClientSecret, nil)
+		return azidentity.NewClientSecretCredential(
+			strings.TrimSpace(c.TenantID),
+			strings.TrimSpace(c.ClientID),
+			strings.TrimSpace(c.ClientSecret),
+			nil,
+		)
 	case ModeManagedIdentity:
 		if strings.TrimSpace(c.ManagedIdentityClientID) != "" {
 			opts := &azidentity.ManagedIdentityCredentialOptions{
