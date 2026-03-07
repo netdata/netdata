@@ -325,7 +325,7 @@ func TestCollector_InitEmptyProfilesFails(t *testing.T) {
 func TestCollector_InitAutoDiscoverNoMatchFails(t *testing.T) {
 	rg := &mockResourceGraph{
 		resources: []map[string]any{
-			{"type": "microsoft.web/sites", "count_": int64(3)},
+			{"type": "microsoft.fakeservice/fakeresources", "count_": int64(3)},
 		},
 	}
 

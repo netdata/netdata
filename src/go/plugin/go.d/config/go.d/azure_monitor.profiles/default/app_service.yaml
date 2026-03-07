@@ -1,0 +1,552 @@
+name: Azure App Service
+resource_type: Microsoft.Web/sites
+metrics:
+  # HTTP Traffic
+  - name: Requests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: HttpResponseTime
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Http2xx
+    units: responses/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Http3xx
+    units: responses/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Http4xx
+    units: responses/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Http5xx
+    units: responses/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Compute
+  - name: CpuPercentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: CpuTime
+    units: seconds
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AverageMemoryWorkingSet
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: MemoryWorkingSet
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: PrivateBytes
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  # Network
+  - name: BytesReceived
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BytesSent
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Health & Connections
+  - name: HealthCheckStatus
+    units: percentage
+    aggregations: [average]
+    time_grain: PT5M
+  - name: AppConnections
+    units: connections
+    aggregations: [average]
+    time_grain: PT1M
+  # IO
+  - name: IoReadBytesPerSecond
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: IoWriteBytesPerSecond
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: IoReadOperationsPerSecond
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: IoWriteOperationsPerSecond
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: IoOtherBytesPerSecond
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: IoOtherOperationsPerSecond
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Runtime
+  - name: Threads
+    units: threads
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Handles
+    units: handles
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Gen0Collections
+    units: collections/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Gen1Collections
+    units: collections/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Gen2Collections
+    units: collections/s
+    aggregations: [total]
+    time_grain: PT1M
+  # HTTP Detail
+  - name: Http101
+    units: responses/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Http401
+    units: responses/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Http403
+    units: responses/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Http404
+    units: responses/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Http406
+    units: responses/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Queue & Scaling
+  - name: RequestsInApplicationQueue
+    units: requests
+    aggregations: [average]
+    time_grain: PT1M
+  - name: InstanceCount
+    units: instances
+    aggregations: [average]
+    time_grain: PT1M
+  # .NET Runtime Detail
+  - name: CurrentAssemblies
+    units: assemblies
+    aggregations: [average]
+    time_grain: PT1M
+  - name: TotalAppDomains
+    units: domains
+    aggregations: [average]
+    time_grain: PT1M
+  - name: TotalAppDomainsUnloaded
+    units: domains
+    aggregations: [average]
+    time_grain: PT1M
+  # Functions
+  - name: FunctionExecutionCount
+    units: executions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: FunctionExecutionUnits
+    units: MB-milliseconds/s
+    aggregations: [total]
+    time_grain: PT1M
+charts:
+  - id: am_azure_app_service__requests
+    title: Azure App Service Requests
+    context: app_service.requests
+    family: HTTP
+    type: line
+    priority: 1000
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Requests
+        aggregation: total
+        name: requests
+
+  - id: am_azure_app_service__response_time
+    title: Azure App Service Response Time
+    context: app_service.response_time
+    family: HTTP
+    type: line
+    priority: 1010
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: HttpResponseTime
+        aggregation: average
+        name: average
+
+  - id: am_azure_app_service__http_status
+    title: Azure App Service HTTP Status Codes
+    context: app_service.http_status
+    family: HTTP
+    type: line
+    priority: 1020
+    units: responses/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Http2xx
+        aggregation: total
+        name: 2xx
+      - metric: Http3xx
+        aggregation: total
+        name: 3xx
+      - metric: Http4xx
+        aggregation: total
+        name: 4xx
+      - metric: Http5xx
+        aggregation: total
+        name: 5xx
+
+  - id: am_azure_app_service__http_error_detail
+    title: Azure App Service HTTP Error Detail
+    context: app_service.http_error_detail
+    family: HTTP
+    type: line
+    priority: 1025
+    units: responses/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Http101
+        aggregation: total
+        name: 101_websocket
+      - metric: Http401
+        aggregation: total
+        name: 401_unauthorized
+      - metric: Http403
+        aggregation: total
+        name: 403_forbidden
+      - metric: Http404
+        aggregation: total
+        name: 404_not_found
+      - metric: Http406
+        aggregation: total
+        name: 406_not_acceptable
+
+  - id: am_azure_app_service__cpu
+    title: Azure App Service CPU Utilization
+    context: app_service.cpu
+    family: Compute
+    type: line
+    priority: 1030
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CpuPercentage
+        aggregation: average
+        name: average
+
+  - id: am_azure_app_service__cpu_time
+    title: Azure App Service CPU Time
+    context: app_service.cpu_time
+    family: Compute
+    type: line
+    priority: 1050
+    units: seconds
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CpuTime
+        aggregation: total
+        name: total
+
+  - id: am_azure_app_service__memory_usage
+    title: Azure App Service Memory Usage
+    context: app_service.memory_usage
+    family: Compute
+    type: line
+    priority: 1060
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AverageMemoryWorkingSet
+        aggregation: average
+        name: average_working_set
+      - metric: MemoryWorkingSet
+        aggregation: average
+        name: working_set
+      - metric: PrivateBytes
+        aggregation: average
+        name: private
+
+  - id: am_azure_app_service__health
+    title: Azure App Service Health Check Status
+    context: app_service.health
+    family: Health
+    type: line
+    priority: 1070
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: HealthCheckStatus
+        aggregation: average
+        name: average
+
+  - id: am_azure_app_service__network_traffic
+    title: Azure App Service Network Traffic
+    context: app_service.network_traffic
+    family: Network
+    type: line
+    priority: 1080
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BytesReceived
+        aggregation: total
+        name: received
+      - metric: BytesSent
+        aggregation: total
+        name: sent
+
+  - id: am_azure_app_service__connections
+    title: Azure App Service Connections
+    context: app_service.connections
+    family: Connections
+    type: line
+    priority: 1090
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AppConnections
+        aggregation: average
+        name: average
+
+  - id: am_azure_app_service__io_throughput
+    title: Azure App Service IO Throughput
+    context: app_service.io_throughput
+    family: IO
+    type: line
+    priority: 1100
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IoReadBytesPerSecond
+        aggregation: total
+        name: read
+      - metric: IoWriteBytesPerSecond
+        aggregation: total
+        name: write
+      - metric: IoOtherBytesPerSecond
+        aggregation: total
+        name: other
+
+  - id: am_azure_app_service__io_operations
+    title: Azure App Service IO Operations
+    context: app_service.io_operations
+    family: IO
+    type: line
+    priority: 1110
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IoReadOperationsPerSecond
+        aggregation: total
+        name: read
+      - metric: IoWriteOperationsPerSecond
+        aggregation: total
+        name: write
+      - metric: IoOtherOperationsPerSecond
+        aggregation: total
+        name: other
+
+  - id: am_azure_app_service__threads
+    title: Azure App Service Threads
+    context: app_service.threads
+    family: Runtime
+    type: line
+    priority: 1120
+    units: threads
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Threads
+        aggregation: average
+        name: average
+
+  - id: am_azure_app_service__handles
+    title: Azure App Service Handles
+    context: app_service.handles
+    family: Runtime
+    type: line
+    priority: 1130
+    units: handles
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Handles
+        aggregation: average
+        name: average
+
+  - id: am_azure_app_service__gc_collections
+    title: Azure App Service .NET GC Collections
+    context: app_service.gc_collections
+    family: Runtime
+    type: line
+    priority: 1140
+    units: collections/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Gen0Collections
+        aggregation: total
+        name: gen0
+      - metric: Gen1Collections
+        aggregation: total
+        name: gen1
+      - metric: Gen2Collections
+        aggregation: total
+        name: gen2
+
+  - id: am_azure_app_service__function_executions
+    title: Azure App Service Function Executions
+    context: app_service.function_executions
+    family: Functions
+    type: line
+    priority: 1150
+    units: executions/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: FunctionExecutionCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_app_service__function_execution_units
+    title: Azure App Service Function Execution Units
+    context: app_service.function_execution_units
+    family: Functions
+    type: line
+    priority: 1160
+    units: MB-milliseconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: FunctionExecutionUnits
+        aggregation: total
+        name: total
+
+  - id: am_azure_app_service__request_queue
+    title: Azure App Service Request Queue
+    context: app_service.request_queue
+    family: Health
+    type: line
+    priority: 1170
+    units: requests
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RequestsInApplicationQueue
+        aggregation: average
+        name: queued
+
+  - id: am_azure_app_service__instances
+    title: Azure App Service Instance Count
+    context: app_service.instances
+    family: Scaling
+    type: line
+    priority: 1180
+    units: instances
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: InstanceCount
+        aggregation: average
+        name: running
+
+  - id: am_azure_app_service__assemblies
+    title: Azure App Service .NET Assemblies
+    context: app_service.assemblies
+    family: Runtime
+    type: line
+    priority: 1190
+    units: assemblies
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CurrentAssemblies
+        aggregation: average
+        name: loaded
+
+  - id: am_azure_app_service__app_domains
+    title: Azure App Service App Domains
+    context: app_service.app_domains
+    family: Runtime
+    type: line
+    priority: 1200
+    units: domains
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalAppDomains
+        aggregation: average
+        name: loaded
+      - metric: TotalAppDomainsUnloaded
+        aggregation: average
+        name: unloaded
