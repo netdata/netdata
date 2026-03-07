@@ -4,7 +4,7 @@
 
 Netdata collectors often need credentials such as database passwords, API tokens, and connection strings. Instead of storing these credentials as plain text in configuration files, you can use **secret references** that are resolved automatically when a collector job starts.
 
-Netdata integrates with **secrets vaults** and credential stores — including HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, GCP Secret Manager, CyberArk Conjur, 1Password, Doppler, and any other vault with a CLI — so you never need to put passwords in config files.
+Netdata integrates with **secrets vaults** and credential stores — including HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, GCP Secret Manager, CyberArk Conjur, Keeper Secrets Manager, 1Password, Bitwarden, Doppler, Akeyless, Infisical, Delinea, and any other vault with a CLI — so you never need to put passwords in config files.
 
 Secret references work with both YAML configuration files and the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md). Collectors require zero changes — resolution is fully transparent.
 
@@ -357,6 +357,7 @@ These vault solutions inject secrets as environment variables or files, which Ne
 | **Kubernetes External Secrets Operator** (ESO) | Syncs any vault to K8s Secrets → `${env:...}` or `${file:...}` |
 | **AWS Systems Manager Parameter Store** (SSM) | Via ESO or ECS task definitions → `${env:...}` |
 | **1Password Connect** | K8s operator injects secrets → `${env:...}` or `${file:...}` |
+| **Keeper Secrets Manager** | K8s integration or CLI injection → `${env:...}` or `${file:...}` |
 | **Doppler** | CLI injects env vars at process startup → `${env:...}` |
 | **CyberArk Conjur** | Sidecar writes secrets to shared volume → `${file:/path}` |
 | **Sealed Secrets** (Bitnami) | Decrypts to K8s Secrets → `${env:...}` or `${file:...}` |
