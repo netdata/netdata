@@ -1580,7 +1580,7 @@ modules:
       configuration:
         file:
           name: "ebpf.d/network.conf"
-          description: "Overwrite default configuration helping to reduce memory usage. You can also select charts visible on dashboard."
+          description: "Overwrite default configuration helping to reduce memory usage. You can also select charts visible on dashboard. Note: You must first enable the socket module in ebpf.d.conf by setting `socket = yes` in the `[ebpf programs]` section."
         options:
           description: |
             All options are defined inside section `[global]`. Options inside `network connections` are ignored for while.
