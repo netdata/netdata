@@ -103,6 +103,10 @@
 - Feat(integrations): link setup option names to detailed configuration sections ([#21897](https://github.com/netdata/netdata/issues/21897))
 - Regenerate integrations docs ([#21898](https://github.com/netdata/netdata/issues/21898))
 - Restructure otel-plugin configuration with layered overrides ([#21896](https://github.com/netdata/netdata/issues/21896))
+- Regenerate integrations docs ([#21899](https://github.com/netdata/netdata/issues/21899))
+- Reject incoming streaming connection for own vnode ([#21889](https://github.com/netdata/netdata/issues/21889))
+- Chore(go/plugin/functions): change "not instances configured" resp code ([#21903](https://github.com/netdata/netdata/issues/21903))
+- Handle fetching IBM MQ libraries in CI package build jobs outside of CMake ([#21862](https://github.com/netdata/netdata/issues/21862))
 
 ## [2.9.0] - 2026-02-16
 
