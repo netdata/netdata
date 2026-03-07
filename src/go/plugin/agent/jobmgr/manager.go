@@ -670,10 +670,14 @@ func newConfigModule(creator collectorapi.Creator) (configModule, error) {
 }
 
 func applyConfig(cfg confgroup.Config, module any) error {
-	if err := secretresolver.Resolve(cfg); err != nil {
+	cfgResolved, err := cfg.Clone()
+	if err != nil {
+		return fmt.Errorf("cloning config: %w", err)
+	}
+	if err := secretresolver.Resolve(cfgResolved); err != nil {
 		return fmt.Errorf("resolving secrets: %w", err)
 	}
-	bs, err := yaml.Marshal(cfg)
+	bs, err := yaml.Marshal(cfgResolved)
 	if err != nil {
 		return err
 	}

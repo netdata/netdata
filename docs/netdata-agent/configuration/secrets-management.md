@@ -232,7 +232,7 @@ sudo systemctl restart netdata
 
 :::important
 
-The `EnvironmentFile` directive makes the variables available only to processes started by this systemd unit. The secrets are not exposed to other users or processes on the system.
+The `EnvironmentFile` directive makes the variables available to processes started by this systemd unit. This limits scope compared to global shell exports, but privileged users or processes may still inspect process environments via `/proc/PID/environ`.
 
 :::
 
@@ -315,8 +315,10 @@ The resulting Kubernetes Secret can then be injected as environment variables or
 | Azure Key Vault | `${azure-kv:vault/name}` | `${cmd:/usr/bin/az ...}` | External Secrets Operator |
 | GCP Secret Manager | `${gcp-sm:project/name}` | `${cmd:/usr/bin/gcloud ...}` | External Secrets Operator |
 | CyberArk | — | `${cmd:/usr/bin/conjur ...}` | Conjur sidecar |
+| Keeper | — | `${cmd:/usr/bin/ksm secret ...}` | Keeper Secrets Manager CLI or K8s integration |
 | 1Password | — | `${cmd:/usr/bin/op read ...}` | 1Password Connect |
 | Doppler | — | `${cmd:/usr/bin/doppler ...}` | Doppler CLI injection |
+| Delinea | — | `${cmd:/usr/bin/dsv secret ...}` | DevOps Secrets Vault CLI |
 | Infisical | — | `${cmd:/usr/bin/infisical ...}` | Infisical Agent |
 
 :::tip
