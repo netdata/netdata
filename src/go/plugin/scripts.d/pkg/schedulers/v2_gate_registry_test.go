@@ -90,6 +90,17 @@ func TestV2Gate_G4_SchedulerRegistry(t *testing.T) {
 		if err := reg.Remove("gate-concurrent"); err != nil {
 			t.Fatalf("remove failed: %v", err)
 		}
+		if _, ok := reg.Snapshot("gate-concurrent"); ok {
+			t.Fatalf("expected snapshot to be absent after remove")
+		}
+		if _, ok := reg.Get("gate-concurrent"); ok {
+			t.Fatalf("expected definition to be absent after remove")
+		}
+		for _, def := range reg.All() {
+			if def.Name == "gate-concurrent" {
+				t.Fatalf("found orphan scheduler definition after remove")
+			}
+		}
 	})
 
 	t.Run("incompatible predicate", TestRegistryEnsureRejectsIncompatibleRuntimeFields)
