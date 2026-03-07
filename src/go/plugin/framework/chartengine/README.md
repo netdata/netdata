@@ -39,7 +39,7 @@ For `ModuleV2` collectors, the runtime integration expects:
 | `WithRuntimeStore(...)`                             | Override/disable self-metrics store                                                                                                                                     |
 | `WithSeriesSelectionAllVisible()`                   | Process all visible series instead of filtering to latest successful collect cycle. Intended for runtime/internal stores that commit immediately (no cycle boundaries). |
 | `WithEmitTypeIDBudgetPrefix(...)`                   | Set the effective type-id prefix used by autogen budget checks                                                                                                          |
-| `WithRuntimePlannerMode(...)`                       | Enable runtime planner mode with no-write-tick semantics, for jobs/tests that drive planning directly from runtime metrics instead of collect-cycle boundaries.        |
+| `WithRuntimePlannerMode(...)`                       | Enable runtime planner mode with no-write-tick semantics, for jobs/tests that drive planning directly from runtime metrics instead of collect-cycle boundaries.         |
 
 ## End-to-End Example (Single Flow)
 
@@ -75,7 +75,8 @@ groups:
 
 // 3) Build plan from flattened+raw reader and emit.
 // ReadFlatten() is included even for templates with static dimensions
-// because it is required for inferred dimensions and is the standard pattern.
+// because it is required for inferred dimensions, structured-family autogen,
+// and is the standard pattern.
 plan, err := engine.BuildPlan(store.Read(metrix.ReadRaw(), metrix.ReadFlatten()))
 // handle err
 
@@ -107,11 +108,12 @@ Terms like "materialized state" and "route cache" are defined in the Engine Stat
 
 ## Reader Requirements
 
-| Scenario                                                   | Required reader mode                               |
-|------------------------------------------------------------|----------------------------------------------------|
-| Static named dimensions only                               | `Read(...)` is sufficient (no flatten needed)      |
-| Inferred dimensions (`name` and `name_from_label` omitted) | Must use flattened reader metadata (`ReadFlatten`) |
-| Runtime/default `ModuleV2` path                            | `Read(ReadRaw(), ReadFlatten())`                   |
+| Scenario                                                                       | Required reader mode                                                       |
+|--------------------------------------------------------------------------------|----------------------------------------------------------------------------|
+| Static named dimensions only                                                   | `Read(...)` is sufficient (no flatten needed)                              |
+| Inferred dimensions (`name` and `name_from_label` omitted)                     | Must use flattened reader metadata (`ReadFlatten`)                         |
+| Structured autogen families (`Histogram`, `Summary`, `StateSet`, `MeasureSet`) | Must use flattened reader metadata (`ReadFlatten`) or they are not visible |
+| Runtime/default `ModuleV2` path                                                | `Read(ReadRaw(), ReadFlatten())`                                           |
 
 If inferred dimensions are present without flattened reader metadata, `BuildPlan` returns an explicit error.
 
@@ -161,9 +163,21 @@ Default lifecycle policy when template omits lifecycle:
 | Topic                 | Behavior                                                                                                                                       |
 |-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
 | Trigger               | Unmatched series only when autogen is enabled                                                                                                  |
+| Structured families   | Autogen has dedicated source builders for flattened `Histogram`, `Summary`, `StateSet`, and `MeasureSet` families                              |
 | Metric metadata usage | Uses `metrix.MetricMeta` hints for title/family/unit where allowed                                                                             |
 | Type ID budget        | Enforced via `AutogenPolicy.MaxTypeIDLen` + effective emit type-id prefix (`WithEmitTypeIDBudgetPrefix(...)`)                                  |
 | Lifecycle             | Autogen applies `ExpireAfterSuccessCycles` to **both** chart and dimension expiry (unlike template lifecycle where they default independently) |
+
+`MeasureSet` autogen specifics:
+
+- chartengine treats `MeasureSet` as a structured family, similar to `StateSet`, not as grouped scalar coincidence
+- flattened `MeasureSet` inputs are expected to carry:
+    - `SourceKind = MetricKindMeasureSet`
+    - `FlattenRole = FlattenRoleMeasureSetField`
+    - per-field metric names like `<name>_<field>`
+    - a synthetic field label keyed by the base family name (`<name>=<field>`)
+- the synthetic field label is the authoritative field-identity channel; the per-field metric-name suffix remains for `MetricMeta(name)` compatibility
+- gauge-like `MeasureSet` fields autogen with absolute algorithm behavior; counter-like `MeasureSet` fields autogen with incremental algorithm behavior
 
 ## Runtime Metrics
 
