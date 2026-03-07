@@ -135,6 +135,24 @@ func (r *storeReader) StateSet(name string, labels Labels) (StateSetPoint, bool)
 	return StateSetPoint{States: cloneStateMap(s.stateSetValues)}, true
 }
 
+func (r *storeReader) MeasureSet(name string, labels Labels) (MeasureSetPoint, bool) {
+	if r.flattened {
+		return MeasureSetPoint{}, false
+	}
+
+	s, ok := r.lookup(name, labels)
+	if !ok || !r.visible(s) {
+		return MeasureSetPoint{}, false
+	}
+	if s.desc == nil || s.desc.kind != kindMeasureSet || s.desc.measureSet == nil {
+		return MeasureSetPoint{}, false
+	}
+	if len(s.measureSetValues) != len(s.desc.measureSet.fields) {
+		return MeasureSetPoint{}, false
+	}
+	return MeasureSetPoint{Values: append([]SampleValue(nil), s.measureSetValues...)}, true
+}
+
 func (r *storeReader) SeriesMeta(name string, labels Labels) (SeriesMeta, bool) {
 	s, ok := r.lookup(name, labels)
 	if !ok || !r.visible(s) {

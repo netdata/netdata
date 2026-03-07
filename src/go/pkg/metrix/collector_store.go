@@ -21,6 +21,7 @@ const (
 	kindHistogram
 	kindSummary
 	kindStateSet
+	kindMeasureSet
 )
 
 const (
@@ -29,15 +30,16 @@ const (
 )
 
 type instrumentDescriptor struct {
-	name      string
-	kind      metricKind
-	mode      metricMode
-	freshness FreshnessPolicy // visibility policy used by Read()
-	window    MetricWindow
-	histogram *histogramSchema // set for kindHistogram only
-	summary   *summarySchema   // set for kindSummary only
-	stateSet  *stateSetSchema  // set for kindStateSet only
-	meta      MetricMeta
+	name       string
+	kind       metricKind
+	mode       metricMode
+	freshness  FreshnessPolicy // visibility policy used by Read()
+	window     MetricWindow
+	histogram  *histogramSchema  // set for kindHistogram only
+	summary    *summarySchema    // set for kindSummary only
+	stateSet   *stateSetSchema   // set for kindStateSet only
+	measureSet *measureSetSchema // set for kindMeasureSet only
+	meta       MetricMeta
 }
 
 type histogramSchema struct {
@@ -53,6 +55,12 @@ type stateSetSchema struct {
 	mode   StateSetMode
 	states []string
 	index  map[string]struct{}
+}
+
+type measureSetSchema struct {
+	semantics MeasureSetSemantics
+	fields    []FieldSpec
+	index     map[string]int
 }
 
 type committedSeries struct {
@@ -90,6 +98,9 @@ type committedSeries struct {
 
 	// StateSet current sample (used by StateSet()).
 	stateSetValues map[string]bool
+
+	// MeasureSet current sample (used by MeasureSet()).
+	measureSetValues []SampleValue
 
 	meta SeriesMeta
 }
@@ -475,6 +486,9 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 	if (len(cfg.states) > 0 || cfg.stateSetMode != nil) && kind != kindStateSet {
 		return nil, fmt.Errorf("metrix: stateset options are invalid for this instrument kind")
 	}
+	if (len(cfg.measureSetFields) > 0 || cfg.measureSetSemantics != nil) && kind != kindMeasureSet {
+		return nil, fmt.Errorf("metrix: measureset options are invalid for this instrument kind")
+	}
 
 	window := WindowCumulative
 	if cfg.windowSet {
@@ -529,6 +543,15 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		schema = s
 	}
 
+	var measureSet *measureSetSchema
+	if kind == kindMeasureSet {
+		s, err := buildMeasureSetSchema(cfg)
+		if err != nil {
+			return nil, err
+		}
+		measureSet = s
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -556,6 +579,9 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		if kind == kindStateSet && !equalStateSetSchema(d.stateSet, schema) {
 			return nil, fmt.Errorf("metrix: stateset schema mismatch for %s", name)
 		}
+		if kind == kindMeasureSet && !equalMeasureSetSchema(d.measureSet, measureSet) {
+			return nil, fmt.Errorf("metrix: measureset schema mismatch for %s", name)
+		}
 		if cfg.descriptionSet && d.meta.Description != metricMeta.Description {
 			return nil, fmt.Errorf("metrix: metric description mismatch for %s", name)
 		}
@@ -572,15 +598,16 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 	}
 
 	d := &instrumentDescriptor{
-		name:      name,
-		kind:      kind,
-		mode:      mode,
-		freshness: fresh,
-		window:    window,
-		histogram: histogram,
-		summary:   summary,
-		stateSet:  schema,
-		meta:      metricMeta,
+		name:       name,
+		kind:       kind,
+		mode:       mode,
+		freshness:  fresh,
+		window:     window,
+		histogram:  histogram,
+		summary:    summary,
+		stateSet:   schema,
+		measureSet: measureSet,
+		meta:       metricMeta,
 	}
 	c.instruments[name] = d
 	return d, nil
@@ -601,6 +628,9 @@ func cloneCommittedSeries(s *committedSeries) *committedSeries {
 	// Label identity is part of the series key and is never mutated after publish.
 	if s.stateSetValues != nil {
 		cp.stateSetValues = cloneStateMap(s.stateSetValues)
+	}
+	if len(s.measureSetValues) > 0 {
+		cp.measureSetValues = append([]SampleValue(nil), s.measureSetValues...)
 	}
 	if len(s.histogramCumulative) > 0 {
 		cp.histogramCumulative = append([]SampleValue(nil), s.histogramCumulative...)
@@ -713,6 +743,51 @@ func equalStateSetSchema(a, b *stateSetSchema) bool {
 	}
 	for i := range a.states {
 		if a.states[i] != b.states[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func buildMeasureSetSchema(cfg instrumentConfig) (*measureSetSchema, error) {
+	if len(cfg.measureSetFields) == 0 {
+		return nil, fmt.Errorf("metrix: measureset requires WithMeasureSetFields")
+	}
+	if cfg.measureSetSemantics == nil {
+		return nil, fmt.Errorf("metrix: measureset semantics are missing")
+	}
+
+	fields := make([]FieldSpec, 0, len(cfg.measureSetFields))
+	index := make(map[string]int, len(cfg.measureSetFields))
+	for i, field := range cfg.measureSetFields {
+		name := strings.TrimSpace(field.Name)
+		if name == "" {
+			return nil, fmt.Errorf("metrix: measureset field name cannot be empty")
+		}
+		if _, ok := index[name]; ok {
+			return nil, fmt.Errorf("metrix: duplicate measureset field %q", name)
+		}
+		field.Name = name
+		fields = append(fields, field)
+		index[name] = i
+	}
+
+	return &measureSetSchema{
+		semantics: *cfg.measureSetSemantics,
+		fields:    fields,
+		index:     index,
+	}, nil
+}
+
+func equalMeasureSetSchema(a, b *measureSetSchema) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	if a.semantics != b.semantics || len(a.fields) != len(b.fields) {
+		return false
+	}
+	for i := range a.fields {
+		if a.fields[i].Name != b.fields[i].Name || a.fields[i].Float != b.fields[i].Float {
 			return false
 		}
 	}

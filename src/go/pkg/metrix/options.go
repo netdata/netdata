@@ -23,6 +23,8 @@ type instrumentConfig struct {
 	summaryReservoir    int
 	states              []string
 	stateSetMode        *StateSetMode
+	measureSetFields    []FieldSpec
+	measureSetSemantics *MeasureSetSemantics
 
 	descriptionSet bool
 	description    string
@@ -79,6 +81,19 @@ func WithStateSetMode(mode StateSetMode) InstrumentOption {
 	return optionFunc(func(cfg *instrumentConfig) {
 		m := mode
 		cfg.stateSetMode = &m
+	})
+}
+
+func WithMeasureSetFields(fields ...FieldSpec) InstrumentOption {
+	return optionFunc(func(cfg *instrumentConfig) {
+		cfg.measureSetFields = append([]FieldSpec(nil), fields...)
+	})
+}
+
+func withMeasureSetSemantics(semantics MeasureSetSemantics) InstrumentOption {
+	return optionFunc(func(cfg *instrumentConfig) {
+		s := semantics
+		cfg.measureSetSemantics = &s
 	})
 }
 

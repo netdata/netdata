@@ -17,6 +17,11 @@ type meterBackend interface {
 	recordSummaryObservePoint(desc *instrumentDescriptor, point SummaryPoint, sets []LabelSet)
 	recordSummaryObserve(desc *instrumentDescriptor, value SampleValue, sets []LabelSet)
 	recordStateSetObserve(desc *instrumentDescriptor, point StateSetPoint, sets []LabelSet)
+	recordMeasureSetGaugeObservePoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet)
+	recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet)
+	recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, delta MeasureSetPoint, sets []LabelSet)
+	recordMeasureSetCounterObserveTotalPoint(desc *instrumentDescriptor, point MeasureSetPoint, sets []LabelSet)
+	recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, delta MeasureSetPoint, sets []LabelSet)
 }
 
 var _ meterBackend = (*storeCore)(nil)

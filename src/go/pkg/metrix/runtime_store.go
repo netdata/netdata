@@ -297,6 +297,26 @@ func (r *runtimeStoreBackend) recordStateSetObserve(desc *instrumentDescriptor, 
 	})
 }
 
+func (r *runtimeStoreBackend) recordMeasureSetGaugeObservePoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
+	panic(errRuntimeSnapshotWrite)
+}
+
+func (r *runtimeStoreBackend) recordMeasureSetGaugeSetPoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
+	panic(errMeasureSetPending)
+}
+
+func (r *runtimeStoreBackend) recordMeasureSetGaugeAddPoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
+	panic(errMeasureSetPending)
+}
+
+func (r *runtimeStoreBackend) recordMeasureSetCounterObserveTotalPoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
+	panic(errRuntimeSnapshotWrite)
+}
+
+func (r *runtimeStoreBackend) recordMeasureSetCounterAddPoint(_ *instrumentDescriptor, _ MeasureSetPoint, _ []LabelSet) {
+	panic(errMeasureSetPending)
+}
+
 func (r *runtimeStoreBackend) commitRuntimeWrite(apply func(old, next *readSnapshot, seq uint64, nowUnixNano int64)) {
 	r.core.mu.Lock()
 	defer r.core.mu.Unlock()
