@@ -65,7 +65,8 @@ func resolveVault(ref, original string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	// Cap response body to 1 MiB to prevent memory exhaustion.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': reading vault response: %w", original, err)
 	}
@@ -118,7 +119,7 @@ func parseVaultResponse(body []byte, key, original string) (string, error) {
 	}
 	if err := json.Unmarshal(resp.Data, &kvV2); err == nil && kvV2.Data != nil {
 		if val, ok := kvV2.Data[key]; ok {
-			return fmt.Sprint(val), nil
+			return vaultValueToString(val)
 		}
 	}
 
@@ -126,11 +127,24 @@ func parseVaultResponse(body []byte, key, original string) (string, error) {
 	var kvV1 map[string]any
 	if err := json.Unmarshal(resp.Data, &kvV1); err == nil {
 		if val, ok := kvV1[key]; ok {
-			return fmt.Sprint(val), nil
+			return vaultValueToString(val)
 		}
 	}
 
 	return "", fmt.Errorf("resolving secret '%s': key '%s' not found in vault response", original, key)
+}
+
+func vaultValueToString(val any) (string, error) {
+	if s, ok := val.(string); ok {
+		return s, nil
+	}
+	// For non-string values (numbers, booleans), use JSON encoding
+	// to avoid Go-internal formatting like map[k:v].
+	b, err := json.Marshal(val)
+	if err != nil {
+		return "", fmt.Errorf("encoding vault value: %w", err)
+	}
+	return string(b), nil
 }
 
 func truncateBody(body []byte) string {

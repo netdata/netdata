@@ -231,7 +231,13 @@ func awsGetIMDSCredentials() (*awsCredentials, error) {
 
 func awsGetSecretValue(creds *awsCredentials, region, secretName, original string) (string, error) {
 	endpoint := fmt.Sprintf("https://secretsmanager.%s.amazonaws.com/", region)
-	payload := fmt.Sprintf(`{"SecretId":"%s"}`, secretName)
+
+	// Use json.Marshal to safely escape the secret name.
+	secretIDJSON, err := json.Marshal(secretName)
+	if err != nil {
+		return "", fmt.Errorf("resolving secret '%s': encoding secret name: %w", original, err)
+	}
+	payload := `{"SecretId":` + string(secretIDJSON) + `}`
 
 	now := time.Now().UTC()
 	timestamp := now.Format("20060102T150405Z")
@@ -329,9 +335,13 @@ func awsSigV4Sign(method, uri, query string, headers map[string]string, payload 
 
 // awsCanonicalHeaders builds the canonical headers string and signed headers list.
 func awsCanonicalHeaders(headers map[string]string) (string, string) {
+	// Build a normalized map with lowercase keys for safe lookup.
+	norm := make(map[string]string, len(headers))
 	keys := make([]string, 0, len(headers))
-	for k := range headers {
-		keys = append(keys, strings.ToLower(k))
+	for k, v := range headers {
+		lk := strings.ToLower(k)
+		norm[lk] = v
+		keys = append(keys, lk)
 	}
 	sort.Strings(keys)
 
@@ -339,7 +349,7 @@ func awsCanonicalHeaders(headers map[string]string) (string, string) {
 	for _, k := range keys {
 		canonical.WriteString(k)
 		canonical.WriteByte(':')
-		canonical.WriteString(strings.TrimSpace(headers[k]))
+		canonical.WriteString(strings.TrimSpace(norm[k]))
 		canonical.WriteByte('\n')
 	}
 

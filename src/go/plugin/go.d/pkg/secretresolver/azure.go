@@ -67,10 +67,8 @@ func azureGetAccessToken() (string, error) {
 	clientSecret := os.Getenv("AZURE_CLIENT_SECRET")
 
 	if tenantID != "" && clientID != "" && clientSecret != "" {
-		token, err := azureGetTokenClientCredentials(tenantID, clientID, clientSecret)
-		if err == nil {
-			return token, nil
-		}
+		// All three client credential vars are set — use them exclusively.
+		return azureGetTokenClientCredentials(tenantID, clientID, clientSecret)
 	}
 
 	// Fall back to managed identity (IMDS).
