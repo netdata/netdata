@@ -83,8 +83,9 @@ func TestCollector_InitCollectCleanup(t *testing.T) {
 	cc.CommitCycleSuccess()
 
 	read := coll.MetricStore().Read(metrix.ReadRaw())
+	flat := coll.MetricStore().Read(metrix.ReadFlatten())
 	assertMetricValue(t, read, "nagios.scheduler.running", metrix.Labels{"nagios_scheduler": "default"}, 1)
-	assertMetricValue(t, read, "nagios.job.state.ok", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk"}, 1)
+	assertMetricValue(t, flat, "nagios.job.state", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk", "nagios.job.state": "ok"}, 1)
 	assertMetricValue(t, read, "nagios.perf_bytes_used_value", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk"}, 30000)
 	meta, ok := read.MetricMeta("nagios.perf_bytes_used_value")
 	if !ok {

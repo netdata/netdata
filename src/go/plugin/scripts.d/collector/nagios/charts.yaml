@@ -8,10 +8,7 @@ engine:
 groups:
   - family: Job
     metrics:
-      - nagios.job.state.ok
-      - nagios.job.state.warning
-      - nagios.job.state.critical
-      - nagios.job.state.unknown
+      - nagios.job.state
       - nagios.job.attempt
       - nagios.job.max_attempts
     charts:
@@ -22,14 +19,7 @@ groups:
         instances:
           by_labels: [nagios_scheduler, nagios_job]
         dimensions:
-          - selector: nagios.job.state.ok
-            name: ok
-          - selector: nagios.job.state.warning
-            name: warning
-          - selector: nagios.job.state.critical
-            name: critical
-          - selector: nagios.job.state.unknown
-            name: unknown
+          - selector: nagios.job.state
       - id: job_attempts
         title: Job Attempts
         context: job_attempts

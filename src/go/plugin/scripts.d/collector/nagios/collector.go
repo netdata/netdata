@@ -134,6 +134,12 @@ func (c *Collector) Collect(context.Context) error {
 	observe := func(name string, value float64) {
 		sm.Gauge(name).Observe(value, lbl)
 	}
+	jobStateSet := sm.Vec("nagios_scheduler", "nagios_job").StateSet(
+		"job.state",
+		metrix.WithStateSetMode(metrix.ModeEnum),
+		metrix.WithStateSetStates("ok", "warning", "critical", "unknown"),
+		metrix.WithUnit("state"),
+	)
 	observe("scheduler.running", float64(snapshot.Running))
 	observe("scheduler.queued", float64(snapshot.Queued))
 	observe("scheduler.scheduled", float64(snapshot.Scheduled))
@@ -154,10 +160,7 @@ func (c *Collector) Collect(context.Context) error {
 			sm.Gauge(name).Observe(value, jobLbl)
 		}
 
-		observeJob("job.state.ok", boolToFloat(strings.EqualFold(job.State, "OK")))
-		observeJob("job.state.warning", boolToFloat(strings.EqualFold(job.State, "WARNING")))
-		observeJob("job.state.critical", boolToFloat(strings.EqualFold(job.State, "CRITICAL")))
-		observeJob("job.state.unknown", boolToFloat(strings.EqualFold(job.State, "UNKNOWN")))
+		jobStateSet.WithLabelValues(c.jobSpec.Scheduler, job.JobName).Enable(normalizeJobStateForMetric(job.State))
 		observeJob("job.attempt", float64(job.Attempt))
 		observeJob("job.max_attempts", float64(job.MaxAttempt))
 
@@ -196,6 +199,19 @@ func (c *Collector) Cleanup(context.Context) {
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
 func (c *Collector) ChartTemplateYAML() string { return nagiosChartTemplateV2 }
+
+func normalizeJobStateForMetric(state string) string {
+	switch strings.ToUpper(strings.TrimSpace(state)) {
+	case "OK":
+		return "ok"
+	case "WARNING":
+		return "warning"
+	case "CRITICAL":
+		return "critical"
+	default:
+		return "unknown"
+	}
+}
 
 func boolToFloat(v bool) float64 {
 	if v {
