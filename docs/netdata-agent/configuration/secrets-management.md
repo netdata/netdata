@@ -4,6 +4,8 @@
 
 Netdata collectors often need credentials such as database passwords, API tokens, and connection strings. Instead of storing these credentials as plain text in configuration files, you can use **secret references** that are resolved automatically when a collector job starts.
 
+Netdata integrates with **secrets vaults** and credential stores — including HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, GCP Secret Manager, CyberArk Conjur, 1Password, Doppler, and any other vault with a CLI — so you never need to put passwords in config files.
+
 Secret references work with both YAML configuration files and the [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md). Collectors require zero changes — resolution is fully transparent.
 
 :::tip
@@ -308,22 +310,65 @@ The resulting Kubernetes Secret can then be injected as environment variables or
 
 ## Vault Integration Summary
 
-| Vault | Native Support | Via `${cmd:...}` | Via Env/File |
-|-------|---------------|-------------------|--------------|
-| HashiCorp Vault | `${vault:path#key}` | `${cmd:/usr/bin/vault ...}` | Vault Agent sidecar |
-| AWS Secrets Manager | `${aws-sm:name#key}` | `${cmd:/usr/bin/aws ...}` | External Secrets Operator |
-| Azure Key Vault | `${azure-kv:vault/name}` | `${cmd:/usr/bin/az ...}` | External Secrets Operator |
-| GCP Secret Manager | `${gcp-sm:project/name}` | `${cmd:/usr/bin/gcloud ...}` | External Secrets Operator |
-| CyberArk | — | `${cmd:/usr/bin/conjur ...}` | Conjur sidecar |
-| Keeper | — | `${cmd:/usr/bin/ksm secret ...}` | Keeper Secrets Manager CLI or K8s integration |
-| 1Password | — | `${cmd:/usr/bin/op read ...}` | 1Password Connect |
-| Doppler | — | `${cmd:/usr/bin/doppler ...}` | Doppler CLI injection |
-| Delinea | — | `${cmd:/usr/bin/dsv secret ...}` | DevOps Secrets Vault CLI |
-| Infisical | — | `${cmd:/usr/bin/infisical ...}` | Infisical Agent |
+Netdata supports **every vault and secrets manager** — either natively, via CLI command execution, or through environment/file injection. The table below lists popular vault solutions and how to integrate them.
+
+### Vaults with Native API Support
+
+| Vault Provider | Syntax | Details |
+|----------------|--------|---------|
+| **HashiCorp Vault** (HCP Vault, Vault Enterprise, Vault OSS) | `${vault:path#key}` | [Configuration](#hashicorp-vault) |
+| **AWS Secrets Manager** | `${aws-sm:name#key}` | [Configuration](#aws-secrets-manager) |
+| **Azure Key Vault** | `${azure-kv:vault/name}` | [Configuration](#azure-key-vault) |
+| **GCP Secret Manager** (Google Cloud) | `${gcp-sm:project/name}` | [Configuration](#gcp-secret-manager) |
+
+### Vaults Supported via CLI (`${cmd:...}`)
+
+Any vault with a command-line interface works with Netdata's `${cmd:...}` provider. Here are common examples:
+
+| Vault Provider | Example Command |
+|----------------|----------------|
+| **HashiCorp Vault** CLI (`vault`) | `${cmd:/usr/bin/vault kv get -field=password secret/myapp}` |
+| **AWS CLI** (`aws`) | `${cmd:/usr/bin/aws secretsmanager get-secret-value --secret-id myapp --query SecretString --output text}` |
+| **Azure CLI** (`az`) | `${cmd:/usr/bin/az keyvault secret show --name mypass --vault-name myvault --query value -o tsv}` |
+| **GCP CLI** (`gcloud`) | `${cmd:/usr/bin/gcloud secrets versions access latest --secret=mypass}` |
+| **CyberArk Conjur** CLI (`conjur`) | `${cmd:/usr/bin/conjur variable get -i myapp/password}` |
+| **CyberArk Credential Provider** (`clipasswordsdk`) | `${cmd:/opt/CARKaim/sdk/clipasswordsdk GetPassword ...}` |
+| **Keeper Secrets Manager** CLI (`ksm`) | `${cmd:/usr/bin/ksm secret notation keeper://record/field}` |
+| **1Password** CLI (`op`) | `${cmd:/usr/bin/op read op://vault/item/password}` |
+| **Bitwarden** CLI (`bw`) | `${cmd:/usr/bin/bw get password myapp}` |
+| **Bitwarden Secrets Manager** CLI (`bws`) | `${cmd:/usr/bin/bws secret get secret-id}` |
+| **Doppler** CLI (`doppler`) | `${cmd:/usr/bin/doppler secrets get DB_PASS --plain}` |
+| **Delinea/Thycotic DevOps Secrets Vault** CLI (`dsv`) | `${cmd:/usr/bin/dsv secret read --path myapp/db --field password}` |
+| **Delinea Secret Server** CLI (`tss`) | `${cmd:/usr/bin/tss secret -id 42 -field password}` |
+| **Infisical** CLI (`infisical`) | `${cmd:/usr/bin/infisical secrets get DB_PASS --plain}` |
+| **Akeyless** CLI (`akeyless`) | `${cmd:/usr/bin/akeyless get-secret-value -n /myapp/password}` |
+| **Fortanix SDKMS** CLI | `${cmd:/usr/bin/sdkms-cli export-secret --name mypass}` |
+| **EnvKey** CLI (`envkey`) | `${cmd:/usr/bin/envkey source -f json \| ...}` |
+| **Passbolt** CLI | `${cmd:/usr/bin/passbolt get secret --id uuid}` |
+| Any custom vault script | `${cmd:/usr/local/bin/my-vault-script.sh get password}` |
+
+### Vaults Supported via Sidecars, Operators, or File/Env Injection
+
+These vault solutions inject secrets as environment variables or files, which Netdata reads with `${env:...}` or `${file:...}`:
+
+| Vault Provider | Injection Method |
+|----------------|-----------------|
+| **HashiCorp Vault Agent** | Sidecar writes secrets to files → `${file:/path}` |
+| **Kubernetes External Secrets Operator** (ESO) | Syncs any vault to K8s Secrets → `${env:...}` or `${file:...}` |
+| **AWS Systems Manager Parameter Store** (SSM) | Via ESO or ECS task definitions → `${env:...}` |
+| **1Password Connect** | K8s operator injects secrets → `${env:...}` or `${file:...}` |
+| **Doppler** | CLI injects env vars at process startup → `${env:...}` |
+| **CyberArk Conjur** | Sidecar writes secrets to shared volume → `${file:/path}` |
+| **Sealed Secrets** (Bitnami) | Decrypts to K8s Secrets → `${env:...}` or `${file:...}` |
+| **SOPS** (Mozilla) | Decrypts files at deploy time → `${file:...}` |
+| **Bank-Vaults** (Banzai Cloud) | Mutating webhook injects env vars → `${env:...}` |
+| **Docker Secrets** | Mounted at `/run/secrets/` → `${file:/run/secrets/name}` |
+| **Podman Secrets** | Mounted as files → `${file:/path}` |
+| **systemd credentials** | `EnvironmentFile=` or `LoadCredential=` → `${env:...}` or `${file:...}` |
 
 :::tip
 
-Every vault solution is supported. Use native integration for the simplest setup, `${cmd:...}` for any vault with a CLI, or environment variable/file injection via sidecars and operators.
+**Every vault solution is supported.** If your vault has a CLI, use `${cmd:...}`. If it has a sidecar, operator, or agent that writes secrets to files or environment variables, use `${file:...}` or `${env:...}`. For HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, and GCP Secret Manager, use native API integration for the simplest setup.
 
 :::
 
@@ -362,3 +407,49 @@ The `${aws-sm:...}` provider requires `AWS_DEFAULT_REGION` or `AWS_REGION`. On E
 **Job keeps restarting but secrets are not available yet**
 
 This is expected. When a secret reference cannot be resolved, the job fails and retries according to its `autodetection_retry` interval. Once the secret becomes available (for example, after a vault sidecar finishes writing it), the job starts successfully on the next retry.
+
+## FAQ
+
+**Q: Does Netdata support my vault?**
+
+Yes. Netdata supports every vault and secrets management solution. If your vault has native support (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, GCP Secret Manager), use the built-in provider. If your vault has a CLI, use `${cmd:/path/to/cli ...}`. If your vault has a sidecar or operator that injects secrets as environment variables or files, use `${env:...}` or `${file:...}`. See the [Vault Integration Summary](#vault-integration-summary) for details.
+
+**Q: Are secrets stored in plain text anywhere?**
+
+No. Secret references (e.g., `${env:MYSQL_PASSWORD}`) are stored in configuration files and in the Dynamic Configuration Manager. The actual secret values are resolved in memory only when a collector job starts. They are never written to disk, never logged, and never exposed through the API or UI.
+
+**Q: Can I use multiple secret references in a single configuration value?**
+
+Yes. Multiple references in a single string are all resolved independently. For example:
+
+```yaml
+dsn: "${env:DB_USER}:${env:DB_PASS}@tcp(${env:DB_HOST}:3306)/mydb"
+```
+
+**Q: What happens if a secret changes (rotation)?**
+
+Secrets are re-resolved every time a collector job starts or restarts. If you rotate a secret, the new value will be picked up on the next job restart. You can trigger this by restarting the Netdata Agent or by using the `autodetection_retry` setting to have jobs automatically retry at regular intervals.
+
+**Q: Can I use secret references with the Dynamic Configuration Manager?**
+
+Yes. The Dynamic Configuration Manager stores the secret reference (e.g., `${vault:secret/data/myapp#password}`), not the resolved value. When you view or edit a job's configuration through the UI, you see the reference — never the actual secret.
+
+**Q: Do I need to install vault SDKs or libraries?**
+
+No. Native vault providers (HashiCorp Vault, AWS, Azure, GCP) use REST APIs directly — no external SDKs or libraries are needed. For the `${cmd:...}` provider, you only need the vault's CLI tool installed on the system.
+
+**Q: Is the `${cmd:...}` provider secure?**
+
+Yes, with safeguards: commands must use absolute paths (no `PATH` lookup), no shell expansion is performed (preventing command injection), and commands have a 10-second timeout. The command's stdout is captured as the secret value; stderr is discarded.
+
+**Q: Can I use secret references in all collector configuration fields?**
+
+Secret references work in any string configuration value — passwords, DSN strings, API tokens, URLs, headers, usernames, certificates paths, and more. Non-string values (numbers, booleans) are not scanned for references.
+
+**Q: How do I debug secret resolution issues?**
+
+Check the Netdata Agent logs (`/var/log/netdata/collector.log` or `journalctl -u netdata`). When a secret reference fails to resolve, the error message identifies which reference failed and why — without revealing the secret value itself. Common issues include missing environment variables, inaccessible files, and vault authentication failures.
+
+**Q: Does secret resolution add latency to collector startup?**
+
+Environment variable and file resolution are near-instant (<1ms). External commands (`${cmd:...}`) add the command's execution time (typically 100-500ms for vault CLIs). Native vault API calls add network round-trip time. This latency occurs only at job startup, not during ongoing metric collection.
