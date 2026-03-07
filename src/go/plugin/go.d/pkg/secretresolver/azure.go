@@ -14,7 +14,10 @@ import (
 )
 
 var azureHTTPClient = &http.Client{Timeout: 10 * time.Second}
-var azureIMDSHTTPClient = &http.Client{Timeout: 2 * time.Second}
+var azureIMDSHTTPClient = &http.Client{
+	Timeout:   2 * time.Second,
+	Transport: &http.Transport{Proxy: nil}, // IMDS must never be proxied
+}
 
 func resolveAzureKV(ref, original string) (string, error) {
 	vaultName, secretName, ok := strings.Cut(ref, "/")
@@ -41,7 +44,7 @@ func resolveAzureKV(ref, original string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': reading response: %w", original, err)
 	}
@@ -91,7 +94,7 @@ func azureGetTokenClientCredentials(tenantID, clientID, clientSecret string) (st
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return "", fmt.Errorf("reading client credentials token response: %w", err)
 	}
@@ -133,7 +136,7 @@ func azureGetTokenManagedIdentity() (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return "", fmt.Errorf("reading managed identity token response: %w", err)
 	}

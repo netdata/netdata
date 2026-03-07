@@ -20,7 +20,10 @@ import (
 )
 
 var gcpHTTPClient = &http.Client{Timeout: 10 * time.Second}
-var gcpMetadataHTTPClient = &http.Client{Timeout: 2 * time.Second}
+var gcpMetadataHTTPClient = &http.Client{
+	Timeout:   2 * time.Second,
+	Transport: &http.Transport{Proxy: nil}, // metadata server must never be proxied
+}
 
 func resolveGCPSM(ref, original string) (string, error) {
 	project, rest, ok := strings.Cut(ref, "/")
@@ -55,7 +58,7 @@ func resolveGCPSM(ref, original string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': reading response: %w", original, err)
 	}
@@ -111,7 +114,7 @@ func gcpGetTokenMetadata() (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return "", fmt.Errorf("reading metadata token response: %w", err)
 	}
@@ -176,7 +179,7 @@ func gcpGetTokenServiceAccount() (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return "", fmt.Errorf("reading token exchange response: %w", err)
 	}

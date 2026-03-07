@@ -17,7 +17,10 @@ import (
 )
 
 var awsHTTPClient = &http.Client{Timeout: 10 * time.Second}
-var awsIMDSHTTPClient = &http.Client{Timeout: 2 * time.Second}
+var awsIMDSHTTPClient = &http.Client{
+	Timeout:   2 * time.Second,
+	Transport: &http.Transport{Proxy: nil}, // IMDS must never be proxied
+}
 
 type awsCredentials struct {
 	accessKeyID     string
@@ -113,7 +116,7 @@ func awsGetECSCredentials(relativeURI string) (*awsCredentials, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return nil, fmt.Errorf("reading ECS credentials response: %w", err)
 	}
@@ -156,7 +159,7 @@ func awsGetIMDSCredentials() (*awsCredentials, error) {
 	}
 	defer tokenResp.Body.Close()
 
-	tokenBody, err := io.ReadAll(tokenResp.Body)
+	tokenBody, err := io.ReadAll(io.LimitReader(tokenResp.Body, 1<<20))
 	if err != nil {
 		return nil, fmt.Errorf("reading IMDS token response: %w", err)
 	}
@@ -180,7 +183,7 @@ func awsGetIMDSCredentials() (*awsCredentials, error) {
 	}
 	defer roleResp.Body.Close()
 
-	roleBody, err := io.ReadAll(roleResp.Body)
+	roleBody, err := io.ReadAll(io.LimitReader(roleResp.Body, 1<<20))
 	if err != nil {
 		return nil, fmt.Errorf("reading IMDS role response: %w", err)
 	}
@@ -207,7 +210,7 @@ func awsGetIMDSCredentials() (*awsCredentials, error) {
 	}
 	defer credResp.Body.Close()
 
-	credBody, err := io.ReadAll(credResp.Body)
+	credBody, err := io.ReadAll(io.LimitReader(credResp.Body, 1<<20))
 	if err != nil {
 		return nil, fmt.Errorf("reading IMDS credentials response: %w", err)
 	}
@@ -288,7 +291,7 @@ func awsGetSecretValue(creds *awsCredentials, region, secretName, original strin
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': reading response: %w", original, err)
 	}

@@ -14,10 +14,19 @@ import (
 	"time"
 )
 
+// vaultNoRedirect prevents following redirects that could leak the Vault token.
+var vaultNoRedirect = func(req *http.Request, via []*http.Request) error {
+	return http.ErrUseLastResponse
+}
+
 var (
-	vaultHTTPClient         = &http.Client{Timeout: 10 * time.Second}
+	vaultHTTPClient = &http.Client{
+		Timeout:       10 * time.Second,
+		CheckRedirect: vaultNoRedirect,
+	}
 	vaultHTTPClientInsecure = &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout:       10 * time.Second,
+		CheckRedirect: vaultNoRedirect,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
