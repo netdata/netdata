@@ -304,3 +304,80 @@ modules:
         icon_filename: azure.svg
         categories:
           - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-app_service
+      monitored_instance:
+        name: Azure App Service
+        link: https://learn.microsoft.com/azure/app-service/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-azure_functions
+      monitored_instance:
+        name: Azure Functions
+        link: https://learn.microsoft.com/azure/azure-functions/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-redis_cache
+      monitored_instance:
+        name: Azure Cache for Redis
+        link: https://learn.microsoft.com/azure/azure-cache-for-redis/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-event_hubs
+      monitored_instance:
+        name: Azure Event Hubs Namespace
+        link: https://learn.microsoft.com/azure/event-hubs/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-service_bus
+      monitored_instance:
+        name: Azure Service Bus Namespace
+        link: https://learn.microsoft.com/azure/service-bus-messaging/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-application_gateway
+      monitored_instance:
+        name: Azure Application Gateway
+        link: https://learn.microsoft.com/azure/application-gateway/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-key_vault
+      monitored_instance:
+        name: Azure Key Vault
+        link: https://learn.microsoft.com/azure/key-vault/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
