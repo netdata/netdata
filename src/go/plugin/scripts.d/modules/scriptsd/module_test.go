@@ -86,6 +86,16 @@ func TestCollector_InitCollectCleanup(t *testing.T) {
 	assertMetricValue(t, read, "scriptsd.scheduler.running", metrix.Labels{"nagios_scheduler": "default"}, 1)
 	assertMetricValue(t, read, "scriptsd.job.state.ok", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk"}, 1)
 	assertMetricValue(t, read, "scriptsd.perf_bytes_used_value", metrix.Labels{"nagios_scheduler": "default", "nagios_job": "check_disk"}, 30000)
+	meta, ok := read.MetricMeta("scriptsd.perf_bytes_used_value")
+	if !ok {
+		t.Fatalf("expected metric metadata for scriptsd.perf_bytes_used_value")
+	}
+	if meta.Unit != "bytes" {
+		t.Fatalf("unexpected unit metadata: %q", meta.Unit)
+	}
+	if !meta.Float {
+		t.Fatalf("expected float metadata to be true")
+	}
 
 	coll.Cleanup(context.Background())
 	if reg.detached != 1 {

@@ -43,6 +43,13 @@ func TestPerfdataRouterRoutesAndCanonicalizesUnits(t *testing.T) {
 	assertNear(t, samples["perf_time_latency_warn_inclusive"], 1)
 	assertNear(t, samples["perf_time_latency_warn_low"], 0.1)
 	assertNear(t, samples["perf_time_latency_warn_high"], 0.5)
+	assertString(t, sampleUnits(got)["perf_time_latency_value"], "seconds")
+	assertString(t, sampleUnits(got)["perf_bytes_throughput_value"], "bytes")
+	assertString(t, sampleUnits(got)["perf_bits_traffic_value"], "bits")
+	assertString(t, sampleUnits(got)["perf_percent_free_pct_value"], "%")
+	assertString(t, sampleUnits(got)["perf_counter_checks_value"], "c")
+	assertString(t, sampleUnits(got)["perf_generic_custom_value"], "generic")
+	assertString(t, sampleUnits(got)["perf_time_latency_warn_defined"], "state")
 }
 
 func TestPerfdataRouterCollisionPolicy(t *testing.T) {
@@ -135,9 +142,24 @@ func sampleMap(samples []perfMetricSample) map[string]float64 {
 	return out
 }
 
+func sampleUnits(samples []perfMetricSample) map[string]string {
+	out := make(map[string]string, len(samples))
+	for _, sample := range samples {
+		out[sample.name] = sample.unit
+	}
+	return out
+}
+
 func assertNear(t *testing.T, got, want float64) {
 	t.Helper()
 	if math.Abs(got-want) > 1e-9 {
 		t.Fatalf("value mismatch: got=%f want=%f", got, want)
+	}
+}
+
+func assertString(t *testing.T, got, want string) {
+	t.Helper()
+	if got != want {
+		t.Fatalf("value mismatch: got=%q want=%q", got, want)
 	}
 }

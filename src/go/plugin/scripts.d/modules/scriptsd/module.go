@@ -163,7 +163,7 @@ func (c *Collector) Collect(context.Context) error {
 
 		perf := c.router.route(c.jobSpec.Scheduler, job.JobName, job.PerfSamples)
 		for _, sample := range perf {
-			observeJob(sample.name, sample.value)
+			sm.Gauge(sample.name, metrix.WithUnit(sample.unit), metrix.WithFloat(sample.float)).Observe(sample.value, jobLbl)
 		}
 	}
 

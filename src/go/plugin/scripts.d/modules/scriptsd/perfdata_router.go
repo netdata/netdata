@@ -35,6 +35,8 @@ type perfDropCounters struct {
 type perfMetricSample struct {
 	name  string
 	value float64
+	unit  string
+	float bool
 }
 
 type perfMetricBindingKey struct {
@@ -136,15 +138,16 @@ func (r *perfdataRouter) route(scheduler, job string, perf []output.PerfDatum) [
 		}
 
 		base := fmt.Sprintf("perf_%s_%s", item.class, item.metricKey)
-		samples = append(samples, perfMetricSample{name: base + "_value", value: item.value})
+		classUnit := unitForClass(item.class)
+		samples = append(samples, perfMetricSample{name: base + "_value", value: item.value, unit: classUnit, float: true})
 		if item.min != nil {
-			samples = append(samples, perfMetricSample{name: base + "_min", value: *item.min})
+			samples = append(samples, perfMetricSample{name: base + "_min", value: *item.min, unit: classUnit, float: true})
 		}
 		if item.max != nil {
-			samples = append(samples, perfMetricSample{name: base + "_max", value: *item.max})
+			samples = append(samples, perfMetricSample{name: base + "_max", value: *item.max, unit: classUnit, float: true})
 		}
-		samples = append(samples, thresholdSamples(base, "warn", item.warn)...)
-		samples = append(samples, thresholdSamples(base, "crit", item.crit)...)
+		samples = append(samples, thresholdSamples(base, "warn", item.warn, classUnit)...)
+		samples = append(samples, thresholdSamples(base, "crit", item.crit, classUnit)...)
 	}
 
 	return samples
@@ -179,16 +182,16 @@ func preparePerfDatum(datum output.PerfDatum) (perfPreparedDatum, bool) {
 	return item, true
 }
 
-func thresholdSamples(base, kind string, rng *output.ThresholdRange) []perfMetricSample {
+func thresholdSamples(base, kind string, rng *output.ThresholdRange, classUnit string) []perfMetricSample {
 	prefix := base + "_" + kind
 	if rng == nil {
 		return []perfMetricSample{
-			{name: prefix + "_defined", value: 0},
-			{name: prefix + "_inclusive", value: 0},
-			{name: prefix + "_low", value: 0},
-			{name: prefix + "_high", value: 0},
-			{name: prefix + "_low_defined", value: 0},
-			{name: prefix + "_high_defined", value: 0},
+			{name: prefix + "_defined", value: 0, unit: "state", float: false},
+			{name: prefix + "_inclusive", value: 0, unit: "state", float: false},
+			{name: prefix + "_low", value: 0, unit: classUnit, float: true},
+			{name: prefix + "_high", value: 0, unit: classUnit, float: true},
+			{name: prefix + "_low_defined", value: 0, unit: "state", float: false},
+			{name: prefix + "_high_defined", value: 0, unit: "state", float: false},
 		}
 	}
 
@@ -206,12 +209,12 @@ func thresholdSamples(base, kind string, rng *output.ThresholdRange) []perfMetri
 	}
 
 	return []perfMetricSample{
-		{name: prefix + "_defined", value: 1},
-		{name: prefix + "_inclusive", value: boolToFloat(rng.Inclusive)},
-		{name: prefix + "_low", value: low},
-		{name: prefix + "_high", value: high},
-		{name: prefix + "_low_defined", value: lowDefined},
-		{name: prefix + "_high_defined", value: highDefined},
+		{name: prefix + "_defined", value: 1, unit: "state", float: false},
+		{name: prefix + "_inclusive", value: boolToFloat(rng.Inclusive), unit: "state", float: false},
+		{name: prefix + "_low", value: low, unit: classUnit, float: true},
+		{name: prefix + "_high", value: high, unit: classUnit, float: true},
+		{name: prefix + "_low_defined", value: lowDefined, unit: "state", float: false},
+		{name: prefix + "_high_defined", value: highDefined, unit: "state", float: false},
 	}
 }
 
@@ -337,4 +340,21 @@ func byteMagnitude(prefix string) (float64, bool) {
 
 func isFinite(v float64) bool {
 	return !math.IsNaN(v) && !math.IsInf(v, 0)
+}
+
+func unitForClass(class perfUnitClass) string {
+	switch class {
+	case perfClassTime:
+		return "seconds"
+	case perfClassBytes:
+		return "bytes"
+	case perfClassBits:
+		return "bits"
+	case perfClassPercent:
+		return "%"
+	case perfClassCounter:
+		return "c"
+	default:
+		return "generic"
+	}
 }
