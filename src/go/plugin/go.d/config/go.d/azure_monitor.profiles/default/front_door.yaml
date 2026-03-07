@@ -1,0 +1,307 @@
+name: Azure Front Door
+resource_type: Microsoft.Cdn/profiles
+metrics:
+  # Latency
+  - name: TotalLatency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OriginLatency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Origin Health
+  - name: OriginHealthPercentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Request Status
+  - name: ByteHitRatio
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Percentage4XX
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Percentage5XX
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Traffic - Requests
+  - name: RequestCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OriginRequestCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Traffic - Data Transfer
+  - name: RequestSize
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ResponseSize
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Origin Shield
+  - name: OriginShieldRequestCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OriginShieldOriginRequestCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OriginShieldRateLimitRequestCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OriginShieldRequestSize
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # WAF
+  - name: WebApplicationFirewallRequestCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: WebApplicationFirewallCaptchaRequestCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: WebApplicationFirewallJsRequestCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  # WebSocket
+  - name: WebSocketConnections
+    units: connections/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ActiveWebSocketConnections
+    units: connections/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AverageWebSocketConnectionDuration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  - id: am_azure_front_door__latency
+    title: Azure Front Door Latency
+    context: front_door.latency
+    family: Latency
+    type: line
+    priority: 1000
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalLatency
+        aggregation: average
+        name: total
+      - metric: OriginLatency
+        aggregation: average
+        name: origin
+
+  - id: am_azure_front_door__origin_health
+    title: Azure Front Door Origin Health
+    context: front_door.origin_health
+    family: Origin Health
+    type: line
+    priority: 1010
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OriginHealthPercentage
+        aggregation: average
+        name: health
+
+  - id: am_azure_front_door__byte_hit_ratio
+    title: Azure Front Door Byte Hit Ratio
+    context: front_door.byte_hit_ratio
+    family: Cache
+    type: line
+    priority: 1020
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ByteHitRatio
+        aggregation: average
+        name: hit_ratio
+
+  - id: am_azure_front_door__error_rate
+    title: Azure Front Door Error Rate
+    context: front_door.error_rate
+    family: Errors
+    type: line
+    priority: 1030
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Percentage4XX
+        aggregation: average
+        name: 4xx
+      - metric: Percentage5XX
+        aggregation: average
+        name: 5xx
+
+  - id: am_azure_front_door__requests
+    title: Azure Front Door Requests
+    context: front_door.requests
+    family: Traffic
+    type: line
+    priority: 1040
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RequestCount
+        aggregation: total
+        name: client
+      - metric: OriginRequestCount
+        aggregation: total
+        name: origin
+
+  - id: am_azure_front_door__data_transfer
+    title: Azure Front Door Data Transfer
+    context: front_door.data_transfer
+    family: Traffic
+    type: line
+    priority: 1050
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RequestSize
+        aggregation: total
+        name: request
+      - metric: ResponseSize
+        aggregation: total
+        name: response
+
+  - id: am_azure_front_door__origin_shield_requests
+    title: Azure Front Door Origin Shield Requests
+    context: front_door.origin_shield_requests
+    family: Origin Shield
+    type: line
+    priority: 1060
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OriginShieldRequestCount
+        aggregation: total
+        name: to_shield
+      - metric: OriginShieldOriginRequestCount
+        aggregation: total
+        name: to_origin
+      - metric: OriginShieldRateLimitRequestCount
+        aggregation: total
+        name: rate_limited
+
+  - id: am_azure_front_door__origin_shield_data_transfer
+    title: Azure Front Door Origin Shield Data Transfer
+    context: front_door.origin_shield_data_transfer
+    family: Origin Shield
+    type: line
+    priority: 1070
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OriginShieldRequestSize
+        aggregation: total
+        name: request
+
+  - id: am_azure_front_door__waf_requests
+    title: Azure Front Door WAF Requests
+    context: front_door.waf_requests
+    family: WAF
+    type: line
+    priority: 1080
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: WebApplicationFirewallRequestCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_front_door__waf_challenges
+    title: Azure Front Door WAF Challenges
+    context: front_door.waf_challenges
+    family: WAF
+    type: line
+    priority: 1090
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: WebApplicationFirewallCaptchaRequestCount
+        aggregation: total
+        name: captcha
+      - metric: WebApplicationFirewallJsRequestCount
+        aggregation: total
+        name: js_challenge
+
+  - id: am_azure_front_door__websocket_connections
+    title: Azure Front Door WebSocket Connections
+    context: front_door.websocket_connections
+    family: WebSocket
+    type: line
+    priority: 1100
+    units: connections/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: WebSocketConnections
+        aggregation: total
+        name: requested
+      - metric: ActiveWebSocketConnections
+        aggregation: total
+        name: active
+
+  - id: am_azure_front_door__websocket_duration
+    title: Azure Front Door WebSocket Connection Duration
+    context: front_door.websocket_duration
+    family: WebSocket
+    type: line
+    priority: 1110
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AverageWebSocketConnectionDuration
+        aggregation: average
+        name: average

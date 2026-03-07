@@ -1,0 +1,2052 @@
+name: Azure Cognitive Services
+resource_type: Microsoft.CognitiveServices/accounts
+metrics:
+  # --- Cognitive Services - SLI ---
+  - name: SuccessRate
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+
+  # --- Cognitive Services - HTTP Requests ---
+  - name: TotalCalls
+    units: calls/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SuccessfulCalls
+    units: calls/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BlockedCalls
+    units: calls/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TotalErrors
+    units: errors/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ClientErrors
+    units: errors/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ServerErrors
+    units: errors/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TotalTokenCalls
+    units: calls/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Latency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: DataIn
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: DataOut
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Ratelimit
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+
+  # --- Azure OpenAI - HTTP Requests ---
+  - name: AzureOpenAIAvailabilityRate
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: AzureOpenAIRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+
+  # --- Azure OpenAI - Latency ---
+  - name: AzureOpenAINormalizedTBTInMS
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: AzureOpenAINormalizedTTFTInMS
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: AzureOpenAITimeToResponse
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: AzureOpenAITokenPerSecond
+    units: tokens/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: AzureOpenAITTLTInMS
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+
+  # --- Azure OpenAI - Usage ---
+  - name: ActiveTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AudioCompletionTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AudioPromptTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AzureOpenAIContextTokensCacheMatchRate
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: AzureOpenAIProvisionedManagedUtilizationV2
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: FineTunedTrainingHours
+    units: hours/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: GeneratedTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ProcessedPromptTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: RealtimeUsageTime
+    units: seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TokenTransaction
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+
+  # --- Models - HTTP Requests ---
+  - name: ModelAvailabilityRate
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ModelRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+
+  # --- Models - Latency ---
+  - name: NormalizedTimeBetweenTokens
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: NormalizedTimeToFirstToken
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: TimeToLastByte
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: TimeToResponse
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: TokensPerSecond
+    units: tokens/s
+    aggregations: [average]
+    time_grain: PT1M
+
+  # --- Models - Usage ---
+  - name: AnnotatedPages
+    units: pages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AudioInputTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AudioOutputTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: cacheReadInputTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ephemeral1hInputTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ephemeral5mInputTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: GeneratedImages
+    units: images/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: InputTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OutputTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ProvisionedUtilization
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: TotalPages
+    units: pages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TotalTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+
+  # --- ContentSafety - Risks & Safety ---
+  - name: RAIAbusiveUsersCount
+    units: users/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: RAIHarmfulRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: RAIRejectedRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: RAISystemEvent
+    units: events
+    aggregations: [average]
+    time_grain: PT1M
+  - name: RAITotalRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+
+  # --- ContentSafety - Usage ---
+  - name: ContentSafetyImageAnalyzeRequestCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ContentSafetyTextAnalyzeRequestCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+
+  # --- Language - Jobs ---
+  - name: JobDuration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+
+  # --- Actions ---
+  - name: ActionIdOccurrences
+    units: occurrences/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ActionsPerEvent
+    units: actions
+    aggregations: [average]
+    time_grain: PT1M
+
+  # --- Feature Occurrences ---
+  - name: ActionFeatureIdOccurrences
+    units: occurrences/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ContextFeatureIdOccurrences
+    units: occurrences/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SlotFeatureIdOccurrences
+    units: occurrences/s
+    aggregations: [total]
+    time_grain: PT1M
+
+  # --- Feature Cardinality ---
+  - name: FeatureCardinality_Action
+    units: features
+    aggregations: [average]
+    time_grain: PT1M
+  - name: FeatureCardinality_Context
+    units: features
+    aggregations: [average]
+    time_grain: PT1M
+  - name: FeatureCardinality_Slot
+    units: features
+    aggregations: [average]
+    time_grain: PT1M
+
+  # --- Features Per Event ---
+  - name: ActionFeaturesPerEvent
+    units: features
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ContextFeaturesPerEvent
+    units: features
+    aggregations: [average]
+    time_grain: PT1M
+  - name: SlotFeaturesPerEvent
+    units: features
+    aggregations: [average]
+    time_grain: PT1M
+
+  # --- Namespaces Per Event ---
+  - name: ActionNamespacesPerEvent
+    units: namespaces
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ContextNamespacesPerEvent
+    units: namespaces
+    aggregations: [average]
+    time_grain: PT1M
+  - name: SlotNamespacesPerEvent
+    units: namespaces
+    aggregations: [average]
+    time_grain: PT1M
+
+  # --- Rewards ---
+  - name: Reward
+    units: reward
+    aggregations: [average]
+    time_grain: PT1M
+  - name: SlotReward
+    units: reward
+    aggregations: [average]
+    time_grain: PT1M
+
+  # --- Slots ---
+  - name: BaselineEstimatorOverallReward
+    units: reward
+    aggregations: [average]
+    time_grain: PT1M
+  - name: BaselineEstimatorSlotReward
+    units: reward
+    aggregations: [average]
+    time_grain: PT1M
+  - name: BaselineRandomEstimatorOverallReward
+    units: reward
+    aggregations: [average]
+    time_grain: PT1M
+  - name: BaselineRandomEstimatorSlotReward
+    units: reward
+    aggregations: [average]
+    time_grain: PT1M
+  - name: NumberOfSlots
+    units: slots
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OnlineEstimatorOverallReward
+    units: reward
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OnlineEstimatorSlotReward
+    units: reward
+    aggregations: [average]
+    time_grain: PT1M
+  - name: SlotIdOccurrences
+    units: occurrences/s
+    aggregations: [total]
+    time_grain: PT1M
+
+  # --- Estimations ---
+  - name: BaselineRandomEventCount
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BaselineRandomReward
+    units: reward/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OnlineEventCount
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OnlineReward
+    units: reward/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: UserBaselineEventCount
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: UserBaselineReward
+    units: reward/s
+    aggregations: [total]
+    time_grain: PT1M
+
+  # --- SpeechServices - Usage ---
+  - name: AudioSecondsTranscribed
+    units: seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AudioSecondsBatchTranscribed
+    units: seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AudioSecondsBatchWhisperTranscribed
+    units: seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AudioSecondsFastTranscribed
+    units: seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AudioSecondsFastWhisperTranscribed
+    units: seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AudioSecondsTranslated
+    units: seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AvatarModelHostingSeconds
+    units: seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AvatarModelTrainingSeconds
+    units: seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: NumberofSpeakerProfiles
+    units: profiles/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SpeakerRecognitionTransactions
+    units: transactions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SpeechModelHostingHours
+    units: hours/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SynthesizedCharacters
+    units: characters/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: VideoSecondsSynthesized
+    units: seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: VoiceLiveAudioInputTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: VoiceLiveAudioOutputTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: VoiceLiveCachedAudioInputTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: VoiceLiveCachedTextInputTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: VoiceLiveTextInputTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: VoiceLiveTextOutputTokens
+    units: tokens/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: VoiceModelHostingHours
+    units: hours/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: VoiceModelTrainingMinutes
+    units: minutes/s
+    aggregations: [total]
+    time_grain: PT1M
+
+  # --- Translator Services - Usage ---
+  - name: DocumentCharactersTranslated
+    units: characters/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: DocumentCustomCharactersTranslated
+    units: characters/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OneDocumentCharactersTranslated
+    units: characters/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OneDocumentCustomCharactersTranslated
+    units: characters/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TextCharactersTranslated
+    units: characters/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TextCustomCharactersTranslated
+    units: characters/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TextTrainedCharacters
+    units: characters/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TranslatorProAppSeconds
+    units: seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+
+  # --- Usage (General) ---
+  - name: CarnegieInferenceCount
+    units: inferences/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ComputerVisionTransactions
+    units: transactions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: CustomVisionTrainingTime
+    units: seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: CustomVisionTransactions
+    units: transactions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: FaceImagesTrained
+    units: images/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: FacesStored
+    units: faces/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: FaceTransactions
+    units: transactions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ImagesStored
+    units: images/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: LearnedEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: LUISSpeechRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: LUISTextRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: MatchedRewards
+    units: rewards/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: NonActivatedEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ObservedRewards
+    units: rewards/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ProcessedCharacters
+    units: characters/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ProcessedHealthTextRecords
+    units: records/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ProcessedImages
+    units: images/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ProcessedPages
+    units: pages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ProcessedTextRecords
+    units: records/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: QuestionAnsweringTextRecords
+    units: records/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TotalEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+
+charts:
+  # =====================================================================
+  # Cognitive Services - SLI & HTTP Requests
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__availability
+    title: Azure Cognitive Services Availability
+    context: cognitive_services.availability
+    family: Availability
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SuccessRate
+        aggregation: average
+        name: availability
+
+  - id: am_azure_cognitive_services__calls
+    title: Azure Cognitive Services Calls
+    context: cognitive_services.calls
+    family: HTTP Requests
+    type: line
+    priority: 1010
+    units: calls/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalCalls
+        aggregation: total
+        name: total
+      - metric: SuccessfulCalls
+        aggregation: total
+        name: successful
+      - metric: BlockedCalls
+        aggregation: total
+        name: blocked
+      - metric: TotalTokenCalls
+        aggregation: total
+        name: token
+
+  - id: am_azure_cognitive_services__errors
+    title: Azure Cognitive Services Errors
+    context: cognitive_services.errors
+    family: HTTP Requests
+    type: line
+    priority: 1020
+    units: errors/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalErrors
+        aggregation: total
+        name: total
+      - metric: ClientErrors
+        aggregation: total
+        name: client
+      - metric: ServerErrors
+        aggregation: total
+        name: server
+
+  - id: am_azure_cognitive_services__latency
+    title: Azure Cognitive Services Latency
+    context: cognitive_services.latency
+    family: Performance
+    type: line
+    priority: 1030
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Latency
+        aggregation: average
+        name: average
+
+  - id: am_azure_cognitive_services__data_transfer
+    title: Azure Cognitive Services Data Transfer
+    context: cognitive_services.data_transfer
+    family: HTTP Requests
+    type: line
+    priority: 1040
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: DataIn
+        aggregation: total
+        name: in
+      - metric: DataOut
+        aggregation: total
+        name: out
+
+  - id: am_azure_cognitive_services__rate_limit
+    title: Azure Cognitive Services Rate Limit
+    context: cognitive_services.rate_limit
+    family: HTTP Requests
+    type: line
+    priority: 1050
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Ratelimit
+        aggregation: total
+        name: rate_limit
+
+  # =====================================================================
+  # Azure OpenAI - HTTP Requests
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__openai_availability
+    title: Azure OpenAI Availability
+    context: cognitive_services.openai_availability
+    family: Azure OpenAI
+    type: line
+    priority: 1100
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AzureOpenAIAvailabilityRate
+        aggregation: average
+        name: availability
+
+  - id: am_azure_cognitive_services__openai_requests
+    title: Azure OpenAI Requests
+    context: cognitive_services.openai_requests
+    family: Azure OpenAI
+    type: line
+    priority: 1110
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AzureOpenAIRequests
+        aggregation: total
+        name: requests
+
+  # =====================================================================
+  # Azure OpenAI - Latency
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__openai_latency
+    title: Azure OpenAI Latency
+    context: cognitive_services.openai_latency
+    family: Azure OpenAI
+    type: line
+    priority: 1120
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AzureOpenAITimeToResponse
+        aggregation: average
+        name: time_to_response
+      - metric: AzureOpenAINormalizedTTFTInMS
+        aggregation: average
+        name: time_to_first_token
+      - metric: AzureOpenAINormalizedTBTInMS
+        aggregation: average
+        name: time_between_tokens
+      - metric: AzureOpenAITTLTInMS
+        aggregation: average
+        name: time_to_last_byte
+
+  - id: am_azure_cognitive_services__openai_generation_speed
+    title: Azure OpenAI Token Generation Speed
+    context: cognitive_services.openai_generation_speed
+    family: Azure OpenAI
+    type: line
+    priority: 1130
+    units: tokens/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AzureOpenAITokenPerSecond
+        aggregation: average
+        name: tokens_per_second
+
+  # =====================================================================
+  # Azure OpenAI - Usage
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__openai_token_usage
+    title: Azure OpenAI Token Usage
+    context: cognitive_services.openai_token_usage
+    family: Azure OpenAI
+    type: line
+    priority: 1140
+    units: tokens/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TokenTransaction
+        aggregation: total
+        name: total
+      - metric: ProcessedPromptTokens
+        aggregation: total
+        name: prompt
+      - metric: GeneratedTokens
+        aggregation: total
+        name: generated
+      - metric: ActiveTokens
+        aggregation: total
+        name: active
+
+  - id: am_azure_cognitive_services__openai_audio_tokens
+    title: Azure OpenAI Audio Tokens
+    context: cognitive_services.openai_audio_tokens
+    family: Azure OpenAI
+    type: line
+    priority: 1150
+    units: tokens/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AudioPromptTokens
+        aggregation: total
+        name: prompt
+      - metric: AudioCompletionTokens
+        aggregation: total
+        name: completion
+
+  - id: am_azure_cognitive_services__openai_cache_match_rate
+    title: Azure OpenAI Prompt Token Cache Match Rate
+    context: cognitive_services.openai_cache_match_rate
+    family: Azure OpenAI
+    type: line
+    priority: 1160
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AzureOpenAIContextTokensCacheMatchRate
+        aggregation: average
+        name: cache_match_rate
+
+  - id: am_azure_cognitive_services__openai_provisioned_utilization
+    title: Azure OpenAI Provisioned-managed Utilization
+    context: cognitive_services.openai_provisioned_utilization
+    family: Azure OpenAI
+    type: line
+    priority: 1170
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AzureOpenAIProvisionedManagedUtilizationV2
+        aggregation: average
+        name: utilization
+
+  - id: am_azure_cognitive_services__openai_finetuning
+    title: Azure OpenAI Fine-Tuning Training Hours
+    context: cognitive_services.openai_finetuning
+    family: Azure OpenAI
+    type: line
+    priority: 1180
+    units: hours/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: FineTunedTrainingHours
+        aggregation: total
+        name: training_hours
+
+  - id: am_azure_cognitive_services__openai_realtime_usage
+    title: Azure OpenAI Realtime API Usage
+    context: cognitive_services.openai_realtime_usage
+    family: Azure OpenAI
+    type: line
+    priority: 1190
+    units: seconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RealtimeUsageTime
+        aggregation: total
+        name: seconds_used
+
+  # =====================================================================
+  # Models - HTTP Requests
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__model_availability
+    title: Azure Cognitive Services Model Availability
+    context: cognitive_services.model_availability
+    family: Models
+    type: line
+    priority: 1200
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ModelAvailabilityRate
+        aggregation: average
+        name: availability
+
+  - id: am_azure_cognitive_services__model_requests
+    title: Azure Cognitive Services Model Requests
+    context: cognitive_services.model_requests
+    family: Models
+    type: line
+    priority: 1210
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ModelRequests
+        aggregation: total
+        name: requests
+
+  # =====================================================================
+  # Models - Latency
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__model_latency
+    title: Azure Cognitive Services Model Latency
+    context: cognitive_services.model_latency
+    family: Models
+    type: line
+    priority: 1220
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TimeToResponse
+        aggregation: average
+        name: time_to_response
+      - metric: NormalizedTimeToFirstToken
+        aggregation: average
+        name: time_to_first_token
+      - metric: NormalizedTimeBetweenTokens
+        aggregation: average
+        name: time_between_tokens
+      - metric: TimeToLastByte
+        aggregation: average
+        name: time_to_last_byte
+
+  - id: am_azure_cognitive_services__model_generation_speed
+    title: Azure Cognitive Services Model Token Generation Speed
+    context: cognitive_services.model_generation_speed
+    family: Models
+    type: line
+    priority: 1230
+    units: tokens/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TokensPerSecond
+        aggregation: average
+        name: tokens_per_second
+
+  # =====================================================================
+  # Models - Usage
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__model_token_usage
+    title: Azure Cognitive Services Model Token Usage
+    context: cognitive_services.model_token_usage
+    family: Models
+    type: line
+    priority: 1240
+    units: tokens/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalTokens
+        aggregation: total
+        name: total
+      - metric: InputTokens
+        aggregation: total
+        name: input
+      - metric: OutputTokens
+        aggregation: total
+        name: output
+
+  - id: am_azure_cognitive_services__model_audio_tokens
+    title: Azure Cognitive Services Model Audio Tokens
+    context: cognitive_services.model_audio_tokens
+    family: Models
+    type: line
+    priority: 1250
+    units: tokens/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AudioInputTokens
+        aggregation: total
+        name: input
+      - metric: AudioOutputTokens
+        aggregation: total
+        name: output
+
+  - id: am_azure_cognitive_services__model_cache_tokens
+    title: Azure Cognitive Services Model Cache Tokens
+    context: cognitive_services.model_cache_tokens
+    family: Models
+    type: line
+    priority: 1260
+    units: tokens/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cacheReadInputTokens
+        aggregation: total
+        name: cache_read
+      - metric: ephemeral1hInputTokens
+        aggregation: total
+        name: cache_write_1h
+      - metric: ephemeral5mInputTokens
+        aggregation: total
+        name: cache_write_5m
+
+  - id: am_azure_cognitive_services__model_provisioned_utilization
+    title: Azure Cognitive Services Model Provisioned Utilization
+    context: cognitive_services.model_provisioned_utilization
+    family: Models
+    type: line
+    priority: 1270
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ProvisionedUtilization
+        aggregation: average
+        name: utilization
+
+  - id: am_azure_cognitive_services__model_pages
+    title: Azure Cognitive Services Model Pages Processed
+    context: cognitive_services.model_pages
+    family: Models
+    type: line
+    priority: 1280
+    units: pages/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalPages
+        aggregation: total
+        name: total
+      - metric: AnnotatedPages
+        aggregation: total
+        name: annotated
+
+  - id: am_azure_cognitive_services__model_generated_images
+    title: Azure Cognitive Services Generated Images
+    context: cognitive_services.model_generated_images
+    family: Models
+    type: line
+    priority: 1290
+    units: images/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: GeneratedImages
+        aggregation: total
+        name: generated
+
+  # =====================================================================
+  # Content Safety - Risks & Safety
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__content_safety_requests
+    title: Azure Cognitive Services Content Safety Requests
+    context: cognitive_services.content_safety_requests
+    family: Content Safety
+    type: line
+    priority: 1300
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RAITotalRequests
+        aggregation: total
+        name: total
+      - metric: RAIHarmfulRequests
+        aggregation: total
+        name: harmful
+      - metric: RAIRejectedRequests
+        aggregation: total
+        name: blocked
+
+  - id: am_azure_cognitive_services__content_safety_abusive_users
+    title: Azure Cognitive Services Potentially Abusive Users
+    context: cognitive_services.content_safety_abusive_users
+    family: Content Safety
+    type: line
+    priority: 1310
+    units: users/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RAIAbusiveUsersCount
+        aggregation: total
+        name: abusive_users
+
+  - id: am_azure_cognitive_services__content_safety_system_events
+    title: Azure Cognitive Services Safety System Events
+    context: cognitive_services.content_safety_system_events
+    family: Content Safety
+    type: line
+    priority: 1320
+    units: events
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RAISystemEvent
+        aggregation: average
+        name: events
+
+  # =====================================================================
+  # Content Safety - Usage
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__content_safety_moderation
+    title: Azure Cognitive Services Content Moderation Calls
+    context: cognitive_services.content_safety_moderation
+    family: Content Safety
+    type: line
+    priority: 1330
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ContentSafetyTextAnalyzeRequestCount
+        aggregation: total
+        name: text
+      - metric: ContentSafetyImageAnalyzeRequestCount
+        aggregation: total
+        name: image
+
+  # =====================================================================
+  # Language - Jobs
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__job_duration
+    title: Azure Cognitive Services Job Duration
+    context: cognitive_services.job_duration
+    family: Language
+    type: line
+    priority: 1400
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: JobDuration
+        aggregation: average
+        name: average
+
+  # =====================================================================
+  # Personalizer - Actions
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__personalizer_actions
+    title: Azure Cognitive Services Personalizer Action Occurrences
+    context: cognitive_services.personalizer_actions
+    family: Personalizer
+    type: line
+    priority: 1500
+    units: occurrences/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ActionIdOccurrences
+        aggregation: total
+        name: occurrences
+
+  - id: am_azure_cognitive_services__personalizer_actions_per_event
+    title: Azure Cognitive Services Personalizer Actions Per Event
+    context: cognitive_services.personalizer_actions_per_event
+    family: Personalizer
+    type: line
+    priority: 1510
+    units: actions
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ActionsPerEvent
+        aggregation: average
+        name: average
+
+  # =====================================================================
+  # Personalizer - Feature Occurrences
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__personalizer_feature_occurrences
+    title: Azure Cognitive Services Personalizer Feature Occurrences
+    context: cognitive_services.personalizer_feature_occurrences
+    family: Personalizer
+    type: line
+    priority: 1520
+    units: occurrences/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ActionFeatureIdOccurrences
+        aggregation: total
+        name: action
+      - metric: ContextFeatureIdOccurrences
+        aggregation: total
+        name: context
+      - metric: SlotFeatureIdOccurrences
+        aggregation: total
+        name: slot
+
+  # =====================================================================
+  # Personalizer - Feature Cardinality
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__personalizer_feature_cardinality
+    title: Azure Cognitive Services Personalizer Feature Cardinality
+    context: cognitive_services.personalizer_feature_cardinality
+    family: Personalizer
+    type: line
+    priority: 1530
+    units: features
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: FeatureCardinality_Action
+        aggregation: average
+        name: action
+      - metric: FeatureCardinality_Context
+        aggregation: average
+        name: context
+      - metric: FeatureCardinality_Slot
+        aggregation: average
+        name: slot
+
+  # =====================================================================
+  # Personalizer - Features Per Event
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__personalizer_features_per_event
+    title: Azure Cognitive Services Personalizer Features Per Event
+    context: cognitive_services.personalizer_features_per_event
+    family: Personalizer
+    type: line
+    priority: 1540
+    units: features
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ActionFeaturesPerEvent
+        aggregation: average
+        name: action
+      - metric: ContextFeaturesPerEvent
+        aggregation: average
+        name: context
+      - metric: SlotFeaturesPerEvent
+        aggregation: average
+        name: slot
+
+  # =====================================================================
+  # Personalizer - Namespaces Per Event
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__personalizer_namespaces_per_event
+    title: Azure Cognitive Services Personalizer Namespaces Per Event
+    context: cognitive_services.personalizer_namespaces_per_event
+    family: Personalizer
+    type: line
+    priority: 1550
+    units: namespaces
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ActionNamespacesPerEvent
+        aggregation: average
+        name: action
+      - metric: ContextNamespacesPerEvent
+        aggregation: average
+        name: context
+      - metric: SlotNamespacesPerEvent
+        aggregation: average
+        name: slot
+
+  # =====================================================================
+  # Personalizer - Rewards
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__personalizer_rewards
+    title: Azure Cognitive Services Personalizer Rewards
+    context: cognitive_services.personalizer_rewards
+    family: Personalizer
+    type: line
+    priority: 1560
+    units: reward
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Reward
+        aggregation: average
+        name: average
+      - metric: SlotReward
+        aggregation: average
+        name: slot
+
+  # =====================================================================
+  # Personalizer - Slot Estimators
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__personalizer_estimator_rewards
+    title: Azure Cognitive Services Personalizer Estimator Rewards
+    context: cognitive_services.personalizer_estimator_rewards
+    family: Personalizer
+    type: line
+    priority: 1570
+    units: reward
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OnlineEstimatorOverallReward
+        aggregation: average
+        name: online
+      - metric: BaselineEstimatorOverallReward
+        aggregation: average
+        name: baseline
+      - metric: BaselineRandomEstimatorOverallReward
+        aggregation: average
+        name: baseline_random
+
+  - id: am_azure_cognitive_services__personalizer_estimator_slot_rewards
+    title: Azure Cognitive Services Personalizer Estimator Slot Rewards
+    context: cognitive_services.personalizer_estimator_slot_rewards
+    family: Personalizer
+    type: line
+    priority: 1580
+    units: reward
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OnlineEstimatorSlotReward
+        aggregation: average
+        name: online
+      - metric: BaselineEstimatorSlotReward
+        aggregation: average
+        name: baseline
+      - metric: BaselineRandomEstimatorSlotReward
+        aggregation: average
+        name: baseline_random
+
+  - id: am_azure_cognitive_services__personalizer_slots
+    title: Azure Cognitive Services Personalizer Slots
+    context: cognitive_services.personalizer_slots
+    family: Personalizer
+    type: line
+    priority: 1590
+    units: slots
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: NumberOfSlots
+        aggregation: average
+        name: average
+
+  - id: am_azure_cognitive_services__personalizer_slot_occurrences
+    title: Azure Cognitive Services Personalizer Slot Occurrences
+    context: cognitive_services.personalizer_slot_occurrences
+    family: Personalizer
+    type: line
+    priority: 1595
+    units: occurrences/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SlotIdOccurrences
+        aggregation: total
+        name: occurrences
+
+  # =====================================================================
+  # Personalizer - Estimations
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__personalizer_event_counts
+    title: Azure Cognitive Services Personalizer Event Counts
+    context: cognitive_services.personalizer_event_counts
+    family: Personalizer
+    type: line
+    priority: 1600
+    units: events/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OnlineEventCount
+        aggregation: total
+        name: online
+      - metric: BaselineRandomEventCount
+        aggregation: total
+        name: baseline_random
+      - metric: UserBaselineEventCount
+        aggregation: total
+        name: user_baseline
+
+  - id: am_azure_cognitive_services__personalizer_estimated_rewards
+    title: Azure Cognitive Services Personalizer Estimated Rewards
+    context: cognitive_services.personalizer_estimated_rewards
+    family: Personalizer
+    type: line
+    priority: 1610
+    units: reward/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OnlineReward
+        aggregation: total
+        name: online
+      - metric: BaselineRandomReward
+        aggregation: total
+        name: baseline_random
+      - metric: UserBaselineReward
+        aggregation: total
+        name: user_baseline
+
+  # =====================================================================
+  # Speech Services - Usage
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__speech_transcription
+    title: Azure Cognitive Services Speech Transcription
+    context: cognitive_services.speech_transcription
+    family: Speech Services
+    type: line
+    priority: 1700
+    units: seconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AudioSecondsTranscribed
+        aggregation: total
+        name: realtime
+      - metric: AudioSecondsBatchTranscribed
+        aggregation: total
+        name: batch
+      - metric: AudioSecondsBatchWhisperTranscribed
+        aggregation: total
+        name: batch_whisper
+      - metric: AudioSecondsFastTranscribed
+        aggregation: total
+        name: fast
+      - metric: AudioSecondsFastWhisperTranscribed
+        aggregation: total
+        name: fast_whisper
+
+  - id: am_azure_cognitive_services__speech_translation
+    title: Azure Cognitive Services Speech Translation
+    context: cognitive_services.speech_translation
+    family: Speech Services
+    type: line
+    priority: 1710
+    units: seconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AudioSecondsTranslated
+        aggregation: total
+        name: translated
+
+  - id: am_azure_cognitive_services__speech_synthesis
+    title: Azure Cognitive Services Speech Synthesis
+    context: cognitive_services.speech_synthesis
+    family: Speech Services
+    type: line
+    priority: 1720
+    units: characters/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SynthesizedCharacters
+        aggregation: total
+        name: synthesized
+
+  - id: am_azure_cognitive_services__speech_video_synthesis
+    title: Azure Cognitive Services Video Synthesis
+    context: cognitive_services.speech_video_synthesis
+    family: Speech Services
+    type: line
+    priority: 1730
+    units: seconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: VideoSecondsSynthesized
+        aggregation: total
+        name: synthesized
+
+  - id: am_azure_cognitive_services__speech_avatar
+    title: Azure Cognitive Services Avatar Usage
+    context: cognitive_services.speech_avatar
+    family: Speech Services
+    type: line
+    priority: 1740
+    units: seconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AvatarModelHostingSeconds
+        aggregation: total
+        name: hosting
+      - metric: AvatarModelTrainingSeconds
+        aggregation: total
+        name: training
+
+  - id: am_azure_cognitive_services__speech_speaker_recognition
+    title: Azure Cognitive Services Speaker Recognition
+    context: cognitive_services.speech_speaker_recognition
+    family: Speech Services
+    type: line
+    priority: 1750
+    units: transactions/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SpeakerRecognitionTransactions
+        aggregation: total
+        name: transactions
+
+  - id: am_azure_cognitive_services__speech_speaker_profiles
+    title: Azure Cognitive Services Speaker Profiles
+    context: cognitive_services.speech_speaker_profiles
+    family: Speech Services
+    type: line
+    priority: 1760
+    units: profiles/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: NumberofSpeakerProfiles
+        aggregation: total
+        name: profiles
+
+  - id: am_azure_cognitive_services__speech_model_hosting
+    title: Azure Cognitive Services Speech Model Hosting
+    context: cognitive_services.speech_model_hosting
+    family: Speech Services
+    type: line
+    priority: 1770
+    units: hours/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SpeechModelHostingHours
+        aggregation: total
+        name: hosting
+
+  - id: am_azure_cognitive_services__speech_voice_live_tokens
+    title: Azure Cognitive Services Voice Live Tokens
+    context: cognitive_services.speech_voice_live_tokens
+    family: Speech Services
+    type: line
+    priority: 1780
+    units: tokens/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: VoiceLiveAudioInputTokens
+        aggregation: total
+        name: audio_input
+      - metric: VoiceLiveAudioOutputTokens
+        aggregation: total
+        name: audio_output
+      - metric: VoiceLiveCachedAudioInputTokens
+        aggregation: total
+        name: cached_audio_input
+      - metric: VoiceLiveTextInputTokens
+        aggregation: total
+        name: text_input
+      - metric: VoiceLiveTextOutputTokens
+        aggregation: total
+        name: text_output
+      - metric: VoiceLiveCachedTextInputTokens
+        aggregation: total
+        name: cached_text_input
+
+  - id: am_azure_cognitive_services__speech_voice_model
+    title: Azure Cognitive Services Voice Model Usage
+    context: cognitive_services.speech_voice_model
+    family: Speech Services
+    type: line
+    priority: 1790
+    units: hours/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: VoiceModelHostingHours
+        aggregation: total
+        name: hosting
+
+  - id: am_azure_cognitive_services__speech_voice_training
+    title: Azure Cognitive Services Voice Model Training
+    context: cognitive_services.speech_voice_training
+    family: Speech Services
+    type: line
+    priority: 1795
+    units: minutes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: VoiceModelTrainingMinutes
+        aggregation: total
+        name: training
+
+  # =====================================================================
+  # Translator Services - Usage
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__translator_text
+    title: Azure Cognitive Services Translator Text Characters
+    context: cognitive_services.translator_text
+    family: Translator
+    type: line
+    priority: 1800
+    units: characters/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TextCharactersTranslated
+        aggregation: total
+        name: standard
+      - metric: TextCustomCharactersTranslated
+        aggregation: total
+        name: custom
+      - metric: TextTrainedCharacters
+        aggregation: total
+        name: trained
+
+  - id: am_azure_cognitive_services__translator_document
+    title: Azure Cognitive Services Translator Document Characters
+    context: cognitive_services.translator_document
+    family: Translator
+    type: line
+    priority: 1810
+    units: characters/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: DocumentCharactersTranslated
+        aggregation: total
+        name: standard
+      - metric: DocumentCustomCharactersTranslated
+        aggregation: total
+        name: custom
+
+  - id: am_azure_cognitive_services__translator_document_sync
+    title: Azure Cognitive Services Translator Document Sync Characters
+    context: cognitive_services.translator_document_sync
+    family: Translator
+    type: line
+    priority: 1820
+    units: characters/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OneDocumentCharactersTranslated
+        aggregation: total
+        name: standard
+      - metric: OneDocumentCustomCharactersTranslated
+        aggregation: total
+        name: custom
+
+  - id: am_azure_cognitive_services__translator_pro_app
+    title: Azure Cognitive Services Translator Pro App Usage
+    context: cognitive_services.translator_pro_app
+    family: Translator
+    type: line
+    priority: 1830
+    units: seconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TranslatorProAppSeconds
+        aggregation: total
+        name: seconds
+
+  # =====================================================================
+  # Usage - Vision
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__vision_transactions
+    title: Azure Cognitive Services Vision Transactions
+    context: cognitive_services.vision_transactions
+    family: Vision
+    type: line
+    priority: 1900
+    units: transactions/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ComputerVisionTransactions
+        aggregation: total
+        name: computer_vision
+      - metric: CustomVisionTransactions
+        aggregation: total
+        name: custom_vision
+
+  - id: am_azure_cognitive_services__vision_training
+    title: Azure Cognitive Services Custom Vision Training
+    context: cognitive_services.vision_training
+    family: Vision
+    type: line
+    priority: 1910
+    units: seconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CustomVisionTrainingTime
+        aggregation: total
+        name: training_time
+
+  - id: am_azure_cognitive_services__vision_images_stored
+    title: Azure Cognitive Services Images Stored
+    context: cognitive_services.vision_images_stored
+    family: Vision
+    type: line
+    priority: 1920
+    units: images/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ImagesStored
+        aggregation: total
+        name: stored
+
+  # =====================================================================
+  # Usage - Face
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__face_transactions
+    title: Azure Cognitive Services Face Transactions
+    context: cognitive_services.face_transactions
+    family: Face
+    type: line
+    priority: 2000
+    units: transactions/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: FaceTransactions
+        aggregation: total
+        name: transactions
+
+  - id: am_azure_cognitive_services__face_images_trained
+    title: Azure Cognitive Services Face Images Trained
+    context: cognitive_services.face_images_trained
+    family: Face
+    type: line
+    priority: 2010
+    units: images/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: FaceImagesTrained
+        aggregation: total
+        name: trained
+
+  - id: am_azure_cognitive_services__faces_stored
+    title: Azure Cognitive Services Faces Stored
+    context: cognitive_services.faces_stored
+    family: Face
+    type: line
+    priority: 2020
+    units: faces/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: FacesStored
+        aggregation: total
+        name: stored
+
+  # =====================================================================
+  # Usage - LUIS
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__luis_requests
+    title: Azure Cognitive Services LUIS Requests
+    context: cognitive_services.luis_requests
+    family: LUIS
+    type: line
+    priority: 2100
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: LUISSpeechRequests
+        aggregation: total
+        name: speech
+      - metric: LUISTextRequests
+        aggregation: total
+        name: text
+
+  # =====================================================================
+  # Usage - Text & Document Processing
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__text_processing
+    title: Azure Cognitive Services Text Processing
+    context: cognitive_services.text_processing
+    family: Text Processing
+    type: line
+    priority: 2200
+    units: records/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ProcessedTextRecords
+        aggregation: total
+        name: text
+      - metric: ProcessedHealthTextRecords
+        aggregation: total
+        name: health_text
+      - metric: QuestionAnsweringTextRecords
+        aggregation: total
+        name: question_answering
+
+  - id: am_azure_cognitive_services__processed_characters
+    title: Azure Cognitive Services Processed Characters
+    context: cognitive_services.processed_characters
+    family: Text Processing
+    type: line
+    priority: 2210
+    units: characters/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ProcessedCharacters
+        aggregation: total
+        name: characters
+
+  - id: am_azure_cognitive_services__processed_images
+    title: Azure Cognitive Services Processed Images
+    context: cognitive_services.processed_images
+    family: Text Processing
+    type: line
+    priority: 2220
+    units: images/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ProcessedImages
+        aggregation: total
+        name: images
+
+  - id: am_azure_cognitive_services__processed_pages
+    title: Azure Cognitive Services Processed Pages
+    context: cognitive_services.processed_pages
+    family: Text Processing
+    type: line
+    priority: 2230
+    units: pages/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ProcessedPages
+        aggregation: total
+        name: pages
+
+  # =====================================================================
+  # Usage - Content Safety Inference
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__carnegie_inference
+    title: Azure Cognitive Services Carnegie Inference
+    context: cognitive_services.carnegie_inference
+    family: Content Safety
+    type: line
+    priority: 2300
+    units: inferences/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CarnegieInferenceCount
+        aggregation: total
+        name: inferences
+
+  # =====================================================================
+  # Usage - Personalizer Events
+  # =====================================================================
+
+  - id: am_azure_cognitive_services__personalizer_events
+    title: Azure Cognitive Services Personalizer Events
+    context: cognitive_services.personalizer_events
+    family: Personalizer
+    type: line
+    priority: 2400
+    units: events/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalEvents
+        aggregation: total
+        name: total
+      - metric: LearnedEvents
+        aggregation: total
+        name: learned
+      - metric: NonActivatedEvents
+        aggregation: total
+        name: non_activated
+
+  - id: am_azure_cognitive_services__personalizer_reward_tracking
+    title: Azure Cognitive Services Personalizer Reward Tracking
+    context: cognitive_services.personalizer_reward_tracking
+    family: Personalizer
+    type: line
+    priority: 2410
+    units: rewards/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: MatchedRewards
+        aggregation: total
+        name: matched
+      - metric: ObservedRewards
+        aggregation: total
+        name: observed

@@ -1,0 +1,257 @@
+name: Azure API Management
+resource_type: Microsoft.ApiManagement/service
+metrics:
+  # Capacity
+  - name: Capacity
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: CpuPercent_Gateway
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: MemoryPercent_Gateway
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Gateway Requests
+  - name: Requests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BackendDuration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Duration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # EventHub Events
+  - name: EventHubTotalEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: EventHubSuccessfulEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: EventHubTotalFailedEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: EventHubDroppedEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: EventHubRejectedEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: EventHubThrottledEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: EventHubTimedoutEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: EventHubTotalBytesSent
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Gateway WebSocket
+  - name: ConnectionAttempts
+    units: attempts/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: WebSocketMessages
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Network Status
+  - name: NetworkConnectivity
+    units: status
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  - id: am_azure_api_management__capacity
+    title: Azure API Management Capacity Utilization
+    context: api_management.capacity
+    family: Capacity
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Capacity
+        aggregation: average
+        name: capacity
+
+  - id: am_azure_api_management__gateway_cpu
+    title: Azure API Management Gateway CPU
+    context: api_management.gateway_cpu
+    family: Capacity
+    type: line
+    priority: 1010
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CpuPercent_Gateway
+        aggregation: average
+        name: cpu
+
+  - id: am_azure_api_management__gateway_memory
+    title: Azure API Management Gateway Memory
+    context: api_management.gateway_memory
+    family: Capacity
+    type: line
+    priority: 1020
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: MemoryPercent_Gateway
+        aggregation: average
+        name: memory
+
+  - id: am_azure_api_management__requests
+    title: Azure API Management Gateway Requests
+    context: api_management.requests
+    family: Requests
+    type: line
+    priority: 1030
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Requests
+        aggregation: total
+        name: requests
+
+  - id: am_azure_api_management__request_duration
+    title: Azure API Management Request Duration
+    context: api_management.request_duration
+    family: Requests
+    type: line
+    priority: 1040
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Duration
+        aggregation: average
+        name: overall
+      - metric: BackendDuration
+        aggregation: average
+        name: backend
+
+  - id: am_azure_api_management__eventhub_events
+    title: Azure API Management EventHub Events
+    context: api_management.eventhub_events
+    family: EventHub
+    type: line
+    priority: 1050
+    units: events/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: EventHubTotalEvents
+        aggregation: total
+        name: total
+      - metric: EventHubSuccessfulEvents
+        aggregation: total
+        name: successful
+      - metric: EventHubTotalFailedEvents
+        aggregation: total
+        name: failed
+      - metric: EventHubDroppedEvents
+        aggregation: total
+        name: dropped
+      - metric: EventHubRejectedEvents
+        aggregation: total
+        name: rejected
+      - metric: EventHubThrottledEvents
+        aggregation: total
+        name: throttled
+      - metric: EventHubTimedoutEvents
+        aggregation: total
+        name: timed_out
+
+  - id: am_azure_api_management__eventhub_bytes
+    title: Azure API Management EventHub Bytes Sent
+    context: api_management.eventhub_bytes
+    family: EventHub
+    type: line
+    priority: 1060
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: EventHubTotalBytesSent
+        aggregation: total
+        name: sent
+
+  - id: am_azure_api_management__websocket_connections
+    title: Azure API Management WebSocket Connection Attempts
+    context: api_management.websocket_connections
+    family: WebSocket
+    type: line
+    priority: 1070
+    units: attempts/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ConnectionAttempts
+        aggregation: total
+        name: connection_attempts
+
+  - id: am_azure_api_management__websocket_messages
+    title: Azure API Management WebSocket Messages
+    context: api_management.websocket_messages
+    family: WebSocket
+    type: line
+    priority: 1080
+    units: messages/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: WebSocketMessages
+        aggregation: total
+        name: messages
+
+  - id: am_azure_api_management__network_connectivity
+    title: Azure API Management Network Connectivity Status
+    context: api_management.network_connectivity
+    family: Network
+    type: line
+    priority: 1090
+    units: status
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: NetworkConnectivity
+        aggregation: average
+        name: connectivity

@@ -1,0 +1,120 @@
+name: Azure SQL Managed Instance
+resource_type: Microsoft.Sql/managedInstances
+metrics:
+  - name: avg_cpu_percent
+    units: percentage
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: io_bytes_read
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: io_bytes_written
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: io_requests
+    units: requests/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: reserved_storage_mb
+    units: MiB
+    aggregations: [average]
+    time_grain: PT1M
+  - name: storage_space_used_mb
+    units: MiB
+    aggregations: [average]
+    time_grain: PT1M
+  - name: virtual_core_count
+    units: cores
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  - id: am_azure_sql_managed_instance__cpu
+    title: Azure SQL Managed Instance CPU Utilization
+    context: sql_managed_instance.cpu
+    family: Utilization
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: avg_cpu_percent
+        aggregation: average
+        name: average
+      - metric: avg_cpu_percent
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_sql_managed_instance__io_throughput
+    title: Azure SQL Managed Instance I/O Throughput
+    context: sql_managed_instance.io_throughput
+    family: I/O
+    type: line
+    priority: 1010
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: io_bytes_read
+        aggregation: average
+        name: read
+      - metric: io_bytes_written
+        aggregation: average
+        name: written
+
+  - id: am_azure_sql_managed_instance__io_requests
+    title: Azure SQL Managed Instance I/O Requests
+    context: sql_managed_instance.io_requests
+    family: I/O
+    type: line
+    priority: 1020
+    units: requests/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: io_requests
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_managed_instance__storage
+    title: Azure SQL Managed Instance Storage
+    context: sql_managed_instance.storage
+    family: Capacity
+    type: line
+    priority: 1030
+    units: MiB
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: reserved_storage_mb
+        aggregation: average
+        name: reserved
+      - metric: storage_space_used_mb
+        aggregation: average
+        name: used
+
+  - id: am_azure_sql_managed_instance__virtual_core_count
+    title: Azure SQL Managed Instance Virtual Core Count
+    context: sql_managed_instance.virtual_core_count
+    family: Capacity
+    type: line
+    priority: 1040
+    units: cores
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: virtual_core_count
+        aggregation: average
+        name: average

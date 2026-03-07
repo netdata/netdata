@@ -1,0 +1,397 @@
+name: Azure Service Bus Namespace
+resource_type: Microsoft.ServiceBus/Namespaces
+metrics:
+  # Messages
+  - name: IncomingMessages
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OutgoingMessages
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: CompleteMessage
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AbandonMessage
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Queue Status
+  - name: ActiveMessages
+    units: messages
+    aggregations: [average]
+    time_grain: PT1M
+  - name: DeadletteredMessages
+    units: messages
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ScheduledMessages
+    units: messages
+    aggregations: [average]
+    time_grain: PT1M
+  # Requests
+  - name: IncomingRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SuccessfulRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Errors
+  - name: ServerErrors
+    units: errors/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: UserErrors
+    units: errors/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ThrottledRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Connections
+  - name: ActiveConnections
+    units: connections
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ConnectionsOpened
+    units: connections
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ConnectionsClosed
+    units: connections
+    aggregations: [average]
+    time_grain: PT1M
+  # Data Throughput
+  - name: IncomingBytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OutgoingBytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Total Messages
+  - name: Messages
+    units: messages
+    aggregations: [average]
+    time_grain: PT1M
+  # Premium Resources
+  - name: NamespaceCpuUsage
+    units: percentage
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: NamespaceMemoryUsage
+    units: percentage
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Latency
+  - name: ServerSendLatency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Replication
+  - name: PendingCheckpointOperationCount
+    units: operations
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ReplicationLagCount
+    units: messages
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: ReplicationLagDuration
+    units: seconds
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Capacity
+  - name: Size
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  - id: am_azure_service_bus__message_flow
+    title: Azure Service Bus Message Flow
+    context: service_bus.message_flow
+    family: Messages
+    type: line
+    priority: 1000
+    units: messages/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IncomingMessages
+        aggregation: total
+        name: in
+      - metric: OutgoingMessages
+        aggregation: total
+        name: out
+
+  - id: am_azure_service_bus__message_operations
+    title: Azure Service Bus Message Operations
+    context: service_bus.message_operations
+    family: Messages
+    type: line
+    priority: 1010
+    units: messages/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CompleteMessage
+        aggregation: total
+        name: completed
+      - metric: AbandonMessage
+        aggregation: total
+        name: abandoned
+
+  - id: am_azure_service_bus__queue_depth
+    title: Azure Service Bus Queue Depth
+    context: service_bus.queue_depth
+    family: Queue
+    type: line
+    priority: 1020
+    units: messages
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ActiveMessages
+        aggregation: average
+        name: active
+
+  - id: am_azure_service_bus__problem_messages
+    title: Azure Service Bus Problem Messages
+    context: service_bus.problem_messages
+    family: Queue
+    type: line
+    priority: 1030
+    units: messages
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: DeadletteredMessages
+        aggregation: average
+        name: dead_lettered
+      - metric: ScheduledMessages
+        aggregation: average
+        name: scheduled
+
+  - id: am_azure_service_bus__requests
+    title: Azure Service Bus Requests
+    context: service_bus.requests
+    family: Requests
+    type: line
+    priority: 1040
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IncomingRequests
+        aggregation: total
+        name: incoming
+      - metric: SuccessfulRequests
+        aggregation: total
+        name: successful
+
+  - id: am_azure_service_bus__errors
+    title: Azure Service Bus Errors
+    context: service_bus.errors
+    family: Errors
+    type: line
+    priority: 1050
+    units: errors/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ServerErrors
+        aggregation: total
+        name: server
+      - metric: UserErrors
+        aggregation: total
+        name: user
+      - metric: ThrottledRequests
+        aggregation: total
+        name: throttled
+
+  - id: am_azure_service_bus__connections
+    title: Azure Service Bus Active Connections
+    context: service_bus.connections
+    family: Connections
+    type: line
+    priority: 1060
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ActiveConnections
+        aggregation: total
+        name: active
+
+  - id: am_azure_service_bus__connection_events
+    title: Azure Service Bus Connection Events
+    context: service_bus.connection_events
+    family: Connections
+    type: line
+    priority: 1070
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ConnectionsOpened
+        aggregation: average
+        name: opened
+      - metric: ConnectionsClosed
+        aggregation: average
+        name: closed
+
+  - id: am_azure_service_bus__namespace_size
+    title: Azure Service Bus Namespace Size
+    context: service_bus.namespace_size
+    family: Capacity
+    type: line
+    priority: 1080
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Size
+        aggregation: average
+        name: average
+
+  - id: am_azure_service_bus__data_throughput
+    title: Azure Service Bus Data Throughput
+    context: service_bus.data_throughput
+    family: Messages
+    type: line
+    priority: 1090
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IncomingBytes
+        aggregation: total
+        name: in
+      - metric: OutgoingBytes
+        aggregation: total
+        name: out
+
+  - id: am_azure_service_bus__total_messages
+    title: Azure Service Bus Total Messages
+    context: service_bus.total_messages
+    family: Queue
+    type: line
+    priority: 1035
+    units: messages
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Messages
+        aggregation: average
+        name: total
+
+  - id: am_azure_service_bus__namespace_resources
+    title: Azure Service Bus Namespace Resources
+    context: service_bus.namespace_resources
+    family: Capacity
+    type: line
+    priority: 1100
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: NamespaceCpuUsage
+        aggregation: maximum
+        name: cpu
+      - metric: NamespaceMemoryUsage
+        aggregation: maximum
+        name: memory
+
+  - id: am_azure_service_bus__send_latency
+    title: Azure Service Bus Send Latency
+    context: service_bus.send_latency
+    family: Performance
+    type: line
+    priority: 1110
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ServerSendLatency
+        aggregation: average
+        name: average
+
+  - id: am_azure_service_bus__replication_lag
+    title: Azure Service Bus Replication Lag
+    context: service_bus.replication_lag
+    family: Replication
+    type: line
+    priority: 1120
+    units: messages
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ReplicationLagCount
+        aggregation: maximum
+        name: messages
+
+  - id: am_azure_service_bus__replication_lag_duration
+    title: Azure Service Bus Replication Lag Duration
+    context: service_bus.replication_lag_duration
+    family: Replication
+    type: line
+    priority: 1130
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ReplicationLagDuration
+        aggregation: maximum
+        name: duration
+
+  - id: am_azure_service_bus__checkpoint_operations
+    title: Azure Service Bus Pending Checkpoint Operations
+    context: service_bus.checkpoint_operations
+    family: Replication
+    type: line
+    priority: 1140
+    units: operations
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: PendingCheckpointOperationCount
+        aggregation: total
+        name: pending

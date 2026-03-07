@@ -1,0 +1,329 @@
+name: Azure Event Hubs Namespace
+resource_type: Microsoft.EventHub/Namespaces
+metrics:
+  # Messages
+  - name: IncomingMessages
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OutgoingMessages
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Data
+  - name: IncomingBytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OutgoingBytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Requests
+  - name: IncomingRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SuccessfulRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Errors
+  - name: ThrottledRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ServerErrors
+    units: errors/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: UserErrors
+    units: errors/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: QuotaExceededErrors
+    units: errors/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Connections
+  - name: ActiveConnections
+    units: connections
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ConnectionsOpened
+    units: connections
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: ConnectionsClosed
+    units: connections
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Capture
+  - name: CapturedMessages
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: CapturedBytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Capture Backlog
+  - name: CaptureBacklog
+    units: messages
+    aggregations: [total]
+    time_grain: PT1M
+  # Premium Resources
+  - name: NamespaceCpuUsage
+    units: percentage
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: NamespaceMemoryUsage
+    units: percentage
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Geo-Replication
+  - name: ReplicationLagCount
+    units: messages
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: ReplicationLagDuration
+    units: seconds
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Size
+  - name: Size
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  - id: am_azure_event_hubs__message_flow
+    title: Azure Event Hubs Message Flow
+    context: event_hubs.message_flow
+    family: Messages
+    type: line
+    priority: 1000
+    units: messages/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IncomingMessages
+        aggregation: total
+        name: in
+      - metric: OutgoingMessages
+        aggregation: total
+        name: out
+
+  - id: am_azure_event_hubs__data_throughput
+    title: Azure Event Hubs Data Throughput
+    context: event_hubs.data_throughput
+    family: Messages
+    type: line
+    priority: 1010
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IncomingBytes
+        aggregation: total
+        name: in
+      - metric: OutgoingBytes
+        aggregation: total
+        name: out
+
+  - id: am_azure_event_hubs__requests
+    title: Azure Event Hubs Requests
+    context: event_hubs.requests
+    family: Requests
+    type: line
+    priority: 1020
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IncomingRequests
+        aggregation: total
+        name: incoming
+      - metric: SuccessfulRequests
+        aggregation: total
+        name: successful
+
+  - id: am_azure_event_hubs__errors
+    title: Azure Event Hubs Errors
+    context: event_hubs.errors
+    family: Errors
+    type: line
+    priority: 1030
+    units: errors/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ServerErrors
+        aggregation: total
+        name: server
+      - metric: UserErrors
+        aggregation: total
+        name: user
+      - metric: ThrottledRequests
+        aggregation: total
+        name: throttled
+      - metric: QuotaExceededErrors
+        aggregation: total
+        name: quota_exceeded
+
+  - id: am_azure_event_hubs__connections
+    title: Azure Event Hubs Active Connections
+    context: event_hubs.connections
+    family: Connections
+    type: line
+    priority: 1040
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ActiveConnections
+        aggregation: average
+        name: active
+
+  - id: am_azure_event_hubs__connection_events
+    title: Azure Event Hubs Connection Events
+    context: event_hubs.connection_events
+    family: Connections
+    type: line
+    priority: 1050
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ConnectionsOpened
+        aggregation: maximum
+        name: opened
+      - metric: ConnectionsClosed
+        aggregation: maximum
+        name: closed
+
+  - id: am_azure_event_hubs__captured_messages
+    title: Azure Event Hubs Captured Messages
+    context: event_hubs.captured_messages
+    family: Capture
+    type: line
+    priority: 1060
+    units: messages/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CapturedMessages
+        aggregation: total
+        name: total
+
+  - id: am_azure_event_hubs__captured_data
+    title: Azure Event Hubs Captured Data
+    context: event_hubs.captured_data
+    family: Capture
+    type: line
+    priority: 1070
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CapturedBytes
+        aggregation: total
+        name: total
+
+  - id: am_azure_event_hubs__namespace_size
+    title: Azure Event Hubs Namespace Size
+    context: event_hubs.namespace_size
+    family: Capacity
+    type: line
+    priority: 1080
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Size
+        aggregation: average
+        name: average
+
+  - id: am_azure_event_hubs__capture_backlog
+    title: Azure Event Hubs Capture Backlog
+    context: event_hubs.capture_backlog
+    family: Capture
+    type: line
+    priority: 1090
+    units: messages
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CaptureBacklog
+        aggregation: total
+        name: backlog
+
+  - id: am_azure_event_hubs__namespace_resources
+    title: Azure Event Hubs Namespace Resources
+    context: event_hubs.namespace_resources
+    family: Capacity
+    type: line
+    priority: 1100
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: NamespaceCpuUsage
+        aggregation: maximum
+        name: cpu
+      - metric: NamespaceMemoryUsage
+        aggregation: maximum
+        name: memory
+
+  - id: am_azure_event_hubs__replication_lag
+    title: Azure Event Hubs Replication Lag
+    context: event_hubs.replication_lag
+    family: Replication
+    type: line
+    priority: 1110
+    units: messages
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ReplicationLagCount
+        aggregation: maximum
+        name: messages
+
+  - id: am_azure_event_hubs__replication_lag_duration
+    title: Azure Event Hubs Replication Lag Duration
+    context: event_hubs.replication_lag_duration
+    family: Replication
+    type: line
+    priority: 1120
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ReplicationLagDuration
+        aggregation: maximum
+        name: duration

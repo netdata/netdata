@@ -1,0 +1,501 @@
+name: Azure Application Gateway
+resource_type: Microsoft.Network/applicationGateways
+metrics:
+  # Traffic
+  - name: Throughput
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: BytesReceived
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BytesSent
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Requests
+  - name: TotalRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: FailedRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ResponseStatus
+    units: responses/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BackendResponseStatus
+    units: responses/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Backend Health
+  - name: HealthyHostCount
+    units: hosts
+    aggregations: [average]
+    time_grain: PT1M
+  - name: UnhealthyHostCount
+    units: hosts
+    aggregations: [average]
+    time_grain: PT1M
+  - name: AvgRequestCountPerHealthyHost
+    units: requests
+    aggregations: [average]
+    time_grain: PT1M
+  # Latency
+  - name: ApplicationGatewayTotalTime
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: BackendConnectTime
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: BackendFirstByteResponseTime
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: BackendLastByteResponseTime
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ClientRtt
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Connections
+  - name: CurrentConnections
+    units: connections
+    aggregations: [total]
+    time_grain: PT1M
+  - name: NewConnectionsPerSecond
+    units: connections/s
+    aggregations: [average]
+    time_grain: PT1M
+  # Capacity
+  - name: CapacityUnits
+    units: units
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ComputeUnits
+    units: units
+    aggregations: [average]
+    time_grain: PT1M
+  - name: EstimatedBilledCapacityUnits
+    units: units
+    aggregations: [average]
+    time_grain: PT1M
+  - name: FixedBillableCapacityUnits
+    units: units
+    aggregations: [average]
+    time_grain: PT1M
+  - name: CpuUtilization
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # TLS
+  - name: TlsProtocol
+    units: connections/s
+    aggregations: [total]
+    time_grain: PT1M
+  # WebSocket
+  - name: WebSocketActiveConnections
+    units: connections
+    aggregations: [total]
+    time_grain: PT1M
+  - name: WebsocketSpecificCloseStatusCode
+    units: connections/s
+    aggregations: [total]
+    time_grain: PT1M
+  # WAF
+  - name: AzwafTotalRequests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BlockedCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: MatchedCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AzwafBotProtection
+    units: matches/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AzwafCustomRule
+    units: matches/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AzwafSecRule
+    units: matches/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AzWAFCaptchaChallengeRequestCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AzWAFJSChallengeRequestCount
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AzwafPenaltyBoxHits
+    units: hits/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AzwafPenaltyBoxSize
+    units: IPs
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  - id: am_azure_application_gateway__throughput
+    title: Azure Application Gateway Throughput
+    context: application_gateway.throughput
+    family: Traffic
+    type: line
+    priority: 1000
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Throughput
+        aggregation: average
+        name: average
+
+  - id: am_azure_application_gateway__traffic_volume
+    title: Azure Application Gateway Traffic Volume
+    context: application_gateway.traffic_volume
+    family: Traffic
+    type: line
+    priority: 1005
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BytesReceived
+        aggregation: total
+        name: received
+      - metric: BytesSent
+        aggregation: total
+        name: sent
+
+  - id: am_azure_application_gateway__requests
+    title: Azure Application Gateway Requests
+    context: application_gateway.requests
+    family: Traffic
+    type: line
+    priority: 1010
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalRequests
+        aggregation: total
+        name: total
+      - metric: FailedRequests
+        aggregation: total
+        name: failed
+
+  - id: am_azure_application_gateway__response_status
+    title: Azure Application Gateway Response Status
+    context: application_gateway.response_status
+    family: Traffic
+    type: line
+    priority: 1015
+    units: responses/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ResponseStatus
+        aggregation: total
+        name: gateway
+      - metric: BackendResponseStatus
+        aggregation: total
+        name: backend
+
+  - id: am_azure_application_gateway__backend_health
+    title: Azure Application Gateway Backend Health
+    context: application_gateway.backend_health
+    family: Backend
+    type: line
+    priority: 1020
+    units: hosts
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: HealthyHostCount
+        aggregation: average
+        name: healthy
+      - metric: UnhealthyHostCount
+        aggregation: average
+        name: unhealthy
+
+  - id: am_azure_application_gateway__backend_request_load
+    title: Azure Application Gateway Backend Request Load
+    context: application_gateway.backend_request_load
+    family: Backend
+    type: line
+    priority: 1025
+    units: requests
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AvgRequestCountPerHealthyHost
+        aggregation: average
+        name: per_healthy_host
+
+  - id: am_azure_application_gateway__backend_latency
+    title: Azure Application Gateway Backend Latency
+    context: application_gateway.backend_latency
+    family: Backend
+    type: line
+    priority: 1030
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BackendConnectTime
+        aggregation: average
+        name: connect
+      - metric: BackendFirstByteResponseTime
+        aggregation: average
+        name: first_byte
+      - metric: BackendLastByteResponseTime
+        aggregation: average
+        name: last_byte
+
+  - id: am_azure_application_gateway__client_latency
+    title: Azure Application Gateway Client Latency
+    context: application_gateway.client_latency
+    family: Latency
+    type: line
+    priority: 1035
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ApplicationGatewayTotalTime
+        aggregation: average
+        name: total_time
+      - metric: ClientRtt
+        aggregation: average
+        name: client_rtt
+
+  - id: am_azure_application_gateway__current_connections
+    title: Azure Application Gateway Current Connections
+    context: application_gateway.current_connections
+    family: Connections
+    type: line
+    priority: 1040
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CurrentConnections
+        aggregation: total
+        name: current
+
+  - id: am_azure_application_gateway__new_connections
+    title: Azure Application Gateway New Connections
+    context: application_gateway.new_connections
+    family: Connections
+    type: line
+    priority: 1050
+    units: connections/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: NewConnectionsPerSecond
+        aggregation: average
+        name: average
+
+  - id: am_azure_application_gateway__websocket_connections
+    title: Azure Application Gateway WebSocket Connections
+    context: application_gateway.websocket_connections
+    family: Connections
+    type: line
+    priority: 1055
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: WebSocketActiveConnections
+        aggregation: total
+        name: active
+
+  - id: am_azure_application_gateway__websocket_close_codes
+    title: Azure Application Gateway WebSocket Close Codes
+    context: application_gateway.websocket_close_codes
+    family: Connections
+    type: line
+    priority: 1056
+    units: connections/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: WebsocketSpecificCloseStatusCode
+        aggregation: total
+        name: total
+
+  - id: am_azure_application_gateway__capacity
+    title: Azure Application Gateway Capacity
+    context: application_gateway.capacity
+    family: Capacity
+    type: line
+    priority: 1060
+    units: units
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CapacityUnits
+        aggregation: average
+        name: capacity
+      - metric: ComputeUnits
+        aggregation: average
+        name: compute
+      - metric: EstimatedBilledCapacityUnits
+        aggregation: average
+        name: billed
+      - metric: FixedBillableCapacityUnits
+        aggregation: average
+        name: fixed_billed
+
+  - id: am_azure_application_gateway__cpu
+    title: Azure Application Gateway CPU Utilization
+    context: application_gateway.cpu
+    family: Capacity
+    type: line
+    priority: 1065
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CpuUtilization
+        aggregation: average
+        name: average
+
+  - id: am_azure_application_gateway__tls_connections
+    title: Azure Application Gateway TLS Connections
+    context: application_gateway.tls_connections
+    family: Security
+    type: line
+    priority: 1070
+    units: connections/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TlsProtocol
+        aggregation: total
+        name: total
+
+  - id: am_azure_application_gateway__waf_requests
+    title: Azure Application Gateway WAF Requests
+    context: application_gateway.waf_requests
+    family: WAF
+    type: line
+    priority: 1080
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AzwafTotalRequests
+        aggregation: total
+        name: total
+      - metric: BlockedCount
+        aggregation: total
+        name: blocked
+      - metric: MatchedCount
+        aggregation: total
+        name: matched
+
+  - id: am_azure_application_gateway__waf_rule_matches
+    title: Azure Application Gateway WAF Rule Matches
+    context: application_gateway.waf_rule_matches
+    family: WAF
+    type: line
+    priority: 1090
+    units: matches/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AzwafSecRule
+        aggregation: total
+        name: managed
+      - metric: AzwafCustomRule
+        aggregation: total
+        name: custom
+      - metric: AzwafBotProtection
+        aggregation: total
+        name: bot
+
+  - id: am_azure_application_gateway__waf_challenges
+    title: Azure Application Gateway WAF Challenges
+    context: application_gateway.waf_challenges
+    family: WAF
+    type: line
+    priority: 1095
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AzWAFCaptchaChallengeRequestCount
+        aggregation: total
+        name: captcha
+      - metric: AzWAFJSChallengeRequestCount
+        aggregation: total
+        name: js_challenge
+
+  - id: am_azure_application_gateway__waf_penalty_box
+    title: Azure Application Gateway WAF Penalty Box
+    context: application_gateway.waf_penalty_box
+    family: WAF
+    type: line
+    priority: 1098
+    units: IPs
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AzwafPenaltyBoxSize
+        aggregation: average
+        name: size

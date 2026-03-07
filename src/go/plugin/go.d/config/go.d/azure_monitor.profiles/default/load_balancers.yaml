@@ -1,0 +1,170 @@
+name: Azure Load Balancer
+resource_type: Microsoft.Network/loadBalancers
+metrics:
+  - name: VipAvailability
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: DipAvailability
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: GlobalBackendAvailability
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ByteCount
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: PacketCount
+    units: packets/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SYNCount
+    units: packets/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SnatConnectionCount
+    units: connections/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AllocatedSnatPorts
+    units: ports
+    aggregations: [average]
+    time_grain: PT1M
+  - name: UsedSnatPorts
+    units: ports
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  - id: am_azure_load_balancers__vip_availability
+    title: Azure Load Balancer Data Path Availability
+    context: load_balancers.vip_availability
+    family: Availability
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: VipAvailability
+        aggregation: average
+        name: average
+
+  - id: am_azure_load_balancers__dip_availability
+    title: Azure Load Balancer Health Probe Status
+    context: load_balancers.dip_availability
+    family: Availability
+    type: line
+    priority: 1010
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: DipAvailability
+        aggregation: average
+        name: average
+
+  - id: am_azure_load_balancers__global_backend_availability
+    title: Azure Load Balancer Global Backend Availability
+    context: load_balancers.global_backend_availability
+    family: Availability
+    type: line
+    priority: 1020
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: GlobalBackendAvailability
+        aggregation: average
+        name: average
+
+  - id: am_azure_load_balancers__byte_throughput
+    title: Azure Load Balancer Byte Throughput
+    context: load_balancers.byte_throughput
+    family: Throughput
+    type: line
+    priority: 1030
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ByteCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_load_balancers__packet_throughput
+    title: Azure Load Balancer Packet Throughput
+    context: load_balancers.packet_throughput
+    family: Throughput
+    type: line
+    priority: 1040
+    units: packets/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: PacketCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_load_balancers__syn_count
+    title: Azure Load Balancer SYN Packets
+    context: load_balancers.syn_count
+    family: Throughput
+    type: line
+    priority: 1050
+    units: packets/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SYNCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_load_balancers__snat_connections
+    title: Azure Load Balancer SNAT Connections
+    context: load_balancers.snat_connections
+    family: SNAT
+    type: line
+    priority: 1060
+    units: connections/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SnatConnectionCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_load_balancers__snat_ports
+    title: Azure Load Balancer SNAT Port Usage
+    context: load_balancers.snat_ports
+    family: SNAT
+    type: line
+    priority: 1070
+    units: ports
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AllocatedSnatPorts
+        aggregation: average
+        name: allocated
+      - metric: UsedSnatPorts
+        aggregation: average
+        name: used

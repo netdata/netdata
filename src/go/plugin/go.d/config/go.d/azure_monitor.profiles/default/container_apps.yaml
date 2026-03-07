@@ -1,0 +1,544 @@
+name: Azure Container Apps
+resource_type: Microsoft.App/containerApps
+metrics:
+  # CPU & Memory
+  - name: UsageNanoCores
+    units: nanocores
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: CpuPercentage
+    units: percentage
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: WorkingSetBytes
+    units: bytes
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: MemoryPercentage
+    units: percentage
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  # Replicas & Cores
+  - name: Replicas
+    units: replicas
+    aggregations: [average]
+    time_grain: PT1M
+  - name: CoresQuotaUsed
+    units: cores
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: TotalCoresQuotaUsed
+    units: cores
+    aggregations: [average]
+    time_grain: PT1M
+  - name: RestartCount
+    units: restarts/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Requests & Responses
+  - name: Requests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ResponseTime
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Network
+  - name: RxBytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TxBytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Resiliency
+  - name: ResiliencyConnectTimeouts
+    units: timeouts/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ResiliencyRequestTimeouts
+    units: timeouts/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ResiliencyRequestRetries
+    units: retries/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ResiliencyRequestsPendingConnectionPool
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ResiliencyEjectedHosts
+    units: hosts/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ResiliencyEjectionsAborted
+    units: ejections/s
+    aggregations: [total]
+    time_grain: PT1M
+  # GPU
+  - name: GpuUtilizationPercentage
+    units: percentage
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  # JVM Buffers
+  - name: JvmBufferCount
+    units: buffers
+    aggregations: [average]
+    time_grain: PT1M
+  - name: JvmBufferMemoryLimit
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: JvmBufferMemoryUsage
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  # JVM GC
+  - name: JvmGcCount
+    units: collections/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: JvmGcDuration
+    units: milliseconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  # JVM Memory (per pool)
+  - name: JvmMemoryCommitted
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: JvmMemoryLimit
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: JvmMemoryUsed
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  # JVM Memory (totals)
+  - name: JvmMemoryTotalCommitted
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: JvmMemoryTotalLimit
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: JvmMemoryTotalUsed
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  # JVM Threads
+  - name: JvmThreadCount
+    units: threads
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  # CPU
+  - id: am_azure_container_apps__cpu_usage
+    title: Azure Container Apps CPU Usage
+    context: container_apps.cpu_usage
+    family: CPU
+    type: line
+    priority: 1000
+    units: nanocores
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: UsageNanoCores
+        aggregation: average
+        name: average
+      - metric: UsageNanoCores
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_container_apps__cpu_percentage
+    title: Azure Container Apps CPU Percentage
+    context: container_apps.cpu_percentage
+    family: CPU
+    type: line
+    priority: 1010
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CpuPercentage
+        aggregation: average
+        name: average
+      - metric: CpuPercentage
+        aggregation: maximum
+        name: maximum
+
+  # Memory
+  - id: am_azure_container_apps__memory_working_set
+    title: Azure Container Apps Memory Working Set
+    context: container_apps.memory_working_set
+    family: Memory
+    type: line
+    priority: 1020
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: WorkingSetBytes
+        aggregation: average
+        name: average
+      - metric: WorkingSetBytes
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_container_apps__memory_percentage
+    title: Azure Container Apps Memory Percentage
+    context: container_apps.memory_percentage
+    family: Memory
+    type: line
+    priority: 1030
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: MemoryPercentage
+        aggregation: average
+        name: average
+      - metric: MemoryPercentage
+        aggregation: maximum
+        name: maximum
+
+  # Replicas & Cores
+  - id: am_azure_container_apps__replicas
+    title: Azure Container Apps Replica Count
+    context: container_apps.replicas
+    family: Scaling
+    type: line
+    priority: 1040
+    units: replicas
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Replicas
+        aggregation: average
+        name: average
+
+  - id: am_azure_container_apps__reserved_cores
+    title: Azure Container Apps Reserved Cores
+    context: container_apps.reserved_cores
+    family: Scaling
+    type: line
+    priority: 1050
+    units: cores
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CoresQuotaUsed
+        aggregation: maximum
+        name: per_revision
+      - metric: TotalCoresQuotaUsed
+        aggregation: average
+        name: total
+
+  - id: am_azure_container_apps__restart_count
+    title: Azure Container Apps Replica Restarts
+    context: container_apps.restart_count
+    family: Scaling
+    type: line
+    priority: 1060
+    units: restarts/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RestartCount
+        aggregation: total
+        name: restarts
+
+  # Requests & Responses
+  - id: am_azure_container_apps__requests
+    title: Azure Container Apps Requests
+    context: container_apps.requests
+    family: Requests
+    type: line
+    priority: 1070
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Requests
+        aggregation: total
+        name: requests
+
+  - id: am_azure_container_apps__response_time
+    title: Azure Container Apps Response Time
+    context: container_apps.response_time
+    family: Requests
+    type: line
+    priority: 1080
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ResponseTime
+        aggregation: average
+        name: average
+
+  # Network
+  - id: am_azure_container_apps__network
+    title: Azure Container Apps Network Traffic
+    context: container_apps.network
+    family: Network
+    type: line
+    priority: 1090
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RxBytes
+        aggregation: total
+        name: received
+      - metric: TxBytes
+        aggregation: total
+        name: sent
+
+  # Resiliency - Timeouts
+  - id: am_azure_container_apps__resiliency_timeouts
+    title: Azure Container Apps Resiliency Timeouts
+    context: container_apps.resiliency_timeouts
+    family: Resiliency
+    type: line
+    priority: 1100
+    units: timeouts/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ResiliencyConnectTimeouts
+        aggregation: total
+        name: connection
+      - metric: ResiliencyRequestTimeouts
+        aggregation: total
+        name: request
+
+  - id: am_azure_container_apps__resiliency_retries
+    title: Azure Container Apps Resiliency Request Retries
+    context: container_apps.resiliency_retries
+    family: Resiliency
+    type: line
+    priority: 1110
+    units: retries/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ResiliencyRequestRetries
+        aggregation: total
+        name: retries
+
+  - id: am_azure_container_apps__resiliency_pending_connections
+    title: Azure Container Apps Resiliency Pending Connection Pool
+    context: container_apps.resiliency_pending_connections
+    family: Resiliency
+    type: line
+    priority: 1120
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ResiliencyRequestsPendingConnectionPool
+        aggregation: total
+        name: pending
+
+  - id: am_azure_container_apps__resiliency_ejections
+    title: Azure Container Apps Resiliency Host Ejections
+    context: container_apps.resiliency_ejections
+    family: Resiliency
+    type: line
+    priority: 1130
+    units: ejections/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ResiliencyEjectedHosts
+        aggregation: total
+        name: ejected
+      - metric: ResiliencyEjectionsAborted
+        aggregation: total
+        name: aborted
+
+  # GPU
+  - id: am_azure_container_apps__gpu_utilization
+    title: Azure Container Apps GPU Utilization
+    context: container_apps.gpu_utilization
+    family: GPU
+    type: line
+    priority: 1140
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: GpuUtilizationPercentage
+        aggregation: average
+        name: average
+      - metric: GpuUtilizationPercentage
+        aggregation: maximum
+        name: maximum
+
+  # JVM Buffers
+  - id: am_azure_container_apps__jvm_buffer_count
+    title: Azure Container Apps JVM Buffer Count
+    context: container_apps.jvm_buffer_count
+    family: JVM Buffers
+    type: line
+    priority: 1150
+    units: buffers
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: JvmBufferCount
+        aggregation: average
+        name: average
+
+  - id: am_azure_container_apps__jvm_buffer_memory
+    title: Azure Container Apps JVM Buffer Memory
+    context: container_apps.jvm_buffer_memory
+    family: JVM Buffers
+    type: line
+    priority: 1160
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: JvmBufferMemoryUsage
+        aggregation: average
+        name: used
+      - metric: JvmBufferMemoryLimit
+        aggregation: average
+        name: limit
+
+  # JVM GC
+  - id: am_azure_container_apps__jvm_gc_count
+    title: Azure Container Apps JVM Garbage Collections
+    context: container_apps.jvm_gc_count
+    family: JVM GC
+    type: line
+    priority: 1170
+    units: collections/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: JvmGcCount
+        aggregation: total
+        name: collections
+
+  - id: am_azure_container_apps__jvm_gc_duration
+    title: Azure Container Apps JVM GC Duration
+    context: container_apps.jvm_gc_duration
+    family: JVM GC
+    type: line
+    priority: 1180
+    units: milliseconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: JvmGcDuration
+        aggregation: total
+        name: duration
+
+  # JVM Memory (per pool)
+  - id: am_azure_container_apps__jvm_memory_pool
+    title: Azure Container Apps JVM Memory per Pool
+    context: container_apps.jvm_memory_pool
+    family: JVM Memory
+    type: line
+    priority: 1190
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: JvmMemoryUsed
+        aggregation: average
+        name: used
+      - metric: JvmMemoryCommitted
+        aggregation: average
+        name: committed
+      - metric: JvmMemoryLimit
+        aggregation: average
+        name: limit
+
+  # JVM Memory (totals)
+  - id: am_azure_container_apps__jvm_memory_total
+    title: Azure Container Apps JVM Memory Total
+    context: container_apps.jvm_memory_total
+    family: JVM Memory
+    type: line
+    priority: 1200
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: JvmMemoryTotalUsed
+        aggregation: average
+        name: used
+      - metric: JvmMemoryTotalCommitted
+        aggregation: average
+        name: committed
+      - metric: JvmMemoryTotalLimit
+        aggregation: average
+        name: limit
+
+  # JVM Threads
+  - id: am_azure_container_apps__jvm_thread_count
+    title: Azure Container Apps JVM Thread Count
+    context: container_apps.jvm_thread_count
+    family: JVM Threads
+    type: line
+    priority: 1210
+    units: threads
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: JvmThreadCount
+        aggregation: average
+        name: average

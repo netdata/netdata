@@ -1,0 +1,94 @@
+name: Azure Key Vault
+resource_type: Microsoft.KeyVault/vaults
+metrics:
+  # Availability
+  - name: Availability
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Latency
+  - name: ServiceApiLatency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Saturation
+  - name: SaturationShoebox
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # API Operations
+  - name: ServiceApiHit
+    units: operations/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: ServiceApiResult
+    units: operations/s
+    aggregations: [count]
+    time_grain: PT1M
+charts:
+  - id: am_azure_key_vault__availability
+    title: Azure Key Vault Availability
+    context: key_vault.availability
+    family: Availability
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Availability
+        aggregation: average
+        name: average
+
+  - id: am_azure_key_vault__api_latency
+    title: Azure Key Vault API Latency
+    context: key_vault.api_latency
+    family: Performance
+    type: line
+    priority: 1010
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ServiceApiLatency
+        aggregation: average
+        name: average
+
+  - id: am_azure_key_vault__saturation
+    title: Azure Key Vault Saturation
+    context: key_vault.saturation
+    family: Capacity
+    type: line
+    priority: 1020
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SaturationShoebox
+        aggregation: average
+        name: average
+
+  - id: am_azure_key_vault__api_activity
+    title: Azure Key Vault API Activity
+    context: key_vault.api_activity
+    family: Operations
+    type: line
+    priority: 1030
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ServiceApiHit
+        aggregation: count
+        name: hits
+      - metric: ServiceApiResult
+        aggregation: count
+        name: results

@@ -1,0 +1,418 @@
+name: Azure Cache for Redis
+resource_type: Microsoft.Cache/redis
+metrics:
+  # Cache Effectiveness
+  - name: cachehits
+    units: hits/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: cachemisses
+    units: misses/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Throughput
+  - name: cacheRead
+    units: bytes/s
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: cacheWrite
+    units: bytes/s
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Server
+  - name: serverLoad
+    units: percentage
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: percentProcessorTime
+    units: percentage
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Memory
+  - name: usedmemory
+    units: bytes
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: usedmemorypercentage
+    units: percentage
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: usedmemoryRss
+    units: bytes
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Clients
+  - name: connectedclients
+    units: clients
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Operations
+  - name: operationsPerSecond
+    units: operations/s
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: totalcommandsprocessed
+    units: commands/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: getcommands
+    units: commands/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: setcommands
+    units: commands/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Latency
+  - name: cacheLatency
+    units: microseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Keys
+  - name: totalkeys
+    units: keys
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: evictedkeys
+    units: keys/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: expiredkeys
+    units: keys/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Errors
+  - name: errors
+    units: errors
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Cache Miss Rate
+  - name: cachemissrate
+    units: percentage
+    aggregations: [total]
+    time_grain: PT1M
+  # P99 Latency
+  - name: LatencyP99
+    units: microseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Connection Rate
+  - name: allConnectionsClosedPerSecond
+    units: connections/s
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: allConnectionsCreatedPerSecond
+    units: connections/s
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Security
+  - name: ConnectedClientsUsingAADToken
+    units: clients
+    aggregations: [maximum]
+    time_grain: PT1M
+charts:
+  - id: am_azure_redis_cache__cache_hits
+    title: Azure Cache for Redis Hit Rate
+    context: redis_cache.cache_hits
+    family: Cache
+    type: line
+    priority: 1000
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cachehits
+        aggregation: total
+        name: hits
+      - metric: cachemisses
+        aggregation: total
+        name: misses
+
+  - id: am_azure_redis_cache__throughput
+    title: Azure Cache for Redis Throughput
+    context: redis_cache.throughput
+    family: Cache
+    type: line
+    priority: 1010
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cacheRead
+        aggregation: maximum
+        name: read
+      - metric: cacheWrite
+        aggregation: maximum
+        name: write
+
+  - id: am_azure_redis_cache__server_load
+    title: Azure Cache for Redis Server Load
+    context: redis_cache.server_load
+    family: Server
+    type: line
+    priority: 1020
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: serverLoad
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_redis_cache__cpu
+    title: Azure Cache for Redis CPU Utilization
+    context: redis_cache.cpu
+    family: Server
+    type: line
+    priority: 1030
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: percentProcessorTime
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_redis_cache__memory_usage
+    title: Azure Cache for Redis Memory Usage
+    context: redis_cache.memory_usage
+    family: Memory
+    type: line
+    priority: 1040
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: usedmemory
+        aggregation: maximum
+        name: used
+      - metric: usedmemoryRss
+        aggregation: maximum
+        name: rss
+
+  - id: am_azure_redis_cache__memory_utilization
+    title: Azure Cache for Redis Memory Utilization
+    context: redis_cache.memory_utilization
+    family: Memory
+    type: line
+    priority: 1050
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: usedmemorypercentage
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_redis_cache__clients
+    title: Azure Cache for Redis Connected Clients
+    context: redis_cache.clients
+    family: Clients
+    type: line
+    priority: 1060
+    units: clients
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: connectedclients
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_redis_cache__operations
+    title: Azure Cache for Redis Operations
+    context: redis_cache.operations
+    family: Operations
+    type: line
+    priority: 1070
+    units: operations/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: operationsPerSecond
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_redis_cache__commands
+    title: Azure Cache for Redis Commands Processed
+    context: redis_cache.commands
+    family: Operations
+    type: line
+    priority: 1080
+    units: commands/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: totalcommandsprocessed
+        aggregation: total
+        name: total
+
+  - id: am_azure_redis_cache__command_types
+    title: Azure Cache for Redis Command Types
+    context: redis_cache.command_types
+    family: Operations
+    type: line
+    priority: 1090
+    units: commands/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: getcommands
+        aggregation: total
+        name: get
+      - metric: setcommands
+        aggregation: total
+        name: set
+
+  - id: am_azure_redis_cache__latency
+    title: Azure Cache for Redis Latency
+    context: redis_cache.latency
+    family: Latency
+    type: line
+    priority: 1100
+    units: microseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cacheLatency
+        aggregation: average
+        name: average
+
+  - id: am_azure_redis_cache__key_events
+    title: Azure Cache for Redis Key Events
+    context: redis_cache.key_events
+    family: Keys
+    type: line
+    priority: 1110
+    units: keys/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: evictedkeys
+        aggregation: total
+        name: evicted
+      - metric: expiredkeys
+        aggregation: total
+        name: expired
+
+  - id: am_azure_redis_cache__total_keys
+    title: Azure Cache for Redis Total Keys
+    context: redis_cache.total_keys
+    family: Keys
+    type: line
+    priority: 1120
+    units: keys
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: totalkeys
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_redis_cache__errors
+    title: Azure Cache for Redis Errors
+    context: redis_cache.errors
+    family: Errors
+    type: line
+    priority: 1130
+    units: errors
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: errors
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_redis_cache__miss_rate
+    title: Azure Cache for Redis Miss Rate
+    context: redis_cache.miss_rate
+    family: Cache
+    type: line
+    priority: 1140
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cachemissrate
+        aggregation: total
+        name: miss_rate
+
+  - id: am_azure_redis_cache__latency_p99
+    title: Azure Cache for Redis P99 Latency
+    context: redis_cache.latency_p99
+    family: Latency
+    type: line
+    priority: 1150
+    units: microseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: LatencyP99
+        aggregation: average
+        name: p99
+
+  - id: am_azure_redis_cache__connection_rate
+    title: Azure Cache for Redis Connection Rate
+    context: redis_cache.connection_rate
+    family: Clients
+    type: line
+    priority: 1160
+    units: connections/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: allConnectionsCreatedPerSecond
+        aggregation: maximum
+        name: created
+      - metric: allConnectionsClosedPerSecond
+        aggregation: maximum
+        name: closed
+
+  - id: am_azure_redis_cache__aad_clients
+    title: Azure Cache for Redis Entra Token Clients
+    context: redis_cache.aad_clients
+    family: Clients
+    type: line
+    priority: 1170
+    units: clients
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ConnectedClientsUsingAADToken
+        aggregation: maximum
+        name: maximum

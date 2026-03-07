@@ -1,0 +1,157 @@
+name: Azure Firewall
+resource_type: Microsoft.Network/azureFirewalls
+metrics:
+  # Health
+  - name: FirewallHealth
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Latency
+  - name: FirewallLatencyPng
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Throughput
+  - name: Throughput
+    units: bits/s
+    aggregations: [average]
+    time_grain: PT1M
+  # Data Processed
+  - name: DataProcessed
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Rule Hits
+  - name: ApplicationRuleHit
+    units: hits/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: NetworkRuleHit
+    units: hits/s
+    aggregations: [total]
+    time_grain: PT1M
+  # SNAT
+  - name: SNATPortUtilization
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Capacity
+  - name: ObservedCapacity
+    units: units
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  - id: am_azure_firewall__health
+    title: Azure Firewall Health State
+    context: firewall.health
+    family: Health
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: FirewallHealth
+        aggregation: average
+        name: average
+
+  - id: am_azure_firewall__latency
+    title: Azure Firewall Latency Probe
+    context: firewall.latency
+    family: Performance
+    type: line
+    priority: 1010
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: FirewallLatencyPng
+        aggregation: average
+        name: average
+
+  - id: am_azure_firewall__throughput
+    title: Azure Firewall Throughput
+    context: firewall.throughput
+    family: Traffic
+    type: line
+    priority: 1020
+    units: bits/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Throughput
+        aggregation: average
+        name: average
+
+  - id: am_azure_firewall__data_processed
+    title: Azure Firewall Data Processed
+    context: firewall.data_processed
+    family: Traffic
+    type: line
+    priority: 1030
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: DataProcessed
+        aggregation: total
+        name: total
+
+  - id: am_azure_firewall__rule_hits
+    title: Azure Firewall Rule Hits
+    context: firewall.rule_hits
+    family: Rules
+    type: line
+    priority: 1040
+    units: hits/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ApplicationRuleHit
+        aggregation: total
+        name: application
+      - metric: NetworkRuleHit
+        aggregation: total
+        name: network
+
+  - id: am_azure_firewall__snat_port_utilization
+    title: Azure Firewall SNAT Port Utilization
+    context: firewall.snat_port_utilization
+    family: SNAT
+    type: line
+    priority: 1050
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SNATPortUtilization
+        aggregation: average
+        name: average
+
+  - id: am_azure_firewall__capacity
+    title: Azure Firewall Observed Capacity Units
+    context: firewall.capacity
+    family: Capacity
+    type: line
+    priority: 1060
+    units: units
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ObservedCapacity
+        aggregation: average
+        name: average
