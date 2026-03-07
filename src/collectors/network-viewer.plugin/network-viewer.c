@@ -1817,6 +1817,27 @@ static void network_viewer_topology_function(
         }
         buffer_json_object_close(wb); // link_types
 
+        buffer_json_member_add_array(wb, "port_fields");
+        {
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_string(wb, "key", "type");
+            buffer_json_member_add_string(wb, "label", "Type");
+            buffer_json_object_close(wb);
+        }
+        buffer_json_array_close(wb); // port_fields
+
+        buffer_json_member_add_object(wb, "port_types");
+        {
+            buffer_json_member_add_object(wb, "topology");
+            {
+                buffer_json_member_add_string(wb, "label", "Socket");
+                buffer_json_member_add_string(wb, "color_slot", "primary");
+                buffer_json_member_add_double(wb, "opacity", 1.0);
+            }
+            buffer_json_object_close(wb);
+        }
+        buffer_json_object_close(wb); // port_types
+
         buffer_json_member_add_object(wb, "legend");
         {
             buffer_json_member_add_array(wb, "actors");
@@ -1851,6 +1872,15 @@ static void network_viewer_topology_function(
                 buffer_json_object_close(wb);
             }
             buffer_json_array_close(wb); // links
+
+            buffer_json_member_add_array(wb, "ports");
+            {
+                buffer_json_add_array_item_object(wb);
+                buffer_json_member_add_string(wb, "type", "topology");
+                buffer_json_member_add_string(wb, "label", "Socket");
+                buffer_json_object_close(wb);
+            }
+            buffer_json_array_close(wb); // ports
         }
         buffer_json_object_close(wb); // legend
 

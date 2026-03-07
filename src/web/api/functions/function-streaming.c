@@ -406,6 +406,15 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
         }
         buffer_json_object_close(wb); // link_types
 
+        buffer_json_member_add_array(wb, "port_fields");
+        {
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_string(wb, "key", "type");
+            buffer_json_member_add_string(wb, "label", "Type");
+            buffer_json_object_close(wb);
+        }
+        buffer_json_array_close(wb); // port_fields
+
         buffer_json_member_add_object(wb, "port_types");
         {
             buffer_json_member_add_object(wb, "streaming");

@@ -110,6 +110,11 @@ type PresentationPortType struct {
 	Opacity   float64 `json:"opacity,omitempty"`
 }
 
+type PresentationPortField struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+}
+
 type PresentationLegendEntry struct {
 	Type  string `json:"type"`
 	Label string `json:"label"`
@@ -125,6 +130,7 @@ type Presentation struct {
 	ActorTypes         map[string]PresentationActorType `json:"actor_types"`
 	LinkTypes          map[string]PresentationLinkType  `json:"link_types"`
 	PortTypes          map[string]PresentationPortType  `json:"port_types,omitempty"`
+	PortFields         []PresentationPortField          `json:"port_fields,omitempty"`
 	Legend             PresentationLegend               `json:"legend"`
 	ActorClickBehavior string                           `json:"actor_click_behavior"`
 }
