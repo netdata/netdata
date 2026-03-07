@@ -1,0 +1,916 @@
+name: Azure Virtual Machine Scale Set
+resource_type: Microsoft.Compute/virtualMachineScaleSets
+metrics:
+  # CPU
+  - name: Percentage CPU
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: CPU Credits Consumed
+    units: credits
+    aggregations: [average]
+    time_grain: PT1M
+  - name: CPU Credits Remaining
+    units: credits
+    aggregations: [average]
+    time_grain: PT1M
+  # Memory
+  - name: Available Memory Bytes
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Available Memory Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Availability
+  - name: VmAvailabilityMetric
+    units: state
+    aggregations: [average]
+    time_grain: PT1M
+  # Network
+  - name: Network In Total
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Network Out Total
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Inbound Flows
+    units: flows
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Outbound Flows
+    units: flows
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Inbound Flows Maximum Creation Rate
+    units: flows/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Outbound Flows Maximum Creation Rate
+    units: flows/s
+    aggregations: [average]
+    time_grain: PT1M
+  # Aggregate Disk
+  - name: Disk Read Bytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Disk Write Bytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Disk Read Operations/Sec
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Disk Write Operations/Sec
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  # OS Disk
+  - name: OS Disk Read Bytes/sec
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Write Bytes/sec
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Read Operations/Sec
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Write Operations/Sec
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Queue Depth
+    units: operations
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Latency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Bandwidth Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk IOPS Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Max Burst Bandwidth
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Max Burst IOPS
+    units: iops
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Target Bandwidth
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Target IOPS
+    units: iops
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Used Burst BPS Credits Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: OS Disk Used Burst IO Credits Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Data Disk
+  - name: Data Disk Read Bytes/sec
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Write Bytes/sec
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Read Operations/Sec
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Write Operations/Sec
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Queue Depth
+    units: operations
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Latency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Bandwidth Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk IOPS Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Max Burst Bandwidth
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Max Burst IOPS
+    units: iops
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Target Bandwidth
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Target IOPS
+    units: iops
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Used Burst BPS Credits Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Data Disk Used Burst IO Credits Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Temp Disk
+  - name: Temp Disk Read Bytes/sec
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Temp Disk Write Bytes/sec
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Temp Disk Read Operations/Sec
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Temp Disk Write Operations/Sec
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Temp Disk Queue Depth
+    units: operations
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Temp Disk Latency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Premium Disk Cache
+  - name: Premium Data Disk Cache Read Hit
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Premium Data Disk Cache Read Miss
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Premium OS Disk Cache Read Hit
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Premium OS Disk Cache Read Miss
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # VM-Level Throttling
+  - name: VM Cached Bandwidth Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: VM Cached IOPS Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: VM Uncached Bandwidth Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: VM Uncached IOPS Consumed Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # VM-Level Burst Credits
+  - name: VM Local Used Burst BPS Credits Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: VM Local Used Burst IO Credits Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: VM Remote Used Burst BPS Credits Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: VM Remote Used Burst IO Credits Percentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  - id: am_azure_vmss__cpu
+    title: Azure VMSS CPU Utilization
+    context: vmss.cpu
+    family: CPU
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Percentage CPU
+        aggregation: average
+        name: average
+
+  - id: am_azure_vmss__cpu_credits
+    title: Azure VMSS CPU Credits
+    context: vmss.cpu_credits
+    family: CPU
+    type: line
+    priority: 1010
+    units: credits
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CPU Credits Consumed
+        aggregation: average
+        name: consumed
+      - metric: CPU Credits Remaining
+        aggregation: average
+        name: remaining
+
+  - id: am_azure_vmss__memory
+    title: Azure VMSS Available Memory
+    context: vmss.memory
+    family: Memory
+    type: line
+    priority: 1020
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Available Memory Bytes
+        aggregation: average
+        name: available
+
+  - id: am_azure_vmss__memory_percentage
+    title: Azure VMSS Available Memory Percentage
+    context: vmss.memory_percentage
+    family: Memory
+    type: line
+    priority: 1025
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Available Memory Percentage
+        aggregation: average
+        name: available
+
+  - id: am_azure_vmss__availability
+    title: Azure VMSS Availability
+    context: vmss.availability
+    family: Availability
+    type: line
+    priority: 1030
+    units: state
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: VmAvailabilityMetric
+        aggregation: average
+        name: average
+
+  - id: am_azure_vmss__network_traffic
+    title: Azure VMSS Network Traffic
+    context: vmss.network_traffic
+    family: Network
+    type: line
+    priority: 1040
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Network In Total
+        aggregation: total
+        name: in
+      - metric: Network Out Total
+        aggregation: total
+        name: out
+
+  - id: am_azure_vmss__network_flows
+    title: Azure VMSS Network Flows
+    context: vmss.network_flows
+    family: Network
+    type: line
+    priority: 1050
+    units: flows
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Inbound Flows
+        aggregation: average
+        name: in
+      - metric: Outbound Flows
+        aggregation: average
+        name: out
+
+  - id: am_azure_vmss__network_flow_creation_rate
+    title: Azure VMSS Network Flow Creation Rate
+    context: vmss.network_flow_creation_rate
+    family: Network
+    type: line
+    priority: 1055
+    units: flows/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Inbound Flows Maximum Creation Rate
+        aggregation: average
+        name: in
+      - metric: Outbound Flows Maximum Creation Rate
+        aggregation: average
+        name: out
+
+  - id: am_azure_vmss__disk_throughput
+    title: Azure VMSS Disk Throughput
+    context: vmss.disk_throughput
+    family: Disk
+    type: line
+    priority: 1060
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Disk Read Bytes
+        aggregation: total
+        name: read
+      - metric: Disk Write Bytes
+        aggregation: total
+        name: write
+
+  - id: am_azure_vmss__disk_iops
+    title: Azure VMSS Disk IOPS
+    context: vmss.disk_iops
+    family: Disk
+    type: line
+    priority: 1070
+    units: operations/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Disk Read Operations/Sec
+        aggregation: average
+        name: read
+      - metric: Disk Write Operations/Sec
+        aggregation: average
+        name: write
+
+  - id: am_azure_vmss__os_disk_throughput
+    title: Azure VMSS OS Disk Throughput
+    context: vmss.os_disk_throughput
+    family: OS Disk
+    type: line
+    priority: 1080
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OS Disk Read Bytes/sec
+        aggregation: average
+        name: read
+      - metric: OS Disk Write Bytes/sec
+        aggregation: average
+        name: write
+
+  - id: am_azure_vmss__os_disk_iops
+    title: Azure VMSS OS Disk IOPS
+    context: vmss.os_disk_iops
+    family: OS Disk
+    type: line
+    priority: 1090
+    units: operations/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OS Disk Read Operations/Sec
+        aggregation: average
+        name: read
+      - metric: OS Disk Write Operations/Sec
+        aggregation: average
+        name: write
+
+  - id: am_azure_vmss__os_disk_latency
+    title: Azure VMSS OS Disk Latency
+    context: vmss.os_disk_latency
+    family: OS Disk
+    type: line
+    priority: 1100
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OS Disk Latency
+        aggregation: average
+        name: average
+
+  - id: am_azure_vmss__os_disk_queue_depth
+    title: Azure VMSS OS Disk Queue Depth
+    context: vmss.os_disk_queue_depth
+    family: OS Disk
+    type: line
+    priority: 1110
+    units: operations
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OS Disk Queue Depth
+        aggregation: average
+        name: average
+
+  - id: am_azure_vmss__os_disk_throttling
+    title: Azure VMSS OS Disk Throttling
+    context: vmss.os_disk_throttling
+    family: OS Disk
+    type: line
+    priority: 1120
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OS Disk Bandwidth Consumed Percentage
+        aggregation: average
+        name: bandwidth
+      - metric: OS Disk IOPS Consumed Percentage
+        aggregation: average
+        name: iops
+
+  - id: am_azure_vmss__os_disk_burst_capacity
+    title: Azure VMSS OS Disk Burst Capacity
+    context: vmss.os_disk_burst_capacity
+    family: OS Disk
+    type: line
+    priority: 1125
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OS Disk Max Burst Bandwidth
+        aggregation: average
+        name: max_burst
+      - metric: OS Disk Target Bandwidth
+        aggregation: average
+        name: target
+
+  - id: am_azure_vmss__os_disk_burst_iops_capacity
+    title: Azure VMSS OS Disk Burst IOPS Capacity
+    context: vmss.os_disk_burst_iops_capacity
+    family: OS Disk
+    type: line
+    priority: 1126
+    units: iops
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OS Disk Max Burst IOPS
+        aggregation: average
+        name: max_burst
+      - metric: OS Disk Target IOPS
+        aggregation: average
+        name: target
+
+  - id: am_azure_vmss__os_disk_burst_credits
+    title: Azure VMSS OS Disk Burst Credits Used
+    context: vmss.os_disk_burst_credits
+    family: OS Disk
+    type: line
+    priority: 1127
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OS Disk Used Burst BPS Credits Percentage
+        aggregation: average
+        name: bandwidth
+      - metric: OS Disk Used Burst IO Credits Percentage
+        aggregation: average
+        name: io
+
+  - id: am_azure_vmss__data_disk_throughput
+    title: Azure VMSS Data Disk Throughput
+    context: vmss.data_disk_throughput
+    family: Data Disk
+    type: line
+    priority: 1130
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Data Disk Read Bytes/sec
+        aggregation: average
+        name: read
+      - metric: Data Disk Write Bytes/sec
+        aggregation: average
+        name: write
+
+  - id: am_azure_vmss__data_disk_iops
+    title: Azure VMSS Data Disk IOPS
+    context: vmss.data_disk_iops
+    family: Data Disk
+    type: line
+    priority: 1140
+    units: operations/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Data Disk Read Operations/Sec
+        aggregation: average
+        name: read
+      - metric: Data Disk Write Operations/Sec
+        aggregation: average
+        name: write
+
+  - id: am_azure_vmss__data_disk_latency
+    title: Azure VMSS Data Disk Latency
+    context: vmss.data_disk_latency
+    family: Data Disk
+    type: line
+    priority: 1150
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Data Disk Latency
+        aggregation: average
+        name: average
+
+  - id: am_azure_vmss__data_disk_queue_depth
+    title: Azure VMSS Data Disk Queue Depth
+    context: vmss.data_disk_queue_depth
+    family: Data Disk
+    type: line
+    priority: 1160
+    units: operations
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Data Disk Queue Depth
+        aggregation: average
+        name: average
+
+  - id: am_azure_vmss__data_disk_throttling
+    title: Azure VMSS Data Disk Throttling
+    context: vmss.data_disk_throttling
+    family: Data Disk
+    type: line
+    priority: 1170
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Data Disk Bandwidth Consumed Percentage
+        aggregation: average
+        name: bandwidth
+      - metric: Data Disk IOPS Consumed Percentage
+        aggregation: average
+        name: iops
+
+  - id: am_azure_vmss__data_disk_burst_capacity
+    title: Azure VMSS Data Disk Burst Capacity
+    context: vmss.data_disk_burst_capacity
+    family: Data Disk
+    type: line
+    priority: 1175
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Data Disk Max Burst Bandwidth
+        aggregation: average
+        name: max_burst
+      - metric: Data Disk Target Bandwidth
+        aggregation: average
+        name: target
+
+  - id: am_azure_vmss__data_disk_burst_iops_capacity
+    title: Azure VMSS Data Disk Burst IOPS Capacity
+    context: vmss.data_disk_burst_iops_capacity
+    family: Data Disk
+    type: line
+    priority: 1176
+    units: iops
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Data Disk Max Burst IOPS
+        aggregation: average
+        name: max_burst
+      - metric: Data Disk Target IOPS
+        aggregation: average
+        name: target
+
+  - id: am_azure_vmss__data_disk_burst_credits
+    title: Azure VMSS Data Disk Burst Credits Used
+    context: vmss.data_disk_burst_credits
+    family: Data Disk
+    type: line
+    priority: 1177
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Data Disk Used Burst BPS Credits Percentage
+        aggregation: average
+        name: bandwidth
+      - metric: Data Disk Used Burst IO Credits Percentage
+        aggregation: average
+        name: io
+
+  - id: am_azure_vmss__temp_disk_throughput
+    title: Azure VMSS Temp Disk Throughput
+    context: vmss.temp_disk_throughput
+    family: Temp Disk
+    type: line
+    priority: 1200
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Temp Disk Read Bytes/sec
+        aggregation: average
+        name: read
+      - metric: Temp Disk Write Bytes/sec
+        aggregation: average
+        name: write
+
+  - id: am_azure_vmss__temp_disk_iops
+    title: Azure VMSS Temp Disk IOPS
+    context: vmss.temp_disk_iops
+    family: Temp Disk
+    type: line
+    priority: 1210
+    units: operations/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Temp Disk Read Operations/Sec
+        aggregation: average
+        name: read
+      - metric: Temp Disk Write Operations/Sec
+        aggregation: average
+        name: write
+
+  - id: am_azure_vmss__temp_disk_latency
+    title: Azure VMSS Temp Disk Latency
+    context: vmss.temp_disk_latency
+    family: Temp Disk
+    type: line
+    priority: 1220
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Temp Disk Latency
+        aggregation: average
+        name: average
+
+  - id: am_azure_vmss__temp_disk_queue_depth
+    title: Azure VMSS Temp Disk Queue Depth
+    context: vmss.temp_disk_queue_depth
+    family: Temp Disk
+    type: line
+    priority: 1230
+    units: operations
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Temp Disk Queue Depth
+        aggregation: average
+        name: average
+
+  - id: am_azure_vmss__premium_data_disk_cache
+    title: Azure VMSS Premium Data Disk Cache
+    context: vmss.premium_data_disk_cache
+    family: Premium Cache
+    type: line
+    priority: 1240
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Premium Data Disk Cache Read Hit
+        aggregation: average
+        name: hit
+      - metric: Premium Data Disk Cache Read Miss
+        aggregation: average
+        name: miss
+
+  - id: am_azure_vmss__premium_os_disk_cache
+    title: Azure VMSS Premium OS Disk Cache
+    context: vmss.premium_os_disk_cache
+    family: Premium Cache
+    type: line
+    priority: 1250
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Premium OS Disk Cache Read Hit
+        aggregation: average
+        name: hit
+      - metric: Premium OS Disk Cache Read Miss
+        aggregation: average
+        name: miss
+
+  - id: am_azure_vmss__vm_cached_throttling
+    title: Azure VMSS Cached IO Throttling
+    context: vmss.vm_cached_throttling
+    family: VM Throttling
+    type: line
+    priority: 1260
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: VM Cached Bandwidth Consumed Percentage
+        aggregation: average
+        name: bandwidth
+      - metric: VM Cached IOPS Consumed Percentage
+        aggregation: average
+        name: iops
+
+  - id: am_azure_vmss__vm_uncached_throttling
+    title: Azure VMSS Uncached IO Throttling
+    context: vmss.vm_uncached_throttling
+    family: VM Throttling
+    type: line
+    priority: 1270
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: VM Uncached Bandwidth Consumed Percentage
+        aggregation: average
+        name: bandwidth
+      - metric: VM Uncached IOPS Consumed Percentage
+        aggregation: average
+        name: iops
+
+  - id: am_azure_vmss__vm_cached_burst_credits
+    title: Azure VMSS Cached Burst Credits Used
+    context: vmss.vm_cached_burst_credits
+    family: VM Throttling
+    type: line
+    priority: 1280
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: VM Local Used Burst BPS Credits Percentage
+        aggregation: average
+        name: bandwidth
+      - metric: VM Local Used Burst IO Credits Percentage
+        aggregation: average
+        name: io
+
+  - id: am_azure_vmss__vm_uncached_burst_credits
+    title: Azure VMSS Uncached Burst Credits Used
+    context: vmss.vm_uncached_burst_credits
+    family: VM Throttling
+    type: line
+    priority: 1290
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: VM Remote Used Burst BPS Credits Percentage
+        aggregation: average
+        name: bandwidth
+      - metric: VM Remote Used Burst IO Credits Percentage
+        aggregation: average
+        name: io
