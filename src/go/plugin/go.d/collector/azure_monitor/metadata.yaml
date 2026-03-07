@@ -381,3 +381,91 @@ modules:
         icon_filename: azure.svg
         categories:
           - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-api_management
+      monitored_instance:
+        name: Azure API Management
+        link: https://learn.microsoft.com/azure/api-management/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-front_door
+      monitored_instance:
+        name: Azure Front Door
+        link: https://learn.microsoft.com/azure/frontdoor/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-vmss
+      monitored_instance:
+        name: Azure Virtual Machine Scale Set
+        link: https://learn.microsoft.com/azure/virtual-machine-scale-sets/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-sql_elastic_pool
+      monitored_instance:
+        name: Azure SQL Elastic Pool
+        link: https://learn.microsoft.com/azure/azure-sql/database/elastic-pool-overview
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-mysql_flexible
+      monitored_instance:
+        name: Azure MySQL Flexible Server
+        link: https://learn.microsoft.com/azure/mysql/flexible-server/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-container_apps
+      monitored_instance:
+        name: Azure Container Apps
+        link: https://learn.microsoft.com/azure/container-apps/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-firewall
+      monitored_instance:
+        name: Azure Firewall
+        link: https://learn.microsoft.com/azure/firewall/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-cognitive_services
+      monitored_instance:
+        name: Azure Cognitive Services
+        link: https://learn.microsoft.com/azure/ai-services/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud

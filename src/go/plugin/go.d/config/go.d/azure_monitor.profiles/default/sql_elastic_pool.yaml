@@ -1,0 +1,397 @@
+name: Azure SQL Elastic Pool
+resource_type: Microsoft.Sql/servers/elasticPools
+metrics:
+  # CPU Utilization
+  - name: cpu_percent
+    units: percentage
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: cpu_used
+    units: vCores
+    aggregations: [average]
+    time_grain: PT1M
+  - name: cpu_limit
+    units: vCores
+    aggregations: [average]
+    time_grain: PT1M
+  # DTU Utilization
+  - name: dtu_consumption_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: eDTU_used
+    units: eDTU
+    aggregations: [average]
+    time_grain: PT1M
+  - name: eDTU_limit
+    units: eDTU
+    aggregations: [average]
+    time_grain: PT1M
+  # Instance Utilization
+  - name: sql_instance_cpu_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: sql_instance_memory_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # I/O
+  - name: physical_data_read_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: log_write_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Resource Limits
+  - name: workers_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: sessions_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: sessions_count
+    units: sessions
+    aggregations: [average]
+    time_grain: PT1M
+  # Storage
+  - name: allocated_data_storage
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: allocated_data_storage_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: storage_used
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: storage_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: storage_limit
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: xtp_storage_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Tempdb
+  - name: tempdb_data_size
+    units: KiB
+    aggregations: [average]
+    time_grain: PT1M
+  - name: tempdb_log_size
+    units: KiB
+    aggregations: [average]
+    time_grain: PT1M
+  - name: tempdb_log_used_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Serverless
+  - name: app_cpu_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: app_memory_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: app_cpu_billed
+    units: vCore-seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+charts:
+  - id: am_azure_sql_elastic_pool__cpu
+    title: Azure SQL Elastic Pool CPU Utilization
+    context: sql_elastic_pool.cpu
+    family: Utilization
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cpu_percent
+        aggregation: average
+        name: average
+      - metric: cpu_percent
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_sql_elastic_pool__instance_cpu
+    title: Azure SQL Elastic Pool Instance CPU Utilization
+    context: sql_elastic_pool.instance_cpu
+    family: Utilization
+    type: line
+    priority: 1010
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: sql_instance_cpu_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_elastic_pool__instance_memory
+    title: Azure SQL Elastic Pool Instance Memory Utilization
+    context: sql_elastic_pool.instance_memory
+    family: Utilization
+    type: line
+    priority: 1020
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: sql_instance_memory_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_elastic_pool__dtu_consumption
+    title: Azure SQL Elastic Pool DTU Consumption
+    context: sql_elastic_pool.dtu_consumption
+    family: Utilization
+    type: line
+    priority: 1030
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: dtu_consumption_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_elastic_pool__io_utilization
+    title: Azure SQL Elastic Pool I/O Utilization
+    context: sql_elastic_pool.io_utilization
+    family: I/O
+    type: line
+    priority: 1040
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: physical_data_read_percent
+        aggregation: average
+        name: data_read
+      - metric: log_write_percent
+        aggregation: average
+        name: log_write
+
+  - id: am_azure_sql_elastic_pool__resource_utilization
+    title: Azure SQL Elastic Pool Resource Utilization
+    context: sql_elastic_pool.resource_utilization
+    family: Utilization
+    type: line
+    priority: 1050
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: workers_percent
+        aggregation: average
+        name: workers
+      - metric: sessions_percent
+        aggregation: average
+        name: sessions
+
+  - id: am_azure_sql_elastic_pool__sessions_count
+    title: Azure SQL Elastic Pool Sessions Count
+    context: sql_elastic_pool.sessions_count
+    family: Capacity
+    type: line
+    priority: 1060
+    units: sessions
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: sessions_count
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_elastic_pool__storage
+    title: Azure SQL Elastic Pool Storage
+    context: sql_elastic_pool.storage
+    family: Storage
+    type: line
+    priority: 1070
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: storage_used
+        aggregation: average
+        name: used
+      - metric: allocated_data_storage
+        aggregation: average
+        name: allocated
+      - metric: storage_limit
+        aggregation: average
+        name: limit
+
+  - id: am_azure_sql_elastic_pool__storage_utilization
+    title: Azure SQL Elastic Pool Storage Utilization
+    context: sql_elastic_pool.storage_utilization
+    family: Storage
+    type: line
+    priority: 1080
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: storage_percent
+        aggregation: average
+        name: used
+      - metric: allocated_data_storage_percent
+        aggregation: average
+        name: allocated
+
+  - id: am_azure_sql_elastic_pool__xtp_storage
+    title: Azure SQL Elastic Pool In-Memory OLTP Storage
+    context: sql_elastic_pool.xtp_storage
+    family: In-Memory OLTP
+    type: line
+    priority: 1090
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: xtp_storage_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_elastic_pool__tempdb_size
+    title: Azure SQL Elastic Pool Tempdb Size
+    context: sql_elastic_pool.tempdb_size
+    family: Tempdb
+    type: line
+    priority: 1100
+    units: KiB
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: tempdb_data_size
+        aggregation: average
+        name: data
+      - metric: tempdb_log_size
+        aggregation: average
+        name: log
+
+  - id: am_azure_sql_elastic_pool__tempdb_log_utilization
+    title: Azure SQL Elastic Pool Tempdb Log Utilization
+    context: sql_elastic_pool.tempdb_log_utilization
+    family: Tempdb
+    type: line
+    priority: 1110
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: tempdb_log_used_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_sql_elastic_pool__vcore_usage
+    title: Azure SQL Elastic Pool vCore Usage
+    context: sql_elastic_pool.vcore_usage
+    family: Capacity
+    type: line
+    priority: 1120
+    units: vCores
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cpu_used
+        aggregation: average
+        name: used
+      - metric: cpu_limit
+        aggregation: average
+        name: limit
+
+  - id: am_azure_sql_elastic_pool__edtu_usage
+    title: Azure SQL Elastic Pool eDTU Usage
+    context: sql_elastic_pool.edtu_usage
+    family: Capacity
+    type: line
+    priority: 1130
+    units: eDTU
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: eDTU_used
+        aggregation: average
+        name: used
+      - metric: eDTU_limit
+        aggregation: average
+        name: limit
+
+  - id: am_azure_sql_elastic_pool__serverless_utilization
+    title: Azure SQL Elastic Pool Serverless Utilization
+    context: sql_elastic_pool.serverless_utilization
+    family: Serverless
+    type: line
+    priority: 1140
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: app_cpu_percent
+        aggregation: average
+        name: cpu
+      - metric: app_memory_percent
+        aggregation: average
+        name: memory
+
+  - id: am_azure_sql_elastic_pool__serverless_billing
+    title: Azure SQL Elastic Pool Serverless Billing
+    context: sql_elastic_pool.serverless_billing
+    family: Serverless
+    type: line
+    priority: 1150
+    units: vCore-seconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: app_cpu_billed
+        aggregation: total
+        name: total

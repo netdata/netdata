@@ -1,0 +1,831 @@
+name: Azure MySQL Flexible Server
+resource_type: Microsoft.DBforMySQL/flexibleServers
+metrics:
+  # Availability
+  - name: HA_IO_status
+    units: status
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: HA_SQL_status
+    units: status
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: Replica_IO_Running
+    units: status
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: Replica_SQL_Running
+    units: status
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Errors
+  - name: aborted_connections
+    units: connections/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Latency
+  - name: HA_replication_lag
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Innodb_row_lock_time
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Innodb_row_lock_waits
+    units: waits/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: replication_lag
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Uptime
+    units: seconds
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Saturation - Utilization
+  - name: cpu_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: memory_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: io_consumption_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Saturation - CPU Credits
+  - name: cpu_credits_consumed
+    units: credits
+    aggregations: [average]
+    time_grain: PT15M
+  - name: cpu_credits_remaining
+    units: credits
+    aggregations: [average]
+    time_grain: PT15M
+  # Saturation - Storage
+  - name: storage_used
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: storage_limit
+    units: bytes
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: storage_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: data_storage_used
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ibdata1_storage_used
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: binlog_storage_used
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: others_storage_used
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: backup_storage_used
+    units: bytes
+    aggregations: [average]
+    time_grain: PT15M
+  - name: serverlog_storage_usage
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: serverlog_storage_limit
+    units: bytes
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: serverlog_storage_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Saturation - InnoDB Buffer Pool
+  - name: Innodb_buffer_pool_pages_data
+    units: pages
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: Innodb_buffer_pool_pages_dirty
+    units: pages
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: Innodb_buffer_pool_pages_free
+    units: pages
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: Innodb_buffer_pool_read_requests
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Innodb_buffer_pool_reads
+    units: reads/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Sort_merge_passes
+    units: passes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Threads_running
+    units: threads
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Traffic - Connections
+  - name: active_connections
+    units: connections
+    aggregations: [average]
+    time_grain: PT1M
+  - name: total_connections
+    units: connections/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: active_transactions
+    units: transactions
+    aggregations: [average]
+    time_grain: PT1M
+  # Traffic - Queries
+  - name: Queries
+    units: queries/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Slow_queries
+    units: queries/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Com_select
+    units: statements/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Com_insert
+    units: statements/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Com_update
+    units: statements/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Com_delete
+    units: statements/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Com_create_table
+    units: statements/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Com_alter_table
+    units: statements/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Com_drop_table
+    units: statements/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Com_create_db
+    units: statements/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Com_drop_db
+    units: statements/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Traffic - InnoDB Writes
+  - name: Innodb_buffer_pool_pages_flushed
+    units: pages
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Innodb_data_writes
+    units: writes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Traffic - Locks
+  - name: lock_deadlocks
+    units: deadlocks/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: lock_timeouts
+    units: timeouts/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Traffic - Network
+  - name: network_bytes_ingress
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: network_bytes_egress
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Traffic - Storage IO
+  - name: storage_io_count
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Traffic - History
+  - name: trx_rseg_history_len
+    units: entries
+    aggregations: [maximum]
+    time_grain: PT1M
+charts:
+  - id: am_azure_mysql_flexible__cpu
+    title: Azure MySQL Flexible Server CPU Utilization
+    context: mysql_flexible.cpu
+    family: Utilization
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cpu_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_mysql_flexible__memory
+    title: Azure MySQL Flexible Server Memory Utilization
+    context: mysql_flexible.memory
+    family: Utilization
+    type: line
+    priority: 1010
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: memory_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_mysql_flexible__io_utilization
+    title: Azure MySQL Flexible Server Storage I/O Utilization
+    context: mysql_flexible.io_utilization
+    family: Utilization
+    type: line
+    priority: 1020
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: io_consumption_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_mysql_flexible__cpu_credits
+    title: Azure MySQL Flexible Server CPU Credits
+    context: mysql_flexible.cpu_credits
+    family: Utilization
+    type: line
+    priority: 1030
+    units: credits
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cpu_credits_consumed
+        aggregation: average
+        name: consumed
+      - metric: cpu_credits_remaining
+        aggregation: average
+        name: remaining
+
+  - id: am_azure_mysql_flexible__ha_status
+    title: Azure MySQL Flexible Server HA Replication Status
+    context: mysql_flexible.ha_status
+    family: Availability
+    type: line
+    priority: 1040
+    units: status
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: HA_IO_status
+        aggregation: maximum
+        name: io
+      - metric: HA_SQL_status
+        aggregation: maximum
+        name: sql
+
+  - id: am_azure_mysql_flexible__replica_status
+    title: Azure MySQL Flexible Server Replica Status
+    context: mysql_flexible.replica_status
+    family: Availability
+    type: line
+    priority: 1050
+    units: status
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Replica_IO_Running
+        aggregation: maximum
+        name: io
+      - metric: Replica_SQL_Running
+        aggregation: maximum
+        name: sql
+
+  - id: am_azure_mysql_flexible__uptime
+    title: Azure MySQL Flexible Server Uptime
+    context: mysql_flexible.uptime
+    family: Availability
+    type: line
+    priority: 1060
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Uptime
+        aggregation: maximum
+        name: uptime
+
+  - id: am_azure_mysql_flexible__replication_lag
+    title: Azure MySQL Flexible Server Replication Lag
+    context: mysql_flexible.replication_lag
+    family: Replication
+    type: line
+    priority: 1070
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: replication_lag
+        aggregation: average
+        name: replica
+      - metric: HA_replication_lag
+        aggregation: average
+        name: ha
+
+  - id: am_azure_mysql_flexible__innodb_row_lock_time
+    title: Azure MySQL Flexible Server InnoDB Row Lock Time
+    context: mysql_flexible.innodb_row_lock_time
+    family: Contention
+    type: line
+    priority: 1080
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Innodb_row_lock_time
+        aggregation: average
+        name: average
+
+  - id: am_azure_mysql_flexible__innodb_row_lock_waits
+    title: Azure MySQL Flexible Server InnoDB Row Lock Waits
+    context: mysql_flexible.innodb_row_lock_waits
+    family: Contention
+    type: line
+    priority: 1090
+    units: waits/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Innodb_row_lock_waits
+        aggregation: total
+        name: total
+
+  - id: am_azure_mysql_flexible__aborted_connections
+    title: Azure MySQL Flexible Server Aborted Connections
+    context: mysql_flexible.aborted_connections
+    family: Errors
+    type: line
+    priority: 1100
+    units: connections/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: aborted_connections
+        aggregation: total
+        name: total
+
+  - id: am_azure_mysql_flexible__active_connections
+    title: Azure MySQL Flexible Server Active Connections
+    context: mysql_flexible.active_connections
+    family: Connections
+    type: line
+    priority: 1110
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: active_connections
+        aggregation: average
+        name: average
+
+  - id: am_azure_mysql_flexible__total_connections
+    title: Azure MySQL Flexible Server Total Connections
+    context: mysql_flexible.total_connections
+    family: Connections
+    type: line
+    priority: 1120
+    units: connections/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: total_connections
+        aggregation: total
+        name: total
+
+  - id: am_azure_mysql_flexible__active_transactions
+    title: Azure MySQL Flexible Server Active Transactions
+    context: mysql_flexible.active_transactions
+    family: Connections
+    type: line
+    priority: 1130
+    units: transactions
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: active_transactions
+        aggregation: average
+        name: average
+
+  - id: am_azure_mysql_flexible__threads_running
+    title: Azure MySQL Flexible Server Threads Running
+    context: mysql_flexible.threads_running
+    family: Connections
+    type: line
+    priority: 1140
+    units: threads
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Threads_running
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_mysql_flexible__queries
+    title: Azure MySQL Flexible Server Queries
+    context: mysql_flexible.queries
+    family: Throughput
+    type: line
+    priority: 1150
+    units: queries/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Queries
+        aggregation: total
+        name: total
+      - metric: Slow_queries
+        aggregation: total
+        name: slow
+
+  - id: am_azure_mysql_flexible__dml_statements
+    title: Azure MySQL Flexible Server DML Statements
+    context: mysql_flexible.dml_statements
+    family: Throughput
+    type: line
+    priority: 1160
+    units: statements/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Com_select
+        aggregation: total
+        name: select
+      - metric: Com_insert
+        aggregation: total
+        name: insert
+      - metric: Com_update
+        aggregation: total
+        name: update
+      - metric: Com_delete
+        aggregation: total
+        name: delete
+
+  - id: am_azure_mysql_flexible__ddl_statements
+    title: Azure MySQL Flexible Server DDL Statements
+    context: mysql_flexible.ddl_statements
+    family: Throughput
+    type: line
+    priority: 1170
+    units: statements/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Com_create_table
+        aggregation: total
+        name: create_table
+      - metric: Com_alter_table
+        aggregation: total
+        name: alter_table
+      - metric: Com_drop_table
+        aggregation: total
+        name: drop_table
+      - metric: Com_create_db
+        aggregation: total
+        name: create_db
+      - metric: Com_drop_db
+        aggregation: total
+        name: drop_db
+
+  - id: am_azure_mysql_flexible__lock_deadlocks
+    title: Azure MySQL Flexible Server Deadlocks
+    context: mysql_flexible.lock_deadlocks
+    family: Contention
+    type: line
+    priority: 1180
+    units: deadlocks/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: lock_deadlocks
+        aggregation: total
+        name: total
+
+  - id: am_azure_mysql_flexible__lock_timeouts
+    title: Azure MySQL Flexible Server Lock Timeouts
+    context: mysql_flexible.lock_timeouts
+    family: Contention
+    type: line
+    priority: 1190
+    units: timeouts/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: lock_timeouts
+        aggregation: total
+        name: total
+
+  - id: am_azure_mysql_flexible__innodb_buffer_pool_pages
+    title: Azure MySQL Flexible Server InnoDB Buffer Pool Pages
+    context: mysql_flexible.innodb_buffer_pool_pages
+    family: InnoDB
+    type: line
+    priority: 1200
+    units: pages
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Innodb_buffer_pool_pages_data
+        aggregation: maximum
+        name: data
+      - metric: Innodb_buffer_pool_pages_dirty
+        aggregation: maximum
+        name: dirty
+      - metric: Innodb_buffer_pool_pages_free
+        aggregation: maximum
+        name: free
+      - metric: Innodb_buffer_pool_pages_flushed
+        aggregation: average
+        name: flushed
+
+  - id: am_azure_mysql_flexible__innodb_buffer_pool_io
+    title: Azure MySQL Flexible Server InnoDB Buffer Pool I/O
+    context: mysql_flexible.innodb_buffer_pool_io
+    family: InnoDB
+    type: line
+    priority: 1210
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Innodb_buffer_pool_read_requests
+        aggregation: total
+        name: read_requests
+      - metric: Innodb_buffer_pool_reads
+        aggregation: total
+        name: disk_reads
+
+  - id: am_azure_mysql_flexible__innodb_data_writes
+    title: Azure MySQL Flexible Server InnoDB Data Writes
+    context: mysql_flexible.innodb_data_writes
+    family: InnoDB
+    type: line
+    priority: 1220
+    units: writes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Innodb_data_writes
+        aggregation: total
+        name: total
+
+  - id: am_azure_mysql_flexible__sort_merge_passes
+    title: Azure MySQL Flexible Server Sort Merge Passes
+    context: mysql_flexible.sort_merge_passes
+    family: Performance
+    type: line
+    priority: 1230
+    units: passes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Sort_merge_passes
+        aggregation: total
+        name: total
+
+  - id: am_azure_mysql_flexible__network
+    title: Azure MySQL Flexible Server Network Traffic
+    context: mysql_flexible.network
+    family: Network
+    type: line
+    priority: 1240
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: network_bytes_ingress
+        aggregation: total
+        name: in
+      - metric: network_bytes_egress
+        aggregation: total
+        name: out
+
+  - id: am_azure_mysql_flexible__storage_io
+    title: Azure MySQL Flexible Server Storage I/O
+    context: mysql_flexible.storage_io
+    family: I/O
+    type: line
+    priority: 1250
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: storage_io_count
+        aggregation: total
+        name: total
+
+  - id: am_azure_mysql_flexible__storage
+    title: Azure MySQL Flexible Server Storage
+    context: mysql_flexible.storage
+    family: Capacity
+    type: line
+    priority: 1260
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: storage_used
+        aggregation: average
+        name: used
+      - metric: storage_limit
+        aggregation: maximum
+        name: limit
+
+  - id: am_azure_mysql_flexible__storage_utilization
+    title: Azure MySQL Flexible Server Storage Utilization
+    context: mysql_flexible.storage_utilization
+    family: Capacity
+    type: line
+    priority: 1270
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: storage_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_mysql_flexible__storage_breakdown
+    title: Azure MySQL Flexible Server Storage Breakdown
+    context: mysql_flexible.storage_breakdown
+    family: Capacity
+    type: line
+    priority: 1280
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: data_storage_used
+        aggregation: average
+        name: data
+      - metric: ibdata1_storage_used
+        aggregation: average
+        name: ibdata1
+      - metric: binlog_storage_used
+        aggregation: average
+        name: binlog
+      - metric: others_storage_used
+        aggregation: average
+        name: others
+
+  - id: am_azure_mysql_flexible__backup_storage
+    title: Azure MySQL Flexible Server Backup Storage
+    context: mysql_flexible.backup_storage
+    family: Capacity
+    type: line
+    priority: 1290
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: backup_storage_used
+        aggregation: average
+        name: used
+
+  - id: am_azure_mysql_flexible__serverlog_storage
+    title: Azure MySQL Flexible Server Server Log Storage
+    context: mysql_flexible.serverlog_storage
+    family: Capacity
+    type: line
+    priority: 1300
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: serverlog_storage_usage
+        aggregation: average
+        name: used
+      - metric: serverlog_storage_limit
+        aggregation: maximum
+        name: limit
+
+  - id: am_azure_mysql_flexible__serverlog_storage_utilization
+    title: Azure MySQL Flexible Server Server Log Storage Utilization
+    context: mysql_flexible.serverlog_storage_utilization
+    family: Capacity
+    type: line
+    priority: 1310
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: serverlog_storage_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_mysql_flexible__history_list_length
+    title: Azure MySQL Flexible Server History List Length
+    context: mysql_flexible.history_list_length
+    family: InnoDB
+    type: line
+    priority: 1320
+    units: entries
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: trx_rseg_history_len
+        aggregation: maximum
+        name: maximum
