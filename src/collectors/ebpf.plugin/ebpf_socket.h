@@ -100,6 +100,11 @@ typedef enum ebpf_socket_idx {
 } ebpf_socket_index_t;
 
 #define NETDATA_SOCKET_KERNEL_FUNCTIONS "kernel"
+#define NETDATA_SOCKET_CHART_ORDER_BASE 21070
+#define NETDATA_SOCKET_CGROUP_ORDER_BASE 5300
+#define NETDATA_SOCKET_APPS_ORDER_BASE 20130
+#define NETDATA_SOCKET_SYSTEMD_ORDER_BASE 20080
+#define TCP_V6_CONNECT_TYPE 'T'
 #define NETDATA_CGROUP_NET_GROUP "network"
 
 // Global chart name
@@ -286,12 +291,10 @@ typedef struct netdata_socket_idx {
     uint32_t pid;
 } netdata_socket_idx_t;
 
-void ebpf_clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 extern ebpf_network_viewer_port_list_t *listen_ports;
 void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connection_t *values);
 void ebpf_fill_ip_list_unsafe(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
 void ebpf_parse_service_name_section(struct config *cfg);
-void ebpf_parse_ips_unsafe(const char *ptr);
 void ebpf_parse_ports(const char *ptr);
 void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em);
 void ebpf_socket_fill_publish_apps(ebpf_socket_publish_apps_t *curr, netdata_socket_t *ns);

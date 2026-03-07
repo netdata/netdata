@@ -140,7 +140,7 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
 
     netdata_publish_fd_stat_t *fd;
     netdata_publish_swap_t *swap;
-    netdata_publish_shm_t *shm; // this has a leak issue
+    netdata_publish_shm_t *shm;
     netdata_publish_dcstat_t *dc;
     netdata_publish_vfs_t *vfs;
     netdata_publish_cachestat_t *cachestat;
@@ -149,7 +149,6 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
 
 } ebpf_pid_data_t;
 
-//extern ebpf_pid_data_t *ebpf_pids;
 extern ebpf_pid_data_t *ebpf_pids_link_list;
 extern size_t ebpf_all_pids_count;
 extern size_t ebpf_hash_table_pids_count;
@@ -159,7 +158,6 @@ ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid);
 
 static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, uint32_t idx)
 {
-    //    ebpf_pid_data_t *ptr = &ebpf_pids[pid];
     ebpf_pid_data_t *ptr = ebpf_find_or_create_pid_data(pid);
     ptr->thread_collecting |= 1 << idx;
     // The caller is getting data to work.
@@ -257,7 +255,6 @@ typedef struct ebpf_pid_stat {
 
     uint32_t log_thrown;
 
-    // char state;
     uint32_t ppid;
 
     int children_count;              // number of processes directly referencing this
@@ -378,7 +375,6 @@ void ebpf_parse_proc_files();
 
 // ARAL Section end
 
-// Threads integrated with apps
 // Threads integrated with apps
 
 #include "libnetdata/threads/threads.h"
