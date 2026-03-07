@@ -13,6 +13,7 @@ import (
 
 const (
 	autogenTemplatePrefix = "__autogen__:"
+	measureSetFieldLabel  = "measure_field"
 )
 
 type autogenRoute struct {
@@ -445,15 +446,12 @@ func buildMeasureSetAutogenRoute(
 	if meta.FlattenRole != metrix.FlattenRoleMeasureSetField {
 		return autogenRoute{}, false, nil
 	}
-	sourceName, fieldName, ok, err := resolveMeasureSetAutogenSource(metricName, labels)
-	if err != nil {
-		return autogenRoute{}, false, err
-	}
+	sourceName, fieldName, ok := resolveMeasureSetAutogenSource(metricName, labels)
 	if !ok {
 		return autogenRoute{}, false, nil
 	}
 	chartID := buildJoinedLabelAutogenID(sourceName, labels, map[string]struct{}{
-		sourceName: {},
+		measureSetFieldLabel: {},
 	})
 	if !fitsTypeIDBudget(policy.MaxTypeIDLen, typeIDPrefix, chartID) {
 		return autogenRoute{}, false, nil
@@ -468,7 +466,7 @@ func buildMeasureSetAutogenRoute(
 		chartID:           chartID,
 		chartName:         sourceName,
 		dimensionName:     fieldName,
-		dimensionKeyLabel: sourceName,
+		dimensionKeyLabel: measureSetFieldLabel,
 		algorithm:         algorithm,
 		units:             units,
 		chartType:         chartTypeFromUnits(units),
@@ -478,47 +476,29 @@ func buildMeasureSetAutogenRoute(
 	}, true, nil
 }
 
-func resolveMeasureSetAutogenSource(metricName string, labels metrix.LabelView) (string, string, bool, error) {
+func resolveMeasureSetAutogenSource(metricName string, labels metrix.LabelView) (string, string, bool) {
 	if strings.TrimSpace(metricName) == "" {
-		return "", "", false, nil
+		return "", "", false
 	}
 	if labels == nil {
-		return "", "", false, nil
+		return "", "", false
 	}
 
-	var (
-		sourceName string
-		fieldName  string
-		found      bool
-		ambiguous  bool
-	)
-	labels.Range(func(key, value string) bool {
-		if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
-			return true
-		}
-		suffix := "_" + value
-		if !strings.HasSuffix(metricName, suffix) {
-			return true
-		}
-		if strings.TrimSuffix(metricName, suffix) != key {
-			return true
-		}
-		if found {
-			ambiguous = true
-			return false
-		}
-		found = true
-		sourceName = key
-		fieldName = value
-		return true
-	})
-	if ambiguous {
-		return "", "", false, fmt.Errorf("chartengine: ambiguous measureset flattened identity for %q", metricName)
+	fieldName, ok := labels.Get(measureSetFieldLabel)
+	if !ok || strings.TrimSpace(fieldName) == "" {
+		return "", "", false
 	}
-	if !found {
-		return "", "", false, nil
+
+	suffix := "_" + fieldName
+	if !strings.HasSuffix(metricName, suffix) {
+		return "", "", false
 	}
-	return sourceName, fieldName, true, nil
+
+	sourceName := strings.TrimSuffix(metricName, suffix)
+	if strings.TrimSpace(sourceName) == "" {
+		return "", "", false
+	}
+	return sourceName, fieldName, true
 }
 
 func buildScalarAutogenRoute(

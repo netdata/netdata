@@ -313,7 +313,7 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeSetPoint(desc *instrumentDesc
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, desc.name) {
+	if labelsContainKey(labels, measureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
 	key := makeSeriesKey(desc.name, labelsKey)
@@ -337,7 +337,7 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeAddPoint(desc *instrumentDesc
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, desc.name) {
+	if labelsContainKey(labels, measureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
 	key := makeSeriesKey(desc.name, labelsKey)
@@ -370,7 +370,7 @@ func (r *runtimeStoreBackend) recordMeasureSetCounterAddPoint(desc *instrumentDe
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, desc.name) {
+	if labelsContainKey(labels, measureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
 	key := makeSeriesKey(desc.name, labelsKey)

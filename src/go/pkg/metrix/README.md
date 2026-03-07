@@ -140,11 +140,11 @@ Re-registering the same metric name with a different `MeasureSet` schema is reje
 | Histogram   | `<name>_bucket{le=...}`, `<name>_count`, `<name>_sum`                                                            |
 | Summary     | `<name>_count`, `<name>_sum` (always); `<name>{quantile=...}` (only when `WithSummaryQuantiles()` is configured) |
 | StateSet    | `<name>{<name>=state}` with scalar 0/1 values                                                                    |
-| MeasureSet  | `<name>_<field>{<name>=field}`; flattened kind follows family semantics (`Gauge` or `Counter`)                   |
+| MeasureSet  | `<name>_<field>{measure_field=field}`; flattened kind follows family semantics (`Gauge` or `Counter`)            |
 
 Flatten metadata is exposed via `SeriesMeta.Kind`, `SeriesMeta.SourceKind`, and `SeriesMeta.FlattenRole`.
 
-`MeasureSet` flattening keeps per-field metric names for `MetricMeta(name)` compatibility and also adds a synthetic field label keyed by the base family name. This gives chartengine explicit field identity without widening the reader metadata API.
+`MeasureSet` flattening keeps per-field metric names for `MetricMeta(name)` compatibility and also adds a synthetic `measure_field=<field>` label. This gives chartengine explicit field identity without widening the reader metadata API.
 
 ## Minimal Usage Snippets
 
@@ -190,7 +190,7 @@ see [how-to-write-a-collector.md](/src/go/plugin/go.d/docs/how-to-write-a-collec
 - **MeasureSet runtime writes** — `RuntimeStore` supports both gauge-like and counter-like `MeasureSet` families, but only through `StatefulMeter(...)`.
 - **Window/freshness coupling** — Stateful histogram/summary with `WindowCycle` requires (and silently forces) `FreshnessCycle`. Setting an explicit non-Cycle freshness with `WindowCycle` returns an error.
 - **Schema stability** — Re-registering an existing metric name with different kind/mode/schema returns an error (or panics in strict runtime paths).
-- **MeasureSet flatten naming** — Flattened `MeasureSet` series use per-field metric names like `<name>_<field>` and also carry a synthetic field label keyed by the base family name.
+- **MeasureSet flatten naming** — Flattened `MeasureSet` series use per-field metric names like `<name>_<field>` and also carry a synthetic `measure_field=<field>` label.
 - **MeasureSet counter semantics** — Stateful counter-like `MeasureSet` families reject negative `AddPoint(...)` deltas, just like scalar counters.
 - **Collector retention** — `CollectorStore` evicts series not seen for 10 successful cycles by default.
 

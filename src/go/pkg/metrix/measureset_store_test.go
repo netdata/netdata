@@ -259,7 +259,7 @@ func TestMeasureSetStoreScenarios(t *testing.T) {
 				s := NewCollectorStore()
 				cc := cycleController(t, s)
 				ms := s.Write().SnapshotMeter("svc").
-					WithLabels(Label{Key: "svc.latency", Value: "already-present"}).
+					WithLabels(Label{Key: measureSetFieldLabel, Value: "already-present"}).
 					MeasureSetGauge(
 						"latency",
 						WithMeasureSetFields(MeasureFieldSpec{Name: "value"}),

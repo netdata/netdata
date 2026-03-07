@@ -175,8 +175,8 @@ Default lifecycle policy when template omits lifecycle:
     - `SourceKind = MetricKindMeasureSet`
     - `FlattenRole = FlattenRoleMeasureSetField`
     - per-field metric names like `<name>_<field>`
-    - a synthetic field label keyed by the base family name (`<name>=<field>`)
-- the synthetic field label is the authoritative field-identity channel; the per-field metric-name suffix remains for `MetricMeta(name)` compatibility
+    - a synthetic reserved field label (`measure_field=<field>`)
+- the synthetic `measure_field` label is the authoritative field-identity channel; the per-field metric-name suffix remains for `MetricMeta(name)` compatibility
 - gauge-like `MeasureSet` fields autogen with absolute algorithm behavior; counter-like `MeasureSet` fields autogen with incremental algorithm behavior
 
 ## Runtime Metrics

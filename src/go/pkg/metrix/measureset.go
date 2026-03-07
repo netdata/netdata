@@ -2,6 +2,8 @@
 
 package metrix
 
+const measureSetFieldLabel = "measure_field"
+
 // stagedMeasureSet holds one in-cycle MeasureSet sample for a single series identity.
 type stagedMeasureSet struct {
 	key       string
@@ -168,7 +170,7 @@ func (c *storeCore) recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, po
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, desc.name) {
+	if labelsContainKey(labels, measureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
 
@@ -206,7 +208,7 @@ func (c *storeCore) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, de
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, desc.name) {
+	if labelsContainKey(labels, measureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
 
@@ -254,7 +256,7 @@ func (c *storeCore) recordMeasureSetCounterObserveTotalPoint(desc *instrumentDes
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, desc.name) {
+	if labelsContainKey(labels, measureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
 
@@ -292,7 +294,7 @@ func (c *storeCore) recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, 
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, desc.name) {
+	if labelsContainKey(labels, measureSetFieldLabel) {
 		panic(errMeasureSetLabelKey)
 	}
 

@@ -4,7 +4,6 @@ package chartengine
 
 import (
 	"sort"
-	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
@@ -221,6 +220,7 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 		metricName string
 		labels     map[string]string
 		meta       metrix.SeriesMeta
+		wantOK     bool
 		wantID     string
 		wantDim    string
 		wantAlg    program.Algorithm
@@ -229,14 +229,15 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 		"MeasureSet gauge uses synthetic field label and absolute algorithm": {
 			metricName: "service_latency_seconds_value",
 			labels: map[string]string{
-				"instance":                "db1",
-				"service_latency_seconds": "value",
+				"instance":           "db1",
+				measureSetFieldLabel: "value",
 			},
 			meta: metrix.SeriesMeta{
 				Kind:        metrix.MetricKindGauge,
 				SourceKind:  metrix.MetricKindMeasureSet,
 				FlattenRole: metrix.FlattenRoleMeasureSetField,
 			},
+			wantOK:    true,
 			wantID:    "service_latency_seconds-instance=db1",
 			wantDim:   "value",
 			wantAlg:   program.AlgorithmAbsolute,
@@ -246,17 +247,62 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 			metricName: "svc_requests_total_ok",
 			labels: map[string]string{
 				"instance":           "db1",
-				"svc_requests_total": "ok",
+				measureSetFieldLabel: "ok",
 			},
 			meta: metrix.SeriesMeta{
 				Kind:        metrix.MetricKindCounter,
 				SourceKind:  metrix.MetricKindMeasureSet,
 				FlattenRole: metrix.FlattenRoleMeasureSetField,
 			},
+			wantOK:    true,
 			wantID:    "svc_requests_total-instance=db1",
 			wantDim:   "ok",
 			wantAlg:   program.AlgorithmIncremental,
 			wantUnits: "requests/s",
+		},
+		"MeasureSet ignores unrelated matching labels and uses reserved field label": {
+			metricName: "svc_requests_total_ok",
+			labels: map[string]string{
+				"instance":           "db1",
+				"svc_requests":       "total_ok",
+				measureSetFieldLabel: "ok",
+			},
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindCounter,
+				SourceKind:  metrix.MetricKindMeasureSet,
+				FlattenRole: metrix.FlattenRoleMeasureSetField,
+			},
+			wantOK:    true,
+			wantID:    "svc_requests_total-instance=db1-svc_requests=total_ok",
+			wantDim:   "ok",
+			wantAlg:   program.AlgorithmIncremental,
+			wantUnits: "requests/s",
+		},
+		"MeasureSet without reserved field label does not route": {
+			metricName: "svc_requests_total_ok",
+			labels: map[string]string{
+				"instance":     "db1",
+				"svc_requests": "total_ok",
+			},
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindCounter,
+				SourceKind:  metrix.MetricKindMeasureSet,
+				FlattenRole: metrix.FlattenRoleMeasureSetField,
+			},
+			wantOK: false,
+		},
+		"MeasureSet with mismatched reserved field label does not route": {
+			metricName: "svc_requests_total_ok",
+			labels: map[string]string{
+				"instance":           "db1",
+				measureSetFieldLabel: "failed",
+			},
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindCounter,
+				SourceKind:  metrix.MetricKindMeasureSet,
+				FlattenRole: metrix.FlattenRoleMeasureSetField,
+			},
+			wantOK: false,
 		},
 	}
 
@@ -270,13 +316,16 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 				"",
 			)
 			require.NoError(t, err)
-			require.True(t, ok)
+			require.Equal(t, tc.wantOK, ok)
+			if !tc.wantOK {
+				return
+			}
 
 			assert.Equal(t, tc.wantID, route.chartID)
 			assert.Equal(t, tc.wantDim, route.dimensionName)
 			assert.Equal(t, tc.wantAlg, route.algorithm)
 			assert.Equal(t, tc.wantUnits, route.units)
-			assert.Equal(t, strings.TrimSuffix(tc.metricName, "_"+tc.wantDim), route.dimensionKeyLabel)
+			assert.Equal(t, measureSetFieldLabel, route.dimensionKeyLabel)
 			assert.False(t, route.staticDimension)
 		})
 	}

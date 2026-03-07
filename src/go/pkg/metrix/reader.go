@@ -481,7 +481,7 @@ func appendFlattenedMeasureSetSeries(dst *readSnapshot, src *committedSeries) {
 		for _, lbl := range src.labels {
 			labelsMap[lbl.Key] = lbl.Value
 		}
-		labelsMap[src.name] = field.Name
+		labelsMap[measureSetFieldLabel] = field.Name
 
 		labels, labelsKey, err := canonicalizeLabels(labelsMap)
 		if err != nil {

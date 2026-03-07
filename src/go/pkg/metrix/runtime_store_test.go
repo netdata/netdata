@@ -146,7 +146,7 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 			run: func(t *testing.T) {
 				s := NewRuntimeStore()
 				ms := s.Write().StatefulMeter("runtime").
-					WithLabels(Label{Key: "runtime.usage", Value: "already-present"}).
+					WithLabels(Label{Key: measureSetFieldLabel, Value: "already-present"}).
 					MeasureSetGauge(
 						"usage",
 						WithMeasureSetFields(MeasureFieldSpec{Name: "value"}),
