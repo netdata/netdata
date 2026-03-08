@@ -99,6 +99,32 @@ int netdata_install_driver()
 
     if (unlikely(!service)) {
         if (GetLastError() == ERROR_SERVICE_EXISTS) {
+            SC_HANDLE existing = OpenServiceA(scm, srv_name, SERVICE_CHANGE_CONFIG);
+            if (!existing) {
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open existing service. Error= %lu \n", GetLastError());
+                CloseServiceHandle(scm);
+                return -1;
+            }
+
+            if (!ChangeServiceConfigA(
+                    existing,
+                    SERVICE_KERNEL_DRIVER,
+                    SERVICE_DEMAND_START,
+                    SERVICE_ERROR_NORMAL,
+                    expanded_path,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL)) {
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot reconfigure existing service. Error= %lu \n", GetLastError());
+                CloseServiceHandle(existing);
+                CloseServiceHandle(scm);
+                return -1;
+            }
+
+            CloseServiceHandle(existing);
             CloseServiceHandle(scm);
             return 0;
         }
