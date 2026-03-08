@@ -1,0 +1,162 @@
+name: Azure Event Grid Topic
+resource_type: Microsoft.EventGrid/topics
+metrics:
+  # Publishing
+  - name: PublishSuccessCount
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: PublishFailCount
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: PublishSuccessLatencyInMs
+    units: milliseconds
+    aggregations: [total]
+    time_grain: PT1M
+  # Routing
+  - name: MatchedEventCount
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: UnmatchedEventCount
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AdvancedFilterEvaluationCount
+    units: evaluations/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Delivery
+  - name: DeliverySuccessCount
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: DeliveryAttemptFailCount
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: DroppedEventCount
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: DeadLetteredCount
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Latency
+  - name: DestinationProcessingDurationInMs
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  - id: am_azure_event_grid__publish_rate
+    title: Azure Event Grid Publish Rate
+    context: event_grid.publish_rate
+    family: Publishing
+    type: line
+    priority: 1000
+    units: events/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: PublishSuccessCount
+        aggregation: total
+        name: success
+      - metric: PublishFailCount
+        aggregation: total
+        name: failed
+
+  - id: am_azure_event_grid__publish_latency
+    title: Azure Event Grid Publish Latency
+    context: event_grid.publish_latency
+    family: Publishing
+    type: line
+    priority: 1010
+    units: milliseconds
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: PublishSuccessLatencyInMs
+        aggregation: total
+        name: latency
+
+  - id: am_azure_event_grid__routing
+    title: Azure Event Grid Event Routing
+    context: event_grid.routing
+    family: Routing
+    type: line
+    priority: 1020
+    units: events/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: MatchedEventCount
+        aggregation: total
+        name: matched
+      - metric: UnmatchedEventCount
+        aggregation: total
+        name: unmatched
+
+  - id: am_azure_event_grid__advanced_filter_evaluations
+    title: Azure Event Grid Advanced Filter Evaluations
+    context: event_grid.advanced_filter_evaluations
+    family: Routing
+    type: line
+    priority: 1030
+    units: evaluations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AdvancedFilterEvaluationCount
+        aggregation: total
+        name: evaluations
+
+  - id: am_azure_event_grid__delivery
+    title: Azure Event Grid Event Delivery
+    context: event_grid.delivery
+    family: Delivery
+    type: line
+    priority: 1040
+    units: events/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: DeliverySuccessCount
+        aggregation: total
+        name: delivered
+      - metric: DeliveryAttemptFailCount
+        aggregation: total
+        name: failed
+      - metric: DroppedEventCount
+        aggregation: total
+        name: dropped
+      - metric: DeadLetteredCount
+        aggregation: total
+        name: dead_lettered
+
+  - id: am_azure_event_grid__destination_processing_duration
+    title: Azure Event Grid Destination Processing Duration
+    context: event_grid.destination_processing_duration
+    family: Performance
+    type: line
+    priority: 1050
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: DestinationProcessingDurationInMs
+        aggregation: average
+        name: average

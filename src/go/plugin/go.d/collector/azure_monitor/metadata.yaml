@@ -469,3 +469,69 @@ modules:
         icon_filename: azure.svg
         categories:
           - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-vpn_gateway
+      monitored_instance:
+        name: Azure VPN Gateway
+        link: https://learn.microsoft.com/azure/vpn-gateway/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-event_grid
+      monitored_instance:
+        name: Azure Event Grid Topic
+        link: https://learn.microsoft.com/azure/event-grid/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-iot_hub
+      monitored_instance:
+        name: Azure IoT Hub
+        link: https://learn.microsoft.com/azure/iot-hub/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-data_factory
+      monitored_instance:
+        name: Azure Data Factory
+        link: https://learn.microsoft.com/azure/data-factory/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-nat_gateway
+      monitored_instance:
+        name: Azure NAT Gateway
+        link: https://learn.microsoft.com/azure/nat-gateway/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-container_instances
+      monitored_instance:
+        name: Azure Container Instances
+        link: https://learn.microsoft.com/azure/container-instances/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud

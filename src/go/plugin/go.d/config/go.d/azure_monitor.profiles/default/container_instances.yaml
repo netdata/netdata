@@ -1,0 +1,82 @@
+name: Azure Container Instances
+resource_type: Microsoft.ContainerInstance/containerGroups
+metrics:
+  # CPU
+  - name: CpuUsage
+    units: millicores
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  # Memory
+  - name: MemoryUsage
+    units: bytes
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  # Network
+  - name: NetworkBytesReceivedPerSecond
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: NetworkBytesTransmittedPerSecond
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  # CPU
+  - id: am_azure_container_instances__cpu_usage
+    title: Azure Container Instances CPU Usage
+    context: container_instances.cpu_usage
+    family: CPU
+    type: line
+    priority: 1000
+    units: millicores
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CpuUsage
+        aggregation: average
+        name: average
+      - metric: CpuUsage
+        aggregation: maximum
+        name: maximum
+
+  # Memory
+  - id: am_azure_container_instances__memory_usage
+    title: Azure Container Instances Memory Usage
+    context: container_instances.memory_usage
+    family: Memory
+    type: line
+    priority: 1010
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: MemoryUsage
+        aggregation: average
+        name: average
+      - metric: MemoryUsage
+        aggregation: maximum
+        name: maximum
+
+  # Network
+  - id: am_azure_container_instances__network
+    title: Azure Container Instances Network Traffic
+    context: container_instances.network
+    family: Network
+    type: line
+    priority: 1020
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: NetworkBytesReceivedPerSecond
+        aggregation: average
+        name: received
+      - metric: NetworkBytesTransmittedPerSecond
+        aggregation: average
+        name: sent

@@ -1,0 +1,1014 @@
+name: Azure IoT Hub
+resource_type: Microsoft.Devices/IotHubs
+metrics:
+  # Cloud-to-Device Commands
+  - name: c2d.commands.egress.abandon.success
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: c2d.commands.egress.complete.success
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: c2d.commands.egress.reject.success
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: C2DMessagesExpired
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Cloud-to-Device Direct Methods
+  - name: c2d.methods.success
+    units: invocations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: c2d.methods.failure
+    units: invocations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: c2d.methods.requestSize
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: c2d.methods.responseSize
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  # Cloud-to-Device Twin Reads
+  - name: c2d.twin.read.success
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: c2d.twin.read.failure
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: c2d.twin.read.size
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  # Cloud-to-Device Twin Updates
+  - name: c2d.twin.update.success
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: c2d.twin.update.failure
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: c2d.twin.update.size
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  # Device-to-Cloud Telemetry
+  - name: d2c.telemetry.ingress.allProtocol
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.telemetry.ingress.success
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.telemetry.ingress.sendThrottle
+    units: errors/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Device-to-Cloud Twin Reads
+  - name: d2c.twin.read.success
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.twin.read.failure
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.twin.read.size
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  # Device-to-Cloud Twin Updates
+  - name: d2c.twin.update.success
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.twin.update.failure
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.twin.update.size
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  # Routing - Delivery
+  - name: d2c.endpoints.egress.builtIn.events
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.endpoints.egress.eventHubs
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.endpoints.egress.serviceBusQueues
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.endpoints.egress.serviceBusTopics
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.endpoints.egress.storage
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.endpoints.egress.storage.blobs
+    units: blobs/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.endpoints.egress.storage.bytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Routing - Latency
+  - name: d2c.endpoints.latency.builtIn.events
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: d2c.endpoints.latency.eventHubs
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: d2c.endpoints.latency.serviceBusQueues
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: d2c.endpoints.latency.serviceBusTopics
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: d2c.endpoints.latency.storage
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Routing - Telemetry Status
+  - name: d2c.telemetry.egress.success
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.telemetry.egress.dropped
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.telemetry.egress.orphaned
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.telemetry.egress.invalid
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: d2c.telemetry.egress.fallback
+    units: messages/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Routing (Preview)
+  - name: RoutingDeliveries
+    units: deliveries/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: RoutingDeliveryLatency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: RoutingDataSizeInBytesDelivered
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Connections
+  - name: connect.success
+    units: connections/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: connectedDeviceCount
+    units: devices
+    aggregations: [average]
+    time_grain: PT1M
+  # Device Counts
+  - name: totalDeviceCount
+    units: devices
+    aggregations: [average]
+    time_grain: PT1M
+  # Quota
+  - name: dailyMessageQuotaUsed
+    units: messages
+    aggregations: [average]
+    time_grain: PT1M
+  # Data Usage
+  - name: deviceDataUsage
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: deviceDataUsageV2
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Configuration
+  - name: configurations
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Event Grid
+  - name: EventGridDeliveries
+    units: deliveries/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: EventGridLatency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Jobs
+  - name: jobs.completed
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: jobs.failed
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: jobs.cancelJob.success
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: jobs.cancelJob.failure
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: jobs.createDirectMethodJob.success
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: jobs.createDirectMethodJob.failure
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: jobs.createTwinUpdateJob.success
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: jobs.createTwinUpdateJob.failure
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: jobs.listJobs.success
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: jobs.listJobs.failure
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: jobs.queryJobs.success
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: jobs.queryJobs.failure
+    units: operations/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Twin Queries
+  - name: twinQueries.success
+    units: queries/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: twinQueries.failure
+    units: queries/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: twinQueries.resultSize
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  # ── Cloud-to-Device Messages ────────────────────────────────────────
+  - id: am_azure_iot_hub__c2d_commands
+    title: Azure IoT Hub Cloud-to-Device Commands
+    context: iot_hub.c2d_commands
+    family: C2D Messages
+    type: line
+    priority: 1000
+    units: messages/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: c2d.commands.egress.complete.success
+        aggregation: total
+        name: completed
+      - metric: c2d.commands.egress.abandon.success
+        aggregation: total
+        name: abandoned
+      - metric: c2d.commands.egress.reject.success
+        aggregation: total
+        name: rejected
+
+  - id: am_azure_iot_hub__c2d_messages_expired
+    title: Azure IoT Hub Cloud-to-Device Messages Expired
+    context: iot_hub.c2d_messages_expired
+    family: C2D Messages
+    type: line
+    priority: 1010
+    units: messages/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: C2DMessagesExpired
+        aggregation: total
+        name: expired
+
+  # ── Cloud-to-Device Direct Methods ──────────────────────────────────
+  - id: am_azure_iot_hub__c2d_methods
+    title: Azure IoT Hub Direct Method Invocations
+    context: iot_hub.c2d_methods
+    family: C2D Methods
+    type: line
+    priority: 1020
+    units: invocations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: c2d.methods.success
+        aggregation: total
+        name: successful
+      - metric: c2d.methods.failure
+        aggregation: total
+        name: failed
+
+  - id: am_azure_iot_hub__c2d_methods_request_size
+    title: Azure IoT Hub Direct Method Request Size
+    context: iot_hub.c2d_methods_request_size
+    family: C2D Methods
+    type: line
+    priority: 1030
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: c2d.methods.requestSize
+        aggregation: average
+        name: average
+
+  - id: am_azure_iot_hub__c2d_methods_response_size
+    title: Azure IoT Hub Direct Method Response Size
+    context: iot_hub.c2d_methods_response_size
+    family: C2D Methods
+    type: line
+    priority: 1040
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: c2d.methods.responseSize
+        aggregation: average
+        name: average
+
+  # ── Cloud-to-Device Twin Operations ─────────────────────────────────
+  - id: am_azure_iot_hub__c2d_twin_reads
+    title: Azure IoT Hub Backend Twin Reads
+    context: iot_hub.c2d_twin_reads
+    family: C2D Twins
+    type: line
+    priority: 1050
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: c2d.twin.read.success
+        aggregation: total
+        name: successful
+      - metric: c2d.twin.read.failure
+        aggregation: total
+        name: failed
+
+  - id: am_azure_iot_hub__c2d_twin_read_size
+    title: Azure IoT Hub Backend Twin Read Size
+    context: iot_hub.c2d_twin_read_size
+    family: C2D Twins
+    type: line
+    priority: 1060
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: c2d.twin.read.size
+        aggregation: average
+        name: average
+
+  - id: am_azure_iot_hub__c2d_twin_updates
+    title: Azure IoT Hub Backend Twin Updates
+    context: iot_hub.c2d_twin_updates
+    family: C2D Twins
+    type: line
+    priority: 1070
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: c2d.twin.update.success
+        aggregation: total
+        name: successful
+      - metric: c2d.twin.update.failure
+        aggregation: total
+        name: failed
+
+  - id: am_azure_iot_hub__c2d_twin_update_size
+    title: Azure IoT Hub Backend Twin Update Size
+    context: iot_hub.c2d_twin_update_size
+    family: C2D Twins
+    type: line
+    priority: 1080
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: c2d.twin.update.size
+        aggregation: average
+        name: average
+
+  # ── Device-to-Cloud Telemetry ───────────────────────────────────────
+  - id: am_azure_iot_hub__d2c_telemetry
+    title: Azure IoT Hub Device Telemetry
+    context: iot_hub.d2c_telemetry
+    family: D2C Telemetry
+    type: line
+    priority: 1090
+    units: messages/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: d2c.telemetry.ingress.allProtocol
+        aggregation: total
+        name: attempted
+      - metric: d2c.telemetry.ingress.success
+        aggregation: total
+        name: sent
+
+  - id: am_azure_iot_hub__d2c_telemetry_throttle
+    title: Azure IoT Hub Telemetry Throttling Errors
+    context: iot_hub.d2c_telemetry_throttle
+    family: D2C Telemetry
+    type: line
+    priority: 1100
+    units: errors/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: d2c.telemetry.ingress.sendThrottle
+        aggregation: total
+        name: throttled
+
+  # ── Device-to-Cloud Twin Operations ─────────────────────────────────
+  - id: am_azure_iot_hub__d2c_twin_reads
+    title: Azure IoT Hub Device Twin Reads
+    context: iot_hub.d2c_twin_reads
+    family: D2C Twins
+    type: line
+    priority: 1110
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: d2c.twin.read.success
+        aggregation: total
+        name: successful
+      - metric: d2c.twin.read.failure
+        aggregation: total
+        name: failed
+
+  - id: am_azure_iot_hub__d2c_twin_read_size
+    title: Azure IoT Hub Device Twin Read Size
+    context: iot_hub.d2c_twin_read_size
+    family: D2C Twins
+    type: line
+    priority: 1120
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: d2c.twin.read.size
+        aggregation: average
+        name: average
+
+  - id: am_azure_iot_hub__d2c_twin_updates
+    title: Azure IoT Hub Device Twin Updates
+    context: iot_hub.d2c_twin_updates
+    family: D2C Twins
+    type: line
+    priority: 1130
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: d2c.twin.update.success
+        aggregation: total
+        name: successful
+      - metric: d2c.twin.update.failure
+        aggregation: total
+        name: failed
+
+  - id: am_azure_iot_hub__d2c_twin_update_size
+    title: Azure IoT Hub Device Twin Update Size
+    context: iot_hub.d2c_twin_update_size
+    family: D2C Twins
+    type: line
+    priority: 1140
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: d2c.twin.update.size
+        aggregation: average
+        name: average
+
+  # ── Routing - Message Delivery ──────────────────────────────────────
+  - id: am_azure_iot_hub__routing_deliveries
+    title: Azure IoT Hub Routing Message Deliveries
+    context: iot_hub.routing_deliveries
+    family: Routing
+    type: line
+    priority: 1150
+    units: messages/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: d2c.telemetry.egress.success
+        aggregation: total
+        name: delivered
+      - metric: d2c.telemetry.egress.dropped
+        aggregation: total
+        name: dropped
+      - metric: d2c.telemetry.egress.orphaned
+        aggregation: total
+        name: orphaned
+      - metric: d2c.telemetry.egress.invalid
+        aggregation: total
+        name: invalid
+      - metric: d2c.telemetry.egress.fallback
+        aggregation: total
+        name: fallback
+
+  - id: am_azure_iot_hub__routing_delivery_by_endpoint
+    title: Azure IoT Hub Routing Deliveries by Endpoint
+    context: iot_hub.routing_delivery_by_endpoint
+    family: Routing
+    type: line
+    priority: 1160
+    units: messages/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: d2c.endpoints.egress.builtIn.events
+        aggregation: total
+        name: builtin_events
+      - metric: d2c.endpoints.egress.eventHubs
+        aggregation: total
+        name: event_hubs
+      - metric: d2c.endpoints.egress.serviceBusQueues
+        aggregation: total
+        name: service_bus_queues
+      - metric: d2c.endpoints.egress.serviceBusTopics
+        aggregation: total
+        name: service_bus_topics
+      - metric: d2c.endpoints.egress.storage
+        aggregation: total
+        name: storage
+
+  - id: am_azure_iot_hub__routing_storage_blobs
+    title: Azure IoT Hub Routing Blobs Delivered to Storage
+    context: iot_hub.routing_storage_blobs
+    family: Routing
+    type: line
+    priority: 1170
+    units: blobs/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: d2c.endpoints.egress.storage.blobs
+        aggregation: total
+        name: blobs
+
+  - id: am_azure_iot_hub__routing_storage_data
+    title: Azure IoT Hub Routing Data Delivered to Storage
+    context: iot_hub.routing_storage_data
+    family: Routing
+    type: line
+    priority: 1180
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: d2c.endpoints.egress.storage.bytes
+        aggregation: total
+        name: bytes
+
+  # ── Routing - Latency ───────────────────────────────────────────────
+  - id: am_azure_iot_hub__routing_latency
+    title: Azure IoT Hub Routing Latency
+    context: iot_hub.routing_latency
+    family: Routing
+    type: line
+    priority: 1190
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: d2c.endpoints.latency.builtIn.events
+        aggregation: average
+        name: builtin_events
+      - metric: d2c.endpoints.latency.eventHubs
+        aggregation: average
+        name: event_hubs
+      - metric: d2c.endpoints.latency.serviceBusQueues
+        aggregation: average
+        name: service_bus_queues
+      - metric: d2c.endpoints.latency.serviceBusTopics
+        aggregation: average
+        name: service_bus_topics
+      - metric: d2c.endpoints.latency.storage
+        aggregation: average
+        name: storage
+
+  # ── Routing (Preview) ──────────────────────────────────────────────
+  - id: am_azure_iot_hub__routing_deliveries_preview
+    title: Azure IoT Hub Routing Deliveries (Preview)
+    context: iot_hub.routing_deliveries_preview
+    family: Routing
+    type: line
+    priority: 1200
+    units: deliveries/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RoutingDeliveries
+        aggregation: total
+        name: deliveries
+
+  - id: am_azure_iot_hub__routing_delivery_latency_preview
+    title: Azure IoT Hub Routing Delivery Latency (Preview)
+    context: iot_hub.routing_delivery_latency_preview
+    family: Routing
+    type: line
+    priority: 1210
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RoutingDeliveryLatency
+        aggregation: average
+        name: average
+
+  - id: am_azure_iot_hub__routing_data_size_preview
+    title: Azure IoT Hub Routing Delivery Message Size (Preview)
+    context: iot_hub.routing_data_size_preview
+    family: Routing
+    type: line
+    priority: 1220
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RoutingDataSizeInBytesDelivered
+        aggregation: total
+        name: bytes
+
+  # ── Connections ─────────────────────────────────────────────────────
+  - id: am_azure_iot_hub__connections
+    title: Azure IoT Hub Successful Connections
+    context: iot_hub.connections
+    family: Connections
+    type: line
+    priority: 1230
+    units: connections/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: connect.success
+        aggregation: total
+        name: successful
+
+  - id: am_azure_iot_hub__connected_devices
+    title: Azure IoT Hub Connected Devices
+    context: iot_hub.connected_devices
+    family: Connections
+    type: line
+    priority: 1240
+    units: devices
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: connectedDeviceCount
+        aggregation: average
+        name: connected
+
+  # ── Device Counts ───────────────────────────────────────────────────
+  - id: am_azure_iot_hub__total_devices
+    title: Azure IoT Hub Total Devices
+    context: iot_hub.total_devices
+    family: Devices
+    type: line
+    priority: 1250
+    units: devices
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: totalDeviceCount
+        aggregation: average
+        name: total
+
+  # ── Quota ───────────────────────────────────────────────────────────
+  - id: am_azure_iot_hub__daily_message_quota
+    title: Azure IoT Hub Daily Message Quota Used
+    context: iot_hub.daily_message_quota
+    family: Quota
+    type: line
+    priority: 1260
+    units: messages
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: dailyMessageQuotaUsed
+        aggregation: average
+        name: used
+
+  # ── Data Usage ──────────────────────────────────────────────────────
+  - id: am_azure_iot_hub__data_usage
+    title: Azure IoT Hub Device Data Usage
+    context: iot_hub.data_usage
+    family: Data Usage
+    type: line
+    priority: 1270
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: deviceDataUsage
+        aggregation: total
+        name: data_usage
+      - metric: deviceDataUsageV2
+        aggregation: total
+        name: data_usage_v2
+
+  # ── Configuration ───────────────────────────────────────────────────
+  - id: am_azure_iot_hub__configurations
+    title: Azure IoT Hub Configuration Operations
+    context: iot_hub.configurations
+    family: Configuration
+    type: line
+    priority: 1280
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: configurations
+        aggregation: total
+        name: operations
+
+  # ── Event Grid ──────────────────────────────────────────────────────
+  - id: am_azure_iot_hub__event_grid_deliveries
+    title: Azure IoT Hub Event Grid Deliveries
+    context: iot_hub.event_grid_deliveries
+    family: Event Grid
+    type: line
+    priority: 1290
+    units: deliveries/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: EventGridDeliveries
+        aggregation: total
+        name: deliveries
+
+  - id: am_azure_iot_hub__event_grid_latency
+    title: Azure IoT Hub Event Grid Latency
+    context: iot_hub.event_grid_latency
+    family: Event Grid
+    type: line
+    priority: 1300
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: EventGridLatency
+        aggregation: average
+        name: average
+
+  # ── Jobs ────────────────────────────────────────────────────────────
+  - id: am_azure_iot_hub__jobs_status
+    title: Azure IoT Hub Job Completions
+    context: iot_hub.jobs_status
+    family: Jobs
+    type: line
+    priority: 1310
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: jobs.completed
+        aggregation: total
+        name: completed
+      - metric: jobs.failed
+        aggregation: total
+        name: failed
+
+  - id: am_azure_iot_hub__jobs_cancel
+    title: Azure IoT Hub Job Cancellations
+    context: iot_hub.jobs_cancel
+    family: Jobs
+    type: line
+    priority: 1320
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: jobs.cancelJob.success
+        aggregation: total
+        name: successful
+      - metric: jobs.cancelJob.failure
+        aggregation: total
+        name: failed
+
+  - id: am_azure_iot_hub__jobs_create_method
+    title: Azure IoT Hub Direct Method Job Creations
+    context: iot_hub.jobs_create_method
+    family: Jobs
+    type: line
+    priority: 1330
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: jobs.createDirectMethodJob.success
+        aggregation: total
+        name: successful
+      - metric: jobs.createDirectMethodJob.failure
+        aggregation: total
+        name: failed
+
+  - id: am_azure_iot_hub__jobs_create_twin_update
+    title: Azure IoT Hub Twin Update Job Creations
+    context: iot_hub.jobs_create_twin_update
+    family: Jobs
+    type: line
+    priority: 1340
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: jobs.createTwinUpdateJob.success
+        aggregation: total
+        name: successful
+      - metric: jobs.createTwinUpdateJob.failure
+        aggregation: total
+        name: failed
+
+  - id: am_azure_iot_hub__jobs_list
+    title: Azure IoT Hub Job List Calls
+    context: iot_hub.jobs_list
+    family: Jobs
+    type: line
+    priority: 1350
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: jobs.listJobs.success
+        aggregation: total
+        name: successful
+      - metric: jobs.listJobs.failure
+        aggregation: total
+        name: failed
+
+  - id: am_azure_iot_hub__jobs_query
+    title: Azure IoT Hub Job Queries
+    context: iot_hub.jobs_query
+    family: Jobs
+    type: line
+    priority: 1360
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: jobs.queryJobs.success
+        aggregation: total
+        name: successful
+      - metric: jobs.queryJobs.failure
+        aggregation: total
+        name: failed
+
+  # ── Twin Queries ────────────────────────────────────────────────────
+  - id: am_azure_iot_hub__twin_queries
+    title: Azure IoT Hub Twin Queries
+    context: iot_hub.twin_queries
+    family: Twin Queries
+    type: line
+    priority: 1370
+    units: queries/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: twinQueries.success
+        aggregation: total
+        name: successful
+      - metric: twinQueries.failure
+        aggregation: total
+        name: failed
+
+  - id: am_azure_iot_hub__twin_queries_result_size
+    title: Azure IoT Hub Twin Query Result Size
+    context: iot_hub.twin_queries_result_size
+    family: Twin Queries
+    type: line
+    priority: 1380
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: twinQueries.resultSize
+        aggregation: average
+        name: average

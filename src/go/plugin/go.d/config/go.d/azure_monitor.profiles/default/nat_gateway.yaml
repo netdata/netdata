@@ -1,0 +1,127 @@
+name: Azure NAT Gateway
+resource_type: Microsoft.Network/natGateways
+metrics:
+  # Availability
+  - name: DatapathAvailability
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Throughput
+  - name: ByteCount
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: PacketCount
+    units: packets/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Drops
+  - name: PacketDropCount
+    units: packets/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Connections
+  - name: SNATConnectionCount
+    units: connections/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TotalConnectionCount
+    units: connections/s
+    aggregations: [total]
+    time_grain: PT1M
+charts:
+  - id: am_azure_nat_gateway__datapath_availability
+    title: Azure NAT Gateway Datapath Availability
+    context: nat_gateway.datapath_availability
+    family: Availability
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: DatapathAvailability
+        aggregation: average
+        name: average
+
+  - id: am_azure_nat_gateway__byte_throughput
+    title: Azure NAT Gateway Byte Throughput
+    context: nat_gateway.byte_throughput
+    family: Throughput
+    type: line
+    priority: 1010
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ByteCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_nat_gateway__packet_throughput
+    title: Azure NAT Gateway Packet Throughput
+    context: nat_gateway.packet_throughput
+    family: Throughput
+    type: line
+    priority: 1020
+    units: packets/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: PacketCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_nat_gateway__dropped_packets
+    title: Azure NAT Gateway Dropped Packets
+    context: nat_gateway.dropped_packets
+    family: Errors
+    type: line
+    priority: 1030
+    units: packets/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: PacketDropCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_nat_gateway__snat_connections
+    title: Azure NAT Gateway SNAT Connections
+    context: nat_gateway.snat_connections
+    family: Connections
+    type: line
+    priority: 1040
+    units: connections/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SNATConnectionCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_nat_gateway__total_connections
+    title: Azure NAT Gateway Total SNAT Connections
+    context: nat_gateway.total_connections
+    family: Connections
+    type: line
+    priority: 1050
+    units: connections/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalConnectionCount
+        aggregation: total
+        name: total
