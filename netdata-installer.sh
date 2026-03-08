@@ -39,6 +39,12 @@ fi
 # make sure /etc/profile does not change our current directory
 cd "${NETDATA_SOURCE_DIR}" || exit 1
 
+# Future automation hooks: NETDATA_PRE_INSTALL reserved for pre-install scripts
+if [ -n "${NETDATA_PRE_INSTALL}" ]; then
+    # Placeholder for future use
+    :
+fi
+
 # -----------------------------------------------------------------------------
 # load the required functions
 
