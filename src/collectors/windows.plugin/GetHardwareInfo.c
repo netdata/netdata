@@ -158,14 +158,62 @@ int netdata_start_driver()
     int ret = 0;
     if (!StartServiceA(service, 0, NULL)) {
         DWORD err = GetLastError();
-        if (err != ERROR_SERVICE_ALREADY_RUNNING) {
+
+        if (err == ERROR_SERVICE_ALREADY_RUNNING) {
+            ret = 0;
+        } else if (err == ERROR_SERVICE_DOES_NOT_EXIST) {
+            nd_log(NDLS_COLLECTORS, NDLP_INFO, "Service not found, attempting to install driver and retry start\n");
+            CloseServiceHandle(service);
+            CloseServiceHandle(scm);
+
+            if (netdata_install_driver() == 0) {
+                scm = OpenSCManagerA(NULL, NULL, SC_MANAGER_CONNECT);
+                if (likely(scm)) {
+                    service = OpenServiceA(scm, srv_name, SERVICE_START | SERVICE_QUERY_STATUS);
+                    if (likely(service)) {
+                        if (!StartServiceA(service, 0, NULL)) {
+                            err = GetLastError();
+                            if (err == ERROR_SERVICE_ALREADY_RUNNING) {
+                                ret = 0;
+                            } else if (err == ERROR_INVALID_IMAGE_HASH) {
+                                nd_log(
+                                    NDLS_COLLECTORS,
+                                    NDLP_ERR,
+                                    "Driver failed to start: ERROR_INVALID_IMAGE_HASH (1937). "
+                                    "This usually indicates a driver signature verification failure. "
+                                    "The driver binary may be corrupted, unsigned, or signed with an untrusted certificate.\n");
+                                ret = -1;
+                            } else {
+                                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Retry start failed. Error= %lu \n", err);
+                                ret = -1;
+                            }
+                        }
+                        CloseServiceHandle(service);
+                    }
+                    CloseServiceHandle(scm);
+                }
+            } else {
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to install driver during self-healing\n");
+                ret = -1;
+            }
+        } else if (err == ERROR_INVALID_IMAGE_HASH) {
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "Driver failed to start: ERROR_INVALID_IMAGE_HASH (1937). "
+                "This usually indicates a driver signature verification failure. "
+                "The driver binary may be corrupted, unsigned, or signed with an untrusted certificate.\n");
+            ret = -1;
+        } else {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot start Service. Error= %lu \n", err);
             ret = -1;
         }
     }
 
-    CloseServiceHandle(service);
-    CloseServiceHandle(scm);
+    if (service)
+        CloseServiceHandle(service);
+    if (scm)
+        CloseServiceHandle(scm);
     return ret;
 }
 
