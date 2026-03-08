@@ -1,0 +1,966 @@
+name: Azure Data Explorer Cluster
+resource_type: Microsoft.Kusto/clusters
+metrics:
+  # Cluster Health
+  - name: CPU
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: IngestionUtilization
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: CacheUtilizationFactor
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: KeepAlive
+    units: count
+    aggregations: [average]
+    time_grain: PT1M
+  - name: InstanceCount
+    units: instances
+    aggregations: [average, maximum, minimum]
+    time_grain: PT1M
+  - name: TotalNumberOfExtents
+    units: extents
+    aggregations: [average]
+    time_grain: PT1M
+  - name: TotalNumberOfThrottledCommands
+    units: commands/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: FollowerLatency
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Query Performance
+  - name: QueryDuration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: QueryResult
+    units: queries/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: TotalNumberOfConcurrentQueries
+    units: queries
+    aggregations: [average, maximum]
+    time_grain: PT1M
+  - name: TotalNumberOfThrottledQueries
+    units: queries/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: WeakConsistencyLatency
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Ingestion Health and Performance
+  - name: IngestionResult
+    units: sources/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: IngestionVolumeInMB
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: IngestionLatencyInSeconds
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: EventsProcessed
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: EventsReceived
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: EventsDropped
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BlobsProcessed
+    units: blobs/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BlobsReceived
+    units: blobs/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BlobsDropped
+    units: blobs/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: DiscoveryLatency
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: StageLatency
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: QueueLength
+    units: messages
+    aggregations: [average]
+    time_grain: PT1M
+  - name: QueueOldestMessage
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ReceivedDataSizeBytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Batching
+  - name: BatchesProcessed
+    units: batches/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BatchBlobCount
+    units: blobs
+    aggregations: [average]
+    time_grain: PT1M
+  - name: BatchSize
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: BatchDuration
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Export Health and Performance
+  - name: ExportUtilization
+    units: percentage
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: ContinuousExportNumOfRecordsExported
+    units: records/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ContinuousExportResult
+    units: results/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: ContinuousExportPendingCount
+    units: jobs
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: ContinuousExportMaxLatenessMinutes
+    units: minutes
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Streaming Ingest
+  - name: StreamingIngestDataRate
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: StreamingIngestDuration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: StreamingIngestResults
+    units: results/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: StreamingIngestUtilization
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Materialized View Health and Performance
+  - name: MaterializedViewHealth
+    units: status
+    aggregations: [average]
+    time_grain: PT1M
+  - name: MaterializedViewAgeMinutes
+    units: minutes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: MaterializedViewAgeSeconds
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: MaterializedViewRecordsInDelta
+    units: records
+    aggregations: [average]
+    time_grain: PT1M
+  - name: MaterializedViewExtentsRebuild
+    units: extents
+    aggregations: [average]
+    time_grain: PT1M
+  - name: MaterializedViewDataLoss
+    units: status
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: MaterializedViewResult
+    units: status
+    aggregations: [average]
+    time_grain: PT1M
+  # Partitioning
+  - name: PartitioningPercentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: PartitioningPercentageHot
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ProcessedPartitionedRecords
+    units: records
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  # ──────────────────────────────────────────────
+  # Cluster Health
+  # ──────────────────────────────────────────────
+  - id: am_azure_data_explorer__cpu_utilization
+    title: Azure Data Explorer CPU Utilization
+    context: data_explorer.cpu_utilization
+    family: Compute
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: CPU
+        aggregation: average
+        name: average
+
+  - id: am_azure_data_explorer__utilization
+    title: Azure Data Explorer Utilization
+    context: data_explorer.utilization
+    family: Compute
+    type: line
+    priority: 1010
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IngestionUtilization
+        aggregation: average
+        name: ingestion
+      - metric: CacheUtilizationFactor
+        aggregation: average
+        name: cache
+
+  - id: am_azure_data_explorer__keep_alive
+    title: Azure Data Explorer Keep Alive
+    context: data_explorer.keep_alive
+    family: Compute
+    type: line
+    priority: 1020
+    units: count
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: KeepAlive
+        aggregation: average
+        name: average
+
+  - id: am_azure_data_explorer__instance_count
+    title: Azure Data Explorer Instance Count
+    context: data_explorer.instance_count
+    family: Compute
+    type: line
+    priority: 1030
+    units: instances
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: InstanceCount
+        aggregation: average
+        name: average
+      - metric: InstanceCount
+        aggregation: maximum
+        name: maximum
+      - metric: InstanceCount
+        aggregation: minimum
+        name: minimum
+
+  - id: am_azure_data_explorer__extents
+    title: Azure Data Explorer Total Extents
+    context: data_explorer.extents
+    family: Compute
+    type: line
+    priority: 1040
+    units: extents
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalNumberOfExtents
+        aggregation: average
+        name: average
+
+  - id: am_azure_data_explorer__throttled_commands
+    title: Azure Data Explorer Throttled Commands
+    context: data_explorer.throttled_commands
+    family: Compute
+    type: line
+    priority: 1050
+    units: commands/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalNumberOfThrottledCommands
+        aggregation: total
+        name: total
+
+  - id: am_azure_data_explorer__follower_latency
+    title: Azure Data Explorer Follower Latency
+    context: data_explorer.follower_latency
+    family: Compute
+    type: line
+    priority: 1060
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: FollowerLatency
+        aggregation: average
+        name: average
+
+  # ──────────────────────────────────────────────
+  # Query Performance
+  # ──────────────────────────────────────────────
+  - id: am_azure_data_explorer__query_duration
+    title: Azure Data Explorer Query Duration
+    context: data_explorer.query_duration
+    family: Query
+    type: line
+    priority: 1070
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: QueryDuration
+        aggregation: average
+        name: average
+
+  - id: am_azure_data_explorer__query_count
+    title: Azure Data Explorer Query Count
+    context: data_explorer.query_count
+    family: Query
+    type: line
+    priority: 1080
+    units: queries/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: QueryResult
+        aggregation: count
+        name: count
+
+  - id: am_azure_data_explorer__concurrent_queries
+    title: Azure Data Explorer Concurrent Queries
+    context: data_explorer.concurrent_queries
+    family: Query
+    type: line
+    priority: 1090
+    units: queries
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalNumberOfConcurrentQueries
+        aggregation: average
+        name: average
+      - metric: TotalNumberOfConcurrentQueries
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_data_explorer__throttled_queries
+    title: Azure Data Explorer Throttled Queries
+    context: data_explorer.throttled_queries
+    family: Query
+    type: line
+    priority: 1100
+    units: queries/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TotalNumberOfThrottledQueries
+        aggregation: total
+        name: total
+
+  - id: am_azure_data_explorer__weak_consistency_latency
+    title: Azure Data Explorer Weak Consistency Latency
+    context: data_explorer.weak_consistency_latency
+    family: Query
+    type: line
+    priority: 1110
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: WeakConsistencyLatency
+        aggregation: average
+        name: average
+
+  # ──────────────────────────────────────────────
+  # Ingestion Health and Performance
+  # ──────────────────────────────────────────────
+  - id: am_azure_data_explorer__ingestion_result
+    title: Azure Data Explorer Ingestion Result
+    context: data_explorer.ingestion_result
+    family: Ingestion
+    type: line
+    priority: 1120
+    units: sources/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IngestionResult
+        aggregation: total
+        name: total
+
+  - id: am_azure_data_explorer__ingestion_volume
+    title: Azure Data Explorer Ingestion Volume
+    context: data_explorer.ingestion_volume
+    family: Ingestion
+    type: line
+    priority: 1130
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IngestionVolumeInMB
+        aggregation: total
+        name: total
+
+  - id: am_azure_data_explorer__ingestion_latency
+    title: Azure Data Explorer Ingestion Latency
+    context: data_explorer.ingestion_latency
+    family: Ingestion
+    type: line
+    priority: 1140
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IngestionLatencyInSeconds
+        aggregation: average
+        name: average
+
+  - id: am_azure_data_explorer__events
+    title: Azure Data Explorer Events
+    context: data_explorer.events
+    family: Ingestion
+    type: line
+    priority: 1150
+    units: events/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: EventsReceived
+        aggregation: total
+        name: received
+      - metric: EventsProcessed
+        aggregation: total
+        name: processed
+      - metric: EventsDropped
+        aggregation: total
+        name: dropped
+
+  - id: am_azure_data_explorer__blobs
+    title: Azure Data Explorer Blobs
+    context: data_explorer.blobs
+    family: Ingestion
+    type: line
+    priority: 1160
+    units: blobs/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BlobsReceived
+        aggregation: total
+        name: received
+      - metric: BlobsProcessed
+        aggregation: total
+        name: processed
+      - metric: BlobsDropped
+        aggregation: total
+        name: dropped
+
+  - id: am_azure_data_explorer__discovery_latency
+    title: Azure Data Explorer Discovery Latency
+    context: data_explorer.discovery_latency
+    family: Ingestion
+    type: line
+    priority: 1170
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: DiscoveryLatency
+        aggregation: average
+        name: average
+
+  - id: am_azure_data_explorer__stage_latency
+    title: Azure Data Explorer Stage Latency
+    context: data_explorer.stage_latency
+    family: Ingestion
+    type: line
+    priority: 1180
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: StageLatency
+        aggregation: average
+        name: average
+
+  - id: am_azure_data_explorer__ingestion_queue
+    title: Azure Data Explorer Ingestion Queue
+    context: data_explorer.ingestion_queue
+    family: Ingestion
+    type: line
+    priority: 1190
+    units: messages
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: QueueLength
+        aggregation: average
+        name: length
+
+  - id: am_azure_data_explorer__queue_oldest_message
+    title: Azure Data Explorer Queue Oldest Message Age
+    context: data_explorer.queue_oldest_message
+    family: Ingestion
+    type: line
+    priority: 1200
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: QueueOldestMessage
+        aggregation: average
+        name: age
+
+  - id: am_azure_data_explorer__received_data_size
+    title: Azure Data Explorer Received Data Size
+    context: data_explorer.received_data_size
+    family: Ingestion
+    type: line
+    priority: 1210
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ReceivedDataSizeBytes
+        aggregation: total
+        name: total
+
+  # ──────────────────────────────────────────────
+  # Batching
+  # ──────────────────────────────────────────────
+  - id: am_azure_data_explorer__batches_processed
+    title: Azure Data Explorer Batches Processed
+    context: data_explorer.batches_processed
+    family: Ingestion
+    type: line
+    priority: 1220
+    units: batches/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BatchesProcessed
+        aggregation: total
+        name: total
+
+  - id: am_azure_data_explorer__batch_blob_count
+    title: Azure Data Explorer Batch Blob Count
+    context: data_explorer.batch_blob_count
+    family: Ingestion
+    type: line
+    priority: 1230
+    units: blobs
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BatchBlobCount
+        aggregation: average
+        name: average
+
+  - id: am_azure_data_explorer__batch_size
+    title: Azure Data Explorer Batch Size
+    context: data_explorer.batch_size
+    family: Ingestion
+    type: line
+    priority: 1240
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BatchSize
+        aggregation: average
+        name: average
+
+  - id: am_azure_data_explorer__batch_duration
+    title: Azure Data Explorer Batch Duration
+    context: data_explorer.batch_duration
+    family: Ingestion
+    type: line
+    priority: 1250
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BatchDuration
+        aggregation: average
+        name: average
+
+  # ──────────────────────────────────────────────
+  # Export Health and Performance
+  # ──────────────────────────────────────────────
+  - id: am_azure_data_explorer__export_utilization
+    title: Azure Data Explorer Export Utilization
+    context: data_explorer.export_utilization
+    family: Export
+    type: line
+    priority: 1260
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExportUtilization
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_data_explorer__continuous_export_records
+    title: Azure Data Explorer Continuous Export Records
+    context: data_explorer.continuous_export_records
+    family: Export
+    type: line
+    priority: 1270
+    units: records/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ContinuousExportNumOfRecordsExported
+        aggregation: total
+        name: total
+
+  - id: am_azure_data_explorer__continuous_export_result
+    title: Azure Data Explorer Continuous Export Result
+    context: data_explorer.continuous_export_result
+    family: Export
+    type: line
+    priority: 1280
+    units: results/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ContinuousExportResult
+        aggregation: count
+        name: count
+
+  - id: am_azure_data_explorer__continuous_export_pending
+    title: Azure Data Explorer Continuous Export Pending Jobs
+    context: data_explorer.continuous_export_pending
+    family: Export
+    type: line
+    priority: 1290
+    units: jobs
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ContinuousExportPendingCount
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_data_explorer__continuous_export_lateness
+    title: Azure Data Explorer Continuous Export Lateness
+    context: data_explorer.continuous_export_lateness
+    family: Export
+    type: line
+    priority: 1300
+    units: minutes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ContinuousExportMaxLatenessMinutes
+        aggregation: maximum
+        name: maximum
+
+  # ──────────────────────────────────────────────
+  # Streaming Ingest
+  # ──────────────────────────────────────────────
+  - id: am_azure_data_explorer__streaming_ingest_data_rate
+    title: Azure Data Explorer Streaming Ingest Data Rate
+    context: data_explorer.streaming_ingest_data_rate
+    family: Streaming
+    type: line
+    priority: 1310
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: StreamingIngestDataRate
+        aggregation: average
+        name: average
+
+  - id: am_azure_data_explorer__streaming_ingest_duration
+    title: Azure Data Explorer Streaming Ingest Duration
+    context: data_explorer.streaming_ingest_duration
+    family: Streaming
+    type: line
+    priority: 1320
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: StreamingIngestDuration
+        aggregation: average
+        name: average
+
+  - id: am_azure_data_explorer__streaming_ingest_result
+    title: Azure Data Explorer Streaming Ingest Result
+    context: data_explorer.streaming_ingest_result
+    family: Streaming
+    type: line
+    priority: 1330
+    units: results/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: StreamingIngestResults
+        aggregation: count
+        name: count
+
+  - id: am_azure_data_explorer__streaming_ingest_utilization
+    title: Azure Data Explorer Streaming Ingest Utilization
+    context: data_explorer.streaming_ingest_utilization
+    family: Streaming
+    type: line
+    priority: 1340
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: StreamingIngestUtilization
+        aggregation: average
+        name: average
+
+  # ──────────────────────────────────────────────
+  # Materialized Views
+  # ──────────────────────────────────────────────
+  - id: am_azure_data_explorer__materialized_view_health
+    title: Azure Data Explorer Materialized View Health
+    context: data_explorer.materialized_view_health
+    family: Materialized Views
+    type: line
+    priority: 1350
+    units: status
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: MaterializedViewHealth
+        aggregation: average
+        name: health
+
+  - id: am_azure_data_explorer__materialized_view_age
+    title: Azure Data Explorer Materialized View Age
+    context: data_explorer.materialized_view_age
+    family: Materialized Views
+    type: line
+    priority: 1360
+    units: minutes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: MaterializedViewAgeMinutes
+        aggregation: average
+        name: minutes
+
+  - id: am_azure_data_explorer__materialized_view_age_seconds
+    title: Azure Data Explorer Materialized View Age (Seconds)
+    context: data_explorer.materialized_view_age_seconds
+    family: Materialized Views
+    type: line
+    priority: 1370
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: MaterializedViewAgeSeconds
+        aggregation: average
+        name: average
+
+  - id: am_azure_data_explorer__materialized_view_records_in_delta
+    title: Azure Data Explorer Materialized View Records in Delta
+    context: data_explorer.materialized_view_records_in_delta
+    family: Materialized Views
+    type: line
+    priority: 1380
+    units: records
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: MaterializedViewRecordsInDelta
+        aggregation: average
+        name: average
+
+  - id: am_azure_data_explorer__materialized_view_extents_rebuild
+    title: Azure Data Explorer Materialized View Extents Rebuild
+    context: data_explorer.materialized_view_extents_rebuild
+    family: Materialized Views
+    type: line
+    priority: 1390
+    units: extents
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: MaterializedViewExtentsRebuild
+        aggregation: average
+        name: average
+
+  - id: am_azure_data_explorer__materialized_view_data_loss
+    title: Azure Data Explorer Materialized View Data Loss
+    context: data_explorer.materialized_view_data_loss
+    family: Materialized Views
+    type: line
+    priority: 1400
+    units: status
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: MaterializedViewDataLoss
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_data_explorer__materialized_view_result
+    title: Azure Data Explorer Materialized View Result
+    context: data_explorer.materialized_view_result
+    family: Materialized Views
+    type: line
+    priority: 1410
+    units: status
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: MaterializedViewResult
+        aggregation: average
+        name: average
+
+  # ──────────────────────────────────────────────
+  # Partitioning
+  # ──────────────────────────────────────────────
+  - id: am_azure_data_explorer__partitioning_percentage
+    title: Azure Data Explorer Partitioning Percentage
+    context: data_explorer.partitioning_percentage
+    family: Partitioning
+    type: line
+    priority: 1420
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: PartitioningPercentage
+        aggregation: average
+        name: total
+      - metric: PartitioningPercentageHot
+        aggregation: average
+        name: hot
+
+  - id: am_azure_data_explorer__partitioned_records
+    title: Azure Data Explorer Processed Partitioned Records
+    context: data_explorer.partitioned_records
+    family: Partitioning
+    type: line
+    priority: 1430
+    units: records
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ProcessedPartitionedRecords
+        aggregation: average
+        name: average

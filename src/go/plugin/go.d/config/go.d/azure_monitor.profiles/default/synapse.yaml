@@ -1,0 +1,432 @@
+name: Azure Synapse Analytics Workspace
+resource_type: Microsoft.Synapse/workspaces
+metrics:
+  # Built-in SQL Pool
+  - name: BuiltinSqlPoolDataProcessedBytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BuiltinSqlPoolLoginAttempts
+    units: attempts/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: BuiltinSqlPoolRequestsEnded
+    units: requests/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Integration - Activity Runs
+  - name: IntegrationActivityRunsEnded
+    units: runs/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Integration - Link Connection
+  - name: IntegrationLinkConnectionEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: IntegrationLinkProcessedChangedRows
+    units: rows/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: IntegrationLinkProcessedDataVolume
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: IntegrationLinkProcessingLatencyInSeconds
+    units: seconds
+    aggregations: [average, maximum, minimum]
+    time_grain: PT1M
+  - name: IntegrationLinkTableEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Integration - Pipeline Runs
+  - name: IntegrationPipelineRunsEnded
+    units: runs/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Integration - Trigger Runs
+  - name: IntegrationTriggerRunsEnded
+    units: runs/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Streaming Job - Input Events
+  - name: SQLStreamingInputEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SQLStreamingInputEventBytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SQLStreamingInputEventsSourcesPerSecond
+    units: sources/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Streaming Job - Output Events
+  - name: SQLStreamingOutputEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Streaming Job - Event Timing
+  - name: SQLStreamingBackloggedInputEventSources
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SQLStreamingEarlyInputEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SQLStreamingLateInputEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SQLStreamingOutOfOrderEvents
+    units: events/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Streaming Job - Watermark
+  - name: SQLStreamingOutputWatermarkDelaySeconds
+    units: seconds
+    aggregations: [average, maximum, minimum]
+    time_grain: PT1M
+  # Streaming Job - Errors
+  - name: SQLStreamingConversionErrors
+    units: errors/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SQLStreamingDeserializationError
+    units: errors/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SQLStreamingRuntimeErrors
+    units: errors/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Streaming Job - Resources
+  - name: SQLStreamingResourceUtilization
+    units: percentage
+    aggregations: [average, maximum, minimum]
+    time_grain: PT1M
+charts:
+  # Built-in SQL Pool
+  - id: am_azure_synapse__builtin_sql_pool_data_processed
+    title: Azure Synapse Built-in SQL Pool Data Processed
+    context: synapse.builtin_sql_pool_data_processed
+    family: Built-in SQL Pool
+    type: line
+    priority: 1000
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BuiltinSqlPoolDataProcessedBytes
+        aggregation: total
+        name: processed
+
+  - id: am_azure_synapse__builtin_sql_pool_login_attempts
+    title: Azure Synapse Built-in SQL Pool Login Attempts
+    context: synapse.builtin_sql_pool_login_attempts
+    family: Built-in SQL Pool
+    type: line
+    priority: 1010
+    units: attempts/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BuiltinSqlPoolLoginAttempts
+        aggregation: total
+        name: login_attempts
+
+  - id: am_azure_synapse__builtin_sql_pool_requests
+    title: Azure Synapse Built-in SQL Pool Requests Ended
+    context: synapse.builtin_sql_pool_requests
+    family: Built-in SQL Pool
+    type: line
+    priority: 1020
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BuiltinSqlPoolRequestsEnded
+        aggregation: total
+        name: requests
+
+  # Integration - Activity Runs
+  - id: am_azure_synapse__activity_runs
+    title: Azure Synapse Activity Runs
+    context: synapse.activity_runs
+    family: Integration
+    type: line
+    priority: 1030
+    units: runs/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IntegrationActivityRunsEnded
+        aggregation: total
+        name: ended
+
+  # Integration - Pipeline Runs
+  - id: am_azure_synapse__pipeline_runs
+    title: Azure Synapse Pipeline Runs
+    context: synapse.pipeline_runs
+    family: Integration
+    type: line
+    priority: 1040
+    units: runs/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IntegrationPipelineRunsEnded
+        aggregation: total
+        name: ended
+
+  # Integration - Trigger Runs
+  - id: am_azure_synapse__trigger_runs
+    title: Azure Synapse Trigger Runs
+    context: synapse.trigger_runs
+    family: Integration
+    type: line
+    priority: 1050
+    units: runs/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IntegrationTriggerRunsEnded
+        aggregation: total
+        name: ended
+
+  # Integration - Link Connection Events
+  - id: am_azure_synapse__link_connection_events
+    title: Azure Synapse Link Connection Events
+    context: synapse.link_connection_events
+    family: Link
+    type: line
+    priority: 1060
+    units: events/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IntegrationLinkConnectionEvents
+        aggregation: total
+        name: events
+
+  # Integration - Link Table Events
+  - id: am_azure_synapse__link_table_events
+    title: Azure Synapse Link Table Events
+    context: synapse.link_table_events
+    family: Link
+    type: line
+    priority: 1070
+    units: events/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IntegrationLinkTableEvents
+        aggregation: total
+        name: events
+
+  # Integration - Link Processed Rows
+  - id: am_azure_synapse__link_processed_rows
+    title: Azure Synapse Link Processed Changed Rows
+    context: synapse.link_processed_rows
+    family: Link
+    type: line
+    priority: 1080
+    units: rows/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IntegrationLinkProcessedChangedRows
+        aggregation: total
+        name: changed_rows
+
+  # Integration - Link Data Volume
+  - id: am_azure_synapse__link_data_volume
+    title: Azure Synapse Link Processed Data Volume
+    context: synapse.link_data_volume
+    family: Link
+    type: line
+    priority: 1090
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IntegrationLinkProcessedDataVolume
+        aggregation: total
+        name: processed
+
+  # Integration - Link Latency
+  - id: am_azure_synapse__link_processing_latency
+    title: Azure Synapse Link Processing Latency
+    context: synapse.link_processing_latency
+    family: Link
+    type: line
+    priority: 1100
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IntegrationLinkProcessingLatencyInSeconds
+        aggregation: average
+        name: average
+
+  # Streaming Job - Event Flow
+  - id: am_azure_synapse__streaming_event_flow
+    title: Azure Synapse Streaming Event Flow
+    context: synapse.streaming_event_flow
+    family: Streaming Job
+    type: line
+    priority: 1110
+    units: events/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SQLStreamingInputEvents
+        aggregation: total
+        name: in
+      - metric: SQLStreamingOutputEvents
+        aggregation: total
+        name: out
+
+  # Streaming Job - Input Data Throughput
+  - id: am_azure_synapse__streaming_input_throughput
+    title: Azure Synapse Streaming Input Data Throughput
+    context: synapse.streaming_input_throughput
+    family: Streaming Job
+    type: line
+    priority: 1120
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SQLStreamingInputEventBytes
+        aggregation: total
+        name: received
+
+  # Streaming Job - Input Sources Received
+  - id: am_azure_synapse__streaming_input_sources
+    title: Azure Synapse Streaming Input Sources Received
+    context: synapse.streaming_input_sources
+    family: Streaming Job
+    type: line
+    priority: 1130
+    units: sources/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SQLStreamingInputEventsSourcesPerSecond
+        aggregation: total
+        name: received
+
+  # Streaming Job - Event Timing Issues
+  - id: am_azure_synapse__streaming_event_timing
+    title: Azure Synapse Streaming Event Timing Issues
+    context: synapse.streaming_event_timing
+    family: Streaming Job
+    type: line
+    priority: 1140
+    units: events/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SQLStreamingLateInputEvents
+        aggregation: total
+        name: late
+      - metric: SQLStreamingEarlyInputEvents
+        aggregation: total
+        name: early
+      - metric: SQLStreamingOutOfOrderEvents
+        aggregation: total
+        name: out_of_order
+      - metric: SQLStreamingBackloggedInputEventSources
+        aggregation: total
+        name: backlogged
+
+  # Streaming Job - Watermark Delay
+  - id: am_azure_synapse__streaming_watermark_delay
+    title: Azure Synapse Streaming Watermark Delay
+    context: synapse.streaming_watermark_delay
+    family: Streaming Job
+    type: line
+    priority: 1150
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SQLStreamingOutputWatermarkDelaySeconds
+        aggregation: maximum
+        name: delay
+
+  # Streaming Job - Errors
+  - id: am_azure_synapse__streaming_errors
+    title: Azure Synapse Streaming Errors
+    context: synapse.streaming_errors
+    family: Streaming Job
+    type: line
+    priority: 1160
+    units: errors/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SQLStreamingRuntimeErrors
+        aggregation: total
+        name: runtime
+      - metric: SQLStreamingConversionErrors
+        aggregation: total
+        name: data_conversion
+      - metric: SQLStreamingDeserializationError
+        aggregation: total
+        name: deserialization
+
+  # Streaming Job - Resource Utilization
+  - id: am_azure_synapse__streaming_resource_utilization
+    title: Azure Synapse Streaming Resource Utilization
+    context: synapse.streaming_resource_utilization
+    family: Streaming Job
+    type: line
+    priority: 1170
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SQLStreamingResourceUtilization
+        aggregation: average
+        name: utilization
