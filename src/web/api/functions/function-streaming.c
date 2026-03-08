@@ -173,7 +173,7 @@ static void streaming_topology_parent_presentation(BUFFER *wb) {
 
     buffer_json_member_add_object(wb, "tables");
     {
-        // inbound: children received by this parent (rows = children)
+        // inbound: all nodes this parent has data for (rows = all known hosts)
         buffer_json_member_add_object(wb, "inbound");
         {
             buffer_json_member_add_string(wb, "label", "Inbound");
@@ -183,6 +183,7 @@ static void streaming_topology_parent_presentation(BUFFER *wb) {
             buffer_json_member_add_array(wb, "columns");
             {
                 streaming_topology_emit_col(wb, "name", "Node", "actor_link");
+                streaming_topology_emit_col(wb, "received_from", "Source", "actor_link");
                 streaming_topology_emit_col(wb, "node_type", "Type", "badge");
                 streaming_topology_emit_col(wb, "ingest_status", "Ingest", "badge");
                 streaming_topology_emit_col(wb, "hops", "Hops", "number");
@@ -199,7 +200,7 @@ static void streaming_topology_parent_presentation(BUFFER *wb) {
         }
         buffer_json_object_close(wb);
 
-        // outbound: this parent's streaming to its parent (rows = destination parents)
+        // outbound: all nodes this parent streams to its parent (rows = all known hosts)
         buffer_json_member_add_object(wb, "outbound");
         {
             buffer_json_member_add_string(wb, "label", "Outbound");
@@ -207,18 +208,13 @@ static void streaming_topology_parent_presentation(BUFFER *wb) {
             buffer_json_member_add_uint64(wb, "order", 1);
             buffer_json_member_add_array(wb, "columns");
             {
-                streaming_topology_emit_col(wb, "name", "Destination", "actor_link");
+                streaming_topology_emit_col(wb, "name", "Node", "actor_link");
+                streaming_topology_emit_col(wb, "streamed_to", "Destination", "actor_link");
+                streaming_topology_emit_col(wb, "node_type", "Type", "badge");
                 streaming_topology_emit_col(wb, "stream_status", "Status", "badge");
-                streaming_topology_emit_col(wb, "stream_hops", "Hops", "number");
-                streaming_topology_emit_col(wb, "stream_since", "Since", "timestamp");
-                streaming_topology_emit_col(wb, "stream_age", "Age", "duration");
+                streaming_topology_emit_col(wb, "hops", "Hops", "number");
                 streaming_topology_emit_col(wb, "ssl", "SSL", "badge");
                 streaming_topology_emit_col(wb, "compression", "Compression", "badge");
-                streaming_topology_emit_col(wb, "repl_completion", "Replication", "number");
-                streaming_topology_emit_col(wb, "bytes_data", "Data", "bytes");
-                streaming_topology_emit_col(wb, "bytes_metadata", "Metadata", "bytes");
-                streaming_topology_emit_col(wb, "bytes_replication", "Repl Traffic", "bytes");
-                streaming_topology_emit_col(wb, "bytes_functions", "Functions", "bytes");
             }
             buffer_json_array_close(wb);
         }
@@ -766,188 +762,187 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                         {
                             bool is_observer = (host == localhost);
 
-                            // PARENT tables: inbound (children), outbound (streaming to parent), retention
+                            // PARENT tables: inbound, outbound, retention
                             if(child_count > 0) {
-                                // inbound table: rows = children received by this parent
-                                buffer_json_member_add_array(wb, "inbound");
-                                {
-                                    RRDHOST *child_host;
-                                    dfe_start_read(rrdhost_root_index, child_host) {
-                                        if(child_host == host)
-                                            continue;
+                                // inbound table: ALL nodes this parent has data for
+                                if(is_observer) {
+                                    buffer_json_member_add_array(wb, "inbound");
+                                    {
+                                        RRDHOST *ih;
+                                        dfe_start_read(rrdhost_root_index, ih) {
+                                            char ih_actor_id[256];
+                                            streaming_topology_actor_id_for_host(ih, ih_actor_id, sizeof(ih_actor_id));
 
-                                        bool is_child_vnode = rrdhost_is_virtual(child_host);
-                                        ND_UUID child_link_ids[2];
-                                        uint16_t child_link_n = streaming_topology_get_path_ids(child_host, 0, child_link_ids, 2);
+                                            RRDHOST_STATUS ihs;
+                                            rrdhost_status(ih, now, &ihs, RRDHOST_STATUS_ALL);
 
-                                        bool is_my_child = false;
-                                        const char *child_node_type = "stale";
-
-                                        if(is_child_vnode && child_link_n >= 2) {
-                                            char guid[UUID_STR_LEN];
-                                            uuid_unparse_lower(child_link_ids[0].uuid, guid);
-                                            if(strcmp(guid, host->machine_guid) == 0) {
-                                                is_my_child = true;
-                                                child_node_type = "vnode";
+                                            // determine node type
+                                            const char *ih_node_type;
+                                            if(rrdhost_is_virtual(ih))
+                                                ih_node_type = "vnode";
+                                            else if(ih != localhost && ihs.ingest.status == RRDHOST_INGEST_STATUS_ARCHIVED)
+                                                ih_node_type = "stale";
+                                            else {
+                                                uint32_t *cc = dictionary_get(parent_child_count, ih->machine_guid);
+                                                ih_node_type = (cc && *cc > 0) ? "parent" : "child";
                                             }
-                                        }
-                                        else if(!is_child_vnode && child_link_n >= 2) {
-                                            char guid[UUID_STR_LEN];
-                                            uuid_unparse_lower(child_link_ids[1].uuid, guid);
-                                            if(strcmp(guid, host->machine_guid) == 0) {
-                                                is_my_child = true;
-                                                uint32_t *ccc = dictionary_get(parent_child_count, child_host->machine_guid);
-                                                child_node_type = (ccc && *ccc > 0) ? "parent" : "child";
+
+                                            // determine source: who sends this host's data to us
+                                            const char *src_hostname = NULL;
+                                            char src_actor_id[256] = "";
+                                            if(ih == host) {
+                                                src_hostname = "local";
                                             }
-                                        }
-
-                                        if(!is_my_child && host == localhost && child_link_n < 2 && !is_child_vnode) {
-                                            is_my_child = true;
-                                            child_node_type = "stale";
-                                        }
-
-                                        if(is_my_child) {
-                                            char child_actor_id[256];
-                                            streaming_topology_actor_id_for_host(child_host, child_actor_id, sizeof(child_actor_id));
-
-                                            buffer_json_add_array_item_object(wb);
-                                            buffer_json_member_add_string(wb, "name", rrdhost_hostname(child_host));
-                                            buffer_json_member_add_string(wb, "name_id", child_actor_id);
-                                            buffer_json_member_add_string(wb, "node_type", child_node_type);
-
-                                            if(is_observer) {
-                                                RRDHOST_STATUS cs;
-                                                rrdhost_status(child_host, now, &cs, RRDHOST_STATUS_ALL);
-
-                                                buffer_json_member_add_string(wb, "ingest_status", rrdhost_ingest_status_to_string(cs.ingest.status));
-                                                buffer_json_member_add_int64(wb, "hops", cs.ingest.hops);
-                                                buffer_json_member_add_uint64(wb, "collected_metrics", cs.ingest.collected.metrics);
-                                                buffer_json_member_add_uint64(wb, "collected_instances", cs.ingest.collected.instances);
-                                                buffer_json_member_add_uint64(wb, "collected_contexts", cs.ingest.collected.contexts);
-                                                buffer_json_member_add_double(wb, "repl_completion", cs.ingest.replication.completion);
-                                                buffer_json_member_add_time_t(wb, "ingest_age", cs.ingest.since ? cs.now - cs.ingest.since : 0);
-                                                buffer_json_member_add_string(wb, "ssl", cs.ingest.ssl ? "SSL" : "PLAIN");
-                                                buffer_json_member_add_uint64(wb, "alerts_critical",
-                                                    cs.health.status == RRDHOST_HEALTH_STATUS_RUNNING ? cs.health.alerts.critical : 0);
-                                                buffer_json_member_add_uint64(wb, "alerts_warning",
-                                                    cs.health.status == RRDHOST_HEALTH_STATUS_RUNNING ? cs.health.alerts.warning : 0);
+                                            else if(rrdhost_is_virtual(ih)) {
+                                                src_hostname = "local";
                                             }
                                             else {
-                                                buffer_json_member_add_string(wb, "ingest_status", "online");
+                                                ND_UUID ih_path[128];
+                                                uint16_t ih_pn = streaming_topology_get_path_ids(ih, 0, ih_path, 128);
+                                                for(uint16_t pi = 0; pi < ih_pn; pi++) {
+                                                    if(UUIDeq(ih_path[pi], host->host_id) && pi > 0) {
+                                                        char guid[UUID_STR_LEN];
+                                                        uuid_unparse_lower(ih_path[pi - 1].uuid, guid);
+                                                        snprintf(src_actor_id, sizeof(src_actor_id), "netdata-machine-guid:%s", guid);
+                                                        RRDHOST *src = rrdhost_find_by_guid(guid);
+                                                        src_hostname = src ? rrdhost_hostname(src) : guid;
+                                                        break;
+                                                    }
+                                                }
+                                                if(!src_hostname) src_hostname = "unknown";
                                             }
 
+                                            buffer_json_add_array_item_object(wb);
+                                            buffer_json_member_add_string(wb, "name", rrdhost_hostname(ih));
+                                            buffer_json_member_add_string(wb, "name_id", ih_actor_id);
+                                            buffer_json_member_add_string(wb, "received_from", src_hostname);
+                                            if(src_actor_id[0])
+                                                buffer_json_member_add_string(wb, "received_from_id", src_actor_id);
+                                            buffer_json_member_add_string(wb, "node_type", ih_node_type);
+                                            buffer_json_member_add_string(wb, "ingest_status", rrdhost_ingest_status_to_string(ihs.ingest.status));
+                                            buffer_json_member_add_int64(wb, "hops", ihs.ingest.hops);
+                                            buffer_json_member_add_uint64(wb, "collected_metrics", ihs.ingest.collected.metrics);
+                                            buffer_json_member_add_uint64(wb, "collected_instances", ihs.ingest.collected.instances);
+                                            buffer_json_member_add_uint64(wb, "collected_contexts", ihs.ingest.collected.contexts);
+                                            buffer_json_member_add_double(wb, "repl_completion", ihs.ingest.replication.completion);
+                                            buffer_json_member_add_time_t(wb, "ingest_age", ihs.ingest.since ? ihs.now - ihs.ingest.since : 0);
+                                            buffer_json_member_add_string(wb, "ssl", ihs.ingest.ssl ? "SSL" : "PLAIN");
+                                            buffer_json_member_add_uint64(wb, "alerts_critical",
+                                                ihs.health.status == RRDHOST_HEALTH_STATUS_RUNNING ? ihs.health.alerts.critical : 0);
+                                            buffer_json_member_add_uint64(wb, "alerts_warning",
+                                                ihs.health.status == RRDHOST_HEALTH_STATUS_RUNNING ? ihs.health.alerts.warning : 0);
                                             buffer_json_object_close(wb);
                                         }
+                                        dfe_done(ih);
                                     }
-                                    dfe_done(child_host);
+                                    buffer_json_array_close(wb); // inbound
                                 }
-                                buffer_json_array_close(wb); // inbound
 
-                                // retention table on parent: rows = children with DB retention
+                                // retention table: ALL nodes with DB retention (including localhost)
                                 if(is_observer) {
                                     buffer_json_member_add_array(wb, "retention");
                                     {
-                                        RRDHOST *child_host;
-                                        dfe_start_read(rrdhost_root_index, child_host) {
-                                            if(child_host == host)
+                                        RRDHOST *rh;
+                                        dfe_start_read(rrdhost_root_index, rh) {
+                                            RRDHOST_STATUS rs;
+                                            rrdhost_status(rh, now, &rs, RRDHOST_STATUS_ALL);
+
+                                            if(!rs.db.first_time_s && !rs.db.last_time_s)
                                                 continue;
 
-                                            RRDHOST_STATUS cs;
-                                            rrdhost_status(child_host, now, &cs, RRDHOST_STATUS_ALL);
-
-                                            if(!cs.db.first_time_s && !cs.db.last_time_s)
-                                                continue;
-
-                                            char child_actor_id[256];
-                                            streaming_topology_actor_id_for_host(child_host, child_actor_id, sizeof(child_actor_id));
+                                            char rh_actor_id[256];
+                                            streaming_topology_actor_id_for_host(rh, rh_actor_id, sizeof(rh_actor_id));
 
                                             buffer_json_add_array_item_object(wb);
-                                            buffer_json_member_add_string(wb, "name", rrdhost_hostname(child_host));
-                                            buffer_json_member_add_string(wb, "name_id", child_actor_id);
-                                            buffer_json_member_add_string(wb, "db_status", rrdhost_db_status_to_string(cs.db.status));
-                                            buffer_json_member_add_uint64(wb, "db_from", cs.db.first_time_s * MSEC_PER_SEC);
-                                            buffer_json_member_add_uint64(wb, "db_to", cs.db.last_time_s * MSEC_PER_SEC);
-                                            if(cs.db.first_time_s && cs.db.last_time_s && cs.db.last_time_s > cs.db.first_time_s)
-                                                buffer_json_member_add_uint64(wb, "db_duration", cs.db.last_time_s - cs.db.first_time_s);
+                                            buffer_json_member_add_string(wb, "name", rrdhost_hostname(rh));
+                                            buffer_json_member_add_string(wb, "name_id", rh_actor_id);
+                                            buffer_json_member_add_string(wb, "db_status", rrdhost_db_status_to_string(rs.db.status));
+                                            buffer_json_member_add_uint64(wb, "db_from", rs.db.first_time_s * MSEC_PER_SEC);
+                                            buffer_json_member_add_uint64(wb, "db_to", rs.db.last_time_s * MSEC_PER_SEC);
+                                            if(rs.db.first_time_s && rs.db.last_time_s && rs.db.last_time_s > rs.db.first_time_s)
+                                                buffer_json_member_add_uint64(wb, "db_duration", rs.db.last_time_s - rs.db.first_time_s);
                                             else
                                                 buffer_json_member_add_uint64(wb, "db_duration", 0);
-                                            buffer_json_member_add_uint64(wb, "db_metrics", cs.db.metrics);
-                                            buffer_json_member_add_uint64(wb, "db_instances", cs.db.instances);
-                                            buffer_json_member_add_uint64(wb, "db_contexts", cs.db.contexts);
+                                            buffer_json_member_add_uint64(wb, "db_metrics", rs.db.metrics);
+                                            buffer_json_member_add_uint64(wb, "db_instances", rs.db.instances);
+                                            buffer_json_member_add_uint64(wb, "db_contexts", rs.db.contexts);
                                             buffer_json_object_close(wb);
                                         }
-                                        dfe_done(child_host);
+                                        dfe_done(rh);
                                     }
                                     buffer_json_array_close(wb); // retention
                                 }
                             }
 
-                            // outbound table: this actor's streaming to its parent + vnodes it originates
+                            // outbound table: ALL nodes this actor streams to its parent
                             if(is_observer && s.stream.status != RRDHOST_STREAM_STATUS_DISABLED) {
+                                // find our streaming destination
+                                const char *dst_hostname = NULL;
+                                char dst_actor_id[256] = "";
+                                {
+                                    ND_UUID path_ids[16];
+                                    uint16_t n_ids = rrdhost_stream_path_get_host_ids(host, 0, path_ids, 16);
+                                    for(uint16_t pi = 0; pi < n_ids; pi++) {
+                                        if(!UUIDeq(path_ids[pi], host->host_id)) {
+                                            char guid[UUID_STR_LEN];
+                                            uuid_unparse_lower(path_ids[pi].uuid, guid);
+                                            snprintf(dst_actor_id, sizeof(dst_actor_id), "netdata-machine-guid:%s", guid);
+                                            RRDHOST *dst_host = rrdhost_find_by_guid(guid);
+                                            if(dst_host)
+                                                dst_hostname = rrdhost_hostname(dst_host);
+                                            break;
+                                        }
+                                    }
+                                    if(!dst_hostname) dst_hostname = s.stream.peers.peer.ip;
+                                }
+
                                 buffer_json_member_add_array(wb, "outbound");
                                 {
-                                    // row 1: destination parent
-                                    buffer_json_add_array_item_object(wb);
-                                    {
-                                        // find destination parent from streaming path
-                                        const char *dst_hostname = NULL;
-                                        char dst_actor_id[256] = "";
-                                        ND_UUID path_ids[16];
-                                        uint16_t n_ids = rrdhost_stream_path_get_host_ids(host, 0, path_ids, 16);
-                                        for(uint16_t pi = 0; pi < n_ids; pi++) {
-                                            if(!UUIDeq(path_ids[pi], host->host_id)) {
-                                                char guid[UUID_STR_LEN];
-                                                uuid_unparse_lower(path_ids[pi].uuid, guid);
-                                                snprintf(dst_actor_id, sizeof(dst_actor_id), "netdata-machine-guid:%s", guid);
-                                                RRDHOST *dst_host = rrdhost_find_by_guid(guid);
-                                                if(dst_host)
-                                                    dst_hostname = rrdhost_hostname(dst_host);
-                                                break;
+                                    RRDHOST *oh;
+                                    dfe_start_read(rrdhost_root_index, oh) {
+                                        char oh_actor_id[256];
+                                        streaming_topology_actor_id_for_host(oh, oh_actor_id, sizeof(oh_actor_id));
+
+                                        // determine node type
+                                        const char *oh_node_type;
+                                        if(rrdhost_is_virtual(oh))
+                                            oh_node_type = "vnode";
+                                        else if(oh != localhost) {
+                                            RRDHOST_STATUS ohs;
+                                            rrdhost_status(oh, now, &ohs, RRDHOST_STATUS_ALL);
+                                            if(ohs.ingest.status == RRDHOST_INGEST_STATUS_ARCHIVED)
+                                                oh_node_type = "stale";
+                                            else {
+                                                uint32_t *cc = dictionary_get(parent_child_count, oh->machine_guid);
+                                                oh_node_type = (cc && *cc > 0) ? "parent" : "child";
                                             }
                                         }
-
-                                        buffer_json_member_add_string(wb, "name", dst_hostname ? dst_hostname : s.stream.peers.peer.ip);
-                                        if(dst_actor_id[0])
-                                            buffer_json_member_add_string(wb, "name_id", dst_actor_id);
-                                        buffer_json_member_add_string(wb, "stream_status", rrdhost_streaming_status_to_string(s.stream.status));
-                                        buffer_json_member_add_uint64(wb, "stream_hops", s.stream.hops);
-                                        if(s.stream.since) {
-                                            buffer_json_member_add_uint64(wb, "stream_since", s.stream.since * MSEC_PER_SEC);
-                                            buffer_json_member_add_time_t(wb, "stream_age", s.now - s.stream.since);
+                                        else {
+                                            uint32_t *cc = dictionary_get(parent_child_count, oh->machine_guid);
+                                            oh_node_type = (cc && *cc > 0) ? "parent" : "child";
                                         }
-                                        buffer_json_member_add_string(wb, "ssl", s.stream.ssl ? "SSL" : "PLAIN");
-                                        buffer_json_member_add_string(wb, "compression", s.stream.compression ? "COMPRESSED" : "UNCOMPRESSED");
-                                        buffer_json_member_add_double(wb, "repl_completion", s.stream.replication.completion);
-                                        buffer_json_member_add_uint64(wb, "bytes_data", s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_DATA]);
-                                        buffer_json_member_add_uint64(wb, "bytes_metadata", s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_METADATA]);
-                                        buffer_json_member_add_uint64(wb, "bytes_replication", s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_REPLICATION]);
-                                        buffer_json_member_add_uint64(wb, "bytes_functions", s.stream.sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_FUNCTIONS]);
-                                    }
-                                    buffer_json_object_close(wb);
-
-                                    // additional rows: vnodes originated by this parent
-                                    RRDHOST *vn_host;
-                                    dfe_start_read(rrdhost_root_index, vn_host) {
-                                        if(!rrdhost_is_virtual(vn_host))
-                                            continue;
-
-                                        // check if this vnode originates from us (path[0] == our host_id)
-                                        ND_UUID vn_origin[1];
-                                        uint16_t vn_n = streaming_topology_get_path_ids(vn_host, 0, vn_origin, 1);
-                                        if(vn_n < 1 || !UUIDeq(vn_origin[0], host->host_id))
-                                            continue;
-
-                                        char vn_actor_id[256];
-                                        streaming_topology_actor_id_for_host(vn_host, vn_actor_id, sizeof(vn_actor_id));
 
                                         buffer_json_add_array_item_object(wb);
-                                        buffer_json_member_add_string(wb, "name", rrdhost_hostname(vn_host));
-                                        buffer_json_member_add_string(wb, "name_id", vn_actor_id);
-                                        buffer_json_member_add_string(wb, "stream_status", "virtual");
-                                        buffer_json_member_add_uint64(wb, "stream_hops", 0);
+                                        buffer_json_member_add_string(wb, "name", rrdhost_hostname(oh));
+                                        buffer_json_member_add_string(wb, "name_id", oh_actor_id);
+                                        buffer_json_member_add_string(wb, "streamed_to", dst_hostname);
+                                        if(dst_actor_id[0])
+                                            buffer_json_member_add_string(wb, "streamed_to_id", dst_actor_id);
+                                        buffer_json_member_add_string(wb, "node_type", oh_node_type);
+
+                                        if(oh == host) {
+                                            buffer_json_member_add_string(wb, "stream_status", rrdhost_streaming_status_to_string(s.stream.status));
+                                            buffer_json_member_add_uint64(wb, "hops", s.stream.hops);
+                                            buffer_json_member_add_string(wb, "ssl", s.stream.ssl ? "SSL" : "PLAIN");
+                                            buffer_json_member_add_string(wb, "compression", s.stream.compression ? "COMPRESSED" : "UNCOMPRESSED");
+                                        }
+                                        else {
+                                            buffer_json_member_add_string(wb, "stream_status", oh_node_type);
+                                        }
+
                                         buffer_json_object_close(wb);
                                     }
-                                    dfe_done(vn_host);
+                                    dfe_done(oh);
                                 }
                                 buffer_json_array_close(wb); // outbound
                             }
