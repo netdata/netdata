@@ -3090,6 +3090,7 @@ if(OS_WINDOWS)
         target_compile_options(NetdataClaim PUBLIC -mwindows)
 
         set(NETDATA_DRIVER_FILE "${CMAKE_BINARY_DIR}/netdata_driver.sys")
+        set(NETDATA_DRIVER_FILE_INF "${CMAKE_BINARY_DIR}/netdata_driver.inf")
 
         add_library(netdata_driver SHARED ${WINDOWS_PLUGIN_DRIVER})
         set_target_properties(netdata_driver PROPERTIES LIBRARY_OUTPUT_NAME "netdata_driver")
@@ -3116,6 +3117,10 @@ if(OS_WINDOWS)
 
         install(FILES "${NETDATA_DRIVER_FILE}"
                 COMPONENT netdata_driver
+                DESTINATION "${BINDIR}")
+
+        install(FILES "${NETDATA_DRIVER_FILE_INF}"
+                COMPONENT netdata_driver_inf
                 DESTINATION "${BINDIR}")
 endif()
 
