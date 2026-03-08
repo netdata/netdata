@@ -978,13 +978,13 @@ charts:
         aggregation: maximum
         name: idle
 
-  - id: am_azure_postgres_flexible__pgbouncer_pools
-    title: Azure PostgreSQL Flexible Server PgBouncer Pools
-    context: postgres_flexible.pgbouncer_pools
+  - id: am_azure_postgres_flexible__pgbouncer_pool_count
+    title: Azure PostgreSQL Flexible Server PgBouncer Pool Count
+    context: postgres_flexible.pgbouncer_pool_count
     family: PgBouncer
     type: line
     priority: 1370
-    units: connections
+    units: pools
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
@@ -993,6 +993,19 @@ charts:
       - metric: num_pools
         aggregation: maximum
         name: pools
+
+  - id: am_azure_postgres_flexible__pgbouncer_pooled_connections
+    title: Azure PostgreSQL Flexible Server PgBouncer Pooled Connections
+    context: postgres_flexible.pgbouncer_pooled_connections
+    family: PgBouncer
+    type: line
+    priority: 1375
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
       - metric: total_pooled_connections
         aggregation: maximum
         name: pooled_connections

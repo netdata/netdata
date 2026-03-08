@@ -544,13 +544,13 @@ charts:
         aggregation: average
         name: available_mbytes_memory
 
-  - id: am_azure_log_analytics__legacy_memory_used
-    title: Azure Log Analytics Legacy Used Memory
-    context: log_analytics.legacy_memory_used
+  - id: am_azure_log_analytics__legacy_memory_used_kbytes
+    title: Azure Log Analytics Legacy Used Memory (kBytes)
+    context: log_analytics.legacy_memory_used_kbytes
     family: "Legacy: Memory"
     type: line
     priority: 1120
-    units: megabytes
+    units: kilobytes
     algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
@@ -558,10 +558,23 @@ charts:
     dimensions:
       - metric: "Average_Used Memory kBytes"
         aggregation: average
-        name: used_kbytes
+        name: used
+
+  - id: am_azure_log_analytics__legacy_memory_used_mbytes
+    title: Azure Log Analytics Legacy Used Memory (MBytes)
+    context: log_analytics.legacy_memory_used_mbytes
+    family: "Legacy: Memory"
+    type: line
+    priority: 1125
+    units: megabytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
       - metric: "Average_Used Memory MBytes"
         aggregation: average
-        name: used_mbytes
+        name: used
 
   - id: am_azure_log_analytics__legacy_memory_free
     title: Azure Log Analytics Legacy Free Memory

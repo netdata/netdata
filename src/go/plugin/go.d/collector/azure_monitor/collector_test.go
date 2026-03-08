@@ -306,7 +306,7 @@ func TestCollector_InitAutoDiscoverWithExplicit(t *testing.T) {
 	assert.Contains(t, c.Config.Profiles, "postgres_flexible")
 }
 
-func TestCollector_InitEmptyProfilesFails(t *testing.T) {
+func TestCollector_InitEmptyProfilesDefaultsToAuto(t *testing.T) {
 	c := New()
 	c.Config = testConfig()
 	c.Config.Profiles = []string{}
@@ -319,7 +319,7 @@ func TestCollector_InitEmptyProfilesFails(t *testing.T) {
 
 	err := c.Init(context.Background())
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no profiles configured")
+	assert.Contains(t, err.Error(), "auto-discovery found no Azure resources")
 }
 
 func TestCollector_InitAutoDiscoverNoMatchFails(t *testing.T) {

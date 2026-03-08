@@ -128,6 +128,9 @@ func (c *Config) applyDefaults() {
 	if c.MaxMetricsPerQuery <= 0 {
 		c.MaxMetricsPerQuery = defaultMaxMetricsQuery
 	}
+	if len(c.Profiles) == 0 {
+		c.Profiles = []string{"auto"}
+	}
 	if strings.TrimSpace(c.Auth.Mode) == "" {
 		c.Auth.Mode = authModeDefault
 	}

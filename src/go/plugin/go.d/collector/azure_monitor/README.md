@@ -17,7 +17,7 @@ and collects metrics in 1-minute or coarser native Azure time grains.
 
 ### Important options
 
-- `profiles`: profile file keys to enable (defaults to all stock profiles).
+- `profiles`: profile file keys to enable (defaults to `auto` — discovers resource types in the subscription and activates matching profiles).
 - `resource_groups`: optional backend filter.
 - `query_offset`: defaults to 180s to avoid partial Azure windows.
 - `max_concurrency`: bounded concurrent batch calls.
@@ -59,15 +59,17 @@ jobs:
 
 ## Built-in profiles
 
-- `sql_managed_instance`
-- `sql_database`
-- `postgres_flexible`
-- `cosmos_db`
-- `logic_apps`
-- `virtual_machines`
-- `aks`
-- `storage_accounts`
-- `load_balancers`
+38 stock profiles covering common Azure services:
+
+`aks`, `api_management`, `app_service`, `application_gateway`, `application_insights`,
+`cognitive_services`, `container_apps`, `container_instances`, `container_registry`,
+`cosmos_db`, `data_explorer`, `data_factory`, `event_grid`, `event_hubs`,
+`express_route_circuit`, `express_route_gateway`, `firewall`, `front_door`,
+`iot_hub`, `key_vault`, `load_balancers`, `log_analytics`, `logic_apps`,
+`machine_learning`, `mysql_flexible`, `nat_gateway`, `postgres_flexible`,
+`redis_cache`, `service_bus`, `sql_database`, `sql_elastic_pool`,
+`sql_managed_instance`, `storage_accounts`, `stream_analytics`, `synapse`,
+`virtual_machines`, `vmss`, `vpn_gateway`
 
 ## Profile files
 

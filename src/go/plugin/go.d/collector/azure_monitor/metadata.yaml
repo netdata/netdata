@@ -846,12 +846,17 @@ modules:
               dimensions:
                 - name: active
                 - name: idle
-            - name: postgres_flexible.pgbouncer_pools
-              description: Azure PostgreSQL Flexible Server PgBouncer Pools
-              unit: connections
+            - name: postgres_flexible.pgbouncer_pool_count
+              description: Azure PostgreSQL Flexible Server PgBouncer Pool Count
+              unit: pools
               chart_type: line
               dimensions:
                 - name: pools
+            - name: postgres_flexible.pgbouncer_pooled_connections
+              description: Azure PostgreSQL Flexible Server PgBouncer Pooled Connections
+              unit: connections
+              chart_type: line
+              dimensions:
                 - name: pooled_connections
             - name: postgres_flexible.cpu_credits
               description: Azure PostgreSQL Flexible Server CPU Credits
@@ -7405,13 +7410,18 @@ modules:
               dimensions:
                 - name: available_mbytes
                 - name: available_mbytes_memory
-            - name: log_analytics.legacy_memory_used
-              description: Azure Log Analytics Legacy Used Memory
+            - name: log_analytics.legacy_memory_used_kbytes
+              description: Azure Log Analytics Legacy Used Memory (kBytes)
+              unit: kilobytes
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: log_analytics.legacy_memory_used_mbytes
+              description: Azure Log Analytics Legacy Used Memory (MBytes)
               unit: megabytes
               chart_type: line
               dimensions:
-                - name: used_kbytes
-                - name: used_mbytes
+                - name: used
             - name: log_analytics.legacy_memory_free
               description: Azure Log Analytics Legacy Free Memory
               unit: megabytes

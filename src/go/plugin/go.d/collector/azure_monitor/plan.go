@@ -161,9 +161,13 @@ func buildProfileRuntime(p ProfileConfig) (*profileRuntime, error) {
 			acc := algo == "incremental"
 			key := metricKey + "\x00" + agg
 			if prev, exists := seenAggAlgo[key]; exists && prev.accumulate != acc {
+				prevAlgo, curAlgo := "absolute", "incremental"
+				if prev.accumulate {
+					prevAlgo, curAlgo = "incremental", "absolute"
+				}
 				return nil, fmt.Errorf(
-					"metric %q aggregation %q used with conflicting algorithms in charts %q (incremental) and %q (absolute)",
-					dim.Metric, agg, prev.chartID, ch.ID,
+					"metric %q aggregation %q used with conflicting algorithms in charts %q (%s) and %q (%s)",
+					dim.Metric, agg, prev.chartID, prevAlgo, ch.ID, curAlgo,
 				)
 			}
 			seenAggAlgo[key] = aggAlgo{accumulate: acc, chartID: ch.ID}
