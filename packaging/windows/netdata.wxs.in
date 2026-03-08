@@ -178,6 +178,7 @@
             </UI>
 
             <StandardDirectory Id="System64Folder">
+                <Directory Id="DRIVERDIR" Name="drivers" />
             </StandardDirectory>
 
             <StandardDirectory Id="WindowsFolder">
@@ -265,7 +266,7 @@
 
             <!-- Install netdata driver file -->
             <FeatureGroup Id="NetdataDriver">
-                <File Id="NetdataDrv" Name="netdata_driver.sys" Directory="System64Folder" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" Condition="NDDRVINST=1">
+                <File Id="NetdataDrv" Name="netdata_driver.sys" Directory="DRIVERDIR" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" Condition="NDDRVINST=1">
                 </File>
                 <File Id="NetdataDrvInf" Name="netdata_driver.inf" Directory="INFDIR" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.inf" Condition="NDDRVINST=1">
                 </File>
