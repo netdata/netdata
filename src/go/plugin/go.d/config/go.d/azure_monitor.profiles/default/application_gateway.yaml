@@ -499,3 +499,19 @@ charts:
       - metric: AzwafPenaltyBoxSize
         aggregation: average
         name: size
+
+  - id: am_azure_application_gateway__waf_penalty_box_hits
+    title: Azure Application Gateway WAF Penalty Box Hits
+    context: application_gateway.waf_penalty_box_hits
+    family: WAF
+    type: line
+    priority: 1099
+    units: hits/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AzwafPenaltyBoxHits
+        aggregation: total
+        name: total

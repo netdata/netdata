@@ -110,6 +110,96 @@ metrics:
     units: clients
     aggregations: [maximum]
     time_grain: PT1M
+  # Instance-Based Cache (per-instance breakdowns)
+  - name: allcachehits
+    units: hits/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: allcachemisses
+    units: misses/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: allcacheRead
+    units: bytes/s
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: allcacheWrite
+    units: bytes/s
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: allserverLoad
+    units: percentage
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: allpercentprocessortime
+    units: percentage
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: allusedmemory
+    units: bytes
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: allusedmemorypercentage
+    units: percentage
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: allusedmemoryRss
+    units: bytes
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: allconnectedclients
+    units: clients
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: alloperationsPerSecond
+    units: operations/s
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: alltotalcommandsprocessed
+    units: commands/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: allgetcommands
+    units: commands/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: allsetcommands
+    units: commands/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: alltotalkeys
+    units: keys
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: allevictedkeys
+    units: keys/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: allexpiredkeys
+    units: keys/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Geo-Replication
+  - name: GeoReplicationConnectivityLag
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: GeoReplicationDataSyncOffset
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: GeoReplicationFullSyncEventFinished
+    units: events/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: GeoReplicationFullSyncEventStarted
+    units: events/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: GeoReplicationHealthy
+    units: status
+    aggregations: [average]
+    time_grain: PT1M
 charts:
   - id: am_azure_redis_cache__cache_hits
     title: Azure Cache for Redis Hit Rate
@@ -416,3 +506,251 @@ charts:
       - metric: ConnectedClientsUsingAADToken
         aggregation: maximum
         name: maximum
+
+  - id: am_azure_redis_cache__instance_cache_hits
+    title: Azure Cache for Redis Instance Hit Rate
+    context: redis_cache.instance_cache_hits
+    family: Instance Cache
+    type: line
+    priority: 1180
+    units: operations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: allcachehits
+        aggregation: total
+        name: hits
+      - metric: allcachemisses
+        aggregation: total
+        name: misses
+
+  - id: am_azure_redis_cache__instance_throughput
+    title: Azure Cache for Redis Instance Throughput
+    context: redis_cache.instance_throughput
+    family: Instance Cache
+    type: line
+    priority: 1190
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: allcacheRead
+        aggregation: maximum
+        name: read
+      - metric: allcacheWrite
+        aggregation: maximum
+        name: write
+
+  - id: am_azure_redis_cache__instance_server_load
+    title: Azure Cache for Redis Instance Server Load
+    context: redis_cache.instance_server_load
+    family: Instance Server
+    type: line
+    priority: 1200
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: allserverLoad
+        aggregation: maximum
+        name: server_load
+      - metric: allpercentprocessortime
+        aggregation: maximum
+        name: cpu
+
+  - id: am_azure_redis_cache__instance_memory_usage
+    title: Azure Cache for Redis Instance Memory Usage
+    context: redis_cache.instance_memory_usage
+    family: Instance Memory
+    type: line
+    priority: 1210
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: allusedmemory
+        aggregation: maximum
+        name: used
+      - metric: allusedmemoryRss
+        aggregation: maximum
+        name: rss
+
+  - id: am_azure_redis_cache__instance_memory_utilization
+    title: Azure Cache for Redis Instance Memory Utilization
+    context: redis_cache.instance_memory_utilization
+    family: Instance Memory
+    type: line
+    priority: 1220
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: allusedmemorypercentage
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_redis_cache__instance_clients
+    title: Azure Cache for Redis Instance Connected Clients
+    context: redis_cache.instance_clients
+    family: Instance Clients
+    type: line
+    priority: 1230
+    units: clients
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: allconnectedclients
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_redis_cache__instance_operations
+    title: Azure Cache for Redis Instance Operations
+    context: redis_cache.instance_operations
+    family: Instance Operations
+    type: line
+    priority: 1240
+    units: operations/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: alloperationsPerSecond
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_redis_cache__instance_commands
+    title: Azure Cache for Redis Instance Commands Processed
+    context: redis_cache.instance_commands
+    family: Instance Operations
+    type: line
+    priority: 1250
+    units: commands/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: alltotalcommandsprocessed
+        aggregation: total
+        name: total
+      - metric: allgetcommands
+        aggregation: total
+        name: get
+      - metric: allsetcommands
+        aggregation: total
+        name: set
+
+  - id: am_azure_redis_cache__instance_total_keys
+    title: Azure Cache for Redis Instance Total Keys
+    context: redis_cache.instance_total_keys
+    family: Instance Keys
+    type: line
+    priority: 1260
+    units: keys
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: alltotalkeys
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_redis_cache__instance_key_events
+    title: Azure Cache for Redis Instance Key Events
+    context: redis_cache.instance_key_events
+    family: Instance Keys
+    type: line
+    priority: 1270
+    units: keys/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: allevictedkeys
+        aggregation: total
+        name: evicted
+      - metric: allexpiredkeys
+        aggregation: total
+        name: expired
+
+  - id: am_azure_redis_cache__geo_replication_lag
+    title: Azure Cache for Redis Geo-Replication Connectivity Lag
+    context: redis_cache.geo_replication_lag
+    family: Geo-Replication
+    type: line
+    priority: 1280
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: GeoReplicationConnectivityLag
+        aggregation: average
+        name: average
+
+  - id: am_azure_redis_cache__geo_replication_sync_offset
+    title: Azure Cache for Redis Geo-Replication Data Sync Offset
+    context: redis_cache.geo_replication_sync_offset
+    family: Geo-Replication
+    type: line
+    priority: 1290
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: GeoReplicationDataSyncOffset
+        aggregation: average
+        name: average
+
+  - id: am_azure_redis_cache__geo_replication_sync_events
+    title: Azure Cache for Redis Geo-Replication Sync Events
+    context: redis_cache.geo_replication_sync_events
+    family: Geo-Replication
+    type: line
+    priority: 1300
+    units: events/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: GeoReplicationFullSyncEventStarted
+        aggregation: count
+        name: started
+      - metric: GeoReplicationFullSyncEventFinished
+        aggregation: count
+        name: finished
+
+  - id: am_azure_redis_cache__geo_replication_health
+    title: Azure Cache for Redis Geo-Replication Health
+    context: redis_cache.geo_replication_health
+    family: Geo-Replication
+    type: line
+    priority: 1310
+    units: status
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: GeoReplicationHealthy
+        aggregation: average
+        name: average

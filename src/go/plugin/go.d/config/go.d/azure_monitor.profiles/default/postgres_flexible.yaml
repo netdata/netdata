@@ -169,6 +169,128 @@ metrics:
     units: bytes
     aggregations: [average]
     time_grain: PT1M
+  # Activity (sessions)
+  - name: oldest_backend_xmin
+    units: transactions
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: sessions_by_state
+    units: sessions
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: sessions_by_wait_event_type
+    units: sessions
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Autovacuum
+  - name: analyze_count_user_tables
+    units: operations
+    aggregations: [maximum]
+    time_grain: PT30M
+  - name: autoanalyze_count_user_tables
+    units: operations
+    aggregations: [maximum]
+    time_grain: PT30M
+  - name: autovacuum_count_user_tables
+    units: operations
+    aggregations: [maximum]
+    time_grain: PT30M
+  - name: bloat_percent
+    units: percentage
+    aggregations: [maximum]
+    time_grain: PT30M
+  - name: n_dead_tup_user_tables
+    units: tuples
+    aggregations: [maximum]
+    time_grain: PT30M
+  - name: n_live_tup_user_tables
+    units: tuples
+    aggregations: [maximum]
+    time_grain: PT30M
+  - name: n_mod_since_analyze_user_tables
+    units: tuples
+    aggregations: [maximum]
+    time_grain: PT30M
+  - name: tables_analyzed_user_tables
+    units: tables
+    aggregations: [maximum]
+    time_grain: PT30M
+  - name: tables_autoanalyzed_user_tables
+    units: tables
+    aggregations: [maximum]
+    time_grain: PT30M
+  - name: tables_autovacuumed_user_tables
+    units: tables
+    aggregations: [maximum]
+    time_grain: PT30M
+  - name: tables_counter_user_tables
+    units: tables
+    aggregations: [maximum]
+    time_grain: PT30M
+  - name: tables_vacuumed_user_tables
+    units: tables
+    aggregations: [maximum]
+    time_grain: PT30M
+  - name: vacuum_count_user_tables
+    units: operations
+    aggregations: [maximum]
+    time_grain: PT30M
+  # Database
+  - name: numbackends
+    units: connections
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: xact_total
+    units: transactions/s
+    aggregations: [total]
+    time_grain: PT1M
+  # PgBouncer
+  - name: client_connections_active
+    units: connections
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: client_connections_waiting
+    units: connections
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: num_pools
+    units: pools
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: server_connections_active
+    units: connections
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: server_connections_idle
+    units: connections
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: total_pooled_connections
+    units: connections
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Saturation
+  - name: cpu_credits_consumed
+    units: credits
+    aggregations: [average]
+    time_grain: PT1M
+  - name: cpu_credits_remaining
+    units: credits
+    aggregations: [average]
+    time_grain: PT1M
+  - name: postmaster_process_cpu_usage_percent
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Traffic
+  - name: max_connections
+    units: connections
+    aggregations: [maximum]
+    time_grain: PT30M
+  - name: tcp_connection_backlog
+    units: connections
+    aggregations: [maximum]
+    time_grain: PT1M
   # Replication
   - name: physical_replication_delay_in_seconds
     units: seconds
@@ -395,6 +517,9 @@ charts:
       - metric: tps
         aggregation: total
         name: total
+      - metric: xact_total
+        aggregation: total
+        name: xact_total
 
   - id: am_azure_postgres_flexible__deadlocks
     title: Azure PostgreSQL Flexible Server Deadlocks
@@ -519,6 +644,9 @@ charts:
       - metric: maximum_used_transactionIDs
         aggregation: average
         name: max_used
+      - metric: oldest_backend_xmin
+        aggregation: maximum
+        name: oldest_xmin
 
   - id: am_azure_postgres_flexible__xmin_age
     title: Azure PostgreSQL Flexible Server Backend XID Age
@@ -672,3 +800,266 @@ charts:
       - metric: logical_replication_delay_in_bytes
         aggregation: maximum
         name: logical
+
+  - id: am_azure_postgres_flexible__sessions_by_state
+    title: Azure PostgreSQL Flexible Server Sessions by State
+    context: postgres_flexible.sessions_by_state
+    family: Activity
+    type: line
+    priority: 1280
+    units: sessions
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: sessions_by_state
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_postgres_flexible__sessions_by_wait_event_type
+    title: Azure PostgreSQL Flexible Server Sessions by Wait Event Type
+    context: postgres_flexible.sessions_by_wait_event_type
+    family: Activity
+    type: line
+    priority: 1290
+    units: sessions
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: sessions_by_wait_event_type
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_postgres_flexible__autovacuum_operations
+    title: Azure PostgreSQL Flexible Server Autovacuum Operations
+    context: postgres_flexible.autovacuum_operations
+    family: Autovacuum
+    type: line
+    priority: 1300
+    units: operations
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: vacuum_count_user_tables
+        aggregation: maximum
+        name: vacuum
+      - metric: autovacuum_count_user_tables
+        aggregation: maximum
+        name: autovacuum
+      - metric: analyze_count_user_tables
+        aggregation: maximum
+        name: analyze
+      - metric: autoanalyze_count_user_tables
+        aggregation: maximum
+        name: autoanalyze
+
+  - id: am_azure_postgres_flexible__autovacuum_table_coverage
+    title: Azure PostgreSQL Flexible Server Autovacuum Table Coverage
+    context: postgres_flexible.autovacuum_table_coverage
+    family: Autovacuum
+    type: line
+    priority: 1310
+    units: tables
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: tables_vacuumed_user_tables
+        aggregation: maximum
+        name: vacuumed
+      - metric: tables_autovacuumed_user_tables
+        aggregation: maximum
+        name: autovacuumed
+      - metric: tables_analyzed_user_tables
+        aggregation: maximum
+        name: analyzed
+      - metric: tables_autoanalyzed_user_tables
+        aggregation: maximum
+        name: autoanalyzed
+      - metric: tables_counter_user_tables
+        aggregation: maximum
+        name: total
+
+  - id: am_azure_postgres_flexible__tuple_liveness
+    title: Azure PostgreSQL Flexible Server Tuple Liveness
+    context: postgres_flexible.tuple_liveness
+    family: Autovacuum
+    type: line
+    priority: 1320
+    units: tuples
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: n_live_tup_user_tables
+        aggregation: maximum
+        name: live
+      - metric: n_dead_tup_user_tables
+        aggregation: maximum
+        name: dead
+      - metric: n_mod_since_analyze_user_tables
+        aggregation: maximum
+        name: modified_since_analyze
+
+  - id: am_azure_postgres_flexible__bloat
+    title: Azure PostgreSQL Flexible Server Table Bloat
+    context: postgres_flexible.bloat
+    family: Autovacuum
+    type: line
+    priority: 1330
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: bloat_percent
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_postgres_flexible__backend_count
+    title: Azure PostgreSQL Flexible Server Backend Count
+    context: postgres_flexible.backend_count
+    family: Connections
+    type: line
+    priority: 1340
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: numbackends
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_postgres_flexible__pgbouncer_client_connections
+    title: Azure PostgreSQL Flexible Server PgBouncer Client Connections
+    context: postgres_flexible.pgbouncer_client_connections
+    family: PgBouncer
+    type: line
+    priority: 1350
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: client_connections_active
+        aggregation: maximum
+        name: active
+      - metric: client_connections_waiting
+        aggregation: maximum
+        name: waiting
+
+  - id: am_azure_postgres_flexible__pgbouncer_server_connections
+    title: Azure PostgreSQL Flexible Server PgBouncer Server Connections
+    context: postgres_flexible.pgbouncer_server_connections
+    family: PgBouncer
+    type: line
+    priority: 1360
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: server_connections_active
+        aggregation: maximum
+        name: active
+      - metric: server_connections_idle
+        aggregation: maximum
+        name: idle
+
+  - id: am_azure_postgres_flexible__pgbouncer_pools
+    title: Azure PostgreSQL Flexible Server PgBouncer Pools
+    context: postgres_flexible.pgbouncer_pools
+    family: PgBouncer
+    type: line
+    priority: 1370
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: num_pools
+        aggregation: maximum
+        name: pools
+      - metric: total_pooled_connections
+        aggregation: maximum
+        name: pooled_connections
+
+  - id: am_azure_postgres_flexible__cpu_credits
+    title: Azure PostgreSQL Flexible Server CPU Credits
+    context: postgres_flexible.cpu_credits
+    family: Saturation
+    type: line
+    priority: 1380
+    units: credits
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: cpu_credits_consumed
+        aggregation: average
+        name: consumed
+      - metric: cpu_credits_remaining
+        aggregation: average
+        name: remaining
+
+  - id: am_azure_postgres_flexible__postmaster_cpu
+    title: Azure PostgreSQL Flexible Server Postmaster CPU Usage
+    context: postgres_flexible.postmaster_cpu
+    family: Saturation
+    type: line
+    priority: 1390
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: postmaster_process_cpu_usage_percent
+        aggregation: average
+        name: average
+
+  - id: am_azure_postgres_flexible__max_connections
+    title: Azure PostgreSQL Flexible Server Max Connections
+    context: postgres_flexible.max_connections
+    family: Connections
+    type: line
+    priority: 1400
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: max_connections
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_postgres_flexible__tcp_connection_backlog
+    title: Azure PostgreSQL Flexible Server TCP Connection Backlog
+    context: postgres_flexible.tcp_connection_backlog
+    family: Connections
+    type: line
+    priority: 1410
+    units: connections
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: tcp_connection_backlog
+        aggregation: maximum
+        name: maximum

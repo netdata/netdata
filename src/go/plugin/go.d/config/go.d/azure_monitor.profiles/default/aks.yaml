@@ -101,11 +101,11 @@ metrics:
     time_grain: PT1M
   - name: node_network_in_bytes
     units: bytes
-    aggregations: [average]
+    aggregations: [average, maximum]
     time_grain: PT1M
   - name: node_network_out_bytes
     units: bytes
-    aggregations: [average]
+    aggregations: [average, maximum]
     time_grain: PT1M
 charts:
   # API Server

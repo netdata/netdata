@@ -42,7 +42,7 @@ metrics:
     time_grain: PT5M
   - name: DocumentQuota
     units: bytes
-    aggregations: [maximum]
+    aggregations: [total]
     time_grain: PT5M
   - name: DocumentCount
     units: documents
@@ -51,8 +51,20 @@ metrics:
   - name: PhysicalPartitionSizeInfo
     units: bytes
     aggregations: [maximum]
+    time_grain: PT1M
+  - name: PhysicalPartitionCount
+    units: partitions
+    aggregations: [maximum]
+    time_grain: PT5M
+  - name: PhysicalPartitionThroughputInfo
+    units: RU/s
+    aggregations: [maximum]
     time_grain: PT5M
   # Provisioning
+  - name: AutoscaledRU
+    units: RU/s
+    aggregations: [maximum]
+    time_grain: PT1M
   - name: ProvisionedThroughput
     units: RU/s
     aggregations: [maximum]
@@ -92,6 +104,28 @@ metrics:
     units: RU/s
     aggregations: [total]
     time_grain: PT1M
+  # Dedicated Gateway
+  - name: DedicatedGatewayCPUUsage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: DedicatedGatewayMemoryUsage
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: DedicatedGatewayRequests
+    units: requests/s
+    aggregations: [count]
+    time_grain: PT1M
+  # Integrated Cache
+  - name: IntegratedCacheItemHitRate
+    units: percentage
+    aggregations: [average]
+    time_grain: PT5M
+  - name: IntegratedCacheQueryHitRate
+    units: percentage
+    aggregations: [average]
+    time_grain: PT5M
   # Cassandra connections
   - name: CassandraConnectionClosures
     units: connections/s
@@ -200,7 +234,7 @@ charts:
         aggregation: maximum
         name: index
       - metric: DocumentQuota
-        aggregation: maximum
+        aggregation: total
         name: quota
 
   - id: am_azure_cosmos_db__document_count
@@ -235,6 +269,22 @@ charts:
         aggregation: maximum
         name: maximum
 
+  - id: am_azure_cosmos_db__partition_count
+    title: Azure Cosmos DB Physical Partition Count
+    context: cosmos_db.partition_count
+    family: Capacity
+    type: line
+    priority: 1075
+    units: partitions
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: PhysicalPartitionCount
+        aggregation: maximum
+        name: maximum
+
   - id: am_azure_cosmos_db__provisioned_throughput
     title: Azure Cosmos DB Provisioned Throughput
     context: cosmos_db.provisioned_throughput
@@ -253,6 +303,25 @@ charts:
       - metric: AutoscaleMaxThroughput
         aggregation: maximum
         name: autoscale_max
+      - metric: AutoscaledRU
+        aggregation: maximum
+        name: autoscaled
+
+  - id: am_azure_cosmos_db__partition_throughput
+    title: Azure Cosmos DB Physical Partition Throughput
+    context: cosmos_db.partition_throughput
+    family: Throughput
+    type: line
+    priority: 1085
+    units: RU/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: PhysicalPartitionThroughputInfo
+        aggregation: maximum
+        name: maximum
 
   - id: am_azure_cosmos_db__availability
     title: Azure Cosmos DB Service Availability
@@ -345,3 +414,70 @@ charts:
       - metric: CassandraConnectionClosures
         aggregation: total
         name: total
+
+  - id: am_azure_cosmos_db__dedicated_gateway_cpu
+    title: Azure Cosmos DB Dedicated Gateway CPU Usage
+    context: cosmos_db.dedicated_gateway_cpu
+    family: Dedicated Gateway
+    type: line
+    priority: 1140
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: DedicatedGatewayCPUUsage
+        aggregation: average
+        name: average
+
+  - id: am_azure_cosmos_db__dedicated_gateway_memory
+    title: Azure Cosmos DB Dedicated Gateway Memory Usage
+    context: cosmos_db.dedicated_gateway_memory
+    family: Dedicated Gateway
+    type: line
+    priority: 1150
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: DedicatedGatewayMemoryUsage
+        aggregation: average
+        name: average
+
+  - id: am_azure_cosmos_db__dedicated_gateway_requests
+    title: Azure Cosmos DB Dedicated Gateway Requests
+    context: cosmos_db.dedicated_gateway_requests
+    family: Dedicated Gateway
+    type: line
+    priority: 1160
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: DedicatedGatewayRequests
+        aggregation: count
+        name: count
+
+  - id: am_azure_cosmos_db__integrated_cache_hit_rate
+    title: Azure Cosmos DB Integrated Cache Hit Rate
+    context: cosmos_db.integrated_cache_hit_rate
+    family: Integrated Cache
+    type: line
+    priority: 1170
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IntegratedCacheItemHitRate
+        aggregation: average
+        name: item
+      - metric: IntegratedCacheQueryHitRate
+        aggregation: average
+        name: query

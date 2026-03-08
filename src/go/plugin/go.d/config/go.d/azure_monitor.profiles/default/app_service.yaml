@@ -163,6 +163,27 @@ metrics:
     units: MB-milliseconds/s
     aggregations: [total]
     time_grain: PT1M
+  # Flex Consumption Functions
+  - name: AlwaysReadyFunctionExecutionCount
+    units: executions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AlwaysReadyFunctionExecutionUnits
+    units: MB-milliseconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: AlwaysReadyUnits
+    units: units
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OnDemandFunctionExecutionCount
+    units: executions/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: OnDemandFunctionExecutionUnits
+    units: MB-milliseconds/s
+    aggregations: [total]
+    time_grain: PT1M
 charts:
   - id: am_azure_app_service__requests
     title: Azure App Service Requests
@@ -481,6 +502,86 @@ charts:
       by_labels: [resource_uid]
     dimensions:
       - metric: FunctionExecutionUnits
+        aggregation: total
+        name: total
+
+  - id: am_azure_app_service__always_ready_function_executions
+    title: Azure App Service Always Ready Function Executions
+    context: app_service.always_ready_function_executions
+    family: Functions
+    type: line
+    priority: 1162
+    units: executions/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AlwaysReadyFunctionExecutionCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_app_service__always_ready_function_execution_units
+    title: Azure App Service Always Ready Function Execution Units
+    context: app_service.always_ready_function_execution_units
+    family: Functions
+    type: line
+    priority: 1163
+    units: MB-milliseconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AlwaysReadyFunctionExecutionUnits
+        aggregation: total
+        name: total
+
+  - id: am_azure_app_service__always_ready_units
+    title: Azure App Service Always Ready Units
+    context: app_service.always_ready_units
+    family: Functions
+    type: line
+    priority: 1164
+    units: units
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AlwaysReadyUnits
+        aggregation: total
+        name: total
+
+  - id: am_azure_app_service__on_demand_function_executions
+    title: Azure App Service On Demand Function Executions
+    context: app_service.on_demand_function_executions
+    family: Functions
+    type: line
+    priority: 1165
+    units: executions/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OnDemandFunctionExecutionCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_app_service__on_demand_function_execution_units
+    title: Azure App Service On Demand Function Execution Units
+    context: app_service.on_demand_function_execution_units
+    family: Functions
+    type: line
+    priority: 1166
+    units: MB-milliseconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: OnDemandFunctionExecutionUnits
         aggregation: total
         name: total
 

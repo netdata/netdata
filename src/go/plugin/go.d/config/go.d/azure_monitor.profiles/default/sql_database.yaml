@@ -132,6 +132,28 @@ metrics:
     units: vCore-seconds/s
     aggregations: [total]
     time_grain: PT1M
+  - name: app_cpu_billed_ha_replicas
+    units: vCore-seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Free Tier
+  - name: free_amount_consumed
+    units: vCore-seconds
+    aggregations: [average]
+    time_grain: PT15M
+  - name: free_amount_remaining
+    units: vCore-seconds
+    aggregations: [average]
+    time_grain: PT15M
+  # Ledger
+  - name: ledger_digest_upload_failed
+    units: events/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: ledger_digest_upload_success
+    units: events/s
+    aggregations: [count]
+    time_grain: PT1M
 charts:
   - id: am_azure_sql_database__cpu
     title: Azure SQL Database CPU Utilization
@@ -485,3 +507,44 @@ charts:
       - metric: app_cpu_billed
         aggregation: total
         name: total
+      - metric: app_cpu_billed_ha_replicas
+        aggregation: total
+        name: ha_replicas
+
+  - id: am_azure_sql_database__free_tier_usage
+    title: Azure SQL Database Free Tier Usage
+    context: sql_database.free_tier_usage
+    family: Free Tier
+    type: line
+    priority: 1200
+    units: vCore-seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: free_amount_consumed
+        aggregation: average
+        name: consumed
+      - metric: free_amount_remaining
+        aggregation: average
+        name: remaining
+
+  - id: am_azure_sql_database__ledger_digest
+    title: Azure SQL Database Ledger Digest Uploads
+    context: sql_database.ledger_digest
+    family: Ledger
+    type: line
+    priority: 1210
+    units: events/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ledger_digest_upload_success
+        aggregation: count
+        name: success
+      - metric: ledger_digest_upload_failed
+        aggregation: count
+        name: failed

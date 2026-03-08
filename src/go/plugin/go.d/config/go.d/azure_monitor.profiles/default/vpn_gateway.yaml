@@ -260,7 +260,7 @@ charts:
     type: line
     priority: 1010
     units: connections
-    algorithm: incremental
+    algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
@@ -505,7 +505,7 @@ charts:
     type: line
     priority: 1090
     units: associations
-    algorithm: incremental
+    algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
@@ -559,7 +559,7 @@ charts:
     type: line
     priority: 1110
     units: routes
-    algorithm: incremental
+    algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
