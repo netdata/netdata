@@ -1,0 +1,876 @@
+name: Azure VPN Gateway
+resource_type: Microsoft.Network/virtualNetworkGateways
+metrics:
+  # Traffic - S2S Bandwidth
+  - name: AverageBandwidth
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT5M
+  # Traffic - P2S Bandwidth
+  - name: P2SBandwidth
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  # Traffic - P2S Connections
+  - name: P2SConnectionCount
+    units: connections
+    aggregations: [total]
+    time_grain: PT1M
+  # Traffic - Gateway Flows
+  - name: InboundFlowsCount
+    units: flows
+    aggregations: [maximum]
+    time_grain: PT5M
+  - name: OutboundFlowsCount
+    units: flows
+    aggregations: [maximum]
+    time_grain: PT5M
+  # Traffic - Tunnel Bandwidth
+  - name: TunnelAverageBandwidth
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT5M
+  # Traffic - Tunnel Bytes
+  - name: TunnelEgressBytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT5M
+  - name: TunnelIngressBytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT5M
+  # Traffic - Tunnel Packets
+  - name: TunnelEgressPackets
+    units: packets/s
+    aggregations: [total]
+    time_grain: PT5M
+  - name: TunnelIngressPackets
+    units: packets/s
+    aggregations: [total]
+    time_grain: PT5M
+  # Traffic - Tunnel Peak PPS
+  - name: TunnelPeakPackets
+    units: packets/s
+    aggregations: [maximum]
+    time_grain: PT5M
+  # Traffic - Tunnel Total Flows
+  - name: TunnelTotalFlowCount
+    units: flows/s
+    aggregations: [total]
+    time_grain: PT5M
+  # Traffic - Tunnel NAT Allocations
+  - name: TunnelNatAllocations
+    units: allocations/s
+    aggregations: [total]
+    time_grain: PT5M
+  # Traffic - Tunnel NATed Bytes
+  - name: TunnelNatedBytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT5M
+  - name: TunnelReverseNatedBytes
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT5M
+  # Traffic - Tunnel NATed Packets
+  - name: TunnelNatedPackets
+    units: packets/s
+    aggregations: [total]
+    time_grain: PT5M
+  - name: TunnelReverseNatedPackets
+    units: packets/s
+    aggregations: [total]
+    time_grain: PT5M
+  # Traffic - Tunnel NAT Flows
+  - name: TunnelNatFlowCount
+    units: flows/s
+    aggregations: [total]
+    time_grain: PT5M
+  # Errors - Tunnel Packet Drops
+  - name: TunnelEgressPacketDropCount
+    units: packets/s
+    aggregations: [total]
+    time_grain: PT5M
+  - name: TunnelIngressPacketDropCount
+    units: packets/s
+    aggregations: [total]
+    time_grain: PT5M
+  # Errors - Tunnel TS Mismatch Drops
+  - name: TunnelEgressPacketDropTSMismatch
+    units: packets/s
+    aggregations: [total]
+    time_grain: PT5M
+  - name: TunnelIngressPacketDropTSMismatch
+    units: packets/s
+    aggregations: [total]
+    time_grain: PT5M
+  # Errors - Tunnel NAT Packet Drops
+  - name: TunnelNatPacketDrop
+    units: packets/s
+    aggregations: [total]
+    time_grain: PT5M
+  # IPsec - Security Associations
+  - name: MmsaCount
+    units: associations
+    aggregations: [total]
+    time_grain: PT5M
+  - name: QmsaCount
+    units: associations
+    aggregations: [total]
+    time_grain: PT5M
+  # Routing - BGP
+  - name: BgpPeerStatus
+    units: status
+    aggregations: [average]
+    time_grain: PT5M
+  - name: BgpRoutesAdvertised
+    units: routes/s
+    aggregations: [total]
+    time_grain: PT5M
+  - name: BgpRoutesLearned
+    units: routes/s
+    aggregations: [total]
+    time_grain: PT5M
+  # Routing - Route Counts
+  - name: UserVpnRouteCount
+    units: routes
+    aggregations: [total]
+    time_grain: PT5M
+  - name: VnetAddressPrefixCount
+    units: prefixes
+    aggregations: [total]
+    time_grain: PT5M
+  # Performance - ExpressRoute Gateway
+  - name: ExpressRouteGatewayBitsPerSecond
+    units: bits/s
+    aggregations: [average]
+    time_grain: PT5M
+  - name: ExpressRouteGatewayCpuUtilization
+    units: percentage
+    aggregations: [average]
+    time_grain: PT5M
+  - name: ExpressRouteGatewayPacketsPerSecond
+    units: packets/s
+    aggregations: [average]
+    time_grain: PT5M
+  # Scalability - ExpressRoute Gateway
+  - name: ExpressRouteGatewayActiveFlows
+    units: flows
+    aggregations: [average]
+    time_grain: PT5M
+  - name: ExpressRouteGatewayCountOfRoutesAdvertisedToPeer
+    units: routes
+    aggregations: [maximum]
+    time_grain: PT5M
+  - name: ExpressRouteGatewayCountOfRoutesLearnedFromPeer
+    units: routes
+    aggregations: [maximum]
+    time_grain: PT5M
+  - name: ExpressRouteGatewayFrequencyOfRoutesChanged
+    units: changes/s
+    aggregations: [total]
+    time_grain: PT5M
+  - name: ExpressRouteGatewayMaxFlowsCreationRate
+    units: flows/s
+    aggregations: [maximum]
+    time_grain: PT5M
+  - name: ExpressRouteGatewayNumberOfVmInVnet
+    units: VMs
+    aggregations: [maximum]
+    time_grain: PT5M
+  # Performance - Scalable ExpressRoute Gateway
+  - name: ScalableExpressRouteGatewayBitsPerSecond
+    units: bits/s
+    aggregations: [average]
+    time_grain: PT5M
+  - name: ScalableExpressRouteGatewayCpuUtilization
+    units: percentage
+    aggregations: [average]
+    time_grain: PT5M
+  - name: ScalableExpressRouteGatewayPacketsPerSecond
+    units: packets/s
+    aggregations: [average]
+    time_grain: PT5M
+  # Scalability - Scalable ExpressRoute Gateway
+  - name: ScalableExpressRouteGatewayActiveFlows
+    units: flows
+    aggregations: [average]
+    time_grain: PT5M
+  - name: ScalableExpressRouteGatewayCountOfRoutesAdvertisedToPeer
+    units: routes
+    aggregations: [maximum]
+    time_grain: PT5M
+  - name: ScalableExpressRouteGatewayCountOfRoutesLearnedFromPeer
+    units: routes
+    aggregations: [maximum]
+    time_grain: PT5M
+  - name: ScalableExpressRouteGatewayFrequencyOfRoutesChanged
+    units: changes/s
+    aggregations: [total]
+    time_grain: PT5M
+  - name: ScalableExpressRouteGatewayMaxFlowsCreationRate
+    units: flows/s
+    aggregations: [maximum]
+    time_grain: PT5M
+  - name: ScalableExpressRouteGatewayNumberOfVmInVnet
+    units: VMs
+    aggregations: [maximum]
+    time_grain: PT5M
+  - name: ScalableExpressRouteGatewayScaleUnit
+    units: units
+    aggregations: [maximum]
+    time_grain: PT5M
+charts:
+  - id: am_azure_vpn_gateway__s2s_bandwidth
+    title: Azure VPN Gateway S2S Bandwidth
+    context: vpn_gateway.s2s_bandwidth
+    family: Traffic
+    type: line
+    priority: 1000
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AverageBandwidth
+        aggregation: average
+        name: average
+
+  - id: am_azure_vpn_gateway__p2s_bandwidth
+    title: Azure VPN Gateway P2S Bandwidth
+    context: vpn_gateway.p2s_bandwidth
+    family: Traffic
+    type: line
+    priority: 1005
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: P2SBandwidth
+        aggregation: average
+        name: average
+
+  - id: am_azure_vpn_gateway__p2s_connections
+    title: Azure VPN Gateway P2S Connection Count
+    context: vpn_gateway.p2s_connections
+    family: Traffic
+    type: line
+    priority: 1010
+    units: connections
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: P2SConnectionCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_vpn_gateway__gateway_flows
+    title: Azure VPN Gateway Flows
+    context: vpn_gateway.gateway_flows
+    family: Traffic
+    type: line
+    priority: 1015
+    units: flows
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: InboundFlowsCount
+        aggregation: maximum
+        name: inbound
+      - metric: OutboundFlowsCount
+        aggregation: maximum
+        name: outbound
+
+  - id: am_azure_vpn_gateway__tunnel_bandwidth
+    title: Azure VPN Gateway Tunnel Bandwidth
+    context: vpn_gateway.tunnel_bandwidth
+    family: Tunnel Traffic
+    type: line
+    priority: 1020
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TunnelAverageBandwidth
+        aggregation: average
+        name: average
+
+  - id: am_azure_vpn_gateway__tunnel_bytes
+    title: Azure VPN Gateway Tunnel Bytes
+    context: vpn_gateway.tunnel_bytes
+    family: Tunnel Traffic
+    type: line
+    priority: 1025
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TunnelEgressBytes
+        aggregation: total
+        name: egress
+      - metric: TunnelIngressBytes
+        aggregation: total
+        name: ingress
+
+  - id: am_azure_vpn_gateway__tunnel_packets
+    title: Azure VPN Gateway Tunnel Packets
+    context: vpn_gateway.tunnel_packets
+    family: Tunnel Traffic
+    type: line
+    priority: 1030
+    units: packets/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TunnelEgressPackets
+        aggregation: total
+        name: egress
+      - metric: TunnelIngressPackets
+        aggregation: total
+        name: ingress
+
+  - id: am_azure_vpn_gateway__tunnel_peak_pps
+    title: Azure VPN Gateway Tunnel Peak PPS
+    context: vpn_gateway.tunnel_peak_pps
+    family: Tunnel Traffic
+    type: line
+    priority: 1035
+    units: packets/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TunnelPeakPackets
+        aggregation: maximum
+        name: peak
+
+  - id: am_azure_vpn_gateway__tunnel_total_flows
+    title: Azure VPN Gateway Tunnel Total Flows
+    context: vpn_gateway.tunnel_total_flows
+    family: Tunnel Traffic
+    type: line
+    priority: 1040
+    units: flows/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TunnelTotalFlowCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_vpn_gateway__tunnel_nat_allocations
+    title: Azure VPN Gateway Tunnel NAT Allocations
+    context: vpn_gateway.tunnel_nat_allocations
+    family: Tunnel NAT
+    type: line
+    priority: 1045
+    units: allocations/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TunnelNatAllocations
+        aggregation: total
+        name: total
+
+  - id: am_azure_vpn_gateway__tunnel_nated_bytes
+    title: Azure VPN Gateway Tunnel NATed Bytes
+    context: vpn_gateway.tunnel_nated_bytes
+    family: Tunnel NAT
+    type: line
+    priority: 1050
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TunnelNatedBytes
+        aggregation: total
+        name: nated
+      - metric: TunnelReverseNatedBytes
+        aggregation: total
+        name: reverse_nated
+
+  - id: am_azure_vpn_gateway__tunnel_nated_packets
+    title: Azure VPN Gateway Tunnel NATed Packets
+    context: vpn_gateway.tunnel_nated_packets
+    family: Tunnel NAT
+    type: line
+    priority: 1055
+    units: packets/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TunnelNatedPackets
+        aggregation: total
+        name: nated
+      - metric: TunnelReverseNatedPackets
+        aggregation: total
+        name: reverse_nated
+
+  - id: am_azure_vpn_gateway__tunnel_nat_flows
+    title: Azure VPN Gateway Tunnel NAT Flows
+    context: vpn_gateway.tunnel_nat_flows
+    family: Tunnel NAT
+    type: line
+    priority: 1060
+    units: flows/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TunnelNatFlowCount
+        aggregation: total
+        name: total
+
+  - id: am_azure_vpn_gateway__tunnel_packet_drops
+    title: Azure VPN Gateway Tunnel Packet Drops
+    context: vpn_gateway.tunnel_packet_drops
+    family: Errors
+    type: line
+    priority: 1070
+    units: packets/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TunnelEgressPacketDropCount
+        aggregation: total
+        name: egress
+      - metric: TunnelIngressPacketDropCount
+        aggregation: total
+        name: ingress
+
+  - id: am_azure_vpn_gateway__tunnel_ts_mismatch_drops
+    title: Azure VPN Gateway Tunnel TS Mismatch Drops
+    context: vpn_gateway.tunnel_ts_mismatch_drops
+    family: Errors
+    type: line
+    priority: 1075
+    units: packets/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TunnelEgressPacketDropTSMismatch
+        aggregation: total
+        name: egress
+      - metric: TunnelIngressPacketDropTSMismatch
+        aggregation: total
+        name: ingress
+
+  - id: am_azure_vpn_gateway__tunnel_nat_packet_drops
+    title: Azure VPN Gateway Tunnel NAT Packet Drops
+    context: vpn_gateway.tunnel_nat_packet_drops
+    family: Errors
+    type: line
+    priority: 1080
+    units: packets/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: TunnelNatPacketDrop
+        aggregation: total
+        name: total
+
+  - id: am_azure_vpn_gateway__ipsec_sa
+    title: Azure VPN Gateway IPsec Security Associations
+    context: vpn_gateway.ipsec_sa
+    family: IPsec
+    type: line
+    priority: 1090
+    units: associations
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: MmsaCount
+        aggregation: total
+        name: mmsa
+      - metric: QmsaCount
+        aggregation: total
+        name: qmsa
+
+  - id: am_azure_vpn_gateway__bgp_peer_status
+    title: Azure VPN Gateway BGP Peer Status
+    context: vpn_gateway.bgp_peer_status
+    family: Routing
+    type: line
+    priority: 1100
+    units: status
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BgpPeerStatus
+        aggregation: average
+        name: average
+
+  - id: am_azure_vpn_gateway__bgp_routes
+    title: Azure VPN Gateway BGP Routes
+    context: vpn_gateway.bgp_routes
+    family: Routing
+    type: line
+    priority: 1105
+    units: routes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BgpRoutesAdvertised
+        aggregation: total
+        name: advertised
+      - metric: BgpRoutesLearned
+        aggregation: total
+        name: learned
+
+  - id: am_azure_vpn_gateway__route_counts
+    title: Azure VPN Gateway Route Counts
+    context: vpn_gateway.route_counts
+    family: Routing
+    type: line
+    priority: 1110
+    units: routes
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: UserVpnRouteCount
+        aggregation: total
+        name: user_vpn
+      - metric: VnetAddressPrefixCount
+        aggregation: total
+        name: vnet_prefix
+
+  - id: am_azure_vpn_gateway__er_gateway_bandwidth
+    title: Azure VPN Gateway ExpressRoute Bandwidth
+    context: vpn_gateway.er_gateway_bandwidth
+    family: ExpressRoute
+    type: line
+    priority: 1120
+    units: bits/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayBitsPerSecond
+        aggregation: average
+        name: average
+
+  - id: am_azure_vpn_gateway__er_gateway_cpu
+    title: Azure VPN Gateway ExpressRoute CPU Utilization
+    context: vpn_gateway.er_gateway_cpu
+    family: ExpressRoute
+    type: line
+    priority: 1125
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayCpuUtilization
+        aggregation: average
+        name: average
+
+  - id: am_azure_vpn_gateway__er_gateway_packets
+    title: Azure VPN Gateway ExpressRoute Packets
+    context: vpn_gateway.er_gateway_packets
+    family: ExpressRoute
+    type: line
+    priority: 1130
+    units: packets/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayPacketsPerSecond
+        aggregation: average
+        name: average
+
+  - id: am_azure_vpn_gateway__er_gateway_active_flows
+    title: Azure VPN Gateway ExpressRoute Active Flows
+    context: vpn_gateway.er_gateway_active_flows
+    family: ExpressRoute
+    type: line
+    priority: 1135
+    units: flows
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayActiveFlows
+        aggregation: average
+        name: average
+
+  - id: am_azure_vpn_gateway__er_gateway_routes_advertised
+    title: Azure VPN Gateway ExpressRoute Routes Advertised to Peer
+    context: vpn_gateway.er_gateway_routes_advertised
+    family: ExpressRoute
+    type: line
+    priority: 1140
+    units: routes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayCountOfRoutesAdvertisedToPeer
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_vpn_gateway__er_gateway_routes_learned
+    title: Azure VPN Gateway ExpressRoute Routes Learned from Peer
+    context: vpn_gateway.er_gateway_routes_learned
+    family: ExpressRoute
+    type: line
+    priority: 1145
+    units: routes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayCountOfRoutesLearnedFromPeer
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_vpn_gateway__er_gateway_route_changes
+    title: Azure VPN Gateway ExpressRoute Route Changes
+    context: vpn_gateway.er_gateway_route_changes
+    family: ExpressRoute
+    type: line
+    priority: 1150
+    units: changes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayFrequencyOfRoutesChanged
+        aggregation: total
+        name: total
+
+  - id: am_azure_vpn_gateway__er_gateway_max_flows_rate
+    title: Azure VPN Gateway ExpressRoute Max Flow Creation Rate
+    context: vpn_gateway.er_gateway_max_flows_rate
+    family: ExpressRoute
+    type: line
+    priority: 1155
+    units: flows/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayMaxFlowsCreationRate
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_vpn_gateway__er_gateway_vm_count
+    title: Azure VPN Gateway ExpressRoute VMs in VNet
+    context: vpn_gateway.er_gateway_vm_count
+    family: ExpressRoute
+    type: line
+    priority: 1160
+    units: VMs
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayNumberOfVmInVnet
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_vpn_gateway__scalable_er_bandwidth
+    title: Azure VPN Gateway Scalable ExpressRoute Bandwidth
+    context: vpn_gateway.scalable_er_bandwidth
+    family: Scalable ExpressRoute
+    type: line
+    priority: 1170
+    units: bits/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ScalableExpressRouteGatewayBitsPerSecond
+        aggregation: average
+        name: average
+
+  - id: am_azure_vpn_gateway__scalable_er_cpu
+    title: Azure VPN Gateway Scalable ExpressRoute CPU Utilization
+    context: vpn_gateway.scalable_er_cpu
+    family: Scalable ExpressRoute
+    type: line
+    priority: 1175
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ScalableExpressRouteGatewayCpuUtilization
+        aggregation: average
+        name: average
+
+  - id: am_azure_vpn_gateway__scalable_er_packets
+    title: Azure VPN Gateway Scalable ExpressRoute Packets
+    context: vpn_gateway.scalable_er_packets
+    family: Scalable ExpressRoute
+    type: line
+    priority: 1180
+    units: packets/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ScalableExpressRouteGatewayPacketsPerSecond
+        aggregation: average
+        name: average
+
+  - id: am_azure_vpn_gateway__scalable_er_active_flows
+    title: Azure VPN Gateway Scalable ExpressRoute Active Flows
+    context: vpn_gateway.scalable_er_active_flows
+    family: Scalable ExpressRoute
+    type: line
+    priority: 1185
+    units: flows
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ScalableExpressRouteGatewayActiveFlows
+        aggregation: average
+        name: average
+
+  - id: am_azure_vpn_gateway__scalable_er_routes_advertised
+    title: Azure VPN Gateway Scalable ExpressRoute Routes Advertised
+    context: vpn_gateway.scalable_er_routes_advertised
+    family: Scalable ExpressRoute
+    type: line
+    priority: 1190
+    units: routes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ScalableExpressRouteGatewayCountOfRoutesAdvertisedToPeer
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_vpn_gateway__scalable_er_routes_learned
+    title: Azure VPN Gateway Scalable ExpressRoute Routes Learned
+    context: vpn_gateway.scalable_er_routes_learned
+    family: Scalable ExpressRoute
+    type: line
+    priority: 1195
+    units: routes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ScalableExpressRouteGatewayCountOfRoutesLearnedFromPeer
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_vpn_gateway__scalable_er_route_changes
+    title: Azure VPN Gateway Scalable ExpressRoute Route Changes
+    context: vpn_gateway.scalable_er_route_changes
+    family: Scalable ExpressRoute
+    type: line
+    priority: 1200
+    units: changes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ScalableExpressRouteGatewayFrequencyOfRoutesChanged
+        aggregation: total
+        name: total
+
+  - id: am_azure_vpn_gateway__scalable_er_max_flows_rate
+    title: Azure VPN Gateway Scalable ExpressRoute Max Flow Creation Rate
+    context: vpn_gateway.scalable_er_max_flows_rate
+    family: Scalable ExpressRoute
+    type: line
+    priority: 1205
+    units: flows/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ScalableExpressRouteGatewayMaxFlowsCreationRate
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_vpn_gateway__scalable_er_vm_count
+    title: Azure VPN Gateway Scalable ExpressRoute VMs in VNet
+    context: vpn_gateway.scalable_er_vm_count
+    family: Scalable ExpressRoute
+    type: line
+    priority: 1210
+    units: VMs
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ScalableExpressRouteGatewayNumberOfVmInVnet
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_vpn_gateway__scalable_er_scale_units
+    title: Azure VPN Gateway Scalable ExpressRoute Scale Units
+    context: vpn_gateway.scalable_er_scale_units
+    family: Scalable ExpressRoute
+    type: line
+    priority: 1215
+    units: units
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ScalableExpressRouteGatewayScaleUnit
+        aggregation: maximum
+        name: maximum
