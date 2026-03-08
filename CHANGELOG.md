@@ -107,6 +107,7 @@
 - Reject incoming streaming connection for own vnode ([#21889](https://github.com/netdata/netdata/issues/21889))
 - Chore(go/plugin/functions): change "not instances configured" resp code ([#21903](https://github.com/netdata/netdata/issues/21903))
 - Handle fetching IBM MQ libraries in CI package build jobs outside of CMake ([#21862](https://github.com/netdata/netdata/issues/21862))
+- Feat(go/plugin/metrix): add MeasureSet structured family support ([#21909](https://github.com/netdata/netdata/issues/21909))
 
 ## [2.9.0] - 2026-02-16
 
