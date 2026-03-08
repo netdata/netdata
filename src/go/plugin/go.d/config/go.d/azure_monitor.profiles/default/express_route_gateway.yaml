@@ -1,0 +1,220 @@
+name: Azure ExpressRoute Gateway
+resource_type: Microsoft.Network/expressRouteGateways
+metrics:
+  # Traffic - Connection Throughput
+  - name: ErGatewayConnectionBitsInPerSecond
+    units: bits/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: ErGatewayConnectionBitsOutPerSecond
+    units: bits/s
+    aggregations: [average]
+    time_grain: PT1M
+  # Performance - Gateway Throughput
+  - name: ExpressRouteGatewayBitsPerSecond
+    units: bits/s
+    aggregations: [average, minimum, maximum]
+    time_grain: PT5M
+  # Performance - CPU
+  - name: ExpressRouteGatewayCpuUtilization
+    units: percentage
+    aggregations: [average, minimum, maximum]
+    time_grain: PT5M
+  # Performance - Packets
+  - name: ExpressRouteGatewayPacketsPerSecond
+    units: packets/s
+    aggregations: [average, minimum, maximum]
+    time_grain: PT5M
+  # Scalability - Active Flows
+  - name: ExpressRouteGatewayActiveFlows
+    units: flows
+    aggregations: [average, minimum, maximum]
+    time_grain: PT5M
+  # Scalability - Routes Advertised
+  - name: ExpressRouteGatewayCountOfRoutesAdvertisedToPeer
+    units: routes
+    aggregations: [maximum]
+    time_grain: PT5M
+  # Scalability - Routes Learned
+  - name: ExpressRouteGatewayCountOfRoutesLearnedFromPeer
+    units: routes
+    aggregations: [maximum]
+    time_grain: PT5M
+  # Scalability - Route Changes
+  - name: ExpressRouteGatewayFrequencyOfRoutesChanged
+    units: changes/s
+    aggregations: [total]
+    time_grain: PT5M
+  # Scalability - Max Flow Creation Rate
+  - name: ExpressRouteGatewayMaxFlowsCreationRate
+    units: flows/s
+    aggregations: [maximum]
+    time_grain: PT5M
+  # Scalability - VMs in VNet
+  - name: ExpressRouteGatewayNumberOfVmInVnet
+    units: VMs
+    aggregations: [maximum]
+    time_grain: PT5M
+charts:
+  - id: am_azure_express_route_gateway__connection_throughput
+    title: Azure ExpressRoute Gateway Connection Throughput
+    context: express_route_gateway.connection_throughput
+    family: Traffic
+    type: line
+    priority: 1000
+    units: bits/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ErGatewayConnectionBitsInPerSecond
+        aggregation: average
+        name: in
+      - metric: ErGatewayConnectionBitsOutPerSecond
+        aggregation: average
+        name: out
+
+  - id: am_azure_express_route_gateway__gateway_throughput
+    title: Azure ExpressRoute Gateway Throughput
+    context: express_route_gateway.gateway_throughput
+    family: Performance
+    type: line
+    priority: 1010
+    units: bits/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayBitsPerSecond
+        aggregation: average
+        name: average
+
+  - id: am_azure_express_route_gateway__cpu_utilization
+    title: Azure ExpressRoute Gateway CPU Utilization
+    context: express_route_gateway.cpu_utilization
+    family: Performance
+    type: line
+    priority: 1020
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayCpuUtilization
+        aggregation: average
+        name: average
+
+  - id: am_azure_express_route_gateway__packets
+    title: Azure ExpressRoute Gateway Packets
+    context: express_route_gateway.packets
+    family: Performance
+    type: line
+    priority: 1030
+    units: packets/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayPacketsPerSecond
+        aggregation: average
+        name: average
+
+  - id: am_azure_express_route_gateway__active_flows
+    title: Azure ExpressRoute Gateway Active Flows
+    context: express_route_gateway.active_flows
+    family: Scalability
+    type: line
+    priority: 1040
+    units: flows
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayActiveFlows
+        aggregation: average
+        name: average
+
+  - id: am_azure_express_route_gateway__routes_advertised
+    title: Azure ExpressRoute Gateway Routes Advertised to Peer
+    context: express_route_gateway.routes_advertised
+    family: Scalability
+    type: line
+    priority: 1050
+    units: routes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayCountOfRoutesAdvertisedToPeer
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_express_route_gateway__routes_learned
+    title: Azure ExpressRoute Gateway Routes Learned from Peer
+    context: express_route_gateway.routes_learned
+    family: Scalability
+    type: line
+    priority: 1060
+    units: routes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayCountOfRoutesLearnedFromPeer
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_express_route_gateway__route_changes
+    title: Azure ExpressRoute Gateway Route Changes
+    context: express_route_gateway.route_changes
+    family: Scalability
+    type: line
+    priority: 1070
+    units: changes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayFrequencyOfRoutesChanged
+        aggregation: total
+        name: total
+
+  - id: am_azure_express_route_gateway__max_flows_creation_rate
+    title: Azure ExpressRoute Gateway Max Flow Creation Rate
+    context: express_route_gateway.max_flows_creation_rate
+    family: Scalability
+    type: line
+    priority: 1080
+    units: flows/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayMaxFlowsCreationRate
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_express_route_gateway__vm_count
+    title: Azure ExpressRoute Gateway VMs in VNet
+    context: express_route_gateway.vm_count
+    family: Scalability
+    type: line
+    priority: 1090
+    units: VMs
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExpressRouteGatewayNumberOfVmInVnet
+        aggregation: maximum
+        name: maximum

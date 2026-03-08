@@ -1,0 +1,176 @@
+name: Azure ExpressRoute Circuit
+resource_type: Microsoft.Network/expressRouteCircuits
+metrics:
+  # Circuit Availability
+  - name: ArpAvailability
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: BgpAvailability
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Circuit Traffic
+  - name: BitsInPerSecond
+    units: bits/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: BitsOutPerSecond
+    units: bits/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: IngressBandwidthUtilization
+    units: percentage
+    aggregations: [maximum]
+    time_grain: PT1M
+  - name: EgressBandwidthUtilization
+    units: percentage
+    aggregations: [maximum]
+    time_grain: PT1M
+  # Circuit QoS
+  - name: QosDropBitsInPerSecond
+    units: bits/s
+    aggregations: [average]
+    time_grain: PT5M
+  - name: QosDropBitsOutPerSecond
+    units: bits/s
+    aggregations: [average]
+    time_grain: PT5M
+  # FastPath
+  - name: FastPathRoutesCountForCircuit
+    units: routes
+    aggregations: [maximum]
+    time_grain: PT5M
+  # GlobalReach Traffic
+  - name: GlobalReachBitsInPerSecond
+    units: bits/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: GlobalReachBitsOutPerSecond
+    units: bits/s
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  - id: am_azure_express_route_circuit__arp_availability
+    title: Azure ExpressRoute Circuit ARP Availability
+    context: express_route_circuit.arp_availability
+    family: Availability
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ArpAvailability
+        aggregation: average
+        name: average
+
+  - id: am_azure_express_route_circuit__bgp_availability
+    title: Azure ExpressRoute Circuit BGP Availability
+    context: express_route_circuit.bgp_availability
+    family: Availability
+    type: line
+    priority: 1010
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BgpAvailability
+        aggregation: average
+        name: average
+
+  - id: am_azure_express_route_circuit__throughput
+    title: Azure ExpressRoute Circuit Throughput
+    context: express_route_circuit.throughput
+    family: Traffic
+    type: line
+    priority: 1020
+    units: bits/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BitsInPerSecond
+        aggregation: average
+        name: in
+      - metric: BitsOutPerSecond
+        aggregation: average
+        name: out
+
+  - id: am_azure_express_route_circuit__bandwidth_utilization
+    title: Azure ExpressRoute Circuit Bandwidth Utilization
+    context: express_route_circuit.bandwidth_utilization
+    family: Traffic
+    type: line
+    priority: 1030
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: IngressBandwidthUtilization
+        aggregation: maximum
+        name: ingress
+      - metric: EgressBandwidthUtilization
+        aggregation: maximum
+        name: egress
+
+  - id: am_azure_express_route_circuit__qos_dropped_bits
+    title: Azure ExpressRoute Circuit QoS Dropped Bits
+    context: express_route_circuit.qos_dropped_bits
+    family: QoS
+    type: line
+    priority: 1040
+    units: bits/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: QosDropBitsInPerSecond
+        aggregation: average
+        name: in
+      - metric: QosDropBitsOutPerSecond
+        aggregation: average
+        name: out
+
+  - id: am_azure_express_route_circuit__fastpath_routes
+    title: Azure ExpressRoute Circuit FastPath Routes
+    context: express_route_circuit.fastpath_routes
+    family: FastPath
+    type: line
+    priority: 1050
+    units: routes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: FastPathRoutesCountForCircuit
+        aggregation: maximum
+        name: maximum
+
+  - id: am_azure_express_route_circuit__global_reach_throughput
+    title: Azure ExpressRoute Circuit GlobalReach Throughput
+    context: express_route_circuit.global_reach_throughput
+    family: GlobalReach
+    type: line
+    priority: 1060
+    units: bits/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: GlobalReachBitsInPerSecond
+        aggregation: average
+        name: in
+      - metric: GlobalReachBitsOutPerSecond
+        aggregation: average
+        name: out

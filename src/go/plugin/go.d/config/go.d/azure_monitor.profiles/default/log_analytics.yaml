@@ -1,0 +1,1025 @@
+name: Azure Log Analytics Workspace
+resource_type: Microsoft.OperationalInsights/workspaces
+metrics:
+  # SLI - Availability
+  - name: AvailabilityRate_Query
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # SLI - Ingestion
+  - name: Ingestion Time
+    units: seconds
+    aggregations: [average, maximum, minimum]
+    time_grain: PT1M
+  - name: Ingestion Volume
+    units: records/s
+    aggregations: [count]
+    time_grain: PT1M
+  # User Queries
+  - name: Query Count
+    units: queries/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: Query Failure Count
+    units: queries/s
+    aggregations: [count]
+    time_grain: PT1M
+  # DataExport
+  - name: BytesExported
+    units: bytes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: RecordsExported
+    units: records/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: ExportFailed
+    units: exports/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Legacy Log-based - CPU
+  - name: "Average_% Processor Time"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_% Privileged Time"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_% User Time"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_% DPC Time"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_% Interrupt Time"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_% Idle Time"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_% IO Wait Time"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_% Nice Time"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Pct Privileged Time"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Pct User Time"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  # Legacy Log-based - Memory
+  - name: "Average_% Available Memory"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_% Used Memory"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_% Committed Bytes In Use"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Available MBytes"
+    units: megabytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Available MBytes Memory"
+    units: megabytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Used Memory kBytes"
+    units: kilobytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Used Memory MBytes"
+    units: megabytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Free Physical Memory"
+    units: megabytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Free Virtual Memory"
+    units: megabytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Virtual Shared Memory"
+    units: megabytes
+    aggregations: [average]
+    time_grain: PT1M
+  # Legacy Log-based - Swap
+  - name: "Average_% Available Swap Space"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_% Used Swap Space"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Available MBytes Swap"
+    units: megabytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Used MBytes Swap Space"
+    units: megabytes
+    aggregations: [average]
+    time_grain: PT1M
+  # Legacy Log-based - Disk
+  - name: "Average_% Free Space"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_% Used Space"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_% Free Inodes"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_% Used Inodes"
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Free Megabytes"
+    units: megabytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Disk Read Bytes/sec"
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Disk Write Bytes/sec"
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Disk Reads/sec"
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Disk Writes/sec"
+    units: operations/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Disk Transfers/sec"
+    units: transfers/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Logical Disk Bytes/sec"
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Physical Disk Bytes/sec"
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Avg. Disk sec/Read"
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Avg. Disk sec/Write"
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Avg. Disk sec/Transfer"
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Current Disk Queue Length"
+    units: operations
+    aggregations: [average]
+    time_grain: PT1M
+  # Legacy Log-based - Paging
+  - name: "Average_Page Reads/sec"
+    units: pages/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Page Writes/sec"
+    units: pages/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Pages/sec"
+    units: pages/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Free Space in Paging Files"
+    units: megabytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Size Stored In Paging Files"
+    units: megabytes
+    aggregations: [average]
+    time_grain: PT1M
+  # Legacy Log-based - Network
+  - name: "Average_Bytes Received/sec"
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Bytes Sent/sec"
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Bytes Total/sec"
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Total Bytes"
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Total Bytes Received"
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Total Bytes Transmitted"
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Total Packets Received"
+    units: packets
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Total Packets Transmitted"
+    units: packets
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Total Collisions"
+    units: collisions
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Total Rx Errors"
+    units: errors
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Total Tx Errors"
+    units: errors
+    aggregations: [average]
+    time_grain: PT1M
+  # Legacy Log-based - System
+  - name: "Average_Processes"
+    units: processes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Processor Queue Length"
+    units: threads
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Uptime"
+    units: seconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: "Average_Users"
+    units: users
+    aggregations: [average]
+    time_grain: PT1M
+  # Legacy Log-based - Events
+  - name: Event
+    units: events/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: Heartbeat
+    units: heartbeats/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: Update
+    units: updates
+    aggregations: [average]
+    time_grain: PT1M
+charts:
+  # -------------------------------------------------------------------------
+  # SLI / Workspace Health
+  # -------------------------------------------------------------------------
+  - id: am_azure_log_analytics__query_availability
+    title: Azure Log Analytics Query Availability
+    context: log_analytics.query_availability
+    family: Availability
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AvailabilityRate_Query
+        aggregation: average
+        name: availability
+
+  - id: am_azure_log_analytics__ingestion_latency
+    title: Azure Log Analytics Ingestion Latency
+    context: log_analytics.ingestion_latency
+    family: Ingestion
+    type: line
+    priority: 1010
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Ingestion Time
+        aggregation: average
+        name: average
+      - metric: Ingestion Time
+        aggregation: maximum
+        name: maximum
+      - metric: Ingestion Time
+        aggregation: minimum
+        name: minimum
+
+  - id: am_azure_log_analytics__ingestion_volume
+    title: Azure Log Analytics Ingestion Volume
+    context: log_analytics.ingestion_volume
+    family: Ingestion
+    type: line
+    priority: 1020
+    units: records/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Ingestion Volume
+        aggregation: count
+        name: records
+
+  # -------------------------------------------------------------------------
+  # User Queries
+  # -------------------------------------------------------------------------
+  - id: am_azure_log_analytics__queries
+    title: Azure Log Analytics Queries
+    context: log_analytics.queries
+    family: Queries
+    type: line
+    priority: 1030
+    units: queries/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Query Count
+        aggregation: count
+        name: total
+      - metric: Query Failure Count
+        aggregation: count
+        name: failed
+
+  # -------------------------------------------------------------------------
+  # Data Export
+  # -------------------------------------------------------------------------
+  - id: am_azure_log_analytics__export_data
+    title: Azure Log Analytics Exported Data
+    context: log_analytics.export_data
+    family: DataExport
+    type: line
+    priority: 1040
+    units: bytes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: BytesExported
+        aggregation: total
+        name: exported
+
+  - id: am_azure_log_analytics__export_records
+    title: Azure Log Analytics Exported Records
+    context: log_analytics.export_records
+    family: DataExport
+    type: line
+    priority: 1050
+    units: records/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RecordsExported
+        aggregation: total
+        name: exported
+
+  - id: am_azure_log_analytics__export_failures
+    title: Azure Log Analytics Export Failures
+    context: log_analytics.export_failures
+    family: DataExport
+    type: line
+    priority: 1060
+    units: exports/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: ExportFailed
+        aggregation: total
+        name: failed
+
+  # -------------------------------------------------------------------------
+  # Legacy Log-based: CPU
+  # -------------------------------------------------------------------------
+  - id: am_azure_log_analytics__legacy_cpu_utilization
+    title: Azure Log Analytics Legacy CPU Utilization
+    context: log_analytics.legacy_cpu_utilization
+    family: "Legacy: CPU"
+    type: line
+    priority: 1070
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_% Processor Time"
+        aggregation: average
+        name: processor
+      - metric: "Average_% Privileged Time"
+        aggregation: average
+        name: privileged
+      - metric: "Average_% User Time"
+        aggregation: average
+        name: user
+      - metric: "Average_% Idle Time"
+        aggregation: average
+        name: idle
+
+  - id: am_azure_log_analytics__legacy_cpu_detailed
+    title: Azure Log Analytics Legacy CPU Detailed
+    context: log_analytics.legacy_cpu_detailed
+    family: "Legacy: CPU"
+    type: line
+    priority: 1080
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_% DPC Time"
+        aggregation: average
+        name: dpc
+      - metric: "Average_% Interrupt Time"
+        aggregation: average
+        name: interrupt
+      - metric: "Average_% IO Wait Time"
+        aggregation: average
+        name: io_wait
+      - metric: "Average_% Nice Time"
+        aggregation: average
+        name: nice
+
+  - id: am_azure_log_analytics__legacy_cpu_pct
+    title: Azure Log Analytics Legacy CPU Pct Time
+    context: log_analytics.legacy_cpu_pct
+    family: "Legacy: CPU"
+    type: line
+    priority: 1090
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Pct Privileged Time"
+        aggregation: average
+        name: privileged
+      - metric: "Average_Pct User Time"
+        aggregation: average
+        name: user
+
+  # -------------------------------------------------------------------------
+  # Legacy Log-based: Memory
+  # -------------------------------------------------------------------------
+  - id: am_azure_log_analytics__legacy_memory_utilization
+    title: Azure Log Analytics Legacy Memory Utilization
+    context: log_analytics.legacy_memory_utilization
+    family: "Legacy: Memory"
+    type: line
+    priority: 1100
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_% Available Memory"
+        aggregation: average
+        name: available
+      - metric: "Average_% Used Memory"
+        aggregation: average
+        name: used
+      - metric: "Average_% Committed Bytes In Use"
+        aggregation: average
+        name: committed
+
+  - id: am_azure_log_analytics__legacy_memory_available
+    title: Azure Log Analytics Legacy Available Memory
+    context: log_analytics.legacy_memory_available
+    family: "Legacy: Memory"
+    type: line
+    priority: 1110
+    units: megabytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Available MBytes"
+        aggregation: average
+        name: available_mbytes
+      - metric: "Average_Available MBytes Memory"
+        aggregation: average
+        name: available_mbytes_memory
+
+  - id: am_azure_log_analytics__legacy_memory_used
+    title: Azure Log Analytics Legacy Used Memory
+    context: log_analytics.legacy_memory_used
+    family: "Legacy: Memory"
+    type: line
+    priority: 1120
+    units: megabytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Used Memory kBytes"
+        aggregation: average
+        name: used_kbytes
+      - metric: "Average_Used Memory MBytes"
+        aggregation: average
+        name: used_mbytes
+
+  - id: am_azure_log_analytics__legacy_memory_free
+    title: Azure Log Analytics Legacy Free Memory
+    context: log_analytics.legacy_memory_free
+    family: "Legacy: Memory"
+    type: line
+    priority: 1130
+    units: megabytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Free Physical Memory"
+        aggregation: average
+        name: physical
+      - metric: "Average_Free Virtual Memory"
+        aggregation: average
+        name: virtual
+      - metric: "Average_Virtual Shared Memory"
+        aggregation: average
+        name: shared
+
+  # -------------------------------------------------------------------------
+  # Legacy Log-based: Swap
+  # -------------------------------------------------------------------------
+  - id: am_azure_log_analytics__legacy_swap_utilization
+    title: Azure Log Analytics Legacy Swap Utilization
+    context: log_analytics.legacy_swap_utilization
+    family: "Legacy: Swap"
+    type: line
+    priority: 1140
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_% Available Swap Space"
+        aggregation: average
+        name: available
+      - metric: "Average_% Used Swap Space"
+        aggregation: average
+        name: used
+
+  - id: am_azure_log_analytics__legacy_swap_size
+    title: Azure Log Analytics Legacy Swap Size
+    context: log_analytics.legacy_swap_size
+    family: "Legacy: Swap"
+    type: line
+    priority: 1150
+    units: megabytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Available MBytes Swap"
+        aggregation: average
+        name: available
+      - metric: "Average_Used MBytes Swap Space"
+        aggregation: average
+        name: used
+
+  # -------------------------------------------------------------------------
+  # Legacy Log-based: Disk Space
+  # -------------------------------------------------------------------------
+  - id: am_azure_log_analytics__legacy_disk_space_utilization
+    title: Azure Log Analytics Legacy Disk Space Utilization
+    context: log_analytics.legacy_disk_space_utilization
+    family: "Legacy: Disk"
+    type: line
+    priority: 1160
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_% Free Space"
+        aggregation: average
+        name: free
+      - metric: "Average_% Used Space"
+        aggregation: average
+        name: used
+
+  - id: am_azure_log_analytics__legacy_disk_inodes
+    title: Azure Log Analytics Legacy Disk Inodes
+    context: log_analytics.legacy_disk_inodes
+    family: "Legacy: Disk"
+    type: line
+    priority: 1170
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_% Free Inodes"
+        aggregation: average
+        name: free
+      - metric: "Average_% Used Inodes"
+        aggregation: average
+        name: used
+
+  - id: am_azure_log_analytics__legacy_disk_free
+    title: Azure Log Analytics Legacy Disk Free Space
+    context: log_analytics.legacy_disk_free
+    family: "Legacy: Disk"
+    type: line
+    priority: 1180
+    units: megabytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Free Megabytes"
+        aggregation: average
+        name: free
+
+  # -------------------------------------------------------------------------
+  # Legacy Log-based: Disk I/O
+  # -------------------------------------------------------------------------
+  - id: am_azure_log_analytics__legacy_disk_io_throughput
+    title: Azure Log Analytics Legacy Disk I/O Throughput
+    context: log_analytics.legacy_disk_io_throughput
+    family: "Legacy: Disk"
+    type: line
+    priority: 1190
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Disk Read Bytes/sec"
+        aggregation: average
+        name: read
+      - metric: "Average_Disk Write Bytes/sec"
+        aggregation: average
+        name: write
+      - metric: "Average_Logical Disk Bytes/sec"
+        aggregation: average
+        name: logical
+      - metric: "Average_Physical Disk Bytes/sec"
+        aggregation: average
+        name: physical
+
+  - id: am_azure_log_analytics__legacy_disk_io_operations
+    title: Azure Log Analytics Legacy Disk I/O Operations
+    context: log_analytics.legacy_disk_io_operations
+    family: "Legacy: Disk"
+    type: line
+    priority: 1200
+    units: operations/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Disk Reads/sec"
+        aggregation: average
+        name: reads
+      - metric: "Average_Disk Writes/sec"
+        aggregation: average
+        name: writes
+      - metric: "Average_Disk Transfers/sec"
+        aggregation: average
+        name: transfers
+
+  - id: am_azure_log_analytics__legacy_disk_io_latency
+    title: Azure Log Analytics Legacy Disk I/O Latency
+    context: log_analytics.legacy_disk_io_latency
+    family: "Legacy: Disk"
+    type: line
+    priority: 1210
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Avg. Disk sec/Read"
+        aggregation: average
+        name: read
+      - metric: "Average_Avg. Disk sec/Write"
+        aggregation: average
+        name: write
+      - metric: "Average_Avg. Disk sec/Transfer"
+        aggregation: average
+        name: transfer
+
+  - id: am_azure_log_analytics__legacy_disk_queue
+    title: Azure Log Analytics Legacy Disk Queue Length
+    context: log_analytics.legacy_disk_queue
+    family: "Legacy: Disk"
+    type: line
+    priority: 1220
+    units: operations
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Current Disk Queue Length"
+        aggregation: average
+        name: queue_length
+
+  # -------------------------------------------------------------------------
+  # Legacy Log-based: Paging
+  # -------------------------------------------------------------------------
+  - id: am_azure_log_analytics__legacy_paging
+    title: Azure Log Analytics Legacy Paging Activity
+    context: log_analytics.legacy_paging
+    family: "Legacy: Memory"
+    type: line
+    priority: 1230
+    units: pages/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Page Reads/sec"
+        aggregation: average
+        name: reads
+      - metric: "Average_Page Writes/sec"
+        aggregation: average
+        name: writes
+      - metric: "Average_Pages/sec"
+        aggregation: average
+        name: total
+
+  - id: am_azure_log_analytics__legacy_paging_files
+    title: Azure Log Analytics Legacy Paging Files
+    context: log_analytics.legacy_paging_files
+    family: "Legacy: Memory"
+    type: line
+    priority: 1240
+    units: megabytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Free Space in Paging Files"
+        aggregation: average
+        name: free
+      - metric: "Average_Size Stored In Paging Files"
+        aggregation: average
+        name: stored
+
+  # -------------------------------------------------------------------------
+  # Legacy Log-based: Network (Windows)
+  # -------------------------------------------------------------------------
+  - id: am_azure_log_analytics__legacy_network_throughput_win
+    title: Azure Log Analytics Legacy Network Throughput (Windows)
+    context: log_analytics.legacy_network_throughput_win
+    family: "Legacy: Network"
+    type: line
+    priority: 1250
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Bytes Received/sec"
+        aggregation: average
+        name: received
+      - metric: "Average_Bytes Sent/sec"
+        aggregation: average
+        name: sent
+      - metric: "Average_Bytes Total/sec"
+        aggregation: average
+        name: total
+
+  # -------------------------------------------------------------------------
+  # Legacy Log-based: Network (Linux)
+  # -------------------------------------------------------------------------
+  - id: am_azure_log_analytics__legacy_network_traffic
+    title: Azure Log Analytics Legacy Network Traffic
+    context: log_analytics.legacy_network_traffic
+    family: "Legacy: Network"
+    type: line
+    priority: 1260
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Total Bytes"
+        aggregation: average
+        name: total
+      - metric: "Average_Total Bytes Received"
+        aggregation: average
+        name: received
+      - metric: "Average_Total Bytes Transmitted"
+        aggregation: average
+        name: transmitted
+
+  - id: am_azure_log_analytics__legacy_network_packets
+    title: Azure Log Analytics Legacy Network Packets
+    context: log_analytics.legacy_network_packets
+    family: "Legacy: Network"
+    type: line
+    priority: 1270
+    units: packets
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Total Packets Received"
+        aggregation: average
+        name: received
+      - metric: "Average_Total Packets Transmitted"
+        aggregation: average
+        name: transmitted
+
+  - id: am_azure_log_analytics__legacy_network_errors
+    title: Azure Log Analytics Legacy Network Errors
+    context: log_analytics.legacy_network_errors
+    family: "Legacy: Network"
+    type: line
+    priority: 1280
+    units: errors
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Total Rx Errors"
+        aggregation: average
+        name: rx
+      - metric: "Average_Total Tx Errors"
+        aggregation: average
+        name: tx
+      - metric: "Average_Total Collisions"
+        aggregation: average
+        name: collisions
+
+  # -------------------------------------------------------------------------
+  # Legacy Log-based: System
+  # -------------------------------------------------------------------------
+  - id: am_azure_log_analytics__legacy_system
+    title: Azure Log Analytics Legacy System
+    context: log_analytics.legacy_system
+    family: "Legacy: System"
+    type: line
+    priority: 1290
+    units: processes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Processes"
+        aggregation: average
+        name: processes
+
+  - id: am_azure_log_analytics__legacy_processor_queue
+    title: Azure Log Analytics Legacy Processor Queue
+    context: log_analytics.legacy_processor_queue
+    family: "Legacy: System"
+    type: line
+    priority: 1300
+    units: threads
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Processor Queue Length"
+        aggregation: average
+        name: queue_length
+
+  - id: am_azure_log_analytics__legacy_uptime
+    title: Azure Log Analytics Legacy Uptime
+    context: log_analytics.legacy_uptime
+    family: "Legacy: System"
+    type: line
+    priority: 1310
+    units: seconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Uptime"
+        aggregation: average
+        name: uptime
+
+  - id: am_azure_log_analytics__legacy_users
+    title: Azure Log Analytics Legacy Users
+    context: log_analytics.legacy_users
+    family: "Legacy: System"
+    type: line
+    priority: 1320
+    units: users
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: "Average_Users"
+        aggregation: average
+        name: users
+
+  # -------------------------------------------------------------------------
+  # Legacy Log-based: Events / Heartbeat / Updates
+  # -------------------------------------------------------------------------
+  - id: am_azure_log_analytics__legacy_events
+    title: Azure Log Analytics Legacy Events
+    context: log_analytics.legacy_events
+    family: "Legacy: Events"
+    type: line
+    priority: 1330
+    units: events/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Event
+        aggregation: average
+        name: events
+
+  - id: am_azure_log_analytics__legacy_heartbeat
+    title: Azure Log Analytics Legacy Heartbeat
+    context: log_analytics.legacy_heartbeat
+    family: "Legacy: Events"
+    type: line
+    priority: 1340
+    units: heartbeats/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Heartbeat
+        aggregation: total
+        name: heartbeats
+
+  - id: am_azure_log_analytics__legacy_updates
+    title: Azure Log Analytics Legacy Updates
+    context: log_analytics.legacy_updates
+    family: "Legacy: Events"
+    type: line
+    priority: 1350
+    units: updates
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: Update
+        aggregation: average
+        name: updates

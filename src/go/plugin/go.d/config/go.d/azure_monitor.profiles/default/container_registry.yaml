@@ -1,0 +1,125 @@
+name: Azure Container Registry
+resource_type: Microsoft.ContainerRegistry/registries
+metrics:
+  # Storage
+  - name: StorageUsed
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1H
+  # Image Operations
+  - name: SuccessfulPullCount
+    units: pulls/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: SuccessfulPushCount
+    units: pushes/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TotalPullCount
+    units: pulls/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: TotalPushCount
+    units: pushes/s
+    aggregations: [total]
+    time_grain: PT1M
+  # Task Runs
+  - name: AgentPoolCPUTime
+    units: seconds/s
+    aggregations: [total]
+    time_grain: PT1M
+  - name: RunDuration
+    units: milliseconds/s
+    aggregations: [total]
+    time_grain: PT1M
+charts:
+  # Storage
+  - id: am_azure_container_registry__storage_used
+    title: Azure Container Registry Storage Used
+    context: container_registry.storage_used
+    family: Storage
+    type: line
+    priority: 1000
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: StorageUsed
+        aggregation: average
+        name: used
+
+  # Image Pull Operations
+  - id: am_azure_container_registry__pull_count
+    title: Azure Container Registry Image Pulls
+    context: container_registry.pull_count
+    family: Operations
+    type: line
+    priority: 1010
+    units: pulls/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SuccessfulPullCount
+        aggregation: total
+        name: successful
+      - metric: TotalPullCount
+        aggregation: total
+        name: total
+
+  # Image Push Operations
+  - id: am_azure_container_registry__push_count
+    title: Azure Container Registry Image Pushes
+    context: container_registry.push_count
+    family: Operations
+    type: line
+    priority: 1020
+    units: pushes/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: SuccessfulPushCount
+        aggregation: total
+        name: successful
+      - metric: TotalPushCount
+        aggregation: total
+        name: total
+
+  # Task Run CPU Time
+  - id: am_azure_container_registry__agentpool_cpu_time
+    title: Azure Container Registry AgentPool CPU Time
+    context: container_registry.agentpool_cpu_time
+    family: Tasks
+    type: line
+    priority: 1030
+    units: seconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: AgentPoolCPUTime
+        aggregation: total
+        name: cpu_time
+
+  # Task Run Duration
+  - id: am_azure_container_registry__run_duration
+    title: Azure Container Registry Task Run Duration
+    context: container_registry.run_duration
+    family: Tasks
+    type: line
+    priority: 1040
+    units: milliseconds/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: RunDuration
+        aggregation: total
+        name: duration

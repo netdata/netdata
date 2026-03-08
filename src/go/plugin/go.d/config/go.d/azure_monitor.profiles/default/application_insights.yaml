@@ -1,0 +1,504 @@
+name: Azure Application Insights
+resource_type: Microsoft.Insights/components
+metrics:
+  # Availability
+  - name: availabilityResults/availabilityPercentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: availabilityResults/count
+    units: tests/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: availabilityResults/duration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Browser
+  - name: browserTimings/networkDuration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: browserTimings/processingDuration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: browserTimings/receiveDuration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: browserTimings/sendDuration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: browserTimings/totalDuration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  # Server - Requests
+  - name: requests/count
+    units: requests/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: requests/duration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: requests/failed
+    units: requests/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: requests/rate
+    units: requests/s
+    aggregations: [average]
+    time_grain: PT1M
+  # Server - Dependencies
+  - name: dependencies/count
+    units: calls/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: dependencies/duration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: dependencies/failed
+    units: calls/s
+    aggregations: [count]
+    time_grain: PT1M
+  # Failures - Exceptions
+  - name: exceptions/count
+    units: exceptions/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: exceptions/browser
+    units: exceptions/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: exceptions/server
+    units: exceptions/s
+    aggregations: [count]
+    time_grain: PT1M
+  # Performance Counters
+  - name: performanceCounters/processCpuPercentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: performanceCounters/processorCpuPercentage
+    units: percentage
+    aggregations: [average]
+    time_grain: PT1M
+  - name: performanceCounters/memoryAvailableBytes
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: performanceCounters/processPrivateBytes
+    units: bytes
+    aggregations: [average]
+    time_grain: PT1M
+  - name: performanceCounters/processIOBytesPerSecond
+    units: bytes/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: performanceCounters/exceptionsPerSecond
+    units: exceptions/s
+    aggregations: [average]
+    time_grain: PT1M
+  - name: performanceCounters/requestExecutionTime
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: performanceCounters/requestsInQueue
+    units: requests
+    aggregations: [average]
+    time_grain: PT1M
+  - name: performanceCounters/requestsPerSecond
+    units: requests/s
+    aggregations: [average]
+    time_grain: PT1M
+  # Usage
+  - name: pageViews/count
+    units: views/s
+    aggregations: [count]
+    time_grain: PT1M
+  - name: pageViews/duration
+    units: milliseconds
+    aggregations: [average]
+    time_grain: PT1M
+  - name: traces/count
+    units: traces/s
+    aggregations: [count]
+    time_grain: PT1M
+charts:
+  # ── Availability ──────────────────────────────────────────────────────────
+  - id: am_azure_application_insights__availability_percentage
+    title: Azure Application Insights Availability
+    context: application_insights.availability_percentage
+    family: Availability
+    type: line
+    priority: 1000
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: availabilityResults/availabilityPercentage
+        aggregation: average
+        name: average
+
+  - id: am_azure_application_insights__availability_tests
+    title: Azure Application Insights Availability Tests
+    context: application_insights.availability_tests
+    family: Availability
+    type: line
+    priority: 1010
+    units: tests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: availabilityResults/count
+        aggregation: count
+        name: tests
+
+  - id: am_azure_application_insights__availability_duration
+    title: Azure Application Insights Availability Test Duration
+    context: application_insights.availability_duration
+    family: Availability
+    type: line
+    priority: 1020
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: availabilityResults/duration
+        aggregation: average
+        name: average
+
+  # ── Requests ──────────────────────────────────────────────────────────────
+  - id: am_azure_application_insights__server_requests
+    title: Azure Application Insights Server Requests
+    context: application_insights.server_requests
+    family: Requests
+    type: line
+    priority: 1030
+    units: requests/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: requests/count
+        aggregation: count
+        name: total
+      - metric: requests/failed
+        aggregation: count
+        name: failed
+
+  - id: am_azure_application_insights__server_request_rate
+    title: Azure Application Insights Server Request Rate
+    context: application_insights.server_request_rate
+    family: Requests
+    type: line
+    priority: 1040
+    units: requests/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: requests/rate
+        aggregation: average
+        name: average
+
+  - id: am_azure_application_insights__server_response_time
+    title: Azure Application Insights Server Response Time
+    context: application_insights.server_response_time
+    family: Requests
+    type: line
+    priority: 1050
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: requests/duration
+        aggregation: average
+        name: average
+
+  # ── Dependencies ──────────────────────────────────────────────────────────
+  - id: am_azure_application_insights__dependency_calls
+    title: Azure Application Insights Dependency Calls
+    context: application_insights.dependency_calls
+    family: Dependencies
+    type: line
+    priority: 1060
+    units: calls/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: dependencies/count
+        aggregation: count
+        name: total
+      - metric: dependencies/failed
+        aggregation: count
+        name: failed
+
+  - id: am_azure_application_insights__dependency_duration
+    title: Azure Application Insights Dependency Duration
+    context: application_insights.dependency_duration
+    family: Dependencies
+    type: line
+    priority: 1070
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: dependencies/duration
+        aggregation: average
+        name: average
+
+  # ── Exceptions ────────────────────────────────────────────────────────────
+  - id: am_azure_application_insights__exceptions
+    title: Azure Application Insights Exceptions
+    context: application_insights.exceptions
+    family: Exceptions
+    type: line
+    priority: 1080
+    units: exceptions/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: exceptions/count
+        aggregation: count
+        name: total
+      - metric: exceptions/browser
+        aggregation: count
+        name: browser
+      - metric: exceptions/server
+        aggregation: count
+        name: server
+
+  # ── Browser ───────────────────────────────────────────────────────────────
+  - id: am_azure_application_insights__browser_page_load_time
+    title: Azure Application Insights Browser Page Load Time
+    context: application_insights.browser_page_load_time
+    family: Browser
+    type: line
+    priority: 1090
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: browserTimings/totalDuration
+        aggregation: average
+        name: total
+
+  - id: am_azure_application_insights__browser_timing_breakdown
+    title: Azure Application Insights Browser Timing Breakdown
+    context: application_insights.browser_timing_breakdown
+    family: Browser
+    type: line
+    priority: 1100
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: browserTimings/networkDuration
+        aggregation: average
+        name: network
+      - metric: browserTimings/sendDuration
+        aggregation: average
+        name: send
+      - metric: browserTimings/receiveDuration
+        aggregation: average
+        name: receive
+      - metric: browserTimings/processingDuration
+        aggregation: average
+        name: processing
+
+  # ── Performance - CPU ─────────────────────────────────────────────────────
+  - id: am_azure_application_insights__cpu_utilization
+    title: Azure Application Insights CPU Utilization
+    context: application_insights.cpu_utilization
+    family: Performance
+    type: line
+    priority: 1110
+    units: percentage
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: performanceCounters/processCpuPercentage
+        aggregation: average
+        name: process
+      - metric: performanceCounters/processorCpuPercentage
+        aggregation: average
+        name: processor
+
+  # ── Performance - Memory ──────────────────────────────────────────────────
+  - id: am_azure_application_insights__memory
+    title: Azure Application Insights Memory
+    context: application_insights.memory
+    family: Performance
+    type: line
+    priority: 1120
+    units: bytes
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: performanceCounters/memoryAvailableBytes
+        aggregation: average
+        name: available
+      - metric: performanceCounters/processPrivateBytes
+        aggregation: average
+        name: private
+
+  # ── Performance - IO ──────────────────────────────────────────────────────
+  - id: am_azure_application_insights__process_io_rate
+    title: Azure Application Insights Process IO Rate
+    context: application_insights.process_io_rate
+    family: Performance
+    type: line
+    priority: 1130
+    units: bytes/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: performanceCounters/processIOBytesPerSecond
+        aggregation: average
+        name: average
+
+  # ── Performance - Exception Rate ──────────────────────────────────────────
+  - id: am_azure_application_insights__exception_rate
+    title: Azure Application Insights Exception Rate
+    context: application_insights.exception_rate
+    family: Performance
+    type: line
+    priority: 1140
+    units: exceptions/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: performanceCounters/exceptionsPerSecond
+        aggregation: average
+        name: average
+
+  # ── Performance - HTTP Pipeline ───────────────────────────────────────────
+  - id: am_azure_application_insights__http_request_execution_time
+    title: Azure Application Insights HTTP Request Execution Time
+    context: application_insights.http_request_execution_time
+    family: Performance
+    type: line
+    priority: 1150
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: performanceCounters/requestExecutionTime
+        aggregation: average
+        name: average
+
+  - id: am_azure_application_insights__http_request_queue
+    title: Azure Application Insights HTTP Requests in Queue
+    context: application_insights.http_request_queue
+    family: Performance
+    type: line
+    priority: 1160
+    units: requests
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: performanceCounters/requestsInQueue
+        aggregation: average
+        name: queued
+
+  - id: am_azure_application_insights__http_request_rate
+    title: Azure Application Insights HTTP Request Rate
+    context: application_insights.http_request_rate
+    family: Performance
+    type: line
+    priority: 1170
+    units: requests/s
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: performanceCounters/requestsPerSecond
+        aggregation: average
+        name: average
+
+  # ── Usage ─────────────────────────────────────────────────────────────────
+  - id: am_azure_application_insights__page_views
+    title: Azure Application Insights Page Views
+    context: application_insights.page_views
+    family: Usage
+    type: line
+    priority: 1180
+    units: views/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: pageViews/count
+        aggregation: count
+        name: views
+
+  - id: am_azure_application_insights__page_view_load_time
+    title: Azure Application Insights Page View Load Time
+    context: application_insights.page_view_load_time
+    family: Usage
+    type: line
+    priority: 1190
+    units: milliseconds
+    algorithm: absolute
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: pageViews/duration
+        aggregation: average
+        name: average
+
+  - id: am_azure_application_insights__traces
+    title: Azure Application Insights Traces
+    context: application_insights.traces
+    family: Usage
+    type: line
+    priority: 1200
+    units: traces/s
+    algorithm: incremental
+    label_promotion: [resource_name, resource_group, region, resource_type, profile]
+    instances:
+      by_labels: [resource_uid]
+    dimensions:
+      - metric: traces/count
+        aggregation: count
+        name: traces

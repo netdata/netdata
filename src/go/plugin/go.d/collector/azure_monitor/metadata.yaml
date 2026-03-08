@@ -535,3 +535,102 @@ modules:
         icon_filename: azure.svg
         categories:
           - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-container_registry
+      monitored_instance:
+        name: Azure Container Registry
+        link: https://learn.microsoft.com/azure/container-registry/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-application_insights
+      monitored_instance:
+        name: Azure Application Insights
+        link: https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-express_route_circuit
+      monitored_instance:
+        name: Azure ExpressRoute Circuit
+        link: https://learn.microsoft.com/azure/expressroute/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-machine_learning
+      monitored_instance:
+        name: Azure Machine Learning Workspace
+        link: https://learn.microsoft.com/azure/machine-learning/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-data_explorer
+      monitored_instance:
+        name: Azure Data Explorer Cluster
+        link: https://learn.microsoft.com/azure/data-explorer/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-stream_analytics
+      monitored_instance:
+        name: Azure Stream Analytics Job
+        link: https://learn.microsoft.com/azure/stream-analytics/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-synapse
+      monitored_instance:
+        name: Azure Synapse Analytics Workspace
+        link: https://learn.microsoft.com/azure/synapse-analytics/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-log_analytics
+      monitored_instance:
+        name: Azure Log Analytics Workspace
+        link: https://learn.microsoft.com/azure/azure-monitor/logs/
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-azure_monitor-express_route_gateway
+      monitored_instance:
+        name: Azure ExpressRoute Gateway
+        link: https://learn.microsoft.com/azure/expressroute/expressroute-about-virtual-network-gateways
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud
