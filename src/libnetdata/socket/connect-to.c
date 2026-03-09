@@ -378,7 +378,7 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
         scope_id = if_nametoindex(iface);
         if(!scope_id)
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "Cannot find a network interface named '%s'. Continuing with limiting the network interface",
+                   "Cannot find a network interface named '%s'. Continuing without limiting the network interface",
                    iface);
     }
 
