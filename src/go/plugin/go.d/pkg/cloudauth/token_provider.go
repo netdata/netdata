@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package azureauth
+package cloudauth
 
 import (
 	"context"

@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package azureauth
+package sqlcloudauth
 
 import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/azureadauth"
 )
 
 const (
@@ -17,27 +20,29 @@ const (
 	mssqlFedAuthServicePrincipal = "ActiveDirectoryServicePrincipal"
 )
 
-func MSSQLDriver(cfg Config) string {
-	if cfg.Enabled {
+func MSSQLDriver(cfg cloudauth.Config) string {
+	if cfg.IsProvider(cloudauth.ProviderAzureAD) {
 		return MSSQLAzureDriverName
 	}
 	return MSSQLDriverName
 }
 
-func BuildMSSQLAzureADDSN(baseDSN string, cfg Config) (string, error) {
+func BuildMSSQLAzureADDSN(baseDSN string, cfg cloudauth.Config) (string, error) {
 	if err := cfg.Validate(); err != nil {
 		return "", err
 	}
-	if !cfg.Enabled {
+	if !cfg.IsProvider(cloudauth.ProviderAzureAD) {
 		return baseDSN, nil
 	}
+
+	aadCfg := cfg.AzureAD
 
 	u, err := url.Parse(baseDSN)
 	if err != nil {
 		return "", fmt.Errorf("parsing SQL Server DSN: %w", err)
 	}
 	if !strings.EqualFold(u.Scheme, "sqlserver") {
-		return "", fmt.Errorf("azure_ad requires URL DSN with sqlserver scheme, got %q", u.Scheme)
+		return "", fmt.Errorf("cloud_auth.provider %q requires URL DSN with sqlserver scheme, got %q", cloudauth.ProviderAzureAD, u.Scheme)
 	}
 
 	q := u.Query()
@@ -48,27 +53,27 @@ func BuildMSSQLAzureADDSN(baseDSN string, cfg Config) (string, error) {
 		}
 	}
 
-	switch cfg.normalizedMode() {
-	case ModeServicePrincipal:
+	switch aadCfg.NormalizedMode() {
+	case azureadauth.ModeServicePrincipal:
 		q.Set("fedauth", mssqlFedAuthServicePrincipal)
-		clientID := strings.TrimSpace(cfg.ClientID)
-		clientSecret := strings.TrimSpace(cfg.ClientSecret)
+		clientID := strings.TrimSpace(aadCfg.ClientID)
+		clientSecret := strings.TrimSpace(aadCfg.ClientSecret)
 		userID := clientID
-		if tenantID := strings.TrimSpace(cfg.TenantID); tenantID != "" {
+		if tenantID := strings.TrimSpace(aadCfg.TenantID); tenantID != "" {
 			userID = userID + "@" + tenantID
 		}
 		u.User = url.UserPassword(userID, clientSecret)
-	case ModeManagedIdentity:
+	case azureadauth.ModeManagedIdentity:
 		q.Set("fedauth", mssqlFedAuthManagedIdentity)
 		u.User = nil
-		if id := strings.TrimSpace(cfg.ManagedIdentityClientID); id != "" {
+		if id := strings.TrimSpace(aadCfg.ManagedIdentityClientID); id != "" {
 			q.Set("user id", id)
 		}
-	case ModeDefault:
+	case azureadauth.ModeDefault:
 		q.Set("fedauth", mssqlFedAuthDefault)
 		u.User = nil
 	default:
-		return "", fmt.Errorf("unsupported azure_ad.mode %q", cfg.Mode)
+		return "", fmt.Errorf("unsupported cloud_auth.azure_ad.mode %q", aadCfg.Mode)
 	}
 
 	u.RawQuery = q.Encode()

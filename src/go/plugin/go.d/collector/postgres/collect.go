@@ -127,7 +127,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 }
 
 func (c *Collector) openPrimaryConnection() (*sql.DB, error) {
-	if c.AzureAD.Enabled {
+	if c.CloudAuth.IsEnabled() {
 		cfg, err := pgx.ParseConfig(c.DSN)
 		if err != nil {
 			return nil, fmt.Errorf("error on parsing DSN [%s]: %v", c.DSN, err)
@@ -163,7 +163,7 @@ func (c *Collector) openSecondaryConnection(dbname string) (*sql.DB, string, err
 
 	cfg.Database = dbname
 
-	if c.AzureAD.Enabled {
+	if c.CloudAuth.IsEnabled() {
 		db, err := c.openAzureADConnection(cfg, fmt.Sprintf("secondary Postgres database [%s]", dbname))
 		return db, "", err
 	}
@@ -194,7 +194,7 @@ func (c *Collector) openSecondaryConnection(dbname string) (*sql.DB, string, err
 
 func (c *Collector) openAzureADConnection(cfg *pgx.ConnConfig, target string) (*sql.DB, error) {
 	if c.azureTokenProvider == nil {
-		return nil, fmt.Errorf("azure token provider is not initialized for %s", target)
+		return nil, fmt.Errorf("cloud auth token provider is not initialized for %s", target)
 	}
 
 	db := stdlib.OpenDB(*cfg, stdlib.OptionBeforeConnect(c.azureADBeforeConnect))

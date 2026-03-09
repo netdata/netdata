@@ -14,8 +14,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/sqlcloudauth"
 )
 
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
@@ -169,17 +169,17 @@ func (c *Collector) openConnection(ctx context.Context) error {
 	driverName := c.Driver
 	dsn := c.DSN
 
-	if c.AzureAD.Enabled {
+	if c.CloudAuth.IsEnabled() {
 		switch c.Driver {
 		case "pgx":
 			return c.openPostgresAzureADConnection(ctx)
 		case "sqlserver", "azuresql":
 			var err error
-			dsn, err = azureauth.BuildMSSQLAzureADDSN(c.DSN, c.AzureAD)
+			dsn, err = sqlcloudauth.BuildMSSQLAzureADDSN(c.DSN, c.CloudAuth)
 			if err != nil {
-				return fmt.Errorf("prepare Azure AD SQL Server DSN: %w", err)
+				return fmt.Errorf("prepare cloud_auth SQL Server DSN: %w", err)
 			}
-			driverName = azureauth.MSSQLAzureDriverName
+			driverName = sqlcloudauth.MSSQLAzureDriverName
 		}
 	}
 
@@ -208,7 +208,7 @@ func (c *Collector) openConnection(ctx context.Context) error {
 
 func (c *Collector) openPostgresAzureADConnection(ctx context.Context) error {
 	if c.azureTokenProvider == nil {
-		return errors.New("azure token provider is not initialized for pgx")
+		return errors.New("cloud auth token provider is not initialized for pgx")
 	}
 
 	cfg, err := pgx.ParseConfig(c.DSN)

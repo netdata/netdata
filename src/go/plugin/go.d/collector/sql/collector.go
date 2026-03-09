@@ -12,7 +12,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/sqlcloudauth"
 )
 
 //go:embed "config_schema.json"
@@ -54,7 +55,7 @@ type Collector struct {
 
 	funcTable *funcTable
 
-	azureTokenProvider *azureauth.TokenProvider
+	azureTokenProvider *cloudauth.TokenProvider
 }
 
 func (c *Collector) Configuration() any {
@@ -72,15 +73,15 @@ func (c *Collector) Init(context.Context) error {
 	if err := c.validateConfig(); err != nil {
 		return err
 	}
-	if c.AzureAD.Enabled && c.Driver == "pgx" {
-		cred, err := c.AzureAD.NewCredential()
+	if c.CloudAuth.IsProvider(cloudauth.ProviderAzureAD) && c.Driver == "pgx" {
+		cred, err := c.CloudAuth.NewCredential()
 		if err != nil {
 			return err
 		}
-		provider, err := azureauth.NewTokenProvider(
+		provider, err := cloudauth.NewTokenProvider(
 			cred,
-			[]string{azureauth.PostgreSQLAADScope},
-			azureauth.DefaultTokenRefreshMargin,
+			[]string{sqlcloudauth.AzurePostgreSQLAADScope},
+			cloudauth.DefaultTokenRefreshMargin,
 		)
 		if err != nil {
 			return err

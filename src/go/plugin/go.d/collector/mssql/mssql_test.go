@@ -6,7 +6,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/azureadauth"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,10 +27,10 @@ func TestCollector_Init_EmptyDSN(t *testing.T) {
 
 func TestCollector_Init_InvalidAzureADConfig(t *testing.T) {
 	c := New()
-	c.AzureAD.Enabled = true
-	c.AzureAD.Mode = "service_principal"
-	c.AzureAD.ClientID = "client-id"
-	c.AzureAD.TenantID = "tenant-id"
+	c.CloudAuth.Provider = cloudauth.ProviderAzureAD
+	c.CloudAuth.AzureAD.Mode = azureadauth.ModeServicePrincipal
+	c.CloudAuth.AzureAD.ClientID = "client-id"
+	c.CloudAuth.AzureAD.TenantID = "tenant-id"
 	// Missing client_secret.
 
 	assert.Error(t, c.Init(context.Background()))
@@ -38,12 +39,12 @@ func TestCollector_Init_InvalidAzureADConfig(t *testing.T) {
 func TestCollector_openConnection_AzureADRequiresURLDSN(t *testing.T) {
 	c := New()
 	c.DSN = "server=localhost;database=master"
-	c.AzureAD.Enabled = true
-	c.AzureAD.Mode = azureauth.ModeDefault
+	c.CloudAuth.Provider = cloudauth.ProviderAzureAD
+	c.CloudAuth.AzureAD.Mode = azureadauth.ModeDefault
 
 	db, err := c.openConnection()
 	assert.Nil(t, db)
-	assert.ErrorContains(t, err, "error preparing Azure AD SQL Server DSN")
+	assert.ErrorContains(t, err, "error preparing cloud auth SQL Server DSN")
 }
 
 func TestCollector_Configuration(t *testing.T) {

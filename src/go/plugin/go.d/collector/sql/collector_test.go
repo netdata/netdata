@@ -148,8 +148,8 @@ func TestCollector_Init_ConfigValidation(t *testing.T) {
 				c.DSN = "user:pass@tcp(localhost:3306)/"
 				c.FunctionOnly = true
 				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
-				c.AzureAD.Enabled = true
-				c.AzureAD.Mode = "default"
+				c.CloudAuth.Provider = "azure_ad"
+				c.CloudAuth.AzureAD.Mode = "default"
 			},
 			wantFail: true,
 		},
@@ -159,10 +159,10 @@ func TestCollector_Init_ConfigValidation(t *testing.T) {
 				c.DSN = "postgres://user@localhost/db"
 				c.FunctionOnly = true
 				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
-				c.AzureAD.Enabled = true
-				c.AzureAD.Mode = "service_principal"
-				c.AzureAD.TenantID = "tenant"
-				c.AzureAD.ClientID = "client"
+				c.CloudAuth.Provider = "azure_ad"
+				c.CloudAuth.AzureAD.Mode = "service_principal"
+				c.CloudAuth.AzureAD.TenantID = "tenant"
+				c.CloudAuth.AzureAD.ClientID = "client"
 			},
 			wantFail: true,
 		},

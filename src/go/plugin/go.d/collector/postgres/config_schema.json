@@ -24,48 +24,87 @@
         "type": "string",
         "default": "postgres://netdata:password@127.0.0.1:5432/postgres"
       },
-      "azure_ad": {
-        "title": "Azure AD",
-        "description": "Optional Microsoft Entra (Azure AD) token authentication for Azure Database for PostgreSQL.",
+      "cloud_auth": {
+        "title": "Cloud auth",
+        "description": "Optional cloud authentication settings for Azure Database for PostgreSQL.",
         "type": "object",
         "properties": {
-          "enabled": {
-            "title": "Enabled",
-            "description": "Enable Azure AD token authentication.",
-            "type": "boolean",
-            "default": false
-          },
-          "mode": {
-            "title": "Mode",
-            "description": "Azure AD credential mode.",
+          "provider": {
+            "title": "Provider",
+            "description": "Cloud auth provider. Use `none` (or leave empty) to disable cloud authentication.",
             "type": "string",
             "enum": [
-              "service_principal",
-              "managed_identity",
-              "default"
+              "none",
+              "azure_ad",
+              ""
             ],
-            "default": "default"
+            "default": "none"
           },
-          "tenant_id": {
-            "title": "Tenant ID",
-            "description": "Azure tenant ID. Required for service_principal mode.",
-            "type": "string"
-          },
-          "client_id": {
-            "title": "Client ID",
-            "description": "Service principal client ID for service_principal mode.",
-            "type": "string"
-          },
-          "client_secret": {
-            "title": "Client Secret",
-            "description": "Service principal client secret for service_principal mode.",
-            "type": "string",
-            "sensitive": true
-          },
-          "managed_identity_client_id": {
-            "title": "Managed Identity Client ID",
-            "description": "Optional client ID of a user-assigned managed identity.",
-            "type": "string"
+          "azure_ad": {
+            "title": "Azure AD",
+            "description": "Microsoft Entra (Azure AD) settings used when provider is `azure_ad`.",
+            "type": "object",
+            "properties": {
+              "mode": {
+                "title": "Mode",
+                "description": "Azure AD credential mode.",
+                "type": "string",
+                "enum": [
+                  "service_principal",
+                  "managed_identity",
+                  "default"
+                ],
+                "default": "default"
+              },
+              "tenant_id": {
+                "title": "Tenant ID",
+                "description": "Azure tenant ID. Required for service_principal mode.",
+                "type": "string"
+              },
+              "client_id": {
+                "title": "Client ID",
+                "description": "Service principal client ID for service_principal mode.",
+                "type": "string"
+              },
+              "client_secret": {
+                "title": "Client Secret",
+                "description": "Service principal client secret for service_principal mode.",
+                "type": "string",
+                "sensitive": true
+              },
+              "managed_identity_client_id": {
+                "title": "Managed Identity Client ID",
+                "description": "Optional client ID of a user-assigned managed identity.",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "dependencies": {
+          "provider": {
+            "oneOf": [
+              {
+                "properties": {
+                  "provider": {
+                    "const": "none"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "provider": {
+                    "const": ""
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "provider": {
+                    "const": "azure_ad"
+                  }
+                }
+              }
+            ]
           }
         }
       },
@@ -196,7 +235,7 @@
             "update_every",
             "autodetection_retry",
             "dsn",
-            "azure_ad",
+            "cloud_auth",
             "timeout",
             "vnode"
           ]
@@ -233,12 +272,20 @@
     "dsn": {
       "ui:placeholder": "postgres://username:password@host:port/dbname"
     },
-    "azure_ad": {
-      "mode": {
-        "ui:help": "Use `service_principal`, `managed_identity`, or `default` credential chain."
+    "cloud_auth": {
+      "provider": {
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
       },
-      "client_secret": {
-        "ui:widget": "password"
+      "azure_ad": {
+        "mode": {
+          "ui:help": "Use `service_principal`, `managed_identity`, or `default` credential chain."
+        },
+        "client_secret": {
+          "ui:widget": "password"
+        }
       }
     },
     "transaction_time_histogram": {

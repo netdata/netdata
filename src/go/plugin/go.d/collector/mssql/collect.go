@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/sqlcloudauth"
 )
 
 // noLatencySentinel is the value SQL Server returns when no latency data is available
@@ -58,13 +58,13 @@ func (c *Collector) collect() (map[string]int64, error) {
 }
 
 func (c *Collector) openConnection() (*sql.DB, error) {
-	driverName := azureauth.MSSQLDriver(c.AzureAD)
+	driverName := sqlcloudauth.MSSQLDriver(c.CloudAuth)
 	dsn := c.DSN
-	if c.AzureAD.Enabled {
+	if c.CloudAuth.IsEnabled() {
 		var err error
-		dsn, err = azureauth.BuildMSSQLAzureADDSN(c.DSN, c.AzureAD)
+		dsn, err = sqlcloudauth.BuildMSSQLAzureADDSN(c.DSN, c.CloudAuth)
 		if err != nil {
-			return nil, fmt.Errorf("error preparing Azure AD SQL Server DSN: %v", err)
+			return nil, fmt.Errorf("error preparing cloud auth SQL Server DSN: %v", err)
 		}
 	}
 

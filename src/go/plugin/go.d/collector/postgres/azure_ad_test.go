@@ -11,7 +11,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/jackc/pgx/v5"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +31,7 @@ func TestCollector_openAzureADConnection_NoTokenProvider(t *testing.T) {
 
 	db, err := c.openAzureADConnection(cfg, "Postgres database")
 	assert.Nil(t, db)
-	assert.ErrorContains(t, err, "azure token provider is not initialized")
+	assert.ErrorContains(t, err, "cloud auth token provider is not initialized")
 }
 
 func TestCollector_azureADBeforeConnect_SetsPassword(t *testing.T) {
@@ -43,7 +43,7 @@ func TestCollector_azureADBeforeConnect_SetsPassword(t *testing.T) {
 			}, nil
 		},
 	}
-	provider, err := azureauth.NewTokenProvider(cred, []string{"scope"}, time.Minute)
+	provider, err := cloudauth.NewTokenProvider(cred, []string{"scope"}, time.Minute)
 	require.NoError(t, err)
 
 	c := New()
@@ -63,7 +63,7 @@ func TestCollector_azureADBeforeConnect_ProviderError(t *testing.T) {
 			return azcore.AccessToken{}, errors.New("token failure")
 		},
 	}
-	provider, err := azureauth.NewTokenProvider(cred, []string{"scope"}, time.Minute)
+	provider, err := cloudauth.NewTokenProvider(cred, []string{"scope"}, time.Minute)
 	require.NoError(t, err)
 
 	c := New()

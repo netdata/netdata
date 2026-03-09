@@ -11,7 +11,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/jackc/pgx/v5"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/azureadauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,11 +29,11 @@ func TestCollector_openConnection_AzureADSQLServerRequiresURLDSN(t *testing.T) {
 	c := New()
 	c.Driver = "sqlserver"
 	c.DSN = "server=localhost;database=master"
-	c.AzureAD.Enabled = true
-	c.AzureAD.Mode = azureauth.ModeDefault
+	c.CloudAuth.Provider = cloudauth.ProviderAzureAD
+	c.CloudAuth.AzureAD.Mode = azureadauth.ModeDefault
 
 	err := c.openConnection(context.Background())
-	assert.ErrorContains(t, err, "prepare Azure AD SQL Server DSN")
+	assert.ErrorContains(t, err, "prepare cloud_auth SQL Server DSN")
 	assert.Nil(t, c.db)
 }
 
@@ -40,11 +41,11 @@ func TestCollector_openConnection_AzureADPGXWithoutTokenProvider(t *testing.T) {
 	c := New()
 	c.Driver = "pgx"
 	c.DSN = "postgres://netdata@127.0.0.1:5432/postgres"
-	c.AzureAD.Enabled = true
-	c.AzureAD.Mode = azureauth.ModeDefault
+	c.CloudAuth.Provider = cloudauth.ProviderAzureAD
+	c.CloudAuth.AzureAD.Mode = azureadauth.ModeDefault
 
 	err := c.openConnection(context.Background())
-	assert.ErrorContains(t, err, "azure token provider is not initialized for pgx")
+	assert.ErrorContains(t, err, "cloud auth token provider is not initialized for pgx")
 	assert.Nil(t, c.db)
 }
 
@@ -57,7 +58,7 @@ func TestCollector_azureADBeforeConnect_SetsPassword(t *testing.T) {
 			}, nil
 		},
 	}
-	provider, err := azureauth.NewTokenProvider(cred, []string{"scope"}, time.Minute)
+	provider, err := cloudauth.NewTokenProvider(cred, []string{"scope"}, time.Minute)
 	require.NoError(t, err)
 
 	c := New()
@@ -77,7 +78,7 @@ func TestCollector_azureADBeforeConnect_ProviderError(t *testing.T) {
 			return azcore.AccessToken{}, errors.New("token failure")
 		},
 	}
-	provider, err := azureauth.NewTokenProvider(cred, []string{"scope"}, time.Minute)
+	provider, err := cloudauth.NewTokenProvider(cred, []string{"scope"}, time.Minute)
 	require.NoError(t, err)
 
 	c := New()

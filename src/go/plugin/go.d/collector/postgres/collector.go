@@ -14,8 +14,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/sqlcloudauth"
 
 	"github.com/jackc/pgx/v5/stdlib"
 )
@@ -72,7 +73,7 @@ type Config struct {
 	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	DSN                string           `yaml:"dsn" json:"dsn"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	AzureAD            azureauth.Config `yaml:"azure_ad,omitempty" json:"azure_ad,omitempty"`
+	CloudAuth          cloudauth.Config `yaml:"cloud_auth,omitempty" json:"cloud_auth,omitempty"`
 	DBSelector         string           `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`
 	XactTimeHistogram  []float64        `yaml:"transaction_time_histogram,omitempty" json:"transaction_time_histogram"`
 	QueryTimeHistogram []float64        `yaml:"query_time_histogram,omitempty" json:"query_time_histogram"`
@@ -132,7 +133,7 @@ type (
 		doSlowTime              time.Time
 		doSlowEvery             time.Duration
 
-		azureTokenProvider *azureauth.TokenProvider
+		azureTokenProvider *cloudauth.TokenProvider
 
 		mx *pgMetrics
 
@@ -154,21 +155,21 @@ func (c *Collector) Init(context.Context) error {
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
-	if err := c.AzureAD.Validate(); err != nil {
+	if err := c.CloudAuth.Validate(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
-	if c.AzureAD.Enabled {
-		cred, err := c.AzureAD.NewCredential()
+	if c.CloudAuth.IsEnabled() {
+		cred, err := c.CloudAuth.NewCredential()
 		if err != nil {
-			return fmt.Errorf("config validation: creating Azure credential: %v", err)
+			return fmt.Errorf("config validation: creating cloud auth credential: %v", err)
 		}
-		provider, err := azureauth.NewTokenProvider(
+		provider, err := cloudauth.NewTokenProvider(
 			cred,
-			[]string{azureauth.PostgreSQLAADScope},
-			azureauth.DefaultTokenRefreshMargin,
+			[]string{sqlcloudauth.AzurePostgreSQLAADScope},
+			cloudauth.DefaultTokenRefreshMargin,
 		)
 		if err != nil {
-			return fmt.Errorf("config validation: creating Azure token provider: %v", err)
+			return fmt.Errorf("config validation: creating cloud auth token provider: %v", err)
 		}
 		c.azureTokenProvider = provider
 	}

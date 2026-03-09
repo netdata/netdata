@@ -1,35 +1,30 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package azureauth
+package azureadauth
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestConfigValidate(t *testing.T) {
 	tests := map[string]struct {
 		cfg     Config
 		wantErr bool
 	}{
-		"disabled config": {
-			cfg: Config{
-				Enabled: false,
-			},
-		},
 		"default mode": {
-			cfg: Config{
-				Enabled: true,
-				Mode:    "default",
-			},
+			cfg: Config{Mode: ModeDefault},
+		},
+		"empty mode defaults to default": {
+			cfg: Config{},
 		},
 		"managed identity mode": {
-			cfg: Config{
-				Enabled: true,
-				Mode:    "managed_identity",
-			},
+			cfg: Config{Mode: ModeManagedIdentity},
 		},
 		"service principal mode": {
 			cfg: Config{
-				Enabled:      true,
-				Mode:         "service_principal",
+				Mode:         ModeServicePrincipal,
 				TenantID:     "tenant",
 				ClientID:     "client",
 				ClientSecret: "secret",
@@ -37,18 +32,14 @@ func TestConfigValidate(t *testing.T) {
 		},
 		"service principal missing secret": {
 			cfg: Config{
-				Enabled:  true,
-				Mode:     "service_principal",
+				Mode:     ModeServicePrincipal,
 				TenantID: "tenant",
 				ClientID: "client",
 			},
 			wantErr: true,
 		},
 		"invalid mode": {
-			cfg: Config{
-				Enabled: true,
-				Mode:    "invalid_mode",
-			},
+			cfg:     Config{Mode: "invalid_mode"},
 			wantErr: true,
 		},
 	}
@@ -56,12 +47,11 @@ func TestConfigValidate(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			err := tc.cfg.Validate()
-			if tc.wantErr && err == nil {
-				t.Fatalf("expected error, got nil")
+			if tc.wantErr {
+				require.Error(t, err)
+				return
 			}
-			if !tc.wantErr && err != nil {
-				t.Fatalf("expected nil, got error: %v", err)
-			}
+			require.NoError(t, err)
 		})
 	}
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package azureauth
+package azureadauth
 
 import (
 	"errors"
@@ -18,7 +18,6 @@ const (
 )
 
 type Config struct {
-	Enabled                 bool   `yaml:"enabled,omitempty" json:"enabled,omitempty"`
 	Mode                    string `yaml:"mode,omitempty" json:"mode,omitempty"`
 	TenantID                string `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty"`
 	ClientID                string `yaml:"client_id,omitempty" json:"client_id,omitempty"`
@@ -26,7 +25,7 @@ type Config struct {
 	ManagedIdentityClientID string `yaml:"managed_identity_client_id,omitempty" json:"managed_identity_client_id,omitempty"`
 }
 
-func (c Config) normalizedMode() string {
+func (c Config) NormalizedMode() string {
 	mode := strings.TrimSpace(c.Mode)
 	if mode == "" {
 		return ModeDefault
@@ -35,28 +34,23 @@ func (c Config) normalizedMode() string {
 }
 
 func (c Config) Validate() error {
-	if !c.Enabled {
-		return nil
-	}
-
-	mode := c.normalizedMode()
-	switch mode {
+	switch c.NormalizedMode() {
 	case ModeServicePrincipal:
 		var errs []error
 		if strings.TrimSpace(c.TenantID) == "" {
-			errs = append(errs, errors.New("azure_ad.tenant_id is required for service_principal mode"))
+			errs = append(errs, errors.New("cloud_auth.azure_ad.tenant_id is required for service_principal mode"))
 		}
 		if strings.TrimSpace(c.ClientID) == "" {
-			errs = append(errs, errors.New("azure_ad.client_id is required for service_principal mode"))
+			errs = append(errs, errors.New("cloud_auth.azure_ad.client_id is required for service_principal mode"))
 		}
 		if strings.TrimSpace(c.ClientSecret) == "" {
-			errs = append(errs, errors.New("azure_ad.client_secret is required for service_principal mode"))
+			errs = append(errs, errors.New("cloud_auth.azure_ad.client_secret is required for service_principal mode"))
 		}
 		return errors.Join(errs...)
 	case ModeManagedIdentity, ModeDefault:
 		return nil
 	default:
-		return fmt.Errorf("azure_ad.mode %q is invalid: expected one of %q, %q, %q",
+		return fmt.Errorf("cloud_auth.azure_ad.mode %q is invalid: expected one of %q, %q, %q",
 			c.Mode, ModeServicePrincipal, ModeManagedIdentity, ModeDefault)
 	}
 }
@@ -65,11 +59,8 @@ func (c Config) NewCredential() (azcore.TokenCredential, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
-	if !c.Enabled {
-		return nil, errors.New("azure_ad is not enabled")
-	}
 
-	switch c.normalizedMode() {
+	switch c.NormalizedMode() {
 	case ModeServicePrincipal:
 		return azidentity.NewClientSecretCredential(
 			strings.TrimSpace(c.TenantID),
@@ -88,6 +79,6 @@ func (c Config) NewCredential() (azcore.TokenCredential, error) {
 	case ModeDefault:
 		return azidentity.NewDefaultAzureCredential(nil)
 	default:
-		return nil, fmt.Errorf("azure_ad.mode %q is invalid", c.Mode)
+		return nil, fmt.Errorf("cloud_auth.azure_ad.mode %q is invalid", c.Mode)
 	}
 }

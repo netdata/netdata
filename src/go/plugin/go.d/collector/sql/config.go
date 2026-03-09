@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 )
 
 type Config struct {
@@ -17,10 +17,10 @@ type Config struct {
 	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 
-	Driver  string           `yaml:"driver" json:"driver"`
-	DSN     string           `yaml:"dsn" json:"dsn"`
-	Timeout confopt.Duration `yaml:"timeout" json:"timeout"`
-	AzureAD azureauth.Config `yaml:"azure_ad,omitempty" json:"azure_ad,omitempty"`
+	Driver    string           `yaml:"driver" json:"driver"`
+	DSN       string           `yaml:"dsn" json:"dsn"`
+	Timeout   confopt.Duration `yaml:"timeout" json:"timeout"`
+	CloudAuth cloudauth.Config `yaml:"cloud_auth,omitempty" json:"cloud_auth,omitempty"`
 
 	StaticLabels map[string]string   `yaml:"static_labels,omitempty" json:"static_labels"`
 	Queries      []ConfigQueryDef    `yaml:"queries,omitempty" json:"queries"`
@@ -132,14 +132,15 @@ func (c *Collector) validateConfig() error {
 	if c.DSN == "" {
 		errs = append(errs, errors.New("dsn required"))
 	}
-	if err := c.AzureAD.Validate(); err != nil {
+	if err := c.CloudAuth.Validate(); err != nil {
 		errs = append(errs, err)
 	}
-	if c.AzureAD.Enabled {
+	if c.CloudAuth.IsEnabled() {
 		switch c.Driver {
 		case "pgx", "sqlserver", "azuresql":
 		default:
-			errs = append(errs, fmt.Errorf("azure_ad is supported only for drivers %q, %q and %q",
+			errs = append(errs, fmt.Errorf("cloud_auth.provider %q is supported only for drivers %q, %q and %q",
+				c.CloudAuth.ProviderName(),
 				"pgx", "sqlserver", "azuresql"))
 		}
 	}
