@@ -197,13 +197,14 @@ dsn: "<connection string>"                   # REQUIRED. Driver-specific DSN/URL
 
 # Optional connection settings
 timeout: <seconds>                           # OPTIONAL. Query timeout.
-azure_ad:                                    # OPTIONAL. Azure AD auth for pgx/sqlserver/azuresql.
-  enabled: <true|false>
-  mode: <service_principal|managed_identity|default>
-  tenant_id: "<tenant-id>"                  # REQUIRED for service_principal
-  client_id: "<client-id>"                  # REQUIRED for service_principal
-  client_secret: "<client-secret>"          # REQUIRED for service_principal
-  managed_identity_client_id: "<client-id>" # Optional for user-assigned MI
+cloud_auth:                                  # OPTIONAL. Cloud auth for pgx/sqlserver/azuresql.
+  provider: <none|azure_ad>                 # OPTIONAL. Default: none.
+  azure_ad:
+    mode: <service_principal|managed_identity|default>
+    tenant_id: "<tenant-id>"                # REQUIRED for service_principal
+    client_id: "<client-id>"                # REQUIRED for service_principal
+    client_secret: "<client-secret>"        # REQUIRED for service_principal
+    managed_identity_client_id: "<client-id>" # Optional for user-assigned MI
 
 # Optional static labels applied to all charts
 static_labels:
@@ -310,13 +311,13 @@ functions:
 |  | autodetection_retry | Autodetection retry interval (seconds). Not used for this collector. Set 0 to disable. | 0 | no |
 | **Target** | driver | SQL driver to use. Supported values: `mysql`, `pgx`, `oracle`, `sqlserver`, `azuresql`. | mysql | yes |
 |  | dsn | Database connection string (DSN). The format depends on the selected driver ( [MySQL](https://github.com/go-sql-driver/mysql#dsn-data-source-name), [PostgreSQL](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS), [MS SQL Server](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn)). |  | yes |
-| **Connection** | azure_ad.enabled | Enable Microsoft Entra (Azure AD) authentication. Supported for `pgx`, `sqlserver`, and `azuresql`. | no | no |
-|  | azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). | default | no |
-|  | azure_ad.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
-|  | azure_ad.client_id | Azure client ID. Required for `service_principal`; optional for user-assigned managed identity. |  | no |
-|  | azure_ad.client_secret | Azure client secret for `service_principal` mode. |  | no |
-|  | azure_ad.managed_identity_client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
-|  | timeout | Query and connection check timeout (seconds). | 5 | no |
+| **Cloud Auth** | cloud_auth.provider | Cloud auth provider (`none` or `azure_ad`). Supported for `pgx`, `sqlserver`, and `azuresql`. | none | no |
+| **Cloud Auth/Azure** | cloud_auth.azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). | default | no |
+|  | cloud_auth.azure_ad.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.client_id | Azure client ID. Required for `service_principal`; optional for user-assigned managed identity. |  | no |
+|  | cloud_auth.azure_ad.client_secret | Azure client secret for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.managed_identity_client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
+| **Connection** | timeout | Query and connection check timeout (seconds). | 5 | no |
 | **Labels** | static_labels | A map of static labels added to every chart created by this job. Useful for tagging charts with environment, region, or role. | {} | no |
 | **Queries & Metrics** | queries | A list of reusable queries. Metric blocks can reference these via `query_ref` to avoid repeating SQL. See [Configuration Structure](#configuration) for details. | [] | no |
 |  | metrics | A list of metric blocks. Each block defines how a query is executed and how its result is transformed into one or more charts. See [Configuration Structure](#configuration) for details. | [] | no |
@@ -387,12 +388,13 @@ jobs:
     driver: azuresql
     dsn: "sqlserver://my-server.database.windows.net:1433?database=master"
     timeout: 5
-    azure_ad:
-      enabled: true
-      mode: service_principal
-      tenant_id: "00000000-0000-0000-0000-000000000000"
-      client_id: "11111111-1111-1111-1111-111111111111"
-      client_secret: "super-secret-value"
+    cloud_auth:
+      provider: azure_ad
+      azure_ad:
+        mode: service_principal
+        tenant_id: "00000000-0000-0000-0000-000000000000"
+        client_id: "11111111-1111-1111-1111-111111111111"
+        client_secret: "super-secret-value"
     metrics:
       - id: user_connections
         mode: columns
@@ -425,9 +427,10 @@ jobs:
     driver: pgx
     dsn: 'postgresql://netdata@myserver.postgres.database.azure.com:5432/postgres?sslmode=require'
     timeout: 5
-    azure_ad:
-      enabled: true
-      mode: default
+    cloud_auth:
+      provider: azure_ad
+      azure_ad:
+        mode: default
     metrics:
       - id: uptime
         mode: columns
