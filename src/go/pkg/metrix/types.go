@@ -68,6 +68,7 @@ const (
 	MetricKindHistogram
 	MetricKindSummary
 	MetricKindStateSet
+	MetricKindMeasureSet
 )
 
 // FlattenRole describes synthetic scalar roles produced by Read(ReadFlatten()).
@@ -82,6 +83,7 @@ const (
 	FlattenRoleSummarySum
 	FlattenRoleSummaryQuantile
 	FlattenRoleStateSetState
+	FlattenRoleMeasureSetField
 )
 
 type CollectMeta struct {
@@ -114,6 +116,27 @@ type HistogramPoint struct {
 
 type StateSetPoint struct {
 	States map[string]bool
+}
+
+type MeasureFieldSpec struct {
+	Name  string
+	Float bool
+}
+
+type MeasureSetPoint struct {
+	Values []SampleValue
+}
+
+type MeasureSetSemantics int
+
+const (
+	MeasureSetSemanticsGauge MeasureSetSemantics = iota
+	MeasureSetSemanticsCounter
+)
+
+type MeasureSetSchema struct {
+	Semantics MeasureSetSemantics
+	Fields    []MeasureFieldSpec
 }
 
 type StateSetMode int

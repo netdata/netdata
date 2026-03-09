@@ -108,6 +108,14 @@ func (m *snapshotVecMeter) StateSet(name string, opts ...InstrumentOption) Snaps
 	return m.meter.StateSetVec(name, m.labelKeys, opts...)
 }
 
+func (m *snapshotVecMeter) MeasureSetGauge(name string, opts ...InstrumentOption) SnapshotMeasureSetGaugeVec {
+	return m.meter.MeasureSetGaugeVec(name, m.labelKeys, opts...)
+}
+
+func (m *snapshotVecMeter) MeasureSetCounter(name string, opts ...InstrumentOption) SnapshotMeasureSetCounterVec {
+	return m.meter.MeasureSetCounterVec(name, m.labelKeys, opts...)
+}
+
 func (m *statefulVecMeter) Gauge(name string, opts ...InstrumentOption) StatefulGaugeVec {
 	return m.meter.GaugeVec(name, m.labelKeys, opts...)
 }
@@ -126,6 +134,14 @@ func (m *statefulVecMeter) Summary(name string, opts ...InstrumentOption) Statef
 
 func (m *statefulVecMeter) StateSet(name string, opts ...InstrumentOption) StatefulStateSetVec {
 	return m.meter.StateSetVec(name, m.labelKeys, opts...)
+}
+
+func (m *statefulVecMeter) MeasureSetGauge(name string, opts ...InstrumentOption) StatefulMeasureSetGaugeVec {
+	return m.meter.MeasureSetGaugeVec(name, m.labelKeys, opts...)
+}
+
+func (m *statefulVecMeter) MeasureSetCounter(name string, opts ...InstrumentOption) StatefulMeasureSetCounterVec {
+	return m.meter.MeasureSetCounterVec(name, m.labelKeys, opts...)
 }
 
 // metricName composes meter prefix with instrument local name.
