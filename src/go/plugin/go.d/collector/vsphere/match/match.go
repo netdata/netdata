@@ -18,6 +18,10 @@ type VMMatcher interface {
 	Match(*rs.VM) bool
 }
 
+type DatastoreMatcher interface {
+	Match(*rs.Datastore) bool
+}
+
 type (
 	hostDCMatcher      struct{ m matcher.Matcher }
 	hostClusterMatcher struct{ m matcher.Matcher }
@@ -84,10 +88,33 @@ func newOrVMMatcher(lhs, rhs VMMatcher, others ...VMMatcher) orVMMatcher {
 	}
 }
 
+func newOrDSMatcher(lhs, rhs DatastoreMatcher, others ...DatastoreMatcher) orDSMatcher {
+	m := orDSMatcher{lhs: lhs, rhs: rhs}
+	switch len(others) {
+	case 0:
+		return m
+	default:
+		return newOrDSMatcher(m, others[0], others[1:]...)
+	}
+}
+
 type (
-	VMIncludes   []string
-	HostIncludes []string
+	VMIncludes        []string
+	HostIncludes      []string
+	DatastoreIncludes []string
 )
+
+type (
+	dsDCMatcher  struct{ m matcher.Matcher }
+	dsDSMatcher  struct{ m matcher.Matcher }
+	orDSMatcher  struct{ lhs, rhs DatastoreMatcher }
+	andDSMatcher struct{ lhs, rhs DatastoreMatcher }
+)
+
+func (m dsDCMatcher) Match(ds *rs.Datastore) bool  { return m.m.MatchString(ds.Hier.DC.Name) }
+func (m dsDSMatcher) Match(ds *rs.Datastore) bool  { return m.m.MatchString(ds.Name) }
+func (m orDSMatcher) Match(ds *rs.Datastore) bool  { return m.lhs.Match(ds) || m.rhs.Match(ds) }
+func (m andDSMatcher) Match(ds *rs.Datastore) bool { return m.lhs.Match(ds) && m.rhs.Match(ds) }
 
 func (vi VMIncludes) Parse() (VMMatcher, error) {
 	var ms []VMMatcher
@@ -132,6 +159,29 @@ func (hi HostIncludes) Parse() (HostMatcher, error) {
 		return ms[0], nil
 	default:
 		return newOrHostMatcher(ms[0], ms[1], ms[2:]...), nil
+	}
+}
+
+func (di DatastoreIncludes) Parse() (DatastoreMatcher, error) {
+	var ms []DatastoreMatcher
+	for _, v := range di {
+		m, err := parseDatastoreInclude(v)
+		if err != nil {
+			return nil, err
+		}
+		if m == nil {
+			continue
+		}
+		ms = append(ms, m)
+	}
+
+	switch len(ms) {
+	case 0:
+		return nil, nil
+	case 1:
+		return ms[0], nil
+	default:
+		return newOrDSMatcher(ms[0], ms[1], ms[2:]...), nil
 	}
 }
 
@@ -230,4 +280,42 @@ func parseSubInclude(sub string) (matcher.Matcher, error) {
 
 func isIncludeFormatValid(line string) bool {
 	return strings.HasPrefix(line, "/")
+}
+
+const (
+	dsDatacenterIdx = iota
+	dsDatastoreIdx
+)
+
+func parseDatastoreInclude(include string) (DatastoreMatcher, error) {
+	if !isIncludeFormatValid(include) {
+		return nil, fmt.Errorf("bad include format: %s", include)
+	}
+
+	include = cleanInclude(include)
+	parts := strings.Split(include, "/") // /dc/datastore
+	var ms []DatastoreMatcher
+
+	for i, v := range parts {
+		m, err := parseSubInclude(v)
+		if err != nil {
+			return nil, err
+		}
+		switch i {
+		case dsDatacenterIdx:
+			ms = append(ms, dsDCMatcher{m})
+		case dsDatastoreIdx:
+			ms = append(ms, dsDSMatcher{m})
+		default:
+		}
+	}
+
+	switch len(ms) {
+	case 0:
+		return nil, nil
+	case 1:
+		return ms[0], nil
+	default:
+		return andDSMatcher{lhs: ms[0], rhs: ms[1]}, nil
+	}
 }

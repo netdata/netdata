@@ -28,12 +28,18 @@ func (d Discoverer) collectMetricLists(res *rs.Resources) error {
 	for _, v := range res.VMs {
 		v.MetricList = vmML
 	}
+	dsML := simpleDatastoreMetricList(perfCounters)
+	for _, ds := range res.Datastores {
+		ds.MetricList = dsML
+	}
 
-	d.Infof("discovering : metric lists : collected metric lists for %d/%d hosts, %d/%d vms, process took %s",
+	d.Infof("discovering : metric lists : collected metric lists for %d/%d hosts, %d/%d vms, %d/%d datastores, process took %s",
 		len(res.Hosts),
 		len(res.Hosts),
 		len(res.VMs),
 		len(res.VMs),
+		len(res.Datastores),
+		len(res.Datastores),
 		time.Since(t),
 	)
 
@@ -46,6 +52,10 @@ func simpleHostMetricList(pci map[string]*types.PerfCounterInfo) performance.Met
 
 func simpleVMMetricList(pci map[string]*types.PerfCounterInfo) performance.MetricList {
 	return simpleMetricList(vmMetrics, pci)
+}
+
+func simpleDatastoreMetricList(pci map[string]*types.PerfCounterInfo) performance.MetricList {
+	return simpleMetricList(datastoreMetrics, pci)
 }
 
 func simpleMetricList(metrics []string, pci map[string]*types.PerfCounterInfo) performance.MetricList {
@@ -101,6 +111,18 @@ var (
 		"disk.maxTotalLatency.latest",
 
 		"sys.uptime.latest",
+	}
+
+	datastoreMetrics = []string{
+		// Level 1 - available at default vCenter settings
+		"datastore.numberReadAveraged.average",
+		"datastore.numberWriteAveraged.average",
+		"datastore.totalReadLatency.average",
+		"datastore.totalWriteLatency.average",
+
+		// Level 2 - requires elevated stats level
+		"datastore.read.average",
+		"datastore.write.average",
 	}
 
 	hostMetrics = []string{

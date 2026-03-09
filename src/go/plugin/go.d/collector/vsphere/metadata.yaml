@@ -22,7 +22,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors hosts and vms performance statistics from `vCenter` servers.
+          This collector monitors hosts, vms, and datastores performance statistics from `vCenter` servers.
           
           > **Warning**: The `vsphere` collector cannot re-login and continue collecting metrics after a vCenter reboot.
           > go.d.plugin needs to be restarted.
@@ -42,6 +42,8 @@ modules:
           description: |
             The default `update_every` is 20 seconds, and it doesn't make sense to decrease the value.
             **VMware real-time statistics are generated at the 20-second specificity**.
+
+            **Note**: Datastore performance metrics (IOPS, throughput, latency) use 300-second (5-minute) historical intervals because VMware does not support real-time statistics for datastore entities. Datastore capacity and status are updated every collection cycle. Host and VM metrics use real-time 20-second intervals.
 
             It is likely that 20 seconds is not enough for big installations and the value should be tuned.
 
@@ -96,7 +98,7 @@ modules:
           list:
             - name: update_every
               description: Data collection interval (seconds).
-              default_value: 1
+              default_value: 20
               required: false
               group: Collection
 
@@ -108,17 +110,17 @@ modules:
 
             - name: url
               description: Target endpoint URL.
-              default_value: http://127.0.0.1/server-status?auto
+              default_value: https://vcenter.local
               required: true
               group: Target
             - name: timeout
               description: HTTP request timeout (seconds).
-              default_value: 1
+              default_value: 20
               required: false
               group: Target
 
             - name: discovery_interval
-              description: Hosts and VMs discovery interval (seconds).
+              description: Hosts, VMs, and datastores discovery interval (seconds).
               default_value: 300
               required: false
               group: Discovery
@@ -148,7 +150,7 @@ modules:
               group: Filters
               detailed_description: |
                 Metrics of VMs matching the selector will be collected.
-                
+
                 - Include pattern syntax: "/Datacenter pattern/Cluster pattern/Host pattern/VM pattern".
                 - Match pattern syntax: [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
                 - Syntax:
@@ -158,6 +160,23 @@ modules:
                     - '/DC1/*'           # all VMs from datacenter DC1
                     - '/DC2/*/*/!VM2 *'  # all VMs from DC2 except VM2
                     - '/DC3/Cluster3/*'  # all VMs from DC3, cluster Cluster3
+                  ```
+            - name: datastore_include
+              description: Datastore selector (filter).
+              default_value: "/*"
+              required: false
+              group: Filters
+              detailed_description: |
+                Metrics of datastores matching the selector will be collected.
+
+                - Include pattern syntax: "/Datacenter pattern/Datastore pattern".
+                - Match pattern syntax: [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
+                - Syntax:
+
+                  ```yaml
+                  datastore_include:
+                    - '/DC1/*'           # all datastores from datacenter DC1
+                    - '/DC2/!DS2 *'      # all datastores from DC2 except DS2
                   ```
 
             - name: username
@@ -492,3 +511,57 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+        - name: datastore
+          description: These metrics refer to the Datastore.
+          labels:
+            - name: datacenter
+              description: Datacenter name
+            - name: datastore
+              description: Datastore name
+            - name: type
+              description: "Datastore type (VMFS, NFS, NFS41, vsan, VVOL, PMEM)"
+          metrics:
+            - name: vsphere.datastore_disk_io
+              description: Datastore disk IO
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: vsphere.datastore_disk_iops
+              description: Datastore disk IOPS
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: vsphere.datastore_disk_latency
+              description: Datastore disk latency
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: vsphere.datastore_space_utilization
+              description: Datastore space utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: vsphere.datastore_space_usage
+              description: Datastore space usage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: capacity
+                - name: free
+                - name: used
+            - name: vsphere.datastore_overall_status
+              description: Datastore overall alarm status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: green
+                - name: red
+                - name: yellow
+                - name: gray

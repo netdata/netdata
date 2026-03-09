@@ -11,7 +11,14 @@ import (
 )
 
 const (
-	prioVMCPUUtilization = collectorapi.Priority + iota
+	prioDatastoreDiskIO = collectorapi.Priority + iota
+	prioDatastoreDiskIOPS
+	prioDatastoreDiskLatency
+	prioDatastoreSpaceUtilization
+	prioDatastoreSpaceUsage
+	prioDatastoreOverallStatus
+
+	prioVMCPUUtilization
 	prioVmMemoryUtilization
 	prioVmMemoryUsage
 	prioVmMemorySwapUsage
@@ -386,6 +393,97 @@ var (
 	}
 )
 
+var (
+	datastorePropertyChartsTmpl = collectorapi.Charts{
+		datastoreSpaceUtilizationChartTmpl.Copy(),
+		datastoreSpaceUsageChartTmpl.Copy(),
+		datastoreOverallStatusChartTmpl.Copy(),
+	}
+	datastorePerfChartsTmpl = collectorapi.Charts{
+		datastoreDiskIOChartTmpl.Copy(),
+		datastoreDiskIOPSChartTmpl.Copy(),
+		datastoreDiskLatencyChartTmpl.Copy(),
+	}
+
+	datastoreDiskIOChartTmpl = collectorapi.Chart{
+		ID:       "%s_disk_io",
+		Title:    "Datastore disk IO",
+		Units:    "KiB/s",
+		Fam:      "datastores disk",
+		Ctx:      "vsphere.datastore_disk_io",
+		Type:     collectorapi.Area,
+		Priority: prioDatastoreDiskIO,
+		Dims: collectorapi.Dims{
+			{ID: "%s_datastore.read.average", Name: "read"},
+			{ID: "%s_datastore.write.average", Name: "write", Mul: -1},
+		},
+	}
+	datastoreDiskIOPSChartTmpl = collectorapi.Chart{
+		ID:       "%s_disk_iops",
+		Title:    "Datastore disk IOPS",
+		Units:    "operations/s",
+		Fam:      "datastores disk",
+		Ctx:      "vsphere.datastore_disk_iops",
+		Priority: prioDatastoreDiskIOPS,
+		Dims: collectorapi.Dims{
+			{ID: "%s_datastore.numberReadAveraged.average", Name: "reads"},
+			{ID: "%s_datastore.numberWriteAveraged.average", Name: "writes", Mul: -1},
+		},
+	}
+	datastoreDiskLatencyChartTmpl = collectorapi.Chart{
+		ID:       "%s_disk_latency",
+		Title:    "Datastore disk latency",
+		Units:    "milliseconds",
+		Fam:      "datastores disk",
+		Ctx:      "vsphere.datastore_disk_latency",
+		Priority: prioDatastoreDiskLatency,
+		Dims: collectorapi.Dims{
+			{ID: "%s_datastore.totalReadLatency.average", Name: "read"},
+			{ID: "%s_datastore.totalWriteLatency.average", Name: "write"},
+		},
+	}
+
+	datastoreSpaceUtilizationChartTmpl = collectorapi.Chart{
+		ID:       "%s_space_utilization",
+		Title:    "Datastore space utilization",
+		Units:    "percentage",
+		Fam:      "datastores space",
+		Ctx:      "vsphere.datastore_space_utilization",
+		Priority: prioDatastoreSpaceUtilization,
+		Dims: collectorapi.Dims{
+			{ID: "%s_used_space_pct", Name: "used", Div: 100},
+		},
+	}
+	datastoreSpaceUsageChartTmpl = collectorapi.Chart{
+		ID:       "%s_space_usage",
+		Title:    "Datastore space usage",
+		Units:    "bytes",
+		Fam:      "datastores space",
+		Ctx:      "vsphere.datastore_space_usage",
+		Priority: prioDatastoreSpaceUsage,
+		Dims: collectorapi.Dims{
+			{ID: "%s_capacity", Name: "capacity"},
+			{ID: "%s_free_space", Name: "free"},
+			{ID: "%s_used_space", Name: "used"},
+		},
+	}
+
+	datastoreOverallStatusChartTmpl = collectorapi.Chart{
+		ID:       "%s_overall_status",
+		Title:    "Datastore overall alarm status",
+		Units:    "status",
+		Fam:      "datastores status",
+		Ctx:      "vsphere.datastore_overall_status",
+		Priority: prioDatastoreOverallStatus,
+		Dims: collectorapi.Dims{
+			{ID: "%s_overall.status.green", Name: "green"},
+			{ID: "%s_overall.status.red", Name: "red"},
+			{ID: "%s_overall.status.yellow", Name: "yellow"},
+			{ID: "%s_overall.status.gray", Name: "gray"},
+		},
+	}
+)
+
 const failedUpdatesLimit = 10
 
 func (c *Collector) updateCharts() {
@@ -426,6 +524,38 @@ func (c *Collector) updateCharts() {
 		charts := newVMCHarts(vm)
 		if err := c.Charts().Add(*charts...); err != nil {
 			c.Error(err)
+		}
+	}
+
+	for id, fails := range c.discoveredDatastores {
+		if fails >= failedUpdatesLimit {
+			c.removeFromCharts(id)
+			delete(c.charted, id)
+			delete(c.discoveredDatastores, id)
+			delete(c.datastorePerfReceived, id)
+			delete(c.datastorePerfCharted, id)
+			continue
+		}
+
+		ds := c.resources.Datastores.Get(id)
+		if ds == nil || fails != 0 {
+			continue
+		}
+
+		if !c.charted[id] {
+			c.charted[id] = true
+			charts := newDatastorePropertyCharts(ds)
+			if err := c.Charts().Add(*charts...); err != nil {
+				c.Error(err)
+			}
+		}
+
+		if c.datastorePerfReceived[id] && !c.datastorePerfCharted[id] {
+			c.datastorePerfCharted[id] = true
+			charts := newDatastorePerfCharts(ds)
+			if err := c.Charts().Add(*charts...); err != nil {
+				c.Error(err)
+			}
 		}
 	}
 }
@@ -480,6 +610,32 @@ func getHostClusterName(host *rs.Host) string {
 		return ""
 	}
 	return host.Hier.Cluster.Name
+}
+
+func newDatastorePropertyCharts(ds *rs.Datastore) *collectorapi.Charts {
+	charts := datastorePropertyChartsTmpl.Copy()
+	applyDatastoreChartLabels(charts, ds)
+	return charts
+}
+
+func newDatastorePerfCharts(ds *rs.Datastore) *collectorapi.Charts {
+	charts := datastorePerfChartsTmpl.Copy()
+	applyDatastoreChartLabels(charts, ds)
+	return charts
+}
+
+func applyDatastoreChartLabels(charts *collectorapi.Charts, ds *rs.Datastore) {
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, ds.ID)
+		chart.Labels = []collectorapi.Label{
+			{Key: "datacenter", Value: ds.Hier.DC.Name},
+			{Key: "datastore", Value: ds.Name},
+			{Key: "type", Value: ds.Type},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, ds.ID)
+		}
+	}
 }
 
 func (c *Collector) removeFromCharts(prefix string) {

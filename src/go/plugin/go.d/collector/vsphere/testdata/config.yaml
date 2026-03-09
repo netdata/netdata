@@ -24,3 +24,5 @@ host_include:
   - "ok"
 vm_include:
   - "ok"
+datastore_include:
+  - "ok"

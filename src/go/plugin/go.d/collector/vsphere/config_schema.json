@@ -33,7 +33,7 @@
       },
       "discovery_interval": {
         "title": "Discovery interval",
-        "description": "Hosts and VMs discovery interval in seconds.",
+        "description": "Hosts, VMs, and datastores discovery interval in seconds.",
         "type": "number",
         "minimum": 60,
         "default": 300
@@ -80,6 +80,25 @@
           "description": "",
           "type": "string",
           "default": "/*/*/*/*",
+          "pattern": "^$|^/"
+        },
+        "default": [
+          "/*"
+        ]
+      },
+      "datastore_include": {
+        "title": "Datastore selectors",
+        "description": "Configuration for monitoring specific datastores. The selector format follows the pattern `/Datacenter/Datastore`, where each value can be set using [Netdata simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme).",
+        "type": [
+          "array",
+          "null"
+        ],
+        "uniqueItems": true,
+        "items": {
+          "title": "Datastore selector",
+          "description": "",
+          "type": "string",
+          "default": "/*/*",
           "pattern": "^$|^/"
         },
         "default": [
@@ -173,7 +192,8 @@
       "username",
       "password",
       "host_include",
-      "vm_include"
+      "vm_include",
+      "datastore_include"
     ]
   },
   "uiSchema": {
@@ -196,10 +216,11 @@
           ]
         },
         {
-          "title": "Hosts & VMs selector",
+          "title": "Hosts, VMs & Datastores selector",
           "fields": [
             "host_include",
-            "vm_include"
+            "vm_include",
+            "datastore_include"
           ]
         },
         {
@@ -266,6 +287,9 @@
       "ui:listFlavour": "list"
     },
     "vm_include": {
+      "ui:listFlavour": "list"
+    },
+    "datastore_include": {
       "ui:listFlavour": "list"
     },
     "username": {

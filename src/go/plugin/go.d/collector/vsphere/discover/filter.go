@@ -25,14 +25,17 @@ func (d Discoverer) matchVM(vm *rs.VM) bool {
 func (d Discoverer) removeUnmatched(res *rs.Resources) (removed int) {
 	d.Debug("discovering : filtering : starting filtering resources process")
 	t := time.Now()
-	numH, numV := len(res.Hosts), len(res.VMs)
+	numH, numV, numD := len(res.Hosts), len(res.VMs), len(res.Datastores)
 	removed += d.removeUnmatchedHosts(res.Hosts)
 	removed += d.removeUnmatchedVMs(res.VMs)
-	d.Infof("discovering : filtering : filtered %d/%d hosts, %d/%d vms, process took %s",
+	removed += d.removeUnmatchedDatastores(res.Datastores)
+	d.Infof("discovering : filtering : filtered %d/%d hosts, %d/%d vms, %d/%d datastores, process took %s",
 		numH-len(res.Hosts),
 		numH,
 		numV-len(res.VMs),
 		numV,
+		numD-len(res.Datastores),
+		numD,
 		time.Since(t))
 	return
 }
@@ -56,5 +59,23 @@ func (d Discoverer) removeUnmatchedVMs(vms rs.VMs) (removed int) {
 		}
 	}
 	d.Debugf("discovering : filtering : removed %d unmatched vms", removed)
+	return removed
+}
+
+func (d Discoverer) matchDatastore(ds *rs.Datastore) bool {
+	if d.DatastoreMatcher == nil {
+		return true
+	}
+	return d.DatastoreMatcher.Match(ds)
+}
+
+func (d Discoverer) removeUnmatchedDatastores(datastores rs.Datastores) (removed int) {
+	for _, ds := range datastores {
+		if !d.matchDatastore(ds) {
+			removed++
+			datastores.Remove(ds.ID)
+		}
+	}
+	d.Debugf("discovering : filtering : removed %d unmatched datastores", removed)
 	return removed
 }

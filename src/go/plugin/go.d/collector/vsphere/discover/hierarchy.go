@@ -15,12 +15,13 @@ func (d Discoverer) setHierarchy(res *rs.Resources) error {
 	c := d.setClustersHierarchy(res)
 	h := d.setHostsHierarchy(res)
 	v := d.setVMsHierarchy(res)
+	ds := d.setDatastoresHierarchy(res)
 
-	// notSet := len(res.Clusters) + len(res.Hosts) + len(res.VMs) - (c + h + v)
-	d.Infof("discovering : hierarchy : set %d/%d clusters, %d/%d hosts, %d/%d vms, process took %s",
+	d.Infof("discovering : hierarchy : set %d/%d clusters, %d/%d hosts, %d/%d vms, %d/%d datastores, process took %s",
 		c, len(res.Clusters),
 		h, len(res.Hosts),
 		v, len(res.VMs),
+		ds, len(res.Datastores),
 		time.Since(t),
 	)
 
@@ -97,4 +98,32 @@ func setVMHierarchy(vm *rs.VM, res *rs.Resources) bool {
 	}
 	vm.Hier.DC.Set(dc.ID, dc.Name)
 	return vm.Hier.IsSet()
+}
+
+func (d Discoverer) setDatastoresHierarchy(res *rs.Resources) (set int) {
+	for _, ds := range res.Datastores {
+		if setDatastoreHierarchy(ds, res) {
+			set++
+		}
+	}
+	return set
+}
+
+// Datastore parent is a folder (group-s*) which resolves to a datacenter.
+func setDatastoreHierarchy(ds *rs.Datastore, res *rs.Resources) bool {
+	dcID := findDatastoreDcID(ds.ParentID, res.Folders)
+	dc := res.DataCenters.Get(dcID)
+	if dc == nil {
+		return false
+	}
+	ds.Hier.DC.Set(dc.ID, dc.Name)
+	return ds.Hier.IsSet()
+}
+
+func findDatastoreDcID(parentID string, folders rs.Folders) string {
+	f := folders.Get(parentID)
+	if f == nil {
+		return parentID
+	}
+	return findDatastoreDcID(f.ParentID, folders)
 }

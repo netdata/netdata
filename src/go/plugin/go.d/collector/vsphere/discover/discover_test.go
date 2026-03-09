@@ -29,6 +29,7 @@ func TestDiscoverer_Discover(t *testing.T) {
 	assert.True(t, len(res.Clusters) > 0)
 	assert.True(t, len(res.Hosts) > 0)
 	assert.True(t, len(res.VMs) > 0)
+	assert.True(t, len(res.Datastores) > 0)
 	assert.True(t, isHierarchySet(res))
 	assert.True(t, isMetricListsCollected(res))
 }
@@ -46,7 +47,8 @@ func TestDiscoverer_discover(t *testing.T) {
 	dummyClusters := model.Host * count.Datacenter
 	assert.Lenf(t, raw.clusters, count.Cluster+dummyClusters, "clusters")
 	assert.Lenf(t, raw.hosts, count.Host, "hosts")
-	assert.Lenf(t, raw.vms, count.Machine, "hosts")
+	assert.Lenf(t, raw.vms, count.Machine, "vms")
+	assert.Lenf(t, raw.datastores, count.Datastore, "datastores")
 }
 
 func TestDiscoverer_build(t *testing.T) {
@@ -62,7 +64,8 @@ func TestDiscoverer_build(t *testing.T) {
 	assert.Lenf(t, res.Folders, len(raw.folders), "folders")
 	assert.Lenf(t, res.Clusters, len(raw.clusters), "clusters")
 	assert.Lenf(t, res.Hosts, len(raw.hosts), "hosts")
-	assert.Lenf(t, res.VMs, len(raw.vms), "hosts")
+	assert.Lenf(t, res.VMs, len(raw.vms), "vms")
+	assert.Lenf(t, res.Datastores, len(raw.datastores), "datastores")
 }
 
 func TestDiscoverer_setHierarchy(t *testing.T) {
@@ -153,6 +156,11 @@ func isHierarchySet(res *rs.Resources) bool {
 			return false
 		}
 	}
+	for _, ds := range res.Datastores {
+		if !ds.Hier.IsSet() {
+			return false
+		}
+	}
 	return true
 }
 
@@ -167,6 +175,7 @@ func isMetricListsCollected(res *rs.Resources) bool {
 			return false
 		}
 	}
+	// Datastore metric lists may be empty if perf counters are not available (e.g., vSAN)
 	return true
 }
 

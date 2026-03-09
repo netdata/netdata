@@ -17,6 +17,8 @@ var (
 	falseHostDC = hostDCMatcher{matcher.FALSE()}
 	trueVMDC    = vmDCMatcher{matcher.TRUE()}
 	falseVMDC   = vmDCMatcher{matcher.FALSE()}
+	trueDSDC    = dsDCMatcher{matcher.TRUE()}
+	falseDSDC   = dsDCMatcher{matcher.FALSE()}
 )
 
 func TestOrHostMatcher_Match(t *testing.T) {
@@ -267,6 +269,116 @@ func TestVMIncludes_Parse(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			includes := prepareIncludes(name)
 			m, err := VMIncludes(includes).Parse()
+
+			if !test.valid {
+				assert.Error(t, err)
+			} else {
+				assert.Equal(t, test.expected, m)
+			}
+		})
+	}
+}
+
+func TestOrDSMatcher_Match(t *testing.T) {
+	tests := map[string]struct {
+		expected bool
+		lhs      DatastoreMatcher
+		rhs      DatastoreMatcher
+	}{
+		"true, true":   {expected: true, lhs: trueDSDC, rhs: trueDSDC},
+		"true, false":  {expected: true, lhs: trueDSDC, rhs: falseDSDC},
+		"false, true":  {expected: true, lhs: falseDSDC, rhs: trueDSDC},
+		"false, false": {expected: false, lhs: falseDSDC, rhs: falseDSDC},
+	}
+
+	var ds resources.Datastore
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			m := orDSMatcher{lhs: test.lhs, rhs: test.rhs}
+			assert.Equal(t, test.expected, m.Match(&ds))
+		})
+	}
+}
+
+func TestAndDSMatcher_Match(t *testing.T) {
+	tests := map[string]struct {
+		expected bool
+		lhs      DatastoreMatcher
+		rhs      DatastoreMatcher
+	}{
+		"true, true":   {expected: true, lhs: trueDSDC, rhs: trueDSDC},
+		"true, false":  {expected: false, lhs: trueDSDC, rhs: falseDSDC},
+		"false, true":  {expected: false, lhs: falseDSDC, rhs: trueDSDC},
+		"false, false": {expected: false, lhs: falseDSDC, rhs: falseDSDC},
+	}
+
+	var ds resources.Datastore
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			m := andDSMatcher{lhs: test.lhs, rhs: test.rhs}
+			assert.Equal(t, test.expected, m.Match(&ds))
+		})
+	}
+}
+
+func TestDatastoreIncludes_Parse(t *testing.T) {
+	tests := map[string]struct {
+		valid    bool
+		expected DatastoreMatcher
+	}{
+		"":      {valid: false},
+		"*/DS1": {valid: false},
+		"/":     {valid: true, expected: falseDSDC},
+		"/*":    {valid: true, expected: trueDSDC},
+		"/!*":   {valid: true, expected: falseDSDC},
+		"/!*/":  {valid: true, expected: falseDSDC},
+		"/!*/ ": {
+			valid: true,
+			expected: andDSMatcher{
+				lhs: falseDSDC,
+				rhs: dsDSMatcher{matcher.FALSE()},
+			},
+		},
+		"/DC1*/DS*": {
+			valid: true,
+			expected: andDSMatcher{
+				lhs: dsDCMatcher{mustSP("DC1*")},
+				rhs: dsDSMatcher{mustSP("DS*")},
+			},
+		},
+		"/*/*/extra": {
+			valid: true,
+			expected: andDSMatcher{
+				lhs: trueDSDC,
+				rhs: dsDSMatcher{matcher.TRUE()},
+			},
+		},
+		"[/DC1*,/DC2*]": {
+			valid: true,
+			expected: orDSMatcher{
+				lhs: dsDCMatcher{mustSP("DC1*")},
+				rhs: dsDCMatcher{mustSP("DC2*")},
+			},
+		},
+		"[/DC1*,/DC2*,/DC3*/DS*]": {
+			valid: true,
+			expected: orDSMatcher{
+				lhs: orDSMatcher{
+					lhs: dsDCMatcher{mustSP("DC1*")},
+					rhs: dsDCMatcher{mustSP("DC2*")},
+				},
+				rhs: andDSMatcher{
+					lhs: dsDCMatcher{mustSP("DC3*")},
+					rhs: dsDSMatcher{mustSP("DS*")},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			includes := prepareIncludes(name)
+			m, err := DatastoreIncludes(includes).Parse()
 
 			if !test.valid {
 				assert.Error(t, err)

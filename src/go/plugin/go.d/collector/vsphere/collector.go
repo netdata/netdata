@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/vmware/govmomi/performance"
+	mo25 "github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/types"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -43,12 +45,16 @@ func New() *Collector {
 			DiscoveryInterval: confopt.Duration(time.Minute * 5),
 			HostsInclude:      []string{"/*"},
 			VMsInclude:        []string{"/*"},
+			DatastoresInclude: []string{"/*"},
 		},
-		collectionLock:  &sync.RWMutex{},
-		charts:          &collectorapi.Charts{},
-		discoveredHosts: make(map[string]int),
-		discoveredVMs:   make(map[string]int),
-		charted:         make(map[string]bool),
+		collectionLock:        &sync.RWMutex{},
+		charts:                &collectorapi.Charts{},
+		discoveredHosts:       make(map[string]int),
+		discoveredVMs:         make(map[string]int),
+		discoveredDatastores:  make(map[string]int),
+		charted:               make(map[string]bool),
+		datastorePerfReceived: make(map[string]bool),
+		datastorePerfCharted:  make(map[string]bool),
 	}
 }
 
@@ -57,9 +63,10 @@ type Config struct {
 	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	web.HTTPConfig     `yaml:",inline" json:""`
-	DiscoveryInterval  confopt.Duration   `yaml:"discovery_interval,omitempty" json:"discovery_interval"`
-	HostsInclude       match.HostIncludes `yaml:"host_include,omitempty" json:"host_include"`
-	VMsInclude         match.VMIncludes   `yaml:"vm_include,omitempty" json:"vm_include"`
+	DiscoveryInterval  confopt.Duration        `yaml:"discovery_interval,omitempty" json:"discovery_interval"`
+	HostsInclude       match.HostIncludes      `yaml:"host_include,omitempty" json:"host_include"`
+	VMsInclude         match.VMIncludes        `yaml:"vm_include,omitempty" json:"vm_include"`
+	DatastoresInclude  match.DatastoreIncludes `yaml:"datastore_include,omitempty" json:"datastore_include"`
 }
 
 type (
@@ -71,13 +78,19 @@ type (
 
 		discoverer
 		scraper
+		dsPropertyCollector
 
-		collectionLock  *sync.RWMutex
-		resources       *rs.Resources
-		discoveryTask   *task
-		discoveredHosts map[string]int
-		discoveredVMs   map[string]int
-		charted         map[string]bool
+		collectionLock       *sync.RWMutex
+		resources            *rs.Resources
+		discoveryTask        *task
+		discoveredHosts      map[string]int
+		discoveredVMs        map[string]int
+		discoveredDatastores map[string]int
+		charted              map[string]bool
+
+		// two-phase chart creation for datastores: property charts always, perf charts only when data arrives
+		datastorePerfReceived map[string]bool
+		datastorePerfCharted  map[string]bool
 	}
 	discoverer interface {
 		Discover() (*rs.Resources, error)
@@ -85,6 +98,10 @@ type (
 	scraper interface {
 		ScrapeHosts(rs.Hosts) []performance.EntityMetric
 		ScrapeVMs(rs.VMs) []performance.EntityMetric
+		ScrapeDatastores(rs.Datastores) []performance.EntityMetric
+	}
+	dsPropertyCollector interface {
+		DatastoresByRef(refs []types.ManagedObjectReference, pathSet ...string) ([]mo25.Datastore, error)
 	}
 )
 

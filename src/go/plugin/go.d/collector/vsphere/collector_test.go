@@ -102,6 +102,11 @@ func TestCollector_Init_ReturnsFalseIfInvalidHostVMIncludeFormat(t *testing.T) {
 
 	collr.VMsInclude = match.VMIncludes{"invalid"}
 	assert.Error(t, collr.Init(context.Background()))
+
+	collr.VMsInclude = collr.VMsInclude[:0]
+
+	collr.DatastoresInclude = match.DatastoreIncludes{"invalid"}
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -137,198 +142,212 @@ func TestCollector_Collect(t *testing.T) {
 	collr.scraper = mockScraper{collr.scraper}
 
 	expected := map[string]int64{
-		"host-21_cpu.usage.average":           100,
-		"host-21_disk.maxTotalLatency.latest": 100,
-		"host-21_disk.read.average":           100,
-		"host-21_disk.write.average":          100,
-		"host-21_mem.active.average":          100,
-		"host-21_mem.consumed.average":        100,
-		"host-21_mem.granted.average":         100,
-		"host-21_mem.shared.average":          100,
-		"host-21_mem.sharedcommon.average":    100,
-		"host-21_mem.swapinRate.average":      100,
-		"host-21_mem.swapoutRate.average":     100,
-		"host-21_mem.usage.average":           100,
-		"host-21_net.bytesRx.average":         100,
-		"host-21_net.bytesTx.average":         100,
-		"host-21_net.droppedRx.summation":     100,
-		"host-21_net.droppedTx.summation":     100,
-		"host-21_net.errorsRx.summation":      100,
-		"host-21_net.errorsTx.summation":      100,
-		"host-21_net.packetsRx.summation":     100,
-		"host-21_net.packetsTx.summation":     100,
-		"host-21_overall.status.gray":         1,
-		"host-21_overall.status.green":        0,
-		"host-21_overall.status.red":          0,
-		"host-21_overall.status.yellow":       0,
-		"host-21_sys.uptime.latest":           100,
-		"host-37_cpu.usage.average":           100,
-		"host-37_disk.maxTotalLatency.latest": 100,
-		"host-37_disk.read.average":           100,
-		"host-37_disk.write.average":          100,
-		"host-37_mem.active.average":          100,
-		"host-37_mem.consumed.average":        100,
-		"host-37_mem.granted.average":         100,
-		"host-37_mem.shared.average":          100,
-		"host-37_mem.sharedcommon.average":    100,
-		"host-37_mem.swapinRate.average":      100,
-		"host-37_mem.swapoutRate.average":     100,
-		"host-37_mem.usage.average":           100,
-		"host-37_net.bytesRx.average":         100,
-		"host-37_net.bytesTx.average":         100,
-		"host-37_net.droppedRx.summation":     100,
-		"host-37_net.droppedTx.summation":     100,
-		"host-37_net.errorsRx.summation":      100,
-		"host-37_net.errorsTx.summation":      100,
-		"host-37_net.packetsRx.summation":     100,
-		"host-37_net.packetsTx.summation":     100,
-		"host-37_overall.status.gray":         1,
-		"host-37_overall.status.green":        0,
-		"host-37_overall.status.red":          0,
-		"host-37_overall.status.yellow":       0,
-		"host-37_sys.uptime.latest":           100,
-		"host-47_cpu.usage.average":           100,
-		"host-47_disk.maxTotalLatency.latest": 100,
-		"host-47_disk.read.average":           100,
-		"host-47_disk.write.average":          100,
-		"host-47_mem.active.average":          100,
-		"host-47_mem.consumed.average":        100,
-		"host-47_mem.granted.average":         100,
-		"host-47_mem.shared.average":          100,
-		"host-47_mem.sharedcommon.average":    100,
-		"host-47_mem.swapinRate.average":      100,
-		"host-47_mem.swapoutRate.average":     100,
-		"host-47_mem.usage.average":           100,
-		"host-47_net.bytesRx.average":         100,
-		"host-47_net.bytesTx.average":         100,
-		"host-47_net.droppedRx.summation":     100,
-		"host-47_net.droppedTx.summation":     100,
-		"host-47_net.errorsRx.summation":      100,
-		"host-47_net.errorsTx.summation":      100,
-		"host-47_net.packetsRx.summation":     100,
-		"host-47_net.packetsTx.summation":     100,
-		"host-47_overall.status.gray":         1,
-		"host-47_overall.status.green":        0,
-		"host-47_overall.status.red":          0,
-		"host-47_overall.status.yellow":       0,
-		"host-47_sys.uptime.latest":           100,
-		"host-57_cpu.usage.average":           100,
-		"host-57_disk.maxTotalLatency.latest": 100,
-		"host-57_disk.read.average":           100,
-		"host-57_disk.write.average":          100,
-		"host-57_mem.active.average":          100,
-		"host-57_mem.consumed.average":        100,
-		"host-57_mem.granted.average":         100,
-		"host-57_mem.shared.average":          100,
-		"host-57_mem.sharedcommon.average":    100,
-		"host-57_mem.swapinRate.average":      100,
-		"host-57_mem.swapoutRate.average":     100,
-		"host-57_mem.usage.average":           100,
-		"host-57_net.bytesRx.average":         100,
-		"host-57_net.bytesTx.average":         100,
-		"host-57_net.droppedRx.summation":     100,
-		"host-57_net.droppedTx.summation":     100,
-		"host-57_net.errorsRx.summation":      100,
-		"host-57_net.errorsTx.summation":      100,
-		"host-57_net.packetsRx.summation":     100,
-		"host-57_net.packetsTx.summation":     100,
-		"host-57_overall.status.gray":         1,
-		"host-57_overall.status.green":        0,
-		"host-57_overall.status.red":          0,
-		"host-57_overall.status.yellow":       0,
-		"host-57_sys.uptime.latest":           100,
-		"vm-62_cpu.usage.average":             200,
-		"vm-62_disk.maxTotalLatency.latest":   200,
-		"vm-62_disk.read.average":             200,
-		"vm-62_disk.write.average":            200,
-		"vm-62_mem.active.average":            200,
-		"vm-62_mem.consumed.average":          200,
-		"vm-62_mem.granted.average":           200,
-		"vm-62_mem.shared.average":            200,
-		"vm-62_mem.swapinRate.average":        200,
-		"vm-62_mem.swapoutRate.average":       200,
-		"vm-62_mem.swapped.average":           200,
-		"vm-62_mem.usage.average":             200,
-		"vm-62_net.bytesRx.average":           200,
-		"vm-62_net.bytesTx.average":           200,
-		"vm-62_net.droppedRx.summation":       200,
-		"vm-62_net.droppedTx.summation":       200,
-		"vm-62_net.packetsRx.summation":       200,
-		"vm-62_net.packetsTx.summation":       200,
-		"vm-62_overall.status.gray":           0,
-		"vm-62_overall.status.green":          1,
-		"vm-62_overall.status.red":            0,
-		"vm-62_overall.status.yellow":         0,
-		"vm-62_sys.uptime.latest":             200,
-		"vm-65_cpu.usage.average":             200,
-		"vm-65_disk.maxTotalLatency.latest":   200,
-		"vm-65_disk.read.average":             200,
-		"vm-65_disk.write.average":            200,
-		"vm-65_mem.active.average":            200,
-		"vm-65_mem.consumed.average":          200,
-		"vm-65_mem.granted.average":           200,
-		"vm-65_mem.shared.average":            200,
-		"vm-65_mem.swapinRate.average":        200,
-		"vm-65_mem.swapoutRate.average":       200,
-		"vm-65_mem.swapped.average":           200,
-		"vm-65_mem.usage.average":             200,
-		"vm-65_net.bytesRx.average":           200,
-		"vm-65_net.bytesTx.average":           200,
-		"vm-65_net.droppedRx.summation":       200,
-		"vm-65_net.droppedTx.summation":       200,
-		"vm-65_net.packetsRx.summation":       200,
-		"vm-65_net.packetsTx.summation":       200,
-		"vm-65_overall.status.gray":           0,
-		"vm-65_overall.status.green":          1,
-		"vm-65_overall.status.red":            0,
-		"vm-65_overall.status.yellow":         0,
-		"vm-65_sys.uptime.latest":             200,
-		"vm-68_cpu.usage.average":             200,
-		"vm-68_disk.maxTotalLatency.latest":   200,
-		"vm-68_disk.read.average":             200,
-		"vm-68_disk.write.average":            200,
-		"vm-68_mem.active.average":            200,
-		"vm-68_mem.consumed.average":          200,
-		"vm-68_mem.granted.average":           200,
-		"vm-68_mem.shared.average":            200,
-		"vm-68_mem.swapinRate.average":        200,
-		"vm-68_mem.swapoutRate.average":       200,
-		"vm-68_mem.swapped.average":           200,
-		"vm-68_mem.usage.average":             200,
-		"vm-68_net.bytesRx.average":           200,
-		"vm-68_net.bytesTx.average":           200,
-		"vm-68_net.droppedRx.summation":       200,
-		"vm-68_net.droppedTx.summation":       200,
-		"vm-68_net.packetsRx.summation":       200,
-		"vm-68_net.packetsTx.summation":       200,
-		"vm-68_overall.status.gray":           0,
-		"vm-68_overall.status.green":          1,
-		"vm-68_overall.status.red":            0,
-		"vm-68_overall.status.yellow":         0,
-		"vm-68_sys.uptime.latest":             200,
-		"vm-71_cpu.usage.average":             200,
-		"vm-71_disk.maxTotalLatency.latest":   200,
-		"vm-71_disk.read.average":             200,
-		"vm-71_disk.write.average":            200,
-		"vm-71_mem.active.average":            200,
-		"vm-71_mem.consumed.average":          200,
-		"vm-71_mem.granted.average":           200,
-		"vm-71_mem.shared.average":            200,
-		"vm-71_mem.swapinRate.average":        200,
-		"vm-71_mem.swapoutRate.average":       200,
-		"vm-71_mem.swapped.average":           200,
-		"vm-71_mem.usage.average":             200,
-		"vm-71_net.bytesRx.average":           200,
-		"vm-71_net.bytesTx.average":           200,
-		"vm-71_net.droppedRx.summation":       200,
-		"vm-71_net.droppedTx.summation":       200,
-		"vm-71_net.packetsRx.summation":       200,
-		"vm-71_net.packetsTx.summation":       200,
-		"vm-71_overall.status.gray":           0,
-		"vm-71_overall.status.green":          1,
-		"vm-71_overall.status.red":            0,
-		"vm-71_overall.status.yellow":         0,
-		"vm-71_sys.uptime.latest":             200,
+		"host-21_cpu.usage.average":                          100,
+		"host-21_disk.maxTotalLatency.latest":                100,
+		"host-21_disk.read.average":                          100,
+		"host-21_disk.write.average":                         100,
+		"host-21_mem.active.average":                         100,
+		"host-21_mem.consumed.average":                       100,
+		"host-21_mem.granted.average":                        100,
+		"host-21_mem.shared.average":                         100,
+		"host-21_mem.sharedcommon.average":                   100,
+		"host-21_mem.swapinRate.average":                     100,
+		"host-21_mem.swapoutRate.average":                    100,
+		"host-21_mem.usage.average":                          100,
+		"host-21_net.bytesRx.average":                        100,
+		"host-21_net.bytesTx.average":                        100,
+		"host-21_net.droppedRx.summation":                    100,
+		"host-21_net.droppedTx.summation":                    100,
+		"host-21_net.errorsRx.summation":                     100,
+		"host-21_net.errorsTx.summation":                     100,
+		"host-21_net.packetsRx.summation":                    100,
+		"host-21_net.packetsTx.summation":                    100,
+		"host-21_overall.status.gray":                        1,
+		"host-21_overall.status.green":                       0,
+		"host-21_overall.status.red":                         0,
+		"host-21_overall.status.yellow":                      0,
+		"host-21_sys.uptime.latest":                          100,
+		"host-37_cpu.usage.average":                          100,
+		"host-37_disk.maxTotalLatency.latest":                100,
+		"host-37_disk.read.average":                          100,
+		"host-37_disk.write.average":                         100,
+		"host-37_mem.active.average":                         100,
+		"host-37_mem.consumed.average":                       100,
+		"host-37_mem.granted.average":                        100,
+		"host-37_mem.shared.average":                         100,
+		"host-37_mem.sharedcommon.average":                   100,
+		"host-37_mem.swapinRate.average":                     100,
+		"host-37_mem.swapoutRate.average":                    100,
+		"host-37_mem.usage.average":                          100,
+		"host-37_net.bytesRx.average":                        100,
+		"host-37_net.bytesTx.average":                        100,
+		"host-37_net.droppedRx.summation":                    100,
+		"host-37_net.droppedTx.summation":                    100,
+		"host-37_net.errorsRx.summation":                     100,
+		"host-37_net.errorsTx.summation":                     100,
+		"host-37_net.packetsRx.summation":                    100,
+		"host-37_net.packetsTx.summation":                    100,
+		"host-37_overall.status.gray":                        1,
+		"host-37_overall.status.green":                       0,
+		"host-37_overall.status.red":                         0,
+		"host-37_overall.status.yellow":                      0,
+		"host-37_sys.uptime.latest":                          100,
+		"host-47_cpu.usage.average":                          100,
+		"host-47_disk.maxTotalLatency.latest":                100,
+		"host-47_disk.read.average":                          100,
+		"host-47_disk.write.average":                         100,
+		"host-47_mem.active.average":                         100,
+		"host-47_mem.consumed.average":                       100,
+		"host-47_mem.granted.average":                        100,
+		"host-47_mem.shared.average":                         100,
+		"host-47_mem.sharedcommon.average":                   100,
+		"host-47_mem.swapinRate.average":                     100,
+		"host-47_mem.swapoutRate.average":                    100,
+		"host-47_mem.usage.average":                          100,
+		"host-47_net.bytesRx.average":                        100,
+		"host-47_net.bytesTx.average":                        100,
+		"host-47_net.droppedRx.summation":                    100,
+		"host-47_net.droppedTx.summation":                    100,
+		"host-47_net.errorsRx.summation":                     100,
+		"host-47_net.errorsTx.summation":                     100,
+		"host-47_net.packetsRx.summation":                    100,
+		"host-47_net.packetsTx.summation":                    100,
+		"host-47_overall.status.gray":                        1,
+		"host-47_overall.status.green":                       0,
+		"host-47_overall.status.red":                         0,
+		"host-47_overall.status.yellow":                      0,
+		"host-47_sys.uptime.latest":                          100,
+		"host-57_cpu.usage.average":                          100,
+		"host-57_disk.maxTotalLatency.latest":                100,
+		"host-57_disk.read.average":                          100,
+		"host-57_disk.write.average":                         100,
+		"host-57_mem.active.average":                         100,
+		"host-57_mem.consumed.average":                       100,
+		"host-57_mem.granted.average":                        100,
+		"host-57_mem.shared.average":                         100,
+		"host-57_mem.sharedcommon.average":                   100,
+		"host-57_mem.swapinRate.average":                     100,
+		"host-57_mem.swapoutRate.average":                    100,
+		"host-57_mem.usage.average":                          100,
+		"host-57_net.bytesRx.average":                        100,
+		"host-57_net.bytesTx.average":                        100,
+		"host-57_net.droppedRx.summation":                    100,
+		"host-57_net.droppedTx.summation":                    100,
+		"host-57_net.errorsRx.summation":                     100,
+		"host-57_net.errorsTx.summation":                     100,
+		"host-57_net.packetsRx.summation":                    100,
+		"host-57_net.packetsTx.summation":                    100,
+		"host-57_overall.status.gray":                        1,
+		"host-57_overall.status.green":                       0,
+		"host-57_overall.status.red":                         0,
+		"host-57_overall.status.yellow":                      0,
+		"host-57_sys.uptime.latest":                          100,
+		"vm-62_cpu.usage.average":                            200,
+		"vm-62_disk.maxTotalLatency.latest":                  200,
+		"vm-62_disk.read.average":                            200,
+		"vm-62_disk.write.average":                           200,
+		"vm-62_mem.active.average":                           200,
+		"vm-62_mem.consumed.average":                         200,
+		"vm-62_mem.granted.average":                          200,
+		"vm-62_mem.shared.average":                           200,
+		"vm-62_mem.swapinRate.average":                       200,
+		"vm-62_mem.swapoutRate.average":                      200,
+		"vm-62_mem.swapped.average":                          200,
+		"vm-62_mem.usage.average":                            200,
+		"vm-62_net.bytesRx.average":                          200,
+		"vm-62_net.bytesTx.average":                          200,
+		"vm-62_net.droppedRx.summation":                      200,
+		"vm-62_net.droppedTx.summation":                      200,
+		"vm-62_net.packetsRx.summation":                      200,
+		"vm-62_net.packetsTx.summation":                      200,
+		"vm-62_overall.status.gray":                          0,
+		"vm-62_overall.status.green":                         1,
+		"vm-62_overall.status.red":                           0,
+		"vm-62_overall.status.yellow":                        0,
+		"vm-62_sys.uptime.latest":                            200,
+		"vm-65_cpu.usage.average":                            200,
+		"vm-65_disk.maxTotalLatency.latest":                  200,
+		"vm-65_disk.read.average":                            200,
+		"vm-65_disk.write.average":                           200,
+		"vm-65_mem.active.average":                           200,
+		"vm-65_mem.consumed.average":                         200,
+		"vm-65_mem.granted.average":                          200,
+		"vm-65_mem.shared.average":                           200,
+		"vm-65_mem.swapinRate.average":                       200,
+		"vm-65_mem.swapoutRate.average":                      200,
+		"vm-65_mem.swapped.average":                          200,
+		"vm-65_mem.usage.average":                            200,
+		"vm-65_net.bytesRx.average":                          200,
+		"vm-65_net.bytesTx.average":                          200,
+		"vm-65_net.droppedRx.summation":                      200,
+		"vm-65_net.droppedTx.summation":                      200,
+		"vm-65_net.packetsRx.summation":                      200,
+		"vm-65_net.packetsTx.summation":                      200,
+		"vm-65_overall.status.gray":                          0,
+		"vm-65_overall.status.green":                         1,
+		"vm-65_overall.status.red":                           0,
+		"vm-65_overall.status.yellow":                        0,
+		"vm-65_sys.uptime.latest":                            200,
+		"vm-68_cpu.usage.average":                            200,
+		"vm-68_disk.maxTotalLatency.latest":                  200,
+		"vm-68_disk.read.average":                            200,
+		"vm-68_disk.write.average":                           200,
+		"vm-68_mem.active.average":                           200,
+		"vm-68_mem.consumed.average":                         200,
+		"vm-68_mem.granted.average":                          200,
+		"vm-68_mem.shared.average":                           200,
+		"vm-68_mem.swapinRate.average":                       200,
+		"vm-68_mem.swapoutRate.average":                      200,
+		"vm-68_mem.swapped.average":                          200,
+		"vm-68_mem.usage.average":                            200,
+		"vm-68_net.bytesRx.average":                          200,
+		"vm-68_net.bytesTx.average":                          200,
+		"vm-68_net.droppedRx.summation":                      200,
+		"vm-68_net.droppedTx.summation":                      200,
+		"vm-68_net.packetsRx.summation":                      200,
+		"vm-68_net.packetsTx.summation":                      200,
+		"vm-68_overall.status.gray":                          0,
+		"vm-68_overall.status.green":                         1,
+		"vm-68_overall.status.red":                           0,
+		"vm-68_overall.status.yellow":                        0,
+		"vm-68_sys.uptime.latest":                            200,
+		"vm-71_cpu.usage.average":                            200,
+		"vm-71_disk.maxTotalLatency.latest":                  200,
+		"vm-71_disk.read.average":                            200,
+		"vm-71_disk.write.average":                           200,
+		"vm-71_mem.active.average":                           200,
+		"vm-71_mem.consumed.average":                         200,
+		"vm-71_mem.granted.average":                          200,
+		"vm-71_mem.shared.average":                           200,
+		"vm-71_mem.swapinRate.average":                       200,
+		"vm-71_mem.swapoutRate.average":                      200,
+		"vm-71_mem.swapped.average":                          200,
+		"vm-71_mem.usage.average":                            200,
+		"vm-71_net.bytesRx.average":                          200,
+		"vm-71_net.bytesTx.average":                          200,
+		"vm-71_net.droppedRx.summation":                      200,
+		"vm-71_net.droppedTx.summation":                      200,
+		"vm-71_net.packetsRx.summation":                      200,
+		"vm-71_net.packetsTx.summation":                      200,
+		"vm-71_overall.status.gray":                          0,
+		"vm-71_overall.status.green":                         1,
+		"vm-71_overall.status.red":                           0,
+		"vm-71_overall.status.yellow":                        0,
+		"vm-71_sys.uptime.latest":                            200,
+		"datastore-59_capacity":                              4398046511104,
+		"datastore-59_free_space":                            4355096838144,
+		"datastore-59_used_space":                            42949672960,
+		"datastore-59_used_space_pct":                        97,
+		"datastore-59_overall.status.green":                  1,
+		"datastore-59_overall.status.gray":                   0,
+		"datastore-59_overall.status.red":                    0,
+		"datastore-59_overall.status.yellow":                 0,
+		"datastore-59_datastore.numberReadAveraged.average":  300,
+		"datastore-59_datastore.numberWriteAveraged.average": 300,
+		"datastore-59_datastore.read.average":                300,
+		"datastore-59_datastore.write.average":               300,
+		"datastore-59_datastore.totalReadLatency.average":    300,
+		"datastore-59_datastore.totalWriteLatency.average":   300,
 	}
 
 	mx := collr.Collect(context.Background())
@@ -338,9 +357,10 @@ func TestCollector_Collect(t *testing.T) {
 	count := model.Count()
 	assert.Len(t, collr.discoveredHosts, count.Host)
 	assert.Len(t, collr.discoveredVMs, count.Machine)
-	assert.Len(t, collr.charted, count.Host+count.Machine)
+	assert.Len(t, collr.discoveredDatastores, count.Datastore)
+	assert.Len(t, collr.charted, count.Host+count.Machine+count.Datastore)
 
-	assert.Len(t, *collr.Charts(), count.Host*len(hostChartsTmpl)+count.Machine*len(vmChartsTmpl))
+	assert.Len(t, *collr.Charts(), count.Host*len(hostChartsTmpl)+count.Machine*len(vmChartsTmpl)+count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl)))
 	collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 }
 
@@ -388,10 +408,10 @@ func TestCollector_Collect_RemoveHostsVMsInRuntime(t *testing.T) {
 
 	assert.Len(t, collr.discoveredHosts, 1)
 	assert.Len(t, collr.discoveredVMs, 1)
-	assert.Len(t, collr.charted, 2)
+	assert.Len(t, collr.charted, 2+len(collr.discoveredDatastores))
 
 	for _, c := range *collr.Charts() {
-		if strings.HasPrefix(c.ID, okHostId) || strings.HasPrefix(c.ID, okVmId) {
+		if strings.HasPrefix(c.ID, okHostId) || strings.HasPrefix(c.ID, okVmId) || strings.HasPrefix(c.ID, "datastore-") {
 			assert.False(t, c.Obsolete)
 		} else {
 			assert.True(t, c.Obsolete)
@@ -418,8 +438,9 @@ func TestCollector_Collect_Run(t *testing.T) {
 	count := model.Count()
 	assert.Len(t, collr.discoveredHosts, count.Host)
 	assert.Len(t, collr.discoveredVMs, count.Machine)
-	assert.Len(t, collr.charted, count.Host+count.Machine)
-	assert.Len(t, *collr.charts, count.Host*len(hostChartsTmpl)+count.Machine*len(vmChartsTmpl))
+	assert.Len(t, collr.discoveredDatastores, count.Datastore)
+	assert.Len(t, collr.charted, count.Host+count.Machine+count.Datastore)
+	assert.Len(t, *collr.charts, count.Host*len(hostChartsTmpl)+count.Machine*len(vmChartsTmpl)+count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl)))
 }
 
 func prepareVSphereSim(t *testing.T) (collr *Collector, model *simulator.Model, teardown func()) {
@@ -455,6 +476,10 @@ func (s mockScraper) ScrapeVMs(vms rs.VMs) []performance.EntityMetric {
 	ms := s.scraper.ScrapeVMs(vms)
 	return populateMetrics(ms, 200)
 }
+func (s mockScraper) ScrapeDatastores(datastores rs.Datastores) []performance.EntityMetric {
+	ms := s.scraper.ScrapeDatastores(datastores)
+	return populateMetrics(ms, 300)
+}
 
 func populateMetrics(ms []performance.EntityMetric, value int64) []performance.EntityMetric {
 	for i := range ms {
@@ -475,3 +500,116 @@ type mockVMMatcher struct{ name string }
 
 func (m mockHostMatcher) Match(host *rs.Host) bool { return m.name == host.ID }
 func (m mockVMMatcher) Match(vm *rs.VM) bool       { return m.name == vm.ID }
+
+// mockScraperNoDSPerf wraps a scraper but returns no perf data for datastores (simulates vSAN).
+type mockScraperNoDSPerf struct {
+	scraper
+}
+
+func (s mockScraperNoDSPerf) ScrapeHosts(hosts rs.Hosts) []performance.EntityMetric {
+	return populateMetrics(s.scraper.ScrapeHosts(hosts), 100)
+}
+func (s mockScraperNoDSPerf) ScrapeVMs(vms rs.VMs) []performance.EntityMetric {
+	return populateMetrics(s.scraper.ScrapeVMs(vms), 200)
+}
+func (s mockScraperNoDSPerf) ScrapeDatastores(_ rs.Datastores) []performance.EntityMetric {
+	return nil
+}
+
+func TestCollector_Collect_DatastoreNoPerfData(t *testing.T) {
+	collr, model, teardown := prepareVSphereSim(t)
+	defer teardown()
+
+	require.NoError(t, collr.Init(context.Background()))
+
+	collr.scraper = mockScraperNoDSPerf{collr.scraper}
+
+	mx := collr.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	count := model.Count()
+
+	// Property metrics should be present.
+	for _, ds := range collr.resources.Datastores {
+		assert.Contains(t, mx, ds.ID+"_capacity")
+		assert.Contains(t, mx, ds.ID+"_free_space")
+		assert.Contains(t, mx, ds.ID+"_used_space")
+		assert.Contains(t, mx, ds.ID+"_used_space_pct")
+		assert.Contains(t, mx, ds.ID+"_overall.status.green")
+	}
+
+	// Perf metrics should NOT be present.
+	for _, ds := range collr.resources.Datastores {
+		assert.NotContains(t, mx, ds.ID+"_datastore.read.average")
+		assert.NotContains(t, mx, ds.ID+"_datastore.numberReadAveraged.average")
+	}
+
+	// Only property charts created, no perf charts.
+	assert.Len(t, *collr.Charts(),
+		count.Host*len(hostChartsTmpl)+
+			count.Machine*len(vmChartsTmpl)+
+			count.Datastore*len(datastorePropertyChartsTmpl))
+
+	// datastorePerfReceived should be empty.
+	assert.Empty(t, collr.datastorePerfReceived)
+	assert.Empty(t, collr.datastorePerfCharted)
+
+	// Now switch to a scraper that returns perf data — perf charts should appear.
+	collr.scraper = mockScraper{collr.scraper.(mockScraperNoDSPerf).scraper}
+
+	mx = collr.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	// Perf metrics should now be present.
+	for _, ds := range collr.resources.Datastores {
+		assert.Contains(t, mx, ds.ID+"_datastore.read.average")
+	}
+
+	// Both property and perf charts now.
+	assert.Len(t, *collr.Charts(),
+		count.Host*len(hostChartsTmpl)+
+			count.Machine*len(vmChartsTmpl)+
+			count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl)))
+
+	assert.Len(t, collr.datastorePerfReceived, count.Datastore)
+	assert.Len(t, collr.datastorePerfCharted, count.Datastore)
+}
+
+func TestCollector_Collect_DatastoreEvictionCleansUpMaps(t *testing.T) {
+	collr, _, teardown := prepareVSphereSim(t)
+	defer teardown()
+
+	require.NoError(t, collr.Init(context.Background()))
+
+	collr.scraper = mockScraper{collr.scraper}
+
+	// First collect — creates all charts including datastore perf charts.
+	mx := collr.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	assert.NotEmpty(t, collr.discoveredDatastores)
+	assert.NotEmpty(t, collr.datastorePerfReceived)
+	assert.NotEmpty(t, collr.datastorePerfCharted)
+
+	// Simulate eviction: disable property collector and perf scraper so the counter isn't reset,
+	// then set the failure counter to the eviction threshold.
+	collr.dsPropertyCollector = nil
+	collr.scraper = mockScraperNoDSPerf{collr.scraper.(mockScraper).scraper}
+	for id := range collr.discoveredDatastores {
+		collr.discoveredDatastores[id] = failedUpdatesLimit
+	}
+
+	// Next collect increments counter past the limit, triggering eviction in updateCharts.
+	collr.Collect(context.Background())
+
+	assert.Empty(t, collr.discoveredDatastores)
+	assert.Empty(t, collr.datastorePerfReceived)
+	assert.Empty(t, collr.datastorePerfCharted)
+
+	// Datastore charts should be marked obsolete.
+	for _, c := range *collr.Charts() {
+		if strings.HasPrefix(c.ID, "datastore-") {
+			assert.True(t, c.Obsolete, "chart %s should be obsolete", c.ID)
+		}
+	}
+}

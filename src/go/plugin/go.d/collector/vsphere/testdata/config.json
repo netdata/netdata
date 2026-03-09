@@ -27,5 +27,8 @@
   ],
   "vm_include": [
     "ok"
+  ],
+  "datastore_include": [
+    "ok"
   ]
 }
