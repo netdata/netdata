@@ -91,4 +91,3 @@ func TestCollector_azureADBeforeConnect_ProviderError(t *testing.T) {
 	assert.ErrorContains(t, err, "token failure")
 	assert.Equal(t, "old-password", cfg.Password)
 }
-

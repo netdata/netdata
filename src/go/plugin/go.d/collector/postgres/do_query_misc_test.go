@@ -47,4 +47,3 @@ func TestCloseDBAndUnregisterConnConfig_NonEmptyConnStr(t *testing.T) {
 	assert.Equal(t, "registered-conn", calledWith)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
-
