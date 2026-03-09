@@ -296,21 +296,38 @@ bool connect_to_definition_get_service(const char *definition, int default_port,
     if(!definition || !*definition)
         return true;
 
-    char *buffer = strdupz(definition);
+    const char *s = definition;
+    if(strncmp(s, "tcp:", 4) == 0 || strncmp(s, "udp:", 4) == 0)
+        s += 4;
+    else if(strncmp(s, "unix:", 5) == 0 || *s == '/')
+        return true;
 
-    char *host = NULL, *entry_service = NULL, *iface = NULL, *unix_path = NULL;
-    int protocol = 0, socktype = 0;
-    int rc = parse_connection_definition(
-        buffer, &host, &entry_service, &iface, &protocol, &socktype, &unix_path);
-    if(rc == -1) {
-        freez(buffer);
-        return false;
+    const char *e = s;
+    size_t host_len = 0;
+    if(*e == '[') {
+        const char *host_start = ++e;
+        while(*e && *e != ']') e++;
+        host_len = (size_t)(e - host_start);
+        if(*e == ']')
+            e++;
+    }
+    else {
+        const char *host_start = e;
+        while(*e && *e != ':' && *e != '%') e++;
+        host_len = (size_t)(e - host_start);
     }
 
-    if(entry_service && *entry_service)
-        snprintfz(service, service_size, "%s", entry_service);
+    if(!host_len)
+        return false;
 
-    freez(buffer);
+    if(*e == '%') {
+        e++;
+        while(*e && *e != ':') e++;
+    }
+
+    if(*e == ':' && *(e + 1))
+        snprintfz(service, service_size, "%s", e + 1);
+
     return true;
 }
 
