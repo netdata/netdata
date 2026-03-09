@@ -166,21 +166,13 @@ func (c *Collector) evalStatusWhen(sw *ConfigStatusWhen, value string) bool {
 }
 
 func (c *Collector) openConnection(ctx context.Context) error {
-	driverName := c.Driver
-	dsn := c.DSN
+	if c.CloudAuth.IsEnabled() && c.Driver == "pgx" {
+		return c.openPostgresAzureADConnection(ctx)
+	}
 
-	if c.CloudAuth.IsEnabled() {
-		switch c.Driver {
-		case "pgx":
-			return c.openPostgresAzureADConnection(ctx)
-		case "sqlserver", "azuresql":
-			var err error
-			dsn, err = sqladapter.BuildMSSQLAzureADDSN(c.DSN, c.CloudAuth)
-			if err != nil {
-				return fmt.Errorf("prepare cloud_auth SQL Server DSN: %w", err)
-			}
-			driverName = sqladapter.MSSQLAzureDriverName
-		}
+	driverName, dsn, err := c.resolveConnectionParams()
+	if err != nil {
+		return err
 	}
 
 	db, err := sql.Open(driverName, dsn)
@@ -204,6 +196,25 @@ func (c *Collector) openConnection(ctx context.Context) error {
 
 	c.db = db
 	return nil
+}
+
+func (c *Collector) resolveConnectionParams() (string, string, error) {
+	driverName := c.Driver
+	dsn := c.DSN
+
+	if c.CloudAuth.IsEnabled() {
+		switch c.Driver {
+		case "sqlserver", "azuresql":
+			var err error
+			dsn, err = sqladapter.BuildMSSQLAzureADDSN(c.DSN, c.CloudAuth)
+			if err != nil {
+				return "", "", fmt.Errorf("prepare cloud_auth SQL Server DSN: %w", err)
+			}
+			driverName = sqladapter.MSSQLAzureDriverName
+		}
+	}
+
+	return driverName, dsn, nil
 }
 
 func (c *Collector) openPostgresAzureADConnection(ctx context.Context) error {

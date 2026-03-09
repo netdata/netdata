@@ -145,6 +145,22 @@ func TestCollector_Init(t *testing.T) {
 	}
 }
 
+func TestCollector_Init_AzureADInitializesTokenProvider(t *testing.T) {
+	c := New()
+	c.CloudAuth = cloudauth.Config{
+		Provider: cloudauth.ProviderAzureAD,
+		AzureAD: &cloudauth.AzureADAuthConfig{
+			Mode:         cloudauth.AzureADAuthModeServicePrincipal,
+			TenantID:     "tenant-id",
+			ClientID:     "client-id",
+			ClientSecret: "client-secret",
+		},
+	}
+
+	require.NoError(t, c.Init(context.Background()))
+	assert.NotNil(t, c.azureTokenProvider)
+}
+
 func TestCollector_Cleanup(t *testing.T) {
 
 }

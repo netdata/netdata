@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/jackc/pgx/v5"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/sqladapter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -34,6 +35,20 @@ func TestCollector_openConnection_AzureADSQLServerRequiresURLDSN(t *testing.T) {
 	err := c.openConnection(context.Background())
 	assert.ErrorContains(t, err, "prepare cloud_auth SQL Server DSN")
 	assert.Nil(t, c.db)
+}
+
+func TestCollector_resolveConnectionParams_AzureADSQLServerRewritesDSNAndDriver(t *testing.T) {
+	c := New()
+	c.Driver = "sqlserver"
+	c.DSN = "sqlserver://localhost:1433?database=master"
+	c.CloudAuth.Provider = cloudauth.ProviderAzureAD
+	c.CloudAuth.AzureAD = &cloudauth.AzureADAuthConfig{Mode: cloudauth.AzureADAuthModeDefault}
+
+	driverName, dsn, err := c.resolveConnectionParams()
+	require.NoError(t, err)
+
+	assert.Equal(t, sqladapter.MSSQLAzureDriverName, driverName)
+	assert.Contains(t, dsn, "fedauth=ActiveDirectoryDefault")
 }
 
 func TestCollector_openConnection_AzureADPGXWithoutTokenProvider(t *testing.T) {

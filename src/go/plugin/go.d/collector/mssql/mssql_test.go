@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/sqladapter"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCollector_Init(t *testing.T) {
@@ -46,6 +48,19 @@ func TestCollector_openConnection_AzureADRequiresURLDSN(t *testing.T) {
 	db, err := c.openConnection()
 	assert.Nil(t, db)
 	assert.ErrorContains(t, err, "error preparing cloud auth SQL Server DSN")
+}
+
+func TestCollector_resolveConnectionParams_AzureADRewritesDSNAndDriver(t *testing.T) {
+	c := New()
+	c.DSN = "sqlserver://localhost:1433?database=master"
+	c.CloudAuth.Provider = cloudauth.ProviderAzureAD
+	c.CloudAuth.AzureAD = &cloudauth.AzureADAuthConfig{Mode: cloudauth.AzureADAuthModeDefault}
+
+	driverName, dsn, err := c.resolveConnectionParams()
+	require.NoError(t, err)
+
+	assert.Equal(t, sqladapter.MSSQLAzureDriverName, driverName)
+	assert.Contains(t, dsn, "fedauth=ActiveDirectoryDefault")
 }
 
 func TestCollector_Configuration(t *testing.T) {
