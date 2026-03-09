@@ -29,7 +29,7 @@ func TestCollector_openConnection_AzureADSQLServerRequiresURLDSN(t *testing.T) {
 	c.Driver = "sqlserver"
 	c.DSN = "server=localhost;database=master"
 	c.CloudAuth.Provider = cloudauth.ProviderAzureAD
-	c.CloudAuth.AzureAD.Mode = cloudauth.AzureADAuthModeDefault
+	c.CloudAuth.AzureAD = &cloudauth.AzureADAuthConfig{Mode: cloudauth.AzureADAuthModeDefault}
 
 	err := c.openConnection(context.Background())
 	assert.ErrorContains(t, err, "prepare cloud_auth SQL Server DSN")
@@ -41,7 +41,7 @@ func TestCollector_openConnection_AzureADPGXWithoutTokenProvider(t *testing.T) {
 	c.Driver = "pgx"
 	c.DSN = "postgres://netdata@127.0.0.1:5432/postgres"
 	c.CloudAuth.Provider = cloudauth.ProviderAzureAD
-	c.CloudAuth.AzureAD.Mode = cloudauth.AzureADAuthModeDefault
+	c.CloudAuth.AzureAD = &cloudauth.AzureADAuthConfig{Mode: cloudauth.AzureADAuthModeDefault}
 
 	err := c.openConnection(context.Background())
 	assert.ErrorContains(t, err, "cloud auth token provider is not initialized for pgx")

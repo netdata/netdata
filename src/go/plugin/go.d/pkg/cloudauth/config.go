@@ -10,8 +10,8 @@ import (
 )
 
 type Config struct {
-	Provider Provider          `yaml:"provider,omitempty" json:"provider,omitempty"`
-	AzureAD  AzureADAuthConfig `yaml:"azure_ad,omitempty" json:"azure_ad,omitempty"`
+	Provider Provider           `yaml:"provider" json:"provider"`
+	AzureAD  *AzureADAuthConfig `yaml:"azure_ad,omitempty" json:"azure_ad,omitempty"`
 }
 
 func (c Config) ProviderName() Provider {
@@ -31,7 +31,7 @@ func (c Config) Validate() error {
 	case ProviderNone:
 		return nil
 	case ProviderAzureAD:
-		return c.AzureAD.Validate()
+		return c.azureADConfig().Validate()
 	default:
 		return fmt.Errorf("cloud_auth.provider %q is invalid: expected one of %q, %q",
 			c.Provider, ProviderNone, ProviderAzureAD)
@@ -45,10 +45,17 @@ func (c Config) NewCredential() (azcore.TokenCredential, error) {
 
 	switch c.ProviderName() {
 	case ProviderAzureAD:
-		return c.AzureAD.NewCredential()
+		return c.azureADConfig().NewCredential()
 	case ProviderNone:
 		return nil, errors.New("cloud_auth is not enabled")
 	default:
 		return nil, fmt.Errorf("cloud_auth.provider %q is invalid", c.Provider)
 	}
+}
+
+func (c Config) azureADConfig() AzureADAuthConfig {
+	if c.AzureAD == nil {
+		return AzureADAuthConfig{}
+	}
+	return *c.AzureAD
 }

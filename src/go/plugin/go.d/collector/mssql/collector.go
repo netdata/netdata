@@ -64,7 +64,7 @@ type Config struct {
 	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
 	DSN         string           `yaml:"dsn" json:"dsn"`
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	CloudAuth   cloudauth.Config `yaml:"cloud_auth,omitempty" json:"cloud_auth,omitempty"`
+	CloudAuth   cloudauth.Config `yaml:"cloud_auth" json:"cloud_auth"`
 	Functions   FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
 }
 

@@ -120,7 +120,7 @@ func TestCollector_Init(t *testing.T) {
 				DSN: "postgresql://netdata@127.0.0.1:5432/postgres",
 				CloudAuth: cloudauth.Config{
 					Provider: cloudauth.ProviderAzureAD,
-					AzureAD: cloudauth.AzureADAuthConfig{
+					AzureAD: &cloudauth.AzureADAuthConfig{
 						Mode:     "service_principal",
 						TenantID: "tenant-id",
 						ClientID: "client-id",

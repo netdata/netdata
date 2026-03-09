@@ -20,7 +20,7 @@ type Config struct {
 	Driver    string           `yaml:"driver" json:"driver"`
 	DSN       string           `yaml:"dsn" json:"dsn"`
 	Timeout   confopt.Duration `yaml:"timeout" json:"timeout"`
-	CloudAuth cloudauth.Config `yaml:"cloud_auth,omitempty" json:"cloud_auth,omitempty"`
+	CloudAuth cloudauth.Config `yaml:"cloud_auth" json:"cloud_auth"`
 
 	StaticLabels map[string]string   `yaml:"static_labels,omitempty" json:"static_labels"`
 	Queries      []ConfigQueryDef    `yaml:"queries,omitempty" json:"queries"`

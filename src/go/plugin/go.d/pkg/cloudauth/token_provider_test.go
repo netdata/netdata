@@ -35,6 +35,22 @@ func TestNewTokenProviderValidation(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestNewTokenProviderDefaultsRefreshMarginWhenNonPositive(t *testing.T) {
+	cred := fakeTokenCredential{
+		getToken: func(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error) {
+			return azcore.AccessToken{}, nil
+		},
+	}
+
+	p, err := NewTokenProvider(cred, []string{"scope"}, 0)
+	require.NoError(t, err)
+	assert.Equal(t, DefaultTokenRefreshMargin, p.refreshMargin)
+
+	p, err = NewTokenProvider(cred, []string{"scope"}, -1*time.Minute)
+	require.NoError(t, err)
+	assert.Equal(t, DefaultTokenRefreshMargin, p.refreshMargin)
+}
+
 func TestTokenProviderCachesToken(t *testing.T) {
 	baseNow := time.Date(2026, time.March, 6, 10, 0, 0, 0, time.UTC)
 	calls := 0

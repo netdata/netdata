@@ -4,7 +4,7 @@
   "driver": "postgres",
   "dsn": "host=localhost port=5432 user=netdata dbname=metrics sslmode=disable",
   "cloud_auth": {
-    "azure_ad": {}
+    "provider": "none"
   },
   "timeout": 5,
   "static_labels": {

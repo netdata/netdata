@@ -29,7 +29,7 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 	t.Run("service principal", func(t *testing.T) {
 		cfg := cloudauth.Config{
 			Provider: cloudauth.ProviderAzureAD,
-			AzureAD: cloudauth.AzureADAuthConfig{
+			AzureAD: &cloudauth.AzureADAuthConfig{
 				Mode:         cloudauth.AzureADAuthModeServicePrincipal,
 				TenantID:     "tenant",
 				ClientID:     "client",
@@ -53,7 +53,7 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 	t.Run("managed identity with client id", func(t *testing.T) {
 		cfg := cloudauth.Config{
 			Provider: cloudauth.ProviderAzureAD,
-			AzureAD: cloudauth.AzureADAuthConfig{
+			AzureAD: &cloudauth.AzureADAuthConfig{
 				Mode:                    cloudauth.AzureADAuthModeManagedIdentity,
 				ManagedIdentityClientID: "mi-client-id",
 			},
@@ -73,7 +73,7 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 	t.Run("default credential", func(t *testing.T) {
 		cfg := cloudauth.Config{
 			Provider: cloudauth.ProviderAzureAD,
-			AzureAD:  cloudauth.AzureADAuthConfig{Mode: cloudauth.AzureADAuthModeDefault},
+			AzureAD:  &cloudauth.AzureADAuthConfig{Mode: cloudauth.AzureADAuthModeDefault},
 		}
 
 		dsn, err := BuildMSSQLAzureADDSN(base, cfg)
@@ -90,7 +90,7 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 		stale := "sqlserver://olduser:oldpass@localhost:1433?database=master&FedAuth=old&User+ID=old&Password=old"
 		cfg := cloudauth.Config{
 			Provider: cloudauth.ProviderAzureAD,
-			AzureAD:  cloudauth.AzureADAuthConfig{Mode: cloudauth.AzureADAuthModeDefault},
+			AzureAD:  &cloudauth.AzureADAuthConfig{Mode: cloudauth.AzureADAuthModeDefault},
 		}
 
 		dsn, err := BuildMSSQLAzureADDSN(stale, cfg)
@@ -109,7 +109,7 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 	t.Run("invalid scheme", func(t *testing.T) {
 		cfg := cloudauth.Config{
 			Provider: cloudauth.ProviderAzureAD,
-			AzureAD:  cloudauth.AzureADAuthConfig{Mode: cloudauth.AzureADAuthModeDefault},
+			AzureAD:  &cloudauth.AzureADAuthConfig{Mode: cloudauth.AzureADAuthModeDefault},
 		}
 
 		_, err := BuildMSSQLAzureADDSN("server=localhost;database=master", cfg)

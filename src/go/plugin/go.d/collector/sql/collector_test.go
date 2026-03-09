@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -149,7 +150,9 @@ func TestCollector_Init_ConfigValidation(t *testing.T) {
 				c.FunctionOnly = true
 				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
 				c.CloudAuth.Provider = "azure_ad"
-				c.CloudAuth.AzureAD.Mode = "default"
+				c.CloudAuth.AzureAD = &cloudauth.AzureADAuthConfig{
+					Mode: "default",
+				}
 			},
 			wantFail: true,
 		},
@@ -160,9 +163,11 @@ func TestCollector_Init_ConfigValidation(t *testing.T) {
 				c.FunctionOnly = true
 				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
 				c.CloudAuth.Provider = "azure_ad"
-				c.CloudAuth.AzureAD.Mode = "service_principal"
-				c.CloudAuth.AzureAD.TenantID = "tenant"
-				c.CloudAuth.AzureAD.ClientID = "client"
+				c.CloudAuth.AzureAD = &cloudauth.AzureADAuthConfig{
+					Mode:     "service_principal",
+					TenantID: "tenant",
+					ClientID: "client",
+				}
 			},
 			wantFail: true,
 		},

@@ -34,7 +34,10 @@ func BuildMSSQLAzureADDSN(baseDSN string, cfg cloudauth.Config) (string, error) 
 		return baseDSN, nil
 	}
 
-	aadCfg := cfg.AzureAD
+	aadCfg := cloudauth.AzureADAuthConfig{}
+	if cfg.AzureAD != nil {
+		aadCfg = *cfg.AzureAD
+	}
 
 	u, err := url.Parse(baseDSN)
 	if err != nil {
