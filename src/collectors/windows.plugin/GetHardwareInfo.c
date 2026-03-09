@@ -171,9 +171,23 @@ int netdata_start_driver()
 
             if (netdata_install_driver() == 0) {
                 scm = OpenSCManagerA(NULL, NULL, SC_MANAGER_CONNECT);
-                if (likely(scm)) {
+                if (unlikely(!scm)) {
+                    nd_log(
+                        NDLS_COLLECTORS,
+                        NDLP_ERR,
+                        "Cannot open Service Manager after install. Error= %lu \n",
+                        GetLastError());
+                    ret = -1;
+                } else {
                     service = OpenServiceA(scm, srv_name, SERVICE_START | SERVICE_QUERY_STATUS);
-                    if (likely(service)) {
+                    if (unlikely(!service)) {
+                        nd_log(
+                            NDLS_COLLECTORS,
+                            NDLP_ERR,
+                            "Cannot open Service after install. Error= %lu \n",
+                            GetLastError());
+                        ret = -1;
+                    } else {
                         if (!StartServiceA(service, 0, NULL)) {
                             err = GetLastError();
                             if (err == ERROR_SERVICE_ALREADY_RUNNING) {
