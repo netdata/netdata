@@ -13,7 +13,7 @@
       },
       "dsn": {
         "title": "DSN",
-        "description": "Microsoft SQL Server [Data Source Name](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn).",
+        "description": "Microsoft SQL Server [Data Source Name](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). When `azure_ad.enabled` is true, use URL format with `sqlserver://` scheme.",
         "type": "string",
         "default": "sqlserver://localhost:1433"
       },

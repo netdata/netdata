@@ -127,7 +127,7 @@ modules:
               group: Collection
 
             - name: dsn
-              description: "SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn)."
+              description: "SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). When `azure_ad.enabled` is true, use URL format with `sqlserver://` scheme."
               default_value: "sqlserver://localhost:1433"
               required: true
               group: Target
