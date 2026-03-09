@@ -20,24 +20,21 @@ func TestMSSQLDriver(t *testing.T) {
 func TestBuildMSSQLAzureADDSN(t *testing.T) {
 	base := "sqlserver://localhost:1433?database=master"
 
-	tests := []struct {
-		name     string
+	tests := map[string]struct {
 		baseDSN  string
 		cfg      cloudauth.Config
 		wantErr  bool
 		validate func(t *testing.T, dsn string, u *url.URL)
 		parseDSN bool
 	}{
-		{
-			name:    "provider disabled returns original dsn",
+		"provider disabled returns original dsn": {
 			baseDSN: base,
 			cfg:     cloudauth.Config{Provider: cloudauth.ProviderNone},
 			validate: func(t *testing.T, dsn string, _ *url.URL) {
 				assert.Equal(t, base, dsn)
 			},
 		},
-		{
-			name:    "service principal",
+		"service principal": {
 			baseDSN: base,
 			cfg: cloudauth.Config{
 				Provider: cloudauth.ProviderAzureAD,
@@ -57,8 +54,7 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 				assert.Equal(t, "secret", pass)
 			},
 		},
-		{
-			name:    "managed identity with client id",
+		"managed identity with client id": {
 			baseDSN: base,
 			cfg: cloudauth.Config{
 				Provider: cloudauth.ProviderAzureAD,
@@ -74,8 +70,7 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 				assert.Nil(t, u.User)
 			},
 		},
-		{
-			name:    "default credential",
+		"default credential": {
 			baseDSN: base,
 			cfg: cloudauth.Config{
 				Provider: cloudauth.ProviderAzureAD,
@@ -87,8 +82,7 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 				assert.Nil(t, u.User)
 			},
 		},
-		{
-			name:    "cleans mixed-case stale params",
+		"cleans mixed-case stale params": {
 			baseDSN: "sqlserver://olduser:oldpass@localhost:1433?database=master&FedAuth=old&User+ID=old&Password=old",
 			cfg: cloudauth.Config{
 				Provider: cloudauth.ProviderAzureAD,
@@ -103,8 +97,7 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 				assert.Nil(t, u.User)
 			},
 		},
-		{
-			name:    "invalid scheme",
+		"invalid scheme": {
 			baseDSN: "server=localhost;database=master",
 			cfg: cloudauth.Config{
 				Provider: cloudauth.ProviderAzureAD,
@@ -114,8 +107,8 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			dsn, err := BuildMSSQLAzureADDSN(tc.baseDSN, tc.cfg)
 			if tc.wantErr {
 				require.Error(t, err)
