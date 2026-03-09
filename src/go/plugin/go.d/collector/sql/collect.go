@@ -14,8 +14,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/sqladapter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/sqlcloudauth"
 )
 
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
@@ -175,11 +175,11 @@ func (c *Collector) openConnection(ctx context.Context) error {
 			return c.openPostgresAzureADConnection(ctx)
 		case "sqlserver", "azuresql":
 			var err error
-			dsn, err = sqlcloudauth.BuildMSSQLAzureADDSN(c.DSN, c.CloudAuth)
+			dsn, err = sqladapter.BuildMSSQLAzureADDSN(c.DSN, c.CloudAuth)
 			if err != nil {
 				return fmt.Errorf("prepare cloud_auth SQL Server DSN: %w", err)
 			}
-			driverName = sqlcloudauth.MSSQLAzureDriverName
+			driverName = sqladapter.MSSQLAzureDriverName
 		}
 	}
 

@@ -11,14 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/sqladapter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/sqlcloudauth"
-
-	"github.com/jackc/pgx/v5/stdlib"
 )
 
 //go:embed "config_schema.json"
@@ -165,7 +164,7 @@ func (c *Collector) Init(context.Context) error {
 		}
 		provider, err := cloudauth.NewTokenProvider(
 			cred,
-			[]string{sqlcloudauth.AzurePostgreSQLAADScope},
+			[]string{sqladapter.AzurePostgreSQLAADScope},
 			cloudauth.DefaultTokenRefreshMargin,
 		)
 		if err != nil {

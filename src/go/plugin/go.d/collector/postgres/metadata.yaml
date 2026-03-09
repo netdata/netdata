@@ -98,35 +98,35 @@ modules:
               required: true
               group: Target
             - name: cloud_auth.provider
-              description: Cloud auth provider (`none` or `azure_ad`). Empty is treated as `none`.
+              description: Cloud auth provider (`none` or `azure_ad`).
               default_value: none
               required: false
-              group: Target
+              group: Cloud Auth
             - name: cloud_auth.azure_ad.mode
               description: Azure AD credential mode (`service_principal`, `managed_identity`, or `default`).
               default_value: default
               required: false
-              group: Target
+              group: Cloud Auth/Azure
             - name: cloud_auth.azure_ad.tenant_id
               description: Azure tenant ID. Required for `service_principal` mode.
               default_value: ""
               required: false
-              group: Target
+              group: Cloud Auth/Azure
             - name: cloud_auth.azure_ad.client_id
               description: Azure client ID. Required for `service_principal`; optional for user-assigned managed identity.
               default_value: ""
               required: false
-              group: Target
+              group: Cloud Auth/Azure
             - name: cloud_auth.azure_ad.client_secret
               description: Azure client secret for `service_principal` mode.
               default_value: ""
               required: false
-              group: Target
+              group: Cloud Auth/Azure
             - name: cloud_auth.azure_ad.managed_identity_client_id
               description: Optional client ID of a user-assigned managed identity (`managed_identity` mode).
               default_value: ""
               required: false
-              group: Target
+              group: Cloud Auth/Azure
             - name: timeout
               description: Query timeout (seconds).
               default_value: 2

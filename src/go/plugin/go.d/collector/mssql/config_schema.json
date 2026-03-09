@@ -24,53 +24,13 @@
         "properties": {
           "provider": {
             "title": "Provider",
-            "description": "Cloud auth provider. Use `none` (or leave empty) to disable cloud authentication.",
+            "description": "Cloud auth provider. Use `none` to disable cloud authentication.",
             "type": "string",
             "enum": [
               "none",
-              "azure_ad",
-              ""
+              "azure_ad"
             ],
             "default": "none"
-          },
-          "azure_ad": {
-            "title": "Azure AD",
-            "description": "Microsoft Entra (Azure AD) settings used when provider is `azure_ad`.",
-            "type": "object",
-            "properties": {
-              "mode": {
-                "title": "Mode",
-                "description": "Azure AD credential mode.",
-                "type": "string",
-                "enum": [
-                  "service_principal",
-                  "managed_identity",
-                  "default"
-                ],
-                "default": "default"
-              },
-              "tenant_id": {
-                "title": "Tenant ID",
-                "description": "Azure tenant ID. Required for service_principal mode.",
-                "type": "string"
-              },
-              "client_id": {
-                "title": "Client ID",
-                "description": "Service principal client ID for service_principal mode.",
-                "type": "string"
-              },
-              "client_secret": {
-                "title": "Client Secret",
-                "description": "Service principal client secret for service_principal mode.",
-                "type": "string",
-                "sensitive": true
-              },
-              "managed_identity_client_id": {
-                "title": "Managed Identity Client ID",
-                "description": "Optional client ID of a user-assigned managed identity.",
-                "type": "string"
-              }
-            }
           }
         },
         "dependencies": {
@@ -86,14 +46,46 @@
               {
                 "properties": {
                   "provider": {
-                    "const": ""
-                  }
-                }
-              },
-              {
-                "properties": {
-                  "provider": {
                     "const": "azure_ad"
+                  },
+                  "azure_ad": {
+                    "title": "Azure AD",
+                    "description": "Microsoft Entra (Azure AD) settings used when provider is `azure_ad`.",
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "title": "Mode",
+                        "description": "Azure AD credential mode.",
+                        "type": "string",
+                        "enum": [
+                          "service_principal",
+                          "managed_identity",
+                          "default"
+                        ],
+                        "default": "default"
+                      },
+                      "tenant_id": {
+                        "title": "Tenant ID",
+                        "description": "Azure tenant ID. Required for service_principal mode.",
+                        "type": "string"
+                      },
+                      "client_id": {
+                        "title": "Client ID",
+                        "description": "Service principal client ID for service_principal mode.",
+                        "type": "string"
+                      },
+                      "client_secret": {
+                        "title": "Client Secret",
+                        "description": "Service principal client secret for service_principal mode.",
+                        "type": "string",
+                        "sensitive": true
+                      },
+                      "managed_identity_client_id": {
+                        "title": "Managed Identity Client ID",
+                        "description": "Optional client ID of a user-assigned managed identity.",
+                        "type": "string"
+                      }
+                    }
                   }
                 }
               }
@@ -286,9 +278,14 @@
           "fields": [
             "update_every",
             "dsn",
-            "cloud_auth",
             "timeout",
             "vnode"
+          ]
+        },
+        {
+          "title": "Cloud Auth",
+          "fields": [
+            "cloud_auth"
           ]
         },
         {

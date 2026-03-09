@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/azureadauth"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,7 +27,7 @@ func TestCollector_Init_EmptyDSN(t *testing.T) {
 func TestCollector_Init_InvalidAzureADConfig(t *testing.T) {
 	c := New()
 	c.CloudAuth.Provider = cloudauth.ProviderAzureAD
-	c.CloudAuth.AzureAD.Mode = azureadauth.ModeServicePrincipal
+	c.CloudAuth.AzureAD.Mode = cloudauth.AzureADAuthModeServicePrincipal
 	c.CloudAuth.AzureAD.ClientID = "client-id"
 	c.CloudAuth.AzureAD.TenantID = "tenant-id"
 	// Missing client_secret.
@@ -40,7 +39,7 @@ func TestCollector_openConnection_AzureADRequiresURLDSN(t *testing.T) {
 	c := New()
 	c.DSN = "server=localhost;database=master"
 	c.CloudAuth.Provider = cloudauth.ProviderAzureAD
-	c.CloudAuth.AzureAD.Mode = azureadauth.ModeDefault
+	c.CloudAuth.AzureAD.Mode = cloudauth.AzureADAuthModeDefault
 
 	db, err := c.openConnection()
 	assert.Nil(t, db)

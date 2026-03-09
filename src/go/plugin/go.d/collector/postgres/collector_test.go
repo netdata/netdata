@@ -15,7 +15,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/azureadauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -121,7 +120,7 @@ func TestCollector_Init(t *testing.T) {
 				DSN: "postgresql://netdata@127.0.0.1:5432/postgres",
 				CloudAuth: cloudauth.Config{
 					Provider: cloudauth.ProviderAzureAD,
-					AzureAD: azureadauth.Config{
+					AzureAD: cloudauth.AzureADAuthConfig{
 						Mode:     "service_principal",
 						TenantID: "tenant-id",
 						ClientID: "client-id",

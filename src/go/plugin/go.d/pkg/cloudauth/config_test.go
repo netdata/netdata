@@ -7,8 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/azureadauth"
 )
 
 func TestConfigValidate(t *testing.T) {
@@ -28,7 +26,7 @@ func TestConfigValidate(t *testing.T) {
 		"provider none with azure_ad block": {
 			cfg: Config{
 				Provider: ProviderNone,
-				AzureAD: azureadauth.Config{
+				AzureAD: AzureADAuthConfig{
 					Mode: "service_principal",
 				},
 			},
@@ -36,8 +34,8 @@ func TestConfigValidate(t *testing.T) {
 		"provider azure_ad valid": {
 			cfg: Config{
 				Provider: ProviderAzureAD,
-				AzureAD: azureadauth.Config{
-					Mode:         azureadauth.ModeServicePrincipal,
+				AzureAD: AzureADAuthConfig{
+					Mode:         AzureADAuthModeServicePrincipal,
 					TenantID:     "tenant",
 					ClientID:     "client",
 					ClientSecret: "secret",
@@ -47,8 +45,8 @@ func TestConfigValidate(t *testing.T) {
 		"provider azure_ad invalid": {
 			cfg: Config{
 				Provider: ProviderAzureAD,
-				AzureAD: azureadauth.Config{
-					Mode:     azureadauth.ModeServicePrincipal,
+				AzureAD: AzureADAuthConfig{
+					Mode:     AzureADAuthModeServicePrincipal,
 					TenantID: "tenant",
 					ClientID: "client",
 				},

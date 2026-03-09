@@ -7,21 +7,19 @@ import (
 	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/azureadauth"
 )
 
 type Config struct {
-	Provider string             `yaml:"provider,omitempty" json:"provider,omitempty"`
-	AzureAD  azureadauth.Config `yaml:"azure_ad,omitempty" json:"azure_ad,omitempty"`
+	Provider Provider          `yaml:"provider,omitempty" json:"provider,omitempty"`
+	AzureAD  AzureADAuthConfig `yaml:"azure_ad,omitempty" json:"azure_ad,omitempty"`
 }
 
-func (c Config) ProviderName() string {
-	return normalizeProviderValue(c.Provider)
+func (c Config) ProviderName() Provider {
+	return c.Provider.Normalized()
 }
 
-func (c Config) IsProvider(provider string) bool {
-	return c.ProviderName() == normalizeProviderValue(provider)
+func (c Config) IsProvider(provider Provider) bool {
+	return c.ProviderName() == provider.Normalized()
 }
 
 func (c Config) IsEnabled() bool {

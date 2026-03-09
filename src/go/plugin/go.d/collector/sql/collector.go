@@ -13,7 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/sqlcloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/sqladapter"
 )
 
 //go:embed "config_schema.json"
@@ -80,7 +80,7 @@ func (c *Collector) Init(context.Context) error {
 		}
 		provider, err := cloudauth.NewTokenProvider(
 			cred,
-			[]string{sqlcloudauth.AzurePostgreSQLAADScope},
+			[]string{sqladapter.AzurePostgreSQLAADScope},
 			cloudauth.DefaultTokenRefreshMargin,
 		)
 		if err != nil {

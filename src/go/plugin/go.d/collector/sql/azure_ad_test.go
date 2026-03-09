@@ -12,7 +12,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/jackc/pgx/v5"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/azureadauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +29,7 @@ func TestCollector_openConnection_AzureADSQLServerRequiresURLDSN(t *testing.T) {
 	c.Driver = "sqlserver"
 	c.DSN = "server=localhost;database=master"
 	c.CloudAuth.Provider = cloudauth.ProviderAzureAD
-	c.CloudAuth.AzureAD.Mode = azureadauth.ModeDefault
+	c.CloudAuth.AzureAD.Mode = cloudauth.AzureADAuthModeDefault
 
 	err := c.openConnection(context.Background())
 	assert.ErrorContains(t, err, "prepare cloud_auth SQL Server DSN")
@@ -42,7 +41,7 @@ func TestCollector_openConnection_AzureADPGXWithoutTokenProvider(t *testing.T) {
 	c.Driver = "pgx"
 	c.DSN = "postgres://netdata@127.0.0.1:5432/postgres"
 	c.CloudAuth.Provider = cloudauth.ProviderAzureAD
-	c.CloudAuth.AzureAD.Mode = azureadauth.ModeDefault
+	c.CloudAuth.AzureAD.Mode = cloudauth.AzureADAuthModeDefault
 
 	err := c.openConnection(context.Background())
 	assert.ErrorContains(t, err, "cloud auth token provider is not initialized for pgx")

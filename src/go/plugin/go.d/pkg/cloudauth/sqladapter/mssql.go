@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package sqlcloudauth
+package sqladapter
 
 import (
 	"fmt"
@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/azureadauth"
 )
 
 const (
@@ -54,7 +53,7 @@ func BuildMSSQLAzureADDSN(baseDSN string, cfg cloudauth.Config) (string, error) 
 	}
 
 	switch aadCfg.NormalizedMode() {
-	case azureadauth.ModeServicePrincipal:
+	case cloudauth.AzureADAuthModeServicePrincipal:
 		q.Set("fedauth", mssqlFedAuthServicePrincipal)
 		clientID := strings.TrimSpace(aadCfg.ClientID)
 		clientSecret := strings.TrimSpace(aadCfg.ClientSecret)
@@ -63,13 +62,13 @@ func BuildMSSQLAzureADDSN(baseDSN string, cfg cloudauth.Config) (string, error) 
 			userID = userID + "@" + tenantID
 		}
 		u.User = url.UserPassword(userID, clientSecret)
-	case azureadauth.ModeManagedIdentity:
+	case cloudauth.AzureADAuthModeManagedIdentity:
 		q.Set("fedauth", mssqlFedAuthManagedIdentity)
 		u.User = nil
 		if id := strings.TrimSpace(aadCfg.ManagedIdentityClientID); id != "" {
 			q.Set("user id", id)
 		}
-	case azureadauth.ModeDefault:
+	case cloudauth.AzureADAuthModeDefault:
 		q.Set("fedauth", mssqlFedAuthDefault)
 		u.User = nil
 	default:

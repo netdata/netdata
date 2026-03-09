@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package sqlcloudauth
+package sqladapter
 
 import (
 	"net/url"
@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/azureadauth"
 )
 
 func TestMSSQLDriver(t *testing.T) {
@@ -30,8 +29,8 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 	t.Run("service principal", func(t *testing.T) {
 		cfg := cloudauth.Config{
 			Provider: cloudauth.ProviderAzureAD,
-			AzureAD: azureadauth.Config{
-				Mode:         azureadauth.ModeServicePrincipal,
+			AzureAD: cloudauth.AzureADAuthConfig{
+				Mode:         cloudauth.AzureADAuthModeServicePrincipal,
 				TenantID:     "tenant",
 				ClientID:     "client",
 				ClientSecret: "secret",
@@ -54,8 +53,8 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 	t.Run("managed identity with client id", func(t *testing.T) {
 		cfg := cloudauth.Config{
 			Provider: cloudauth.ProviderAzureAD,
-			AzureAD: azureadauth.Config{
-				Mode:                    azureadauth.ModeManagedIdentity,
+			AzureAD: cloudauth.AzureADAuthConfig{
+				Mode:                    cloudauth.AzureADAuthModeManagedIdentity,
 				ManagedIdentityClientID: "mi-client-id",
 			},
 		}
@@ -74,7 +73,7 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 	t.Run("default credential", func(t *testing.T) {
 		cfg := cloudauth.Config{
 			Provider: cloudauth.ProviderAzureAD,
-			AzureAD:  azureadauth.Config{Mode: azureadauth.ModeDefault},
+			AzureAD:  cloudauth.AzureADAuthConfig{Mode: cloudauth.AzureADAuthModeDefault},
 		}
 
 		dsn, err := BuildMSSQLAzureADDSN(base, cfg)
@@ -91,7 +90,7 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 		stale := "sqlserver://olduser:oldpass@localhost:1433?database=master&FedAuth=old&User+ID=old&Password=old"
 		cfg := cloudauth.Config{
 			Provider: cloudauth.ProviderAzureAD,
-			AzureAD:  azureadauth.Config{Mode: azureadauth.ModeDefault},
+			AzureAD:  cloudauth.AzureADAuthConfig{Mode: cloudauth.AzureADAuthModeDefault},
 		}
 
 		dsn, err := BuildMSSQLAzureADDSN(stale, cfg)
@@ -110,7 +109,7 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 	t.Run("invalid scheme", func(t *testing.T) {
 		cfg := cloudauth.Config{
 			Provider: cloudauth.ProviderAzureAD,
-			AzureAD:  azureadauth.Config{Mode: azureadauth.ModeDefault},
+			AzureAD:  cloudauth.AzureADAuthConfig{Mode: cloudauth.AzureADAuthModeDefault},
 		}
 
 		_, err := BuildMSSQLAzureADDSN("server=localhost;database=master", cfg)

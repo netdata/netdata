@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package azureadauth
+package cloudauth
 
 import (
 	"testing"
@@ -8,38 +8,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConfigValidate(t *testing.T) {
+func TestAzureADAuthConfigValidate(t *testing.T) {
 	tests := map[string]struct {
-		cfg     Config
+		cfg     AzureADAuthConfig
 		wantErr bool
 	}{
 		"default mode": {
-			cfg: Config{Mode: ModeDefault},
+			cfg: AzureADAuthConfig{Mode: AzureADAuthModeDefault},
 		},
 		"empty mode defaults to default": {
-			cfg: Config{},
+			cfg: AzureADAuthConfig{},
 		},
 		"managed identity mode": {
-			cfg: Config{Mode: ModeManagedIdentity},
+			cfg: AzureADAuthConfig{Mode: AzureADAuthModeManagedIdentity},
 		},
 		"service principal mode": {
-			cfg: Config{
-				Mode:         ModeServicePrincipal,
+			cfg: AzureADAuthConfig{
+				Mode:         AzureADAuthModeServicePrincipal,
 				TenantID:     "tenant",
 				ClientID:     "client",
 				ClientSecret: "secret",
 			},
 		},
 		"service principal missing secret": {
-			cfg: Config{
-				Mode:     ModeServicePrincipal,
+			cfg: AzureADAuthConfig{
+				Mode:     AzureADAuthModeServicePrincipal,
 				TenantID: "tenant",
 				ClientID: "client",
 			},
 			wantErr: true,
 		},
 		"invalid mode": {
-			cfg:     Config{Mode: "invalid_mode"},
+			cfg:     AzureADAuthConfig{Mode: "invalid_mode"},
 			wantErr: true,
 		},
 	}
