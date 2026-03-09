@@ -151,6 +151,7 @@ int netdata_start_driver()
     SC_HANDLE service = OpenServiceA(scm, srv_name, SERVICE_START | SERVICE_QUERY_STATUS);
     if (unlikely(!service)) {
         CloseServiceHandle(scm);
+        scm = NULL;
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open Service. Error= %lu \n", GetLastError());
         return -1;
     }
@@ -165,6 +166,8 @@ int netdata_start_driver()
             nd_log(NDLS_COLLECTORS, NDLP_INFO, "Service not found, attempting to install driver and retry start\n");
             CloseServiceHandle(service);
             CloseServiceHandle(scm);
+            service = NULL;
+            scm = NULL;
 
             if (netdata_install_driver() == 0) {
                 scm = OpenSCManagerA(NULL, NULL, SC_MANAGER_CONNECT);
@@ -189,8 +192,10 @@ int netdata_start_driver()
                             }
                         }
                         CloseServiceHandle(service);
+                        service = NULL;
                     }
                     CloseServiceHandle(scm);
+                    scm = NULL;
                 }
             } else {
                 nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to install driver during self-healing\n");
