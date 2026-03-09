@@ -10,6 +10,8 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type fakeTokenCredential struct {
@@ -22,9 +24,7 @@ func (f fakeTokenCredential) GetToken(ctx context.Context, opts policy.TokenRequ
 
 func TestNewTokenProviderValidation(t *testing.T) {
 	_, err := NewTokenProvider(nil, []string{"scope"}, time.Minute)
-	if err == nil {
-		t.Fatalf("expected error for nil credential")
-	}
+	require.Error(t, err)
 
 	cred := fakeTokenCredential{
 		getToken: func(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error) {
@@ -32,9 +32,7 @@ func TestNewTokenProviderValidation(t *testing.T) {
 		},
 	}
 	_, err = NewTokenProvider(cred, nil, time.Minute)
-	if err == nil {
-		t.Fatalf("expected error for empty scopes")
-	}
+	require.Error(t, err)
 }
 
 func TestTokenProviderCachesToken(t *testing.T) {
@@ -51,32 +49,18 @@ func TestTokenProviderCachesToken(t *testing.T) {
 	}
 
 	p, err := NewTokenProvider(cred, []string{"scope"}, 5*time.Minute)
-	if err != nil {
-		t.Fatalf("NewTokenProvider() unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	p.now = func() time.Time { return baseNow }
 
 	token, expiry, err := p.Token(context.Background())
-	if err != nil {
-		t.Fatalf("Token() unexpected error: %v", err)
-	}
-	if token != "token-1" {
-		t.Fatalf("unexpected token: %q", token)
-	}
-	if !expiry.Equal(baseNow.Add(30 * time.Minute)) {
-		t.Fatalf("unexpected expiry: %v", expiry)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "token-1", token)
+	assert.Equal(t, baseNow.Add(30*time.Minute), expiry)
 
 	token, _, err = p.Token(context.Background())
-	if err != nil {
-		t.Fatalf("Token() unexpected error on second call: %v", err)
-	}
-	if token != "token-1" {
-		t.Fatalf("unexpected token on second call: %q", token)
-	}
-	if calls != 1 {
-		t.Fatalf("expected one credential call, got %d", calls)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "token-1", token)
+	assert.Equal(t, 1, calls)
 }
 
 func TestTokenProviderRefreshesNearExpiry(t *testing.T) {
@@ -95,29 +79,19 @@ func TestTokenProviderRefreshesNearExpiry(t *testing.T) {
 	}
 
 	p, err := NewTokenProvider(cred, []string{"scope"}, 5*time.Minute)
-	if err != nil {
-		t.Fatalf("NewTokenProvider() unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	p.now = func() time.Time { return currentNow }
 
 	first, _, err := p.Token(context.Background())
-	if err != nil {
-		t.Fatalf("Token() first call unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Past expiry-refresh boundary: now + margin >= cached expiry.
 	currentNow = baseNow.Add(6 * time.Minute)
 	second, _, err := p.Token(context.Background())
-	if err != nil {
-		t.Fatalf("Token() second call unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if first == second {
-		t.Fatalf("expected refreshed token, got same token %q", second)
-	}
-	if calls != 2 {
-		t.Fatalf("expected two credential calls, got %d", calls)
-	}
+	assert.NotEqual(t, first, second)
+	assert.Equal(t, 2, calls)
 }
 
 func TestTokenProviderReturnsCredentialError(t *testing.T) {
@@ -128,14 +102,10 @@ func TestTokenProviderReturnsCredentialError(t *testing.T) {
 	}
 
 	p, err := NewTokenProvider(cred, []string{"scope"}, time.Minute)
-	if err != nil {
-		t.Fatalf("NewTokenProvider() unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	_, _, err = p.Token(context.Background())
-	if err == nil {
-		t.Fatalf("expected error")
-	}
+	require.Error(t, err)
 }
 
 func TestTokenProviderFallsBackOnRefreshFailure(t *testing.T) {
@@ -157,31 +127,61 @@ func TestTokenProviderFallsBackOnRefreshFailure(t *testing.T) {
 	}
 
 	p, err := NewTokenProvider(cred, []string{"scope"}, 5*time.Minute)
-	if err != nil {
-		t.Fatalf("NewTokenProvider() unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	p.now = func() time.Time { return currentNow }
 
 	// First call succeeds
 	token, _, err := p.Token(context.Background())
-	if err != nil || token != "good-token" {
-		t.Fatalf("first call: unexpected error=%v token=%q", err, token)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "good-token", token)
 
 	// Advance into refresh margin but before expiry
 	currentNow = baseNow.Add(6 * time.Minute)
 	token, _, err = p.Token(context.Background())
-	if err != nil {
-		t.Fatalf("expected fallback to cached token, got error: %v", err)
-	}
-	if token != "good-token" {
-		t.Fatalf("expected cached token, got %q", token)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "good-token", token)
 
 	// Advance past expiry — should error since no valid cache
 	currentNow = baseNow.Add(11 * time.Minute)
 	_, _, err = p.Token(context.Background())
-	if err == nil {
-		t.Fatalf("expected error when cached token expired and refresh fails")
+	require.Error(t, err)
+}
+
+func TestTokenProviderDoesNotFallbackToExpiredTokenAfterSlowRefreshFailure(t *testing.T) {
+	baseNow := time.Date(2026, time.March, 6, 10, 0, 0, 0, time.UTC)
+	currentNow := baseNow
+	calls := 0
+
+	cred := fakeTokenCredential{
+		getToken: func(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error) {
+			calls++
+			if calls == 1 {
+				return azcore.AccessToken{
+					Token:     "good-token",
+					ExpiresOn: baseNow.Add(10 * time.Minute),
+				}, nil
+			}
+
+			// Simulate a slow refresh attempt that crosses token expiry before failing.
+			currentNow = baseNow.Add(11 * time.Minute)
+			return azcore.AccessToken{}, errors.New("slow refresh failure")
+		},
 	}
+
+	p, err := NewTokenProvider(cred, []string{"scope"}, 5*time.Minute)
+	require.NoError(t, err)
+	p.now = func() time.Time { return currentNow }
+
+	// Seed cache.
+	token, _, err := p.Token(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "good-token", token)
+
+	// Enter refresh window while token is still valid.
+	currentNow = baseNow.Add(6 * time.Minute)
+
+	// Refresh fails after cache has expired in wall-clock time.
+	_, _, err = p.Token(context.Background())
+	require.Error(t, err)
+	assert.Equal(t, 2, calls)
 }

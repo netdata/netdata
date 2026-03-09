@@ -15,8 +15,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
 )
 
-const azurePostgreSQLAADScope = "https://ossrdbms-aad.database.windows.net/.default"
-
 //go:embed "config_schema.json"
 var configSchema string
 
@@ -81,7 +79,7 @@ func (c *Collector) Init(context.Context) error {
 		}
 		provider, err := azureauth.NewTokenProvider(
 			cred,
-			[]string{azurePostgreSQLAADScope},
+			[]string{azureauth.PostgreSQLAADScope},
 			azureauth.DefaultTokenRefreshMargin,
 		)
 		if err != nil {

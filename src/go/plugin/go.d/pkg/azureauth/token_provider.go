@@ -64,7 +64,9 @@ func (p *TokenProvider) Token(ctx context.Context) (string, time.Time, error) {
 	token, err := p.cred.GetToken(ctx, policy.TokenRequestOptions{Scopes: p.scopes})
 	if err != nil {
 		// Fall back to cached token if it hasn't expired yet
-		if p.cachedToken != "" && now.Before(p.cachedExpiry) {
+		// Re-evaluate time after refresh attempt, because GetToken may block.
+		fallbackNow := p.now()
+		if p.cachedToken != "" && fallbackNow.Before(p.cachedExpiry) {
 			return p.cachedToken, p.cachedExpiry, nil
 		}
 		return "", time.Time{}, err
