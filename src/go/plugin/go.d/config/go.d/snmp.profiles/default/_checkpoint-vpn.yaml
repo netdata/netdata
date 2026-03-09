@@ -1,0 +1,225 @@
+# Check Point VPN monitoring (CHECKPOINT-MIB)
+# Covers IKE/IPSec global stats, tunnel state, and permanent tunnel state
+
+metrics:
+  # IKE global scalars
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.9.1.1.0
+      name: cpvIKECurrSAs
+      chart_meta:
+        description: Number of current IKE Security Associations
+        family: 'Network/VPN/IPSec/IKE/SA/Active'
+        unit: "{sa}"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.9.2.1.0
+      name: cpvIKETotalFailuresInit
+      chart_meta:
+        description: Total IKE negotiation failures as initiator
+        family: 'Network/VPN/IPSec/IKE/Failure/Initiator'
+        unit: "{failure}/s"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.9.2.3.0
+      name: cpvIKETotalFailuresResp
+      chart_meta:
+        description: Total IKE negotiation failures as responder
+        family: 'Network/VPN/IPSec/IKE/Failure/Responder'
+        unit: "{failure}/s"
+
+  # IPSec SA scalars
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.2.1.0
+      name: cpvCurrEspSAsIn
+      chart_meta:
+        description: Number of current inbound ESP Security Associations
+        family: 'Network/VPN/IPSec/SA/Active/In'
+        unit: "{sa}"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.2.3.0
+      name: cpvCurrEspSAsOut
+      chart_meta:
+        description: Number of current outbound ESP Security Associations
+        family: 'Network/VPN/IPSec/SA/Active/Out'
+        unit: "{sa}"
+
+  # IPSec error scalars
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.3.1.0
+      name: cpvSaDecrErr
+      chart_meta:
+        description: Total SA decryption errors
+        family: 'Network/VPN/IPSec/SA/Error/Decrypt'
+        unit: "{error}/s"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.3.2.0
+      name: cpvSaAuthErr
+      chart_meta:
+        description: Total SA authentication errors
+        family: 'Network/VPN/IPSec/SA/Error/Auth'
+        unit: "{error}/s"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.3.3.0
+      name: cpvSaReplayErr
+      chart_meta:
+        description: Total SA replay errors
+        family: 'Network/VPN/IPSec/SA/Error/Replay'
+        unit: "{error}/s"
+
+  # IPSec traffic scalars
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.4.5.0
+      name: cpvIpsecEspEncPkts
+      chart_meta:
+        description: Total ESP encrypted packets
+        family: 'Network/VPN/IPSec/Traffic/Packet/Out'
+        unit: "{packet}/s"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.4.6.0
+      name: cpvIpsecEspDecPkts
+      chart_meta:
+        description: Total ESP decrypted packets
+        family: 'Network/VPN/IPSec/Traffic/Packet/In'
+        unit: "{packet}/s"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.4.19.0
+      name: cpvIpsecEspEncBytes
+      chart_meta:
+        description: Total ESP encrypted bytes
+        family: 'Network/VPN/IPSec/Traffic/Throughput/Out'
+        unit: "By/s"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.2.5.4.20.0
+      name: cpvIpsecEspDecBytes
+      chart_meta:
+        description: Total ESP decrypted bytes
+        family: 'Network/VPN/IPSec/Traffic/Throughput/In'
+        unit: "By/s"
+
+  # VPN tunnel state table
+  - MIB: CHECKPOINT-MIB
+    table:
+      OID: 1.3.6.1.4.1.2620.500.9002
+      name: tunnelTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.500.9002.1.3
+        name: tunnelState
+        chart_meta:
+          description: Current state of the VPN tunnel
+          family: 'Network/VPN/IPSec/Tunnel/Status'
+          unit: "{status}"
+        mapping:
+          3: active
+          4: destroy
+          129: idle
+          130: phase1
+          131: down
+          132: init
+      - OID: 1.3.6.1.4.1.2620.500.9002.1.9
+        name: tunnelProbState
+        chart_meta:
+          description: DPD probe state of the VPN tunnel
+          family: 'Network/VPN/IPSec/Tunnel/ProbeStatus'
+          unit: "{status}"
+        mapping:
+          0: unknown
+          1: alive
+          2: dead
+    metric_tags:
+      - tag: tunnel_peer_name
+        symbol:
+          OID: 1.3.6.1.4.1.2620.500.9002.1.2
+          name: tunnelPeerObjName
+      - tag: tunnel_community
+        symbol:
+          OID: 1.3.6.1.4.1.2620.500.9002.1.4
+          name: tunnelCommunity
+      - tag: tunnel_interface
+        symbol:
+          OID: 1.3.6.1.4.1.2620.500.9002.1.6
+          name: tunnelInterface
+      - tag: tunnel_source_ip
+        symbol:
+          OID: 1.3.6.1.4.1.2620.500.9002.1.7
+          name: tunnelSourceIP
+      - tag: _tunnel_link_priority
+        symbol:
+          OID: 1.3.6.1.4.1.2620.500.9002.1.8
+          name: tunnelLinkPriority
+      - tag: _tunnel_peer_type
+        symbol:
+          OID: 1.3.6.1.4.1.2620.500.9002.1.10
+          name: tunnelPeerType
+      - tag: _tunnel_type
+        symbol:
+          OID: 1.3.6.1.4.1.2620.500.9002.1.11
+          name: tunnelType
+
+  # Permanent VPN tunnel state table
+  - MIB: CHECKPOINT-MIB
+    table:
+      OID: 1.3.6.1.4.1.2620.500.9003
+      name: permanentTunnelTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.500.9003.1.3
+        name: permanentTunnelState
+        chart_meta:
+          description: Current state of the permanent VPN tunnel
+          family: 'Network/VPN/IPSec/PermanentTunnel/Status'
+          unit: "{status}"
+        mapping:
+          3: active
+          4: destroy
+          129: idle
+          130: phase1
+          131: down
+          132: init
+      - OID: 1.3.6.1.4.1.2620.500.9003.1.9
+        name: permanentTunnelProbState
+        chart_meta:
+          description: DPD probe state of the permanent VPN tunnel
+          family: 'Network/VPN/IPSec/PermanentTunnel/ProbeStatus'
+          unit: "{status}"
+        mapping:
+          0: unknown
+          1: alive
+          2: dead
+    metric_tags:
+      - tag: tunnel_peer_name
+        symbol:
+          OID: 1.3.6.1.4.1.2620.500.9003.1.2
+          name: permanentTunnelPeerObjName
+      - tag: tunnel_community
+        symbol:
+          OID: 1.3.6.1.4.1.2620.500.9003.1.4
+          name: permanentTunnelCommunity
+      - tag: tunnel_interface
+        symbol:
+          OID: 1.3.6.1.4.1.2620.500.9003.1.6
+          name: permanentTunnelInterface
+      - tag: tunnel_source_ip
+        symbol:
+          OID: 1.3.6.1.4.1.2620.500.9003.1.7
+          name: permanentTunnelSourceIP
+      - tag: _tunnel_link_priority
+        symbol:
+          OID: 1.3.6.1.4.1.2620.500.9003.1.8
+          name: permanentTunnelLinkPriority
+      - tag: _tunnel_peer_type
+        symbol:
+          OID: 1.3.6.1.4.1.2620.500.9003.1.10
+          name: permanentTunnelPeerType
+      - tag: _tunnel_type
+        symbol:
+          OID: 1.3.6.1.4.1.2620.500.9003.1.11
+          name: permanentTunnelType

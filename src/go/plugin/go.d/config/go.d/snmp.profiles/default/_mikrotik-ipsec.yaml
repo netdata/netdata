@@ -1,0 +1,88 @@
+# MikroTik IPSec IKE SA monitoring (MIKROTIK-MIB)
+# MIB root: 1.3.6.1.4.1.14988.1.1.20
+
+metrics:
+  # Global scalar
+  - MIB: MIKROTIK-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.14988.1.1.20.1.0
+      name: mtxrIkeSACount
+      chart_meta:
+        description: Number of active IKE Security Associations
+        family: 'Network/VPN/IPSec/IKE/SA/Active'
+        unit: "{sa}"
+
+  # IKE SA table
+  - MIB: MIKROTIK-MIB
+    table:
+      OID: 1.3.6.1.4.1.14988.1.1.20.2
+      name: mtxrIkeSATable
+    symbols:
+      - OID: 1.3.6.1.4.1.14988.1.1.20.2.1.7
+        name: mtxrIkeSAState
+        chart_meta:
+          description: Current state of the IKE Security Association
+          family: 'Network/VPN/IPSec/IKE/SA/Status'
+          unit: "{status}"
+        mapping:
+          1: exchange
+          2: established
+          3: expired
+          4: eap
+      - OID: 1.3.6.1.4.1.14988.1.1.20.2.1.8
+        name: mtxrIkeSAUptime
+        chart_meta:
+          description: How long this IKE SA has been active
+          family: 'Network/VPN/IPSec/IKE/SA/Uptime'
+          unit: "s"
+        # TimeTicks in hundredths of seconds
+        scale_factor: 0.01
+      - OID: 1.3.6.1.4.1.14988.1.1.20.2.1.11
+        name: mtxrIkeSAPh2Count
+        chart_meta:
+          description: Number of Phase 2 child SAs for this IKE SA
+          family: 'Network/VPN/IPSec/IKE/SA/Phase2Count'
+          unit: "{sa}"
+      - OID: 1.3.6.1.4.1.14988.1.1.20.2.1.20
+        name: mtxrIkeSATxBytes
+        chart_meta:
+          description: Number of bytes transmitted through this IKE SA
+          family: 'Network/VPN/IPSec/IKE/SA/Traffic/Out'
+          unit: "By/s"
+      - OID: 1.3.6.1.4.1.14988.1.1.20.2.1.21
+        name: mtxrIkeSARxBytes
+        chart_meta:
+          description: Number of bytes received through this IKE SA
+          family: 'Network/VPN/IPSec/IKE/SA/Traffic/In'
+          unit: "By/s"
+      - OID: 1.3.6.1.4.1.14988.1.1.20.2.1.22
+        name: mtxrIkeSATxPackets
+        chart_meta:
+          description: Number of packets transmitted through this IKE SA
+          family: 'Network/VPN/IPSec/IKE/SA/Packet/Out'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.14988.1.1.20.2.1.23
+        name: mtxrIkeSARxPackets
+        chart_meta:
+          description: Number of packets received through this IKE SA
+          family: 'Network/VPN/IPSec/IKE/SA/Packet/In'
+          unit: "{packet}/s"
+    metric_tags:
+      - tag: ike_sa_index
+        index: 1
+      - tag: ike_version
+        symbol:
+          OID: 1.3.6.1.4.1.14988.1.1.20.2.1.6
+          name: mtxrIkeSAIKEVersion
+      - tag: peer_identity
+        symbol:
+          OID: 1.3.6.1.4.1.14988.1.1.20.2.1.10
+          name: mtxrIkeSARemoteIdentity
+      - tag: local_address
+        symbol:
+          OID: 1.3.6.1.4.1.14988.1.1.20.2.1.13
+          name: mtxrIkeSALocalAddress
+      - tag: peer_address
+        symbol:
+          OID: 1.3.6.1.4.1.14988.1.1.20.2.1.16
+          name: mtxrIkeSARemoteAddress
