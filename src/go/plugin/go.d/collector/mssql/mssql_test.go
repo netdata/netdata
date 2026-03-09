@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/azureauth"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,6 +33,17 @@ func TestCollector_Init_InvalidAzureADConfig(t *testing.T) {
 	// Missing client_secret.
 
 	assert.Error(t, c.Init(context.Background()))
+}
+
+func TestCollector_openConnection_AzureADRequiresURLDSN(t *testing.T) {
+	c := New()
+	c.DSN = "server=localhost;database=master"
+	c.AzureAD.Enabled = true
+	c.AzureAD.Mode = azureauth.ModeDefault
+
+	db, err := c.openConnection()
+	assert.Nil(t, db)
+	assert.ErrorContains(t, err, "error preparing Azure AD SQL Server DSN")
 }
 
 func TestCollector_Configuration(t *testing.T) {
