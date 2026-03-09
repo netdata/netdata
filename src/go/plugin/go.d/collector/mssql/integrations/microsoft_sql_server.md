@@ -586,7 +586,13 @@ The following options can be defined globally: update_every, autodetection_retry
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Data collection interval (seconds). | 10 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| **Target** | dsn | SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). | sqlserver://localhost:1433 | yes |
+| **Target** | dsn | SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). When `azure_ad.enabled` is true, use URL format with `sqlserver://` scheme. | sqlserver://localhost:1433 | yes |
+|  | azure_ad.enabled | Enable Microsoft Entra (Azure AD) authentication for Azure SQL. | no | no |
+|  | azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). | default | no |
+|  | azure_ad.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
+|  | azure_ad.client_id | Azure client ID. Required for `service_principal`; optional for user-assigned managed identity. |  | no |
+|  | azure_ad.client_secret | Azure client secret for `service_principal` mode. |  | no |
+|  | azure_ad.managed_identity_client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
 |  | timeout | Query timeout (seconds). | 5 | no |
 | **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
 |  | functions.top_queries.timeout | Query timeout for top-queries function (seconds). Uses collector timeout if not set. |  | no |
@@ -694,6 +700,43 @@ Connect to a remote SQL Server.
 jobs:
   - name: remote
     dsn: "sqlserver://netdata_user:password@192.168.1.100:1433"
+
+```
+</details>
+
+###### Azure SQL with service principal
+
+Use Microsoft Entra service principal authentication for Azure SQL.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: azure_sql_sp
+    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
+    azure_ad:
+      enabled: true
+      mode: service_principal
+      tenant_id: "00000000-0000-0000-0000-000000000000"
+      client_id: "11111111-1111-1111-1111-111111111111"
+      client_secret: "super-secret-value"
+
+```
+</details>
+
+###### Azure SQL with managed identity
+
+Use managed identity authentication (system-assigned by default).
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: azure_sql_mi
+    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
+    azure_ad:
+      enabled: true
+      mode: managed_identity
 
 ```
 </details>
@@ -829,6 +872,5 @@ Ensure SQL Server is configured for mixed mode authentication if using SQL login
 
 The monitoring user needs VIEW SERVER STATE permission.
 Grant it with: `GRANT VIEW SERVER STATE TO netdata_user;`
-
 
 

@@ -11,12 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/sqladapter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
-
-	"github.com/jackc/pgx/v5/stdlib"
 )
 
 //go:embed "config_schema.json"
@@ -71,6 +72,7 @@ type Config struct {
 	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	DSN                string           `yaml:"dsn" json:"dsn"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	CloudAuth          cloudauth.Config `yaml:"cloud_auth" json:"cloud_auth"`
 	DBSelector         string           `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`
 	XactTimeHistogram  []float64        `yaml:"transaction_time_histogram,omitempty" json:"transaction_time_histogram"`
 	QueryTimeHistogram []float64        `yaml:"query_time_histogram,omitempty" json:"query_time_histogram"`
@@ -130,6 +132,8 @@ type (
 		doSlowTime              time.Time
 		doSlowEvery             time.Duration
 
+		azureTokenProvider *cloudauth.TokenProvider
+
 		mx *pgMetrics
 
 		funcRouter *funcRouter
@@ -149,6 +153,24 @@ func (c *Collector) Init(context.Context) error {
 	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
+	}
+	if err := c.CloudAuth.Validate(); err != nil {
+		return fmt.Errorf("config validation: %v", err)
+	}
+	if c.CloudAuth.IsEnabled() {
+		cred, err := c.CloudAuth.NewCredential()
+		if err != nil {
+			return fmt.Errorf("config validation: creating cloud auth credential: %v", err)
+		}
+		provider, err := cloudauth.NewTokenProvider(
+			cred,
+			[]string{sqladapter.AzurePostgreSQLAADScope},
+			cloudauth.DefaultTokenRefreshMargin,
+		)
+		if err != nil {
+			return fmt.Errorf("config validation: creating cloud auth token provider: %v", err)
+		}
+		c.azureTokenProvider = provider
 	}
 
 	sr, err := c.initDBSelector()
