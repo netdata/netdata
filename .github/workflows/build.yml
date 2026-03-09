@@ -1018,7 +1018,7 @@ jobs:
           submodules: recursive
       - name: Setup Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Build test environment
         id: build
         uses: Wandalen/wretry.action@v3
