@@ -45,6 +45,19 @@ struct stream_parent {
     STREAM_PARENT *next;
 };
 
+static int stream_parent_effective_port(const char *definition, int default_port) {
+    char service[NI_MAXSERV + 1];
+    if(!connect_to_definition_get_service(definition, default_port, service, sizeof(service)))
+        return default_port;
+
+    char *end = NULL;
+    uint32_t port = str2uint32_t(service, &end);
+    if(end && *end == '\0' && port > 0 && port <= UINT16_MAX)
+        return (int)port;
+
+    return default_port;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // block unresponsive parents for some time, to allow speeding up the connection of the rest
 
@@ -374,9 +387,11 @@ static bool stream_info_json_parse_v1(struct json_object *jobj, const char *path
 }
 
 static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_port, ND_SOCK *sender_sock, bool ssl, const char *hostname) {
+    int effective_port = stream_parent_effective_port(string2str(d->destination), default_port);
+
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_STR(NDF_DST_IP, d->destination),
-        ND_LOG_FIELD_I64(NDF_DST_PORT, default_port),
+        ND_LOG_FIELD_I64(NDF_DST_PORT, effective_port),
         ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, "GET"),
         ND_LOG_FIELD_END(),
     };
@@ -826,9 +841,10 @@ bool stream_parent_connect_to_one_unsafe(
                rrdhost_hostname(host), string2str(d->destination), default_port,
                i + 1, count);
 
+        int effective_port = stream_parent_effective_port(string2str(d->destination), default_port);
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_STR(NDF_DST_IP, d->destination),
-            ND_LOG_FIELD_I64(NDF_DST_PORT, default_port),
+            ND_LOG_FIELD_I64(NDF_DST_PORT, effective_port),
             ND_LOG_FIELD_END(),
         };
         ND_LOG_STACK_PUSH(lgs);

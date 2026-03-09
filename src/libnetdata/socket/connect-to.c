@@ -217,6 +217,103 @@ int connect_to_this_ip46(
     return fd;
 }
 
+static int parse_connection_definition(
+    char *definition,
+    char **host,
+    char **service,
+    char **iface,
+    int *protocol,
+    int *socktype,
+    char **unix_path)
+{
+    if(!definition || !*definition)
+        return -1;
+
+    *host = definition;
+    *service = NULL;
+    *iface = "";
+    *protocol = IPPROTO_TCP;
+    *socktype = SOCK_STREAM;
+    *unix_path = NULL;
+
+    if(strncmp(*host, "tcp:", 4) == 0) {
+        *host += 4;
+        *protocol = IPPROTO_TCP;
+        *socktype = SOCK_STREAM;
+    }
+    else if(strncmp(*host, "udp:", 4) == 0) {
+        *host += 4;
+        *protocol = IPPROTO_UDP;
+        *socktype = SOCK_DGRAM;
+    }
+    else if(strncmp(*host, "unix:", 5) == 0) {
+        *unix_path = *host + 5;
+        return 1;
+    }
+    else if(**host == '/') {
+        *unix_path = *host;
+        return 1;
+    }
+
+    char *e = *host;
+    if(*e == '[') {
+        e = ++(*host);
+        while(*e && *e != ']') e++;
+        if(*e == ']') {
+            *e = '\0';
+            e++;
+        }
+    }
+    else {
+        while(*e && *e != ':' && *e != '%') e++;
+    }
+
+    if(*e == '%') {
+        *e = '\0';
+        e++;
+        *iface = e;
+        while(*e && *e != ':') e++;
+    }
+
+    if(*e == ':') {
+        *e = '\0';
+        e++;
+        *service = e;
+    }
+
+    if(!**host)
+        return -1;
+
+    return 0;
+}
+
+bool connect_to_definition_get_service(const char *definition, int default_port, char *service, size_t service_size) {
+    if(!service || !service_size)
+        return false;
+
+    snprintfz(service, service_size, "%d", default_port);
+
+    if(!definition || !*definition)
+        return true;
+
+    char *buffer = strdupz(definition);
+
+    char *host = NULL, *entry_service = NULL, *iface = NULL, *unix_path = NULL;
+    int protocol = 0, socktype = 0;
+    int rc = parse_connection_definition(
+        buffer, &host, &entry_service, &iface, &protocol, &socktype, &unix_path);
+    if(rc == -1) {
+        freez(buffer);
+        return false;
+    }
+
+    if(entry_service && *entry_service)
+        snprintfz(service, service_size, "%s", entry_service);
+
+    freez(buffer);
+    return true;
+}
+
 // connect_to_this()
 //
 // definition format:
@@ -243,56 +340,16 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
     char default_service[10 + 1];
     snprintfz(default_service, 10, "%d", default_port);
 
-    char *host = buffer, *service = default_service, *iface = "";
-    int protocol = IPPROTO_TCP, socktype = SOCK_STREAM;
+    char *host = NULL, *service = NULL, *iface = NULL, *unix_path = NULL;
+    int protocol = 0, socktype = 0;
     uint32_t scope_id = 0;
 
-    if(strncmp(host, "tcp:", 4) == 0) {
-        host += 4;
-        protocol = IPPROTO_TCP;
-        socktype = SOCK_STREAM;
-    }
-    else if(strncmp(host, "udp:", 4) == 0) {
-        host += 4;
-        protocol = IPPROTO_UDP;
-        socktype = SOCK_DGRAM;
-    }
-    else if(strncmp(host, "unix:", 5) == 0) {
-        char *path = host + 5;
-        return connect_to_unix(path, timeout);
-    }
-    else if(*host == '/') {
-        char *path = host;
-        return connect_to_unix(path, timeout);
-    }
+    int rc = parse_connection_definition(
+        buffer, &host, &service, &iface, &protocol, &socktype, &unix_path);
+    if(rc == 1)
+        return connect_to_unix(unix_path, timeout);
 
-    char *e = host;
-    if(*e == '[') {
-        e = ++host;
-        while(*e && *e != ']') e++;
-        if(*e == ']') {
-            *e = '\0';
-            e++;
-        }
-    }
-    else {
-        while(*e && *e != ':' && *e != '%') e++;
-    }
-
-    if(*e == '%') {
-        *e = '\0';
-        e++;
-        iface = e;
-        while(*e && *e != ':') e++;
-    }
-
-    if(*e == ':') {
-        *e = '\0';
-        e++;
-        service = e;
-    }
-
-    if(!*host) {
+    if(rc == -1) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "Definition '%s' does not specify a host.",
                definition);
@@ -300,7 +357,7 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
         return -ND_SOCK_ERR_NO_HOST_IN_DEFINITION;
     }
 
-    if(*iface) {
+    if(iface && *iface) {
         scope_id = if_nametoindex(iface);
         if(!scope_id)
             nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -308,7 +365,7 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
                    iface);
     }
 
-    if(!*service)
+    if(!service || !*service)
         service = default_service;
 
 
