@@ -630,6 +630,10 @@ static void GetServiceNames(void) {
                 sanitize_apps_plugin_chart_meta(name);
                 string_freez(p->name);
                 p->name = string_strdupz(name);
+#if (PROCESSES_HAVE_SERVICE == 1)
+                string_freez(p->service_name);
+                p->service_name = string_strdupz(name);
+#endif
             }
         }
     }
