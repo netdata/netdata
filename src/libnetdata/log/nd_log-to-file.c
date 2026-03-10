@@ -33,8 +33,25 @@ bool nd_logger_file(FILE *fp, ND_LOG_FORMAT format, struct log_field *fields, si
     else
         nd_logger_logfmt(wb, fields, fields_max);
 
-    int r = fprintf(fp, "%s\n", buffer_tostring(wb));
+    // Use the FILE*'s internal mutex to ensure the entire line (fprintf + fflush)
+    // is written atomically, even for lines larger than PIPE_BUF.
+    // This is a proper mutex (sleeps on contention, doesn't spin), so it cannot
+    // cause the deadlock that the previous spinlock-based approach suffered from
+    // when I/O blocked due to full pipes or slow disks.
+
+    int r;
+
+#if defined(OS_WINDOWS)
+    _lock_file(fp);
+    r = fprintf(fp, "%s\n", buffer_tostring(wb));
     fflush(fp);
+    _unlock_file(fp);
+#else
+    flockfile(fp);
+    r = fprintf(fp, "%s\n", buffer_tostring(wb));
+    fflush(fp);
+    funlockfile(fp);
+#endif
 
     buffer_free(wb);
     return r > 0;

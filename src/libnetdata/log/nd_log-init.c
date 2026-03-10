@@ -310,7 +310,6 @@ void nd_log_reopen_log_files_for_spawn_server(const char *name) {
     }
 
     for(size_t i = 0; i < _NDLS_MAX ;i++) {
-        spinlock_init(&nd_log.sources[i].spinlock);
         nd_log.sources[i].method = NDLM_DEFAULT;
         nd_log.sources[i].fd = -1;
         nd_log.sources[i].fp = NULL;
@@ -319,10 +318,6 @@ void nd_log_reopen_log_files_for_spawn_server(const char *name) {
         nd_log.sources[i].hEventLog = NULL;
 #endif
     }
-
-    // initialize spinlocks
-    spinlock_init(&nd_log.std_output.spinlock);
-    spinlock_init(&nd_log.std_error.spinlock);
 
     nd_log.syslog.initialized = false;
     nd_log.eventlog.initialized = false;

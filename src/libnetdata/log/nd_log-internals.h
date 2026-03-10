@@ -99,7 +99,6 @@ int nd_log_facility2id(const char *facility);
 #include "nd_log_limit.h"
 
 struct nd_log_source {
-    SPINLOCK spinlock;
     ND_LOG_METHOD method;
     ND_LOG_FORMAT format;
     const char *filename;
@@ -155,12 +154,10 @@ struct nd_log {
     } eventlog;
 
     struct {
-        SPINLOCK spinlock;
         bool initialized;
     } std_output;
 
     struct {
-        SPINLOCK spinlock;
         bool initialized;
     } std_error;
 
