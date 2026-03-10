@@ -196,7 +196,7 @@ void ebpf_create_chart(
 int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
 {
     static int priority = NETDATA_EBPF_ORDER_STAT_ARAL_BEGIN;
-    static netdata_mutex_t priority_mutex = PTHREAD_MUTEX_INITIALIZER;
+    static netdata_mutex_t priority_mutex;
     static int priority_mutex_initialized = 0;
 
     if (!priority_mutex_initialized) {
