@@ -3,6 +3,7 @@
 package powerstore
 
 import (
+	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
@@ -29,18 +30,31 @@ func (c *Collector) collect() (map[string]int64, error) {
 		Drive:      make(map[string]driveMetrics),
 	}
 
-	c.collectClusterSpace(&mx)
-	c.collectAppliances(&mx)
-	c.collectVolumes(&mx)
-	c.collectNodes(&mx)
-	c.collectFcPorts(&mx)
-	c.collectEthPorts(&mx)
-	c.collectFileSystems(&mx)
+	// Collect metrics from API concurrently, bounded by semaphore.
+	var wg sync.WaitGroup
+	for _, fn := range []func(*metrics){
+		c.collectClusterSpace,
+		c.collectAppliances,
+		c.collectVolumes,
+		c.collectNodes,
+		c.collectFcPorts,
+		c.collectEthPorts,
+		c.collectFileSystems,
+		c.collectAlerts,
+		c.collectDriveWear,
+		c.collectReplication,
+	} {
+		wg.Add(1)
+		go func(f func(*metrics)) {
+			defer wg.Done()
+			f(&mx)
+		}(fn)
+	}
+	wg.Wait()
+
+	// These use cached discovery data, no API calls.
 	c.collectHardwareHealth(&mx)
-	c.collectAlerts(&mx)
-	c.collectDriveWear(&mx)
 	c.collectNASStatus(&mx)
-	c.collectReplication(&mx)
 
 	c.updateCharts()
 	return stm.ToMap(mx), nil

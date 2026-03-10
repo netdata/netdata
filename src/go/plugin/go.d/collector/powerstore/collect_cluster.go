@@ -7,6 +7,9 @@ func (c *Collector) collectClusterSpace(mx *metrics) {
 		return
 	}
 
+	c.sem <- struct{}{}
+	defer func() { <-c.sem }()
+
 	cl := c.discovered.clusters[0]
 	sm, err := c.client.SpaceMetricsByCluster(cl.ID)
 	if err != nil {

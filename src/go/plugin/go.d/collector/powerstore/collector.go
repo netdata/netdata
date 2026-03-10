@@ -30,6 +30,8 @@ func init() {
 	})
 }
 
+const maxConcurrentAPIRequests = 10
+
 func New() *Collector {
 	return &Collector{
 		Config: Config{
@@ -44,6 +46,7 @@ func New() *Collector {
 		},
 		charts:  clusterCharts.Copy(),
 		charted: make(map[string]bool),
+		sem:     make(chan struct{}, maxConcurrentAPIRequests),
 	}
 }
 
@@ -70,6 +73,7 @@ type (
 		runs            int
 
 		volMatcher matcher.Matcher
+		sem        chan struct{} // limits concurrent API calls
 	}
 	discovered struct {
 		clusters    []client.Cluster

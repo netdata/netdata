@@ -9,6 +9,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"path"
+	"strconv"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -17,7 +18,7 @@ import (
 const (
 	apiBasePath  = "/api/rest"
 	dellEMCToken = "DELL-EMC-TOKEN"
-	defaultLimit = "5000"
+	defaultLimit = "2000"
 )
 
 // New creates a new PowerStore REST API client.
@@ -70,56 +71,47 @@ func (c *Client) Logout() {
 
 // Clusters returns all clusters.
 func (c *Client) Clusters() ([]Cluster, error) {
-	var v []Cluster
-	return v, c.doGetWithRetry(&v, "/cluster", nil)
+	return doGetAllPages[Cluster](c, "/cluster", nil)
 }
 
 // Appliances returns all appliances.
 func (c *Client) Appliances() ([]Appliance, error) {
-	var v []Appliance
-	return v, c.doGetWithRetry(&v, "/appliance", nil)
+	return doGetAllPages[Appliance](c, "/appliance", nil)
 }
 
 // Volumes returns all volumes.
 func (c *Client) Volumes() ([]Volume, error) {
-	var v []Volume
-	return v, c.doGetWithRetry(&v, "/volume", nil)
+	return doGetAllPages[Volume](c, "/volume", nil)
 }
 
 // AllHardware returns all hardware components.
 func (c *Client) AllHardware() ([]Hardware, error) {
-	var v []Hardware
-	return v, c.doGetWithRetry(&v, "/hardware", nil)
+	return doGetAllPages[Hardware](c, "/hardware", nil)
 }
 
 // Alerts returns alerts filtered by state.
 func (c *Client) Alerts(state string) ([]Alert, error) {
-	var v []Alert
-	return v, c.doGetWithRetry(&v, "/alert", url.Values{"state": {"eq." + state}})
+	return doGetAllPages[Alert](c, "/alert", url.Values{"state": {"eq." + state}})
 }
 
 // FcPorts returns all Fibre Channel ports.
 func (c *Client) FcPorts() ([]FcPort, error) {
-	var v []FcPort
-	return v, c.doGetWithRetry(&v, "/fc_port", nil)
+	return doGetAllPages[FcPort](c, "/fc_port", nil)
 }
 
 // EthPorts returns all Ethernet ports.
 func (c *Client) EthPorts() ([]EthPort, error) {
-	var v []EthPort
-	return v, c.doGetWithRetry(&v, "/eth_port", nil)
+	return doGetAllPages[EthPort](c, "/eth_port", nil)
 }
 
 // FileSystems returns all file systems.
 func (c *Client) FileSystems() ([]FileSystem, error) {
-	var v []FileSystem
-	return v, c.doGetWithRetry(&v, "/file_system", nil)
+	return doGetAllPages[FileSystem](c, "/file_system", nil)
 }
 
 // NASServers returns all NAS servers.
 func (c *Client) NASServers() ([]NAS, error) {
-	var v []NAS
-	return v, c.doGetWithRetry(&v, "/nas_server", nil)
+	return doGetAllPages[NAS](c, "/nas_server", nil)
 }
 
 // PerformanceMetricsByAppliance returns performance metrics for an appliance.
@@ -276,15 +268,49 @@ func (c *Client) doOKWithRetry(req web.RequestConfig) (*http.Response, error) {
 	return resp, err
 }
 
-func (c *Client) doGetWithRetry(dst any, urlPath string, params url.Values) error {
-	req := c.createGetRequest(urlPath, params)
-	resp, err := c.doOKWithRetry(req)
-	defer web.CloseBody(resp)
-	if err != nil {
-		return err
+// doGetAllPages fetches all pages from a paginated GET endpoint.
+// PowerStore returns HTTP 206 (Partial Content) when more pages are available,
+// with a server-enforced maximum of 2000 items per page.
+func doGetAllPages[T any](c *Client, urlPath string, params url.Values) ([]T, error) {
+	var all []T
+	offset := 0
+
+	for {
+		reqParams := make(url.Values)
+		for k, v := range params {
+			reqParams[k] = v
+		}
+		if offset > 0 {
+			reqParams.Set("offset", strconv.Itoa(offset))
+		}
+
+		req := c.createGetRequest(urlPath, reqParams)
+
+		resp, err := c.doOKWithRetry(req)
+		if err != nil {
+			web.CloseBody(resp)
+			return nil, err
+		}
+
+		var page []T
+		err = json.NewDecoder(resp.Body).Decode(&page)
+		c.cacheCSRFToken(resp)
+		partial := resp.StatusCode == http.StatusPartialContent
+		web.CloseBody(resp)
+
+		if err != nil {
+			return nil, fmt.Errorf("error decoding %s response: %v", urlPath, err)
+		}
+
+		all = append(all, page...)
+
+		if !partial || len(page) == 0 {
+			break
+		}
+		offset += len(page)
 	}
-	c.cacheCSRFToken(resp)
-	return json.NewDecoder(resp.Body).Decode(dst)
+
+	return all, nil
 }
 
 func (c *Client) doPostWithRetry(dst any, urlPath string, body any) error {

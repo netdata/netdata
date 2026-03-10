@@ -3,6 +3,9 @@
 package powerstore
 
 func (c *Collector) collectAlerts(mx *metrics) {
+	c.sem <- struct{}{}
+	defer func() { <-c.sem }()
+
 	alerts, err := c.client.Alerts("ACTIVE")
 	if err != nil {
 		c.Warningf("error collecting alerts: %v", err)
