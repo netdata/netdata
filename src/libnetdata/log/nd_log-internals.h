@@ -126,7 +126,7 @@ struct nd_log {
 
     ND_LOG_SOURCES overwrite_process_source;
     // Only set in post-fork nofork spawn-server children, which stay single-threaded in-tree.
-    bool disable_output_mutexes;
+    bool single_threaded_child;
     log_event_t fatal_hook_cb;
     fatal_event_t fatal_final_cb;
 

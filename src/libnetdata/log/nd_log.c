@@ -106,7 +106,7 @@ static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, 
             break;
     }
 
-    if(nd_log.disable_output_mutexes)
+    if(nd_log.single_threaded_child)
         *mutexp = NULL;
 
     return output;
@@ -149,9 +149,9 @@ void nd_log_register_fatal_final_cb(fatal_event_t cb) {
 // high level logger
 
 // Write serialization uses a netdata_mutex_t (sleeping mutex) per output
-// destination, passed through from nd_logger_select_output(). Spawn-server
-// children run single-threaded immediately after fork(), so they disable these
-// mutexes instead of trying to reinitialize inherited libuv mutex state.
+// destination, passed through from nd_logger_select_output(). Post-fork nofork
+// spawn-server children stay single-threaded in-tree, so they bypass logger
+// locking instead of trying to reuse inherited lock state.
 static void nd_logger_log_fields(FILE *fp, netdata_mutex_t *mutex, bool limit,
                                  ND_LOG_FIELD_PRIORITY priority,
                                  ND_LOG_METHOD output, struct nd_log_source *source,
@@ -167,7 +167,7 @@ static void nd_logger_log_fields(FILE *fp, netdata_mutex_t *mutex, bool limit,
             // we can't log to journal, let's log to stderr
             output = NDLM_FILE;
             fp = stderr;
-            mutex = nd_log.disable_output_mutexes ? NULL : &nd_log.std_error.mutex;
+            mutex = nd_log.single_threaded_child ? NULL : &nd_log.std_error.mutex;
         }
     }
 
@@ -178,7 +178,7 @@ static void nd_logger_log_fields(FILE *fp, netdata_mutex_t *mutex, bool limit,
             // we can't log to windows events, let's log to stderr
             output = NDLM_FILE;
             fp = stderr;
-            mutex = nd_log.disable_output_mutexes ? NULL : &nd_log.std_error.mutex;
+            mutex = nd_log.single_threaded_child ? NULL : &nd_log.std_error.mutex;
         }
     }
 #endif
@@ -188,7 +188,7 @@ static void nd_logger_log_fields(FILE *fp, netdata_mutex_t *mutex, bool limit,
             // we can't log to windows events, let's log to stderr
             output = NDLM_FILE;
             fp = stderr;
-            mutex = nd_log.disable_output_mutexes ? NULL : &nd_log.std_error.mutex;
+            mutex = nd_log.single_threaded_child ? NULL : &nd_log.std_error.mutex;
         }
     }
 #endif
@@ -428,18 +428,18 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
     if(erl->sleep_ut)
         sleep_usec(erl->sleep_ut);
 
-    if(!nd_log.disable_output_mutexes)
+    if(!nd_log.single_threaded_child)
         spinlock_lock(&erl->spinlock);
 
     erl->count++;
     time_t now = now_boottime_sec();
     if(now - erl->last_logged < erl->log_every) {
-        if(!nd_log.disable_output_mutexes)
+        if(!nd_log.single_threaded_child)
             spinlock_unlock(&erl->spinlock);
         return;
     }
 
-    if(!nd_log.disable_output_mutexes)
+    if(!nd_log.single_threaded_child)
         spinlock_unlock(&erl->spinlock);
 
     va_list args;
