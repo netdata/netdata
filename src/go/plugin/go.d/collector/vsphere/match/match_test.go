@@ -438,12 +438,12 @@ func TestClusterIncludes_Parse(t *testing.T) {
 		valid    bool
 		expected ClusterMatcher
 	}{
-		"":      {valid: false},
-		"*/C1":  {valid: false},
-		"/":     {valid: true, expected: falseClDC},
-		"/*":    {valid: true, expected: trueClDC},
-		"/!*":   {valid: true, expected: falseClDC},
-		"/!*/":  {valid: true, expected: falseClDC},
+		"":     {valid: false},
+		"*/C1": {valid: false},
+		"/":    {valid: true, expected: falseClDC},
+		"/*":   {valid: true, expected: trueClDC},
+		"/!*":  {valid: true, expected: falseClDC},
+		"/!*/": {valid: true, expected: falseClDC},
 		"/!*/ ": {
 			valid: true,
 			expected: andClusterMatcher{

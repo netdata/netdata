@@ -98,13 +98,13 @@ func (d Discoverer) Discover() (*rs.Resources, error) {
 
 var (
 	// properties to set
-	datacenterPathSet    = []string{"name", "parent"}
-	folderPathSet        = []string{"name", "parent"}
-	clusterPathSet       = []string{"name", "parent"}
-	hostPathSet          = []string{"name", "parent", "runtime.powerState", "summary.overallStatus"}
-	vmPathSet            = []string{"name", "runtime.host", "runtime.powerState", "summary.overallStatus"}
-	datastorePathSet     = []string{"name", "parent", "summary", "overallStatus"}
-	resourcePoolPathSet  = []string{"name", "owner"}
+	datacenterPathSet   = []string{"name", "parent"}
+	folderPathSet       = []string{"name", "parent"}
+	clusterPathSet      = []string{"name", "parent"}
+	hostPathSet         = []string{"name", "parent", "runtime.powerState", "summary.overallStatus"}
+	vmPathSet           = []string{"name", "runtime.host", "runtime.powerState", "summary.overallStatus"}
+	datastorePathSet    = []string{"name", "parent", "summary", "overallStatus"}
+	resourcePoolPathSet = []string{"name", "owner"}
 )
 
 func (d Discoverer) discover() (*resources, error) {

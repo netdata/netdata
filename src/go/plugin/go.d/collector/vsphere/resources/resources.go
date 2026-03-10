@@ -142,7 +142,7 @@ type (
 		CpuLimit       int64 // MHz, -1 = unlimited
 		MemReservation int64 // MB, 0 if nil
 		MemLimit       int64 // MB, -1 = unlimited
-		OverallStatus string
+		OverallStatus  string
 		Ref            types.ManagedObjectReference
 	}
 
@@ -213,22 +213,22 @@ type (
 	ResourcePools map[string]*ResourcePool
 )
 
-func (dcs DataCenters) Put(dc *Datacenter)        { dcs[dc.ID] = dc }
-func (dcs DataCenters) Get(id string) *Datacenter { return dcs[id] }
-func (fs Folders) Put(folder *Folder)             { fs[folder.ID] = folder }
-func (fs Folders) Get(id string) *Folder          { return fs[id] }
-func (cs Clusters) Put(cluster *Cluster)          { cs[cluster.ID] = cluster }
-func (cs Clusters) Remove(id string)              { delete(cs, id) }
-func (cs Clusters) Get(id string) *Cluster        { return cs[id] }
-func (hs Hosts) Put(host *Host)                   { hs[host.ID] = host }
-func (hs Hosts) Remove(id string)                 { delete(hs, id) }
-func (hs Hosts) Get(id string) *Host              { return hs[id] }
-func (vs VMs) Put(vm *VM)                         { vs[vm.ID] = vm }
-func (vs VMs) Remove(id string)                   { delete(vs, id) }
-func (vs VMs) Get(id string) *VM                  { return vs[id] }
-func (ds Datastores) Put(d *Datastore)            { ds[d.ID] = d }
-func (ds Datastores) Remove(id string)            { delete(ds, id) }
-func (ds Datastores) Get(id string) *Datastore    { return ds[id] }
-func (rp ResourcePools) Put(p *ResourcePool)      { rp[p.ID] = p }
-func (rp ResourcePools) Remove(id string)         { delete(rp, id) }
+func (dcs DataCenters) Put(dc *Datacenter)           { dcs[dc.ID] = dc }
+func (dcs DataCenters) Get(id string) *Datacenter    { return dcs[id] }
+func (fs Folders) Put(folder *Folder)                { fs[folder.ID] = folder }
+func (fs Folders) Get(id string) *Folder             { return fs[id] }
+func (cs Clusters) Put(cluster *Cluster)             { cs[cluster.ID] = cluster }
+func (cs Clusters) Remove(id string)                 { delete(cs, id) }
+func (cs Clusters) Get(id string) *Cluster           { return cs[id] }
+func (hs Hosts) Put(host *Host)                      { hs[host.ID] = host }
+func (hs Hosts) Remove(id string)                    { delete(hs, id) }
+func (hs Hosts) Get(id string) *Host                 { return hs[id] }
+func (vs VMs) Put(vm *VM)                            { vs[vm.ID] = vm }
+func (vs VMs) Remove(id string)                      { delete(vs, id) }
+func (vs VMs) Get(id string) *VM                     { return vs[id] }
+func (ds Datastores) Put(d *Datastore)               { ds[d.ID] = d }
+func (ds Datastores) Remove(id string)               { delete(ds, id) }
+func (ds Datastores) Get(id string) *Datastore       { return ds[id] }
+func (rp ResourcePools) Put(p *ResourcePool)         { rp[p.ID] = p }
+func (rp ResourcePools) Remove(id string)            { delete(rp, id) }
 func (rp ResourcePools) Get(id string) *ResourcePool { return rp[id] }

@@ -333,7 +333,7 @@ func (ci ClusterIncludes) Parse() (ClusterMatcher, error) {
 }
 
 const (
-	clDCIdx        = iota
+	clDCIdx = iota
 	clClusterIdx
 )
 

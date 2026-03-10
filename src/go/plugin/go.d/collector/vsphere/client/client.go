@@ -22,11 +22,11 @@ import (
 )
 
 const (
-	datacenter      = "Datacenter"
-	folder          = "Folder"
-	computeResource = "ComputeResource"
-	hostSystem      = "HostSystem"
-	virtualMachine  = "VirtualMachine"
+	datacenter       = "Datacenter"
+	folder           = "Folder"
+	computeResource  = "ComputeResource"
+	hostSystem       = "HostSystem"
+	virtualMachine   = "VirtualMachine"
 	datastoreType    = "Datastore"
 	resourcePoolType = "ResourcePool"
 

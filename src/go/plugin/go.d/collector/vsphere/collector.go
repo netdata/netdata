@@ -48,18 +48,18 @@ func New() *Collector {
 			DatastoresInclude: []string{"/*"},
 			ClustersInclude:   []string{"/*"},
 		},
-		collectionLock:         &sync.RWMutex{},
-		charts:                 &collectorapi.Charts{},
-		discoveredHosts:        make(map[string]int),
-		discoveredVMs:          make(map[string]int),
-		discoveredDatastores:   make(map[string]int),
-		discoveredClusters:     make(map[string]int),
+		collectionLock:          &sync.RWMutex{},
+		charts:                  &collectorapi.Charts{},
+		discoveredHosts:         make(map[string]int),
+		discoveredVMs:           make(map[string]int),
+		discoveredDatastores:    make(map[string]int),
+		discoveredClusters:      make(map[string]int),
 		discoveredResourcePools: make(map[string]int),
-		charted:                make(map[string]bool),
-		datastorePerfReceived:  make(map[string]bool),
-		datastorePerfCharted:   make(map[string]bool),
-		clusterPerfReceived:    make(map[string]bool),
-		clusterPerfCharted:     make(map[string]bool),
+		charted:                 make(map[string]bool),
+		datastorePerfReceived:   make(map[string]bool),
+		datastorePerfCharted:    make(map[string]bool),
+		clusterPerfReceived:     make(map[string]bool),
+		clusterPerfCharted:      make(map[string]bool),
 	}
 }
 
@@ -88,15 +88,15 @@ type (
 		clusterPropertyCollector
 		rpPropertyCollector
 
-		collectionLock       *sync.RWMutex
-		resources            *rs.Resources
-		discoveryTask        *task
-		discoveredHosts      map[string]int
-		discoveredVMs        map[string]int
-		discoveredDatastores map[string]int
-		discoveredClusters     map[string]int
+		collectionLock          *sync.RWMutex
+		resources               *rs.Resources
+		discoveryTask           *task
+		discoveredHosts         map[string]int
+		discoveredVMs           map[string]int
+		discoveredDatastores    map[string]int
+		discoveredClusters      map[string]int
 		discoveredResourcePools map[string]int
-		charted              map[string]bool
+		charted                 map[string]bool
 
 		// two-phase chart creation: property charts always, perf charts only when data arrives
 		datastorePerfReceived map[string]bool
