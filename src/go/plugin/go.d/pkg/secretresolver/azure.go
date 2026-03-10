@@ -11,22 +11,12 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"time"
 )
 
 // reAzureSafeName validates Azure Key Vault and secret names (alphanumeric + hyphens).
 var reAzureSafeName = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
 
-var azureHTTPClient = &http.Client{Timeout: 10 * time.Second}
-var azureIMDSHTTPClient = &http.Client{
-	Timeout:   2 * time.Second,
-	Transport: &http.Transport{Proxy: nil}, // IMDS must never be proxied
-}
-
-// azureLoginEndpointOverride allows tests to override the Azure AD login endpoint.
-var azureLoginEndpointOverride string
-
-func resolveAzureKV(ref, original string) (string, error) {
+func (r *Resolver) resolveAzureKV(ref, original string) (string, error) {
 	vaultName, secretName, ok := strings.Cut(ref, "/")
 	if !ok || vaultName == "" || secretName == "" {
 		return "", fmt.Errorf("resolving secret '%s': reference must be in format 'vault-name/secret-name'", original)
@@ -38,7 +28,7 @@ func resolveAzureKV(ref, original string) (string, error) {
 		return "", fmt.Errorf("resolving secret '%s': invalid secret name '%s' (must contain only alphanumeric characters and hyphens)", original, secretName)
 	}
 
-	token, err := azureGetAccessToken()
+	token, err := r.azureGetAccessToken()
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': %w", original, err)
 	}
@@ -51,7 +41,7 @@ func resolveAzureKV(ref, original string) (string, error) {
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := azureHTTPClient.Do(req)
+	resp, err := r.azureHTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': request failed: %w", original, err)
 	}
@@ -76,7 +66,7 @@ func resolveAzureKV(ref, original string) (string, error) {
 	return result.Value, nil
 }
 
-func azureGetAccessToken() (string, error) {
+func (r *Resolver) azureGetAccessToken() (string, error) {
 	// Try client credentials first (if all env vars are present).
 	tenantID := os.Getenv("AZURE_TENANT_ID")
 	clientID := os.Getenv("AZURE_CLIENT_ID")
@@ -84,15 +74,15 @@ func azureGetAccessToken() (string, error) {
 
 	if tenantID != "" && clientID != "" && clientSecret != "" {
 		// All three client credential vars are set — use them exclusively.
-		return azureGetTokenClientCredentials(tenantID, clientID, clientSecret)
+		return r.azureGetTokenClientCredentials(tenantID, clientID, clientSecret)
 	}
 
 	// Fall back to managed identity (IMDS).
-	return azureGetTokenManagedIdentity()
+	return r.azureGetTokenManagedIdentity()
 }
 
-func azureGetTokenClientCredentials(tenantID, clientID, clientSecret string) (string, error) {
-	tokenURL := azureLoginEndpointOverride
+func (r *Resolver) azureGetTokenClientCredentials(tenantID, clientID, clientSecret string) (string, error) {
+	tokenURL := r.azureLoginEndpoint
 	if tokenURL == "" {
 		tokenURL = fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", tenantID)
 	}
@@ -104,7 +94,7 @@ func azureGetTokenClientCredentials(tenantID, clientID, clientSecret string) (st
 		"grant_type":    {"client_credentials"},
 	}
 
-	resp, err := azureHTTPClient.PostForm(tokenURL, form)
+	resp, err := r.azureHTTPClient.PostForm(tokenURL, form)
 	if err != nil {
 		return "", fmt.Errorf("client credentials token request failed: %w", err)
 	}
@@ -133,7 +123,7 @@ func azureGetTokenClientCredentials(tenantID, clientID, clientSecret string) (st
 	return result.AccessToken, nil
 }
 
-func azureGetTokenManagedIdentity() (string, error) {
+func (r *Resolver) azureGetTokenManagedIdentity() (string, error) {
 	reqURL := "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://vault.azure.net"
 
 	if clientID := os.Getenv("AZURE_CLIENT_ID"); clientID != "" {
@@ -146,7 +136,7 @@ func azureGetTokenManagedIdentity() (string, error) {
 	}
 	req.Header.Set("Metadata", "true")
 
-	resp, err := azureIMDSHTTPClient.Do(req)
+	resp, err := r.azureIMDSHTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("managed identity token request failed: %w", err)
 	}

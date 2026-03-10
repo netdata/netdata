@@ -81,8 +81,9 @@ func TestResolveCmd(t *testing.T) {
 				t.Skip("skipping on windows")
 			}
 
+			resolver := New()
 			cfg := tc.buildCfg(t)
-			err := Resolve(cfg)
+			err := resolver.Resolve(cfg)
 
 			if tc.wantErrContains != "" {
 				require.Error(t, err)

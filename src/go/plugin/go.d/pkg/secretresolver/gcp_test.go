@@ -74,8 +74,9 @@ func TestResolveGCPSM_Validation(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			resolver := New()
 			cfg := map[string]any{"password": tc.ref}
-			err := Resolve(cfg)
+			err := resolver.Resolve(cfg)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.wantErrContains)
 		})
@@ -84,10 +85,10 @@ func TestResolveGCPSM_Validation(t *testing.T) {
 
 func TestResolveGCPSM(t *testing.T) {
 	tests := map[string]struct {
-		run func(t *testing.T)
+		run func(t *testing.T, resolver *Resolver)
 	}{
 		"domain scoped project id": {
-			run: func(t *testing.T) {
+			run: func(t *testing.T, resolver *Resolver) {
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					assert.Contains(t, r.URL.Path, "/v1/projects/example.com:my-project/secrets/db-pass/versions/latest:access")
 
@@ -106,21 +107,16 @@ func TestResolveGCPSM(t *testing.T) {
 				saFile := writeTestGCPServiceAccountFile(t, tokenSrv.URL)
 				t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", saFile)
 
-				origClient := gcpHTTPClient
-				gcpHTTPClient = srv.Client()
-				t.Cleanup(func() { gcpHTTPClient = origClient })
-
-				origEndpoint := gcpSecretManagerEndpointOverride
-				gcpSecretManagerEndpointOverride = srv.URL
-				t.Cleanup(func() { gcpSecretManagerEndpointOverride = origEndpoint })
+				resolver.gcpHTTPClient = srv.Client()
+				resolver.gcpSecretManagerEndpoint = srv.URL
 
 				cfg := map[string]any{"password": "${gcp-sm:example.com:my-project/db-pass}"}
-				require.NoError(t, Resolve(cfg))
+				require.NoError(t, resolver.Resolve(cfg))
 				assert.Equal(t, "domain-secret", cfg["password"])
 			},
 		},
 		"version in reference": {
-			run: func(t *testing.T) {
+			run: func(t *testing.T, resolver *Resolver) {
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					assert.Contains(t, r.URL.Path, "/versions/42:access")
 
@@ -139,21 +135,16 @@ func TestResolveGCPSM(t *testing.T) {
 				saFile := writeTestGCPServiceAccountFile(t, tokenSrv.URL)
 				t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", saFile)
 
-				origClient := gcpHTTPClient
-				gcpHTTPClient = srv.Client()
-				t.Cleanup(func() { gcpHTTPClient = origClient })
-
-				origEndpoint := gcpSecretManagerEndpointOverride
-				gcpSecretManagerEndpointOverride = srv.URL
-				t.Cleanup(func() { gcpSecretManagerEndpointOverride = origEndpoint })
+				resolver.gcpHTTPClient = srv.Client()
+				resolver.gcpSecretManagerEndpoint = srv.URL
 
 				cfg := map[string]any{"password": "${gcp-sm:myproject/mysecret/42}"}
-				require.NoError(t, Resolve(cfg))
+				require.NoError(t, resolver.Resolve(cfg))
 				assert.Equal(t, "versioned-secret", cfg["password"])
 			},
 		},
 		"parse response": {
-			run: func(t *testing.T) {
+			run: func(t *testing.T, resolver *Resolver) {
 				secretData := base64.StdEncoding.EncodeToString([]byte("gcp-secret-value"))
 
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -163,11 +154,9 @@ func TestResolveGCPSM(t *testing.T) {
 				}))
 				t.Cleanup(srv.Close)
 
-				origClient := gcpHTTPClient
-				gcpHTTPClient = srv.Client()
-				t.Cleanup(func() { gcpHTTPClient = origClient })
+				resolver.gcpHTTPClient = srv.Client()
 
-				resp, err := gcpHTTPClient.Get(srv.URL + "/v1/projects/myproj/secrets/mysecret/versions/latest:access")
+				resp, err := resolver.gcpHTTPClient.Get(srv.URL + "/v1/projects/myproj/secrets/mysecret/versions/latest:access")
 				require.NoError(t, err)
 				defer resp.Body.Close()
 
@@ -187,7 +176,8 @@ func TestResolveGCPSM(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			tc.run(t)
+			resolver := New()
+			tc.run(t, resolver)
 		})
 	}
 }
@@ -246,53 +236,52 @@ func TestGCPCreateSignedJWT(t *testing.T) {
 
 func TestGCPAuthPaths(t *testing.T) {
 	tests := map[string]struct {
-		run func(t *testing.T)
+		run func(t *testing.T, resolver *Resolver)
 	}{
 		"get access token no credentials": {
-			run: func(t *testing.T) {
+			run: func(t *testing.T, resolver *Resolver) {
 				t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
 
-				_, err := gcpGetAccessToken("${gcp-sm:proj/sec}")
+				_, err := resolver.gcpGetAccessToken("${gcp-sm:proj/sec}")
 				assert.Error(t, err)
 			},
 		},
 		"service account missing file": {
-			run: func(t *testing.T) {
+			run: func(t *testing.T, resolver *Resolver) {
 				t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/nonexistent/sa.json")
 
-				_, err := gcpGetTokenServiceAccount()
+				_, err := resolver.gcpGetTokenServiceAccount()
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "reading service account file")
 			},
 		},
 		"service account invalid json": {
-			run: func(t *testing.T) {
+			run: func(t *testing.T, resolver *Resolver) {
 				dir := t.TempDir()
 				f := filepath.Join(dir, "sa.json")
 				require.NoError(t, os.WriteFile(f, []byte("not json"), 0600))
 				t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", f)
 
-				_, err := gcpGetTokenServiceAccount()
+				_, err := resolver.gcpGetTokenServiceAccount()
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "parsing service account JSON")
 			},
 		},
 		"service account missing fields": {
-			run: func(t *testing.T) {
+			run: func(t *testing.T, resolver *Resolver) {
 				dir := t.TempDir()
 				f := filepath.Join(dir, "sa.json")
 				require.NoError(t, os.WriteFile(f, []byte(`{"client_email":"","private_key":"","token_uri":""}`), 0600))
 				t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", f)
 
-				_, err := gcpGetTokenServiceAccount()
+				_, err := resolver.gcpGetTokenServiceAccount()
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "missing required fields")
 			},
 		},
 		"metadata token success": {
-			run: func(t *testing.T) {
-				origClient := gcpMetadataHTTPClient
-				gcpMetadataHTTPClient = &http.Client{
+			run: func(t *testing.T, resolver *Resolver) {
+				resolver.gcpMetadataHTTPClient = &http.Client{
 					Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 						assert.Equal(t, "GET", req.Method)
 						assert.Equal(t, "metadata.google.internal", req.URL.Host)
@@ -301,27 +290,24 @@ func TestGCPAuthPaths(t *testing.T) {
 						return newHTTPResponse(http.StatusOK, `{"access_token":"metadata-token"}`), nil
 					}),
 				}
-				t.Cleanup(func() { gcpMetadataHTTPClient = origClient })
 
-				token, err := gcpGetTokenMetadata()
+				token, err := resolver.gcpGetTokenMetadata()
 				require.NoError(t, err)
 				assert.Equal(t, "metadata-token", token)
 			},
 		},
 		"access token metadata fallback success": {
-			run: func(t *testing.T) {
+			run: func(t *testing.T, resolver *Resolver) {
 				t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
 
-				origClient := gcpMetadataHTTPClient
-				gcpMetadataHTTPClient = &http.Client{
+				resolver.gcpMetadataHTTPClient = &http.Client{
 					Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 						assert.Equal(t, "Google", req.Header.Get("Metadata-Flavor"))
 						return newHTTPResponse(http.StatusOK, `{"access_token":"metadata-token"}`), nil
 					}),
 				}
-				t.Cleanup(func() { gcpMetadataHTTPClient = origClient })
 
-				token, err := gcpGetAccessToken("${gcp-sm:project/secret}")
+				token, err := resolver.gcpGetAccessToken("${gcp-sm:project/secret}")
 				require.NoError(t, err)
 				assert.Equal(t, "metadata-token", token)
 			},
@@ -330,7 +316,8 @@ func TestGCPAuthPaths(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			tc.run(t)
+			resolver := New()
+			tc.run(t, resolver)
 		})
 	}
 }

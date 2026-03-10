@@ -3,7 +3,6 @@
 package secretresolver
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,29 +10,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // vaultNoRedirect prevents following redirects that could leak the Vault token.
-var vaultNoRedirect = func(req *http.Request, via []*http.Request) error {
+func vaultNoRedirect(req *http.Request, via []*http.Request) error {
 	return http.ErrUseLastResponse
 }
 
-var (
-	vaultHTTPClient = &http.Client{
-		Timeout:       10 * time.Second,
-		CheckRedirect: vaultNoRedirect,
-	}
-	vaultHTTPClientInsecure = &http.Client{
-		Timeout:       10 * time.Second,
-		CheckRedirect: vaultNoRedirect,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-)
-
-func resolveVault(ref, original string) (string, error) {
+func (r *Resolver) resolveVault(ref, original string) (string, error) {
 	path, key, ok := strings.Cut(ref, "#")
 	if !ok || key == "" {
 		return "", fmt.Errorf("resolving secret '%s': vault reference must be in format 'path#key'", original)
@@ -67,9 +51,9 @@ func resolveVault(ref, original string) (string, error) {
 		req.Header.Set("X-Vault-Namespace", ns)
 	}
 
-	client := vaultHTTPClient
+	client := r.vaultHTTPClient
 	if v := os.Getenv("VAULT_SKIP_VERIFY"); v == "true" || v == "1" {
-		client = vaultHTTPClientInsecure
+		client = r.vaultHTTPClientInsecure
 	}
 
 	resp, err := client.Do(req)

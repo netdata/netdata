@@ -15,12 +15,12 @@ import (
 
 func TestResolveVault(t *testing.T) {
 	tests := map[string]struct {
-		buildCfg        func(t *testing.T) map[string]any
+		buildCfg        func(t *testing.T, resolver *Resolver) map[string]any
 		wantErrContains string
 		assertCfg       func(t *testing.T, cfg map[string]any)
 	}{
 		"kv v2": {
-			buildCfg: func(t *testing.T) map[string]any {
+			buildCfg: func(t *testing.T, resolver *Resolver) map[string]any {
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					assert.Equal(t, "/v1/secret/data/myapp", r.URL.Path)
 					assert.Equal(t, "test-token", r.Header.Get("X-Vault-Token"))
@@ -36,10 +36,7 @@ func TestResolveVault(t *testing.T) {
 
 				t.Setenv("VAULT_ADDR", srv.URL)
 				t.Setenv("VAULT_TOKEN", "test-token")
-
-				origClient := vaultHTTPClient
-				vaultHTTPClient = srv.Client()
-				t.Cleanup(func() { vaultHTTPClient = origClient })
+				resolver.vaultHTTPClient = srv.Client()
 
 				return map[string]any{"password": "${vault:secret/data/myapp#password}"}
 			},
@@ -48,7 +45,7 @@ func TestResolveVault(t *testing.T) {
 			},
 		},
 		"kv v1": {
-			buildCfg: func(t *testing.T) map[string]any {
+			buildCfg: func(t *testing.T, resolver *Resolver) map[string]any {
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					resp := map[string]any{
 						"data": map[string]any{"password": "v1secret"},
@@ -59,10 +56,7 @@ func TestResolveVault(t *testing.T) {
 
 				t.Setenv("VAULT_ADDR", srv.URL)
 				t.Setenv("VAULT_TOKEN", "test-token")
-
-				origClient := vaultHTTPClient
-				vaultHTTPClient = srv.Client()
-				t.Cleanup(func() { vaultHTTPClient = origClient })
+				resolver.vaultHTTPClient = srv.Client()
 
 				return map[string]any{"password": "${vault:secret/myapp#password}"}
 			},
@@ -71,7 +65,7 @@ func TestResolveVault(t *testing.T) {
 			},
 		},
 		"namespace": {
-			buildCfg: func(t *testing.T) map[string]any {
+			buildCfg: func(t *testing.T, resolver *Resolver) map[string]any {
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					assert.Equal(t, "engineering", r.Header.Get("X-Vault-Namespace"))
 
@@ -87,10 +81,7 @@ func TestResolveVault(t *testing.T) {
 				t.Setenv("VAULT_ADDR", srv.URL)
 				t.Setenv("VAULT_TOKEN", "test-token")
 				t.Setenv("VAULT_NAMESPACE", "engineering")
-
-				origClient := vaultHTTPClient
-				vaultHTTPClient = srv.Client()
-				t.Cleanup(func() { vaultHTTPClient = origClient })
+				resolver.vaultHTTPClient = srv.Client()
 
 				return map[string]any{"key": "${vault:secret/data/app#api_key}"}
 			},
@@ -99,7 +90,7 @@ func TestResolveVault(t *testing.T) {
 			},
 		},
 		"missing key": {
-			buildCfg: func(t *testing.T) map[string]any {
+			buildCfg: func(t *testing.T, resolver *Resolver) map[string]any {
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					resp := map[string]any{
 						"data": map[string]any{
@@ -112,17 +103,14 @@ func TestResolveVault(t *testing.T) {
 
 				t.Setenv("VAULT_ADDR", srv.URL)
 				t.Setenv("VAULT_TOKEN", "test-token")
-
-				origClient := vaultHTTPClient
-				vaultHTTPClient = srv.Client()
-				t.Cleanup(func() { vaultHTTPClient = origClient })
+				resolver.vaultHTTPClient = srv.Client()
 
 				return map[string]any{"password": "${vault:secret/data/myapp#nonexistent}"}
 			},
 			wantErrContains: "key 'nonexistent' not found",
 		},
 		"missing vault addr": {
-			buildCfg: func(t *testing.T) map[string]any {
+			buildCfg: func(t *testing.T, resolver *Resolver) map[string]any {
 				t.Setenv("VAULT_ADDR", "")
 				t.Setenv("VAULT_TOKEN", "test-token")
 				return map[string]any{"password": "${vault:secret/data/myapp#password}"}
@@ -130,7 +118,7 @@ func TestResolveVault(t *testing.T) {
 			wantErrContains: "VAULT_ADDR",
 		},
 		"missing token": {
-			buildCfg: func(t *testing.T) map[string]any {
+			buildCfg: func(t *testing.T, resolver *Resolver) map[string]any {
 				t.Setenv("VAULT_ADDR", "http://localhost:8200")
 				t.Setenv("VAULT_TOKEN", "")
 				t.Setenv("VAULT_TOKEN_FILE", "/nonexistent/token/file")
@@ -139,19 +127,19 @@ func TestResolveVault(t *testing.T) {
 			wantErrContains: "cannot read token file",
 		},
 		"path traversal": {
-			buildCfg: func(t *testing.T) map[string]any {
+			buildCfg: func(t *testing.T, resolver *Resolver) map[string]any {
 				return map[string]any{"password": "${vault:secret/../sys/seal#key}"}
 			},
 			wantErrContains: "invalid characters",
 		},
 		"query injection": {
-			buildCfg: func(t *testing.T) map[string]any {
+			buildCfg: func(t *testing.T, resolver *Resolver) map[string]any {
 				return map[string]any{"password": "${vault:secret/data/myapp?list=true#key}"}
 			},
 			wantErrContains: "invalid characters",
 		},
 		"missing hash key": {
-			buildCfg: func(t *testing.T) map[string]any {
+			buildCfg: func(t *testing.T, resolver *Resolver) map[string]any {
 				t.Setenv("VAULT_ADDR", "http://localhost:8200")
 				t.Setenv("VAULT_TOKEN", "test-token")
 				return map[string]any{"password": "${vault:secret/data/myapp}"}
@@ -159,7 +147,7 @@ func TestResolveVault(t *testing.T) {
 			wantErrContains: "must be in format 'path#key'",
 		},
 		"http error": {
-			buildCfg: func(t *testing.T) map[string]any {
+			buildCfg: func(t *testing.T, resolver *Resolver) map[string]any {
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusForbidden)
 					_, _ = w.Write([]byte(`{"errors":["permission denied"]}`))
@@ -168,10 +156,7 @@ func TestResolveVault(t *testing.T) {
 
 				t.Setenv("VAULT_ADDR", srv.URL)
 				t.Setenv("VAULT_TOKEN", "bad-token")
-
-				origClient := vaultHTTPClient
-				vaultHTTPClient = srv.Client()
-				t.Cleanup(func() { vaultHTTPClient = origClient })
+				resolver.vaultHTTPClient = srv.Client()
 
 				return map[string]any{"password": "${vault:secret/data/myapp#password}"}
 			},
@@ -181,8 +166,9 @@ func TestResolveVault(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			cfg := tc.buildCfg(t)
-			err := Resolve(cfg)
+			resolver := New()
+			cfg := tc.buildCfg(t, resolver)
+			err := resolver.Resolve(cfg)
 
 			if tc.wantErrContains != "" {
 				require.Error(t, err)

@@ -13,17 +13,7 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
 )
-
-var awsHTTPClient = &http.Client{Timeout: 10 * time.Second}
-var awsIMDSHTTPClient = &http.Client{
-	Timeout:   2 * time.Second,
-	Transport: &http.Transport{Proxy: nil}, // IMDS must never be proxied
-}
-
-// awsEndpointOverride allows tests to override the AWS Secrets Manager endpoint.
-var awsEndpointOverride string
 
 type awsCredentials struct {
 	accessKeyID     string
@@ -31,13 +21,13 @@ type awsCredentials struct {
 	sessionToken    string
 }
 
-func resolveAWSSM(ref, original string) (string, error) {
+func (r *Resolver) resolveAWSSM(ref, original string) (string, error) {
 	secretName, jsonKey, _ := strings.Cut(ref, "#")
 	if secretName == "" {
 		return "", fmt.Errorf("resolving secret '%s': secret name is empty", original)
 	}
 
-	creds, err := awsGetCredentials()
+	creds, err := r.awsGetCredentials()
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': %w", original, err)
 	}
@@ -50,7 +40,7 @@ func resolveAWSSM(ref, original string) (string, error) {
 		return "", fmt.Errorf("resolving secret '%s': AWS region not set (need AWS_DEFAULT_REGION or AWS_REGION)", original)
 	}
 
-	secretString, err := awsGetSecretValue(creds, region, secretName, original)
+	secretString, err := r.awsGetSecretValue(creds, region, secretName, original)
 	if err != nil {
 		return "", err
 	}
@@ -79,7 +69,7 @@ func resolveAWSSM(ref, original string) (string, error) {
 	return string(b), nil
 }
 
-func awsGetCredentials() (*awsCredentials, error) {
+func (r *Resolver) awsGetCredentials() (*awsCredentials, error) {
 	// Try environment variables first.
 	if ak := os.Getenv("AWS_ACCESS_KEY_ID"); ak != "" {
 		sk := os.Getenv("AWS_SECRET_ACCESS_KEY")
@@ -95,17 +85,17 @@ func awsGetCredentials() (*awsCredentials, error) {
 
 	// Try ECS container credentials.
 	if uri := os.Getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"); uri != "" {
-		creds, err := awsGetECSCredentials(uri)
+		creds, err := r.awsGetECSCredentials(uri)
 		if err == nil {
 			return creds, nil
 		}
 	}
 
 	// Try EC2 IMDS v2.
-	return awsGetIMDSCredentials()
+	return r.awsGetIMDSCredentials()
 }
 
-func awsGetECSCredentials(relativeURI string) (*awsCredentials, error) {
+func (r *Resolver) awsGetECSCredentials(relativeURI string) (*awsCredentials, error) {
 	url := "http://169.254.170.2" + relativeURI
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
@@ -113,7 +103,7 @@ func awsGetECSCredentials(relativeURI string) (*awsCredentials, error) {
 		return nil, fmt.Errorf("creating ECS credentials request: %w", err)
 	}
 
-	resp, err := awsIMDSHTTPClient.Do(req)
+	resp, err := r.awsIMDSHTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("ECS credentials request failed: %w", err)
 	}
@@ -148,7 +138,7 @@ func awsGetECSCredentials(relativeURI string) (*awsCredentials, error) {
 	}, nil
 }
 
-func awsGetIMDSCredentials() (*awsCredentials, error) {
+func (r *Resolver) awsGetIMDSCredentials() (*awsCredentials, error) {
 	// Step 1: get IMDS v2 token.
 	tokenReq, err := http.NewRequest(http.MethodPut, "http://169.254.169.254/latest/api/token", nil)
 	if err != nil {
@@ -156,7 +146,7 @@ func awsGetIMDSCredentials() (*awsCredentials, error) {
 	}
 	tokenReq.Header.Set("X-aws-ec2-metadata-token-ttl-seconds", "21600")
 
-	tokenResp, err := awsIMDSHTTPClient.Do(tokenReq)
+	tokenResp, err := r.awsIMDSHTTPClient.Do(tokenReq)
 	if err != nil {
 		return nil, fmt.Errorf("IMDS token request failed: %w", err)
 	}
@@ -180,7 +170,7 @@ func awsGetIMDSCredentials() (*awsCredentials, error) {
 	}
 	roleReq.Header.Set("X-aws-ec2-metadata-token", imdsToken)
 
-	roleResp, err := awsIMDSHTTPClient.Do(roleReq)
+	roleResp, err := r.awsIMDSHTTPClient.Do(roleReq)
 	if err != nil {
 		return nil, fmt.Errorf("IMDS role request failed: %w", err)
 	}
@@ -207,7 +197,7 @@ func awsGetIMDSCredentials() (*awsCredentials, error) {
 	}
 	credReq.Header.Set("X-aws-ec2-metadata-token", imdsToken)
 
-	credResp, err := awsIMDSHTTPClient.Do(credReq)
+	credResp, err := r.awsIMDSHTTPClient.Do(credReq)
 	if err != nil {
 		return nil, fmt.Errorf("IMDS credentials request failed: %w", err)
 	}
@@ -242,8 +232,8 @@ func awsGetIMDSCredentials() (*awsCredentials, error) {
 	}, nil
 }
 
-func awsGetSecretValue(creds *awsCredentials, region, secretName, original string) (string, error) {
-	endpoint := awsEndpointOverride
+func (r *Resolver) awsGetSecretValue(creds *awsCredentials, region, secretName, original string) (string, error) {
+	endpoint := r.awsEndpoint
 	host := fmt.Sprintf("secretsmanager.%s.amazonaws.com", region)
 	if endpoint == "" {
 		endpoint = "https://" + host + "/"
@@ -256,7 +246,7 @@ func awsGetSecretValue(creds *awsCredentials, region, secretName, original strin
 	}
 	payload := `{"SecretId":` + string(secretIDJSON) + `}`
 
-	now := time.Now().UTC()
+	now := r.now().UTC()
 	timestamp := now.Format("20060102T150405Z")
 	datestamp := now.Format("20060102")
 
@@ -292,7 +282,7 @@ func awsGetSecretValue(creds *awsCredentials, region, secretName, original strin
 	}
 	req.Header.Set("Authorization", authHeader)
 
-	resp, err := awsHTTPClient.Do(req)
+	resp, err := r.awsHTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': request failed: %w", original, err)
 	}

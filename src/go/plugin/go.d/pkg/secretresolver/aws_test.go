@@ -13,28 +13,23 @@ import (
 )
 
 func TestResolveAWSSM(t *testing.T) {
-	setupAWSServer := func(t *testing.T, handler http.HandlerFunc) {
+	setupAWSServer := func(t *testing.T, resolver *Resolver, handler http.HandlerFunc) {
 		srv := httptest.NewServer(handler)
 		t.Cleanup(srv.Close)
 
-		origClient := awsHTTPClient
-		awsHTTPClient = srv.Client()
-		t.Cleanup(func() { awsHTTPClient = origClient })
-
-		origEndpoint := awsEndpointOverride
-		awsEndpointOverride = srv.URL + "/"
-		t.Cleanup(func() { awsEndpointOverride = origEndpoint })
+		resolver.awsHTTPClient = srv.Client()
+		resolver.awsEndpoint = srv.URL + "/"
 	}
 
 	tests := map[string]struct {
 		buildCfg        func(t *testing.T) map[string]any
-		setup           func(t *testing.T)
+		setup           func(t *testing.T, resolver *Resolver)
 		wantErrContains string
 		wantValue       string
 	}{
 		"plain string": {
-			setup: func(t *testing.T) {
-				setupAWSServer(t, func(w http.ResponseWriter, r *http.Request) {
+			setup: func(t *testing.T, resolver *Resolver) {
+				setupAWSServer(t, resolver, func(w http.ResponseWriter, r *http.Request) {
 					assert.Equal(t, "secretsmanager.GetSecretValue", r.Header.Get("X-Amz-Target"))
 					assert.Contains(t, r.Header.Get("Authorization"), "AWS4-HMAC-SHA256")
 					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"SecretString": "my-plain-secret"}))
@@ -50,8 +45,8 @@ func TestResolveAWSSM(t *testing.T) {
 			wantValue: "my-plain-secret",
 		},
 		"json key": {
-			setup: func(t *testing.T) {
-				setupAWSServer(t, func(w http.ResponseWriter, r *http.Request) {
+			setup: func(t *testing.T, resolver *Resolver) {
+				setupAWSServer(t, resolver, func(w http.ResponseWriter, r *http.Request) {
 					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 						"SecretString": `{"username":"admin","password":"s3cret"}`,
 					}))
@@ -67,7 +62,7 @@ func TestResolveAWSSM(t *testing.T) {
 			wantValue: "s3cret",
 		},
 		"missing region": {
-			setup: func(t *testing.T) {
+			setup: func(t *testing.T, resolver *Resolver) {
 				t.Setenv("AWS_ACCESS_KEY_ID", "AKID")
 				t.Setenv("AWS_SECRET_ACCESS_KEY", "SECRET")
 				t.Setenv("AWS_DEFAULT_REGION", "")
@@ -85,7 +80,7 @@ func TestResolveAWSSM(t *testing.T) {
 			wantErrContains: "secret name is empty",
 		},
 		"missing access key secret": {
-			setup: func(t *testing.T) {
+			setup: func(t *testing.T, resolver *Resolver) {
 				t.Setenv("AWS_ACCESS_KEY_ID", "AKID")
 				t.Setenv("AWS_SECRET_ACCESS_KEY", "")
 				t.Setenv("AWS_DEFAULT_REGION", "us-east-1")
@@ -99,12 +94,13 @@ func TestResolveAWSSM(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			resolver := New()
 			if tc.setup != nil {
-				tc.setup(t)
+				tc.setup(t, resolver)
 			}
 
 			cfg := tc.buildCfg(t)
-			err := Resolve(cfg)
+			err := resolver.Resolve(cfg)
 
 			if tc.wantErrContains != "" {
 				require.Error(t, err)
@@ -120,15 +116,15 @@ func TestResolveAWSSM(t *testing.T) {
 
 func TestAWSGetCredentials(t *testing.T) {
 	tests := map[string]struct {
-		run func(t *testing.T)
+		run func(t *testing.T, resolver *Resolver)
 	}{
 		"env vars with session token": {
-			run: func(t *testing.T) {
+			run: func(t *testing.T, resolver *Resolver) {
 				t.Setenv("AWS_ACCESS_KEY_ID", "AKID")
 				t.Setenv("AWS_SECRET_ACCESS_KEY", "SECRET")
 				t.Setenv("AWS_SESSION_TOKEN", "TOKEN")
 
-				creds, err := awsGetCredentials()
+				creds, err := resolver.awsGetCredentials()
 				require.NoError(t, err)
 				assert.Equal(t, "AKID", creds.accessKeyID)
 				assert.Equal(t, "SECRET", creds.secretAccessKey)
@@ -136,12 +132,12 @@ func TestAWSGetCredentials(t *testing.T) {
 			},
 		},
 		"env vars without session token": {
-			run: func(t *testing.T) {
+			run: func(t *testing.T, resolver *Resolver) {
 				t.Setenv("AWS_ACCESS_KEY_ID", "AKID")
 				t.Setenv("AWS_SECRET_ACCESS_KEY", "SECRET")
 				t.Setenv("AWS_SESSION_TOKEN", "")
 
-				creds, err := awsGetCredentials()
+				creds, err := resolver.awsGetCredentials()
 				require.NoError(t, err)
 				assert.Equal(t, "AKID", creds.accessKeyID)
 				assert.Equal(t, "SECRET", creds.secretAccessKey)
@@ -149,14 +145,13 @@ func TestAWSGetCredentials(t *testing.T) {
 			},
 		},
 		"ecs relative uri": {
-			run: func(t *testing.T) {
+			run: func(t *testing.T, resolver *Resolver) {
 				t.Setenv("AWS_ACCESS_KEY_ID", "")
 				t.Setenv("AWS_SECRET_ACCESS_KEY", "")
 				t.Setenv("AWS_SESSION_TOKEN", "")
 				t.Setenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/v2/credentials/abc")
 
-				origClient := awsIMDSHTTPClient
-				awsIMDSHTTPClient = &http.Client{
+				resolver.awsIMDSHTTPClient = &http.Client{
 					Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 						assert.Equal(t, "GET", req.Method)
 						assert.Equal(t, "169.254.170.2", req.URL.Host)
@@ -164,9 +159,8 @@ func TestAWSGetCredentials(t *testing.T) {
 						return newHTTPResponse(http.StatusOK, `{"AccessKeyId":"ECSAK","SecretAccessKey":"ECSSK","Token":"ECSTOKEN"}`), nil
 					}),
 				}
-				t.Cleanup(func() { awsIMDSHTTPClient = origClient })
 
-				creds, err := awsGetCredentials()
+				creds, err := resolver.awsGetCredentials()
 				require.NoError(t, err)
 				assert.Equal(t, "ECSAK", creds.accessKeyID)
 				assert.Equal(t, "ECSSK", creds.secretAccessKey)
@@ -174,14 +168,13 @@ func TestAWSGetCredentials(t *testing.T) {
 			},
 		},
 		"imds fallback after ecs failure": {
-			run: func(t *testing.T) {
+			run: func(t *testing.T, resolver *Resolver) {
 				t.Setenv("AWS_ACCESS_KEY_ID", "")
 				t.Setenv("AWS_SECRET_ACCESS_KEY", "")
 				t.Setenv("AWS_SESSION_TOKEN", "")
 				t.Setenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/v2/credentials/fail")
 
-				origClient := awsIMDSHTTPClient
-				awsIMDSHTTPClient = &http.Client{
+				resolver.awsIMDSHTTPClient = &http.Client{
 					Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 						switch {
 						case req.URL.Host == "169.254.170.2":
@@ -202,9 +195,8 @@ func TestAWSGetCredentials(t *testing.T) {
 						}
 					}),
 				}
-				t.Cleanup(func() { awsIMDSHTTPClient = origClient })
 
-				creds, err := awsGetCredentials()
+				creds, err := resolver.awsGetCredentials()
 				require.NoError(t, err)
 				assert.Equal(t, "IMDSAK", creds.accessKeyID)
 				assert.Equal(t, "IMDSSK", creds.secretAccessKey)
@@ -215,7 +207,8 @@ func TestAWSGetCredentials(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			tc.run(t)
+			resolver := New()
+			tc.run(t, resolver)
 		})
 	}
 }

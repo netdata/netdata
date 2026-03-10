@@ -93,6 +93,7 @@ func New(cfg Config) *Manager {
 		auditDataDir:       cfg.AuditDataDir,
 		functionJSONWriter: cfg.FunctionJSONWriter,
 		runtimeService:     cfg.RuntimeService,
+		secretResolver:     secretresolver.New(),
 
 		moduleFuncs:       newModuleFuncRegistry(),
 		staticMethodsSeen: make(map[string]struct{}),
@@ -197,6 +198,8 @@ type Manager struct {
 	// RuntimeService is an optional runtime/internal metrics registration seam.
 	// When set, V2 jobs may register per-job runtime components.
 	runtimeService runtimecomp.Service
+
+	secretResolver *secretresolver.Resolver
 }
 
 func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
@@ -669,12 +672,15 @@ func newConfigModule(creator collectorapi.Creator) (configModule, error) {
 	return mod, nil
 }
 
-func applyConfig(cfg confgroup.Config, module any) error {
+func applyConfig(cfg confgroup.Config, module any, resolver *secretresolver.Resolver) error {
+	if resolver == nil {
+		return fmt.Errorf("secret resolver is nil")
+	}
 	cfgResolved, err := cfg.Clone()
 	if err != nil {
 		return fmt.Errorf("cloning config: %w", err)
 	}
-	if err := secretresolver.Resolve(cfgResolved); err != nil {
+	if err := resolver.Resolve(cfgResolved); err != nil {
 		return fmt.Errorf("resolving secrets: %w", err)
 	}
 	bs, err := yaml.Marshal(cfgResolved)

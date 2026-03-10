@@ -41,8 +41,9 @@ func TestResolveAzureKV_Validation(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			resolver := New()
 			cfg := map[string]any{"password": tc.ref}
-			err := Resolve(cfg)
+			err := resolver.Resolve(cfg)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.wantErrContains)
 		})
@@ -100,18 +101,14 @@ func TestAzureGetTokenClientCredentials(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			resolver := New()
 			srv := httptest.NewServer(tc.handler)
 			t.Cleanup(srv.Close)
 
-			origClient := azureHTTPClient
-			azureHTTPClient = srv.Client()
-			t.Cleanup(func() { azureHTTPClient = origClient })
+			resolver.azureHTTPClient = srv.Client()
+			resolver.azureLoginEndpoint = srv.URL
 
-			origLoginEndpoint := azureLoginEndpointOverride
-			azureLoginEndpointOverride = srv.URL
-			t.Cleanup(func() { azureLoginEndpointOverride = origLoginEndpoint })
-
-			token, err := azureGetTokenClientCredentials(tc.tenantID, tc.clientID, tc.clientSecret)
+			token, err := resolver.azureGetTokenClientCredentials(tc.tenantID, tc.clientID, tc.clientSecret)
 
 			if tc.wantErrContains != "" {
 				require.Error(t, err)
@@ -127,24 +124,23 @@ func TestAzureGetTokenClientCredentials(t *testing.T) {
 
 func TestAzureAccessTokenPaths(t *testing.T) {
 	tests := map[string]struct {
-		run func(t *testing.T)
+		run func(t *testing.T, resolver *Resolver)
 	}{
 		"no credentials": {
-			run: func(t *testing.T) {
+			run: func(t *testing.T, resolver *Resolver) {
 				t.Setenv("AZURE_TENANT_ID", "")
 				t.Setenv("AZURE_CLIENT_ID", "")
 				t.Setenv("AZURE_CLIENT_SECRET", "")
 
-				_, err := azureGetAccessToken()
+				_, err := resolver.azureGetAccessToken()
 				assert.Error(t, err)
 			},
 		},
 		"managed identity success": {
-			run: func(t *testing.T) {
+			run: func(t *testing.T, resolver *Resolver) {
 				t.Setenv("AZURE_CLIENT_ID", "user-assigned-client-id")
 
-				origClient := azureIMDSHTTPClient
-				azureIMDSHTTPClient = &http.Client{
+				resolver.azureIMDSHTTPClient = &http.Client{
 					Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 						assert.Equal(t, "GET", req.Method)
 						assert.Equal(t, "169.254.169.254", req.URL.Host)
@@ -156,9 +152,8 @@ func TestAzureAccessTokenPaths(t *testing.T) {
 						return newHTTPResponse(http.StatusOK, `{"access_token":"mi-token"}`), nil
 					}),
 				}
-				t.Cleanup(func() { azureIMDSHTTPClient = origClient })
 
-				token, err := azureGetTokenManagedIdentity()
+				token, err := resolver.azureGetTokenManagedIdentity()
 				require.NoError(t, err)
 				assert.Equal(t, "mi-token", token)
 			},
@@ -167,7 +162,8 @@ func TestAzureAccessTokenPaths(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			tc.run(t)
+			resolver := New()
+			tc.run(t, resolver)
 		})
 	}
 }

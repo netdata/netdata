@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func resolveCmd(cmdLine, original string) (string, error) {
+func (r *Resolver) resolveCmd(cmdLine, original string) (string, error) {
 	// Split by whitespace
 	parts := strings.Fields(cmdLine)
 	if len(parts) == 0 {

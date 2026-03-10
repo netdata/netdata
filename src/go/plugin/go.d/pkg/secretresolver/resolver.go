@@ -16,17 +16,21 @@ var reSecretRef = regexp.MustCompile(`\$\{([^}]+)\}`)
 var reUpperEnvVar = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
 
 // Resolve walks the config map and resolves all secret references in string values.
-func Resolve(cfg map[string]any) error {
-	return resolveMap(cfg)
+func (r *Resolver) Resolve(cfg map[string]any) error {
+	if r == nil {
+		return fmt.Errorf("secret resolver is nil")
+	}
+	r.ensureDefaults()
+	return r.resolveMap(cfg)
 }
 
-func resolveMap(m map[string]any) error {
+func (r *Resolver) resolveMap(m map[string]any) error {
 	for k, v := range m {
 		// skip internal keys (__key__)
 		if isInternalKey(k) {
 			continue
 		}
-		resolved, err := resolveValue(v)
+		resolved, err := r.resolveValue(v)
 		if err != nil {
 			return err
 		}
@@ -35,13 +39,13 @@ func resolveMap(m map[string]any) error {
 	return nil
 }
 
-func resolveMapAny(m map[any]any) error {
+func (r *Resolver) resolveMapAny(m map[any]any) error {
 	for k, v := range m {
 		s, ok := k.(string)
 		if ok && isInternalKey(s) {
 			continue
 		}
-		resolved, err := resolveValue(v)
+		resolved, err := r.resolveValue(v)
 		if err != nil {
 			return err
 		}
@@ -50,9 +54,9 @@ func resolveMapAny(m map[any]any) error {
 	return nil
 }
 
-func resolveSlice(s []any) error {
+func (r *Resolver) resolveSlice(s []any) error {
 	for i, v := range s {
-		resolved, err := resolveValue(v)
+		resolved, err := r.resolveValue(v)
 		if err != nil {
 			return err
 		}
@@ -61,22 +65,22 @@ func resolveSlice(s []any) error {
 	return nil
 }
 
-func resolveValue(v any) (any, error) {
+func (r *Resolver) resolveValue(v any) (any, error) {
 	switch val := v.(type) {
 	case string:
-		return resolveString(val)
+		return r.resolveString(val)
 	case map[string]any:
-		return val, resolveMap(val)
+		return val, r.resolveMap(val)
 	case map[any]any:
-		return val, resolveMapAny(val)
+		return val, r.resolveMapAny(val)
 	case []any:
-		return val, resolveSlice(val)
+		return val, r.resolveSlice(val)
 	default:
 		return v, nil
 	}
 }
 
-func resolveString(s string) (string, error) {
+func (r *Resolver) resolveString(s string) (string, error) {
 	if !strings.Contains(s, "${") {
 		return s, nil
 	}
@@ -91,7 +95,7 @@ func resolveString(s string) (string, error) {
 		// extract inner content between ${ and }
 		inner := match[2 : len(match)-1]
 
-		val, err := resolveRef(inner, match)
+		val, err := r.resolveRef(inner, match)
 		if err != nil {
 			resolveErr = err
 			return match
@@ -105,13 +109,13 @@ func resolveString(s string) (string, error) {
 	return result, nil
 }
 
-func resolveRef(ref, original string) (string, error) {
+func (r *Resolver) resolveRef(ref, original string) (string, error) {
 	scheme, name, hasScheme := strings.Cut(ref, ":")
 
 	if !hasScheme {
 		// no scheme — only resolve if it looks like an uppercase env var
 		if reUpperEnvVar.MatchString(ref) {
-			return resolveEnv(ref, original)
+			return r.resolveEnv(ref, original)
 		}
 		// not an uppercase env var pattern — leave unchanged
 		return original, nil
@@ -119,25 +123,25 @@ func resolveRef(ref, original string) (string, error) {
 
 	switch scheme {
 	case "env":
-		return resolveEnv(name, original)
+		return r.resolveEnv(name, original)
 	case "file":
-		return resolveFile(name, original)
+		return r.resolveFile(name, original)
 	case "cmd":
-		return resolveCmd(name, original)
+		return r.resolveCmd(name, original)
 	case "vault":
-		return resolveVault(name, original)
+		return r.resolveVault(name, original)
 	case "aws-sm":
-		return resolveAWSSM(name, original)
+		return r.resolveAWSSM(name, original)
 	case "azure-kv":
-		return resolveAzureKV(name, original)
+		return r.resolveAzureKV(name, original)
 	case "gcp-sm":
-		return resolveGCPSM(name, original)
+		return r.resolveGCPSM(name, original)
 	default:
 		return "", fmt.Errorf("resolving secret '%s': unknown secret provider '%s'", original, scheme)
 	}
 }
 
-func resolveEnv(name, original string) (string, error) {
+func (r *Resolver) resolveEnv(name, original string) (string, error) {
 	val, ok := os.LookupEnv(name)
 	if !ok {
 		return "", fmt.Errorf("resolving secret '%s': environment variable '%s' is not set", original, name)
@@ -145,7 +149,7 @@ func resolveEnv(name, original string) (string, error) {
 	return val, nil
 }
 
-func resolveFile(path, original string) (string, error) {
+func (r *Resolver) resolveFile(path, original string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': %w", original, err)

@@ -270,8 +270,9 @@ func TestResolve(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			resolver := New()
 			cfg := tc.buildCfg(t)
-			err := Resolve(cfg)
+			err := resolver.Resolve(cfg)
 
 			if tc.wantErrContains != "" {
 				require.Error(t, err)

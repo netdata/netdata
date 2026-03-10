@@ -18,7 +18,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"time"
 )
 
 // reGCPSafeProjectID validates GCP project IDs, including domain-scoped IDs (e.g., "domain.com:project-id").
@@ -27,16 +26,7 @@ var reGCPSafeProjectID = regexp.MustCompile(`^[a-zA-Z0-9._:-]+$`)
 // reGCPSafeName validates GCP secret names and versions.
 var reGCPSafeName = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
-var gcpHTTPClient = &http.Client{Timeout: 10 * time.Second}
-var gcpMetadataHTTPClient = &http.Client{
-	Timeout:   2 * time.Second,
-	Transport: &http.Transport{Proxy: nil}, // metadata server must never be proxied
-}
-
-// gcpSecretManagerEndpointOverride allows tests to override the GCP Secret Manager endpoint.
-var gcpSecretManagerEndpointOverride string
-
-func resolveGCPSM(ref, original string) (string, error) {
+func (r *Resolver) resolveGCPSM(ref, original string) (string, error) {
 	project, rest, ok := strings.Cut(ref, "/")
 	if !ok || project == "" || rest == "" {
 		return "", fmt.Errorf("resolving secret '%s': reference must be in format 'project/secret' or 'project/secret/version'", original)
@@ -57,12 +47,12 @@ func resolveGCPSM(ref, original string) (string, error) {
 		return "", fmt.Errorf("resolving secret '%s': invalid version '%s'", original, version)
 	}
 
-	token, err := gcpGetAccessToken(original)
+	token, err := r.gcpGetAccessToken(original)
 	if err != nil {
 		return "", err
 	}
 
-	baseURL := gcpSecretManagerEndpointOverride
+	baseURL := r.gcpSecretManagerEndpoint
 	if baseURL == "" {
 		baseURL = "https://secretmanager.googleapis.com"
 	}
@@ -77,7 +67,7 @@ func resolveGCPSM(ref, original string) (string, error) {
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := gcpHTTPClient.Do(req)
+	resp, err := r.gcpHTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': request failed: %w", original, err)
 	}
@@ -109,10 +99,10 @@ func resolveGCPSM(ref, original string) (string, error) {
 	return string(decoded), nil
 }
 
-func gcpGetAccessToken(original string) (string, error) {
+func (r *Resolver) gcpGetAccessToken(original string) (string, error) {
 	// Try service account JSON first (avoids 2s metadata timeout on non-GCE hosts).
 	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
-		token, err := gcpGetTokenServiceAccount()
+		token, err := r.gcpGetTokenServiceAccount()
 		if err != nil {
 			return "", fmt.Errorf("resolving secret '%s': %w", original, err)
 		}
@@ -120,7 +110,7 @@ func gcpGetAccessToken(original string) (string, error) {
 	}
 
 	// Fall back to metadata server (GCE/GKE).
-	token, err := gcpGetTokenMetadata()
+	token, err := r.gcpGetTokenMetadata()
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': cannot obtain GCP access token (set GOOGLE_APPLICATION_CREDENTIALS or run on GCE/GKE): %w", original, err)
 	}
@@ -128,7 +118,7 @@ func gcpGetAccessToken(original string) (string, error) {
 	return token, nil
 }
 
-func gcpGetTokenMetadata() (string, error) {
+func (r *Resolver) gcpGetTokenMetadata() (string, error) {
 	req, err := http.NewRequest(http.MethodGet,
 		"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token", nil)
 	if err != nil {
@@ -136,7 +126,7 @@ func gcpGetTokenMetadata() (string, error) {
 	}
 	req.Header.Set("Metadata-Flavor", "Google")
 
-	resp, err := gcpMetadataHTTPClient.Do(req)
+	resp, err := r.gcpMetadataHTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("metadata token request failed: %w", err)
 	}
@@ -165,7 +155,7 @@ func gcpGetTokenMetadata() (string, error) {
 	return result.AccessToken, nil
 }
 
-func gcpGetTokenServiceAccount() (string, error) {
+func (r *Resolver) gcpGetTokenServiceAccount() (string, error) {
 	credFile := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
 	if credFile == "" {
 		return "", fmt.Errorf("GOOGLE_APPLICATION_CREDENTIALS is not set")
@@ -189,7 +179,7 @@ func gcpGetTokenServiceAccount() (string, error) {
 		return "", fmt.Errorf("service account JSON missing required fields (client_email, private_key, token_uri)")
 	}
 
-	now := time.Now().Unix()
+	now := r.now().Unix()
 
 	signedJWT, err := gcpCreateSignedJWT(sa.ClientEmail, sa.TokenURI, sa.PrivateKey, now)
 	if err != nil {
@@ -201,7 +191,7 @@ func gcpGetTokenServiceAccount() (string, error) {
 		"assertion":  {signedJWT},
 	}
 
-	resp, err := gcpHTTPClient.PostForm(sa.TokenURI, form)
+	resp, err := r.gcpHTTPClient.PostForm(sa.TokenURI, form)
 	if err != nil {
 		return "", fmt.Errorf("token exchange request failed: %w", err)
 	}

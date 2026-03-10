@@ -16,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/secretresolver"
 )
 
 // jobFactory builds runtime jobs from configs without mutating manager-owned runtime maps.
@@ -32,6 +33,8 @@ type jobFactory struct {
 	auditDataDir  string
 
 	runtimeService runtimecomp.Service
+
+	secretResolver *secretresolver.Resolver
 }
 
 func newJobFactory(m *Manager) *jobFactory {
@@ -48,6 +51,7 @@ func newJobFactory(m *Manager) *jobFactory {
 		auditDataDir:  m.auditDataDir,
 
 		runtimeService: m.runtimeService,
+		secretResolver: m.secretResolver,
 	}
 }
 
@@ -84,7 +88,7 @@ func (f *jobFactory) createV2(cfg confgroup.Config, creator collectorapi.Creator
 	if mod == nil {
 		return nil, fmt.Errorf("module %s CreateV2 returned nil", cfg.Module())
 	}
-	if err := applyConfig(cfg, mod); err != nil {
+	if err := applyConfig(cfg, mod, f.secretResolver); err != nil {
 		return nil, err
 	}
 
@@ -119,7 +123,7 @@ func (f *jobFactory) createV1(cfg confgroup.Config, creator collectorapi.Creator
 	}
 
 	mod := creator.Create()
-	if err := applyConfig(cfg, mod); err != nil {
+	if err := applyConfig(cfg, mod, f.secretResolver); err != nil {
 		return nil, err
 	}
 

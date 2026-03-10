@@ -241,7 +241,7 @@ func (m *Manager) runDyncfgCmdTest(task dyncfgCmdTestTask) {
 	defer cleanupCancel()
 	defer job.Cleanup(cleanupCtx)
 
-	if err := applyConfig(task.cfg, job); err != nil {
+	if err := applyConfig(task.cfg, job, m.secretResolver); err != nil {
 		m.Warningf("dyncfg: test: module %s: failed to apply config: %v", task.moduleName, err)
 		m.dyncfgApi.SendCodef(task.fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
 		return
