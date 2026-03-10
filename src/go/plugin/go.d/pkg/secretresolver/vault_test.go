@@ -6,222 +6,221 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestResolveVault_KVv2(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/v1/secret/data/myapp", r.URL.Path)
-		assert.Equal(t, "test-token", r.Header.Get("X-Vault-Token"))
+func TestResolveVault(t *testing.T) {
+	tests := map[string]struct {
+		buildCfg        func(t *testing.T) map[string]any
+		wantErrContains string
+		assertCfg       func(t *testing.T, cfg map[string]any)
+	}{
+		"kv v2": {
+			buildCfg: func(t *testing.T) map[string]any {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					assert.Equal(t, "/v1/secret/data/myapp", r.URL.Path)
+					assert.Equal(t, "test-token", r.Header.Get("X-Vault-Token"))
 
-		resp := map[string]any{
-			"data": map[string]any{
-				"data": map[string]any{
-					"password": "s3cret",
-				},
+					resp := map[string]any{
+						"data": map[string]any{
+							"data": map[string]any{"password": "s3cret"},
+						},
+					}
+					require.NoError(t, json.NewEncoder(w).Encode(resp))
+				}))
+				t.Cleanup(srv.Close)
+
+				t.Setenv("VAULT_ADDR", srv.URL)
+				t.Setenv("VAULT_TOKEN", "test-token")
+
+				origClient := vaultHTTPClient
+				vaultHTTPClient = srv.Client()
+				t.Cleanup(func() { vaultHTTPClient = origClient })
+
+				return map[string]any{"password": "${vault:secret/data/myapp#password}"}
 			},
-		}
-		json.NewEncoder(w).Encode(resp)
-	}))
-	defer srv.Close()
-
-	t.Setenv("VAULT_ADDR", srv.URL)
-	t.Setenv("VAULT_TOKEN", "test-token")
-
-	// Override the HTTP client to use the test server's client.
-	origClient := vaultHTTPClient
-	vaultHTTPClient = srv.Client()
-	defer func() { vaultHTTPClient = origClient }()
-
-	cfg := map[string]any{
-		"password": "${vault:secret/data/myapp#password}",
-	}
-
-	require.NoError(t, Resolve(cfg))
-	assert.Equal(t, "s3cret", cfg["password"])
-}
-
-func TestResolveVault_KVv1(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := map[string]any{
-			"data": map[string]any{
-				"password": "v1secret",
+			assertCfg: func(t *testing.T, cfg map[string]any) {
+				assert.Equal(t, "s3cret", cfg["password"])
 			},
-		}
-		json.NewEncoder(w).Encode(resp)
-	}))
-	defer srv.Close()
+		},
+		"kv v1": {
+			buildCfg: func(t *testing.T) map[string]any {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					resp := map[string]any{
+						"data": map[string]any{"password": "v1secret"},
+					}
+					require.NoError(t, json.NewEncoder(w).Encode(resp))
+				}))
+				t.Cleanup(srv.Close)
 
-	t.Setenv("VAULT_ADDR", srv.URL)
-	t.Setenv("VAULT_TOKEN", "test-token")
+				t.Setenv("VAULT_ADDR", srv.URL)
+				t.Setenv("VAULT_TOKEN", "test-token")
 
-	origClient := vaultHTTPClient
-	vaultHTTPClient = srv.Client()
-	defer func() { vaultHTTPClient = origClient }()
+				origClient := vaultHTTPClient
+				vaultHTTPClient = srv.Client()
+				t.Cleanup(func() { vaultHTTPClient = origClient })
 
-	cfg := map[string]any{
-		"password": "${vault:secret/myapp#password}",
-	}
-
-	require.NoError(t, Resolve(cfg))
-	assert.Equal(t, "v1secret", cfg["password"])
-}
-
-func TestResolveVault_Namespace(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "engineering", r.Header.Get("X-Vault-Namespace"))
-
-		resp := map[string]any{
-			"data": map[string]any{
-				"data": map[string]any{
-					"api_key": "nskey",
-				},
+				return map[string]any{"password": "${vault:secret/myapp#password}"}
 			},
-		}
-		json.NewEncoder(w).Encode(resp)
-	}))
-	defer srv.Close()
-
-	t.Setenv("VAULT_ADDR", srv.URL)
-	t.Setenv("VAULT_TOKEN", "test-token")
-	t.Setenv("VAULT_NAMESPACE", "engineering")
-
-	origClient := vaultHTTPClient
-	vaultHTTPClient = srv.Client()
-	defer func() { vaultHTTPClient = origClient }()
-
-	cfg := map[string]any{
-		"key": "${vault:secret/data/app#api_key}",
-	}
-
-	require.NoError(t, Resolve(cfg))
-	assert.Equal(t, "nskey", cfg["key"])
-}
-
-func TestResolveVault_MissingKey(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := map[string]any{
-			"data": map[string]any{
-				"data": map[string]any{
-					"other": "value",
-				},
+			assertCfg: func(t *testing.T, cfg map[string]any) {
+				assert.Equal(t, "v1secret", cfg["password"])
 			},
-		}
-		json.NewEncoder(w).Encode(resp)
-	}))
-	defer srv.Close()
+		},
+		"namespace": {
+			buildCfg: func(t *testing.T) map[string]any {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					assert.Equal(t, "engineering", r.Header.Get("X-Vault-Namespace"))
 
-	t.Setenv("VAULT_ADDR", srv.URL)
-	t.Setenv("VAULT_TOKEN", "test-token")
+					resp := map[string]any{
+						"data": map[string]any{
+							"data": map[string]any{"api_key": "nskey"},
+						},
+					}
+					require.NoError(t, json.NewEncoder(w).Encode(resp))
+				}))
+				t.Cleanup(srv.Close)
 
-	origClient := vaultHTTPClient
-	vaultHTTPClient = srv.Client()
-	defer func() { vaultHTTPClient = origClient }()
+				t.Setenv("VAULT_ADDR", srv.URL)
+				t.Setenv("VAULT_TOKEN", "test-token")
+				t.Setenv("VAULT_NAMESPACE", "engineering")
 
-	cfg := map[string]any{
-		"password": "${vault:secret/data/myapp#nonexistent}",
+				origClient := vaultHTTPClient
+				vaultHTTPClient = srv.Client()
+				t.Cleanup(func() { vaultHTTPClient = origClient })
+
+				return map[string]any{"key": "${vault:secret/data/app#api_key}"}
+			},
+			assertCfg: func(t *testing.T, cfg map[string]any) {
+				assert.Equal(t, "nskey", cfg["key"])
+			},
+		},
+		"missing key": {
+			buildCfg: func(t *testing.T) map[string]any {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					resp := map[string]any{
+						"data": map[string]any{
+							"data": map[string]any{"other": "value"},
+						},
+					}
+					require.NoError(t, json.NewEncoder(w).Encode(resp))
+				}))
+				t.Cleanup(srv.Close)
+
+				t.Setenv("VAULT_ADDR", srv.URL)
+				t.Setenv("VAULT_TOKEN", "test-token")
+
+				origClient := vaultHTTPClient
+				vaultHTTPClient = srv.Client()
+				t.Cleanup(func() { vaultHTTPClient = origClient })
+
+				return map[string]any{"password": "${vault:secret/data/myapp#nonexistent}"}
+			},
+			wantErrContains: "key 'nonexistent' not found",
+		},
+		"missing vault addr": {
+			buildCfg: func(t *testing.T) map[string]any {
+				t.Setenv("VAULT_ADDR", "")
+				t.Setenv("VAULT_TOKEN", "test-token")
+				return map[string]any{"password": "${vault:secret/data/myapp#password}"}
+			},
+			wantErrContains: "VAULT_ADDR",
+		},
+		"missing token": {
+			buildCfg: func(t *testing.T) map[string]any {
+				t.Setenv("VAULT_ADDR", "http://localhost:8200")
+				t.Setenv("VAULT_TOKEN", "")
+				t.Setenv("VAULT_TOKEN_FILE", "/nonexistent/token/file")
+				return map[string]any{"password": "${vault:secret/data/myapp#password}"}
+			},
+			wantErrContains: "cannot read token file",
+		},
+		"path traversal": {
+			buildCfg: func(t *testing.T) map[string]any {
+				return map[string]any{"password": "${vault:secret/../sys/seal#key}"}
+			},
+			wantErrContains: "invalid characters",
+		},
+		"query injection": {
+			buildCfg: func(t *testing.T) map[string]any {
+				return map[string]any{"password": "${vault:secret/data/myapp?list=true#key}"}
+			},
+			wantErrContains: "invalid characters",
+		},
+		"missing hash key": {
+			buildCfg: func(t *testing.T) map[string]any {
+				t.Setenv("VAULT_ADDR", "http://localhost:8200")
+				t.Setenv("VAULT_TOKEN", "test-token")
+				return map[string]any{"password": "${vault:secret/data/myapp}"}
+			},
+			wantErrContains: "must be in format 'path#key'",
+		},
+		"http error": {
+			buildCfg: func(t *testing.T) map[string]any {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusForbidden)
+					_, _ = w.Write([]byte(`{"errors":["permission denied"]}`))
+				}))
+				t.Cleanup(srv.Close)
+
+				t.Setenv("VAULT_ADDR", srv.URL)
+				t.Setenv("VAULT_TOKEN", "bad-token")
+
+				origClient := vaultHTTPClient
+				vaultHTTPClient = srv.Client()
+				t.Cleanup(func() { vaultHTTPClient = origClient })
+
+				return map[string]any{"password": "${vault:secret/data/myapp#password}"}
+			},
+			wantErrContains: "HTTP 403",
+		},
 	}
 
-	err := Resolve(cfg)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "key 'nonexistent' not found")
-}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := tc.buildCfg(t)
+			err := Resolve(cfg)
 
-func TestResolveVault_NoAddr(t *testing.T) {
-	t.Setenv("VAULT_ADDR", "")
-	t.Setenv("VAULT_TOKEN", "test-token")
+			if tc.wantErrContains != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErrContains)
+				return
+			}
 
-	cfg := map[string]any{
-		"password": "${vault:secret/data/myapp#password}",
+			require.NoError(t, err)
+			if tc.assertCfg != nil {
+				tc.assertCfg(t, cfg)
+			}
+		})
 	}
-
-	err := Resolve(cfg)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "VAULT_ADDR")
-}
-
-func TestResolveVault_NoToken(t *testing.T) {
-	t.Setenv("VAULT_ADDR", "http://localhost:8200")
-	t.Setenv("VAULT_TOKEN", "")
-	t.Setenv("VAULT_TOKEN_FILE", "/nonexistent/token/file")
-
-	cfg := map[string]any{
-		"password": "${vault:secret/data/myapp#password}",
-	}
-
-	err := Resolve(cfg)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot read token file")
-}
-
-func TestResolveVault_PathTraversal(t *testing.T) {
-	cfg := map[string]any{
-		"password": "${vault:secret/../sys/seal#key}",
-	}
-
-	err := Resolve(cfg)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid characters")
-}
-
-func TestResolveVault_QueryInjection(t *testing.T) {
-	cfg := map[string]any{
-		"password": "${vault:secret/data/myapp?list=true#key}",
-	}
-
-	err := Resolve(cfg)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid characters")
-}
-
-func TestResolveVault_MissingHashKey(t *testing.T) {
-	t.Setenv("VAULT_ADDR", "http://localhost:8200")
-	t.Setenv("VAULT_TOKEN", "test-token")
-
-	cfg := map[string]any{
-		"password": "${vault:secret/data/myapp}",
-	}
-
-	err := Resolve(cfg)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "must be in format 'path#key'")
-}
-
-func TestResolveVault_HTTPError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"errors":["permission denied"]}`))
-	}))
-	defer srv.Close()
-
-	t.Setenv("VAULT_ADDR", srv.URL)
-	t.Setenv("VAULT_TOKEN", "bad-token")
-
-	origClient := vaultHTTPClient
-	vaultHTTPClient = srv.Client()
-	defer func() { vaultHTTPClient = origClient }()
-
-	cfg := map[string]any{
-		"password": "${vault:secret/data/myapp#password}",
-	}
-
-	err := Resolve(cfg)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "HTTP 403")
 }
 
 func TestTruncateBody(t *testing.T) {
-	short := "short message"
-	assert.Equal(t, short, truncateBody([]byte(short)))
-
-	long := make([]byte, 300)
-	for i := range long {
-		long[i] = 'a'
+	tests := map[string]struct {
+		body    []byte
+		wantLen int
+		want    string
+	}{
+		"short body": {
+			body:    []byte("short message"),
+			wantLen: len("short message"),
+			want:    "short message",
+		},
+		"long body": {
+			body:    []byte(strings.Repeat("a", 300)),
+			wantLen: 203,
+			want:    strings.Repeat("a", 200) + "...",
+		},
 	}
-	result := truncateBody(long)
-	assert.Len(t, result, 203) // 200 + "..."
-	assert.True(t, len(result) <= 203)
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			result := truncateBody(tc.body)
+			assert.Equal(t, tc.want, result)
+			assert.Len(t, result, tc.wantLen)
+		})
+	}
 }
