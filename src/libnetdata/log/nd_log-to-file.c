@@ -53,10 +53,12 @@ bool nd_logger_file(FILE *fp, netdata_mutex_t *mutex, ND_LOG_FORMAT format, stru
 
     while(remaining > 0) {
         ssize_t written = write(fd, buf, remaining);
-        if(written >= 0) {
+        if(written > 0) {
             buf += written;
             remaining -= written;
         }
+        else if(written == 0)
+            break;
         else if(errno != EINTR)
             break;
     }
