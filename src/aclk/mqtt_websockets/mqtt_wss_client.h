@@ -86,7 +86,9 @@ struct mqtt_connect_params {
 
 enum mqtt_wss_proxy_type {
     MQTT_WSS_DIRECT = 0,
-    MQTT_WSS_PROXY_HTTP
+    MQTT_WSS_PROXY_HTTP,
+    MQTT_WSS_PROXY_SOCKS5,
+    MQTT_WSS_PROXY_SOCKS5H
 };
 
 struct mqtt_wss_proxy {
