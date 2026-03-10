@@ -330,7 +330,13 @@ void nd_log_reopen_log_files_for_spawn_server(const char *name) {
         nd_log.journal_direct.initialized = false;
     }
 
+    // Keep flood protection in the post-fork child. These spinlocks are plain
+    // atomic state on non-Windows builds, so they can be safely reset here.
     for(size_t i = 0; i < _NDLS_MAX ;i++) {
+        spinlock_init(&nd_log.sources[i].limits.spinlock);
+        nd_log.sources[i].limits.started_monotonic_ut = 0;
+        nd_log.sources[i].limits.counter = 0;
+        nd_log.sources[i].limits.prevented = 0;
         nd_log.sources[i].method = NDLM_DEFAULT;
         nd_log.sources[i].fd = -1;
         nd_log.sources[i].fp = NULL;
