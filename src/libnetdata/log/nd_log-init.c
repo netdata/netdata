@@ -27,14 +27,6 @@ ND_UUID nd_log_get_invocation_id(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-__attribute__((constructor)) static void nd_log_init_mutexes(void) {
-    for(size_t i = 0 ; i < _NDLS_MAX ; i++)
-        netdata_mutex_init(&nd_log.sources[i].mutex);
-
-    netdata_mutex_init(&nd_log.std_output.mutex);
-    netdata_mutex_init(&nd_log.std_error.mutex);
-}
-
 void nd_log_initialize_for_external_plugins(const char *name) {
     // if we don't run under Netdata, log to stderr,
     // otherwise, use the logging method Netdata wants us to use.
@@ -318,8 +310,8 @@ void nd_log_reopen_log_files_for_spawn_server(const char *name) {
         nd_log.journal_direct.initialized = false;
     }
 
-    // Keep flood protection in the post-fork child. These spinlocks are plain
-    // atomic state on non-Windows builds, so they can be safely reset here.
+    // Keep flood protection in the post-fork child by resetting the
+    // per-source throttle spinlocks and counters.
     for(size_t i = 0; i < _NDLS_MAX ;i++) {
         spinlock_init(&nd_log.sources[i].limits.spinlock);
         nd_log.sources[i].limits.started_monotonic_ut = 0;

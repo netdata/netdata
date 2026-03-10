@@ -25,7 +25,27 @@ ALWAYS_INLINE void errno_clear(void) {
 // --------------------------------------------------------------------------------------------------------------------
 // logger router
 
+static void nd_log_ensure_mutexes_initialized(void) {
+    static SPINLOCK init_spinlock = SPINLOCK_INITIALIZER;
+    static bool initialized = false;
+
+    if(likely(__atomic_load_n(&initialized, __ATOMIC_ACQUIRE)))
+        return;
+
+    spinlock_lock(&init_spinlock);
+    if(!initialized) {
+        for(size_t i = 0 ; i < _NDLS_MAX ; i++)
+            netdata_mutex_init(&nd_log.sources[i].mutex);
+
+        netdata_mutex_init(&nd_log.std_output.mutex);
+        netdata_mutex_init(&nd_log.std_error.mutex);
+        __atomic_store_n(&initialized, true, __ATOMIC_RELEASE);
+    }
+    spinlock_unlock(&init_spinlock);
+}
+
 static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, netdata_mutex_t **mutexp) {
+    nd_log_ensure_mutexes_initialized();
     *mutexp = NULL;
 
     if(source >= _NDLS_MAX)
