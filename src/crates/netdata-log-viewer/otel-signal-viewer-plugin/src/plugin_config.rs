@@ -4,7 +4,7 @@ use rt::NetdataEnv;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use tracing::warn;
+use tracing::{info, warn};
 
 /// Default value for workers (number of CPU cores)
 fn default_workers() -> usize {
@@ -150,6 +150,7 @@ impl PluginConfig {
                 });
 
             if let Some(config) = user_config {
+                info!("loaded user configuration from {:?}", netdata_env.user_config_dir);
                 config
             } else if let Some(stock_path) = netdata_env
                 .stock_config_dir
@@ -157,26 +158,32 @@ impl PluginConfig {
                 .map(|p| p.join("otel-signal-viewer.yaml"))
             {
                 if stock_path.exists() {
+                    info!("loaded stock configuration from {}", stock_path.display());
                     Config::from_yaml_file(&stock_path).with_context(|| {
                         format!("Loading stock config from {}", stock_path.display())
                     })?
                 } else {
                     // No config files found, use defaults
+                    info!("no configuration files found, using defaults");
                     Config::default()
                 }
             } else {
                 // No config directories available, use defaults
+                info!("no configuration directories available, using defaults");
                 Config::default()
             }
         } else {
             // Not running under Netdata, use defaults
+            info!("not running under netdata, using default configuration");
             Config::default()
         };
 
         // Add host-prefixed journal paths for containerized environments
         if let Some(ref host_prefix) = netdata_env.host_prefix {
             if !host_prefix.is_empty() {
+                info!("container mode: NETDATA_HOST_PREFIX={}", host_prefix);
                 expand_paths_with_host_prefix(&mut config.journal.paths, host_prefix);
+                info!("journal paths after host prefix expansion: {:?}", config.journal.paths);
             }
         }
 

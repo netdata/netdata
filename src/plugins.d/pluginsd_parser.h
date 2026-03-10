@@ -59,6 +59,7 @@ typedef struct parser_user_object {
     RRDLABELS *new_host_labels;
     size_t clabel_count;
     size_t data_collections_count;
+    size_t keepalive_count;
     int enabled;
 
 #ifdef NETDATA_LOG_STREAM_RECEIVER

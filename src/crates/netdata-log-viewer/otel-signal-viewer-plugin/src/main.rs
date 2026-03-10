@@ -80,11 +80,19 @@ async fn run_plugin() -> std::result::Result<(), Box<dyn std::error::Error>> {
     .await?;
 
     // Watch configured journal directories
+    let mut watched = 0usize;
     for path in &config.journal.paths {
-        if let Err(e) = catalog_function.watch_directory(path) {
-            error!("failed to watch directory {}: {:#?}", path, e);
+        match catalog_function.watch_directory(path) {
+            Ok(()) => {
+                info!("watching journal directory: {}", path);
+                watched += 1;
+            }
+            Err(e) => {
+                error!("failed to watch directory {}: {:#?}", path, e);
+            }
         }
     }
+    info!("watching {}/{} configured journal paths", watched, config.journal.paths.len());
 
     runtime.register_handler(catalog_function.clone());
 
