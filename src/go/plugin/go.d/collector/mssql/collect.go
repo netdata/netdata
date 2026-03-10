@@ -64,7 +64,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	}
 	if c.hadrEnabled {
 		if err := c.collectAvailabilityGroups(mx); err != nil {
-			c.Debugf("AG metrics collection failed: %v", err)
+			c.Warningf("AG metrics collection failed: %v", err)
 		}
 	}
 
@@ -779,14 +779,10 @@ func (c *Collector) checkHadrEnabled() error {
 
 // agDatabaseReplicaQuery returns the appropriate query for the SQL Server version
 func agDatabaseReplicaQuery(majorVersion int) string {
-	switch {
-	case majorVersion >= 13: // SQL Server 2016+
+	if majorVersion >= 13 { // SQL Server 2016+
 		return queryAGDatabaseReplicas16
-	case majorVersion >= 12: // SQL Server 2014
-		return queryAGDatabaseReplicas14
-	default: // SQL Server 2012
-		return queryAGDatabaseReplicas12
 	}
+	return queryAGDatabaseReplicasPre16 // SQL Server 2012-2014
 }
 
 func (c *Collector) collectAvailabilityGroups(mx map[string]int64) error {

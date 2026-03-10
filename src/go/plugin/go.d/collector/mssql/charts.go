@@ -90,6 +90,7 @@ const (
 
 	prioAGClusterQuorumState
 	prioAGClusterMemberState
+	prioAGClusterMemberQuorumVotes
 
 	prioAGThreads
 
@@ -1168,7 +1169,7 @@ var (
 		Units:    "votes",
 		Fam:      "ag cluster",
 		Ctx:      "mssql.ag_cluster_member_quorum_votes",
-		Priority: prioAGClusterMemberState + 1,
+		Priority: prioAGClusterMemberQuorumVotes,
 		Dims: collectorapi.Dims{
 			{ID: "ag_cluster_member_%s_quorum_votes", Name: "votes"},
 		},

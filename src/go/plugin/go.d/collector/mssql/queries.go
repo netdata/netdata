@@ -386,7 +386,7 @@ SELECT CAST(SERVERPROPERTY('IsHadrEnabled') AS int);
 const queryAGHealth = `
 SELECT
   ag.name AS ag_name,
-  ags.synchronization_health,
+  ISNULL(ags.synchronization_health, -1) AS synchronization_health,
   ISNULL(ags.primary_recovery_health, -1) AS primary_recovery_health,
   ISNULL(ags.secondary_recovery_health, -1) AS secondary_recovery_health
 FROM sys.availability_groups AS ag
@@ -403,7 +403,7 @@ SELECT
   LOWER(ar.failover_mode_desc) AS failover_mode,
   ISNULL(ars.role, -1) AS role,
   ISNULL(ars.connected_state, -1) AS connected_state,
-  ars.synchronization_health
+  ISNULL(ars.synchronization_health, -1) AS synchronization_health
 FROM sys.availability_replicas AS ar
 INNER JOIN sys.availability_groups AS ag
   ON ar.group_id = ag.group_id
@@ -411,31 +411,9 @@ INNER JOIN sys.dm_hadr_availability_replica_states AS ars
   ON ar.replica_id = ars.replica_id;
 `
 
-// queryAGDatabaseReplicas12 gets per-database replica metrics (SQL Server 2012)
+// queryAGDatabaseReplicasPre16 gets per-database replica metrics (SQL Server 2012-2014)
 // No secondary_lag_seconds
-const queryAGDatabaseReplicas12 = `
-SELECT
-  ag.name AS ag_name,
-  ar.replica_server_name,
-  DB_NAME(drs.database_id) AS database_name,
-  ISNULL(drs.synchronization_state, -1) AS synchronization_state,
-  CAST(ISNULL(drs.is_suspended, 0) AS int) AS is_suspended,
-  ISNULL(drs.log_send_queue_size, 0) * 1024 AS log_send_queue_size,
-  ISNULL(drs.log_send_rate, 0) * 1024 AS log_send_rate,
-  ISNULL(drs.redo_queue_size, 0) * 1024 AS redo_queue_size,
-  ISNULL(drs.redo_rate, 0) * 1024 AS redo_rate,
-  ISNULL(drs.filestream_send_rate, 0) * 1024 AS filestream_send_rate,
-  -1 AS secondary_lag_seconds
-FROM sys.dm_hadr_database_replica_states AS drs
-INNER JOIN sys.availability_replicas AS ar
-  ON drs.replica_id = ar.replica_id
-INNER JOIN sys.availability_groups AS ag
-  ON drs.group_id = ag.group_id;
-`
-
-// queryAGDatabaseReplicas14 gets per-database replica metrics (SQL Server 2014+)
-// No secondary_lag_seconds
-const queryAGDatabaseReplicas14 = `
+const queryAGDatabaseReplicasPre16 = `
 SELECT
   ag.name AS ag_name,
   ar.replica_server_name,
