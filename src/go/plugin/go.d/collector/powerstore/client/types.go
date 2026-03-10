@@ -31,16 +31,16 @@ type Volume struct {
 
 // Hardware represents a PowerStore hardware component.
 type Hardware struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	Type            string `json:"type"`
-	LifecycleState  string `json:"lifecycle_state"`
-	StatusLED       string `json:"status_led,omitempty"`
-	ApplianceID     string `json:"appliance_id,omitempty"`
-	ExtraDetails    string `json:"extra_details,omitempty"`
-	PartNumber      string `json:"part_number,omitempty"`
-	SerialNumber    string `json:"serial_number,omitempty"`
-	Slot            int    `json:"slot,omitempty"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Type           string `json:"type"`
+	LifecycleState string `json:"lifecycle_state"`
+	StatusLED      string `json:"status_led,omitempty"`
+	ApplianceID    string `json:"appliance_id,omitempty"`
+	ExtraDetails   string `json:"extra_details,omitempty"`
+	PartNumber     string `json:"part_number,omitempty"`
+	SerialNumber   string `json:"serial_number,omitempty"`
+	Slot           int    `json:"slot,omitempty"`
 }
 
 // Alert represents a PowerStore alert.
@@ -112,10 +112,10 @@ type MetricsRequest struct {
 
 // PerformanceMetrics contains common performance fields shared by most entity types.
 type PerformanceMetrics struct {
-	ApplianceID string  `json:"appliance_id,omitempty"`
-	NodeID      string  `json:"node_id,omitempty"`
-	VolumeID    string  `json:"volume_id,omitempty"`
-	FePortID    string  `json:"fe_port_id,omitempty"`
+	ApplianceID string `json:"appliance_id,omitempty"`
+	NodeID      string `json:"node_id,omitempty"`
+	VolumeID    string `json:"volume_id,omitempty"`
+	FePortID    string `json:"fe_port_id,omitempty"`
 
 	// Current values
 	ReadIops       float64 `json:"read_iops"`
@@ -158,16 +158,16 @@ type EthPortMetrics struct {
 
 // SpaceMetrics contains capacity/space fields.
 type SpaceMetrics struct {
-	ClusterID    string `json:"cluster_id,omitempty"`
-	ApplianceID  string `json:"appliance_id,omitempty"`
-	VolumeID     string `json:"volume_id,omitempty"`
+	ClusterID   string `json:"cluster_id,omitempty"`
+	ApplianceID string `json:"appliance_id,omitempty"`
+	VolumeID    string `json:"volume_id,omitempty"`
 
-	PhysicalTotal      *int64  `json:"physical_total,omitempty"`
-	PhysicalUsed       *int64  `json:"physical_used,omitempty"`
-	LogicalProvisioned *int64  `json:"logical_provisioned,omitempty"`
-	LogicalUsed        *int64  `json:"logical_used,omitempty"`
-	DataPhysicalUsed   *int64  `json:"data_physical_used,omitempty"`
-	SharedLogicalUsed  *int64  `json:"shared_logical_used,omitempty"`
+	PhysicalTotal      *int64 `json:"physical_total,omitempty"`
+	PhysicalUsed       *int64 `json:"physical_used,omitempty"`
+	LogicalProvisioned *int64 `json:"logical_provisioned,omitempty"`
+	LogicalUsed        *int64 `json:"logical_used,omitempty"`
+	DataPhysicalUsed   *int64 `json:"data_physical_used,omitempty"`
+	SharedLogicalUsed  *int64 `json:"shared_logical_used,omitempty"`
 
 	EfficiencyRatio float64 `json:"efficiency_ratio"`
 	DataReduction   float64 `json:"data_reduction"`
@@ -193,14 +193,13 @@ type CopyMetrics struct {
 type FileSystemMetrics struct {
 	FileSystemID string `json:"file_system_id"`
 
-	ReadIops       float64 `json:"read_iops"`
-	WriteIops      float64 `json:"write_iops"`
-	TotalIops      float64 `json:"total_iops"`
-	ReadBandwidth  float64 `json:"read_bandwidth"`
-	WriteBandwidth float64 `json:"write_bandwidth"`
-	TotalBandwidth float64 `json:"total_bandwidth"`
-	AvgReadLatency float64 `json:"avg_read_latency"`
+	ReadIops        float64 `json:"read_iops"`
+	WriteIops       float64 `json:"write_iops"`
+	TotalIops       float64 `json:"total_iops"`
+	ReadBandwidth   float64 `json:"read_bandwidth"`
+	WriteBandwidth  float64 `json:"write_bandwidth"`
+	TotalBandwidth  float64 `json:"total_bandwidth"`
+	AvgReadLatency  float64 `json:"avg_read_latency"`
 	AvgWriteLatency float64 `json:"avg_write_latency"`
-	AvgLatency     float64 `json:"avg_latency"`
+	AvgLatency      float64 `json:"avg_latency"`
 }
-

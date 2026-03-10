@@ -11,6 +11,13 @@
         "minimum": 1,
         "default": 30
       },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero means no recheck will be scheduled.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
       "url": {
         "title": "URL",
         "description": "The base URL of the PowerStore management interface.",
@@ -62,7 +69,10 @@
       "headers": {
         "title": "Headers",
         "description": "Additional HTTP headers to include in requests.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "additionalProperties": {
           "type": "string"
         }
@@ -95,6 +105,11 @@
         "description": "Specifies a space-separated list of volume name patterns to monitor. Use * for wildcards, prefix with ! to exclude.",
         "type": "string",
         "default": "*"
+      },
+      "vnode": {
+        "title": "Virtual Node",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
       }
     },
     "required": [
@@ -130,10 +145,12 @@
           "title": "Base",
           "fields": [
             "update_every",
+            "autodetection_retry",
             "url",
             "timeout",
             "not_follow_redirects",
-            "volume_selector"
+            "volume_selector",
+            "vnode"
           ]
         },
         {

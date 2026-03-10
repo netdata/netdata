@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	apiBasePath    = "/api/rest"
-	dellEMCToken   = "DELL-EMC-TOKEN"
-	defaultLimit   = "5000"
+	apiBasePath  = "/api/rest"
+	dellEMCToken = "DELL-EMC-TOKEN"
+	defaultLimit = "5000"
 )
 
 // New creates a new PowerStore REST API client.

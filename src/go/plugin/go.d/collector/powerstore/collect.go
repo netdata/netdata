@@ -131,9 +131,9 @@ func (c *Collector) discovery() error {
 		c.lastDiscoveryOK = false
 		return err
 	}
-	c.discovered.naServers = make(map[string]client.NAS, len(nas))
+	c.discovered.nasServers = make(map[string]client.NAS, len(nas))
 	for _, n := range nas {
-		c.discovered.naServers[n.ID] = n
+		c.discovered.nasServers[n.ID] = n
 	}
 
 	c.Debugf("discovery: %d clusters, %d appliances, %d volumes, %d nodes, %d FC ports, %d ETH ports, %d file systems, %d NAS servers, %d drives (took %s)",

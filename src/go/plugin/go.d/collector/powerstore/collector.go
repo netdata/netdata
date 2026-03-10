@@ -79,7 +79,7 @@ type (
 		fcPorts     map[string]client.FcPort
 		ethPorts    map[string]client.EthPort
 		fileSystems map[string]client.FileSystem
-		naServers   map[string]client.NAS
+		nasServers  map[string]client.NAS
 		drives      map[string]client.Hardware
 		hardware    []client.Hardware
 	}

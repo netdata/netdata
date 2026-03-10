@@ -3,7 +3,7 @@
 package powerstore
 
 func (c *Collector) collectNASStatus(mx *metrics) {
-	for _, nas := range c.discovered.naServers {
+	for _, nas := range c.discovered.nasServers {
 		switch nas.OperationalStatus {
 		case "Started":
 			mx.NAS.Started++

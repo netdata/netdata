@@ -3,18 +3,18 @@
 package powerstore
 
 type metrics struct {
-	Cluster    clusterMetrics                   `stm:"cluster"`
-	Appliance  map[string]applianceMetrics      `stm:"appliance"`
-	Volume     map[string]volumeMetrics         `stm:"volume"`
-	Node       map[string]nodeMetrics           `stm:"node"`
-	FcPort     map[string]fcPortMetrics         `stm:"fc_port"`
-	EthPort    map[string]ethPortMetrics        `stm:"eth_port"`
-	FileSystem map[string]fileSystemMetrics     `stm:"file_system"`
-	Hardware   hardwareMetrics                  `stm:"hardware"`
-	Alerts     alertMetrics                     `stm:"alerts"`
-	Drive      map[string]driveMetrics          `stm:"drive"`
-	NAS        nasStatusMetrics                 `stm:"nas"`
-	Copy       copyFields                       `stm:"copy"`
+	Cluster    clusterMetrics               `stm:"cluster"`
+	Appliance  map[string]applianceMetrics  `stm:"appliance"`
+	Volume     map[string]volumeMetrics     `stm:"volume"`
+	Node       map[string]nodeMetrics       `stm:"node"`
+	FcPort     map[string]fcPortMetrics     `stm:"fc_port"`
+	EthPort    map[string]ethPortMetrics    `stm:"eth_port"`
+	FileSystem map[string]fileSystemMetrics `stm:"file_system"`
+	Hardware   hardwareMetrics              `stm:"hardware"`
+	Alerts     alertMetrics                 `stm:"alerts"`
+	Drive      map[string]driveMetrics      `stm:"drive"`
+	NAS        nasStatusMetrics             `stm:"nas"`
+	Copy       copyFields                   `stm:"copy"`
 }
 
 type clusterMetrics struct {
@@ -35,15 +35,15 @@ type spaceFields struct {
 }
 
 type perfFields struct {
-	ReadIops       float64 `stm:"read_iops,1000,1"`
-	WriteIops      float64 `stm:"write_iops,1000,1"`
-	TotalIops      float64 `stm:"total_iops,1000,1"`
-	ReadBandwidth  float64 `stm:"read_bandwidth,1000,1"`
-	WriteBandwidth float64 `stm:"write_bandwidth,1000,1"`
-	TotalBandwidth float64 `stm:"total_bandwidth,1000,1"`
-	AvgReadLatency float64 `stm:"avg_read_latency,1000,1"`
+	ReadIops        float64 `stm:"read_iops,1000,1"`
+	WriteIops       float64 `stm:"write_iops,1000,1"`
+	TotalIops       float64 `stm:"total_iops,1000,1"`
+	ReadBandwidth   float64 `stm:"read_bandwidth,1000,1"`
+	WriteBandwidth  float64 `stm:"write_bandwidth,1000,1"`
+	TotalBandwidth  float64 `stm:"total_bandwidth,1000,1"`
+	AvgReadLatency  float64 `stm:"avg_read_latency,1000,1"`
 	AvgWriteLatency float64 `stm:"avg_write_latency,1000,1"`
-	AvgLatency     float64 `stm:"avg_latency,1000,1"`
+	AvgLatency      float64 `stm:"avg_latency,1000,1"`
 }
 
 type applianceMetrics struct {
@@ -59,7 +59,7 @@ type volumeSpaceFields struct {
 }
 
 type volumeMetrics struct {
-	Perf  perfFields       `stm:"perf"`
+	Perf  perfFields        `stm:"perf"`
 	Space volumeSpaceFields `stm:"space"`
 }
 
