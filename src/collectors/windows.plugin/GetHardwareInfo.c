@@ -3,7 +3,7 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
-#include "netdata_driver.h"
+#include "driver/netdata_driver.h"
 
 static const char *srv_name = "NetdataDriver";
 static const char *drv_path = "%SystemRoot%\\system32\\drivers\\netdata_driver.sys";
