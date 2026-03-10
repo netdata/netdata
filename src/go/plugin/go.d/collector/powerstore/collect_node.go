@@ -4,42 +4,33 @@ package powerstore
 
 import "sync"
 
-func (c *Collector) collectNodes(mx *metrics) {
+func (c *Collector) collectNodes() {
 	var wg sync.WaitGroup
-	var mu sync.Mutex
 
-	for id := range c.discovered.nodes {
+	for id, node := range c.discovered.nodes {
 		wg.Add(1)
-		go func(id string) {
+		go func(id, name string) {
 			defer wg.Done()
 			c.sem <- struct{}{}
 			defer func() { <-c.sem }()
-
-			nm := nodeMetrics{}
 
 			pm, err := c.client.PerformanceMetricsByNode(id)
 			if err != nil {
 				c.Warningf("error collecting node %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {
 				last := pm[len(pm)-1]
-				nm.Perf.ReadIops = last.ReadIops
-				nm.Perf.WriteIops = last.WriteIops
-				nm.Perf.TotalIops = last.TotalIops
-				nm.Perf.ReadBandwidth = last.ReadBandwidth
-				nm.Perf.WriteBandwidth = last.WriteBandwidth
-				nm.Perf.TotalBandwidth = last.TotalBandwidth
-				nm.Perf.AvgReadLatency = last.AvgReadLatency
-				nm.Perf.AvgWriteLatency = last.AvgWriteLatency
-				nm.Perf.AvgLatency = last.AvgLatency
+				c.mx.node.perf.readIops.WithLabelValues(name).Observe(last.ReadIops)
+				c.mx.node.perf.writeIops.WithLabelValues(name).Observe(last.WriteIops)
+				c.mx.node.perf.readBandwidth.WithLabelValues(name).Observe(last.ReadBandwidth)
+				c.mx.node.perf.writeBandwidth.WithLabelValues(name).Observe(last.WriteBandwidth)
+				c.mx.node.perf.avgReadLatency.WithLabelValues(name).Observe(last.AvgReadLatency)
+				c.mx.node.perf.avgWriteLatency.WithLabelValues(name).Observe(last.AvgWriteLatency)
+				c.mx.node.perf.avgLatency.WithLabelValues(name).Observe(last.AvgLatency)
 				if last.CurrentLogins != nil {
-					nm.CurrentLogins = *last.CurrentLogins
+					c.mx.node.currentLogins.WithLabelValues(name).Observe(float64(*last.CurrentLogins))
 				}
 			}
-
-			mu.Lock()
-			mx.Node[id] = nm
-			mu.Unlock()
-		}(id)
+		}(id, node.Name)
 	}
 
 	wg.Wait()

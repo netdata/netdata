@@ -4,39 +4,30 @@ package powerstore
 
 import "sync"
 
-func (c *Collector) collectFileSystems(mx *metrics) {
+func (c *Collector) collectFileSystems() {
 	var wg sync.WaitGroup
-	var mu sync.Mutex
 
-	for id := range c.discovered.fileSystems {
+	for id, fs := range c.discovered.fileSystems {
 		wg.Add(1)
-		go func(id string) {
+		go func(id, name string) {
 			defer wg.Done()
 			c.sem <- struct{}{}
 			defer func() { <-c.sem }()
-
-			fm := fileSystemMetrics{}
 
 			pm, err := c.client.PerformanceMetricsByFileSystem(id)
 			if err != nil {
 				c.Warningf("error collecting filesystem %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {
 				last := pm[len(pm)-1]
-				fm.Perf.ReadIops = last.ReadIops
-				fm.Perf.WriteIops = last.WriteIops
-				fm.Perf.TotalIops = last.TotalIops
-				fm.Perf.ReadBandwidth = last.ReadBandwidth
-				fm.Perf.WriteBandwidth = last.WriteBandwidth
-				fm.Perf.TotalBandwidth = last.TotalBandwidth
-				fm.Perf.AvgReadLatency = last.AvgReadLatency
-				fm.Perf.AvgWriteLatency = last.AvgWriteLatency
-				fm.Perf.AvgLatency = last.AvgLatency
+				c.mx.fileSystem.perf.readIops.WithLabelValues(name).Observe(last.ReadIops)
+				c.mx.fileSystem.perf.writeIops.WithLabelValues(name).Observe(last.WriteIops)
+				c.mx.fileSystem.perf.readBandwidth.WithLabelValues(name).Observe(last.ReadBandwidth)
+				c.mx.fileSystem.perf.writeBandwidth.WithLabelValues(name).Observe(last.WriteBandwidth)
+				c.mx.fileSystem.perf.avgReadLatency.WithLabelValues(name).Observe(last.AvgReadLatency)
+				c.mx.fileSystem.perf.avgWriteLatency.WithLabelValues(name).Observe(last.AvgWriteLatency)
+				c.mx.fileSystem.perf.avgLatency.WithLabelValues(name).Observe(last.AvgLatency)
 			}
-
-			mu.Lock()
-			mx.FileSystem[id] = fm
-			mu.Unlock()
-		}(id)
+		}(id, fs.Name)
 	}
 
 	wg.Wait()

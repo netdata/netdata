@@ -11,7 +11,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -107,83 +111,88 @@ func TestCollector_Collect(t *testing.T) {
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
 
-	mx := collr.Collect(context.Background())
-	require.NotNil(t, mx)
+	cc := mustCycleController(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	cc.CommitCycleSuccess()
 
-	// Verify cluster space metrics exist
-	assert.Contains(t, mx, "cluster_space_physical_total")
-	assert.Contains(t, mx, "cluster_space_physical_used")
-	assert.Contains(t, mx, "cluster_space_efficiency_ratio")
+	r := collr.MetricStore().Read(metrix.ReadRaw())
 
-	// Verify appliance metrics exist
-	assert.Contains(t, mx, "appliance_A1_perf_read_iops")
-	assert.Contains(t, mx, "appliance_A1_cpu_utilization")
-	assert.Contains(t, mx, "appliance_A1_space_physical_total")
+	// Cluster space metrics
+	assertValue(t, r, "cluster_space_physical_total", nil, 10995116277760)
+	assertValue(t, r, "cluster_space_physical_used", nil, 5497558138880)
+	assertValue(t, r, "cluster_space_efficiency_ratio", nil, 2.5)
 
-	// Verify volume metrics exist
-	assert.Contains(t, mx, "volume_V1_perf_read_iops")
-	assert.Contains(t, mx, "volume_V2_perf_read_iops")
-	assert.Contains(t, mx, "volume_V1_space_logical_provisioned")
+	// Appliance metrics
+	appLabels := metrix.Labels{"appliance": "Appliance-1"}
+	assertHasValue(t, r, "appliance_perf_read_iops", appLabels)
+	assertHasValue(t, r, "appliance_cpu_utilization", appLabels)
+	assertHasValue(t, r, "appliance_space_physical_total", appLabels)
+	assertHasValue(t, r, "appliance_space_logical_provisioned", appLabels)
+	assertHasValue(t, r, "appliance_space_logical_used", appLabels)
+	assertHasValue(t, r, "appliance_space_data_physical_used", appLabels)
+	assertHasValue(t, r, "appliance_space_shared_logical_used", appLabels)
+	assertValue(t, r, "appliance_space_efficiency_ratio", appLabels, 2.5)
+	assertValue(t, r, "appliance_space_data_reduction", appLabels, 1.8)
+	assertValue(t, r, "appliance_space_snapshot_savings", appLabels, 0.3)
+	assertValue(t, r, "appliance_space_thin_savings", appLabels, 0.7)
 
-	// Verify node metrics exist
-	assert.Contains(t, mx, "node_N1_perf_read_iops")
-	assert.Contains(t, mx, "node_N1_current_logins")
+	// Volume metrics
+	v1Labels := metrix.Labels{"volume": "prod-vol-01"}
+	v2Labels := metrix.Labels{"volume": "test-vol-01"}
+	assertHasValue(t, r, "volume_perf_read_iops", v1Labels)
+	assertHasValue(t, r, "volume_perf_read_iops", v2Labels)
+	assertHasValue(t, r, "volume_space_logical_provisioned", v1Labels)
+	assertHasValue(t, r, "volume_space_thin_savings", v1Labels)
 
-	// Verify FC port metrics exist
-	assert.Contains(t, mx, "fc_port_FC1_perf_read_iops")
-	assert.Contains(t, mx, "fc_port_FC1_link_up")
+	// Node metrics
+	nodeLabels := metrix.Labels{"node": "Node-A"}
+	assertHasValue(t, r, "node_perf_read_iops", nodeLabels)
+	assertValue(t, r, "node_current_logins", nodeLabels, 5)
 
-	// Verify ETH port metrics exist
-	assert.Contains(t, mx, "eth_port_ETH1_bytes_rx_ps")
-	assert.Contains(t, mx, "eth_port_ETH1_link_up")
+	// FC port metrics
+	fcLabels := metrix.Labels{"fc_port": "FC-Port-0"}
+	assertHasValue(t, r, "fc_port_perf_read_iops", fcLabels)
+	assertHasValue(t, r, "fc_port_perf_avg_read_latency", fcLabels)
+	assertValue(t, r, "fc_port_link_up", fcLabels, 1)
 
-	// Verify filesystem metrics exist
-	assert.Contains(t, mx, "file_system_FS1_perf_read_iops")
+	// ETH port metrics
+	ethLabels := metrix.Labels{"eth_port": "ETH-Port-0"}
+	assertHasValue(t, r, "eth_port_bytes_rx_ps", ethLabels)
+	assertValue(t, r, "eth_port_link_up", ethLabels, 1)
 
-	// Verify hardware health metrics exist
-	assert.Contains(t, mx, "hardware_fan_ok")
-	assert.Contains(t, mx, "hardware_fan_degraded")
-	assert.Contains(t, mx, "hardware_psu_ok")
-	assert.Contains(t, mx, "hardware_drive_ok")
-	assert.Contains(t, mx, "hardware_battery_ok")
-	assert.Contains(t, mx, "hardware_node_ok")
+	// Filesystem metrics
+	fsLabels := metrix.Labels{"filesystem": "nfs-share-01"}
+	assertHasValue(t, r, "file_system_perf_read_iops", fsLabels)
 
-	// Verify alert metrics exist
-	assert.Contains(t, mx, "alerts_minor")
-	assert.Contains(t, mx, "alerts_info")
-	assert.Contains(t, mx, "alerts_critical")
+	// Hardware health metrics (testdata: 2 fans OK, 1 degraded; 2 PSUs; 2 drives; 1 battery; 2 nodes)
+	assertValue(t, r, "hardware_fan_ok", nil, 2)
+	assertValue(t, r, "hardware_fan_degraded", nil, 1)
+	assertValue(t, r, "hardware_psu_ok", nil, 2)
+	assertValue(t, r, "hardware_drive_ok", nil, 2)
+	assertValue(t, r, "hardware_battery_ok", nil, 1)
+	assertValue(t, r, "hardware_node_ok", nil, 2)
 
-	// Verify drive wear metrics exist
-	assert.Contains(t, mx, "drive_D1_endurance_remaining")
+	// Alert metrics
+	assertValue(t, r, "alerts_minor", nil, 1)
+	assertValue(t, r, "alerts_info", nil, 1)
+	assertValue(t, r, "alerts_critical", nil, 0)
 
-	// Verify NAS status metrics exist
-	assert.Contains(t, mx, "nas_started")
-	assert.Contains(t, mx, "nas_stopped")
+	// Drive wear metrics (D1 = "Drive-1" from hardware_all.json)
+	driveLabels := metrix.Labels{"drive": "Drive-1"}
+	assertHasValue(t, r, "drive_endurance_remaining", driveLabels)
 
-	// Verify replication metrics exist
-	assert.Contains(t, mx, "copy_data_remaining")
-	assert.Contains(t, mx, "copy_data_transferred")
-	assert.Contains(t, mx, "copy_transfer_rate")
+	// NAS status metrics
+	assertValue(t, r, "nas_started", nil, 1)
+	assertValue(t, r, "nas_stopped", nil, 0)
 
-	// Verify specific values
-	assert.Equal(t, int64(10995116277760), mx["cluster_space_physical_total"])
-	assert.Equal(t, int64(5497558138880), mx["cluster_space_physical_used"])
-	assert.Equal(t, int64(5), mx["node_N1_current_logins"])
-	assert.Equal(t, int64(1), mx["fc_port_FC1_link_up"])
-	assert.Equal(t, int64(1), mx["eth_port_ETH1_link_up"])
-	assert.Equal(t, int64(1), mx["alerts_minor"])
-	assert.Equal(t, int64(1), mx["alerts_info"])
-	assert.Equal(t, int64(0), mx["alerts_critical"])
-	assert.Equal(t, int64(2), mx["hardware_fan_ok"])
-	assert.Equal(t, int64(1), mx["hardware_fan_degraded"])
-	assert.Equal(t, int64(1), mx["nas_started"])
-	assert.Equal(t, int64(0), mx["nas_stopped"])
-	assert.Equal(t, int64(1073741824), mx["copy_data_remaining"])
-	assert.Equal(t, int64(5368709120), mx["copy_data_transferred"])
+	// Replication metrics
+	assertValue(t, r, "copy_data_remaining", nil, 1073741824)
+	assertValue(t, r, "copy_data_transferred", nil, 5368709120)
+	assertHasValue(t, r, "copy_transfer_rate", nil)
 
-	// Verify charts were created
-	assert.NotNil(t, collr.Charts())
-	assert.Greater(t, len(*collr.Charts()), len(clusterCharts))
+	// Chart coverage: verify all chart template dimensions are materialized
+	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
 }
 
 func TestCollector_CollectWithVolumeSelector(t *testing.T) {
@@ -205,13 +214,18 @@ func TestCollector_CollectWithVolumeSelector(t *testing.T) {
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
 
-	mx := collr.Collect(context.Background())
-	require.NotNil(t, mx)
+	cc := mustCycleController(t, collr.MetricStore())
+	cc.BeginCycle()
+	require.NoError(t, collr.Collect(context.Background()))
+	cc.CommitCycleSuccess()
+
+	r := collr.MetricStore().Read(metrix.ReadRaw())
 
 	// prod-vol-01 should be included
-	assert.Contains(t, mx, "volume_V1_perf_read_iops")
+	assertHasValue(t, r, "volume_perf_read_iops", metrix.Labels{"volume": "prod-vol-01"})
 	// test-vol-01 should be excluded
-	assert.NotContains(t, mx, "volume_V2_perf_read_iops")
+	_, ok := r.Value("volume_perf_read_iops", metrix.Labels{"volume": "test-vol-01"})
+	assert.False(t, ok, "test-vol-01 should be excluded by volume selector")
 }
 
 func TestCollector_Cleanup(t *testing.T) {
@@ -234,6 +248,38 @@ func TestCollector_Cleanup(t *testing.T) {
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
 	assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
+}
+
+func TestCollector_ChartTemplateYAML(t *testing.T) {
+	templateYAML := New().ChartTemplateYAML()
+	collecttest.AssertChartTemplateSchema(t, templateYAML)
+
+	spec, err := charttpl.DecodeYAML([]byte(templateYAML))
+	require.NoError(t, err)
+	require.NoError(t, spec.Validate())
+
+	_, err = chartengine.Compile(spec, 1)
+	require.NoError(t, err)
+}
+
+func mustCycleController(t *testing.T, store metrix.CollectorStore) metrix.CycleController {
+	t.Helper()
+	managed, ok := metrix.AsCycleManagedStore(store)
+	require.True(t, ok, "store does not expose cycle control")
+	return managed.CycleController()
+}
+
+func assertValue(t *testing.T, r metrix.Reader, name string, labels metrix.Labels, want float64) {
+	t.Helper()
+	got, ok := r.Value(name, labels)
+	require.Truef(t, ok, "expected metric %s labels=%v", name, labels)
+	assert.InDeltaf(t, want, got, 1e-9, "unexpected value for %s labels=%v: got %v want %v", name, labels, got, want)
+}
+
+func assertHasValue(t *testing.T, r metrix.Reader, name string, labels metrix.Labels) {
+	t.Helper()
+	_, ok := r.Value(name, labels)
+	assert.Truef(t, ok, "expected metric %s labels=%v to exist", name, labels)
 }
 
 func newMockPowerStoreServer() *httptest.Server {
@@ -303,7 +349,7 @@ func handleMetricsGenerate(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case body.Entity == "performance_metrics_by_appliance" && body.EntityID == "A1":
 		writeTestData(w, "testdata/metrics_perf_appliance.json")
-	case body.Entity == "performance_metrics_by_volume" && body.EntityID == "V1":
+	case body.Entity == "performance_metrics_by_volume" && (body.EntityID == "V1" || body.EntityID == "V2"):
 		writeTestData(w, "testdata/metrics_perf_volume.json")
 	case body.Entity == "performance_metrics_by_node" && body.EntityID == "N1":
 		writeTestData(w, "testdata/metrics_perf_node.json")
@@ -317,7 +363,7 @@ func handleMetricsGenerate(w http.ResponseWriter, r *http.Request) {
 		writeTestData(w, "testdata/metrics_space_cluster.json")
 	case body.Entity == "space_metrics_by_appliance" && body.EntityID == "A1":
 		writeTestData(w, "testdata/metrics_space_appliance.json")
-	case body.Entity == "space_metrics_by_volume" && body.EntityID == "V1":
+	case body.Entity == "space_metrics_by_volume" && (body.EntityID == "V1" || body.EntityID == "V2"):
 		writeTestData(w, "testdata/metrics_space_volume.json")
 	case body.Entity == "wear_metrics_by_drive" && body.EntityID == "D1":
 		writeTestData(w, "testdata/metrics_wear_drive.json")

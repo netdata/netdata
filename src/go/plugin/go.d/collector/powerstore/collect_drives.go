@@ -4,13 +4,12 @@ package powerstore
 
 import "sync"
 
-func (c *Collector) collectDriveWear(mx *metrics) {
+func (c *Collector) collectDriveWear() {
 	var wg sync.WaitGroup
-	var mu sync.Mutex
 
-	for id := range c.discovered.drives {
+	for id, drv := range c.discovered.drives {
 		wg.Add(1)
-		go func(id string) {
+		go func(id, name string) {
 			defer wg.Done()
 			c.sem <- struct{}{}
 			defer func() { <-c.sem }()
@@ -25,13 +24,8 @@ func (c *Collector) collectDriveWear(mx *metrics) {
 			}
 
 			last := wm[len(wm)-1]
-
-			mu.Lock()
-			mx.Drive[id] = driveMetrics{
-				EnduranceRemaining: last.PercentEnduranceRemaining,
-			}
-			mu.Unlock()
-		}(id)
+			c.mx.drive.enduranceRemaining.WithLabelValues(name).Observe(float64(last.PercentEnduranceRemaining))
+		}(id, drv.Name)
 	}
 
 	wg.Wait()

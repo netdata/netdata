@@ -6,33 +6,22 @@ import (
 	"sync"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/powerstore/client"
 )
 
 const discoveryEvery = 5
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect() error {
 	c.runs++
 	if !c.lastDiscoveryOK || c.runs%discoveryEvery == 0 {
 		if err := c.discovery(); err != nil {
-			return nil, err
+			return err
 		}
-	}
-
-	mx := metrics{
-		Appliance:  make(map[string]applianceMetrics),
-		Volume:     make(map[string]volumeMetrics),
-		Node:       make(map[string]nodeMetrics),
-		FcPort:     make(map[string]fcPortMetrics),
-		EthPort:    make(map[string]ethPortMetrics),
-		FileSystem: make(map[string]fileSystemMetrics),
-		Drive:      make(map[string]driveMetrics),
 	}
 
 	// Collect metrics from API concurrently, bounded by semaphore.
 	var wg sync.WaitGroup
-	for _, fn := range []func(*metrics){
+	for _, fn := range []func(){
 		c.collectClusterSpace,
 		c.collectAppliances,
 		c.collectVolumes,
@@ -45,40 +34,42 @@ func (c *Collector) collect() (map[string]int64, error) {
 		c.collectReplication,
 	} {
 		wg.Add(1)
-		go func(f func(*metrics)) {
+		go func(f func()) {
 			defer wg.Done()
-			f(&mx)
+			f()
 		}(fn)
 	}
 	wg.Wait()
 
 	// These use cached discovery data, no API calls.
-	c.collectHardwareHealth(&mx)
-	c.collectNASStatus(&mx)
+	c.collectHardwareHealth()
+	c.collectNASStatus()
 
-	c.updateCharts()
-	return stm.ToMap(mx), nil
+	return nil
 }
 
 func (c *Collector) discovery() error {
 	start := time.Now()
 	c.Debugf("starting discovery")
 
+	// Build results in a temp struct; only swap on full success.
+	var d discovered
+
 	clusters, err := c.client.Clusters()
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
 	}
-	c.discovered.clusters = clusters
+	d.clusters = clusters
 
 	appliances, err := c.client.Appliances()
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
 	}
-	c.discovered.appliances = make(map[string]client.Appliance, len(appliances))
+	d.appliances = make(map[string]client.Appliance, len(appliances))
 	for _, a := range appliances {
-		c.discovered.appliances[a.ID] = a
+		d.appliances[a.ID] = a
 	}
 
 	volumes, err := c.client.Volumes()
@@ -86,10 +77,10 @@ func (c *Collector) discovery() error {
 		c.lastDiscoveryOK = false
 		return err
 	}
-	c.discovered.volumes = make(map[string]client.Volume, len(volumes))
+	d.volumes = make(map[string]client.Volume, len(volumes))
 	for _, v := range volumes {
 		if c.volumeMatches(v.Name) {
-			c.discovered.volumes[v.ID] = v
+			d.volumes[v.ID] = v
 		}
 	}
 
@@ -98,15 +89,15 @@ func (c *Collector) discovery() error {
 		c.lastDiscoveryOK = false
 		return err
 	}
-	c.discovered.hardware = allHW
-	c.discovered.nodes = make(map[string]client.Node)
-	c.discovered.drives = make(map[string]client.Hardware)
+	d.hardware = allHW
+	d.nodes = make(map[string]client.Node)
+	d.drives = make(map[string]client.Hardware)
 	for _, h := range allHW {
 		switch h.Type {
 		case "Node":
-			c.discovered.nodes[h.ID] = client.Node{ID: h.ID, Name: h.Name, ApplianceID: h.ApplianceID}
+			d.nodes[h.ID] = client.Node{ID: h.ID, Name: h.Name, ApplianceID: h.ApplianceID}
 		case "Drive":
-			c.discovered.drives[h.ID] = h
+			d.drives[h.ID] = h
 		}
 	}
 
@@ -115,9 +106,9 @@ func (c *Collector) discovery() error {
 		c.lastDiscoveryOK = false
 		return err
 	}
-	c.discovered.fcPorts = make(map[string]client.FcPort, len(fcPorts))
+	d.fcPorts = make(map[string]client.FcPort, len(fcPorts))
 	for _, p := range fcPorts {
-		c.discovered.fcPorts[p.ID] = p
+		d.fcPorts[p.ID] = p
 	}
 
 	ethPorts, err := c.client.EthPorts()
@@ -125,9 +116,9 @@ func (c *Collector) discovery() error {
 		c.lastDiscoveryOK = false
 		return err
 	}
-	c.discovered.ethPorts = make(map[string]client.EthPort, len(ethPorts))
+	d.ethPorts = make(map[string]client.EthPort, len(ethPorts))
 	for _, p := range ethPorts {
-		c.discovered.ethPorts[p.ID] = p
+		d.ethPorts[p.ID] = p
 	}
 
 	fileSystems, err := c.client.FileSystems()
@@ -135,9 +126,9 @@ func (c *Collector) discovery() error {
 		c.lastDiscoveryOK = false
 		return err
 	}
-	c.discovered.fileSystems = make(map[string]client.FileSystem, len(fileSystems))
+	d.fileSystems = make(map[string]client.FileSystem, len(fileSystems))
 	for _, fs := range fileSystems {
-		c.discovered.fileSystems[fs.ID] = fs
+		d.fileSystems[fs.ID] = fs
 	}
 
 	nas, err := c.client.NASServers()
@@ -145,16 +136,19 @@ func (c *Collector) discovery() error {
 		c.lastDiscoveryOK = false
 		return err
 	}
-	c.discovered.nasServers = make(map[string]client.NAS, len(nas))
+	d.nasServers = make(map[string]client.NAS, len(nas))
 	for _, n := range nas {
-		c.discovered.nasServers[n.ID] = n
+		d.nasServers[n.ID] = n
 	}
 
+	// All API calls succeeded — atomic swap.
+	c.discovered = d
+	c.lastDiscoveryOK = true
+
 	c.Debugf("discovery: %d clusters, %d appliances, %d volumes, %d nodes, %d FC ports, %d ETH ports, %d file systems, %d NAS servers, %d drives (took %s)",
-		len(clusters), len(appliances), len(c.discovered.volumes), len(c.discovered.nodes),
-		len(fcPorts), len(ethPorts), len(fileSystems), len(nas), len(c.discovered.drives),
+		len(d.clusters), len(d.appliances), len(d.volumes), len(d.nodes),
+		len(d.fcPorts), len(d.ethPorts), len(d.fileSystems), len(d.nasServers), len(d.drives),
 		time.Since(start))
 
-	c.lastDiscoveryOK = true
 	return nil
 }

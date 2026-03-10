@@ -2,7 +2,7 @@
 
 package powerstore
 
-func (c *Collector) collectClusterSpace(mx *metrics) {
+func (c *Collector) collectClusterSpace() {
 	if len(c.discovered.clusters) == 0 {
 		return
 	}
@@ -21,26 +21,27 @@ func (c *Collector) collectClusterSpace(mx *metrics) {
 	}
 
 	last := sm[len(sm)-1]
+	mx := c.mx.cluster
 	if last.PhysicalTotal != nil {
-		mx.Cluster.Space.PhysicalTotal = *last.PhysicalTotal
+		mx.spacePhysicalTotal.Observe(float64(*last.PhysicalTotal))
 	}
 	if last.PhysicalUsed != nil {
-		mx.Cluster.Space.PhysicalUsed = *last.PhysicalUsed
+		mx.spacePhysicalUsed.Observe(float64(*last.PhysicalUsed))
 	}
 	if last.LogicalProvisioned != nil {
-		mx.Cluster.Space.LogicalProvisioned = *last.LogicalProvisioned
+		mx.spaceLogicalProvisioned.Observe(float64(*last.LogicalProvisioned))
 	}
 	if last.LogicalUsed != nil {
-		mx.Cluster.Space.LogicalUsed = *last.LogicalUsed
+		mx.spaceLogicalUsed.Observe(float64(*last.LogicalUsed))
 	}
 	if last.DataPhysicalUsed != nil {
-		mx.Cluster.Space.DataPhysicalUsed = *last.DataPhysicalUsed
+		mx.spaceDataPhysicalUsed.Observe(float64(*last.DataPhysicalUsed))
 	}
 	if last.SharedLogicalUsed != nil {
-		mx.Cluster.Space.SharedLogicalUsed = *last.SharedLogicalUsed
+		mx.spaceSharedLogicalUsed.Observe(float64(*last.SharedLogicalUsed))
 	}
-	mx.Cluster.Space.EfficiencyRatio = last.EfficiencyRatio
-	mx.Cluster.Space.DataReduction = last.DataReduction
-	mx.Cluster.Space.SnapshotSavings = last.SnapshotSavings
-	mx.Cluster.Space.ThinSavings = last.ThinSavings
+	mx.spaceEfficiencyRatio.Observe(float64(last.EfficiencyRatio))
+	mx.spaceDataReduction.Observe(float64(last.DataReduction))
+	mx.spaceSnapshotSavings.Observe(float64(last.SnapshotSavings))
+	mx.spaceThinSavings.Observe(float64(last.ThinSavings))
 }

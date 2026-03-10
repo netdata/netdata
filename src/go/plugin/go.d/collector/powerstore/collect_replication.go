@@ -4,9 +4,12 @@ package powerstore
 
 import "sync"
 
-func (c *Collector) collectReplication(mx *metrics) {
+func (c *Collector) collectReplication() {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
+
+	var dataRemaining, dataTransferred int64
+	var transferRate float64
 
 	for id := range c.discovered.appliances {
 		wg.Add(1)
@@ -28,15 +31,19 @@ func (c *Collector) collectReplication(mx *metrics) {
 
 			mu.Lock()
 			if last.DataRemaining != nil {
-				mx.Copy.DataRemaining += *last.DataRemaining
+				dataRemaining += *last.DataRemaining
 			}
 			if last.DataTransferred != nil {
-				mx.Copy.DataTransferred += *last.DataTransferred
+				dataTransferred += *last.DataTransferred
 			}
-			mx.Copy.TransferRate += last.TransferRate
+			transferRate += last.TransferRate
 			mu.Unlock()
 		}(id)
 	}
 
 	wg.Wait()
+
+	c.mx.replication.dataRemaining.Observe(float64(dataRemaining))
+	c.mx.replication.dataTransferred.Observe(float64(dataTransferred))
+	c.mx.replication.transferRate.Observe(transferRate)
 }

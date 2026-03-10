@@ -4,33 +4,28 @@ package powerstore
 
 import "sync"
 
-func (c *Collector) collectVolumes(mx *metrics) {
+func (c *Collector) collectVolumes() {
 	var wg sync.WaitGroup
-	var mu sync.Mutex
 
-	for id := range c.discovered.volumes {
+	for id, vol := range c.discovered.volumes {
 		wg.Add(1)
-		go func(id string) {
+		go func(id, name string) {
 			defer wg.Done()
 			c.sem <- struct{}{}
 			defer func() { <-c.sem }()
-
-			vm := volumeMetrics{}
 
 			pm, err := c.client.PerformanceMetricsByVolume(id)
 			if err != nil {
 				c.Warningf("error collecting volume %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {
 				last := pm[len(pm)-1]
-				vm.Perf.ReadIops = last.ReadIops
-				vm.Perf.WriteIops = last.WriteIops
-				vm.Perf.TotalIops = last.TotalIops
-				vm.Perf.ReadBandwidth = last.ReadBandwidth
-				vm.Perf.WriteBandwidth = last.WriteBandwidth
-				vm.Perf.TotalBandwidth = last.TotalBandwidth
-				vm.Perf.AvgReadLatency = last.AvgReadLatency
-				vm.Perf.AvgWriteLatency = last.AvgWriteLatency
-				vm.Perf.AvgLatency = last.AvgLatency
+				c.mx.volume.perf.readIops.WithLabelValues(name).Observe(last.ReadIops)
+				c.mx.volume.perf.writeIops.WithLabelValues(name).Observe(last.WriteIops)
+				c.mx.volume.perf.readBandwidth.WithLabelValues(name).Observe(last.ReadBandwidth)
+				c.mx.volume.perf.writeBandwidth.WithLabelValues(name).Observe(last.WriteBandwidth)
+				c.mx.volume.perf.avgReadLatency.WithLabelValues(name).Observe(last.AvgReadLatency)
+				c.mx.volume.perf.avgWriteLatency.WithLabelValues(name).Observe(last.AvgWriteLatency)
+				c.mx.volume.perf.avgLatency.WithLabelValues(name).Observe(last.AvgLatency)
 			}
 
 			sm, err := c.client.SpaceMetricsByVolume(id)
@@ -39,18 +34,14 @@ func (c *Collector) collectVolumes(mx *metrics) {
 			} else if len(sm) > 0 {
 				last := sm[len(sm)-1]
 				if last.LogicalProvisioned != nil {
-					vm.Space.LogicalProvisioned = *last.LogicalProvisioned
+					c.mx.volume.spaceLogicalProv.WithLabelValues(name).Observe(float64(*last.LogicalProvisioned))
 				}
 				if last.LogicalUsed != nil {
-					vm.Space.LogicalUsed = *last.LogicalUsed
+					c.mx.volume.spaceLogicalUsed.WithLabelValues(name).Observe(float64(*last.LogicalUsed))
 				}
-				vm.Space.ThinSavings = last.ThinSavings
+				c.mx.volume.spaceThinSavings.WithLabelValues(name).Observe(last.ThinSavings)
 			}
-
-			mu.Lock()
-			mx.Volume[id] = vm
-			mu.Unlock()
-		}(id)
+		}(id, vol.Name)
 	}
 
 	wg.Wait()

@@ -2,87 +2,73 @@
 
 package powerstore
 
-import (
-	"sync"
+import "sync"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/powerstore/client"
-)
-
-func (c *Collector) collectFcPorts(mx *metrics) {
+func (c *Collector) collectFcPorts() {
 	var wg sync.WaitGroup
-	var mu sync.Mutex
 
 	for id, port := range c.discovered.fcPorts {
 		wg.Add(1)
-		go func(id string, port client.FcPort) {
+		go func(id, name string, linkUp bool) {
 			defer wg.Done()
 			c.sem <- struct{}{}
 			defer func() { <-c.sem }()
 
-			fm := fcPortMetrics{}
-			if port.IsLinkUp {
-				fm.LinkUp = 1
+			var linkVal float64
+			if linkUp {
+				linkVal = 1
 			}
+			c.mx.fcPort.linkUp.WithLabelValues(name).Observe(linkVal)
 
 			pm, err := c.client.PerformanceMetricsByFcPort(id)
 			if err != nil {
 				c.Warningf("error collecting FC port %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {
 				last := pm[len(pm)-1]
-				fm.Perf.ReadIops = last.ReadIops
-				fm.Perf.WriteIops = last.WriteIops
-				fm.Perf.TotalIops = last.TotalIops
-				fm.Perf.ReadBandwidth = last.ReadBandwidth
-				fm.Perf.WriteBandwidth = last.WriteBandwidth
-				fm.Perf.TotalBandwidth = last.TotalBandwidth
-				fm.Perf.AvgReadLatency = last.AvgReadLatency
-				fm.Perf.AvgWriteLatency = last.AvgWriteLatency
-				fm.Perf.AvgLatency = last.AvgLatency
+				c.mx.fcPort.perf.readIops.WithLabelValues(name).Observe(last.ReadIops)
+				c.mx.fcPort.perf.writeIops.WithLabelValues(name).Observe(last.WriteIops)
+				c.mx.fcPort.perf.readBandwidth.WithLabelValues(name).Observe(last.ReadBandwidth)
+				c.mx.fcPort.perf.writeBandwidth.WithLabelValues(name).Observe(last.WriteBandwidth)
+				c.mx.fcPort.perf.avgReadLatency.WithLabelValues(name).Observe(last.AvgReadLatency)
+				c.mx.fcPort.perf.avgWriteLatency.WithLabelValues(name).Observe(last.AvgWriteLatency)
+				c.mx.fcPort.perf.avgLatency.WithLabelValues(name).Observe(last.AvgLatency)
 			}
-
-			mu.Lock()
-			mx.FcPort[id] = fm
-			mu.Unlock()
-		}(id, port)
+		}(id, port.Name, port.IsLinkUp)
 	}
 
 	wg.Wait()
 }
 
-func (c *Collector) collectEthPorts(mx *metrics) {
+func (c *Collector) collectEthPorts() {
 	var wg sync.WaitGroup
-	var mu sync.Mutex
 
 	for id, port := range c.discovered.ethPorts {
 		wg.Add(1)
-		go func(id string, port client.EthPort) {
+		go func(id, name string, linkUp bool) {
 			defer wg.Done()
 			c.sem <- struct{}{}
 			defer func() { <-c.sem }()
 
-			em := ethPortMetrics{}
-			if port.IsLinkUp {
-				em.LinkUp = 1
+			var linkVal float64
+			if linkUp {
+				linkVal = 1
 			}
+			c.mx.ethPort.linkUp.WithLabelValues(name).Observe(linkVal)
 
 			pm, err := c.client.EthPortPerformanceMetrics(id)
 			if err != nil {
 				c.Warningf("error collecting ETH port %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {
 				last := pm[len(pm)-1]
-				em.BytesRxPs = last.BytesRxPs
-				em.BytesTxPs = last.BytesTxPs
-				em.PktRxPs = last.PktRxPs
-				em.PktTxPs = last.PktTxPs
-				em.PktRxCrcErrorPs = last.PktRxCrcErrorPs
-				em.PktRxNoBufferErrorPs = last.PktRxNoBufferErrorPs
-				em.PktTxErrorPs = last.PktTxErrorPs
+				c.mx.ethPort.bytesRxPs.WithLabelValues(name).Observe(float64(last.BytesRxPs))
+				c.mx.ethPort.bytesTxPs.WithLabelValues(name).Observe(float64(last.BytesTxPs))
+				c.mx.ethPort.pktRxPs.WithLabelValues(name).Observe(float64(last.PktRxPs))
+				c.mx.ethPort.pktTxPs.WithLabelValues(name).Observe(float64(last.PktTxPs))
+				c.mx.ethPort.pktRxCrcErrorPs.WithLabelValues(name).Observe(float64(last.PktRxCrcErrorPs))
+				c.mx.ethPort.pktRxNoBufferErrorPs.WithLabelValues(name).Observe(float64(last.PktRxNoBufferErrorPs))
+				c.mx.ethPort.pktTxErrorPs.WithLabelValues(name).Observe(float64(last.PktTxErrorPs))
 			}
-
-			mu.Lock()
-			mx.EthPort[id] = em
-			mu.Unlock()
-		}(id, port)
+		}(id, port.Name, port.IsLinkUp)
 	}
 
 	wg.Wait()

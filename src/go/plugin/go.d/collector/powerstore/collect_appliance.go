@@ -4,34 +4,29 @@ package powerstore
 
 import "sync"
 
-func (c *Collector) collectAppliances(mx *metrics) {
+func (c *Collector) collectAppliances() {
 	var wg sync.WaitGroup
-	var mu sync.Mutex
 
-	for id := range c.discovered.appliances {
+	for id, app := range c.discovered.appliances {
 		wg.Add(1)
-		go func(id string) {
+		go func(id, name string) {
 			defer wg.Done()
 			c.sem <- struct{}{}
 			defer func() { <-c.sem }()
-
-			am := applianceMetrics{}
 
 			pm, err := c.client.PerformanceMetricsByAppliance(id)
 			if err != nil {
 				c.Warningf("error collecting appliance %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {
 				last := pm[len(pm)-1]
-				am.Perf.ReadIops = last.ReadIops
-				am.Perf.WriteIops = last.WriteIops
-				am.Perf.TotalIops = last.TotalIops
-				am.Perf.ReadBandwidth = last.ReadBandwidth
-				am.Perf.WriteBandwidth = last.WriteBandwidth
-				am.Perf.TotalBandwidth = last.TotalBandwidth
-				am.Perf.AvgReadLatency = last.AvgReadLatency
-				am.Perf.AvgWriteLatency = last.AvgWriteLatency
-				am.Perf.AvgLatency = last.AvgLatency
-				am.CPU = last.IoWorkloadCPUUtilization
+				c.mx.appliance.perf.readIops.WithLabelValues(name).Observe(last.ReadIops)
+				c.mx.appliance.perf.writeIops.WithLabelValues(name).Observe(last.WriteIops)
+				c.mx.appliance.perf.readBandwidth.WithLabelValues(name).Observe(last.ReadBandwidth)
+				c.mx.appliance.perf.writeBandwidth.WithLabelValues(name).Observe(last.WriteBandwidth)
+				c.mx.appliance.perf.avgReadLatency.WithLabelValues(name).Observe(last.AvgReadLatency)
+				c.mx.appliance.perf.avgWriteLatency.WithLabelValues(name).Observe(last.AvgWriteLatency)
+				c.mx.appliance.perf.avgLatency.WithLabelValues(name).Observe(last.AvgLatency)
+				c.mx.appliance.cpu.WithLabelValues(name).Observe(last.IoWorkloadCPUUtilization)
 			}
 
 			sm, err := c.client.SpaceMetricsByAppliance(id)
@@ -40,33 +35,29 @@ func (c *Collector) collectAppliances(mx *metrics) {
 			} else if len(sm) > 0 {
 				last := sm[len(sm)-1]
 				if last.PhysicalTotal != nil {
-					am.Space.PhysicalTotal = *last.PhysicalTotal
+					c.mx.appliance.space.physicalTotal.WithLabelValues(name).Observe(float64(*last.PhysicalTotal))
 				}
 				if last.PhysicalUsed != nil {
-					am.Space.PhysicalUsed = *last.PhysicalUsed
+					c.mx.appliance.space.physicalUsed.WithLabelValues(name).Observe(float64(*last.PhysicalUsed))
 				}
 				if last.LogicalProvisioned != nil {
-					am.Space.LogicalProvisioned = *last.LogicalProvisioned
+					c.mx.appliance.space.logicalProvisioned.WithLabelValues(name).Observe(float64(*last.LogicalProvisioned))
 				}
 				if last.LogicalUsed != nil {
-					am.Space.LogicalUsed = *last.LogicalUsed
+					c.mx.appliance.space.logicalUsed.WithLabelValues(name).Observe(float64(*last.LogicalUsed))
 				}
 				if last.DataPhysicalUsed != nil {
-					am.Space.DataPhysicalUsed = *last.DataPhysicalUsed
+					c.mx.appliance.space.dataPhysicalUsed.WithLabelValues(name).Observe(float64(*last.DataPhysicalUsed))
 				}
 				if last.SharedLogicalUsed != nil {
-					am.Space.SharedLogicalUsed = *last.SharedLogicalUsed
+					c.mx.appliance.space.sharedLogicalUsed.WithLabelValues(name).Observe(float64(*last.SharedLogicalUsed))
 				}
-				am.Space.EfficiencyRatio = last.EfficiencyRatio
-				am.Space.DataReduction = last.DataReduction
-				am.Space.SnapshotSavings = last.SnapshotSavings
-				am.Space.ThinSavings = last.ThinSavings
+				c.mx.appliance.space.efficiencyRatio.WithLabelValues(name).Observe(last.EfficiencyRatio)
+				c.mx.appliance.space.dataReduction.WithLabelValues(name).Observe(last.DataReduction)
+				c.mx.appliance.space.snapshotSavings.WithLabelValues(name).Observe(last.SnapshotSavings)
+				c.mx.appliance.space.thinSavings.WithLabelValues(name).Observe(last.ThinSavings)
 			}
-
-			mu.Lock()
-			mx.Appliance[id] = am
-			mu.Unlock()
-		}(id)
+		}(id, app.Name)
 	}
 
 	wg.Wait()

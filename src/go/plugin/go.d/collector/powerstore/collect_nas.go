@@ -2,17 +2,24 @@
 
 package powerstore
 
-func (c *Collector) collectNASStatus(mx *metrics) {
+func (c *Collector) collectNASStatus() {
+	var started, stopped, degraded, unknown float64
+
 	for _, nas := range c.discovered.nasServers {
 		switch nas.OperationalStatus {
 		case "Started":
-			mx.NAS.Started++
+			started++
 		case "Stopped":
-			mx.NAS.Stopped++
+			stopped++
 		case "Degraded":
-			mx.NAS.Degraded++
+			degraded++
 		default:
-			mx.NAS.Unknown++
+			unknown++
 		}
 	}
+
+	c.mx.nas.started.Observe(started)
+	c.mx.nas.stopped.Observe(stopped)
+	c.mx.nas.degraded.Observe(degraded)
+	c.mx.nas.unknown.Observe(unknown)
 }

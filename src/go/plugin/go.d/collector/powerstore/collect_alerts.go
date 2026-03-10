@@ -2,7 +2,7 @@
 
 package powerstore
 
-func (c *Collector) collectAlerts(mx *metrics) {
+func (c *Collector) collectAlerts() {
 	c.sem <- struct{}{}
 	defer func() { <-c.sem }()
 
@@ -12,16 +12,22 @@ func (c *Collector) collectAlerts(mx *metrics) {
 		return
 	}
 
+	var crit, major, minor, info float64
 	for _, a := range alerts {
 		switch a.Severity {
 		case "Critical":
-			mx.Alerts.Critical++
+			crit++
 		case "Major":
-			mx.Alerts.Major++
+			major++
 		case "Minor":
-			mx.Alerts.Minor++
+			minor++
 		case "Info":
-			mx.Alerts.Info++
+			info++
 		}
 	}
+
+	c.mx.alerts.critical.Observe(crit)
+	c.mx.alerts.major.Observe(major)
+	c.mx.alerts.minor.Observe(minor)
+	c.mx.alerts.info.Observe(info)
 }
