@@ -69,6 +69,31 @@ const (
 
 	prioReplicationStatus
 	prioReplicationLatency
+
+	prioAGSyncHealth
+	prioAGRecoveryHealth
+
+	prioAGReplicaRole
+	prioAGReplicaConnectedState
+	prioAGReplicaSyncHealth
+
+	prioAGDBSyncState
+	prioAGDBLogSendQueue
+	prioAGDBLogSendRate
+	prioAGDBRedoQueue
+	prioAGDBRedoRate
+	prioAGDBFilestreamSendRate
+	prioAGDBSecondaryLag
+	prioAGDBSuspended
+	prioAGDBFailoverReadiness
+	prioAGDBJoined
+
+	prioAGClusterQuorumState
+	prioAGClusterMemberState
+
+	prioAGThreads
+
+	prioAGPageRepair
 )
 
 // instanceCharts are charts for the SQL Server instance level metrics
@@ -897,4 +922,415 @@ func cleanJobName(name string) string {
 func cleanPublicationName(pubDB, publication string) string {
 	r := strings.NewReplacer(" ", "_", ".", "_", "-", "_")
 	return strings.ToLower(r.Replace(pubDB + "_" + publication))
+}
+
+func cleanAGName(name string) string {
+	r := strings.NewReplacer(" ", "_", ".", "_", "-", "_", "\\", "_")
+	return strings.ToLower(r.Replace(name))
+}
+
+func cleanAGReplicaName(agName, replicaServer string) string {
+	return cleanAGName(agName) + "_" + cleanAGName(replicaServer)
+}
+
+func cleanAGDatabaseReplicaName(agName, replicaServer, dbName string) string {
+	return cleanAGName(agName) + "_" + cleanAGName(replicaServer) + "_" + cleanDatabaseName(dbName)
+}
+
+// AG-level chart templates
+var (
+	agSyncHealthChartTmpl = collectorapi.Chart{
+		ID:       "ag_%s_sync_health",
+		Title:    "Availability group synchronization health",
+		Units:    "state",
+		Fam:      "ag health",
+		Ctx:      "mssql.ag_sync_health",
+		Priority: prioAGSyncHealth,
+		Dims: collectorapi.Dims{
+			{ID: "ag_%s_sync_health_not_healthy", Name: "not_healthy"},
+			{ID: "ag_%s_sync_health_partially_healthy", Name: "partially_healthy"},
+			{ID: "ag_%s_sync_health_healthy", Name: "healthy"},
+		},
+	}
+	agRecoveryHealthChartTmpl = collectorapi.Chart{
+		ID:       "ag_%s_recovery_health",
+		Title:    "Availability group recovery health",
+		Units:    "state",
+		Fam:      "ag health",
+		Ctx:      "mssql.ag_recovery_health",
+		Priority: prioAGRecoveryHealth,
+		Dims: collectorapi.Dims{
+			{ID: "ag_%s_primary_recovery_online", Name: "primary_online"},
+			{ID: "ag_%s_primary_recovery_in_progress", Name: "primary_in_progress"},
+			{ID: "ag_%s_secondary_recovery_online", Name: "secondary_online"},
+			{ID: "ag_%s_secondary_recovery_in_progress", Name: "secondary_in_progress"},
+		},
+	}
+)
+
+// Replica-level chart templates
+var (
+	agReplicaRoleChartTmpl = collectorapi.Chart{
+		ID:       "ag_replica_%s_role",
+		Title:    "Availability group replica role",
+		Units:    "state",
+		Fam:      "ag replicas",
+		Ctx:      "mssql.ag_replica_role",
+		Priority: prioAGReplicaRole,
+		Dims: collectorapi.Dims{
+			{ID: "ag_replica_%s_role_primary", Name: "primary"},
+			{ID: "ag_replica_%s_role_secondary", Name: "secondary"},
+			{ID: "ag_replica_%s_role_resolving", Name: "resolving"},
+			{ID: "ag_replica_%s_role_unknown", Name: "unknown"},
+		},
+	}
+	agReplicaConnectedStateChartTmpl = collectorapi.Chart{
+		ID:       "ag_replica_%s_connected_state",
+		Title:    "Availability group replica connected state",
+		Units:    "state",
+		Fam:      "ag replicas",
+		Ctx:      "mssql.ag_replica_connected_state",
+		Priority: prioAGReplicaConnectedState,
+		Dims: collectorapi.Dims{
+			{ID: "ag_replica_%s_connected", Name: "connected"},
+			{ID: "ag_replica_%s_disconnected", Name: "disconnected"},
+			{ID: "ag_replica_%s_conn_unknown", Name: "unknown"},
+		},
+	}
+	agReplicaSyncHealthChartTmpl = collectorapi.Chart{
+		ID:       "ag_replica_%s_sync_health",
+		Title:    "Availability group replica synchronization health",
+		Units:    "state",
+		Fam:      "ag replicas",
+		Ctx:      "mssql.ag_replica_sync_health",
+		Priority: prioAGReplicaSyncHealth,
+		Dims: collectorapi.Dims{
+			{ID: "ag_replica_%s_sync_health_not_healthy", Name: "not_healthy"},
+			{ID: "ag_replica_%s_sync_health_partially_healthy", Name: "partially_healthy"},
+			{ID: "ag_replica_%s_sync_health_healthy", Name: "healthy"},
+		},
+	}
+)
+
+// Database-replica-level chart templates
+var (
+	agDBSyncStateChartTmpl = collectorapi.Chart{
+		ID:       "ag_db_%s_sync_state",
+		Title:    "AG database synchronization state",
+		Units:    "state",
+		Fam:      "ag databases",
+		Ctx:      "mssql.ag_db_sync_state",
+		Priority: prioAGDBSyncState,
+		Dims: collectorapi.Dims{
+			{ID: "ag_db_%s_sync_state_not_synchronizing", Name: "not_synchronizing"},
+			{ID: "ag_db_%s_sync_state_synchronizing", Name: "synchronizing"},
+			{ID: "ag_db_%s_sync_state_synchronized", Name: "synchronized"},
+			{ID: "ag_db_%s_sync_state_reverting", Name: "reverting"},
+			{ID: "ag_db_%s_sync_state_initializing", Name: "initializing"},
+		},
+	}
+	agDBLogSendQueueChartTmpl = collectorapi.Chart{
+		ID:       "ag_db_%s_log_send_queue",
+		Title:    "AG database log send queue size",
+		Units:    "bytes",
+		Fam:      "ag databases",
+		Ctx:      "mssql.ag_db_log_send_queue",
+		Priority: prioAGDBLogSendQueue,
+		Dims: collectorapi.Dims{
+			{ID: "ag_db_%s_log_send_queue_size", Name: "queue_size"},
+		},
+	}
+	agDBLogSendRateChartTmpl = collectorapi.Chart{
+		ID:       "ag_db_%s_log_send_rate",
+		Title:    "AG database log send rate",
+		Units:    "bytes/s",
+		Fam:      "ag databases",
+		Ctx:      "mssql.ag_db_log_send_rate",
+		Priority: prioAGDBLogSendRate,
+		Dims: collectorapi.Dims{
+			{ID: "ag_db_%s_log_send_rate", Name: "send_rate"},
+		},
+	}
+	agDBRedoQueueChartTmpl = collectorapi.Chart{
+		ID:       "ag_db_%s_redo_queue",
+		Title:    "AG database redo queue size",
+		Units:    "bytes",
+		Fam:      "ag databases",
+		Ctx:      "mssql.ag_db_redo_queue",
+		Priority: prioAGDBRedoQueue,
+		Dims: collectorapi.Dims{
+			{ID: "ag_db_%s_redo_queue_size", Name: "queue_size"},
+		},
+	}
+	agDBRedoRateChartTmpl = collectorapi.Chart{
+		ID:       "ag_db_%s_redo_rate",
+		Title:    "AG database redo rate",
+		Units:    "bytes/s",
+		Fam:      "ag databases",
+		Ctx:      "mssql.ag_db_redo_rate",
+		Priority: prioAGDBRedoRate,
+		Dims: collectorapi.Dims{
+			{ID: "ag_db_%s_redo_rate", Name: "redo_rate"},
+		},
+	}
+	agDBFilestreamSendRateChartTmpl = collectorapi.Chart{
+		ID:       "ag_db_%s_filestream_send_rate",
+		Title:    "AG database filestream send rate",
+		Units:    "bytes/s",
+		Fam:      "ag databases",
+		Ctx:      "mssql.ag_db_filestream_send_rate",
+		Priority: prioAGDBFilestreamSendRate,
+		Dims: collectorapi.Dims{
+			{ID: "ag_db_%s_filestream_send_rate", Name: "send_rate"},
+		},
+	}
+	agDBSecondaryLagChartTmpl = collectorapi.Chart{
+		ID:       "ag_db_%s_secondary_lag",
+		Title:    "AG database secondary lag",
+		Units:    "seconds",
+		Fam:      "ag databases",
+		Ctx:      "mssql.ag_db_secondary_lag",
+		Priority: prioAGDBSecondaryLag,
+		Dims: collectorapi.Dims{
+			{ID: "ag_db_%s_secondary_lag_seconds", Name: "lag"},
+		},
+	}
+	agDBSuspendedChartTmpl = collectorapi.Chart{
+		ID:       "ag_db_%s_suspended",
+		Title:    "AG database data movement suspended state",
+		Units:    "state",
+		Fam:      "ag databases",
+		Ctx:      "mssql.ag_db_suspended",
+		Priority: prioAGDBSuspended,
+		Dims: collectorapi.Dims{
+			{ID: "ag_db_%s_not_suspended", Name: "active"},
+			{ID: "ag_db_%s_suspended", Name: "suspended"},
+		},
+	}
+	agDBFailoverReadinessChartTmpl = collectorapi.Chart{
+		ID:       "ag_db_%s_failover_readiness",
+		Title:    "AG database failover readiness",
+		Units:    "state",
+		Fam:      "ag databases",
+		Ctx:      "mssql.ag_db_failover_readiness",
+		Priority: prioAGDBFailoverReadiness,
+		Dims: collectorapi.Dims{
+			{ID: "ag_db_%s_failover_ready", Name: "ready"},
+			{ID: "ag_db_%s_failover_not_ready", Name: "not_ready"},
+		},
+	}
+	agDBJoinedChartTmpl = collectorapi.Chart{
+		ID:       "ag_db_%s_joined_state",
+		Title:    "AG database joined state",
+		Units:    "state",
+		Fam:      "ag databases",
+		Ctx:      "mssql.ag_db_joined_state",
+		Priority: prioAGDBJoined,
+		Dims: collectorapi.Dims{
+			{ID: "ag_db_%s_joined", Name: "joined"},
+			{ID: "ag_db_%s_not_joined", Name: "not_joined"},
+		},
+	}
+)
+
+// Cluster-level chart
+var agClusterQuorumStateChart = collectorapi.Chart{
+	ID:       "ag_cluster_quorum_state",
+	Title:    "WSFC cluster quorum state",
+	Units:    "state",
+	Fam:      "ag cluster",
+	Ctx:      "mssql.ag_cluster_quorum_state",
+	Priority: prioAGClusterQuorumState,
+	Dims: collectorapi.Dims{
+		{ID: "ag_cluster_quorum_state_normal", Name: "normal"},
+		{ID: "ag_cluster_quorum_state_forced", Name: "forced"},
+		{ID: "ag_cluster_quorum_state_unknown", Name: "unknown"},
+	},
+}
+
+// Cluster member chart templates
+var (
+	agClusterMemberStateChartTmpl = collectorapi.Chart{
+		ID:       "ag_cluster_member_%s_state",
+		Title:    "WSFC cluster member state",
+		Units:    "state",
+		Fam:      "ag cluster",
+		Ctx:      "mssql.ag_cluster_member_state",
+		Priority: prioAGClusterMemberState,
+		Dims: collectorapi.Dims{
+			{ID: "ag_cluster_member_%s_up", Name: "up"},
+			{ID: "ag_cluster_member_%s_down", Name: "down"},
+		},
+	}
+	agClusterMemberQuorumVotesChartTmpl = collectorapi.Chart{
+		ID:       "ag_cluster_member_%s_quorum_votes",
+		Title:    "WSFC cluster member quorum votes",
+		Units:    "votes",
+		Fam:      "ag cluster",
+		Ctx:      "mssql.ag_cluster_member_quorum_votes",
+		Priority: prioAGClusterMemberState + 1,
+		Dims: collectorapi.Dims{
+			{ID: "ag_cluster_member_%s_quorum_votes", Name: "votes"},
+		},
+	}
+)
+
+// Page repair chart template (keyed by database name)
+var agPageRepairChartTmpl = collectorapi.Chart{
+	ID:       "ag_page_repair_%s",
+	Title:    "AG automatic page repair events",
+	Units:    "repairs",
+	Fam:      "ag page repair",
+	Ctx:      "mssql.ag_page_repair",
+	Priority: prioAGPageRepair,
+	Dims: collectorapi.Dims{
+		{ID: "ag_page_repair_%s_successful", Name: "successful"},
+		{ID: "ag_page_repair_%s_failed", Name: "failed"},
+	},
+}
+
+// Thread chart template
+var agThreadsChartTmpl = collectorapi.Chart{
+	ID:       "ag_%s_threads",
+	Title:    "Availability group threads",
+	Units:    "threads",
+	Fam:      "ag threads",
+	Ctx:      "mssql.ag_threads",
+	Priority: prioAGThreads,
+	Dims: collectorapi.Dims{
+		{ID: "ag_%s_capture_threads", Name: "capture"},
+		{ID: "ag_%s_redo_threads", Name: "redo"},
+		{ID: "ag_%s_parallel_redo_threads", Name: "parallel_redo"},
+	},
+}
+
+func (c *Collector) addAGCharts(agName string) {
+	charts := &collectorapi.Charts{
+		agSyncHealthChartTmpl.Copy(),
+		agRecoveryHealthChartTmpl.Copy(),
+	}
+
+	if c.majorVersion >= 15 { // SQL Server 2019+
+		*charts = append(*charts, agThreadsChartTmpl.Copy())
+	}
+
+	agID := cleanAGName(agName)
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, agID)
+		chart.Labels = []collectorapi.Label{
+			{Key: "ag_name", Value: agName},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, agID)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
+	}
+}
+
+func (c *Collector) addAGReplicaCharts(agName, replicaServer, availMode, failoverMode string) {
+	charts := &collectorapi.Charts{
+		agReplicaRoleChartTmpl.Copy(),
+		agReplicaConnectedStateChartTmpl.Copy(),
+		agReplicaSyncHealthChartTmpl.Copy(),
+	}
+
+	rID := cleanAGReplicaName(agName, replicaServer)
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, rID)
+		chart.Labels = []collectorapi.Label{
+			{Key: "ag_name", Value: agName},
+			{Key: "replica_server", Value: replicaServer},
+			{Key: "availability_mode", Value: availMode},
+			{Key: "failover_mode", Value: failoverMode},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, rID)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
+	}
+}
+
+func (c *Collector) addAGDatabaseReplicaCharts(agName, replicaServer, dbName string) {
+	charts := &collectorapi.Charts{
+		agDBSyncStateChartTmpl.Copy(),
+		agDBLogSendQueueChartTmpl.Copy(),
+		agDBLogSendRateChartTmpl.Copy(),
+		agDBRedoQueueChartTmpl.Copy(),
+		agDBRedoRateChartTmpl.Copy(),
+		agDBFilestreamSendRateChartTmpl.Copy(),
+		agDBSuspendedChartTmpl.Copy(),
+		agDBFailoverReadinessChartTmpl.Copy(),
+		agDBJoinedChartTmpl.Copy(),
+	}
+
+	if c.majorVersion >= 13 { // SQL Server 2016+
+		*charts = append(*charts, agDBSecondaryLagChartTmpl.Copy())
+	}
+
+	drID := cleanAGDatabaseReplicaName(agName, replicaServer, dbName)
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, drID)
+		chart.Labels = []collectorapi.Label{
+			{Key: "ag_name", Value: agName},
+			{Key: "replica_server", Value: replicaServer},
+			{Key: "database", Value: dbName},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, drID)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
+	}
+}
+
+func (c *Collector) addAGClusterMemberCharts(memberName string) {
+	charts := &collectorapi.Charts{
+		agClusterMemberStateChartTmpl.Copy(),
+		agClusterMemberQuorumVotesChartTmpl.Copy(),
+	}
+
+	mID := cleanAGName(memberName)
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, mID)
+		chart.Labels = []collectorapi.Label{
+			{Key: "cluster_member", Value: memberName},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, mID)
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
+	}
+}
+
+func (c *Collector) addAGPageRepairCharts(dbName string) {
+	chart := agPageRepairChartTmpl.Copy()
+
+	dbID := cleanDatabaseName(dbName)
+
+	chart.ID = fmt.Sprintf(chart.ID, dbID)
+	chart.Labels = []collectorapi.Label{
+		{Key: "database", Value: dbName},
+	}
+	for _, dim := range chart.Dims {
+		dim.ID = fmt.Sprintf(dim.ID, dbID)
+	}
+
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
+	}
 }

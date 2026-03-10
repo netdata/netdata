@@ -377,6 +377,157 @@ WHERE object_name LIKE '%Databases%'
   AND instance_name NOT IN ('_Total', 'mssqlsystemresource');
 `
 
+// queryHadrEnabled checks if Always On Availability Groups is enabled
+const queryHadrEnabled = `
+SELECT CAST(SERVERPROPERTY('IsHadrEnabled') AS int);
+`
+
+// queryAGHealth gets AG-level health rollup
+const queryAGHealth = `
+SELECT
+  ag.name AS ag_name,
+  ags.synchronization_health,
+  ISNULL(ags.primary_recovery_health, -1) AS primary_recovery_health,
+  ISNULL(ags.secondary_recovery_health, -1) AS secondary_recovery_health
+FROM sys.availability_groups AS ag
+INNER JOIN sys.dm_hadr_availability_group_states AS ags
+  ON ag.group_id = ags.group_id;
+`
+
+// queryAGReplicaStates gets per-replica role, connectivity, and sync health
+const queryAGReplicaStates = `
+SELECT
+  ag.name AS ag_name,
+  ar.replica_server_name,
+  LOWER(ar.availability_mode_desc) AS availability_mode,
+  LOWER(ar.failover_mode_desc) AS failover_mode,
+  ISNULL(ars.role, -1) AS role,
+  ISNULL(ars.connected_state, -1) AS connected_state,
+  ars.synchronization_health
+FROM sys.availability_replicas AS ar
+INNER JOIN sys.availability_groups AS ag
+  ON ar.group_id = ag.group_id
+INNER JOIN sys.dm_hadr_availability_replica_states AS ars
+  ON ar.replica_id = ars.replica_id;
+`
+
+// queryAGDatabaseReplicas12 gets per-database replica metrics (SQL Server 2012)
+// No secondary_lag_seconds
+const queryAGDatabaseReplicas12 = `
+SELECT
+  ag.name AS ag_name,
+  ar.replica_server_name,
+  DB_NAME(drs.database_id) AS database_name,
+  ISNULL(drs.synchronization_state, -1) AS synchronization_state,
+  CAST(ISNULL(drs.is_suspended, 0) AS int) AS is_suspended,
+  ISNULL(drs.log_send_queue_size, 0) * 1024 AS log_send_queue_size,
+  ISNULL(drs.log_send_rate, 0) * 1024 AS log_send_rate,
+  ISNULL(drs.redo_queue_size, 0) * 1024 AS redo_queue_size,
+  ISNULL(drs.redo_rate, 0) * 1024 AS redo_rate,
+  ISNULL(drs.filestream_send_rate, 0) * 1024 AS filestream_send_rate,
+  -1 AS secondary_lag_seconds
+FROM sys.dm_hadr_database_replica_states AS drs
+INNER JOIN sys.availability_replicas AS ar
+  ON drs.replica_id = ar.replica_id
+INNER JOIN sys.availability_groups AS ag
+  ON drs.group_id = ag.group_id;
+`
+
+// queryAGDatabaseReplicas14 gets per-database replica metrics (SQL Server 2014+)
+// No secondary_lag_seconds
+const queryAGDatabaseReplicas14 = `
+SELECT
+  ag.name AS ag_name,
+  ar.replica_server_name,
+  DB_NAME(drs.database_id) AS database_name,
+  ISNULL(drs.synchronization_state, -1) AS synchronization_state,
+  CAST(ISNULL(drs.is_suspended, 0) AS int) AS is_suspended,
+  ISNULL(drs.log_send_queue_size, 0) * 1024 AS log_send_queue_size,
+  ISNULL(drs.log_send_rate, 0) * 1024 AS log_send_rate,
+  ISNULL(drs.redo_queue_size, 0) * 1024 AS redo_queue_size,
+  ISNULL(drs.redo_rate, 0) * 1024 AS redo_rate,
+  ISNULL(drs.filestream_send_rate, 0) * 1024 AS filestream_send_rate,
+  -1 AS secondary_lag_seconds
+FROM sys.dm_hadr_database_replica_states AS drs
+INNER JOIN sys.availability_replicas AS ar
+  ON drs.replica_id = ar.replica_id
+INNER JOIN sys.availability_groups AS ag
+  ON drs.group_id = ag.group_id;
+`
+
+// queryAGDatabaseReplicas16 gets per-database replica metrics (SQL Server 2016+)
+// Adds secondary_lag_seconds
+const queryAGDatabaseReplicas16 = `
+SELECT
+  ag.name AS ag_name,
+  ar.replica_server_name,
+  DB_NAME(drs.database_id) AS database_name,
+  ISNULL(drs.synchronization_state, -1) AS synchronization_state,
+  CAST(ISNULL(drs.is_suspended, 0) AS int) AS is_suspended,
+  ISNULL(drs.log_send_queue_size, 0) * 1024 AS log_send_queue_size,
+  ISNULL(drs.log_send_rate, 0) * 1024 AS log_send_rate,
+  ISNULL(drs.redo_queue_size, 0) * 1024 AS redo_queue_size,
+  ISNULL(drs.redo_rate, 0) * 1024 AS redo_rate,
+  ISNULL(drs.filestream_send_rate, 0) * 1024 AS filestream_send_rate,
+  ISNULL(drs.secondary_lag_seconds, -1) AS secondary_lag_seconds
+FROM sys.dm_hadr_database_replica_states AS drs
+INNER JOIN sys.availability_replicas AS ar
+  ON drs.replica_id = ar.replica_id
+INNER JOIN sys.availability_groups AS ag
+  ON drs.group_id = ag.group_id;
+`
+
+// queryAGCluster gets WSFC cluster quorum state
+const queryAGCluster = `
+SELECT
+  quorum_state
+FROM sys.dm_hadr_cluster;
+`
+
+// queryAGClusterMembers gets WSFC cluster member states
+const queryAGClusterMembers = `
+SELECT
+  member_name,
+  member_state,
+  number_of_quorum_votes
+FROM sys.dm_hadr_cluster_members;
+`
+
+// queryAGFailoverReadiness gets per-database failover readiness
+const queryAGFailoverReadiness = `
+SELECT
+  ag.name AS ag_name,
+  ar.replica_server_name,
+  dcs.database_name,
+  CAST(ISNULL(dcs.is_failover_ready, 0) AS int) AS is_failover_ready,
+  CAST(ISNULL(dcs.is_database_joined, 0) AS int) AS is_database_joined
+FROM sys.dm_hadr_database_replica_cluster_states AS dcs
+INNER JOIN sys.availability_replicas AS ar
+  ON dcs.replica_id = ar.replica_id
+INNER JOIN sys.availability_groups AS ag
+  ON ar.group_id = ag.group_id;
+`
+
+// queryAGAutoPageRepair gets page repair event counts per database
+const queryAGAutoPageRepair = `
+SELECT
+  DB_NAME(database_id) AS database_name,
+  SUM(CASE WHEN page_status = 4 THEN 1 ELSE 0 END) AS successful_repairs,
+  SUM(CASE WHEN page_status = 5 THEN 1 ELSE 0 END) AS failed_repairs
+FROM sys.dm_hadr_auto_page_repair
+GROUP BY database_id;
+`
+
+// queryAGThreads gets AG thread usage (SQL Server 2019+ only)
+const queryAGThreads = `
+SELECT
+  name AS ag_name,
+  num_capture_threads,
+  num_redo_threads,
+  num_parallel_redo_threads
+FROM sys.dm_hadr_ag_threads;
+`
+
 // waitTypeCategories maps wait types to their categories
 var waitTypeCategories = map[string]string{
 	"ASYNC_IO_COMPLETION":              "Other Disk IO",

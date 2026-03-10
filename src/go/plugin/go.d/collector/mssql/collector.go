@@ -56,6 +56,12 @@ func New() *Collector {
 		seenLockStatsTypes: make(map[string]bool),
 		seenJobs:           make(map[string]bool),
 		seenReplications:   make(map[string]bool),
+
+		seenAGs:                make(map[string]bool),
+		seenAGReplicas:         make(map[string]bool),
+		seenAGDatabaseReplicas: make(map[string]bool),
+		seenAGClusterMembers:   make(map[string]bool),
+		seenAGPageRepairDBs:    make(map[string]bool),
 	}
 }
 
@@ -155,6 +161,17 @@ type Collector struct {
 	seenLockStatsTypes map[string]bool
 	seenJobs           map[string]bool
 	seenReplications   map[string]bool
+
+	hadrEnabled  bool // true if Always On AG is enabled on this instance
+	hadrChecked  bool // true after the HADR check has been performed
+	majorVersion int  // parsed from version string (11=2012, 12=2014, 13=2016, etc.)
+
+	seenAGs                map[string]bool // key: ag_name
+	seenAGReplicas         map[string]bool // key: ag_name + "_" + replica_server_name
+	seenAGDatabaseReplicas map[string]bool // key: ag_name + "_" + replica_server_name + "_" + db_name
+	seenAGClusterMembers   map[string]bool // key: member_name
+	seenAGPageRepairDBs    map[string]bool // key: database_name
+	agClusterChartAdded    bool            // true after cluster quorum chart has been added
 
 	// Query Store column cache (per-instance to handle different SQL Server versions)
 	queryStoreColsMu sync.RWMutex // protects queryStoreCols for concurrent access

@@ -77,3 +77,63 @@ func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, charts)
 	assert.NotEmpty(t, *charts)
 }
+
+func TestParseMajorVersion(t *testing.T) {
+	tests := []struct {
+		version  string
+		expected int
+	}{
+		{"16.0.4175.1", 16},
+		{"15.0.4198.2", 15},
+		{"14.0.3456.2", 14},
+		{"13.0.6300.2", 13},
+		{"12.0.6024.0", 12},
+		{"11.0.7001.0", 11},
+		{"", 0},
+		{"invalid", 0},
+		{"abc.def", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.version, func(t *testing.T) {
+			assert.Equal(t, tt.expected, parseMajorVersion(tt.version))
+		})
+	}
+}
+
+func TestCleanAGName(t *testing.T) {
+	tests := []struct {
+		name     string
+		expected string
+	}{
+		{"MyAG", "myag"},
+		{"My AG-1", "my_ag_1"},
+		{"SERVER\\INSTANCE", "server_instance"},
+		{"ag.with.dots", "ag_with_dots"},
+		{"simple", "simple"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, cleanAGName(tt.name))
+		})
+	}
+}
+
+func TestCleanAGReplicaName(t *testing.T) {
+	assert.Equal(t, "myag_server1", cleanAGReplicaName("MyAG", "SERVER1"))
+	assert.Equal(t, "prod_ag_node1_instance", cleanAGReplicaName("Prod-AG", "Node1.Instance"))
+}
+
+func TestCleanAGDatabaseReplicaName(t *testing.T) {
+	assert.Equal(t, "myag_server1_testdb", cleanAGDatabaseReplicaName("MyAG", "SERVER1", "TestDB"))
+}
+
+func TestAGDatabaseReplicaQuery(t *testing.T) {
+	assert.Equal(t, queryAGDatabaseReplicas12, agDatabaseReplicaQuery(11))
+	assert.Equal(t, queryAGDatabaseReplicas14, agDatabaseReplicaQuery(12))
+	assert.Equal(t, queryAGDatabaseReplicas16, agDatabaseReplicaQuery(13))
+	assert.Equal(t, queryAGDatabaseReplicas16, agDatabaseReplicaQuery(14))
+	assert.Equal(t, queryAGDatabaseReplicas16, agDatabaseReplicaQuery(15))
+	assert.Equal(t, queryAGDatabaseReplicas16, agDatabaseReplicaQuery(16))
+}
