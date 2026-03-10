@@ -44,9 +44,9 @@ func resolveDimensionName(dim program.Dimension, metricName string, labels metri
 func inferDimensionLabelKey(metricName string, meta metrix.SeriesMeta) (string, bool, error) {
 	switch meta.FlattenRole {
 	case metrix.FlattenRoleHistogramBucket:
-		return histogramBucketLabel, true, nil
+		return metrix.HistogramBucketLabel, true, nil
 	case metrix.FlattenRoleSummaryQuantile:
-		return summaryQuantileLabel, true, nil
+		return metrix.SummaryQuantileLabel, true, nil
 	case metrix.FlattenRoleStateSetState:
 		if strings.TrimSpace(metricName) == "" {
 			return "", false, fmt.Errorf("chartengine: stateset inference requires metric family name")

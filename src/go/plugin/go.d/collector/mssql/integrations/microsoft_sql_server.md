@@ -586,8 +586,14 @@ The following options can be defined globally: update_every, autodetection_retry
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Data collection interval (seconds). | 10 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| **Target** | dsn | SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). | sqlserver://localhost:1433 | yes |
-|  | timeout | Query timeout (seconds). | 5 | no |
+| **Target** | dsn | SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). When `cloud_auth.provider` is `azure_ad`, use URL format with `sqlserver://` scheme. | sqlserver://localhost:1433 | yes |
+| **Cloud Auth** | cloud_auth.provider | Cloud auth provider (`none` or `azure_ad`). | none | no |
+| **Cloud Auth/Azure** | cloud_auth.azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). | default | no |
+|  | cloud_auth.azure_ad.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.client_id | Azure client ID. Required for `service_principal`; optional for user-assigned managed identity. |  | no |
+|  | cloud_auth.azure_ad.client_secret | Azure client secret for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.managed_identity_client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
+| **Target** | timeout | Query timeout (seconds). | 5 | no |
 | **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
 |  | functions.top_queries.timeout | Query timeout for top-queries function (seconds). Uses collector timeout if not set. |  | no |
 |  | functions.top_queries.limit | Maximum number of queries to return in the top-queries response. | 500 | no |
@@ -694,6 +700,45 @@ Connect to a remote SQL Server.
 jobs:
   - name: remote
     dsn: "sqlserver://netdata_user:password@192.168.1.100:1433"
+
+```
+</details>
+
+###### Azure SQL with service principal
+
+Use Microsoft Entra service principal authentication for Azure SQL.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: azure_sql_sp
+    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
+    cloud_auth:
+      provider: azure_ad
+      azure_ad:
+        mode: service_principal
+        tenant_id: "00000000-0000-0000-0000-000000000000"
+        client_id: "11111111-1111-1111-1111-111111111111"
+        client_secret: "super-secret-value"
+
+```
+</details>
+
+###### Azure SQL with managed identity
+
+Use managed identity authentication (system-assigned by default).
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: azure_sql_mi
+    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
+    cloud_auth:
+      provider: azure_ad
+      azure_ad:
+        mode: managed_identity
 
 ```
 </details>

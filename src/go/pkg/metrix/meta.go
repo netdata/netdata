@@ -14,6 +14,8 @@ func metricKindPublic(kind metricKind) MetricKind {
 		return MetricKindSummary
 	case kindStateSet:
 		return MetricKindStateSet
+	case kindMeasureSet:
+		return MetricKindMeasureSet
 	default:
 		return MetricKindUnknown
 	}

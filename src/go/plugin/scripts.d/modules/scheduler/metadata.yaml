@@ -15,8 +15,6 @@ modules:
           list:
             - plugin_name: scripts.d.plugin
               module_name: nagios
-            - plugin_name: scripts.d.plugin
-              module_name: zabbix
       info_provided_to_referring_integrations:
         description: ""
       keywords:

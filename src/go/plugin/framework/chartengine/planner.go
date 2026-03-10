@@ -12,11 +12,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 )
 
-const (
-	histogramBucketLabel = "le"
-	summaryQuantileLabel = "quantile"
-)
-
 type labelSliceView struct {
 	items []metrix.Label
 }

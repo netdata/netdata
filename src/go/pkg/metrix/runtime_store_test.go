@@ -109,6 +109,64 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				mustValue(t, fr, "runtime.mode", Labels{"runtime.mode": "operational"}, 1)
 			},
 		},
+		"runtime MeasureSet gauge and counter are readable and flattenable": {
+			run: func(t *testing.T) {
+				s := NewRuntimeStore()
+				m := s.Write().StatefulMeter("runtime")
+				g := m.MeasureSetGauge(
+					"usage",
+					WithMeasureSetFields(
+						MeasureFieldSpec{Name: "value"},
+						MeasureFieldSpec{Name: "limit"},
+					),
+				)
+				c := m.MeasureSetCounter(
+					"events",
+					WithMeasureSetFields(
+						MeasureFieldSpec{Name: "ok"},
+						MeasureFieldSpec{Name: "failed"},
+					),
+				)
+
+				g.SetFields(map[string]SampleValue{
+					"value": 10,
+					"limit": 20,
+				})
+				g.SetField("value", 11)
+				g.AddField("limit", 2)
+				mustMeasureSet(t, s.Read(), "runtime.usage", nil, []SampleValue{11, 22})
+				mustValue(t, s.Read(ReadFlatten()), "runtime.usage_value", measureSetFieldLabels("value"), 11)
+				mustValue(t, s.Read(ReadFlatten()), "runtime.usage_limit", measureSetFieldLabels("limit"), 22)
+
+				c.AddFields(map[string]SampleValue{
+					"ok":     5,
+					"failed": 1,
+				})
+				mustNoDelta(t, s.Read(ReadFlatten()), "runtime.events_ok", measureSetFieldLabels("ok"))
+				c.AddField("ok", 2)
+				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_ok", measureSetFieldLabels("ok"), 2)
+				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_failed", measureSetFieldLabels("failed"), 0)
+				c.AddField("failed", 3)
+				mustMeasureSet(t, s.Read(), "runtime.events", nil, []SampleValue{7, 4})
+				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_ok", measureSetFieldLabels("ok"), 0)
+				mustDelta(t, s.Read(ReadFlatten()), "runtime.events_failed", measureSetFieldLabels("failed"), 3)
+			},
+		},
+		"runtime MeasureSet flatten label key collision panics": {
+			run: func(t *testing.T) {
+				s := NewRuntimeStore()
+				ms := s.Write().StatefulMeter("runtime").
+					WithLabels(Label{Key: MeasureSetFieldLabel, Value: "already-present"}).
+					MeasureSetGauge(
+						"usage",
+						WithMeasureSetFields(MeasureFieldSpec{Name: "value"}),
+					)
+
+				expectPanic(t, func() {
+					ms.SetPoint(MeasureSetPoint{Values: []SampleValue{1}})
+				})
+			},
+		},
 		"runtime counter is thread-safe for concurrent writers": {
 			run: func(t *testing.T) {
 				s := NewRuntimeStore()

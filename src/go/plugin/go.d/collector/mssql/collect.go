@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/sqladapter"
 )
 
 // noLatencySentinel is the value SQL Server returns when no latency data is available
@@ -56,7 +58,12 @@ func (c *Collector) collect() (map[string]int64, error) {
 }
 
 func (c *Collector) openConnection() (*sql.DB, error) {
-	db, err := sql.Open("sqlserver", c.DSN)
+	driverName, dsn, err := c.resolveConnectionParams()
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := sql.Open(driverName, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("error opening connection: %v", err)
 	}
@@ -74,6 +81,19 @@ func (c *Collector) openConnection() (*sql.DB, error) {
 	}
 
 	return db, nil
+}
+
+func (c *Collector) resolveConnectionParams() (string, string, error) {
+	driverName := sqladapter.MSSQLDriver(c.CloudAuth)
+	dsn := c.DSN
+	if c.CloudAuth.IsEnabled() {
+		var err error
+		dsn, err = sqladapter.BuildMSSQLAzureADDSN(c.DSN, c.CloudAuth)
+		if err != nil {
+			return "", "", fmt.Errorf("error preparing cloud auth SQL Server DSN: %v", err)
+		}
+	}
+	return driverName, dsn, nil
 }
 
 func (c *Collector) queryVersion() (string, error) {
