@@ -43,9 +43,10 @@ The following options can be defined for this notification
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | SEND_CUSTOM | Set `SEND_CUSTOM` to YES | YES | yes |
-| DEFAULT_RECIPIENT_CUSTOM | This value is dependent on how you handle the `${to}` variable inside the `custom_sender()` function. |  | yes |
-| custom_sender() | You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the function in this configuration file. |  | no |
+| [DEFAULT_RECIPIENT_CUSTOM](#option-default-recipient-custom) | This value is dependent on how you handle the `${to}` variable inside the `custom_sender()` function. |  | yes |
+| [custom_sender()](#option-custom-sender) | You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the function in this configuration file. |  | no |
 
+<a id="option-default-recipient-custom"></a>
 ##### DEFAULT_RECIPIENT_CUSTOM
 
 All roles will default to this variable if left unconfigured. You can edit `DEFAULT_RECIPIENT_CUSTOM` with the variable you want, in the following entries at the bottom of the same file:
@@ -59,6 +60,7 @@ role_recipients_custom[sitemgr]="sites"
 ```
 
 
+<a id="option-custom-sender"></a>
 ##### custom_sender()
 
 The following is a sample custom_sender() function in health_alarm_notify.conf, to send an SMS via an imaginary HTTPS endpoint to the SMS gateway:

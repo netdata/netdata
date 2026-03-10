@@ -1,6 +1,12 @@
 # Creating Alerts with Netdata Alerts Configuration Manager
 
-The **Netdata Alerts Configuration Manager** lets you create and fine-tune alerts directly from the Netdata Cloud Dashboard.
+The **Netdata Alerts Configuration Manager** lets you create and fine-tune alerts directly from the Netdata Cloud Dashboard using a visual UI wizard.
+
+:::tip
+
+**Want AI to handle the configuration for you?** [Alerts Automation](/docs/netdata-ai/alerts-automation/alerts-automation.md) uses AI to suggest alerts, generate the configuration, and test it against historical data — so you can validate thresholds before deployment without writing any configuration manually.
+
+:::
 
 :::info
 
@@ -102,3 +108,4 @@ You control how and when alerts are triggered, escalated, or resolved:
 
 - You can apply alert definitions to **Parent Agents** or **Standalone Child Agents**
 - If you need help writing custom alerts, check the [full alert reference](/src/health/REFERENCE.md)
+- To create alerts using natural language instead of this manual wizard, see [Alerts Automation](/docs/netdata-ai/alerts-automation/alerts-automation.md)

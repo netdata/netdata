@@ -128,6 +128,75 @@ modules:
         metric: docker.container_health_status
         info: ${label:container_name} docker container health status is unhealthy
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/docker.conf
+    functions:
+      description: |
+        This collector exposes real-time functions for interactive troubleshooting in the Live tab.
+      list:
+        - id: container-ls
+          name: Containers
+          description: |
+            Retrieves container list data equivalent to `docker ps -a`.
+
+            This function calls the Docker Container List API with `all=true` and returns both running and non-running containers in a table similar to Docker CLI output.
+
+            Use cases:
+            - Quickly inspect all containers (running, exited, paused, dead) from Netdata
+            - Correlate container lifecycle with metric changes and alerts
+            - Verify exposed ports, image tags, and container names without shell access
+          parameters: []
+          returns:
+            description: Container inventory from Docker Engine. Each row represents one container returned by `docker ps -a`.
+            columns:
+              - name: CONTAINER ID
+                type: string
+                unit: ""
+                description: Short container ID (12 characters).
+              - name: IMAGE
+                type: string
+                unit: ""
+                description: Container image reference.
+              - name: COMMAND
+                type: string
+                unit: ""
+                description: Container command as reported by Docker API.
+              - name: CREATED
+                type: string
+                unit: ""
+                description: Human-readable container creation age (for example, '5 days ago').
+              - name: STATUS
+                type: string
+                unit: ""
+                description: Docker status string (for example, 'Up 3 weeks' or 'Exited (0) 4 weeks ago').
+              - name: State (Raw)
+                type: string
+                unit: ""
+                visibility: hidden
+                description: Raw Docker state value (for example, running, exited, paused, restarting, dead).
+              - name: PORTS
+                type: string
+                unit: ""
+                description: Published or exposed ports summary.
+              - name: NAMES
+                type: string
+                unit: ""
+                description: Container name.
+              - name: Container ID (Full)
+                type: string
+                unit: ""
+                visibility: hidden
+                description: Full 64-character container ID.
+              - name: Created (Unix)
+                type: integer
+                unit: "seconds"
+                visibility: hidden
+                description: Container creation timestamp in Unix seconds.
+          performance: |
+            Executes a single Docker API request (`ContainerList` with `all=true`):<br/>• No per-container inspect requests are issued<br/>• Response size grows with total container count<br/>• Large histories with many stopped containers may return more rows
+          security: |
+            Exposes container metadata that may include sensitive details:<br/>• Container command text may include runtime arguments<br/>• Image names, ports, and container names are visible<br/>• Restrict access to authorized operators
+          availability: |
+            Available when:<br/>• Docker collector is initialized and connected<br/>• Docker API list-containers request succeeds<br/>• Returns HTTP 503 while collector is initializing<br/>• Returns HTTP 500 on Docker API errors<br/>• Returns HTTP 504 on timeout
+          require_cloud: true
     metrics:
       folding:
         title: Metrics

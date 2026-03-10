@@ -135,10 +135,11 @@ The following options can be defined globally: update_every, autodetection_retry
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Data collection interval (seconds). | 10 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| **Target** | files | File selector. Defines which files to monitor. |  | yes |
-|  | dirs | Directory selector. Defines which directories to monitor. |  | yes |
+| **Target** | [files](#option-target-files) | File selector. Defines which files to monitor. |  | yes |
+|  | [dirs](#option-target-dirs) | Directory selector. Defines which directories to monitor. |  | yes |
 | **Discovery** | discovery_every | Files and directories discovery interval (seconds). | 60 | no |
 
+<a id="option-target-files"></a>
 ##### files
 
 Files matching the selector will be monitored.
@@ -158,6 +159,7 @@ files:
 ```
 
 
+<a id="option-target-dirs"></a>
 ##### dirs
 
 Directories matching the selector will be monitored.

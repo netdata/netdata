@@ -53,6 +53,16 @@ static struct {
         .priority = NDLP_DEBUG,
     },
     {
+        .response = START_STREAMING_ERROR_LOCAL_VNODE,
+        .length = sizeof(START_STREAMING_ERROR_LOCAL_VNODE) - 1,
+        .version = STREAM_HANDSHAKE_PARENT_VNODE_IS_LOCAL,
+        .dynamic = false,
+        .error = "remote server rejected this stream, the vnode is collected locally on that server",
+        .worker_job_id = WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE,
+        .postpone_reconnect_seconds = 60 * 60, // the vnode may stop being collected, try every hour
+        .priority = NDLP_DEBUG,
+    },
+    {
         .response = START_STREAMING_ERROR_ALREADY_STREAMING,
         .length = sizeof(START_STREAMING_ERROR_ALREADY_STREAMING) - 1,
         .version = STREAM_HANDSHAKE_PARENT_NODE_ALREADY_CONNECTED,

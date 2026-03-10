@@ -11,6 +11,7 @@ extends:
   - _std-tcp-mib.yaml
   - _std-udp-mib.yaml
   - _std-ip-mib.yaml
+  - _checkpoint-vpn.yaml
 
 selector:
   - sysobjectid:

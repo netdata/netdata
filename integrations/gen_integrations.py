@@ -103,6 +103,7 @@ FIXUP_BLANK_PATTERN = re.compile('\\\\\\n *\\n')
 
 GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS', False)
 DEBUG = os.environ.get('DEBUG', False)
+WARNINGS = []
 
 
 def debug(msg):
@@ -115,10 +116,25 @@ def debug(msg):
 
 
 def warn(msg, path):
+    WARNINGS.append((str(path), msg))
+
     if GITHUB_ACTIONS:
         print(f':warning file={path}:{msg}')
     else:
         print(f'!!! WARNING:{path}:{msg}')
+
+
+def fail_on_warnings():
+    if not WARNINGS:
+        return 0
+
+    warned_files = sorted({path for path, _ in WARNINGS})
+    print(f':error:Integrations generation failed with {len(WARNINGS)} warning(s) across {len(warned_files)} file(s).')
+
+    for path in warned_files:
+        print(f':error file={path}:Metadata warnings in this file are now fatal for integrations generation.')
+
+    return 1
 
 
 def retrieve_from_filesystem(uri):
@@ -191,7 +207,7 @@ def get_jinja_env():
             lstrip_blocks=True,
         )
 
-        _jinja_env.globals.update(strfy=strfy)
+        _jinja_env.globals.update(strfy=strfy, anchorfy=anchorfy)
 
     return _jinja_env
 
@@ -202,6 +218,17 @@ def strfy(value):
     if isinstance(value, str):
         return ' '.join([v.strip() for v in value.strip().split("\n") if v]).replace('|', '/')
     return value
+
+
+def anchorfy(value):
+    if value is None:
+        return ''
+
+    anchor = str(value).strip().lower()
+    anchor = re.sub(r'[^a-z0-9]+', '-', anchor)
+    anchor = re.sub(r'-{2,}', '-', anchor).strip('-')
+
+    return anchor
 
 
 def get_category_sets(categories):
@@ -1065,6 +1092,8 @@ def main():
 
     clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_agent_notifications + clean_cloud_notifications + clean_logs + clean_authentications
     render_json(categories, clean_integrations)
+
+    return fail_on_warnings()
 
 
 if __name__ == '__main__':

@@ -12,6 +12,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/sqladapter"
 )
 
 //go:embed "config_schema.json"
@@ -52,6 +54,8 @@ type Collector struct {
 	seenCharts map[string]bool
 
 	funcTable *funcTable
+
+	azureTokenProvider *cloudauth.TokenProvider
 }
 
 func (c *Collector) Configuration() any {
@@ -68,6 +72,21 @@ func (c *Collector) Charts() *collectorapi.Charts {
 func (c *Collector) Init(context.Context) error {
 	if err := c.validateConfig(); err != nil {
 		return err
+	}
+	if c.CloudAuth.IsProvider(cloudauth.ProviderAzureAD) && c.Driver == "pgx" {
+		cred, err := c.CloudAuth.NewCredential()
+		if err != nil {
+			return err
+		}
+		provider, err := cloudauth.NewTokenProvider(
+			cred,
+			[]string{sqladapter.AzurePostgreSQLAADScope},
+			cloudauth.DefaultTokenRefreshMargin,
+		)
+		if err != nil {
+			return err
+		}
+		c.azureTokenProvider = provider
 	}
 
 	c.funcTable = newFuncTable(c)

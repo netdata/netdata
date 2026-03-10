@@ -210,8 +210,8 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Target** | url | Target endpoint URL. | http://127.0.0.1/server-status?auto | yes |
 |  | timeout | HTTP request timeout (seconds). | 1 | no |
 | **Discovery** | discovery_interval | Hosts and VMs discovery interval (seconds). | 300 | no |
-| **Filters** | host_include | Hosts selector (filter). | /* | no |
-|  | vm_include | VM selector (filter). | /* | no |
+| **Filters** | [host_include](#option-filters-host-include) | Hosts selector (filter). | /* | no |
+|  | [vm_include](#option-filters-vm-include) | VM selector (filter). | /* | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | yes |
 |  | password | Password for Basic HTTP authentication. |  | yes |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -229,6 +229,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
+<a id="option-filters-host-include"></a>
 ##### host_include
 
 Metrics of hosts matching the selector will be collected.
@@ -245,6 +246,7 @@ Metrics of hosts matching the selector will be collected.
   ```
 
 
+<a id="option-filters-vm-include"></a>
 ##### vm_include
 
 Metrics of VMs matching the selector will be collected.

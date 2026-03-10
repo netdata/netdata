@@ -145,7 +145,7 @@ modules:
     alerts: []
     functions:
       description: |
-        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+        This collector exposes real-time functions for interactive troubleshooting in the Live tab.
       list:
         - id: running-queries
           name: Running Queries
