@@ -136,6 +136,67 @@ func TestAWSGetCredentials_EnvVarsNoSession(t *testing.T) {
 	assert.Empty(t, creds.sessionToken)
 }
 
+func TestAWSGetCredentials_ECSRelativeURI(t *testing.T) {
+	t.Setenv("AWS_ACCESS_KEY_ID", "")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "")
+	t.Setenv("AWS_SESSION_TOKEN", "")
+	t.Setenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/v2/credentials/abc")
+
+	origClient := awsIMDSHTTPClient
+	awsIMDSHTTPClient = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			assert.Equal(t, "GET", req.Method)
+			assert.Equal(t, "169.254.170.2", req.URL.Host)
+			assert.Equal(t, "/v2/credentials/abc", req.URL.Path)
+			return newHTTPResponse(http.StatusOK, `{"AccessKeyId":"ECSAK","SecretAccessKey":"ECSSK","Token":"ECSTOKEN"}`), nil
+		}),
+	}
+	defer func() { awsIMDSHTTPClient = origClient }()
+
+	creds, err := awsGetCredentials()
+	require.NoError(t, err)
+	assert.Equal(t, "ECSAK", creds.accessKeyID)
+	assert.Equal(t, "ECSSK", creds.secretAccessKey)
+	assert.Equal(t, "ECSTOKEN", creds.sessionToken)
+}
+
+func TestAWSGetCredentials_IMDSFallbackAfterECSFailure(t *testing.T) {
+	t.Setenv("AWS_ACCESS_KEY_ID", "")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "")
+	t.Setenv("AWS_SESSION_TOKEN", "")
+	t.Setenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/v2/credentials/fail")
+
+	origClient := awsIMDSHTTPClient
+	awsIMDSHTTPClient = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			switch {
+			case req.URL.Host == "169.254.170.2":
+				assert.Equal(t, "GET", req.Method)
+				assert.Equal(t, "/v2/credentials/fail", req.URL.Path)
+				return newHTTPResponse(http.StatusInternalServerError, `{"error":"temporary"}`), nil
+			case req.Method == http.MethodPut && req.URL.Host == "169.254.169.254" && req.URL.Path == "/latest/api/token":
+				assert.Equal(t, "21600", req.Header.Get("X-aws-ec2-metadata-token-ttl-seconds"))
+				return newHTTPResponse(http.StatusOK, "imds-token"), nil
+			case req.Method == http.MethodGet && req.URL.Host == "169.254.169.254" && req.URL.Path == "/latest/meta-data/iam/security-credentials/":
+				assert.Equal(t, "imds-token", req.Header.Get("X-aws-ec2-metadata-token"))
+				return newHTTPResponse(http.StatusOK, "my-role"), nil
+			case req.Method == http.MethodGet && req.URL.Host == "169.254.169.254" && req.URL.Path == "/latest/meta-data/iam/security-credentials/my-role":
+				assert.Equal(t, "imds-token", req.Header.Get("X-aws-ec2-metadata-token"))
+				return newHTTPResponse(http.StatusOK, `{"AccessKeyId":"IMDSAK","SecretAccessKey":"IMDSSK","Token":"IMDSTOKEN"}`), nil
+			default:
+				return newHTTPResponse(http.StatusNotFound, `{"error":"unexpected"}`), nil
+			}
+		}),
+	}
+	defer func() { awsIMDSHTTPClient = origClient }()
+
+	creds, err := awsGetCredentials()
+	require.NoError(t, err)
+	assert.Equal(t, "IMDSAK", creds.accessKeyID)
+	assert.Equal(t, "IMDSSK", creds.secretAccessKey)
+	assert.Equal(t, "IMDSTOKEN", creds.sessionToken)
+}
+
 func TestAWSSigV4Sign(t *testing.T) {
 	creds := &awsCredentials{
 		accessKeyID:     "AKIDEXAMPLE",

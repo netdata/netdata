@@ -145,3 +145,26 @@ func TestAzureGetAccessToken_NoCredentials(t *testing.T) {
 	_, err := azureGetAccessToken()
 	assert.Error(t, err)
 }
+
+func TestAzureGetTokenManagedIdentity_Success(t *testing.T) {
+	t.Setenv("AZURE_CLIENT_ID", "user-assigned-client-id")
+
+	origClient := azureIMDSHTTPClient
+	azureIMDSHTTPClient = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			assert.Equal(t, "GET", req.Method)
+			assert.Equal(t, "169.254.169.254", req.URL.Host)
+			assert.Equal(t, "/metadata/identity/oauth2/token", req.URL.Path)
+			assert.Equal(t, "true", req.Header.Get("Metadata"))
+			assert.Equal(t, "2018-02-01", req.URL.Query().Get("api-version"))
+			assert.Equal(t, "https://vault.azure.net", req.URL.Query().Get("resource"))
+			assert.Equal(t, "user-assigned-client-id", req.URL.Query().Get("client_id"))
+			return newHTTPResponse(http.StatusOK, `{"access_token":"mi-token"}`), nil
+		}),
+	}
+	defer func() { azureIMDSHTTPClient = origClient }()
+
+	token, err := azureGetTokenManagedIdentity()
+	require.NoError(t, err)
+	assert.Equal(t, "mi-token", token)
+}

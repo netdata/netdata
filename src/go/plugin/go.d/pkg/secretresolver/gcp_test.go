@@ -295,3 +295,38 @@ func TestGCPGetTokenServiceAccount_MissingFields(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing required fields")
 }
+
+func TestGCPGetTokenMetadata_Success(t *testing.T) {
+	origClient := gcpMetadataHTTPClient
+	gcpMetadataHTTPClient = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			assert.Equal(t, "GET", req.Method)
+			assert.Equal(t, "metadata.google.internal", req.URL.Host)
+			assert.Equal(t, "/computeMetadata/v1/instance/service-accounts/default/token", req.URL.Path)
+			assert.Equal(t, "Google", req.Header.Get("Metadata-Flavor"))
+			return newHTTPResponse(http.StatusOK, `{"access_token":"metadata-token"}`), nil
+		}),
+	}
+	defer func() { gcpMetadataHTTPClient = origClient }()
+
+	token, err := gcpGetTokenMetadata()
+	require.NoError(t, err)
+	assert.Equal(t, "metadata-token", token)
+}
+
+func TestGCPGetAccessToken_MetadataFallbackSuccess(t *testing.T) {
+	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+
+	origClient := gcpMetadataHTTPClient
+	gcpMetadataHTTPClient = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			assert.Equal(t, "Google", req.Header.Get("Metadata-Flavor"))
+			return newHTTPResponse(http.StatusOK, `{"access_token":"metadata-token"}`), nil
+		}),
+	}
+	defer func() { gcpMetadataHTTPClient = origClient }()
+
+	token, err := gcpGetAccessToken("${gcp-sm:project/secret}")
+	require.NoError(t, err)
+	assert.Equal(t, "metadata-token", token)
+}
