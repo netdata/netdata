@@ -15,7 +15,12 @@ func (c *Collector) collect() error {
 	c.runs++
 	if !c.lastDiscoveryOK || c.runs%discoveryEvery == 0 {
 		if err := c.discovery(); err != nil {
-			return err
+			// Initial discovery must succeed.
+			if !c.lastDiscoveryOK {
+				return err
+			}
+			// Refresh failure — continue with previous data.
+			c.Warningf("discovery refresh failed, using previous data: %v", err)
 		}
 	}
 

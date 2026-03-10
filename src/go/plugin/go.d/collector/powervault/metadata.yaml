@@ -393,7 +393,7 @@ modules:
                 - name: read
                 - name: write
             - name: powervault.controller_cache_hits
-              description: Controller Cache Hit Ratio
+              description: Controller Cache Hits and Misses
               unit: hits
               chart_type: stacked
               dimensions:
@@ -440,7 +440,7 @@ modules:
                 - name: read
                 - name: write
             - name: powervault.volume_cache_hits
-              description: Volume Cache Hit Ratio
+              description: Volume Cache Hits and Misses
               unit: hits
               chart_type: stacked
               dimensions:

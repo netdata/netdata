@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -33,6 +34,8 @@ type Client struct {
 	request    web.RequestConfig
 	httpClient *http.Client
 	digest     string // "sha256" or "md5"
+
+	mu         sync.Mutex // protects sessionKey and re-auth
 	sessionKey string
 }
 
@@ -59,8 +62,14 @@ func (c *Client) Login() error {
 		return fmt.Errorf("login: authentication failed")
 	}
 
-	c.sessionKey = result.Status[0].Response
+	c.setSessionKey(result.Status[0].Response)
 	return nil
+}
+
+func (c *Client) setSessionKey(key string) {
+	c.mu.Lock()
+	c.sessionKey = key
+	c.mu.Unlock()
 }
 
 // SetLocale sets the CLI output to English to prevent locale-dependent parsing.
@@ -142,14 +151,14 @@ func (c *Client) PhyStatistics() ([]PhyStats, error) {
 }
 
 // doShow fetches a /api/show/<command> endpoint and extracts the named array from the response.
-// Re-authenticates once on 401 (session expiry).
+// Re-authenticates once on 401 (session expiry), including locale reset.
 func doShow[T any](c *Client, urlPath, key string) ([]T, error) {
 	req := c.newSessionRequest(urlPath)
 
 	resp, err := c.doOK(req)
 	if err != nil && resp != nil && resp.StatusCode == http.StatusUnauthorized {
-		if loginErr := c.Login(); loginErr != nil {
-			return nil, fmt.Errorf("%s: session expired and re-login failed: %v", urlPath, loginErr)
+		if loginErr := c.reAuth(); loginErr != nil {
+			return nil, fmt.Errorf("%s: session expired and re-auth failed: %v", urlPath, loginErr)
 		}
 		req = c.newSessionRequest(urlPath)
 		resp, err = c.doOK(req)
@@ -164,6 +173,18 @@ func doShow[T any](c *Client, urlPath, key string) ([]T, error) {
 		return nil, fmt.Errorf("%s: error decoding response: %v", urlPath, err)
 	}
 
+	// Check for API-level errors in the status envelope.
+	if statusData, ok := raw["status"]; ok {
+		var statuses []StatusResponse
+		if json.Unmarshal(statusData, &statuses) == nil {
+			for _, s := range statuses {
+				if s.ResponseType == "Error" {
+					return nil, fmt.Errorf("%s: API error: %s (rc=%d)", urlPath, s.Response, s.ReturnCode)
+				}
+			}
+		}
+	}
+
 	data, ok := raw[key]
 	if !ok {
 		return nil, nil
@@ -174,6 +195,14 @@ func doShow[T any](c *Client, urlPath, key string) ([]T, error) {
 		return nil, fmt.Errorf("%s: error decoding %q: %v", urlPath, key, err)
 	}
 	return result, nil
+}
+
+// reAuth re-authenticates and restores session locale.
+func (c *Client) reAuth() error {
+	if err := c.Login(); err != nil {
+		return err
+	}
+	return c.SetLocale()
 }
 
 func (c *Client) authHash() string {
@@ -201,8 +230,13 @@ func (c *Client) newRequest(urlPath string) web.RequestConfig {
 
 func (c *Client) newSessionRequest(urlPath string) web.RequestConfig {
 	req := c.newRequest(urlPath)
-	if c.sessionKey != "" {
-		req.Headers["sessionKey"] = c.sessionKey
+
+	c.mu.Lock()
+	key := c.sessionKey
+	c.mu.Unlock()
+
+	if key != "" {
+		req.Headers["sessionKey"] = key
 	}
 	return req
 }

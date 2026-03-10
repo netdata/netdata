@@ -207,9 +207,9 @@ func TestCollector_Collect(t *testing.T) {
 	assertValue(t, r, "port_data_written", pA0, 90194313216)
 	assertHasValue(t, r, "port_read_ops", pA1)
 
-	// PHY errors (aggregated per port: A0 has phy0+phy1, A1 has phy0)
-	phyA0 := metrix.Labels{"port": "A0"}
-	phyA1 := metrix.Labels{"port": "A1"}
+	// PHY errors (aggregated per port: hostport_A0 has phy0+phy1, hostport_A1 has phy0)
+	phyA0 := metrix.Labels{"port": "hostport_A0"}
+	phyA1 := metrix.Labels{"port": "hostport_A1"}
 	assertValue(t, r, "phy_disparity_errors", phyA0, 8) // 5+3
 	assertValue(t, r, "phy_lost_dwords", phyA0, 2)      // 2+0
 	assertValue(t, r, "phy_invalid_dwords", phyA0, 1)   // 1+0

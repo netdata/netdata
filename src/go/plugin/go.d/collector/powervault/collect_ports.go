@@ -32,19 +32,21 @@ func (c *Collector) collectPhyStats() {
 	byPort := make(map[string]*portErrors)
 
 	for _, s := range stats {
-		pe, ok := byPort[s.Port]
+		// Normalize to match port durable ID format (e.g. "A0" → "hostport_A0").
+		portID := "hostport_" + s.Port
+		pe, ok := byPort[portID]
 		if !ok {
 			pe = &portErrors{}
-			byPort[s.Port] = pe
+			byPort[portID] = pe
 		}
 		pe.disparity += s.DisparityErrors
 		pe.lost += s.LostDwords
 		pe.invalid += s.InvalidDwords
 	}
 
-	for port, pe := range byPort {
-		c.mx.phy.disparityErrors.WithLabelValues(port).Observe(float64(pe.disparity))
-		c.mx.phy.lostDwords.WithLabelValues(port).Observe(float64(pe.lost))
-		c.mx.phy.invalidDwords.WithLabelValues(port).Observe(float64(pe.invalid))
+	for portID, pe := range byPort {
+		c.mx.phy.disparityErrors.WithLabelValues(portID).Observe(float64(pe.disparity))
+		c.mx.phy.lostDwords.WithLabelValues(portID).Observe(float64(pe.lost))
+		c.mx.phy.invalidDwords.WithLabelValues(portID).Observe(float64(pe.invalid))
 	}
 }

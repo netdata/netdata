@@ -231,7 +231,7 @@ groups:
             options:
               multiplier: -1
       - id: controller_cache_hits
-        title: Controller Cache Hit Ratio
+        title: Controller Cache Hits and Misses
         context: controller_cache_hits
         units: hits
         type: stacked
@@ -326,7 +326,7 @@ groups:
             options:
               multiplier: -1
       - id: volume_cache_hits
-        title: Volume Cache Hit Ratio
+        title: Volume Cache Hits and Misses
         context: volume_cache_hits
         units: hits
         type: stacked
