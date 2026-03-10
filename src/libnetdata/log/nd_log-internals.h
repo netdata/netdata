@@ -99,6 +99,7 @@ int nd_log_facility2id(const char *facility);
 #include "nd_log_limit.h"
 
 struct nd_log_source {
+    netdata_mutex_t mutex;      // protects write() serialization for FILE* output
     ND_LOG_METHOD method;
     ND_LOG_FORMAT format;
     const char *filename;
@@ -124,6 +125,8 @@ struct nd_log {
     nd_uuid_t invocation_id;
 
     ND_LOG_SOURCES overwrite_process_source;
+    // Only set in post-fork nofork spawn-server children, which stay single-threaded in-tree.
+    bool disable_output_mutexes;
     log_event_t fatal_hook_cb;
     fatal_event_t fatal_final_cb;
 
@@ -154,10 +157,12 @@ struct nd_log {
     } eventlog;
 
     struct {
+        netdata_mutex_t mutex;  // protects write() serialization for stdout
         bool initialized;
     } std_output;
 
     struct {
+        netdata_mutex_t mutex;  // protects write() serialization for stderr
         bool initialized;
     } std_error;
 
@@ -233,7 +238,7 @@ bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields_max);
 // --------------------------------------------------------------------------------------------------------------------
 // output to file
 
-bool nd_logger_file(FILE *fp, ND_LOG_FORMAT format, struct log_field *fields, size_t fields_max);
+bool nd_logger_file(FILE *fp, netdata_mutex_t *mutex, ND_LOG_FORMAT format, struct log_field *fields, size_t fields_max);
 
 // --------------------------------------------------------------------------------------------------------------------
 // output to windows events log

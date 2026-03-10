@@ -27,7 +27,21 @@ ND_UUID nd_log_get_invocation_id(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static void nd_log_init_mutexes(void) {
+    for(size_t i = 0 ; i < _NDLS_MAX ; i++)
+        netdata_mutex_init(&nd_log.sources[i].mutex);
+
+    netdata_mutex_init(&nd_log.std_output.mutex);
+    netdata_mutex_init(&nd_log.std_error.mutex);
+}
+
 void nd_log_initialize_for_external_plugins(const char *name) {
+    static bool mutexes_initialized = false;
+    if(!nd_log.disable_output_mutexes && !mutexes_initialized) {
+        nd_log_init_mutexes();
+        mutexes_initialized = true;
+    }
+
     // if we don't run under Netdata, log to stderr,
     // otherwise, use the logging method Netdata wants us to use.
 #if defined(OS_WINDOWS)
@@ -263,6 +277,12 @@ void nd_log_stdin_init(int fd, const char *filename) {
 }
 
 void nd_log_initialize(void) {
+    static bool mutexes_initialized = false;
+    if(!nd_log.disable_output_mutexes && !mutexes_initialized) {
+        nd_log_init_mutexes();
+        mutexes_initialized = true;
+    }
+
     nd_log_stdin_init(STDIN_FILENO, "/dev/null");
 
     for(size_t i = 0 ; i < _NDLS_MAX ; i++)
@@ -290,6 +310,7 @@ int nd_log_systemd_journal_fd(void) {
 void nd_log_reopen_log_files_for_spawn_server(const char *name) {
     nd_log.fatal_hook_cb = NULL;
     nd_log.fatal_final_cb = NULL;
+    nd_log.disable_output_mutexes = true;
 
     gettid_uncached();
 #if defined(HAVE_LIBBACKTRACE)
