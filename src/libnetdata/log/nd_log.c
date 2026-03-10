@@ -428,16 +428,19 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
     if(erl->sleep_ut)
         sleep_usec(erl->sleep_ut);
 
-    spinlock_lock(&erl->spinlock);
+    if(!nd_log.disable_output_mutexes)
+        spinlock_lock(&erl->spinlock);
 
     erl->count++;
     time_t now = now_boottime_sec();
     if(now - erl->last_logged < erl->log_every) {
-        spinlock_unlock(&erl->spinlock);
+        if(!nd_log.disable_output_mutexes)
+            spinlock_unlock(&erl->spinlock);
         return;
     }
 
-    spinlock_unlock(&erl->spinlock);
+    if(!nd_log.disable_output_mutexes)
+        spinlock_unlock(&erl->spinlock);
 
     va_list args;
     va_start(args, fmt);
