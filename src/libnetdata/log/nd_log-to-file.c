@@ -25,7 +25,7 @@ void nd_log_chown_log_files(uid_t uid, gid_t gid) {
     }
 }
 
-bool nd_logger_file(FILE *fp, netdata_mutex_t *mutex, ND_LOG_FORMAT format, struct log_field *fields, size_t fields_max) {
+bool nd_logger_file(int fd, FILE *fp, netdata_mutex_t *mutex, ND_LOG_FORMAT format, struct log_field *fields, size_t fields_max) {
     BUFFER *wb = buffer_create(1024, NULL);
 
     if(format == NDLF_JSON)
@@ -49,14 +49,13 @@ bool nd_logger_file(FILE *fp, netdata_mutex_t *mutex, ND_LOG_FORMAT format, stru
     // these direct write() calls. In post-fork nofork children (mutex == NULL), we
     // intentionally avoid stdio locking paths.
 
-    int fd = fileno(fp);
     const char *buf = buffer_tostring(wb);
     size_t remaining = buffer_strlen(wb);
 
     if(mutex)
         netdata_mutex_lock(mutex);
 
-    if(mutex)
+    if(mutex && fp)
         fflush(fp);
 
     while(remaining > 0) {

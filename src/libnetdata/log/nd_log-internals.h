@@ -238,7 +238,7 @@ bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields_max);
 // --------------------------------------------------------------------------------------------------------------------
 // output to file
 
-bool nd_logger_file(FILE *fp, netdata_mutex_t *mutex, ND_LOG_FORMAT format, struct log_field *fields, size_t fields_max);
+bool nd_logger_file(int fd, FILE *fp, netdata_mutex_t *mutex, ND_LOG_FORMAT format, struct log_field *fields, size_t fields_max);
 
 // --------------------------------------------------------------------------------------------------------------------
 // output to windows events log
