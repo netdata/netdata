@@ -64,9 +64,13 @@ static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
         return;
     }
 
+    time_t runtime = now_realtime_sec() - cd->started_t;
+
     if (likely(cd->serial_failures <= SERIAL_FAILURES_THRESHOLD)) {
-        netdata_log_info("PLUGINSD: 'host:%s', '%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.",
+        netdata_log_info("PLUGINSD: 'host:%s', '%s' (pid %d) exited after %lld seconds "
+             "with %zu keepalives but 0 data collections (serial failures: %zu). %s.",
              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid,
+             (long long)runtime, cd->keepalive_count, cd->serial_failures,
              plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is now disabled.");
 
         pluginsd_sleep(cd->update_every * 10);
@@ -74,10 +78,11 @@ static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
     }
 
     if (cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
-        netdata_log_error("PLUGINSD: 'host:'%s', '%s' (pid %d) does not generate useful output, "
-              "although it reports success (exits with 0)."
-              "We have tried to collect something %zu times - unsuccessfully. Disabling it.",
-              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, cd->serial_failures);
+        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited after %lld seconds "
+              "with %zu keepalives but 0 data collections. "
+              "We have tried %zu times - unsuccessfully. Disabling it.",
+              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid,
+              (long long)runtime, cd->keepalive_count, cd->serial_failures);
         plugin_set_disabled(cd);
         return;
     }
@@ -92,8 +97,8 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
     }
 
     if (!cd->successful_collections) {
-        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d and haven't collected any data. Disabling it.",
-              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, worker_ret_code);
+        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d and haven't collected any data (%zu keepalives received). Disabling it.",
+              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, worker_ret_code, cd->keepalive_count);
         plugin_set_disabled(cd);
         return;
     }
@@ -165,8 +170,8 @@ static void pluginsd_worker_thread(void *arg) {
                                  0);
 
         nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-               "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections.",
-               rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, count);
+               "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections (%zu keepalives received).",
+               rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, count, cd->keepalive_count);
 
         int worker_ret_code = spawn_popen_kill(cd->unsafe.pi, 3 * MSEC_PER_SEC);
         cd->unsafe.pi = NULL;

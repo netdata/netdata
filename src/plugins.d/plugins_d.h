@@ -25,6 +25,8 @@ struct plugind {
     size_t serial_failures;             // the number of times the plugin started
                                         // without collecting values
 
+    size_t keepalive_count;             // keepalives received during last cycle
+
     struct rrdhost *host;               // the host the plugin collects data for
     int update_every;                   // the plugin default data collection frequency
 

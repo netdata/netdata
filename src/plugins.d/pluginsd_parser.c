@@ -1196,7 +1196,8 @@ static inline PARSER_RC pluginsd_exit(char **words __maybe_unused, size_t num_wo
     return PARSER_RC_STOP;
 }
 
-static inline PARSER_RC pluginsd_plugin_keepalive(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
+static inline PARSER_RC pluginsd_plugin_keepalive(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
+    parser->user.keepalive_count++;
     return PARSER_RC_OK;
 }
 
@@ -1357,6 +1358,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
 
     cd->unsafe.enabled = parser->user.enabled;
     count = parser->user.data_collections_count;
+    cd->keepalive_count = parser->user.keepalive_count;
 
     if(likely(count)) {
         cd->successful_collections += count;

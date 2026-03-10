@@ -826,28 +826,37 @@ where
 
         let writer_task = tokio::spawn(async move {
             let mut keepalive = tokio::time::interval(tokio::time::Duration::from_secs(60));
+            let mut keepalive_count: u64 = 0;
 
-            loop {
+            let exit_reason = loop {
                 tokio::select! {
                     msg = outbound_rx.recv() => {
                         match msg {
                             Some(msg) => {
                                 if let Err(e) = writer.lock().await.send(msg).await {
-                                    error!("outbound writer error: {}", e);
-                                    break;
+                                    error!("outbound writer error after {} keepalives: {}", keepalive_count, e);
+                                    break "outbound write error";
                                 }
                             }
-                            None => break,
+                            None => break "outbound channel closed",
                         }
                     }
                     _ = keepalive.tick() => {
+                        keepalive_count += 1;
+                        info!("sending keepalive #{}", keepalive_count);
+
                         if let Err(e) = writer.lock().await.write_raw(b"PLUGIN_KEEPALIVE\n").await {
-                            error!("keepalive write error: {}", e);
-                            break;
+                            error!("keepalive write error after {} keepalives: {}", keepalive_count, e);
+                            break "keepalive write error";
                         }
                     }
                 }
-            }
+            };
+
+            info!(
+                "writer task exiting after {} keepalives sent (reason: {})",
+                keepalive_count, exit_reason
+            );
         });
 
         self.process_messages().await?;
