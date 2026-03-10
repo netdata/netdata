@@ -27,9 +27,8 @@ const (
 	computeResource = "ComputeResource"
 	hostSystem      = "HostSystem"
 	virtualMachine  = "VirtualMachine"
-	datastoreType        = "Datastore"
-	clusterType          = "ClusterComputeResource"
-	resourcePoolType     = "ResourcePool"
+	datastoreType    = "Datastore"
+	resourcePoolType = "ResourcePool"
 
 	maxIdleConnections = 32
 )
