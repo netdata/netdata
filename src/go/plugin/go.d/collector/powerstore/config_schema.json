@@ -1,0 +1,172 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Dell PowerStore collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 30
+      },
+      "url": {
+        "title": "URL",
+        "description": "The base URL of the PowerStore management interface.",
+        "type": "string",
+        "default": "https://127.0.0.1",
+        "format": "uri"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "The timeout in seconds for HTTP requests.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 30
+      },
+      "not_follow_redirects": {
+        "title": "Not follow redirects",
+        "description": "If set, the client will not follow HTTP redirects automatically.",
+        "type": "boolean"
+      },
+      "username": {
+        "title": "Username",
+        "description": "The username for PowerStore API authentication.",
+        "type": "string",
+        "sensitive": true
+      },
+      "password": {
+        "title": "Password",
+        "description": "The password for PowerStore API authentication.",
+        "type": "string",
+        "sensitive": true
+      },
+      "proxy_url": {
+        "title": "Proxy URL",
+        "description": "The URL of the proxy server.",
+        "type": "string"
+      },
+      "proxy_username": {
+        "title": "Proxy username",
+        "description": "The username for proxy authentication.",
+        "type": "string",
+        "sensitive": true
+      },
+      "proxy_password": {
+        "title": "Proxy password",
+        "description": "The password for proxy authentication.",
+        "type": "string",
+        "sensitive": true
+      },
+      "headers": {
+        "title": "Headers",
+        "description": "Additional HTTP headers to include in requests.",
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "If set, TLS certificate verification will be skipped.",
+        "type": "boolean"
+      },
+      "tls_ca": {
+        "title": "TLS CA",
+        "description": "The path to the CA certificate file for TLS verification.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "tls_cert": {
+        "title": "TLS certificate",
+        "description": "The path to the client TLS certificate file.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "tls_key": {
+        "title": "TLS key",
+        "description": "The path to the client TLS key file.",
+        "type": "string",
+        "pattern": "^$|^/"
+      },
+      "volume_selector": {
+        "title": "Volume selector",
+        "description": "Specifies a space-separated list of volume name patterns to monitor. Use * for wildcards, prefix with ! to exclude.",
+        "type": "string",
+        "default": "*"
+      }
+    },
+    "required": [
+      "url",
+      "username",
+      "password"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "url": {
+      "ui:placeholder": "https://127.0.0.1"
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for sub-second values (e.g., 0.5 = 500ms)."
+    },
+    "password": {
+      "ui:widget": "password"
+    },
+    "proxy_password": {
+      "ui:widget": "password"
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "url",
+            "timeout",
+            "not_follow_redirects",
+            "volume_selector"
+          ]
+        },
+        {
+          "title": "Auth",
+          "fields": [
+            "username",
+            "password"
+          ]
+        },
+        {
+          "title": "TLS",
+          "fields": [
+            "tls_skip_verify",
+            "tls_ca",
+            "tls_cert",
+            "tls_key"
+          ]
+        },
+        {
+          "title": "Proxy",
+          "fields": [
+            "proxy_url",
+            "proxy_username",
+            "proxy_password"
+          ]
+        },
+        {
+          "title": "Headers",
+          "fields": [
+            "headers"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,517 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-powerstore
+      plugin_name: go.d.plugin
+      module_name: powerstore
+      monitored_instance:
+        name: Dell PowerStore
+        link: https://www.dell.com/en-us/dt/storage/powerstore-storage-appliance.htm
+        icon_filename: dell.svg
+        categories:
+          - data-collection.storage
+      keywords:
+        - powerstore
+        - dell
+        - storage
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Dell PowerStore storage arrays via the PowerStore REST API.
+
+          It collects metrics for the following components:
+
+          - Cluster (capacity, efficiency ratios)
+          - Appliances (IOPS, bandwidth, latency, CPU utilization, capacity)
+          - Volumes (IOPS, bandwidth, latency, capacity)
+          - Nodes (IOPS, bandwidth, latency, logins)
+          - FC Ports (IOPS, bandwidth, link status)
+          - Ethernet Ports (bytes/packets rate, errors, link status)
+          - File Systems (IOPS, bandwidth, latency)
+          - Hardware Health (fans, PSUs, drives, batteries, nodes by state)
+          - Active Alerts (count by severity)
+          - Drive Wear (SSD endurance remaining)
+          - NAS Servers (operational status)
+          - Replication (data remaining, transferred, transfer rate)
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: PowerStore API access
+            description: |
+              A user account with at least read-only (Operator) role on the PowerStore array is required.
+              The collector connects to the PowerStore management IP via HTTPS.
+      configuration:
+        file:
+          name: go.d/powerstore.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval (seconds).
+              default_value: 30
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Autodetection retry interval (seconds). Set 0 to disable.
+              default_value: 0
+              required: false
+              group: Collection
+
+            - name: url
+              description: Target PowerStore management URL.
+              default_value: https://127.0.0.1
+              required: true
+              group: Target
+            - name: timeout
+              description: HTTP request timeout (seconds).
+              default_value: 30
+              required: false
+              group: Target
+
+            - name: username
+              description: Username for PowerStore API authentication.
+              default_value: ""
+              required: true
+              group: HTTP Auth
+            - name: password
+              description: Password for PowerStore API authentication.
+              default_value: ""
+              required: true
+              group: HTTP Auth
+
+            - name: volume_selector
+              description: "Space-separated volume name patterns. Use * for wildcards, ! prefix to exclude. Default: all volumes."
+              default_value: "*"
+              required: false
+              group: Filtering
+
+            - name: tls_skip_verify
+              description: Skip TLS certificate and hostname verification (insecure).
+              default_value: no
+              required: false
+              group: TLS
+            - name: tls_ca
+              description: Path to CA bundle used to validate the server certificate.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_cert
+              description: Path to client TLS certificate (for mTLS).
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_key
+              description: Path to client TLS private key (for mTLS).
+              default_value: ""
+              required: false
+              group: TLS
+
+            - name: proxy_url
+              description: HTTP proxy URL.
+              default_value: ""
+              required: false
+              group: Proxy
+            - name: proxy_username
+              description: Username for proxy Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: Proxy
+            - name: proxy_password
+              description: Password for proxy Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: Proxy
+
+            - name: headers
+              description: "Additional HTTP headers (one per line as key: value)."
+              default_value: ""
+              required: false
+              group: Request
+            - name: not_follow_redirects
+              description: Do not follow HTTP redirects.
+              default_value: no
+              required: false
+              group: Request
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://10.0.0.1
+                    username: admin
+                    password: password
+                    tls_skip_verify: yes  # self-signed certificate
+            - name: With volume filtering
+              description: Monitor only production volumes.
+              config: |
+                jobs:
+                  - name: powerstore1
+                    url: https://10.0.0.1
+                    username: monitor
+                    password: password
+                    tls_skip_verify: yes
+                    volume_selector: "prod-* !*-temp !*-test"
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Monitoring multiple PowerStore arrays.
+              config: |
+                jobs:
+                  - name: powerstore1
+                    url: https://10.0.0.1
+                    username: admin
+                    password: password
+                    tls_skip_verify: yes
+
+                  - name: powerstore2
+                    url: https://10.0.0.2
+                    username: admin
+                    password: password
+                    tls_skip_verify: yes
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored PowerStore cluster.
+          labels: []
+          metrics:
+            - name: powerstore.cluster_space_usage
+              description: Cluster Space Usage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: used
+                - name: total
+            - name: powerstore.cluster_space_logical
+              description: Cluster Logical Space
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: provisioned
+                - name: used
+                - name: data_physical
+                - name: shared
+            - name: powerstore.cluster_space_efficiency
+              description: Cluster Space Efficiency Ratios
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: efficiency
+                - name: data_reduction
+                - name: snapshot_savings
+                - name: thin_savings
+            - name: powerstore.hardware_health_fan
+              description: Fan Health Status
+              unit: fans
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: degraded
+                - name: failed
+                - name: unknown
+            - name: powerstore.hardware_health_psu
+              description: Power Supply Health Status
+              unit: PSUs
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: degraded
+                - name: failed
+                - name: unknown
+            - name: powerstore.hardware_health_drive
+              description: Drive Health Status
+              unit: drives
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: degraded
+                - name: failed
+                - name: unknown
+            - name: powerstore.hardware_health_battery
+              description: Battery Health Status
+              unit: batteries
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: degraded
+                - name: failed
+                - name: unknown
+            - name: powerstore.hardware_health_node
+              description: Node Health Status
+              unit: nodes
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: degraded
+                - name: failed
+                - name: unknown
+            - name: powerstore.alerts_active
+              description: Active Alerts by Severity
+              unit: alerts
+              chart_type: stacked
+              dimensions:
+                - name: critical
+                - name: major
+                - name: minor
+                - name: info
+            - name: powerstore.nas_server_status
+              description: NAS Server Status
+              unit: servers
+              chart_type: stacked
+              dimensions:
+                - name: started
+                - name: stopped
+                - name: degraded
+                - name: unknown
+            - name: powerstore.copy_data
+              description: Replication Data
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: remaining
+                - name: transferred
+            - name: powerstore.copy_transfer_rate
+              description: Replication Transfer Rate
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: rate
+        - name: appliance
+          description: These metrics refer to individual PowerStore appliances.
+          labels: []
+          metrics:
+            - name: powerstore.appliance_iops
+              description: Appliance IOPS
+              unit: ops/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: powerstore.appliance_bandwidth
+              description: Appliance Bandwidth
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: powerstore.appliance_latency
+              description: Appliance Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+                - name: avg
+            - name: powerstore.appliance_cpu
+              description: Appliance IO Workload CPU Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: powerstore.appliance_space
+              description: Appliance Space Usage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: used
+                - name: total
+        - name: volume
+          description: These metrics refer to individual PowerStore volumes.
+          labels: []
+          metrics:
+            - name: powerstore.volume_iops
+              description: Volume IOPS
+              unit: ops/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: powerstore.volume_bandwidth
+              description: Volume Bandwidth
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: powerstore.volume_latency
+              description: Volume Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+                - name: avg
+            - name: powerstore.volume_space
+              description: Volume Space Usage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: provisioned
+                - name: used
+        - name: node
+          description: These metrics refer to individual PowerStore nodes.
+          labels: []
+          metrics:
+            - name: powerstore.node_iops
+              description: Node IOPS
+              unit: ops/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: powerstore.node_bandwidth
+              description: Node Bandwidth
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: powerstore.node_latency
+              description: Node Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+                - name: avg
+            - name: powerstore.node_logins
+              description: Node Current Logins
+              unit: logins
+              chart_type: line
+              dimensions:
+                - name: logins
+        - name: fc port
+          description: These metrics refer to individual Fibre Channel ports.
+          labels: []
+          metrics:
+            - name: powerstore.fc_port_iops
+              description: FC Port IOPS
+              unit: ops/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: powerstore.fc_port_bandwidth
+              description: FC Port Bandwidth
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: powerstore.fc_port_link_status
+              description: FC Port Link Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: up
+        - name: ethernet port
+          description: These metrics refer to individual Ethernet ports.
+          labels: []
+          metrics:
+            - name: powerstore.eth_port_bytes
+              description: Ethernet Port Bytes Rate
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: powerstore.eth_port_packets
+              description: Ethernet Port Packets Rate
+              unit: packets/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: powerstore.eth_port_errors
+              description: Ethernet Port Errors Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: rx_crc
+                - name: rx_no_buffer
+                - name: tx_error
+            - name: powerstore.eth_port_link_status
+              description: Ethernet Port Link Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: up
+        - name: file system
+          description: These metrics refer to individual file systems.
+          labels: []
+          metrics:
+            - name: powerstore.filesystem_iops
+              description: File System IOPS
+              unit: ops/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: powerstore.filesystem_bandwidth
+              description: File System Bandwidth
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: powerstore.filesystem_latency
+              description: File System Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+                - name: avg
+        - name: drive
+          description: These metrics refer to individual drives.
+          labels: []
+          metrics:
+            - name: powerstore.drive_endurance
+              description: Drive Endurance Remaining
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: remaining
