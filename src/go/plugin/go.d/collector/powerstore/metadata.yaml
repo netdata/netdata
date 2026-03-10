@@ -14,6 +14,10 @@ modules:
         - powerstore
         - dell
         - storage
+        - san
+        - nas
+        - block
+        - file
       related_resources:
         integrations:
           list: []
@@ -26,39 +30,70 @@ modules:
 
           It collects metrics for the following components:
 
-          - Cluster (capacity, efficiency ratios)
-          - Appliances (IOPS, bandwidth, latency, CPU utilization, capacity)
-          - Volumes (IOPS, bandwidth, latency, capacity)
-          - Nodes (IOPS, bandwidth, latency, logins)
-          - FC Ports (IOPS, bandwidth, link status)
-          - Ethernet Ports (bytes/packets rate, errors, link status)
-          - File Systems (IOPS, bandwidth, latency)
-          - Hardware Health (fans, PSUs, drives, batteries, nodes by state)
-          - Active Alerts (count by severity)
-          - Drive Wear (SSD endurance remaining)
-          - NAS Servers (operational status)
-          - Replication (data remaining, transferred, transfer rate)
-        method_description: ""
+          - **Cluster Capacity** — physical and logical space usage, efficiency ratios (data reduction, snapshot savings, thin provisioning)
+          - **Appliance Performance** — IOPS, bandwidth, latency, CPU utilization, and space usage per appliance
+          - **Volume Performance** — IOPS, bandwidth, latency, provisioned/used space, and thin savings per volume
+          - **Node Performance** — IOPS, bandwidth, latency, and current login count per node
+          - **FC Port Performance** — IOPS, bandwidth, latency, and link status per Fibre Channel port
+          - **Ethernet Port Performance** — bytes/packets rate, error rates, and link status per Ethernet port
+          - **File System Performance** — IOPS, bandwidth, and latency per file system
+          - **Hardware Health** — component-level status counts (fans, PSUs, drives, batteries, nodes) by health state (OK, degraded, failed, unknown)
+          - **Active Alerts** — count of currently active alerts by severity (critical, major, minor, info)
+          - **Drive Wear** — SSD endurance remaining percentage per drive
+          - **NAS Server Status** — operational status counts (started, stopped, degraded, unknown)
+          - **Replication** — data remaining, data transferred, and transfer rate across appliances
+        method_description: |
+          The collector uses the PowerStore REST API (`/api/rest/*` endpoints) to fetch data.
+          Authentication uses HTTP Basic Auth — the collector calls `/api/rest/login_session` to obtain
+          a session cookie and a `DELL-EMC-TOKEN` CSRF token, which are reused for subsequent requests.
+          Sessions are automatically refreshed on HTTP 403 (token expiry).
+
+          Discovery runs on startup and then every 5 collection cycles to refresh the hardware inventory,
+          appliances, volumes, nodes, ports, file systems, and NAS servers.
+
+          Performance and space metrics are collected via the `/api/rest/metrics/generate` endpoint using
+          the PowerStore metrics generation API. The collector requests `Five_Mins` interval data for
+          performance metrics and `One_Day` for cluster space metrics, taking the most recent data point.
+
+          Discovery API calls use pagination (2000 items per page, HTTP 206 for partial results).
+          Performance metrics for different entities are collected concurrently (up to 10 parallel API calls).
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: ""
+        description: |
+          A user account on the PowerStore array is required. Any role with API read access
+          is sufficient (e.g., the built-in `Operator` role). The account does not need write permissions.
       default_behavior:
         auto_detection:
-          description: ""
+          description: |
+            The collector does not auto-detect PowerStore arrays. You must configure the management IP address,
+            username, and password explicitly.
         limits:
-          description: ""
+          description: |
+            The collector makes multiple API calls per collection cycle: discovery calls (once every 5 cycles)
+            plus per-entity metrics calls (appliances, volumes, nodes, ports, file systems, drives, and
+            replication — one API call per entity). With many volumes or ports, the number of API calls
+            scales linearly. The default 30-second collection interval provides ample headroom.
         performance_impact:
-          description: ""
+          description: |
+            The PowerStore REST API is lightweight and read-only. The collector uses the metrics generation
+            API which returns pre-aggregated data, imposing minimal load on the array. Session tokens and
+            CSRF tokens are cached across collection cycles.
     setup:
       prerequisites:
         list:
           - title: PowerStore API access
             description: |
-              A user account with at least read-only (Operator) role on the PowerStore array is required.
-              The collector connects to the PowerStore management IP via HTTPS.
+              1. A user account on the PowerStore array with at least read-only access.
+                 The built-in `Operator` role is sufficient.
+              2. Network connectivity from the Netdata Agent to the PowerStore management IP (HTTPS, port 443).
+              3. The PowerStore management REST API must be accessible (enabled by default).
+          - title: TLS certificate
+            description: |
+              PowerStore arrays typically use self-signed TLS certificates. You will likely need to set
+              `tls_skip_verify: yes` in the configuration, or provide the array's CA certificate via `tls_ca`.
       configuration:
         file:
           name: go.d/powerstore.conf
@@ -81,7 +116,7 @@ modules:
               group: Collection
 
             - name: url
-              description: Target PowerStore management URL.
+              description: PowerStore management URL.
               default_value: https://127.0.0.1
               required: true
               group: Target
@@ -103,13 +138,16 @@ modules:
               group: HTTP Auth
 
             - name: volume_selector
-              description: "Space-separated volume name patterns. Use * for wildcards, ! prefix to exclude. Default: all volumes."
+              description: |
+                Space-separated [simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme)
+                to filter which volumes to monitor. Use `*` for wildcards, `!` prefix to exclude.
+                An empty value or `*` monitors all volumes.
               default_value: "*"
               required: false
               group: Filtering
 
             - name: tls_skip_verify
-              description: Skip TLS certificate and hostname verification (insecure).
+              description: Skip TLS certificate and hostname verification (insecure, but often needed for self-signed certs on storage arrays).
               default_value: no
               required: false
               group: TLS
@@ -167,22 +205,22 @@ modules:
             enabled: true
           list:
             - name: Basic
-              description: An example configuration.
+              description: A minimal configuration connecting to a PowerStore array with a self-signed certificate.
               config: |
                 jobs:
-                  - name: local
-                    url: https://10.0.0.1
-                    username: admin
-                    password: password
-                    tls_skip_verify: yes  # self-signed certificate
-            - name: With volume filtering
-              description: Monitor only production volumes.
-              config: |
-                jobs:
-                  - name: powerstore1
+                  - name: ps-lab
                     url: https://10.0.0.1
                     username: monitor
-                    password: password
+                    password: monitor123
+                    tls_skip_verify: yes
+            - name: With volume filtering
+              description: Monitor only production volumes, excluding temporary and test volumes.
+              config: |
+                jobs:
+                  - name: ps-prod
+                    url: https://10.0.0.1
+                    username: monitor
+                    password: monitor123
                     tls_skip_verify: yes
                     volume_selector: "prod-* !*-temp !*-test"
             - name: Multi-instance
@@ -192,20 +230,49 @@ modules:
                 Monitoring multiple PowerStore arrays.
               config: |
                 jobs:
-                  - name: powerstore1
+                  - name: ps-site-a
                     url: https://10.0.0.1
-                    username: admin
-                    password: password
+                    username: monitor
+                    password: monitor123
                     tls_skip_verify: yes
 
-                  - name: powerstore2
+                  - name: ps-site-b
                     url: https://10.0.0.2
-                    username: admin
-                    password: password
+                    username: monitor
+                    password: monitor456
                     tls_skip_verify: yes
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: Authentication failure
+            description: |
+              If the collector fails with `login failed`:
+
+              1. Verify the username and password are correct.
+              2. Ensure the user account has at least `Operator` role privileges.
+              3. Check that the account is not locked or expired on the array.
+          - name: Connection refused or timeout
+            description: |
+              If the collector fails with connection errors:
+
+              1. Verify the `url` points to the management IP of the PowerStore array.
+              2. Ensure HTTPS port 443 is reachable from the Netdata Agent host.
+              3. If using a firewall, allow outbound HTTPS to the array.
+              4. Try increasing `timeout` if the array is on a high-latency link.
+          - name: TLS certificate errors
+            description: |
+              PowerStore arrays ship with self-signed certificates. If you see TLS errors:
+
+              1. Set `tls_skip_verify: yes` in the configuration (most common solution).
+              2. Alternatively, export the array's certificate and provide it via `tls_ca`.
+          - name: HTTP 403 errors
+            description: |
+              PowerStore returns HTTP 403 when the session/CSRF token is stale. The collector
+              automatically re-authenticates on 403, but if you see persistent 403 errors:
+
+              1. Verify the user account still has API access.
+              2. Check if the array's security policy has been changed to restrict API access.
+              3. Ensure no IP-based access controls are blocking the Netdata Agent host.
     alerts: []
     metrics:
       folding:
@@ -321,7 +388,9 @@ modules:
                 - name: rate
         - name: appliance
           description: These metrics refer to individual PowerStore appliances.
-          labels: []
+          labels:
+            - name: appliance
+              description: Appliance name (e.g., `Appliance-WX-D8031`).
           metrics:
             - name: powerstore.appliance_iops
               description: Appliance IOPS
@@ -358,9 +427,29 @@ modules:
               dimensions:
                 - name: used
                 - name: total
+            - name: powerstore.appliance_space_logical
+              description: Appliance Logical Space
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: provisioned
+                - name: used
+                - name: data_physical
+                - name: shared
+            - name: powerstore.appliance_space_efficiency
+              description: Appliance Space Efficiency Ratios
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: efficiency
+                - name: data_reduction
+                - name: snapshot_savings
+                - name: thin_savings
         - name: volume
-          description: These metrics refer to individual PowerStore volumes.
-          labels: []
+          description: These metrics refer to individual PowerStore volumes. Volumes can be filtered using the `volume_selector` configuration option.
+          labels:
+            - name: volume
+              description: Volume name (e.g., `prod-db-01`).
           metrics:
             - name: powerstore.volume_iops
               description: Volume IOPS
@@ -391,9 +480,17 @@ modules:
               dimensions:
                 - name: provisioned
                 - name: used
+            - name: powerstore.volume_space_savings
+              description: Volume Thin Savings
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: thin_savings
         - name: node
-          description: These metrics refer to individual PowerStore nodes.
-          labels: []
+          description: These metrics refer to individual PowerStore nodes within an appliance.
+          labels:
+            - name: node
+              description: Node name (e.g., `Appliance-WX-D8031-node-A`).
           metrics:
             - name: powerstore.node_iops
               description: Node IOPS
@@ -424,8 +521,10 @@ modules:
               dimensions:
                 - name: logins
         - name: fc port
-          description: These metrics refer to individual Fibre Channel ports.
-          labels: []
+          description: These metrics refer to individual Fibre Channel ports used for host connectivity.
+          labels:
+            - name: fc_port
+              description: FC port name (e.g., `Appliance-WX-D8031-node-A-Port-0`).
           metrics:
             - name: powerstore.fc_port_iops
               description: FC Port IOPS
@@ -441,6 +540,14 @@ modules:
               dimensions:
                 - name: read
                 - name: write
+            - name: powerstore.fc_port_latency
+              description: FC Port Latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+                - name: avg
             - name: powerstore.fc_port_link_status
               description: FC Port Link Status
               unit: status
@@ -448,8 +555,10 @@ modules:
               dimensions:
                 - name: up
         - name: ethernet port
-          description: These metrics refer to individual Ethernet ports.
-          labels: []
+          description: These metrics refer to individual Ethernet ports (management and iSCSI connectivity).
+          labels:
+            - name: eth_port
+              description: Ethernet port name (e.g., `Appliance-WX-D8031-node-A-Port-eth0`).
           metrics:
             - name: powerstore.eth_port_bytes
               description: Ethernet Port Bytes Rate
@@ -468,7 +577,7 @@ modules:
             - name: powerstore.eth_port_errors
               description: Ethernet Port Errors Rate
               unit: errors/s
-              chart_type: line
+              chart_type: stacked
               dimensions:
                 - name: rx_crc
                 - name: rx_no_buffer
@@ -480,8 +589,10 @@ modules:
               dimensions:
                 - name: up
         - name: file system
-          description: These metrics refer to individual file systems.
-          labels: []
+          description: These metrics refer to individual file systems (NFS/SMB shares).
+          labels:
+            - name: filesystem
+              description: File system name (e.g., `nfs-share-01`).
           metrics:
             - name: powerstore.filesystem_iops
               description: File System IOPS
@@ -506,8 +617,10 @@ modules:
                 - name: write
                 - name: avg
         - name: drive
-          description: These metrics refer to individual drives.
-          labels: []
+          description: These metrics refer to individual physical drives (SSDs).
+          labels:
+            - name: drive
+              description: Drive name (e.g., `Drive_0_0_25`).
           metrics:
             - name: powerstore.drive_endurance
               description: Drive Endurance Remaining
