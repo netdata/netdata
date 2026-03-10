@@ -272,12 +272,6 @@ static int ebpf_vfs_attach_probe(struct vfs_bpf *obj)
     if (ret)
         return -1;
 
-    obj->links.netdata_vfs_create_kretprobe = bpf_program__attach_kprobe(
-        obj->progs.netdata_vfs_create_kretprobe, true, vfs_targets[NETDATA_EBPF_VFS_CREATE].name);
-    ret = libbpf_get_error(obj->links.netdata_vfs_create_kretprobe);
-    if (ret)
-        return -1;
-
     return 0;
 }
 
@@ -1053,7 +1047,6 @@ static void ebpf_vfs_read_global_table(netdata_idx_t *stats, int maps_per_core)
     vfs_aggregated_data[NETDATA_KEY_PUBLISH_VFS_READ].bytes =
         (uint64_t)res[NETDATA_KEY_BYTES_VFS_READ] + (uint64_t)res[NETDATA_KEY_BYTES_VFS_READV];
 }
-
 /**
  * Set VFS
  *
@@ -1065,10 +1058,26 @@ static void ebpf_vfs_read_global_table(netdata_idx_t *stats, int maps_per_core)
 static inline void vfs_aggregate_set_vfs(netdata_publish_vfs_t *vfs, netdata_ebpf_vfs_t *w)
 {
     vfs->ct = w->ct;
-    memcpy(
-        ((char *)vfs) + offsetof(netdata_publish_vfs_t, write_call),
-        ((char *)w) + offsetof(netdata_ebpf_vfs_t, write_call),
-        sizeof(netdata_publish_vfs_t) - offsetof(netdata_publish_vfs_t, write_call));
+    vfs->write_call = w->write_call;
+    vfs->writev_call = w->writev_call;
+    vfs->read_call = w->read_call;
+    vfs->readv_call = w->readv_call;
+    vfs->unlink_call = w->unlink_call;
+    vfs->fsync_call = w->fsync_call;
+    vfs->open_call = w->open_call;
+    vfs->create_call = w->create_call;
+    vfs->write_bytes = w->write_bytes;
+    vfs->writev_bytes = w->writev_bytes;
+    vfs->readv_bytes = w->readv_bytes;
+    vfs->read_bytes = w->read_bytes;
+    vfs->write_err = w->write_err;
+    vfs->writev_err = w->writev_err;
+    vfs->read_err = w->read_err;
+    vfs->readv_err = w->readv_err;
+    vfs->unlink_err = w->unlink_err;
+    vfs->fsync_err = w->fsync_err;
+    vfs->open_err = w->open_err;
+    vfs->create_err = w->create_err;
 }
 
 /**

@@ -112,7 +112,7 @@ static inline ssize_t ebpf_read_file_to_str(const char *filename, char *buffer, 
     if (fd < 0)
         return -1;
 
-    ssize_t file_length = read(fd, buffer, size);
+    ssize_t file_length = read(fd, buffer, size - 1);
     close(fd);
     if (file_length <= 0)
         return -1;

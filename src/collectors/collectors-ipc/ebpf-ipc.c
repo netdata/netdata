@@ -35,6 +35,7 @@ static bool ebpf_find_pid_shm_del_unsafe(uint32_t pid, enum ebpf_pids_index shm_
     if (ptr->threads)
         return true;
 
+    freez(lpid);
     (void)JudyLDel(&ebpf_ipc_JudyL, (Word_t)pid, PJE0);
     ebpf_stat_values.current--;
 
@@ -58,7 +59,7 @@ static uint32_t ebpf_find_or_create_index_pid(uint32_t pid)
         return *idx;
 
     if (ebpf_stat_values.current >= ebpf_stat_values.total)
-        return 0;
+        return UINT32_MAX;
 
     Pvoid_t *Pvalue = JudyLIns(&ebpf_ipc_JudyL, (Word_t)pid, PJE0);
     internal_fatal(!Pvalue || Pvalue == PJERR, "EBPF: pid judy index");
@@ -85,7 +86,7 @@ netdata_ebpf_pid_stats_t *netdata_ebpf_get_shm_pointer_unsafe(uint32_t pid, enum
         return NULL;
 
     uint32_t shm_idx = ebpf_find_or_create_index_pid(pid);
-    if (shm_idx >= ebpf_stat_values.total)
+    if (shm_idx == UINT32_MAX || shm_idx >= ebpf_stat_values.total)
         return NULL;
 
     netdata_ebpf_pid_stats_t *ptr = &integration_shm[shm_idx];

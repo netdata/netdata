@@ -10,20 +10,6 @@
 #include "../ebpf_socket.h"
 #include <ifaddrs.h>
 
-extern char *ebpf_algorithms[];
-extern uint32_t integration_with_collectors;
-extern int running_on_kernel;
-extern int isrh;
-extern ebpf_network_viewer_options_t network_viewer_opt;
-extern const char *btf_path;
-extern ebpf_module_t ebpf_modules[];
-
-void ebpf_parse_ports(const char *ptr);
-void ebpf_read_local_addresses_unsafe();
-
-void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_load_mode_t origin);
-void ebpf_parse_service_name_section(struct config *cfg);
-
 /*****************************************************************
  *
  *  DIMENSION WRITING FUNCTIONS
@@ -958,6 +944,8 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
                 if (inet_ntop(AF_INET, &ipv4_convert, ipv4_msg, INET_ADDRSTRLEN))
                     netdata_log_info("The network value of CIDR %s was updated for %s .", ipdup, ipv4_msg);
             }
+
+            last.addr32[0] = htonl(ebpf_broadcast(ntohl(first.addr32[0]), select));
         } else { // Range
             select = ebpf_ip2nl(first.addr8, ip, AF_INET, ipdup);
             if (select)
@@ -968,7 +956,7 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
                 goto cleanipdup;
         }
 
-        if (first.addr32[0] > last.addr32[0]) {
+        if (ntohl(first.addr32[0]) > ntohl(last.addr32[0])) {
             netdata_log_info(
                 "The specified range %s is invalid, the second address is smallest than the first, it will be ignored.",
                 ipdup);

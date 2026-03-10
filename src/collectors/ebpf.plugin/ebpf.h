@@ -280,6 +280,11 @@ extern struct btf *default_btf;
 extern void *default_btf;
 #endif
 
+extern uint32_t integration_with_collectors;
+extern int running_on_kernel;
+extern int isrh;
+extern const char *btf_path;
+
 // Socket functions and variables
 // Common functions
 void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr);
