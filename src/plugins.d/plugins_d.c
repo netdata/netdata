@@ -97,7 +97,7 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
     }
 
     if (!cd->successful_collections) {
-        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d and haven't collected any data (%zu keepalives received). Disabling it.",
+        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d and hasn't collected any data (%zu keepalives received). Disabling it.",
               rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, worker_ret_code, cd->keepalive_count);
         plugin_set_disabled(cd);
         return;
