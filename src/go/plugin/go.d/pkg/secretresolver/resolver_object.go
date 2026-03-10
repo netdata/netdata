@@ -27,6 +27,8 @@ type Resolver struct {
 	vaultHTTPClientInsecure *http.Client
 
 	now func() time.Time
+
+	providers map[string]func(ref, original string) (string, error)
 }
 
 // New creates a resolver with secure provider defaults.
@@ -85,5 +87,17 @@ func (r *Resolver) ensureDefaults() {
 
 	if r.now == nil {
 		r.now = time.Now
+	}
+
+	if r.providers == nil {
+		r.providers = map[string]func(ref, original string) (string, error){
+			"env":      r.resolveEnv,
+			"file":     r.resolveFile,
+			"cmd":      r.resolveCmd,
+			"vault":    r.resolveVault,
+			"aws-sm":   r.resolveAWSSM,
+			"azure-kv": r.resolveAzureKV,
+			"gcp-sm":   r.resolveGCPSM,
+		}
 	}
 }

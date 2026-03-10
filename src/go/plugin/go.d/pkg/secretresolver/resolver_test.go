@@ -287,3 +287,23 @@ func TestResolve(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveRefUsesProviderRegistry(t *testing.T) {
+	resolver := New()
+
+	called := false
+	resolver.providers["stub"] = func(ref, original string) (string, error) {
+		called = true
+		assert.Equal(t, "name", ref)
+		assert.Equal(t, "${stub:name}", original)
+		return "resolved-by-stub", nil
+	}
+
+	cfg := map[string]any{
+		"value": "${stub:name}",
+	}
+
+	require.NoError(t, resolver.Resolve(cfg))
+	assert.True(t, called)
+	assert.Equal(t, "resolved-by-stub", cfg["value"])
+}

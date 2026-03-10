@@ -121,24 +121,12 @@ func (r *Resolver) resolveRef(ref, original string) (string, error) {
 		return original, nil
 	}
 
-	switch scheme {
-	case "env":
-		return r.resolveEnv(name, original)
-	case "file":
-		return r.resolveFile(name, original)
-	case "cmd":
-		return r.resolveCmd(name, original)
-	case "vault":
-		return r.resolveVault(name, original)
-	case "aws-sm":
-		return r.resolveAWSSM(name, original)
-	case "azure-kv":
-		return r.resolveAzureKV(name, original)
-	case "gcp-sm":
-		return r.resolveGCPSM(name, original)
-	default:
+	provider, ok := r.providers[scheme]
+	if !ok {
 		return "", fmt.Errorf("resolving secret '%s': unknown secret provider '%s'", original, scheme)
 	}
+
+	return provider(name, original)
 }
 
 func (r *Resolver) resolveEnv(name, original string) (string, error) {
