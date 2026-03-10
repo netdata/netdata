@@ -38,6 +38,7 @@ modules:
           - Dynamic management views (DMVs) for wait statistics, locks, and sessions
           - Per-database transaction and lock statistics
           - SQL Server Agent job status
+          - Always On Availability Group health, replica states, and per-database synchronization metrics
         method_description: |
           It connects to the SQL Server instance via TCP using the go-mssqldb driver and executes queries against:
 
@@ -50,6 +51,13 @@ modules:
           - `sys.dm_os_sys_memory` - OS physical memory and page file
           - `sys.master_files` - Database file sizes
           - `msdb.dbo.sysjobs` - SQL Agent job status
+          - `sys.dm_hadr_availability_group_states` - AG health rollup
+          - `sys.dm_hadr_availability_replica_states` - Replica operational state
+          - `sys.dm_hadr_database_replica_states` - Database sync queues and rates
+          - `sys.dm_hadr_cluster` / `sys.dm_hadr_cluster_members` - WSFC cluster health
+          - `sys.dm_hadr_database_replica_cluster_states` - Failover readiness
+          - `sys.dm_hadr_auto_page_repair` - Automatic page repair events
+          - `sys.dm_hadr_ag_threads` - AG thread usage (SQL Server 2019+)
       default_behavior:
         auto_detection:
           description: |
@@ -66,6 +74,8 @@ modules:
           The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
           SQL Agent job monitoring is part of collector startup, so access to
           `msdb.dbo.sysjobs` is required.
+          Always On AG monitoring requires VIEW ANY DEFINITION for access to availability group catalog views.
+          On SQL Server 2022+, HADR DMVs may additionally require VIEW SERVER PERFORMANCE STATE.
       supported_platforms:
         include: []
         exclude: []
@@ -82,6 +92,12 @@ modules:
 
               -- Grant VIEW SERVER STATE (required for DMVs)
               GRANT VIEW SERVER STATE TO netdata_user;
+
+              -- Grant VIEW ANY DEFINITION (required for Always On AG monitoring)
+              GRANT VIEW ANY DEFINITION TO netdata_user;
+
+              -- Grant VIEW SERVER PERFORMANCE STATE (required for HADR DMVs on SQL Server 2022+)
+              -- GRANT VIEW SERVER PERFORMANCE STATE TO netdata_user;
 
               -- Grant access to msdb for SQL Agent job monitoring (required)
               USE msdb;
@@ -102,6 +118,8 @@ modules:
               - `SELECT on msdb.dbo.sysjobs` - SQL Agent job status monitoring
 
               **Optional permissions:**
+              - `VIEW ANY DEFINITION` - Always On Availability Group monitoring
+              - `VIEW SERVER PERFORMANCE STATE` - HADR DMVs on SQL Server 2022+
               - `SELECT on distribution.dbo.MSreplication_monitordata` - Replication monitoring
               - `SELECT on distribution.dbo.MSpublications` - Publication information
               - `SELECT on distribution.dbo.MSsubscriptions` - Subscription counts
@@ -1261,3 +1279,194 @@ modules:
               dimensions:
                 - name: total
                 - name: agents_running
+        - name: availability group
+          description: These metrics refer to Always On Availability Groups. Auto-detected when HADR is enabled.
+          labels:
+            - name: ag_name
+              description: Availability group name
+          metrics:
+            - name: mssql.ag_sync_health
+              description: Availability Group Synchronization Health
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: not_healthy
+                - name: partially_healthy
+                - name: healthy
+            - name: mssql.ag_recovery_health
+              description: Availability Group Recovery Health
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: primary_online
+                - name: primary_in_progress
+                - name: secondary_online
+                - name: secondary_in_progress
+            - name: mssql.ag_threads
+              description: Availability Group Threads (SQL Server 2019+)
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: capture
+                - name: redo
+                - name: parallel_redo
+        - name: availability group replica
+          description: >-
+            These metrics refer to per-replica state within an Availability Group.
+            Note: on secondary replicas, the replica states DMV returns only local information.
+          labels:
+            - name: ag_name
+              description: Availability group name
+            - name: replica_server
+              description: Replica server name
+            - name: availability_mode
+              description: Availability mode (synchronous_commit or asynchronous_commit)
+            - name: failover_mode
+              description: Failover mode (automatic or manual)
+          metrics:
+            - name: mssql.ag_replica_role
+              description: Availability Group Replica Role
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: primary
+                - name: secondary
+                - name: resolving
+                - name: unknown
+            - name: mssql.ag_replica_connected_state
+              description: Availability Group Replica Connected State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: connected
+                - name: disconnected
+                - name: unknown
+            - name: mssql.ag_replica_sync_health
+              description: Availability Group Replica Synchronization Health
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: not_healthy
+                - name: partially_healthy
+                - name: healthy
+        - name: availability group database replica
+          description: These metrics refer to per-database synchronization within an Availability Group.
+          labels:
+            - name: ag_name
+              description: Availability group name
+            - name: replica_server
+              description: Replica server name
+            - name: database
+              description: Database name
+          metrics:
+            - name: mssql.ag_db_sync_state
+              description: AG Database Synchronization State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: not_synchronizing
+                - name: synchronizing
+                - name: synchronized
+                - name: reverting
+                - name: initializing
+            - name: mssql.ag_db_log_send_queue
+              description: AG Database Log Send Queue Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: queue_size
+            - name: mssql.ag_db_log_send_rate
+              description: AG Database Log Send Rate
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: send_rate
+            - name: mssql.ag_db_redo_queue
+              description: AG Database Redo Queue Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: queue_size
+            - name: mssql.ag_db_redo_rate
+              description: AG Database Redo Rate (averaged over active redo time since startup)
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: redo_rate
+            - name: mssql.ag_db_filestream_send_rate
+              description: AG Database Filestream Send Rate
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: send_rate
+            - name: mssql.ag_db_secondary_lag
+              description: AG Database Secondary Lag (SQL Server 2016+)
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: lag
+            - name: mssql.ag_db_suspended
+              description: AG Database Data Movement Suspended State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: suspended
+            - name: mssql.ag_db_failover_readiness
+              description: AG Database Failover Readiness
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: ready
+                - name: not_ready
+            - name: mssql.ag_db_joined_state
+              description: AG Database Joined State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: joined
+                - name: not_joined
+        - name: WSFC cluster
+          description: These metrics refer to the Windows Server Failover Clustering quorum state.
+          labels: []
+          metrics:
+            - name: mssql.ag_cluster_quorum_state
+              description: WSFC Cluster Quorum State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: normal
+                - name: forced
+                - name: unknown
+        - name: WSFC cluster member
+          description: These metrics refer to individual WSFC cluster members.
+          labels:
+            - name: cluster_member
+              description: Cluster member name
+          metrics:
+            - name: mssql.ag_cluster_member_state
+              description: WSFC Cluster Member State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+            - name: mssql.ag_cluster_member_quorum_votes
+              description: WSFC Cluster Member Quorum Votes
+              unit: votes
+              chart_type: line
+              dimensions:
+                - name: votes
+        - name: AG page repair
+          description: These metrics refer to automatic page repair events per database in an Availability Group.
+          labels:
+            - name: database
+              description: Database name
+          metrics:
+            - name: mssql.ag_page_repair
+              description: AG Automatic Page Repair Events
+              unit: repairs
+              chart_type: line
+              dimensions:
+                - name: successful
+                - name: failed
