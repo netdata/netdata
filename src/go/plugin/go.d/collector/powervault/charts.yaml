@@ -1,0 +1,526 @@
+version: v1
+context_namespace: powervault
+groups:
+  - family: System Health
+    metrics:
+      - system_health
+    charts:
+      - id: system_health
+        title: System Health Status
+        context: system_health
+        units: status
+        algorithm: absolute
+        dimensions:
+          - selector: system_health
+            name: health
+
+  - family: Hardware Health
+    metrics:
+      - hw_controller_ok
+      - hw_controller_degraded
+      - hw_controller_fault
+      - hw_controller_unknown
+      - hw_drive_ok
+      - hw_drive_degraded
+      - hw_drive_fault
+      - hw_drive_unknown
+      - hw_fan_ok
+      - hw_fan_degraded
+      - hw_fan_fault
+      - hw_fan_unknown
+      - hw_psu_ok
+      - hw_psu_degraded
+      - hw_psu_fault
+      - hw_psu_unknown
+      - hw_fru_ok
+      - hw_fru_degraded
+      - hw_fru_fault
+      - hw_fru_unknown
+      - hw_port_ok
+      - hw_port_degraded
+      - hw_port_fault
+      - hw_port_unknown
+    charts:
+      - id: hw_health_controller
+        title: Controller Health Status
+        context: hw_health_controller
+        units: controllers
+        type: stacked
+        algorithm: absolute
+        dimensions:
+          - selector: hw_controller_ok
+            name: ok
+          - selector: hw_controller_degraded
+            name: degraded
+          - selector: hw_controller_fault
+            name: fault
+          - selector: hw_controller_unknown
+            name: unknown
+      - id: hw_health_drive
+        title: Drive Health Status
+        context: hw_health_drive
+        units: drives
+        type: stacked
+        algorithm: absolute
+        dimensions:
+          - selector: hw_drive_ok
+            name: ok
+          - selector: hw_drive_degraded
+            name: degraded
+          - selector: hw_drive_fault
+            name: fault
+          - selector: hw_drive_unknown
+            name: unknown
+      - id: hw_health_fan
+        title: Fan Health Status
+        context: hw_health_fan
+        units: fans
+        type: stacked
+        algorithm: absolute
+        dimensions:
+          - selector: hw_fan_ok
+            name: ok
+          - selector: hw_fan_degraded
+            name: degraded
+          - selector: hw_fan_fault
+            name: fault
+          - selector: hw_fan_unknown
+            name: unknown
+      - id: hw_health_psu
+        title: Power Supply Health Status
+        context: hw_health_psu
+        units: PSUs
+        type: stacked
+        algorithm: absolute
+        dimensions:
+          - selector: hw_psu_ok
+            name: ok
+          - selector: hw_psu_degraded
+            name: degraded
+          - selector: hw_psu_fault
+            name: fault
+          - selector: hw_psu_unknown
+            name: unknown
+      - id: hw_health_fru
+        title: FRU Health Status
+        context: hw_health_fru
+        units: FRUs
+        type: stacked
+        algorithm: absolute
+        dimensions:
+          - selector: hw_fru_ok
+            name: ok
+          - selector: hw_fru_degraded
+            name: degraded
+          - selector: hw_fru_fault
+            name: fault
+          - selector: hw_fru_unknown
+            name: unknown
+      - id: hw_health_port
+        title: Port Health Status
+        context: hw_health_port
+        units: ports
+        type: stacked
+        algorithm: absolute
+        dimensions:
+          - selector: hw_port_ok
+            name: ok
+          - selector: hw_port_degraded
+            name: degraded
+          - selector: hw_port_fault
+            name: fault
+          - selector: hw_port_unknown
+            name: unknown
+
+  - family: Controller
+    metrics:
+      - controller_iops
+      - controller_throughput
+      - controller_cpu_load
+      - controller_write_cache_used
+      - controller_forwarded_cmds
+      - controller_data_read
+      - controller_data_written
+      - controller_read_ops
+      - controller_write_ops
+      - controller_write_cache_hits
+      - controller_write_cache_misses
+      - controller_read_cache_hits
+      - controller_read_cache_misses
+    charts:
+      - id: controller_iops
+        title: Controller IOPS
+        context: controller_iops
+        units: ops/s
+        algorithm: absolute
+        instances:
+          by_labels: [controller]
+        dimensions:
+          - selector: controller_iops
+            name: iops
+      - id: controller_throughput
+        title: Controller Throughput
+        context: controller_throughput
+        units: bytes/s
+        algorithm: absolute
+        instances:
+          by_labels: [controller]
+        dimensions:
+          - selector: controller_throughput
+            name: throughput
+      - id: controller_cpu_load
+        title: Controller CPU Load
+        context: controller_cpu_load
+        units: percentage
+        algorithm: absolute
+        instances:
+          by_labels: [controller]
+        dimensions:
+          - selector: controller_cpu_load
+            name: cpu_load
+            options:
+              float: true
+      - id: controller_write_cache_used
+        title: Controller Write Cache Usage
+        context: controller_write_cache_used
+        units: percentage
+        algorithm: absolute
+        instances:
+          by_labels: [controller]
+        dimensions:
+          - selector: controller_write_cache_used
+            name: write_cache_used
+      - id: controller_forwarded_cmds
+        title: Controller Forwarded Commands
+        context: controller_forwarded_cmds
+        units: commands
+        algorithm: incremental
+        instances:
+          by_labels: [controller]
+        dimensions:
+          - selector: controller_forwarded_cmds
+            name: forwarded
+      - id: controller_io
+        title: Controller I/O
+        context: controller_io
+        units: bytes
+        type: area
+        algorithm: incremental
+        instances:
+          by_labels: [controller]
+        dimensions:
+          - selector: controller_data_read
+            name: read
+          - selector: controller_data_written
+            name: written
+            options:
+              multiplier: -1
+      - id: controller_ops
+        title: Controller Operations
+        context: controller_ops
+        units: ops
+        type: area
+        algorithm: incremental
+        instances:
+          by_labels: [controller]
+        dimensions:
+          - selector: controller_read_ops
+            name: read
+          - selector: controller_write_ops
+            name: write
+            options:
+              multiplier: -1
+      - id: controller_cache_hits
+        title: Controller Cache Hit Ratio
+        context: controller_cache_hits
+        units: hits
+        type: stacked
+        algorithm: incremental
+        instances:
+          by_labels: [controller]
+        dimensions:
+          - selector: controller_read_cache_hits
+            name: read_hits
+          - selector: controller_read_cache_misses
+            name: read_misses
+          - selector: controller_write_cache_hits
+            name: write_hits
+          - selector: controller_write_cache_misses
+            name: write_misses
+
+  - family: Volume
+    metrics:
+      - volume_iops
+      - volume_throughput
+      - volume_write_cache_percent
+      - volume_data_read
+      - volume_data_written
+      - volume_read_ops
+      - volume_write_ops
+      - volume_write_cache_hits
+      - volume_write_cache_misses
+      - volume_read_cache_hits
+      - volume_read_cache_misses
+      - volume_tier_ssd
+      - volume_tier_sas
+      - volume_tier_sata
+    charts:
+      - id: volume_iops
+        title: Volume IOPS
+        context: volume_iops
+        units: ops/s
+        algorithm: absolute
+        instances:
+          by_labels: [volume]
+        dimensions:
+          - selector: volume_iops
+            name: iops
+      - id: volume_throughput
+        title: Volume Throughput
+        context: volume_throughput
+        units: bytes/s
+        algorithm: absolute
+        instances:
+          by_labels: [volume]
+        dimensions:
+          - selector: volume_throughput
+            name: throughput
+      - id: volume_write_cache_percent
+        title: Volume Write Cache Usage
+        context: volume_write_cache_percent
+        units: percentage
+        algorithm: absolute
+        instances:
+          by_labels: [volume]
+        dimensions:
+          - selector: volume_write_cache_percent
+            name: write_cache
+      - id: volume_io
+        title: Volume I/O
+        context: volume_io
+        units: bytes
+        type: area
+        algorithm: incremental
+        instances:
+          by_labels: [volume]
+        dimensions:
+          - selector: volume_data_read
+            name: read
+          - selector: volume_data_written
+            name: written
+            options:
+              multiplier: -1
+      - id: volume_ops
+        title: Volume Operations
+        context: volume_ops
+        units: ops
+        type: area
+        algorithm: incremental
+        instances:
+          by_labels: [volume]
+        dimensions:
+          - selector: volume_read_ops
+            name: read
+          - selector: volume_write_ops
+            name: write
+            options:
+              multiplier: -1
+      - id: volume_cache_hits
+        title: Volume Cache Hit Ratio
+        context: volume_cache_hits
+        units: hits
+        type: stacked
+        algorithm: incremental
+        instances:
+          by_labels: [volume]
+        dimensions:
+          - selector: volume_read_cache_hits
+            name: read_hits
+          - selector: volume_read_cache_misses
+            name: read_misses
+          - selector: volume_write_cache_hits
+            name: write_hits
+          - selector: volume_write_cache_misses
+            name: write_misses
+      - id: volume_tier_distribution
+        title: Volume Storage Tier Distribution
+        context: volume_tier_distribution
+        units: percentage
+        type: stacked
+        algorithm: absolute
+        instances:
+          by_labels: [volume]
+        dimensions:
+          - selector: volume_tier_ssd
+            name: ssd
+          - selector: volume_tier_sas
+            name: sas
+          - selector: volume_tier_sata
+            name: sata
+
+  - family: Port
+    metrics:
+      - port_read_ops
+      - port_write_ops
+      - port_data_read
+      - port_data_written
+    charts:
+      - id: port_io
+        title: Port I/O
+        context: port_io
+        units: bytes
+        type: area
+        algorithm: incremental
+        instances:
+          by_labels: [port]
+        dimensions:
+          - selector: port_data_read
+            name: read
+          - selector: port_data_written
+            name: written
+            options:
+              multiplier: -1
+      - id: port_ops
+        title: Port Operations
+        context: port_ops
+        units: ops
+        type: area
+        algorithm: incremental
+        instances:
+          by_labels: [port]
+        dimensions:
+          - selector: port_read_ops
+            name: read
+          - selector: port_write_ops
+            name: write
+            options:
+              multiplier: -1
+
+  - family: PHY Errors
+    metrics:
+      - phy_disparity_errors
+      - phy_lost_dwords
+      - phy_invalid_dwords
+    charts:
+      - id: phy_errors
+        title: SAS PHY Errors
+        context: phy_errors
+        units: errors
+        type: stacked
+        algorithm: incremental
+        instances:
+          by_labels: [port]
+        dimensions:
+          - selector: phy_disparity_errors
+            name: disparity
+          - selector: phy_lost_dwords
+            name: lost_dwords
+          - selector: phy_invalid_dwords
+            name: invalid_dwords
+
+  - family: Pool
+    metrics:
+      - pool_total_bytes
+      - pool_available_bytes
+    charts:
+      - id: pool_capacity
+        title: Pool Capacity
+        context: pool_capacity
+        units: bytes
+        algorithm: absolute
+        instances:
+          by_labels: [pool]
+        dimensions:
+          - selector: pool_total_bytes
+            name: total
+          - selector: pool_available_bytes
+            name: available
+
+  - family: Drive
+    metrics:
+      - drive_temperature
+      - drive_power_on_hours
+      - drive_ssd_life_left
+    charts:
+      - id: drive_temperature
+        title: Drive Temperature
+        context: drive_temperature
+        units: Celsius
+        algorithm: absolute
+        instances:
+          by_labels: [drive]
+        dimensions:
+          - selector: drive_temperature
+            name: temperature
+      - id: drive_power_on_hours
+        title: Drive Power-On Hours
+        context: drive_power_on_hours
+        units: hours
+        algorithm: absolute
+        instances:
+          by_labels: [drive]
+        dimensions:
+          - selector: drive_power_on_hours
+            name: power_on_hours
+      - id: drive_ssd_life_left
+        title: Drive SSD Life Remaining
+        context: drive_ssd_life_left
+        units: percentage
+        algorithm: absolute
+        instances:
+          by_labels: [drive]
+        dimensions:
+          - selector: drive_ssd_life_left
+            name: life_left
+
+  - family: Sensor
+    metrics:
+      - sensor_temperature
+      - sensor_voltage
+      - sensor_current
+      - sensor_charge_capacity
+    charts:
+      - id: sensor_temperature
+        title: Sensor Temperature
+        context: sensor_temperature
+        units: Celsius
+        algorithm: absolute
+        instances:
+          by_labels: [sensor]
+        dimensions:
+          - selector: sensor_temperature
+            name: temperature
+      - id: sensor_voltage
+        title: Sensor Voltage
+        context: sensor_voltage
+        units: millivolts
+        algorithm: absolute
+        instances:
+          by_labels: [sensor]
+        dimensions:
+          - selector: sensor_voltage
+            name: voltage
+            options:
+              float: true
+      - id: sensor_current
+        title: Sensor Current
+        context: sensor_current
+        units: milliamps
+        algorithm: absolute
+        instances:
+          by_labels: [sensor]
+        dimensions:
+          - selector: sensor_current
+            name: current
+            options:
+              float: true
+      - id: sensor_charge_capacity
+        title: Sensor Charge Capacity
+        context: sensor_charge_capacity
+        units: percentage
+        algorithm: absolute
+        instances:
+          by_labels: [sensor]
+        dimensions:
+          - selector: sensor_charge_capacity
+            name: charge_capacity

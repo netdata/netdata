@@ -1,0 +1,555 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-powervault
+      plugin_name: go.d.plugin
+      module_name: powervault
+      monitored_instance:
+        name: Dell PowerVault ME4/ME5
+        link: https://www.dell.com/en-us/shop/povw/dell-powervault-me5
+        icon_filename: dell.svg
+        categories:
+          - data-collection.storage
+      keywords:
+        - powervault
+        - dell
+        - storage
+        - me4
+        - me5
+        - san
+        - das
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Dell PowerVault ME4 and ME5 storage arrays via the Management Controller Interface (MCI) REST API.
+
+          It collects metrics for the following components:
+
+          - **System Health** — overall array health status
+          - **Hardware Health** — component-level status counts (controllers, drives, fans, PSUs, FRUs, ports) by health state (OK, degraded, fault, unknown)
+          - **Controller Performance** — IOPS, throughput, CPU load, write cache usage, forwarded commands, cumulative I/O and cache hit/miss statistics
+          - **Volume Performance** — IOPS, throughput, write cache usage, cumulative I/O, cache hit/miss statistics, storage tier distribution (SSD/SAS/SATA)
+          - **Port I/O** — cumulative read/write operations and data transferred per host port
+          - **SAS PHY Errors** — disparity errors, lost dwords, invalid dwords aggregated per port
+          - **Pool Capacity** — total and available bytes per storage pool
+          - **Drive Metrics** — temperature, power-on hours, SSD life remaining per drive
+          - **Sensor Readings** — temperature, voltage, current, and charge capacity per sensor
+        method_description: |
+          The collector uses the MCI REST API (`/api/show/*` and `/api/show/*-statistics` endpoints) to fetch data.
+          Authentication uses a hash-based login (SHA-256 by default, MD5 for legacy firmware) — the collector
+          hashes `username_password`, calls `/api/login/<hash>`, and uses the returned session key for subsequent requests.
+
+          Discovery runs on startup and then every 10 collection cycles to refresh the hardware inventory.
+          Performance statistics (controllers, volumes, ports, PHY) are collected via concurrent API calls
+          each cycle. Hardware health, drive metrics, sensor readings, pool capacity, and system health
+          are computed from the cached discovery data without additional API calls.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          A user account on the PowerVault management controller is required. Any role with API read access
+          is sufficient (e.g., the built-in `monitor` role). The account does not need write permissions.
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector does not auto-detect PowerVault arrays. You must configure the management IP address,
+            username, and password explicitly.
+        limits:
+          description: |
+            The collector makes approximately 14 API calls per collection cycle (10 for discovery when needed,
+            4 for statistics). With the default 30-second collection interval, this is well within the MCI API's
+            capabilities. Each API call returns all entities of that type in a single response.
+        performance_impact:
+          description: |
+            The MCI API is lightweight and read-only. The collector's impact on the storage array is negligible.
+            Session keys are reused across collection cycles and automatically refreshed on expiry (HTTP 401).
+    setup:
+      prerequisites:
+        list:
+          - title: PowerVault API access
+            description: |
+              1. A user account on the PowerVault management controller with at least read-only access.
+                 The built-in `monitor` role is sufficient.
+              2. Network connectivity from the Netdata Agent to the PowerVault management IP (HTTPS, port 443).
+              3. The management controller must have its REST API enabled (enabled by default on ME4/ME5).
+          - title: TLS certificate
+            description: |
+              PowerVault controllers typically use self-signed TLS certificates. You will likely need to set
+              `tls_skip_verify: yes` in the configuration, or provide the controller's CA certificate via `tls_ca`.
+      configuration:
+        file:
+          name: go.d/powervault.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval (seconds).
+              default_value: 30
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Autodetection retry interval (seconds). Set 0 to disable.
+              default_value: 0
+              required: false
+              group: Collection
+
+            - name: url
+              description: PowerVault management controller URL.
+              default_value: https://127.0.0.1
+              required: true
+              group: Target
+            - name: timeout
+              description: HTTP request timeout (seconds).
+              default_value: 30
+              required: false
+              group: Target
+
+            - name: username
+              description: Username for MCI API authentication.
+              default_value: ""
+              required: true
+              group: HTTP Auth
+            - name: password
+              description: Password for MCI API authentication.
+              default_value: ""
+              required: true
+              group: HTTP Auth
+            - name: auth_digest
+              description: "Hash algorithm for authentication. Use `sha256` (default) or `md5` (legacy ME4 firmware < G280)."
+              default_value: sha256
+              required: false
+              group: HTTP Auth
+
+            - name: volume_selector
+              description: |
+                Space-separated [simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme)
+                to filter which volumes to monitor. Use `*` for wildcards, `!` prefix to exclude.
+                An empty value monitors all volumes.
+              default_value: ""
+              required: false
+              group: Filtering
+
+            - name: tls_skip_verify
+              description: Skip TLS certificate and hostname verification (insecure, but often needed for self-signed certs on storage controllers).
+              default_value: no
+              required: false
+              group: TLS
+            - name: tls_ca
+              description: Path to CA bundle used to validate the server certificate.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_cert
+              description: Path to client TLS certificate (for mTLS).
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_key
+              description: Path to client TLS private key (for mTLS).
+              default_value: ""
+              required: false
+              group: TLS
+
+            - name: proxy_url
+              description: HTTP proxy URL.
+              default_value: ""
+              required: false
+              group: Proxy
+            - name: proxy_username
+              description: Username for proxy Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: Proxy
+            - name: proxy_password
+              description: Password for proxy Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: Proxy
+
+            - name: headers
+              description: "Additional HTTP headers (one per line as key: value)."
+              default_value: ""
+              required: false
+              group: Request
+            - name: not_follow_redirects
+              description: Do not follow HTTP redirects.
+              default_value: no
+              required: false
+              group: Request
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A minimal configuration connecting to a PowerVault controller with a self-signed certificate.
+              config: |
+                jobs:
+                  - name: pv-lab
+                    url: https://10.0.0.1
+                    username: monitor
+                    password: monitor123
+                    tls_skip_verify: yes
+            - name: With volume filtering
+              description: Monitor only production volumes, excluding temporary and test volumes.
+              config: |
+                jobs:
+                  - name: pv-prod
+                    url: https://10.0.0.1
+                    username: monitor
+                    password: monitor123
+                    tls_skip_verify: yes
+                    volume_selector: "prod-* !*-temp !*-test"
+            - name: Legacy ME4 with MD5 auth
+              description: Connecting to an older ME4 controller that requires MD5 authentication (firmware before G280).
+              config: |
+                jobs:
+                  - name: pv-legacy
+                    url: https://10.0.0.2
+                    username: manage
+                    password: manage123
+                    auth_digest: md5
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Monitoring multiple PowerVault arrays.
+              config: |
+                jobs:
+                  - name: pv-site-a
+                    url: https://10.0.0.1
+                    username: monitor
+                    password: monitor123
+                    tls_skip_verify: yes
+
+                  - name: pv-site-b
+                    url: https://10.0.0.2
+                    username: monitor
+                    password: monitor456
+                    tls_skip_verify: yes
+    troubleshooting:
+      problems:
+        list:
+          - name: Authentication failure
+            description: |
+              If the collector fails with `login: authentication failed`:
+
+              1. Verify the username and password are correct.
+              2. Check the `auth_digest` setting. ME4 firmware before G280 requires `auth_digest: md5`.
+                 ME5 and newer ME4 firmware use `sha256` (the default).
+              3. Ensure the user account is not locked or expired on the controller.
+          - name: Connection refused or timeout
+            description: |
+              If the collector fails with connection errors:
+
+              1. Verify the `url` points to the management controller IP (not a data port).
+              2. Ensure HTTPS port 443 is reachable from the Netdata Agent host.
+              3. If using a firewall, allow outbound HTTPS to the controller.
+              4. Try increasing `timeout` if the controller is on a high-latency link.
+          - name: TLS certificate errors
+            description: |
+              PowerVault controllers ship with self-signed certificates. If you see TLS errors:
+
+              1. Set `tls_skip_verify: yes` in the configuration (most common solution).
+              2. Alternatively, export the controller's certificate and provide it via `tls_ca`.
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored PowerVault array.
+          labels: []
+          metrics:
+            - name: powervault.system_health
+              description: System Health Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: health
+            - name: powervault.hw_health_controller
+              description: Controller Health Status
+              unit: controllers
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: degraded
+                - name: fault
+                - name: unknown
+            - name: powervault.hw_health_drive
+              description: Drive Health Status
+              unit: drives
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: degraded
+                - name: fault
+                - name: unknown
+            - name: powervault.hw_health_fan
+              description: Fan Health Status
+              unit: fans
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: degraded
+                - name: fault
+                - name: unknown
+            - name: powervault.hw_health_psu
+              description: Power Supply Health Status
+              unit: PSUs
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: degraded
+                - name: fault
+                - name: unknown
+            - name: powervault.hw_health_fru
+              description: FRU Health Status
+              unit: FRUs
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: degraded
+                - name: fault
+                - name: unknown
+            - name: powervault.hw_health_port
+              description: Port Health Status
+              unit: ports
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: degraded
+                - name: fault
+                - name: unknown
+        - name: controller
+          description: These metrics refer to individual RAID controllers (typically controller_a and controller_b in a dual-controller configuration).
+          labels:
+            - name: controller
+              description: Controller durable ID (e.g., `controller_a`, `controller_b`).
+          metrics:
+            - name: powervault.controller_iops
+              description: Controller IOPS
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: iops
+            - name: powervault.controller_throughput
+              description: Controller Throughput
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: throughput
+            - name: powervault.controller_cpu_load
+              description: Controller CPU Load
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: cpu_load
+            - name: powervault.controller_write_cache_used
+              description: Controller Write Cache Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: write_cache_used
+            - name: powervault.controller_forwarded_cmds
+              description: Controller Forwarded Commands
+              unit: commands
+              chart_type: line
+              dimensions:
+                - name: forwarded
+            - name: powervault.controller_io
+              description: Controller Cumulative I/O
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: written
+            - name: powervault.controller_ops
+              description: Controller Cumulative Operations
+              unit: ops
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: powervault.controller_cache_hits
+              description: Controller Cache Hit Ratio
+              unit: hits
+              chart_type: stacked
+              dimensions:
+                - name: read_hits
+                - name: read_misses
+                - name: write_hits
+                - name: write_misses
+        - name: volume
+          description: These metrics refer to individual storage volumes. Volumes can be filtered using the `volume_selector` configuration option.
+          labels:
+            - name: volume
+              description: Volume name (e.g., `prod-db-01`).
+          metrics:
+            - name: powervault.volume_iops
+              description: Volume IOPS
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: iops
+            - name: powervault.volume_throughput
+              description: Volume Throughput
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: throughput
+            - name: powervault.volume_write_cache_percent
+              description: Volume Write Cache Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: write_cache
+            - name: powervault.volume_io
+              description: Volume Cumulative I/O
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: written
+            - name: powervault.volume_ops
+              description: Volume Cumulative Operations
+              unit: ops
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: powervault.volume_cache_hits
+              description: Volume Cache Hit Ratio
+              unit: hits
+              chart_type: stacked
+              dimensions:
+                - name: read_hits
+                - name: read_misses
+                - name: write_hits
+                - name: write_misses
+            - name: powervault.volume_tier_distribution
+              description: Volume Storage Tier Distribution
+              unit: percentage
+              chart_type: stacked
+              dimensions:
+                - name: ssd
+                - name: sas
+                - name: sata
+        - name: port
+          description: These metrics refer to individual host ports (SAS/FC ports used for host connectivity).
+          labels:
+            - name: port
+              description: Port durable ID (e.g., `hostport_A0`).
+          metrics:
+            - name: powervault.port_io
+              description: Port Cumulative I/O
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: written
+            - name: powervault.port_ops
+              description: Port Cumulative Operations
+              unit: ops
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: powervault.phy_errors
+              description: SAS PHY Errors
+              unit: errors
+              chart_type: stacked
+              dimensions:
+                - name: disparity
+                - name: lost_dwords
+                - name: invalid_dwords
+        - name: pool
+          description: These metrics refer to individual storage pools (also known as disk groups or virtual pools).
+          labels:
+            - name: pool
+              description: Pool name (e.g., `Pool-A`).
+          metrics:
+            - name: powervault.pool_capacity
+              description: Pool Capacity
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: available
+        - name: drive
+          description: These metrics refer to individual physical drives (HDDs and SSDs).
+          labels:
+            - name: drive
+              description: Drive location (e.g., `0.0` for enclosure 0, slot 0).
+          metrics:
+            - name: powervault.drive_temperature
+              description: Drive Temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: powervault.drive_power_on_hours
+              description: Drive Power-On Hours
+              unit: hours
+              chart_type: line
+              dimensions:
+                - name: power_on_hours
+            - name: powervault.drive_ssd_life_left
+              description: Drive SSD Life Remaining
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: life_left
+        - name: sensor
+          description: |
+            These metrics refer to individual hardware sensors. Sensor types include temperature,
+            voltage, current, and charge capacity (supercapacitor/battery backup units).
+          labels:
+            - name: sensor
+              description: Sensor durable ID (e.g., `sensor_temp_ctrl_A.1`).
+          metrics:
+            - name: powervault.sensor_temperature
+              description: Sensor Temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: powervault.sensor_voltage
+              description: Sensor Voltage
+              unit: millivolts
+              chart_type: line
+              dimensions:
+                - name: voltage
+            - name: powervault.sensor_current
+              description: Sensor Current
+              unit: milliamps
+              chart_type: line
+              dimensions:
+                - name: current
+            - name: powervault.sensor_charge_capacity
+              description: Sensor Charge Capacity
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: charge_capacity
