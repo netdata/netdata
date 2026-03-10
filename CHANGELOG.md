@@ -108,6 +108,15 @@
 - Chore(go/plugin/functions): change "not instances configured" resp code ([#21903](https://github.com/netdata/netdata/issues/21903))
 - Handle fetching IBM MQ libraries in CI package build jobs outside of CMake ([#21862](https://github.com/netdata/netdata/issues/21862))
 - Feat(go/plugin/metrix): add MeasureSet structured family support ([#21909](https://github.com/netdata/netdata/issues/21909))
+- Build(deps): bump docker/build-push-action from 6 to 7 ([#21914](https://github.com/netdata/netdata/issues/21914))
+- Build(deps): bump docker/login-action from 3 to 4 ([#21916](https://github.com/netdata/netdata/issues/21916))
+- Build(deps): bump crazy-max/ghaction-import-gpg from 6 to 7 ([#21913](https://github.com/netdata/netdata/issues/21913))
+- Build(deps): bump docker/setup-buildx-action from 3 to 4 ([#21915](https://github.com/netdata/netdata/issues/21915))
+- Build(deps): bump golang.org/x/sync from 0.19.0 to 0.20.0 in /src/go ([#21917](https://github.com/netdata/netdata/issues/21917))
+- Build(deps): bump docker/setup-qemu-action from 3 to 4 ([#21919](https://github.com/netdata/netdata/issues/21919))
+- Fail on broken metadata.yaml ([#21920](https://github.com/netdata/netdata/issues/21920))
+- Go.d: add Azure AD auth for mssql, postgres, and sql collectors ([#21905](https://github.com/netdata/netdata/issues/21905))
+- Regenerate integrations docs ([#21923](https://github.com/netdata/netdata/issues/21923))
 
 ## [2.9.0] - 2026-02-16
 
