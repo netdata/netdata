@@ -2,6 +2,7 @@
 
 #include <sys/resource.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "ebpf.h"
 #include "ebpf_disk.h"
@@ -156,12 +157,7 @@ static inline int ebpf_disk_parse_start(netdata_ebpf_disks_t *w, char *filename)
 static inline int ebpf_parse_uevent(netdata_ebpf_disks_t *w, char *filename)
 {
     (void)w;
-    int fd = open(filename, O_RDONLY, 0);
-    if (fd < 0)
-        return -1;
-
-    close(fd);
-    return 0;
+    return access(filename, F_OK);
 }
 
 /**

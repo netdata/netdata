@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 #include "libnetdata/libnetdata.h"
 #include "ebpf_library.h"
@@ -195,11 +196,24 @@ void ebpf_create_chart(
 int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
 {
     static int priority = NETDATA_EBPF_ORDER_STAT_ARAL_BEGIN;
+    static netdata_mutex_t priority_mutex = PTHREAD_MUTEX_INITIALIZER;
+    static int priority_mutex_initialized = 0;
+
+    if (!priority_mutex_initialized) {
+        netdata_mutex_init(&priority_mutex);
+        priority_mutex_initialized = 1;
+    }
+
     char *mem = NETDATA_EBPF_STAT_DIMENSION_MEMORY;
     char *aral = NETDATA_EBPF_STAT_DIMENSION_ARAL;
 
     snprintfz(em->memory_usage, NETDATA_EBPF_CHART_MEM_LENGTH - 1, "aral_%s_size", name);
     snprintfz(em->memory_allocations, NETDATA_EBPF_CHART_MEM_LENGTH - 1, "aral_%s_alloc", name);
+
+    netdata_mutex_lock(&priority_mutex);
+    int ret_priority = priority;
+    priority += 2;
+    netdata_mutex_unlock(&priority_mutex);
 
     ebpf_write_chart_cmd(
         NETDATA_MONITORING_FAMILY,
@@ -210,7 +224,7 @@ int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
         NETDATA_EBPF_FAMILY,
         NETDATA_EBPF_CHART_TYPE_STACKED,
         "netdata.ebpf_aral_stat_size",
-        priority++,
+        ret_priority,
         em->update_every,
         NETDATA_EBPF_MODULE_NAME_PROCESS);
 
@@ -225,13 +239,13 @@ int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em)
         NETDATA_EBPF_FAMILY,
         NETDATA_EBPF_CHART_TYPE_STACKED,
         "netdata.ebpf_aral_stat_alloc",
-        priority++,
+        ret_priority + 1,
         em->update_every,
         NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_write_global_dimension(aral, aral, ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
-    return priority - 2;
+    return ret_priority;
 }
 
 void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio)
@@ -643,8 +657,10 @@ static void ebpf_link_hostnames(const char *parse)
             move++;
 
         // No valid value found
-        if (unlikely(!*move))
+        if (unlikely(!*move)) {
+            freez(clean);
             return;
+        }
 
         // Find space that ends the list
         char *end = strchr(move, ' ');
