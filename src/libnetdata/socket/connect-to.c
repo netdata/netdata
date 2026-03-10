@@ -217,6 +217,120 @@ int connect_to_this_ip46(
     return fd;
 }
 
+static int parse_connection_definition(
+    char *definition,
+    char **host,
+    char **service,
+    char **iface,
+    int *protocol,
+    int *socktype,
+    char **unix_path)
+{
+    if(!definition || !*definition)
+        return -1;
+
+    *host = definition;
+    *service = NULL;
+    *iface = "";
+    *protocol = IPPROTO_TCP;
+    *socktype = SOCK_STREAM;
+    *unix_path = NULL;
+
+    if(strncmp(*host, "tcp:", 4) == 0) {
+        *host += 4;
+        *protocol = IPPROTO_TCP;
+        *socktype = SOCK_STREAM;
+    }
+    else if(strncmp(*host, "udp:", 4) == 0) {
+        *host += 4;
+        *protocol = IPPROTO_UDP;
+        *socktype = SOCK_DGRAM;
+    }
+    else if(strncmp(*host, "unix:", 5) == 0) {
+        *unix_path = *host + 5;
+        return 1;
+    }
+    else if(**host == '/') {
+        *unix_path = *host;
+        return 1;
+    }
+
+    char *e = *host;
+    if(*e == '[') {
+        e = ++(*host);
+        while(*e && *e != ']') e++;
+        if(*e == ']') {
+            *e = '\0';
+            e++;
+        }
+    }
+    else {
+        while(*e && *e != ':' && *e != '%') e++;
+    }
+
+    if(*e == '%') {
+        *e = '\0';
+        e++;
+        *iface = e;
+        while(*e && *e != ':') e++;
+    }
+
+    if(*e == ':') {
+        *e = '\0';
+        e++;
+        *service = e;
+    }
+
+    if(!**host)
+        return -1;
+
+    return 0;
+}
+
+bool connect_to_definition_get_service(const char *definition, int default_port, char *service, size_t service_size) {
+    if(!service || !service_size)
+        return false;
+
+    snprintfz(service, service_size, "%d", default_port);
+
+    if(!definition || !*definition)
+        return true;
+
+    const char *s = definition;
+    if(strncmp(s, "tcp:", 4) == 0 || strncmp(s, "udp:", 4) == 0)
+        s += 4;
+    else if(strncmp(s, "unix:", 5) == 0 || *s == '/')
+        return true;
+
+    const char *e = s;
+    size_t host_len = 0;
+    if(*e == '[') {
+        const char *host_start = ++e;
+        while(*e && *e != ']') e++;
+        host_len = (size_t)(e - host_start);
+        if(*e == ']')
+            e++;
+    }
+    else {
+        const char *host_start = e;
+        while(*e && *e != ':' && *e != '%') e++;
+        host_len = (size_t)(e - host_start);
+    }
+
+    if(!host_len)
+        return false;
+
+    if(*e == '%') {
+        e++;
+        while(*e && *e != ':') e++;
+    }
+
+    if(*e == ':' && *(e + 1))
+        snprintfz(service, service_size, "%s", e + 1);
+
+    return true;
+}
+
 // connect_to_this()
 //
 // definition format:
@@ -243,56 +357,16 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
     char default_service[10 + 1];
     snprintfz(default_service, 10, "%d", default_port);
 
-    char *host = buffer, *service = default_service, *iface = "";
-    int protocol = IPPROTO_TCP, socktype = SOCK_STREAM;
+    char *host = NULL, *service = NULL, *iface = NULL, *unix_path = NULL;
+    int protocol = 0, socktype = 0;
     uint32_t scope_id = 0;
 
-    if(strncmp(host, "tcp:", 4) == 0) {
-        host += 4;
-        protocol = IPPROTO_TCP;
-        socktype = SOCK_STREAM;
-    }
-    else if(strncmp(host, "udp:", 4) == 0) {
-        host += 4;
-        protocol = IPPROTO_UDP;
-        socktype = SOCK_DGRAM;
-    }
-    else if(strncmp(host, "unix:", 5) == 0) {
-        char *path = host + 5;
-        return connect_to_unix(path, timeout);
-    }
-    else if(*host == '/') {
-        char *path = host;
-        return connect_to_unix(path, timeout);
-    }
+    int rc = parse_connection_definition(
+        buffer, &host, &service, &iface, &protocol, &socktype, &unix_path);
+    if(rc == 1)
+        return connect_to_unix(unix_path, timeout);
 
-    char *e = host;
-    if(*e == '[') {
-        e = ++host;
-        while(*e && *e != ']') e++;
-        if(*e == ']') {
-            *e = '\0';
-            e++;
-        }
-    }
-    else {
-        while(*e && *e != ':' && *e != '%') e++;
-    }
-
-    if(*e == '%') {
-        *e = '\0';
-        e++;
-        iface = e;
-        while(*e && *e != ':') e++;
-    }
-
-    if(*e == ':') {
-        *e = '\0';
-        e++;
-        service = e;
-    }
-
-    if(!*host) {
+    if(rc == -1) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "Definition '%s' does not specify a host.",
                definition);
@@ -300,15 +374,15 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
         return -ND_SOCK_ERR_NO_HOST_IN_DEFINITION;
     }
 
-    if(*iface) {
+    if(iface && *iface) {
         scope_id = if_nametoindex(iface);
         if(!scope_id)
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "Cannot find a network interface named '%s'. Continuing with limiting the network interface",
+                   "Cannot find a network interface named '%s'. Continuing without limiting the network interface",
                    iface);
     }
 
-    if(!*service)
+    if(!service || !*service)
         service = default_service;
 
 
