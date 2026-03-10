@@ -70,19 +70,19 @@ metrics:
     metric_tags:
       - tag: ike_sa_index
         index: 1
-      - tag: ike_version
+      - tag: _ike_version
         symbol:
           OID: 1.3.6.1.4.1.14988.1.1.20.2.1.6
           name: mtxrIkeSAIKEVersion
-      - tag: peer_identity
+      - tag: _peer_identity
         symbol:
           OID: 1.3.6.1.4.1.14988.1.1.20.2.1.10
           name: mtxrIkeSARemoteIdentity
-      - tag: local_address
+      - tag: _local_address
         symbol:
           OID: 1.3.6.1.4.1.14988.1.1.20.2.1.13
           name: mtxrIkeSALocalAddress
-      - tag: peer_address
+      - tag: _peer_address
         symbol:
           OID: 1.3.6.1.4.1.14988.1.1.20.2.1.16
           name: mtxrIkeSARemoteAddress

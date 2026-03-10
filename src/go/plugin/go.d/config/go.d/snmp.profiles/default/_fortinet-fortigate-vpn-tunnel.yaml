@@ -49,11 +49,11 @@ metrics:
         symbol:
           OID: 1.3.6.1.4.1.12356.101.12.2.2.1.3
           name: fgVpnTunEntPhase2Name
-      - tag: remote_gateway_ip
+      - tag: _remote_gateway_ip
         symbol:
           OID: 1.3.6.1.4.1.12356.101.12.2.2.1.4
           name: fgVpnTunEntRemGwyIp
-      - tag: local_gateway_ip
+      - tag: _local_gateway_ip
         symbol:
           OID: 1.3.6.1.4.1.12356.101.12.2.2.1.6
           name: fgVpnTunEntLocGwyIp

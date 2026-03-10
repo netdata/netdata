@@ -83,21 +83,21 @@ metrics:
     metric_tags:
       - tag: ike_tunnel_index
         index: 1
-      - tag: peer_remote_address
+      - tag: _peer_remote_address
         symbol:
           OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.2
           name: jnxIkeTunMonRemoteAddr
           format: ip_address
-      - tag: peer_local_address
+      - tag: _peer_local_address
         symbol:
           OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.4
           name: jnxIkeTunMonLocalAddr
           format: ip_address
-      - tag: remote_identity
+      - tag: _remote_identity
         symbol:
           OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.14
           name: jnxIkeTunMonRemoteIdent
-      - tag: gateway_name
+      - tag: _gateway_name
         symbol:
           OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.43
           name: jnxIkeTunMonRemoteGwName
@@ -159,21 +159,21 @@ metrics:
     metric_tags:
       - tag: ipsec_tunnel_index
         index: 1
-      - tag: peer_remote_address
+      - tag: _peer_remote_address
         symbol:
           OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.2
           name: jnxIpSecTunMonRemoteGwAddr
           format: ip_address
-      - tag: peer_local_address
+      - tag: _peer_local_address
         symbol:
           OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.5
           name: jnxIpSecTunMonLocalAddr
           format: ip_address
-      - tag: local_proxy_id
+      - tag: _local_proxy_id
         symbol:
           OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.6
           name: jnxIpSecTunMonLocalProxyId
-      - tag: remote_proxy_id
+      - tag: _remote_proxy_id
         symbol:
           OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.7
           name: jnxIpSecTunMonRemoteProxyId
@@ -211,15 +211,15 @@ metrics:
     metric_tags:
       - tag: sa_index
         index: 1
-      - tag: sa_encap_mode
+      - tag: _sa_encap_mode
         symbol:
           OID: 1.3.6.1.4.1.2636.3.52.1.2.3.1.6
           name: jnxIpSecSaMonEncapMode
-      - tag: encrypt_algo
+      - tag: _encrypt_algo
         symbol:
           OID: 1.3.6.1.4.1.2636.3.52.1.2.3.1.12
           name: jnxIpSecSaMonEncryptAlgo
-      - tag: auth_algo
+      - tag: _auth_algo
         symbol:
           OID: 1.3.6.1.4.1.2636.3.52.1.2.3.1.13
           name: jnxIpSecSaMonAuthAlgo
