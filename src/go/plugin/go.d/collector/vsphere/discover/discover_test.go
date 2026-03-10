@@ -92,8 +92,12 @@ func TestDiscoverer_removeUnmatched(t *testing.T) {
 	require.NoError(t, err)
 	res := d.build(raw)
 
+	numClusters := len(res.Clusters)
 	numVMs, numHosts := len(res.VMs), len(res.Hosts)
-	assert.Equal(t, numVMs+numHosts, d.removeUnmatched(res))
+	removed := d.removeUnmatched(res)
+	// dummy clusters are removed + all hosts/VMs rejected by matchers
+	remainingClusters := len(res.Clusters)
+	assert.Equal(t, (numClusters-remainingClusters)+numVMs+numHosts, removed)
 	assert.Lenf(t, res.Hosts, 0, "hosts")
 	assert.Lenf(t, res.VMs, 0, "vms")
 }
@@ -158,6 +162,11 @@ func isHierarchySet(res *rs.Resources) bool {
 	}
 	for _, ds := range res.Datastores {
 		if !ds.Hier.IsSet() {
+			return false
+		}
+	}
+	for _, rp := range res.ResourcePools {
+		if !rp.Hier.IsSet() {
 			return false
 		}
 	}

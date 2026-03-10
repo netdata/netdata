@@ -16,12 +16,14 @@ func (d Discoverer) setHierarchy(res *rs.Resources) error {
 	h := d.setHostsHierarchy(res)
 	v := d.setVMsHierarchy(res)
 	ds := d.setDatastoresHierarchy(res)
+	rp := d.setResourcePoolsHierarchy(res)
 
-	d.Infof("discovering : hierarchy : set %d/%d clusters, %d/%d hosts, %d/%d vms, %d/%d datastores, process took %s",
+	d.Infof("discovering : hierarchy : set %d/%d clusters, %d/%d hosts, %d/%d vms, %d/%d datastores, %d/%d resource pools, process took %s",
 		c, len(res.Clusters),
 		h, len(res.Hosts),
 		v, len(res.VMs),
 		ds, len(res.Datastores),
+		rp, len(res.ResourcePools),
 		time.Since(t),
 	)
 
@@ -126,4 +128,29 @@ func findDatastoreDcID(parentID string, folders rs.Folders) string {
 		return parentID
 	}
 	return findDatastoreDcID(f.ParentID, folders)
+}
+
+func (d Discoverer) setResourcePoolsHierarchy(res *rs.Resources) (set int) {
+	for _, rp := range res.ResourcePools {
+		if setResourcePoolHierarchy(rp, res) {
+			set++
+		}
+	}
+	return set
+}
+
+// Resource pool owner is a cluster. Resolve DC from the cluster.
+func setResourcePoolHierarchy(rp *rs.ResourcePool, res *rs.Resources) bool {
+	cr := res.Clusters.Get(rp.ParentID)
+	if cr == nil {
+		return false
+	}
+	rp.Hier.Cluster.Set(cr.ID, cr.Name)
+
+	dc := res.DataCenters.Get(cr.ParentID)
+	if dc == nil {
+		return false
+	}
+	rp.Hier.DC.Set(dc.ID, dc.Name)
+	return rp.Hier.IsSet()
 }

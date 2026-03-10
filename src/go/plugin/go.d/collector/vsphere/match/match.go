@@ -22,6 +22,10 @@ type DatastoreMatcher interface {
 	Match(*rs.Datastore) bool
 }
 
+type ClusterMatcher interface {
+	Match(*rs.Cluster) bool
+}
+
 type (
 	hostDCMatcher      struct{ m matcher.Matcher }
 	hostClusterMatcher struct{ m matcher.Matcher }
@@ -102,6 +106,7 @@ type (
 	VMIncludes        []string
 	HostIncludes      []string
 	DatastoreIncludes []string
+	ClusterIncludes   []string
 )
 
 type (
@@ -115,6 +120,28 @@ func (m dsDCMatcher) Match(ds *rs.Datastore) bool  { return m.m.MatchString(ds.H
 func (m dsDSMatcher) Match(ds *rs.Datastore) bool  { return m.m.MatchString(ds.Name) }
 func (m orDSMatcher) Match(ds *rs.Datastore) bool  { return m.lhs.Match(ds) || m.rhs.Match(ds) }
 func (m andDSMatcher) Match(ds *rs.Datastore) bool { return m.lhs.Match(ds) && m.rhs.Match(ds) }
+
+type (
+	clusterDCMatcher   struct{ m matcher.Matcher }
+	clusterNameMatcher struct{ m matcher.Matcher }
+	orClusterMatcher   struct{ lhs, rhs ClusterMatcher }
+	andClusterMatcher  struct{ lhs, rhs ClusterMatcher }
+)
+
+func (m clusterDCMatcher) Match(c *rs.Cluster) bool   { return m.m.MatchString(c.Hier.DC.Name) }
+func (m clusterNameMatcher) Match(c *rs.Cluster) bool { return m.m.MatchString(c.Name) }
+func (m orClusterMatcher) Match(c *rs.Cluster) bool   { return m.lhs.Match(c) || m.rhs.Match(c) }
+func (m andClusterMatcher) Match(c *rs.Cluster) bool  { return m.lhs.Match(c) && m.rhs.Match(c) }
+
+func newOrClusterMatcher(lhs, rhs ClusterMatcher, others ...ClusterMatcher) orClusterMatcher {
+	m := orClusterMatcher{lhs: lhs, rhs: rhs}
+	switch len(others) {
+	case 0:
+		return m
+	default:
+		return newOrClusterMatcher(m, others[0], others[1:]...)
+	}
+}
 
 func (vi VMIncludes) Parse() (VMMatcher, error) {
 	var ms []VMMatcher
@@ -280,6 +307,67 @@ func parseSubInclude(sub string) (matcher.Matcher, error) {
 
 func isIncludeFormatValid(line string) bool {
 	return strings.HasPrefix(line, "/")
+}
+
+func (ci ClusterIncludes) Parse() (ClusterMatcher, error) {
+	var ms []ClusterMatcher
+	for _, v := range ci {
+		m, err := parseClusterInclude(v)
+		if err != nil {
+			return nil, err
+		}
+		if m == nil {
+			continue
+		}
+		ms = append(ms, m)
+	}
+
+	switch len(ms) {
+	case 0:
+		return nil, nil
+	case 1:
+		return ms[0], nil
+	default:
+		return newOrClusterMatcher(ms[0], ms[1], ms[2:]...), nil
+	}
+}
+
+const (
+	clDCIdx        = iota
+	clClusterIdx
+)
+
+func parseClusterInclude(include string) (ClusterMatcher, error) {
+	if !isIncludeFormatValid(include) {
+		return nil, fmt.Errorf("bad include format: %s", include)
+	}
+
+	include = cleanInclude(include)
+	parts := strings.Split(include, "/") // /dc/cluster
+	var ms []ClusterMatcher
+
+	for i, v := range parts {
+		m, err := parseSubInclude(v)
+		if err != nil {
+			return nil, err
+		}
+		switch i {
+		case clDCIdx:
+			ms = append(ms, clusterDCMatcher{m})
+		case clClusterIdx:
+			ms = append(ms, clusterNameMatcher{m})
+		default:
+		}
+	}
+
+	switch len(ms) {
+	case 0:
+		return nil, nil
+	case 1:
+		return ms[0], nil
+	default:
+		return andClusterMatcher{lhs: ms[0], rhs: ms[1]}, nil
+	}
 }
 
 const (

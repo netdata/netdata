@@ -30,5 +30,8 @@
   ],
   "datastore_include": [
     "ok"
+  ],
+  "cluster_include": [
+    "ok"
   ]
 }

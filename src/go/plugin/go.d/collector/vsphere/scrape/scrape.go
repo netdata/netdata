@@ -79,6 +79,18 @@ func (s *Scraper) ScrapeDatastores(datastores rs.Datastores) []performance.Entit
 	return ms
 }
 
+func (s *Scraper) ScrapeClusters(clusters rs.Clusters) []performance.EntityMetric {
+	t := time.Now()
+	pqs := newClustersPerfQuerySpecs(clusters)
+	ms := s.scrapeMetrics(pqs)
+	s.Debugf("scraping : scraped metrics for %d/%d clusters, process took %s",
+		len(ms),
+		len(clusters),
+		time.Since(t),
+	)
+	return ms
+}
+
 func (s *Scraper) scrapeMetrics(pqs []types.PerfQuerySpec) []performance.EntityMetric {
 	tc := newThrottledCaller(5)
 	var ms []performance.EntityMetric
@@ -156,9 +168,9 @@ func newVMsPerfQuerySpecs(vms rs.VMs) []types.PerfQuerySpec {
 	return pqs
 }
 
-// Datastores do not support real-time (20s) collection.
+// Datastores, clusters, and resource pools do not support real-time (20s) collection.
 // Minimum supported interval is 300s (5 min historical).
-const pqsDatastoreIntervalID = 300
+const pqsHistoricalIntervalID = 300
 
 func newDatastoresPerfQuerySpecs(datastores rs.Datastores) []types.PerfQuerySpec {
 	pqs := make([]types.PerfQuerySpec, 0, len(datastores))
@@ -170,7 +182,25 @@ func newDatastoresPerfQuerySpecs(datastores rs.Datastores) []types.PerfQuerySpec
 			Entity:     ds.Ref,
 			MaxSample:  pqsMaxSample,
 			MetricId:   ds.MetricList,
-			IntervalId: pqsDatastoreIntervalID,
+			IntervalId: pqsHistoricalIntervalID,
+			Format:     pqsFormat,
+		}
+		pqs = append(pqs, pq)
+	}
+	return pqs
+}
+
+func newClustersPerfQuerySpecs(clusters rs.Clusters) []types.PerfQuerySpec {
+	pqs := make([]types.PerfQuerySpec, 0, len(clusters))
+	for _, c := range clusters {
+		if len(c.MetricList) == 0 {
+			continue
+		}
+		pq := types.PerfQuerySpec{
+			Entity:     c.Ref,
+			MaxSample:  pqsMaxSample,
+			MetricId:   c.MetricList,
+			IntervalId: pqsHistoricalIntervalID,
 			Format:     pqsFormat,
 		}
 		pqs = append(pqs, pq)

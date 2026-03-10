@@ -27,7 +27,9 @@ const (
 	computeResource = "ComputeResource"
 	hostSystem      = "HostSystem"
 	virtualMachine  = "VirtualMachine"
-	datastoreType   = "Datastore"
+	datastoreType        = "Datastore"
+	clusterType          = "ClusterComputeResource"
+	resourcePoolType     = "ResourcePool"
 
 	maxIdleConnections = 32
 )
@@ -190,6 +192,31 @@ func (c *Client) DatastoresByRef(refs []types.ManagedObjectReference, pathSet ..
 	pc := property.DefaultCollector(c.client.Client)
 	err := pc.Retrieve(context.Background(), refs, pathSet, &datastores)
 	return datastores, err
+}
+
+func (c *Client) ClustersByRef(refs []types.ManagedObjectReference, pathSet ...string) ([]mo.ClusterComputeResource, error) {
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	var clusters []mo.ClusterComputeResource
+	pc := property.DefaultCollector(c.client.Client)
+	err := pc.Retrieve(context.Background(), refs, pathSet, &clusters)
+	return clusters, err
+}
+
+func (c *Client) ResourcePools(pathSet ...string) (pools []mo.ResourcePool, err error) {
+	err = c.root.Retrieve(context.Background(), []string{resourcePoolType}, pathSet, &pools)
+	return
+}
+
+func (c *Client) ResourcePoolsByRef(refs []types.ManagedObjectReference, pathSet ...string) ([]mo.ResourcePool, error) {
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	var pools []mo.ResourcePool
+	pc := property.DefaultCollector(c.client.Client)
+	err := pc.Retrieve(context.Background(), refs, pathSet, &pools)
+	return pools, err
 }
 
 func (c *Client) CounterInfoByName() (map[string]*types.PerfCounterInfo, error) {

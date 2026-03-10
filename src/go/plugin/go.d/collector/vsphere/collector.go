@@ -46,15 +46,20 @@ func New() *Collector {
 			HostsInclude:      []string{"/*"},
 			VMsInclude:        []string{"/*"},
 			DatastoresInclude: []string{"/*"},
+			ClustersInclude:   []string{"/*"},
 		},
-		collectionLock:        &sync.RWMutex{},
-		charts:                &collectorapi.Charts{},
-		discoveredHosts:       make(map[string]int),
-		discoveredVMs:         make(map[string]int),
-		discoveredDatastores:  make(map[string]int),
-		charted:               make(map[string]bool),
-		datastorePerfReceived: make(map[string]bool),
-		datastorePerfCharted:  make(map[string]bool),
+		collectionLock:         &sync.RWMutex{},
+		charts:                 &collectorapi.Charts{},
+		discoveredHosts:        make(map[string]int),
+		discoveredVMs:          make(map[string]int),
+		discoveredDatastores:   make(map[string]int),
+		discoveredClusters:     make(map[string]int),
+		discoveredResourcePools: make(map[string]int),
+		charted:                make(map[string]bool),
+		datastorePerfReceived:  make(map[string]bool),
+		datastorePerfCharted:   make(map[string]bool),
+		clusterPerfReceived:    make(map[string]bool),
+		clusterPerfCharted:     make(map[string]bool),
 	}
 }
 
@@ -67,6 +72,7 @@ type Config struct {
 	HostsInclude       match.HostIncludes      `yaml:"host_include,omitempty" json:"host_include"`
 	VMsInclude         match.VMIncludes        `yaml:"vm_include,omitempty" json:"vm_include"`
 	DatastoresInclude  match.DatastoreIncludes `yaml:"datastore_include,omitempty" json:"datastore_include"`
+	ClustersInclude    match.ClusterIncludes   `yaml:"cluster_include,omitempty" json:"cluster_include"`
 }
 
 type (
@@ -79,6 +85,8 @@ type (
 		discoverer
 		scraper
 		dsPropertyCollector
+		clusterPropertyCollector
+		rpPropertyCollector
 
 		collectionLock       *sync.RWMutex
 		resources            *rs.Resources
@@ -86,11 +94,15 @@ type (
 		discoveredHosts      map[string]int
 		discoveredVMs        map[string]int
 		discoveredDatastores map[string]int
+		discoveredClusters     map[string]int
+		discoveredResourcePools map[string]int
 		charted              map[string]bool
 
-		// two-phase chart creation for datastores: property charts always, perf charts only when data arrives
+		// two-phase chart creation: property charts always, perf charts only when data arrives
 		datastorePerfReceived map[string]bool
 		datastorePerfCharted  map[string]bool
+		clusterPerfReceived   map[string]bool
+		clusterPerfCharted    map[string]bool
 	}
 	discoverer interface {
 		Discover() (*rs.Resources, error)
@@ -99,9 +111,16 @@ type (
 		ScrapeHosts(rs.Hosts) []performance.EntityMetric
 		ScrapeVMs(rs.VMs) []performance.EntityMetric
 		ScrapeDatastores(rs.Datastores) []performance.EntityMetric
+		ScrapeClusters(rs.Clusters) []performance.EntityMetric
 	}
 	dsPropertyCollector interface {
 		DatastoresByRef(refs []types.ManagedObjectReference, pathSet ...string) ([]mo25.Datastore, error)
+	}
+	clusterPropertyCollector interface {
+		ClustersByRef(refs []types.ManagedObjectReference, pathSet ...string) ([]mo25.ClusterComputeResource, error)
+	}
+	rpPropertyCollector interface {
+		ResourcePoolsByRef(refs []types.ManagedObjectReference, pathSet ...string) ([]mo25.ResourcePool, error)
 	}
 )
 

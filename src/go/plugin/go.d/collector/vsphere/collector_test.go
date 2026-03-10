@@ -107,6 +107,11 @@ func TestCollector_Init_ReturnsFalseIfInvalidHostVMIncludeFormat(t *testing.T) {
 
 	collr.DatastoresInclude = match.DatastoreIncludes{"invalid"}
 	assert.Error(t, collr.Init(context.Background()))
+
+	collr.DatastoresInclude = collr.DatastoresInclude[:0]
+
+	collr.ClustersInclude = match.ClusterIncludes{"invalid"}
+	assert.Error(t, collr.Init(context.Background()))
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -348,6 +353,98 @@ func TestCollector_Collect(t *testing.T) {
 		"datastore-59_datastore.write.average":               300,
 		"datastore-59_datastore.totalReadLatency.average":    300,
 		"datastore-59_datastore.totalWriteLatency.average":   300,
+		// Cluster property metrics (domain-c28)
+		"domain-c28_num_hosts":                       3,
+		"domain-c28_num_effective_hosts":             3,
+		"domain-c28_total_cpu":                       6882,
+		"domain-c28_effective_cpu":                   6882,
+		"domain-c28_total_memory":                    12883292160,
+		"domain-c28_effective_memory":                13509110959964160,
+		"domain-c28_num_cpu_cores":                   6,
+		"domain-c28_num_cpu_threads":                 6,
+		"domain-c28_num_vmotions":                    0,
+		"domain-c28_drs_score":                       0,
+		"domain-c28_current_balance":                 0,
+		"domain-c28_target_balance":                  0,
+		"domain-c28_drs_enabled":                     1,
+		"domain-c28_ha_enabled":                      0,
+		"domain-c28_ha_adm_ctrl_enabled":             0,
+		"domain-c28_usage_cpu_demand_mhz":            0,
+		"domain-c28_usage_mem_demand_mb":             0,
+		"domain-c28_usage_cpu_entitled_mhz":          0,
+		"domain-c28_usage_mem_entitled_mb":           0,
+		"domain-c28_usage_cpu_reservation_mhz":       0,
+		"domain-c28_usage_mem_reservation_mb":        0,
+		"domain-c28_usage_total_vm_count":            0,
+		"domain-c28_usage_powered_off_vm_count":      0,
+		"domain-c28_overall.status.green":            1,
+		"domain-c28_overall.status.gray":             0,
+		"domain-c28_overall.status.red":              0,
+		"domain-c28_overall.status.yellow":           0,
+		// Cluster perf metrics (domain-c28)
+		"domain-c28_clusterServices.cpufairness.latest":   400,
+		"domain-c28_clusterServices.effectivecpu.average":  400,
+		"domain-c28_clusterServices.effectivemem.average":  400,
+		"domain-c28_clusterServices.failover.latest":       400,
+		"domain-c28_clusterServices.memfairness.latest":    400,
+		"domain-c28_cpu.totalmhz.average":                  400,
+		"domain-c28_cpu.usage.average":                     400,
+		"domain-c28_cpu.usagemhz.average":                  400,
+		"domain-c28_mem.active.average":                    400,
+		"domain-c28_mem.consumed.average":                  400,
+		"domain-c28_mem.granted.average":                   400,
+		"domain-c28_mem.overhead.average":                  400,
+		"domain-c28_mem.shared.average":                    400,
+		"domain-c28_mem.swapused.average":                  400,
+		"domain-c28_mem.usage.average":                     400,
+		"domain-c28_vmop.numChangeDS.latest":               400,
+		"domain-c28_vmop.numChangeHost.latest":             400,
+		"domain-c28_vmop.numChangeHostDS.latest":           400,
+		"domain-c28_vmop.numClone.latest":                  400,
+		"domain-c28_vmop.numCreate.latest":                 400,
+		"domain-c28_vmop.numDeploy.latest":                 400,
+		"domain-c28_vmop.numDestroy.latest":                400,
+		"domain-c28_vmop.numPoweroff.latest":               400,
+		"domain-c28_vmop.numPoweron.latest":                400,
+		"domain-c28_vmop.numRebootGuest.latest":            400,
+		"domain-c28_vmop.numReconfigure.latest":            400,
+		"domain-c28_vmop.numRegister.latest":               400,
+		"domain-c28_vmop.numReset.latest":                  400,
+		"domain-c28_vmop.numSVMotion.latest":               400,
+		"domain-c28_vmop.numShutdownGuest.latest":          400,
+		"domain-c28_vmop.numStandbyGuest.latest":           400,
+		"domain-c28_vmop.numSuspend.latest":                400,
+		"domain-c28_vmop.numUnregister.latest":             400,
+		"domain-c28_vmop.numVMotion.latest":                400,
+		"domain-c28_vmop.numXVMotion.latest":               400,
+		// Resource pool metrics (resgroup-27)
+		"resgroup-27_cpu_usage":                    0,
+		"resgroup-27_cpu_demand":                   0,
+		"resgroup-27_cpu_entitlement_distributed":  0,
+		"resgroup-27_mem_usage_guest":              0,
+		"resgroup-27_mem_usage_host":               0,
+		"resgroup-27_mem_entitlement_distributed":  0,
+		"resgroup-27_mem_private":                  0,
+		"resgroup-27_mem_shared":                   0,
+		"resgroup-27_mem_swapped":                  0,
+		"resgroup-27_mem_ballooned":                0,
+		"resgroup-27_mem_overhead":                 0,
+		"resgroup-27_mem_consumed_overhead":        0,
+		"resgroup-27_mem_compressed":               0,
+		"resgroup-27_cpu_reservation_used":         0,
+		"resgroup-27_cpu_max_usage":                4121,
+		"resgroup-27_cpu_unreserved_for_vm":        4121,
+		"resgroup-27_mem_reservation_used":         0,
+		"resgroup-27_mem_max_usage":                1007681536,
+		"resgroup-27_mem_unreserved_for_vm":        1007681536,
+		"resgroup-27_cpu_reservation":              4121,
+		"resgroup-27_cpu_limit":                    4121,
+		"resgroup-27_mem_reservation":              961,
+		"resgroup-27_mem_limit":                    961,
+		"resgroup-27_overall.status.green":         1,
+		"resgroup-27_overall.status.gray":          0,
+		"resgroup-27_overall.status.red":           0,
+		"resgroup-27_overall.status.yellow":        0,
 	}
 
 	mx := collr.Collect(context.Background())
@@ -358,9 +455,17 @@ func TestCollector_Collect(t *testing.T) {
 	assert.Len(t, collr.discoveredHosts, count.Host)
 	assert.Len(t, collr.discoveredVMs, count.Machine)
 	assert.Len(t, collr.discoveredDatastores, count.Datastore)
-	assert.Len(t, collr.charted, count.Host+count.Machine+count.Datastore)
 
-	assert.Len(t, *collr.Charts(), count.Host*len(hostChartsTmpl)+count.Machine*len(vmChartsTmpl)+count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl)))
+	numClusters := len(collr.discoveredClusters)
+	numResourcePools := len(collr.discoveredResourcePools)
+	assert.Len(t, collr.charted, count.Host+count.Machine+count.Datastore+numClusters+numResourcePools)
+
+	assert.Len(t, *collr.Charts(),
+		count.Host*len(hostChartsTmpl)+
+			count.Machine*len(vmChartsTmpl)+
+			count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl))+
+			numClusters*(len(clusterPropertyChartsTmpl)+len(clusterPerfChartsTmpl))+
+			numResourcePools*len(resourcePoolChartsTmpl))
 	collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 }
 
@@ -408,10 +513,11 @@ func TestCollector_Collect_RemoveHostsVMsInRuntime(t *testing.T) {
 
 	assert.Len(t, collr.discoveredHosts, 1)
 	assert.Len(t, collr.discoveredVMs, 1)
-	assert.Len(t, collr.charted, 2+len(collr.discoveredDatastores))
+	assert.Len(t, collr.charted, 2+len(collr.discoveredDatastores)+len(collr.discoveredClusters)+len(collr.discoveredResourcePools))
 
 	for _, c := range *collr.Charts() {
-		if strings.HasPrefix(c.ID, okHostId) || strings.HasPrefix(c.ID, okVmId) || strings.HasPrefix(c.ID, "datastore-") {
+		if strings.HasPrefix(c.ID, okHostId) || strings.HasPrefix(c.ID, okVmId) ||
+			strings.HasPrefix(c.ID, "datastore-") || strings.HasPrefix(c.ID, "domain-") || strings.HasPrefix(c.ID, "resgroup-") {
 			assert.False(t, c.Obsolete)
 		} else {
 			assert.True(t, c.Obsolete)
@@ -439,8 +545,16 @@ func TestCollector_Collect_Run(t *testing.T) {
 	assert.Len(t, collr.discoveredHosts, count.Host)
 	assert.Len(t, collr.discoveredVMs, count.Machine)
 	assert.Len(t, collr.discoveredDatastores, count.Datastore)
-	assert.Len(t, collr.charted, count.Host+count.Machine+count.Datastore)
-	assert.Len(t, *collr.charts, count.Host*len(hostChartsTmpl)+count.Machine*len(vmChartsTmpl)+count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl)))
+
+	numClusters := len(collr.discoveredClusters)
+	numResourcePools := len(collr.discoveredResourcePools)
+	assert.Len(t, collr.charted, count.Host+count.Machine+count.Datastore+numClusters+numResourcePools)
+	assert.Len(t, *collr.charts,
+		count.Host*len(hostChartsTmpl)+
+			count.Machine*len(vmChartsTmpl)+
+			count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl))+
+			numClusters*(len(clusterPropertyChartsTmpl)+len(clusterPerfChartsTmpl))+
+			numResourcePools*len(resourcePoolChartsTmpl))
 }
 
 func prepareVSphereSim(t *testing.T) (collr *Collector, model *simulator.Model, teardown func()) {
@@ -480,6 +594,10 @@ func (s mockScraper) ScrapeDatastores(datastores rs.Datastores) []performance.En
 	ms := s.scraper.ScrapeDatastores(datastores)
 	return populateMetrics(ms, 300)
 }
+func (s mockScraper) ScrapeClusters(clusters rs.Clusters) []performance.EntityMetric {
+	ms := s.scraper.ScrapeClusters(clusters)
+	return populateMetrics(ms, 400)
+}
 
 func populateMetrics(ms []performance.EntityMetric, value int64) []performance.EntityMetric {
 	for i := range ms {
@@ -515,6 +633,9 @@ func (s mockScraperNoDSPerf) ScrapeVMs(vms rs.VMs) []performance.EntityMetric {
 func (s mockScraperNoDSPerf) ScrapeDatastores(_ rs.Datastores) []performance.EntityMetric {
 	return nil
 }
+func (s mockScraperNoDSPerf) ScrapeClusters(clusters rs.Clusters) []performance.EntityMetric {
+	return populateMetrics(s.scraper.ScrapeClusters(clusters), 400)
+}
 
 func TestCollector_Collect_DatastoreNoPerfData(t *testing.T) {
 	collr, model, teardown := prepareVSphereSim(t)
@@ -544,11 +665,16 @@ func TestCollector_Collect_DatastoreNoPerfData(t *testing.T) {
 		assert.NotContains(t, mx, ds.ID+"_datastore.numberReadAveraged.average")
 	}
 
-	// Only property charts created, no perf charts.
+	numClusters := len(collr.discoveredClusters)
+	numResourcePools := len(collr.discoveredResourcePools)
+
+	// Only property charts created for datastores, no perf charts.
 	assert.Len(t, *collr.Charts(),
 		count.Host*len(hostChartsTmpl)+
 			count.Machine*len(vmChartsTmpl)+
-			count.Datastore*len(datastorePropertyChartsTmpl))
+			count.Datastore*len(datastorePropertyChartsTmpl)+
+			numClusters*(len(clusterPropertyChartsTmpl)+len(clusterPerfChartsTmpl))+
+			numResourcePools*len(resourcePoolChartsTmpl))
 
 	// datastorePerfReceived should be empty.
 	assert.Empty(t, collr.datastorePerfReceived)
@@ -565,14 +691,170 @@ func TestCollector_Collect_DatastoreNoPerfData(t *testing.T) {
 		assert.Contains(t, mx, ds.ID+"_datastore.read.average")
 	}
 
-	// Both property and perf charts now.
+	// Both property and perf charts now for datastores.
 	assert.Len(t, *collr.Charts(),
 		count.Host*len(hostChartsTmpl)+
 			count.Machine*len(vmChartsTmpl)+
-			count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl)))
+			count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl))+
+			numClusters*(len(clusterPropertyChartsTmpl)+len(clusterPerfChartsTmpl))+
+			numResourcePools*len(resourcePoolChartsTmpl))
 
 	assert.Len(t, collr.datastorePerfReceived, count.Datastore)
 	assert.Len(t, collr.datastorePerfCharted, count.Datastore)
+}
+
+// mockScraperNoClusterPerf wraps a scraper but returns no perf data for clusters.
+type mockScraperNoClusterPerf struct {
+	scraper
+}
+
+func (s mockScraperNoClusterPerf) ScrapeHosts(hosts rs.Hosts) []performance.EntityMetric {
+	return populateMetrics(s.scraper.ScrapeHosts(hosts), 100)
+}
+func (s mockScraperNoClusterPerf) ScrapeVMs(vms rs.VMs) []performance.EntityMetric {
+	return populateMetrics(s.scraper.ScrapeVMs(vms), 200)
+}
+func (s mockScraperNoClusterPerf) ScrapeDatastores(datastores rs.Datastores) []performance.EntityMetric {
+	return populateMetrics(s.scraper.ScrapeDatastores(datastores), 300)
+}
+func (s mockScraperNoClusterPerf) ScrapeClusters(_ rs.Clusters) []performance.EntityMetric {
+	return nil
+}
+
+func TestCollector_Collect_ClusterNoPerfData(t *testing.T) {
+	collr, model, teardown := prepareVSphereSim(t)
+	defer teardown()
+
+	require.NoError(t, collr.Init(context.Background()))
+
+	collr.scraper = mockScraperNoClusterPerf{collr.scraper}
+
+	mx := collr.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	count := model.Count()
+
+	// Cluster property metrics should be present.
+	for _, cl := range collr.resources.Clusters {
+		assert.Contains(t, mx, cl.ID+"_num_hosts")
+		assert.Contains(t, mx, cl.ID+"_total_cpu")
+		assert.Contains(t, mx, cl.ID+"_overall.status.green")
+	}
+
+	// Cluster perf metrics should NOT be present.
+	for _, cl := range collr.resources.Clusters {
+		assert.NotContains(t, mx, cl.ID+"_cpu.usage.average")
+		assert.NotContains(t, mx, cl.ID+"_clusterServices.cpufairness.latest")
+	}
+
+	numClusters := len(collr.discoveredClusters)
+	numResourcePools := len(collr.discoveredResourcePools)
+
+	// Only property charts created for clusters, no perf charts.
+	assert.Len(t, *collr.Charts(),
+		count.Host*len(hostChartsTmpl)+
+			count.Machine*len(vmChartsTmpl)+
+			count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl))+
+			numClusters*len(clusterPropertyChartsTmpl)+
+			numResourcePools*len(resourcePoolChartsTmpl))
+
+	// clusterPerfReceived should be empty.
+	assert.Empty(t, collr.clusterPerfReceived)
+	assert.Empty(t, collr.clusterPerfCharted)
+
+	// Now switch to a scraper that returns perf data — perf charts should appear.
+	collr.scraper = mockScraper{collr.scraper.(mockScraperNoClusterPerf).scraper}
+
+	mx = collr.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	// Perf metrics should now be present.
+	for _, cl := range collr.resources.Clusters {
+		assert.Contains(t, mx, cl.ID+"_cpu.usage.average")
+	}
+
+	// Both property and perf charts now for clusters.
+	assert.Len(t, *collr.Charts(),
+		count.Host*len(hostChartsTmpl)+
+			count.Machine*len(vmChartsTmpl)+
+			count.Datastore*(len(datastorePropertyChartsTmpl)+len(datastorePerfChartsTmpl))+
+			numClusters*(len(clusterPropertyChartsTmpl)+len(clusterPerfChartsTmpl))+
+			numResourcePools*len(resourcePoolChartsTmpl))
+
+	assert.Len(t, collr.clusterPerfReceived, numClusters)
+	assert.Len(t, collr.clusterPerfCharted, numClusters)
+}
+
+func TestCollector_Collect_ClusterEvictionCleansUpMaps(t *testing.T) {
+	collr, _, teardown := prepareVSphereSim(t)
+	defer teardown()
+
+	require.NoError(t, collr.Init(context.Background()))
+
+	collr.scraper = mockScraper{collr.scraper}
+
+	// First collect — creates all charts including cluster perf charts.
+	mx := collr.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	assert.NotEmpty(t, collr.discoveredClusters)
+	assert.NotEmpty(t, collr.clusterPerfReceived)
+	assert.NotEmpty(t, collr.clusterPerfCharted)
+
+	// Simulate eviction: disable property collector and perf scraper so the counter isn't reset,
+	// then set the failure counter to the eviction threshold.
+	collr.clusterPropertyCollector = nil
+	collr.scraper = mockScraperNoClusterPerf{collr.scraper.(mockScraper).scraper}
+	for id := range collr.discoveredClusters {
+		collr.discoveredClusters[id] = failedUpdatesLimit
+	}
+
+	// Next collect increments counter past the limit, triggering eviction in updateCharts.
+	collr.Collect(context.Background())
+
+	assert.Empty(t, collr.discoveredClusters)
+	assert.Empty(t, collr.clusterPerfReceived)
+	assert.Empty(t, collr.clusterPerfCharted)
+
+	// Cluster charts should be marked obsolete.
+	for _, c := range *collr.Charts() {
+		if strings.HasPrefix(c.ID, "domain-") {
+			assert.True(t, c.Obsolete, "chart %s should be obsolete", c.ID)
+		}
+	}
+}
+
+func TestCollector_Collect_ResourcePoolEvictionCleansUpMaps(t *testing.T) {
+	collr, _, teardown := prepareVSphereSim(t)
+	defer teardown()
+
+	require.NoError(t, collr.Init(context.Background()))
+
+	collr.scraper = mockScraper{collr.scraper}
+
+	// First collect — creates resource pool charts.
+	mx := collr.Collect(context.Background())
+	require.NotNil(t, mx)
+
+	assert.NotEmpty(t, collr.discoveredResourcePools)
+
+	// Simulate eviction: disable property collector so the counter isn't reset.
+	collr.rpPropertyCollector = nil
+	for id := range collr.discoveredResourcePools {
+		collr.discoveredResourcePools[id] = failedUpdatesLimit
+	}
+
+	// Next collect increments counter past the limit, triggering eviction.
+	collr.Collect(context.Background())
+
+	assert.Empty(t, collr.discoveredResourcePools)
+
+	// Resource pool charts should be marked obsolete.
+	for _, c := range *collr.Charts() {
+		if strings.HasPrefix(c.ID, "resgroup-") {
+			assert.True(t, c.Obsolete, "chart %s should be obsolete", c.ID)
+		}
+	}
 }
 
 func TestCollector_Collect_DatastoreEvictionCleansUpMaps(t *testing.T) {
