@@ -160,10 +160,44 @@ int netdata_start_driver()
 
     SC_HANDLE service = OpenServiceA(scm, srv_name, SERVICE_START | SERVICE_QUERY_STATUS);
     if (unlikely(!service)) {
+        DWORD open_err = GetLastError();
         CloseServiceHandle(scm);
         scm = NULL;
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open Service. Error= %lu \n", GetLastError());
-        return -1;
+
+        // Service missing: attempt self-healing install then retry
+        if (open_err == ERROR_SERVICE_DOES_NOT_EXIST) {
+            nd_log(NDLS_COLLECTORS, NDLP_INFO, "Service not found, attempting to install driver and retry start\n");
+
+            if (netdata_install_driver() != 0) {
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to install driver during self-healing\n");
+                return -1;
+            }
+
+            scm = OpenSCManagerA(NULL, NULL, SC_MANAGER_CONNECT);
+            if (unlikely(!scm)) {
+                nd_log(
+                    NDLS_COLLECTORS,
+                    NDLP_ERR,
+                    "Cannot open Service Manager after install. Error= %lu \n",
+                    GetLastError());
+                return -1;
+            }
+
+            service = OpenServiceA(scm, srv_name, SERVICE_START | SERVICE_QUERY_STATUS);
+            if (unlikely(!service)) {
+                nd_log(
+                    NDLS_COLLECTORS,
+                    NDLP_ERR,
+                    "Cannot open Service after install. Error= %lu \n",
+                    GetLastError());
+                CloseServiceHandle(scm);
+                return -1;
+            }
+            // fall through to StartServiceA with the newly opened handle
+        } else {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open Service. Error= %lu \n", open_err);
+            return -1;
+        }
     }
 
     int ret = 0;
@@ -172,54 +206,6 @@ int netdata_start_driver()
 
         if (err == ERROR_SERVICE_ALREADY_RUNNING) {
             ret = 0;
-        } else if (err == ERROR_SERVICE_DOES_NOT_EXIST) {
-            nd_log(NDLS_COLLECTORS, NDLP_INFO, "Service not found, attempting to install driver and retry start\n");
-            CloseServiceHandle(service);
-            CloseServiceHandle(scm);
-            service = NULL;
-            scm = NULL;
-
-            if (netdata_install_driver() == 0) {
-                scm = OpenSCManagerA(NULL, NULL, SC_MANAGER_CONNECT);
-                if (unlikely(!scm)) {
-                    nd_log(
-                        NDLS_COLLECTORS,
-                        NDLP_ERR,
-                        "Cannot open Service Manager after install. Error= %lu \n",
-                        GetLastError());
-                    ret = -1;
-                } else {
-                    service = OpenServiceA(scm, srv_name, SERVICE_START | SERVICE_QUERY_STATUS);
-                    if (unlikely(!service)) {
-                        nd_log(
-                            NDLS_COLLECTORS,
-                            NDLP_ERR,
-                            "Cannot open Service after install. Error= %lu \n",
-                            GetLastError());
-                        ret = -1;
-                    } else {
-                        if (!StartServiceA(service, 0, NULL)) {
-                            err = GetLastError();
-                            if (err == ERROR_SERVICE_ALREADY_RUNNING) {
-                                ret = 0;
-                            } else if (err == ERROR_INVALID_IMAGE_HASH) {
-                                log_invalid_image_hash_error();
-                                ret = -1;
-                            } else {
-                                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Retry start failed. Error= %lu \n", err);
-                                ret = -1;
-                            }
-                        }
-                        CloseServiceHandle(service);
-                        service = NULL;
-                    }
-                    CloseServiceHandle(scm);
-                    scm = NULL;
-                }
-            } else {
-                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to install driver during self-healing\n");
-                ret = -1;
-            }
         } else if (err == ERROR_INVALID_IMAGE_HASH) {
             log_invalid_image_hash_error();
             ret = -1;
