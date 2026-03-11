@@ -356,7 +356,7 @@ include:
 
   - &ubuntu
     distro: ubuntu
-    version: "24.04"
+    version: "26.04"
     support_type: Core
     notes: ''
     eol_check: true
@@ -369,7 +369,7 @@ include:
       apt-get remove -y libjson-c-dev
     packages: &ubuntu_packages
       type: deb
-      repo_distro: ubuntu/noble
+      repo_distro: ubuntu/resolute
       builder_rev: v2
       arches:
         - amd64
@@ -382,6 +382,11 @@ include:
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/questing
+  - <<: *ubuntu
+    version: "24.04"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/noble
   - <<: *ubuntu
     version: "22.04"
     packages:
