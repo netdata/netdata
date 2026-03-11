@@ -59,7 +59,11 @@ bool nd_logger_file(int fd, FILE *fp, netdata_mutex_t *mutex, ND_LOG_FORMAT form
         fflush(fp);
 
     while(remaining > 0) {
-        ssize_t written = write(fd, buf, remaining);
+        size_t chunk = remaining;
+        if(chunk > (size_t)SSIZE_MAX)
+            chunk = (size_t)SSIZE_MAX;
+
+        ssize_t written = write(fd, buf, chunk);
         if(written > 0) {
             buf += written;
             remaining -= written;

@@ -125,6 +125,7 @@ struct nd_log {
     nd_uuid_t invocation_id;
 
     ND_LOG_SOURCES overwrite_process_source;
+    bool mutexes_initialized;
     // Only set in post-fork nofork spawn-server children, which stay single-threaded in-tree.
     bool single_threaded_child;
     log_event_t fatal_hook_cb;

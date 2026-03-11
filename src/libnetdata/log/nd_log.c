@@ -26,6 +26,8 @@ ALWAYS_INLINE void errno_clear(void) {
 // logger router
 
 static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, int *fdp, netdata_mutex_t **mutexp) {
+    bool mutexes_initialized = __atomic_load_n(&nd_log.mutexes_initialized, __ATOMIC_ACQUIRE);
+
     *fdp = -1;
     *mutexp = NULL;
 
@@ -114,7 +116,9 @@ static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, 
             break;
     }
 
-    if(nd_log.single_threaded_child)
+    // Constructor-time logging can happen before the explicit startup init
+    // path runs. Until then, bypass write serialization and log unlocked.
+    if(nd_log.single_threaded_child || !mutexes_initialized)
         *mutexp = NULL;
 
     return output;
