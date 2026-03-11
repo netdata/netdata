@@ -29,11 +29,16 @@ static void nd_log_ensure_mutexes_initialized(void) {
     static SPINLOCK init_spinlock = SPINLOCK_INITIALIZER;
     static bool initialized = false;
 
+    // Post-fork nofork spawn-server children bypass logger mutexes entirely, so
+    // they must not touch the inherited one-time init lock state here.
+    if(unlikely(nd_log.single_threaded_child))
+        return;
+
     if(likely(__atomic_load_n(&initialized, __ATOMIC_ACQUIRE)))
         return;
 
     spinlock_lock(&init_spinlock);
-    if(!initialized) {
+    if(!__atomic_load_n(&initialized, __ATOMIC_RELAXED)) {
         for(size_t i = 0 ; i < _NDLS_MAX ; i++)
             netdata_mutex_init(&nd_log.sources[i].mutex);
 
