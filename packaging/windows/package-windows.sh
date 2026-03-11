@@ -50,3 +50,10 @@ if [ ! -f "/opt/netdata/etc/profile" ]; then
 fi
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
+# TODO: We will have a PR to adjust CAB file creation and sign. This is only adding necessary structure
+#${GITHUB_ACTIONS+echo "::group::CAB file"}
+#mkdir "${build}/driver"
+#cp "${build}/usr/bin/netdata_driver.*" "${build}/driver"
+#powershell.exe -ExecutionPolicy Bypass -File "${repo_root}/packaging/windows/generate-driver-catalog.ps1"
+#${GITHUB_ACTIONS+echo "::endgroup::"}
+
