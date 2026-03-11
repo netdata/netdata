@@ -412,9 +412,9 @@ static void ebpf_obsolete_swap_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
-static void ebpf_swap_exit(void *ptr)
+static void ebpf_swap_exit(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if (!em)
         return;
 
