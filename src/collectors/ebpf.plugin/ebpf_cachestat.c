@@ -913,11 +913,23 @@ static void write_cachestat_charts(
     const char *miss_name)
 {
     if (!ratio_name) {
-        ratio_name = "ratio";
-        dirty_name = "pages";
-        hit_name = "hits";
-        miss_name = "misses";
-        name = name ? name : "";
+        /* app charts use the new-style naming from ebpf_cachestat_create_apps_charts() */
+        ebpf_write_begin_chart(family, name, "_ebpf_cachestat_hit_ratio");
+        write_chart_dimension("ratio", (long long)npc->ratio);
+        ebpf_write_end_chart();
+
+        ebpf_write_begin_chart(family, name, "_ebpf_cachestat_dirty_pages");
+        write_chart_dimension("pages", (long long)npc->dirty);
+        ebpf_write_end_chart();
+
+        ebpf_write_begin_chart(family, name, "_ebpf_cachestat_access");
+        write_chart_dimension("hits", (long long)npc->hit);
+        ebpf_write_end_chart();
+
+        ebpf_write_begin_chart(family, name, "_ebpf_cachestat_misses");
+        write_chart_dimension("misses", (long long)npc->miss);
+        ebpf_write_end_chart();
+        return;
     }
 
     ebpf_write_begin_chart(family, name, NETDATA_CACHESTAT_HIT_RATIO_CHART);
