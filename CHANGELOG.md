@@ -117,6 +117,15 @@
 - Fail on broken metadata.yaml ([#21920](https://github.com/netdata/netdata/issues/21920))
 - Go.d: add Azure AD auth for mssql, postgres, and sql collectors ([#21905](https://github.com/netdata/netdata/issues/21905))
 - Regenerate integrations docs ([#21923](https://github.com/netdata/netdata/issues/21923))
+- Refactor stream connection definition parsing  ([#21921](https://github.com/netdata/netdata/issues/21921))
+- Improve discoverability of Alerts Automation docs ([#21932](https://github.com/netdata/netdata/issues/21932))
+- Go.d/mssql: add Always On Availability Group monitoring ([#21927](https://github.com/netdata/netdata/issues/21927))
+- Regenerate integrations docs ([#21933](https://github.com/netdata/netdata/issues/21933))
+- Go.d/snmp: add IPSec/VPN monitoring profiles for FortiGate, Juniper, MikroTik, Check Point ([#21926](https://github.com/netdata/netdata/issues/21926))
+- Add SOCKS5 and SOCKS5H proxy support to ACLK ([#21831](https://github.com/netdata/netdata/issues/21831))
+- Go.d/snmp: add tunnel_index to Check Point VPN tunnel tables ([#21934](https://github.com/netdata/netdata/issues/21934))
+- Go.d/vsphere: add datastore, cluster, and resource pool monitoring ([#21924](https://github.com/netdata/netdata/issues/21924))
+- Regenerate integrations docs ([#21935](https://github.com/netdata/netdata/issues/21935))
 
 ## [2.9.0] - 2026-02-16
 
