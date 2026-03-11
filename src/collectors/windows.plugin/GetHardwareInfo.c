@@ -145,7 +145,7 @@ static inline void log_invalid_image_hash_error(void)
     nd_log(
         NDLS_COLLECTORS,
         NDLP_ERR,
-        "Driver failed to start: ERROR_INVALID_IMAGE_HASH (1937). "
+        "Driver failed to start: ERROR_INVALID_IMAGE_HASH (577). "
         "This usually indicates a driver signature verification failure. "
         "The driver binary may be corrupted, unsigned, or signed with an untrusted certificate.\n");
 }
