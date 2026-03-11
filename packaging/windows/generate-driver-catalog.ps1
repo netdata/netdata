@@ -29,7 +29,7 @@ function Find-Inf2Cat {
     foreach ($root in $kitRoots) {
         if (Test-Path $root) {
             # Prefer the typical WDK/SDK layout: Windows Kits\10\bin\<version>\x64\Inf2Cat.exe
-            patternX64 = Join-Path $root '*\x64\Inf2Cat.exe'
+            $patternX64 = Join-Path $root '*\x64\Inf2Cat.exe'
             $found = Get-ChildItem -Path $patternX64 -File -ErrorAction SilentlyContinue
             if (-not $found) {
                 # Fallback: any versioned subfolder directly under bin containing Inf2Cat.exe
