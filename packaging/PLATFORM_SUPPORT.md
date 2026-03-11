@@ -68,6 +68,7 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 | Rocky Linux              | 10.x           | x86\_64, AArch64              | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
 | Rocky Linux              | 9.x            | x86\_64, AArch64              | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
 | Rocky Linux              | 8.x            | x86\_64, AArch64              | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
+| Ubuntu                   | 26.04          | x86\_64, AArch64, ARMv7       |                                                                                                                |
 | Ubuntu                   | 25.10          | x86\_64, AArch64, ARMv7       |                                                                                                                |
 | Ubuntu                   | 24.04          | x86\_64, AArch64, ARMv7       |                                                                                                                |
 | Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64       |                                                                                                                |
