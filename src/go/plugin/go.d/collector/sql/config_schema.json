@@ -20,9 +20,10 @@
       },
       "driver": {
         "title": "Driver",
-        "description": "SQL driver / database engine to use. Supported values: `mysql` (MySQL/MariaDB), `pgx` (PostgreSQL), `oracle` (OracleDB), `sqlserver` (Microsoft SQL Server).",
+        "description": "SQL driver / database engine to use. Supported values: `mysql` (MySQL/MariaDB), `pgx` (PostgreSQL), `oracle` (OracleDB), `sqlserver` (Microsoft SQL Server), `azuresql` (Microsoft SQL Server with Azure AD).",
         "type": "string",
         "enum": [
+          "azuresql",
           "mysql",
           "pgx",
           "oracle",
@@ -41,6 +42,85 @@
         "type": "number",
         "minimum": 0,
         "default": 5
+      },
+      "cloud_auth": {
+        "title": "Cloud auth",
+        "description": "Optional cloud authentication settings. `azure_ad` is supported when driver is `pgx`, `sqlserver`, or `azuresql`.",
+        "type": "object",
+        "properties": {
+          "provider": {
+            "title": "Provider",
+            "description": "Cloud auth provider. Use `none` to disable cloud authentication.",
+            "type": "string",
+            "enum": [
+              "none",
+              "azure_ad"
+            ],
+            "default": "none"
+          }
+        },
+        "dependencies": {
+          "provider": {
+            "oneOf": [
+              {
+                "properties": {
+                  "provider": {
+                    "const": "none"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "provider": {
+                    "const": "azure_ad"
+                  },
+                  "azure_ad": {
+                    "title": "Azure AD",
+                    "description": "Microsoft Entra (Azure AD) settings used when provider is `azure_ad`.",
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "title": "Mode",
+                        "description": "Azure AD credential mode.",
+                        "type": "string",
+                        "enum": [
+                          "service_principal",
+                          "managed_identity",
+                          "default"
+                        ],
+                        "default": "default"
+                      },
+                      "tenant_id": {
+                        "title": "Tenant ID",
+                        "description": "Azure tenant ID. Required for service_principal mode.",
+                        "type": "string"
+                      },
+                      "client_id": {
+                        "title": "Client ID",
+                        "description": "Service principal client ID for service_principal mode.",
+                        "type": "string"
+                      },
+                      "client_secret": {
+                        "title": "Client Secret",
+                        "description": "Service principal client secret for service_principal mode.",
+                        "type": "string",
+                        "sensitive": true
+                      },
+                      "managed_identity_client_id": {
+                        "title": "Managed Identity Client ID",
+                        "description": "Optional client ID of a user-assigned managed identity.",
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "azure_ad"
+                ]
+              }
+            ]
+          }
+        }
       },
       "static_labels": {
         "title": "Static labels",
@@ -421,6 +501,12 @@
           ]
         },
         {
+          "title": "Cloud Auth",
+          "fields": [
+            "cloud_auth"
+          ]
+        },
+        {
           "title": "Metrics",
           "fields": [
             "metrics"
@@ -459,9 +545,25 @@
         "inline": true
       }
     },
+    "cloud_auth": {
+      "provider": {
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "azure_ad": {
+        "mode": {
+          "ui:help": "Use `service_principal`, `managed_identity`, or `default` credential chain."
+        },
+        "client_secret": {
+          "ui:widget": "password"
+        }
+      }
+    },
     "dsn": {
       "ui:placeholder": "Enter the database connection string",
-      "ui:help": "**DSN format depends on the selected driver.**\n\n### MySQL / MariaDB\nFormat: `user:password@tcp(host:port)/dbname?param1=value1&paramN=valueN`\nExample:\n```\nroot:pass@tcp(127.0.0.1:3306)/\n```\n[MySQL DSN documentation](https://github.com/go-sql-driver/mysql#dsn-data-source-name)\n\n### PostgreSQL\nFormats: `postgresql://user:password@host:5432/dbname?param1=value1&paramN=valueN`\nExample:\n```\npostgresql://user:pass@localhost:5432/mydb\n```\n[PostgreSQL DSN documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS)\n\n### Oracle\nFormat: `oracle://username:password@host:port/service?param1=value1&paramN=valueN`\nExample:\n```\noracle://scott:tiger@db.example.com:1521/ORCLPDB1?ssl=off\n```\n\n### SQL Server\nFormat: `sqlserver://username:password@host:port?database=dbname&param=value`\nExample:\n```\nsqlserver://sa:myStrong(!)Password@localhost:1433?database=master&connection+timeout=30\n```\n[SQL Server driver DSN documentation](https://github.com/denisenkom/go-mssqldb#connection-parameters-and-dsn)"
+      "ui:help": "**DSN format depends on the selected driver.**\n\n### MySQL / MariaDB\nFormat: `user:password@tcp(host:port)/dbname?param1=value1&paramN=valueN`\nExample:\n```\nroot:pass@tcp(127.0.0.1:3306)/\n```\n[MySQL DSN documentation](https://github.com/go-sql-driver/mysql#dsn-data-source-name)\n\n### PostgreSQL\nFormats: `postgresql://user:password@host:5432/dbname?param1=value1&paramN=valueN`\nExample:\n```\npostgresql://user:pass@localhost:5432/mydb\n```\n[PostgreSQL DSN documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS)\n\n### Oracle\nFormat: `oracle://username:password@host:port/service?param1=value1&paramN=valueN`\nExample:\n```\noracle://scott:tiger@db.example.com:1521/ORCLPDB1?ssl=off\n```\n\n### SQL Server / Azure SQL\nFormat: `sqlserver://username:password@host:port?database=dbname&param=value`\nExample:\n```\nsqlserver://sa:myStrong(!)Password@localhost:1433?database=master&connection+timeout=30\n```\n[SQL Server driver DSN documentation](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn)\n\nWhen `cloud_auth.provider` is `azure_ad` with SQL Server drivers, keep DSN host/database settings and configure authentication in `cloud_auth.azure_ad`."
     },
     "static_labels": {
       "ui:help": "Optional key/value labels added to every chart created by this job (for example env=prod, role=primary)."

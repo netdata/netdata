@@ -16,6 +16,7 @@ extends:
   - _juniper-scu.yaml
   - _juniper-dcu.yaml
   - _juniper-junos-generic.yaml
+  - _juniper-ipsec-flow-monitor.yaml
   - _juniper.yaml
 
 metadata:
