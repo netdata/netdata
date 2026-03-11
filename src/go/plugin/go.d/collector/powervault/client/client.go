@@ -35,8 +35,9 @@ type Client struct {
 	httpClient *http.Client
 	digest     string // "sha256" or "md5"
 
-	mu         sync.Mutex // protects sessionKey and re-auth
+	mu         sync.Mutex // protects sessionKey reads/writes
 	sessionKey string
+	authMu     sync.Mutex // serializes re-authentication
 }
 
 // Login authenticates with the PowerVault API.
@@ -198,7 +199,10 @@ func doShow[T any](c *Client, urlPath, key string) ([]T, error) {
 }
 
 // reAuth re-authenticates and restores session locale.
+// Serialized so concurrent 401 retries don't race on session state.
 func (c *Client) reAuth() error {
+	c.authMu.Lock()
+	defer c.authMu.Unlock()
 	if err := c.Login(); err != nil {
 		return err
 	}
