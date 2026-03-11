@@ -148,7 +148,7 @@ endif()
 
 list(JOIN _main_deps ", " CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS)
 
-set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+set(CPACK_DEBIAN_NETDATA_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/netdata/conffiles;"
 	  "${PKG_FILES_PATH}/deb/netdata/postinst"
 	  "${PKG_FILES_PATH}/deb/netdata/prerm"
