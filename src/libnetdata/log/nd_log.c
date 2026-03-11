@@ -25,32 +25,7 @@ ALWAYS_INLINE void errno_clear(void) {
 // --------------------------------------------------------------------------------------------------------------------
 // logger router
 
-static void nd_log_ensure_mutexes_initialized(void) {
-    static SPINLOCK init_spinlock = SPINLOCK_INITIALIZER;
-    static bool initialized = false;
-
-    // Post-fork nofork spawn-server children bypass logger mutexes entirely, so
-    // they must not touch the inherited one-time init lock state here.
-    if(unlikely(nd_log.single_threaded_child))
-        return;
-
-    if(likely(__atomic_load_n(&initialized, __ATOMIC_ACQUIRE)))
-        return;
-
-    spinlock_lock(&init_spinlock);
-    if(!__atomic_load_n(&initialized, __ATOMIC_RELAXED)) {
-        for(size_t i = 0 ; i < _NDLS_MAX ; i++)
-            netdata_mutex_init(&nd_log.sources[i].mutex);
-
-        netdata_mutex_init(&nd_log.std_output.mutex);
-        netdata_mutex_init(&nd_log.std_error.mutex);
-        __atomic_store_n(&initialized, true, __ATOMIC_RELEASE);
-    }
-    spinlock_unlock(&init_spinlock);
-}
-
 static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, int *fdp, netdata_mutex_t **mutexp) {
-    nd_log_ensure_mutexes_initialized();
     *fdp = -1;
     *mutexp = NULL;
 

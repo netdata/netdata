@@ -27,7 +27,21 @@ ND_UUID nd_log_get_invocation_id(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+void nd_log_initialize_mutexes(void) {
+    FUNCTION_RUN_ONCE();
+
+    for(size_t i = 0 ; i < _NDLS_MAX ; i++)
+        netdata_mutex_init(&nd_log.sources[i].mutex);
+
+    netdata_mutex_init(&nd_log.std_output.mutex);
+    netdata_mutex_init(&nd_log.std_error.mutex);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 void nd_log_initialize_for_external_plugins(const char *name) {
+    nd_log_initialize_mutexes();
+
     // if we don't run under Netdata, log to stderr,
     // otherwise, use the logging method Netdata wants us to use.
 #if defined(OS_WINDOWS)
@@ -263,6 +277,7 @@ void nd_log_stdin_init(int fd, const char *filename) {
 }
 
 void nd_log_initialize(void) {
+    nd_log_initialize_mutexes();
     nd_log_stdin_init(STDIN_FILENO, "/dev/null");
 
     for(size_t i = 0 ; i < _NDLS_MAX ; i++)
