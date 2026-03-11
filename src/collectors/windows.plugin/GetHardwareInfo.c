@@ -140,6 +140,16 @@ int netdata_install_driver()
     return 0;
 }
 
+static inline void log_invalid_image_hash_error(void)
+{
+    nd_log(
+        NDLS_COLLECTORS,
+        NDLP_ERR,
+        "Driver failed to start: ERROR_INVALID_IMAGE_HASH (1937). "
+        "This usually indicates a driver signature verification failure. "
+        "The driver binary may be corrupted, unsigned, or signed with an untrusted certificate.\n");
+}
+
 int netdata_start_driver()
 {
     SC_HANDLE scm = OpenSCManagerA(NULL, NULL, SC_MANAGER_CONNECT);
@@ -193,12 +203,7 @@ int netdata_start_driver()
                             if (err == ERROR_SERVICE_ALREADY_RUNNING) {
                                 ret = 0;
                             } else if (err == ERROR_INVALID_IMAGE_HASH) {
-                                nd_log(
-                                    NDLS_COLLECTORS,
-                                    NDLP_ERR,
-                                    "Driver failed to start: ERROR_INVALID_IMAGE_HASH (1937). "
-                                    "This usually indicates a driver signature verification failure. "
-                                    "The driver binary may be corrupted, unsigned, or signed with an untrusted certificate.\n");
+                                log_invalid_image_hash_error();
                                 ret = -1;
                             } else {
                                 nd_log(NDLS_COLLECTORS, NDLP_ERR, "Retry start failed. Error= %lu \n", err);
@@ -216,12 +221,7 @@ int netdata_start_driver()
                 ret = -1;
             }
         } else if (err == ERROR_INVALID_IMAGE_HASH) {
-            nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "Driver failed to start: ERROR_INVALID_IMAGE_HASH (1937). "
-                "This usually indicates a driver signature verification failure. "
-                "The driver binary may be corrupted, unsigned, or signed with an untrusted certificate.\n");
+            log_invalid_image_hash_error();
             ret = -1;
         } else {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot start Service. Error= %lu \n", err);

@@ -8,7 +8,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$DriverDirectory,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter()]
     [string]$OsTargets = "10_GE_X64,10_25H2_X64,Server2025_X64,10_NI_X64,10_CO_X64,ServerFE_X64,10_VB_X64,10_19H1_X64,10_RS5_X64,ServerRS5_X64,10_RS4_X64,10_RS3_X64,10_RS2_X64,10_AU_X64,10_X64,Server10_X64"
 )
 
@@ -28,7 +28,17 @@ function Find-Inf2Cat {
     $candidates = @()
     foreach ($root in $kitRoots) {
         if (Test-Path $root) {
-            $candidates += Get-ChildItem -Path $root -Filter Inf2Cat.exe -File -Recurse -ErrorAction SilentlyContinue
+            # Prefer the typical WDK/SDK layout: Windows Kits\10\bin\<version>\x64\Inf2Cat.exe
+            patternX64 = Join-Path $root '*\x64\Inf2Cat.exe'
+            $found = Get-ChildItem -Path $patternX64 -File -ErrorAction SilentlyContinue
+            if (-not $found) {
+                # Fallback: any versioned subfolder directly under bin containing Inf2Cat.exe
+                $patternAnyArch = Join-Path $root '*\Inf2Cat.exe'
+                $found = Get-ChildItem -Path $patternAnyArch -File -ErrorAction SilentlyContinue
+                if ($found) {
+                    $candidates += $found
+                }
+            }
         }
     }
 
