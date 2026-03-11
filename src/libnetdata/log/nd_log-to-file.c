@@ -25,7 +25,7 @@ void nd_log_chown_log_files(uid_t uid, gid_t gid) {
     }
 }
 
-bool nd_logger_file(FILE *fp, ND_LOG_FORMAT format, struct log_field *fields, size_t fields_max) {
+bool nd_logger_file(int fd, FILE *fp, netdata_mutex_t *mutex, ND_LOG_FORMAT format, struct log_field *fields, size_t fields_max) {
     BUFFER *wb = buffer_create(1024, NULL);
 
     if(format == NDLF_JSON)
@@ -33,9 +33,45 @@ bool nd_logger_file(FILE *fp, ND_LOG_FORMAT format, struct log_field *fields, si
     else
         nd_logger_logfmt(wb, fields, fields_max);
 
-    int r = fprintf(fp, "%s\n", buffer_tostring(wb));
-    fflush(fp);
+    buffer_strcat(wb, "\n");
+
+    // Serialize writes with a Netdata-owned mutex and use write() on the raw fd.
+    //
+    // We avoid libc's stdio locking (flockfile/funlockfile) because spawn-server
+    // children inherit FILE* state across fork(). In those post-fork children we
+    // disable logger mutexes entirely, since they are single-threaded at that point.
+    //
+    // A netdata_mutex_t sleeps on contention rather than busy-waiting, so blocked
+    // I/O (full pipe, slow disk) does not burn CPU in other logging threads.
+    //
+    // Logger-owned streams are configured unbuffered when opened, so the logger
+    // can stay on raw fd writes here without taking stdio-internal locks.
+
+    const char *buf = buffer_tostring(wb);
+    size_t remaining = buffer_strlen(wb);
+
+    if(mutex)
+        netdata_mutex_lock(mutex);
+
+    while(remaining > 0) {
+        size_t chunk = remaining;
+        if(chunk > (size_t)SSIZE_MAX)
+            chunk = (size_t)SSIZE_MAX;
+
+        ssize_t written = write(fd, buf, chunk);
+        if(written > 0) {
+            buf += written;
+            remaining -= written;
+        }
+        else if(written == 0)
+            break;
+        else if(errno != EINTR)
+            break;
+    }
+
+    if(mutex)
+        netdata_mutex_unlock(mutex);
 
     buffer_free(wb);
-    return r > 0;
+    return remaining == 0;
 }
