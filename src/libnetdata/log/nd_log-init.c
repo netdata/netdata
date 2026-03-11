@@ -27,6 +27,13 @@ ND_UUID nd_log_get_invocation_id(void) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+static void nd_log_make_stream_unbuffered(FILE *fp, int fd, const char *filename) {
+    if(fp && setvbuf(fp, NULL, _IONBF, 0) != 0)
+        netdata_log_error("Cannot disable buffering on fd %d ('%s')", fd, filename ? filename : "stdio");
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 void nd_log_initialize_mutexes(void) {
     FUNCTION_RUN_ONCE();
 
@@ -35,7 +42,7 @@ void nd_log_initialize_mutexes(void) {
 
     netdata_mutex_init(&nd_log.std_output.mutex);
     netdata_mutex_init(&nd_log.std_error.mutex);
-    __atomic_store_n(&nd_log.mutexes_initialized, true, __ATOMIC_RELEASE);
+    nd_log.mutexes_initialized = true;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -195,6 +202,7 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
         case NDLM_STDOUT:
             e->fp = stdout;
             e->fd = STDOUT_FILENO;
+            nd_log_make_stream_unbuffered(e->fp, e->fd, "stdout");
             break;
 
         case NDLM_DISABLED:
@@ -205,6 +213,7 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
             e->method = NDLM_STDERR;
             e->fp = stderr;
             e->fd = STDERR_FILENO;
+            nd_log_make_stream_unbuffered(e->fp, e->fd, "stderr");
             break;
 
         case NDLM_DEVNULL:
@@ -255,10 +264,8 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
                     e->fd = STDERR_FILENO;
                 }
             }
-            else {
-                if (setvbuf(e->fp, NULL, _IOLBF, 0) != 0)
-                    netdata_log_error("Cannot set line buffering on fd %d ('%s')", e->fd, e->filename);
-            }
+
+            nd_log_make_stream_unbuffered(e->fp, e->fd, e->filename);
         }
         break;
     }

@@ -44,19 +44,14 @@ bool nd_logger_file(int fd, FILE *fp, netdata_mutex_t *mutex, ND_LOG_FORMAT form
     // A netdata_mutex_t sleeps on contention rather than busy-waiting, so blocked
     // I/O (full pipe, slow disk) does not burn CPU in other logging threads.
     //
-    // In normal multi-threaded mode, flush stdio state under the same mutex before
-    // writing to the fd, so pending buffered stdio bytes cannot be reordered with
-    // these direct write() calls. In post-fork nofork children (mutex == NULL), we
-    // intentionally avoid stdio locking paths.
+    // Logger-owned streams are configured unbuffered when opened, so the logger
+    // can stay on raw fd writes here without taking stdio-internal locks.
 
     const char *buf = buffer_tostring(wb);
     size_t remaining = buffer_strlen(wb);
 
     if(mutex)
         netdata_mutex_lock(mutex);
-
-    if(mutex && fp)
-        fflush(fp);
 
     while(remaining > 0) {
         size_t chunk = remaining;
