@@ -124,6 +124,16 @@ static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, 
     return output;
 }
 
+static inline netdata_mutex_t *nd_logger_stderr_mutex(void) {
+    if(nd_log.single_threaded_child)
+        return NULL;
+
+    if(!__atomic_load_n(&nd_log.mutexes_initialized, __ATOMIC_ACQUIRE))
+        return NULL;
+
+    return &nd_log.std_error.mutex;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 
 static __thread bool nd_log_fatal_event = false;
@@ -180,7 +190,7 @@ static void nd_logger_log_fields(FILE *fp, int fd, netdata_mutex_t *mutex, bool 
             output = NDLM_FILE;
             fp = stderr;
             fd = STDERR_FILENO;
-            mutex = nd_log.single_threaded_child ? NULL : &nd_log.std_error.mutex;
+            mutex = nd_logger_stderr_mutex();
         }
     }
 
@@ -192,7 +202,7 @@ static void nd_logger_log_fields(FILE *fp, int fd, netdata_mutex_t *mutex, bool 
             output = NDLM_FILE;
             fp = stderr;
             fd = STDERR_FILENO;
-            mutex = nd_log.single_threaded_child ? NULL : &nd_log.std_error.mutex;
+            mutex = nd_logger_stderr_mutex();
         }
     }
 #endif
@@ -203,7 +213,7 @@ static void nd_logger_log_fields(FILE *fp, int fd, netdata_mutex_t *mutex, bool 
             output = NDLM_FILE;
             fp = stderr;
             fd = STDERR_FILENO;
-            mutex = nd_log.single_threaded_child ? NULL : &nd_log.std_error.mutex;
+            mutex = nd_logger_stderr_mutex();
         }
     }
 #endif
