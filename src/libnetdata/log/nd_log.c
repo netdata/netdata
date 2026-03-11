@@ -26,7 +26,7 @@ ALWAYS_INLINE void errno_clear(void) {
 // logger router
 
 static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, int *fdp, netdata_mutex_t **mutexp) {
-    bool mutexes_initialized = nd_log.mutexes_initialized;
+    bool mutexes_initialized = __atomic_load_n(&nd_log.mutexes_initialized, __ATOMIC_ACQUIRE);
 
     *fdp = -1;
     *mutexp = NULL;
@@ -134,7 +134,7 @@ static inline netdata_mutex_t *nd_logger_stderr_mutex(void) {
     if(nd_log.single_threaded_child)
         return NULL;
 
-    if(!nd_log.mutexes_initialized)
+    if(!__atomic_load_n(&nd_log.mutexes_initialized, __ATOMIC_ACQUIRE))
         return NULL;
 
     return &nd_log.std_error.mutex;

@@ -42,7 +42,7 @@ void nd_log_initialize_mutexes(void) {
 
     netdata_mutex_init(&nd_log.std_output.mutex);
     netdata_mutex_init(&nd_log.std_error.mutex);
-    nd_log.mutexes_initialized = true;
+    __atomic_store_n(&nd_log.mutexes_initialized, true, __ATOMIC_RELEASE);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
