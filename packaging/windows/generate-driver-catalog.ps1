@@ -55,7 +55,7 @@ function Find-Inf2Cat {
     return $latest.FullName
 }
 
-$driverDir = Join-Path (Resolve-Path -LiteralPath $DriverDirectory).Path
+$driverDir = (Resolve-Path -LiteralPath $DriverDirectory).Path
 $driverInf = Join-Path $driverDir "netdata_driver.inf"
 $driverSys = Join-Path $driverDir "netdata_driver.sys"
 $driverCat = Join-Path $driverDir "netdata_driver.cat"
