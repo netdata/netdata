@@ -22,11 +22,11 @@ metrics:
     time_grain: PT1M
   # Connections
   - name: SNATConnectionCount
-    units: connections/s
+    units: connections
     aggregations: [total]
     time_grain: PT1M
   - name: TotalConnectionCount
-    units: connections/s
+    units: connections
     aggregations: [total]
     time_grain: PT1M
 charts:
@@ -100,8 +100,8 @@ charts:
     family: Connections
     type: line
     priority: 1040
-    units: connections/s
-    algorithm: incremental
+    units: connections
+    algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
@@ -116,8 +116,8 @@ charts:
     family: Connections
     type: line
     priority: 1050
-    units: connections/s
-    algorithm: incremental
+    units: connections
+    algorithm: absolute
     label_promotion: [resource_name, resource_group, region, resource_type, profile]
     instances:
       by_labels: [resource_uid]
