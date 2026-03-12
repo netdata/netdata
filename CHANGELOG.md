@@ -129,6 +129,9 @@
 - Add Ubuntu 26.04 to CI and package builds. ([#21939](https://github.com/netdata/netdata/issues/21939))
 - Improve logger ([#21928](https://github.com/netdata/netdata/issues/21928))
 - Improve installer (Windows.plugin) ([#21911](https://github.com/netdata/netdata/issues/21911))
+- Docs: Update kickstart URL to canonical get.netdata.cloud ([#21938](https://github.com/netdata/netdata/issues/21938))
+- Fix handling of control files for DEB packages. ([#21940](https://github.com/netdata/netdata/issues/21940))
+- Remove `.inf` extension from file filter in build workflow ([#21941](https://github.com/netdata/netdata/issues/21941))
 
 ## [2.9.0] - 2026-02-16
 
