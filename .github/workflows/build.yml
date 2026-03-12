@@ -389,7 +389,7 @@ jobs:
           signing-account-name: Netdata
           certificate-profile-name: Netdata
           files-folder: ${{ github.workspace }}\build
-          files-folder-filter: exe,dll,sys,inf
+          files-folder-filter: exe,dll,sys
           files-folder-recurse: true
           file-digest: SHA256
           timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
