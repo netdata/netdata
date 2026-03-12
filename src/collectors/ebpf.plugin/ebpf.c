@@ -824,6 +824,7 @@ ebpf_plugin_stats_t plugin_statistics = {
 netdata_ebpf_judy_pid_t ebpf_judy_pid = {.pid_table = NULL, .index = {.JudyLArray = NULL}};
 bool ebpf_plugin_exit = false;
 volatile sig_atomic_t ebpf_stop_signal = 0;
+static bool ebpf_pre_exit_check_done = false;
 
 #ifdef LIBBPF_MAJOR_VERSION
 struct btf *default_btf = NULL;
@@ -941,7 +942,7 @@ ARAL *ebpf_allocate_pid_aral(char *name, size_t size)
  */
 static inline void ebpf_check_before2go()
 {
-    usec_t max = USEC_PER_SEC, step = 200000;
+    usec_t max = 200 * USEC_PER_MS, step = 50 * USEC_PER_MS;
     int j;
     while (max) {
         max -= step;
@@ -985,7 +986,10 @@ static void ebpf_exit()
     fprintf(stdout, "EXIT\n");
     fflush(stdout);
 
-    ebpf_check_before2go();
+    if (!ebpf_pre_exit_check_done) {
+        ebpf_check_before2go();
+        ebpf_pre_exit_check_done = true;
+    }
     netdata_mutex_lock(&mutex_cgroup_shm);
     if (shm_ebpf_cgroup.header) {
         ebpf_unmap_cgroup_shared_memory();
@@ -1121,6 +1125,8 @@ void ebpf_stop_threads(int sig)
 
     netdata_log_info("EBPF SHUTDOWN: stop requested (signal=%d, main_tid=%d, current_tid=%d).",
                      sig, main_thread_id, current_tid);
+    __atomic_store_n(&ebpf_plugin_exit, true, __ATOMIC_RELEASE);
+
     int i;
     for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
         if (ebpf_modules[i].enabled < NETDATA_THREAD_EBPF_STOPPING && ebpf_modules[i].thread &&
@@ -1146,8 +1152,6 @@ void ebpf_stop_threads(int sig)
         }
     }
 
-    __atomic_store_n(&ebpf_plugin_exit, true, __ATOMIC_RELEASE);
-
     netdata_mutex_lock(&mutex_cgroup_shm);
     nd_thread_signal_cancel(cgroup_integration_thread.thread);
 #ifdef NETDATA_DEV_MODE
@@ -1156,18 +1160,23 @@ void ebpf_stop_threads(int sig)
     netdata_mutex_unlock(&mutex_cgroup_shm);
 
     usec_t before_checks_ut = now_monotonic_usec();
-    ebpf_check_before2go();
+    if (!ebpf_pre_exit_check_done) {
+        ebpf_check_before2go();
+        ebpf_pre_exit_check_done = true;
+    }
     usec_t checks_duration_ut = now_monotonic_usec() - before_checks_ut;
     netdata_log_info("EBPF SHUTDOWN: post-cancel checks finished in %llums.",
                      (unsigned long long)(checks_duration_ut / USEC_PER_MS));
 
-    netdata_mutex_lock(&ebpf_exit_cleanup);
     usec_t unload_started_ut = now_monotonic_usec();
-    ebpf_unload_unique_maps();
-    ebpf_unload_filesystems();
-    ebpf_unload_sync();
+    if (!ebpf_plugin_stop()) {
+        netdata_mutex_lock(&ebpf_exit_cleanup);
+        ebpf_unload_unique_maps();
+        ebpf_unload_filesystems();
+        ebpf_unload_sync();
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
+    }
     usec_t unload_duration_ut = now_monotonic_usec() - unload_started_ut;
-    netdata_mutex_unlock(&ebpf_exit_cleanup);
 
     usec_t total_duration_ut = now_monotonic_usec() - stop_started_ut;
     netdata_log_info("EBPF SHUTDOWN: total stop duration %llums (unload=%llums).",

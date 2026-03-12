@@ -324,6 +324,21 @@ static inline bool ebpf_plugin_stop(void)
            nd_thread_signaled_to_cancel();
 }
 
+#define EBPF_RESPONSIVE_HEARTBEAT_STEP_UT (200 * USEC_PER_MS)
+
+static inline bool ebpf_heartbeat_interval_elapsed(heartbeat_t *hb, usec_t *elapsed_ut, usec_t interval_ut)
+{
+    if (unlikely(!hb || !elapsed_ut || !interval_ut))
+       return false;
+
+    *elapsed_ut += heartbeat_next(hb);
+    if (*elapsed_ut < interval_ut)
+        return false;
+
+    *elapsed_ut %= interval_ut;
+    return true;
+}
+
 static inline bool ebpf_shm_sem_wait_or_stop(sem_t *sem)
 {
     if (unlikely(!sem || sem == SEM_FAILED)) {

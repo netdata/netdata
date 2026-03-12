@@ -586,7 +586,7 @@ static void ebpf_cachestat_exit(void *pptr)
     if (ebpf_read_cachestat.thread)
         nd_thread_signal_cancel(ebpf_read_cachestat.thread);
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
             ebpf_obsolete_cachestat_cgroup_charts(em);
@@ -603,17 +603,19 @@ static void ebpf_cachestat_exit(void *pptr)
         netdata_mutex_unlock(&lock);
     }
 
+    if (!ebpf_plugin_stop()) {
 #ifdef LIBBPF_MAJOR_VERSION
-    if (cachestat_bpf_obj) {
-        cachestat_bpf__destroy(cachestat_bpf_obj);
-        cachestat_bpf_obj = NULL;
-    }
+        if (cachestat_bpf_obj) {
+            cachestat_bpf__destroy(cachestat_bpf_obj);
+            cachestat_bpf_obj = NULL;
+        }
 #endif
 
-    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
-        ebpf_unload_legacy_code(em->objects, em->probe_links);
-        em->objects = NULL;
-        em->probe_links = NULL;
+        if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
+            ebpf_unload_legacy_code(em->objects, em->probe_links);
+            em->objects = NULL;
+            em->probe_links = NULL;
+        }
     }
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
@@ -814,6 +816,9 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core)
 
     uint32_t key = 0, next_key = 0;
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (bpf_map_lookup_elem(fd, &key, cv)) {
             goto end_cachestat_loop;
         }
@@ -855,6 +860,9 @@ static void ebpf_update_cachestat_cgroup()
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
+            if (ebpf_plugin_stop())
+                break;
+
             uint32_t pid = pids->pid;
             netdata_publish_cachestat_t *out = &pids->cachestat;
 
@@ -886,11 +894,17 @@ static void cachestat_sum_pids_internal(netdata_publish_cachestat_t *publish, vo
 
     if (is_cgroup) {
         struct pid_on_target2 *r = (struct pid_on_target2 *)root;
-        for (; r; r = r->next)
+        for (; r; r = r->next) {
+            if (ebpf_plugin_stop())
+                break;
             sum_single_pid_cachestat(dst, &r->cachestat.current);
+        }
     } else {
         struct ebpf_pid_on_target *r = (struct ebpf_pid_on_target *)root;
         for (; r; r = r->next) {
+            if (ebpf_plugin_stop())
+                break;
+
             uint32_t pid = r->pid;
             netdata_ebpf_pid_stats_t *local_pid =
                 netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
@@ -963,6 +977,9 @@ void ebpf_cachestat_resume_apps_data()
 
     netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_CACHESTAT_IDX))))
             continue;
 
@@ -1000,7 +1017,10 @@ void ebpf_read_cachestat_thread(void *ptr)
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb);
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         if (!ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
@@ -1188,6 +1208,9 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
 
     netdata_mutex_lock(&collect_data_mutex);
     for (w = root; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_CACHESTAT_IDX))))
             continue;
 
@@ -1211,6 +1234,9 @@ void ebpf_cachestat_calc_chart_values()
 {
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         ebpf_cachestat_sum_cgroup_pids(&ect->publish_cachestat, ect->pids);
         cachestat_calculate_from_values(
             &ect->publish_cachestat, &ect->publish_cachestat.current, &ect->publish_cachestat.prev);
@@ -1284,6 +1310,9 @@ static void ebpf_create_systemd_cachestat_charts(int update_every)
 
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!w->systemd || w->flags & NETDATA_EBPF_SERVICES_HAS_CACHESTAT_CHART))
             continue;
 
@@ -1310,6 +1339,9 @@ static void ebpf_send_systemd_cachestat_charts()
     ebpf_cgroup_target_t *ect;
 
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(ect->flags & NETDATA_EBPF_SERVICES_HAS_CACHESTAT_CHART))) {
             continue;
         }
@@ -1494,6 +1526,9 @@ void ebpf_cachestat_send_cgroup_data(int update_every)
     }
 
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (ect->systemd)
             continue;
 
@@ -1536,12 +1571,18 @@ static void cachestat_collector(ebpf_module_t *em)
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb);
 
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_cachestat_read_global_tables(stats, maps_per_core);
+
+        if (ebpf_plugin_stop())
+            break;
 
         netdata_mutex_lock(&lock);
 

@@ -392,6 +392,8 @@ void ebpf_cgroup_integration(void *ptr __maybe_unused)
     while (!ebpf_plugin_stop()) {
         heartbeat_next(&hb);
 
+        if (ebpf_plugin_stop())
+            break;
         // We are using a small heartbeat time to wake up thread,
         // but we should not update so frequently the shared memory data
         if (++counter >= NETDATA_EBPF_CGROUP_UPDATE) {
