@@ -464,6 +464,7 @@ RRDHOST *rrdhost_create(
 
     // ------------------------------------------------------------------------
 
+    RRDHOST_TZ host_tz = rrdhost_tz_get(host);
     nd_log(NDLS_DAEMON, NDLP_INFO,
            "Host '%s' (at registry as '%s') with guid '%s' initialized"
            ", os '%s'"
@@ -483,7 +484,7 @@ RRDHOST *rrdhost_create(
          , rrdhost_registry_hostname(host)
          , host->machine_guid
          , rrdhost_os(host)
-         , host->timezone ? string2str(host->timezone) : "unknown"
+         , host_tz.timezone
          , rrdhost_program_name(host)
          , rrdhost_program_version(host)
          , host->rrd_update_every
@@ -498,6 +499,7 @@ RRDHOST *rrdhost_create(
          , string2str(host->health.default_exec)
          , string2str(host->health.default_recipient)
     );
+    rrdhost_tz_free(&host_tz);
 
     if(!archived) {
         rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
