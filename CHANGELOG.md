@@ -126,6 +126,9 @@
 - Go.d/snmp: add tunnel_index to Check Point VPN tunnel tables ([#21934](https://github.com/netdata/netdata/issues/21934))
 - Go.d/vsphere: add datastore, cluster, and resource pool monitoring ([#21924](https://github.com/netdata/netdata/issues/21924))
 - Regenerate integrations docs ([#21935](https://github.com/netdata/netdata/issues/21935))
+- Add Ubuntu 26.04 to CI and package builds. ([#21939](https://github.com/netdata/netdata/issues/21939))
+- Improve logger ([#21928](https://github.com/netdata/netdata/issues/21928))
+- Improve installer (Windows.plugin) ([#21911](https://github.com/netdata/netdata/issues/21911))
 
 ## [2.9.0] - 2026-02-16
 
