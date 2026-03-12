@@ -83,6 +83,18 @@ static void pulse_daemon_timezone_do(bool extended __maybe_unused) {
         if (system_timezone_is_user_configured()) {
             // User explicitly configured a timezone in netdata.conf — respect it,
             // just refresh the abbreviation and offset (handles DST transitions).
+            static bool mismatch_logged = false;
+            if (!mismatch_logged) {
+                mismatch_logged = true;
+                char sys_buf[FILENAME_MAX + 1];
+                const char *sys_tz = detect_system_timezone_name(sys_buf, sizeof(sys_buf));
+                SYSTEM_TZ tz = system_tz_get();
+                if (sys_tz && tz.timezone && strcmp(sys_tz, tz.timezone) != 0)
+                    nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                           "TIMEZONE: configured '%s' differs from system '%s'",
+                           tz.timezone, sys_tz);
+                system_tz_free(&tz);
+            }
             SYSTEM_TZ tz = system_tz_get();
             refresh_system_timezone(tz.timezone, true);
             system_tz_free(&tz);

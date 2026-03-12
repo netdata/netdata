@@ -915,13 +915,17 @@ void get_system_timezone(void)
     // inicfg_get auto-populates it with the detected default.
     timezone_user_configured = inicfg_exists(&netdata_config, CONFIG_SECTION_GLOBAL, "timezone");
 
+    // inicfg_get returns a config-system-owned pointer, stable for the process lifetime
+    const char *configured_tz = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "timezone", timezone);
+
+    // Treat "timezone =" (empty value) as not user-configured.
+    if (timezone_user_configured && (!configured_tz || !*configured_tz))
+        timezone_user_configured = false;
+
     // If the user explicitly configured a timezone, treat it as a valid tzdb name
     // (the user is responsible for providing a valid value).
     if (timezone_user_configured)
         timezone_is_tzdb_name = true;
-
-    // inicfg_get returns a config-system-owned pointer, stable for the process lifetime
-    const char *configured_tz = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "timezone", timezone);
 
     // Compute abbreviation and UTC offset, then set all three atomically
     refresh_system_timezone(configured_tz, timezone_is_tzdb_name);
@@ -936,8 +940,9 @@ void refresh_system_timezone(const char *timezone, bool is_tzdb_name) {
     const char *new_abbrev = "UTC";
     int32_t new_offset = 0;
 
-    // Keep the global flag in sync so that future callers passing the stored
-    // timezone (e.g. pulse daemon fallback) use the most recent knowledge.
+    // Update global flag when we have confirmed tzdb knowledge.
+    // When is_tzdb_name is false, preserve the existing global flag — a prior
+    // successful detection may have already promoted it to true.
     if (is_tzdb_name)
         timezone_is_tzdb_name = true;
 
