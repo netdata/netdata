@@ -490,7 +490,7 @@ static void ebpf_disk_exit(void *pptr)
         return;
     }
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         ebpf_obsolete_disk_global(em);
         netdata_mutex_unlock(&lock);
@@ -763,7 +763,10 @@ static void disk_collector(ebpf_module_t *em)
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
 
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         counter = 0;
@@ -775,6 +778,9 @@ static void disk_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         ebpf_update_disks(em);
+
+        if (ebpf_plugin_stop())
+            break;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time)

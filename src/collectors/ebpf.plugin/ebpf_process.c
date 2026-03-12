@@ -969,7 +969,7 @@ static void ebpf_process_exit(void *pptr)
     collect_pids &= ~(1 << EBPF_MODULE_PROCESS_IDX);
     netdata_mutex_unlock(&lock);
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
             ebpf_obsolete_process_cgroup_charts(em);

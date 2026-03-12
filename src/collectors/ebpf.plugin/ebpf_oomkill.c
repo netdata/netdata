@@ -131,7 +131,7 @@ static void oomkill_cleanup(void *pptr)
     collect_pids &= ~(1 << EBPF_MODULE_OOMKILL_IDX);
     netdata_mutex_unlock(&lock);
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
 
         if (em->cgroup_charts) {
@@ -465,7 +465,10 @@ static void oomkill_collector(ebpf_module_t *em)
     heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb);
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         counter = 0;
@@ -477,6 +480,9 @@ static void oomkill_collector(ebpf_module_t *em)
 
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_oomkill_cgroup(keys, count);
+
+        if (ebpf_plugin_stop())
+            break;
 
         netdata_apps_integration_flags_t apps = em->apps_charts;
         netdata_mutex_lock(&lock);

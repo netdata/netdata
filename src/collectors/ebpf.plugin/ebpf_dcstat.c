@@ -483,7 +483,7 @@ static void ebpf_dcstat_exit(void *pptr)
     if (ebpf_read_dcstat.thread)
         nd_thread_signal_cancel(ebpf_read_dcstat.thread);
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
             ebpf_obsolete_dc_cgroup_charts(em);
@@ -569,6 +569,9 @@ static void ebpf_read_dc_apps_table(int maps_per_core)
 
     uint32_t key = 0, next_key = 0;
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (bpf_map_lookup_elem(fd, &key, cv)) {
             goto end_dc_loop;
         }
@@ -610,6 +613,9 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
 {
     memset(&publish->curr, 0, sizeof(netdata_publish_dcstat_pid_t));
     for (; root; root = root->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         uint32_t pid = root->pid;
         netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_DCSTAT_IDX);
         if (!local_pid)
@@ -631,6 +637,9 @@ void ebpf_dc_resume_apps_data(void)
 
     netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_DCSTAT_IDX))))
             continue;
 
@@ -656,6 +665,9 @@ static void ebpf_update_dc_cgroup()
     ebpf_cgroup_target_t *ect;
     netdata_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
@@ -701,7 +713,10 @@ void ebpf_read_dcstat_thread(void *ptr)
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb);
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         if (!ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
@@ -709,6 +724,9 @@ void ebpf_read_dcstat_thread(void *ptr)
                 netdata_log_error("DCSTAT: Failed to wait on semaphore.");
             break;
         }
+
+        if (ebpf_plugin_stop())
+            break;
 
         ebpf_read_dc_apps_table(maps_per_core);
         ebpf_dc_resume_apps_data();
@@ -853,6 +871,9 @@ void ebpf_dcache_send_apps_data(struct ebpf_target *root)
 
     netdata_mutex_lock(&collect_data_mutex);
     for (w = root; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_DCSTAT_IDX))))
             continue;
 
@@ -1082,6 +1103,9 @@ void ebpf_dc_sum_cgroup_pids(netdata_publish_dcstat_t *publish, struct pid_on_ta
 {
     memset(&publish->curr, 0, sizeof(netdata_publish_dcstat_pid_t));
     while (root) {
+        if (ebpf_plugin_stop())
+            break;
+
         netdata_dcstat_pid_t *src = &root->dc;
 
         publish->curr.cache_access += src->cache_access;
@@ -1101,6 +1125,9 @@ void ebpf_dc_calc_chart_values(void)
 {
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         ebpf_dc_sum_cgroup_pids(&ect->publish_dc, ect->pids);
         uint64_t cache = ect->publish_dc.curr.cache_access;
         uint64_t not_found = ect->publish_dc.curr.not_found;
@@ -1187,6 +1214,9 @@ static void ebpf_create_systemd_dc_charts(int update_every)
 
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!w->systemd || w->flags & NETDATA_EBPF_SERVICES_HAS_DC_CHART))
             continue;
 
@@ -1213,6 +1243,9 @@ static void ebpf_send_systemd_dc_charts()
     ebpf_cgroup_target_t *ect;
     collected_number value;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(ect->flags & NETDATA_EBPF_SERVICES_HAS_DC_CHART))) {
             continue;
         }
@@ -1340,7 +1373,10 @@ static void dcstat_collector(ebpf_module_t *em)
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
 
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         counter = 0;
@@ -1358,6 +1394,9 @@ static void dcstat_collector(ebpf_module_t *em)
             ebpf_dc_send_cgroup_data(update_every);
 
         netdata_mutex_unlock(&lock);
+
+        if (ebpf_plugin_stop())
+            break;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time)
