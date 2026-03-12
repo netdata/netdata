@@ -80,9 +80,25 @@ static void pulse_daemon_timezone_do(bool extended __maybe_unused) {
 
     // refresh every 30 minutes to pick up DST changes
     if (now_ut - last_refresh_ut >= 30 * 60 * USEC_PER_SEC) {
-        SYSTEM_TZ tz = system_tz_get();
-        refresh_system_timezone(tz.timezone);
-        system_tz_free(&tz);
+        if (system_timezone_is_user_configured()) {
+            // User explicitly configured a timezone in netdata.conf — respect it,
+            // just refresh the abbreviation and offset (handles DST transitions).
+            SYSTEM_TZ tz = system_tz_get();
+            refresh_system_timezone(tz.timezone, true);
+            system_tz_free(&tz);
+        } else {
+            // Auto-detected timezone — re-detect to pick up system changes.
+            char buf[FILENAME_MAX + 1];
+            const char *detected = detect_system_timezone_name(buf, sizeof(buf));
+            if (detected) {
+                refresh_system_timezone(detected, true);
+            } else {
+                // Detection failed — use the stored name with its original tzdb flag.
+                SYSTEM_TZ tz = system_tz_get();
+                refresh_system_timezone(tz.timezone, system_timezone_is_tzdb_name());
+                system_tz_free(&tz);
+            }
+        }
         last_refresh_ut = now_ut;
     }
 }

@@ -795,7 +795,7 @@ static int map_windows_tz_to_ioanna(char *out, char *win_id, char *geo_name) {
 
 // Detect the current IANA timezone name from the system.
 // Returns a pointer into the provided buffer, or NULL if detection fails.
-static const char *detect_system_timezone_name(char *buffer, size_t buffer_size) {
+const char *detect_system_timezone_name(char *buffer, size_t buffer_size) {
     const char *timezone = NULL;
 
 #ifdef OS_WINDOWS
@@ -835,7 +835,7 @@ static const char *detect_system_timezone_name(char *buffer, size_t buffer_size)
         char *d = tmp;
         const char *src = timezone;
         while (*src) {
-            if (isalnum((uint8_t)*src) || *src == '_' || *src == '/')
+            if (isalnum((uint8_t)*src) || *src == '_' || *src == '/' || *src == '-' || *src == '+')
                 *d++ = *src;
             src++;
         }
@@ -845,6 +845,22 @@ static const char *detect_system_timezone_name(char *buffer, size_t buffer_size)
     }
 
     return (timezone && *timezone) ? timezone : NULL;
+}
+
+// Set at startup: true when the user explicitly set "timezone" in netdata.conf.
+static bool timezone_user_configured = false;
+
+// Set at startup: true when the timezone name came from a proper source (config,
+// /etc/localtime, /etc/timezone, TZ env var) rather than from the strftime("%Z")
+// fallback which only produces bare abbreviations like "CEST" or "PST".
+static bool timezone_is_tzdb_name = true;
+
+bool system_timezone_is_user_configured(void) {
+    return timezone_user_configured;
+}
+
+bool system_timezone_is_tzdb_name(void) {
+    return timezone_is_tzdb_name;
 }
 
 void get_system_timezone(void)
@@ -866,14 +882,15 @@ void get_system_timezone(void)
     }
 #endif
 
-    // Detect from system sources (/etc/timezone, /etc/localtime symlink, Windows API)
+    // Detect from system sources (/etc/localtime symlink, /etc/timezone, Windows API)
     if (!timezone) {
         timezone = detect_system_timezone_name(buffer, sizeof(buffer));
         if (timezone)
             netdata_log_info("TIMEZONE: detected '%s'", timezone);
     }
 
-    // Last resort: use strftime %Z (gives abbreviation, not IANA name)
+    // Last resort: use strftime %Z (gives abbreviation, not IANA name).
+    // Mark it so refresh_system_timezone() won't feed it into setenv("TZ").
     if (!timezone) {
         time_t t;
         struct tm *tmp, tmbuf;
@@ -885,6 +902,7 @@ void get_system_timezone(void)
             if (strftime(buffer, FILENAME_MAX, "%Z", tmp) != 0) {
                 buffer[FILENAME_MAX] = '\0';
                 timezone = buffer;
+                timezone_is_tzdb_name = false;
                 netdata_log_info("TIMEZONE: using strftime(): '%s'", timezone);
             }
         }
@@ -893,39 +911,54 @@ void get_system_timezone(void)
     if (!timezone || !*timezone)
         timezone = "unknown";
 
+    // Check if the user explicitly set "timezone" in netdata.conf BEFORE
+    // inicfg_get auto-populates it with the detected default.
+    timezone_user_configured = inicfg_exists(&netdata_config, CONFIG_SECTION_GLOBAL, "timezone");
+
+    // If the user explicitly configured a timezone, treat it as a valid tzdb name
+    // (the user is responsible for providing a valid value).
+    if (timezone_user_configured)
+        timezone_is_tzdb_name = true;
+
     // inicfg_get returns a config-system-owned pointer, stable for the process lifetime
     const char *configured_tz = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "timezone", timezone);
 
     // Compute abbreviation and UTC offset, then set all three atomically
-    refresh_system_timezone(configured_tz);
+    refresh_system_timezone(configured_tz, timezone_is_tzdb_name);
 }
 
-void refresh_system_timezone(const char *configured_timezone) {
+void refresh_system_timezone(const char *timezone, bool is_tzdb_name) {
     time_t t;
     struct tm *tmp, tmbuf;
     char abbrev[64];
     char offset_str[16];
-    char tz_buf[FILENAME_MAX + 1] = "";
 
     const char *new_abbrev = "UTC";
     int32_t new_offset = 0;
 
-    // Re-detect the timezone name from the system to pick up runtime changes.
-    // This reads /etc/localtime (symlink) which is the authoritative source.
-    const char *detected = detect_system_timezone_name(tz_buf, sizeof(tz_buf));
-    const char *timezone = detected ? detected : configured_timezone;
+    // Keep the global flag in sync so that future callers passing the stored
+    // timezone (e.g. pulse daemon fallback) use the most recent knowledge.
+    if (is_tzdb_name)
+        timezone_is_tzdb_name = true;
 
-    // We must set TZ to the IANA timezone name so that glibc loads the correct
-    // timezone data.  Simply calling tzset() is not enough: when TZ=":/etc/localtime"
-    // glibc caches the file and won't notice that the symlink target changed.
-    // Setting TZ to the actual IANA name (e.g. "Europe/Amsterdam") forces a reload.
+    // When the timezone is a proper tzdb/IANA name we must set TZ so glibc
+    // loads the correct zone data.  Simply calling tzset() is not enough:
+    // when TZ=":/etc/localtime", glibc caches the file and won't notice
+    // that the symlink target changed.
     //
-    // Note: setenv/unsetenv are not thread-safe, but tzset() already modifies global
-    // state, and this function is called from a single thread (pulse daemon).
-    const char *old_tz = getenv("TZ");
-    char *saved_tz = old_tz ? strdupz(old_tz) : NULL;
-
-    setenv("TZ", timezone, 1);
+    // When is_tzdb_name is false the value came from strftime("%Z") (a bare
+    // abbreviation like "CEST" or "PST") and must NOT be fed into TZ — glibc
+    // would interpret it as a POSIX TZ spec with offset 0.  In that case we
+    // just call tzset() to use the process's existing timezone state.
+    //
+    // Note: setenv/unsetenv are not thread-safe, but tzset() already modifies
+    // global state, and this function is called from a single thread (pulse daemon).
+    char *saved_tz = NULL;
+    if (is_tzdb_name) {
+        const char *old_tz = getenv("TZ");
+        saved_tz = old_tz ? strdupz(old_tz) : NULL;
+        setenv("TZ", timezone, 1);
+    }
     tzset();
 
     t = now_realtime_sec();
@@ -950,13 +983,15 @@ void refresh_system_timezone(const char *configured_timezone) {
 
     // Restore the original TZ so that the rest of the process keeps using
     // ":/etc/localtime" (avoids flooding stat() calls on every strftime).
-    if (saved_tz) {
-        setenv("TZ", saved_tz, 1);
-        freez(saved_tz);
-    } else {
-        unsetenv("TZ");
+    if (is_tzdb_name) {
+        if (saved_tz) {
+            setenv("TZ", saved_tz, 1);
+            freez(saved_tz);
+        } else {
+            unsetenv("TZ");
+        }
+        tzset();
     }
-    tzset();
 
     // Atomically update the system timezone triplet
     system_tz_set(timezone, new_abbrev, new_offset);
