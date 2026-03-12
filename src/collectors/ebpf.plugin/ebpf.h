@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <dlfcn.h>
 
@@ -312,12 +313,46 @@ void ebpf_read_local_addresses_unsafe();
 
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];
+extern volatile sig_atomic_t ebpf_stop_signal;
 extern bool ebpf_plugin_exit;
 extern uint64_t collect_pids;
 
 static inline bool ebpf_plugin_stop(void)
 {
-    return __atomic_load_n(&ebpf_plugin_exit, __ATOMIC_ACQUIRE) || nd_thread_signaled_to_cancel();
+    return __atomic_load_n(&ebpf_plugin_exit, __ATOMIC_ACQUIRE) ||
+           ebpf_stop_signal ||
+           nd_thread_signaled_to_cancel();
+}
+
+static inline bool ebpf_shm_sem_wait_or_stop(sem_t *sem)
+{
+    if (unlikely(!sem || sem == SEM_FAILED)) {
+        errno = EINVAL;
+        return false;
+    }
+
+    while (!ebpf_plugin_stop()) {
+        struct timespec ts;
+        if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+            return false;
+
+        ts.tv_nsec += 200 * 1000 * 1000;
+        if (ts.tv_nsec >= 1000000000L) {
+            ts.tv_sec += ts.tv_nsec / 1000000000L;
+            ts.tv_nsec %= 1000000000L;
+        }
+
+        if (sem_timedwait(sem, &ts) == 0)
+            return true;
+
+        if (errno == ETIMEDOUT || errno == EINTR)
+            continue;
+
+        return false;
+    }
+
+    errno = ECANCELED;
+    return false;
 }
 
 void ebpf_stop_threads(int sig);

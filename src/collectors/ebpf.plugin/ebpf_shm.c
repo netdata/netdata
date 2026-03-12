@@ -1109,13 +1109,18 @@ void ebpf_read_shm_thread(void *ptr)
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
-        sem_wait(shm_mutex_ebpf_integration);
+        if (!ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+            if (errno != ECANCELED)
+                netdata_log_error("SHM: Failed to wait on semaphore.");
+            break;
+        }
         ebpf_read_shm_apps_table(maps_per_core);
         ebpf_shm_resume_apps_data();
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_shm_cgroup();
 
-        sem_post(shm_mutex_ebpf_integration);
+        if (sem_post(shm_mutex_ebpf_integration))
+            netdata_log_error("SHM: Failed to post semaphore.");
 
         counter = 0;
 

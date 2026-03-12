@@ -704,17 +704,19 @@ void ebpf_read_dcstat_thread(void *ptr)
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
-        if (sem_wait(shm_mutex_ebpf_integration) == 0) {
-            ebpf_read_dc_apps_table(maps_per_core);
-            ebpf_dc_resume_apps_data();
-            if (cgroups && shm_ebpf_cgroup.header)
-                ebpf_update_dc_cgroup();
-
-            if (sem_post(shm_mutex_ebpf_integration))
-                netdata_log_error("DCSTAT: Failed to post semaphore.");
-        } else {
-            netdata_log_error("DCSTAT: Failed to wait on semaphore.");
+        if (!ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+            if (errno != ECANCELED)
+                netdata_log_error("DCSTAT: Failed to wait on semaphore.");
+            break;
         }
+
+        ebpf_read_dc_apps_table(maps_per_core);
+        ebpf_dc_resume_apps_data();
+        if (cgroups && shm_ebpf_cgroup.header)
+            ebpf_update_dc_cgroup();
+
+        if (sem_post(shm_mutex_ebpf_integration))
+            netdata_log_error("DCSTAT: Failed to post semaphore.");
 
         counter = 0;
 

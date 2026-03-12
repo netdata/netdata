@@ -1003,12 +1003,17 @@ void ebpf_read_cachestat_thread(void *ptr)
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
-        sem_wait(shm_mutex_ebpf_integration);
+        if (!ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+            if (errno != ECANCELED)
+                netdata_log_error("CACHESTAT: Failed to wait on semaphore.");
+            break;
+        }
         ebpf_read_cachestat_apps_table(maps_per_core);
         ebpf_cachestat_resume_apps_data();
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_cachestat_cgroup();
-        sem_post(shm_mutex_ebpf_integration);
+        if (sem_post(shm_mutex_ebpf_integration))
+            netdata_log_error("CACHESTAT: Failed to post semaphore.");
 
         counter = 0;
 

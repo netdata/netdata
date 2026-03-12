@@ -823,6 +823,7 @@ ebpf_plugin_stats_t plugin_statistics = {
     .hash_tables = 0};
 netdata_ebpf_judy_pid_t ebpf_judy_pid = {.pid_table = NULL, .index = {.JudyLArray = NULL}};
 bool ebpf_plugin_exit = false;
+volatile sig_atomic_t ebpf_stop_signal = 0;
 
 #ifdef LIBBPF_MAJOR_VERSION
 struct btf *default_btf = NULL;
@@ -1106,8 +1107,9 @@ static void ebpf_unload_sync()
  */
 void ebpf_stop_threads(int sig)
 {
-    UNUSED(sig);
     static int only_one = 0;
+    usec_t stop_started_ut = now_monotonic_usec();
+    pid_t current_tid = gettid_cached();
 
     // Child thread should be closed by itself.
     netdata_mutex_lock(&ebpf_exit_cleanup);
@@ -1116,6 +1118,9 @@ void ebpf_stop_threads(int sig)
         return;
     }
     only_one = 1;
+
+    netdata_log_info("EBPF SHUTDOWN: stop requested (signal=%d, main_tid=%d, current_tid=%d).",
+                     sig, main_thread_id, current_tid);
     int i;
     for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
         if (ebpf_modules[i].enabled < NETDATA_THREAD_EBPF_STOPPING && ebpf_modules[i].thread &&
@@ -1129,8 +1134,16 @@ void ebpf_stop_threads(int sig)
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 
     for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
-        if (ebpf_modules[i].enabled < NETDATA_THREAD_EBPF_STOPPED && ebpf_threads[i].thread)
+        if (ebpf_modules[i].enabled < NETDATA_THREAD_EBPF_STOPPED && ebpf_threads[i].thread) {
+            netdata_log_info("EBPF SHUTDOWN: about to join module[%d]='%s' (state=%u).",
+                             i, ebpf_modules[i].info.thread_name, ebpf_modules[i].enabled);
+            usec_t join_started_ut = now_monotonic_usec();
             nd_thread_join(ebpf_threads[i].thread);
+            usec_t join_duration_ut = now_monotonic_usec() - join_started_ut;
+            netdata_log_info("EBPF SHUTDOWN: joined '%s' in %llums.",
+                             ebpf_modules[i].info.thread_name,
+                             (unsigned long long)(join_duration_ut / USEC_PER_MS));
+        }
     }
 
     __atomic_store_n(&ebpf_plugin_exit, true, __ATOMIC_RELEASE);
@@ -1142,13 +1155,24 @@ void ebpf_stop_threads(int sig)
 #endif
     netdata_mutex_unlock(&mutex_cgroup_shm);
 
+    usec_t before_checks_ut = now_monotonic_usec();
     ebpf_check_before2go();
+    usec_t checks_duration_ut = now_monotonic_usec() - before_checks_ut;
+    netdata_log_info("EBPF SHUTDOWN: post-cancel checks finished in %llums.",
+                     (unsigned long long)(checks_duration_ut / USEC_PER_MS));
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
+    usec_t unload_started_ut = now_monotonic_usec();
     ebpf_unload_unique_maps();
     ebpf_unload_filesystems();
     ebpf_unload_sync();
+    usec_t unload_duration_ut = now_monotonic_usec() - unload_started_ut;
     netdata_mutex_unlock(&ebpf_exit_cleanup);
+
+    usec_t total_duration_ut = now_monotonic_usec() - stop_started_ut;
+    netdata_log_info("EBPF SHUTDOWN: total stop duration %llums (unload=%llums).",
+                     (unsigned long long)(total_duration_ut / USEC_PER_MS),
+                     (unsigned long long)(unload_duration_ut / USEC_PER_MS));
 
     ebpf_exit();
 }
@@ -2229,6 +2253,13 @@ static void ebpf_set_static_routine()
     }
 }
 
+static void ebpf_signal_stop_handler(int sig)
+{
+    // Async-signal-safe stop request: actual shutdown is handled by main thread flow.
+    if (!ebpf_stop_signal)
+        ebpf_stop_signal = (sig > 0) ? sig : 1;
+}
+
 /**
  * Entry point
  *
@@ -2256,10 +2287,10 @@ int main(int argc, char **argv)
     ebpf_parse_args(argc, argv);
     ebpf_manage_pid(getpid());
 
-    signal(SIGINT, ebpf_stop_threads);
-    signal(SIGQUIT, ebpf_stop_threads);
-    signal(SIGTERM, ebpf_stop_threads);
-    signal(SIGPIPE, ebpf_stop_threads);
+    signal(SIGINT, ebpf_signal_stop_handler);
+    signal(SIGQUIT, ebpf_signal_stop_handler);
+    signal(SIGTERM, ebpf_signal_stop_handler);
+    signal(SIGPIPE, ebpf_signal_stop_handler);
 
     ebpf_mutex_initialize();
 
@@ -2343,7 +2374,7 @@ int main(int argc, char **argv)
         }
     }
 
-    ebpf_stop_threads(0);
+    ebpf_stop_threads((int)ebpf_stop_signal);
 
     return 0;
 }

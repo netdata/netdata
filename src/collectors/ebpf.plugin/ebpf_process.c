@@ -1606,7 +1606,11 @@ static void process_collector(ebpf_module_t *em)
             netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
 
             if (ebpf_all_pids_count > 0) {
-                sem_wait(shm_mutex_ebpf_integration);
+                if (!ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+                    if (errno != ECANCELED)
+                        netdata_log_error("PROCESS: Failed to wait on semaphore.");
+                    break;
+                }
                 netdata_mutex_lock(&collect_data_mutex);
                 collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
 
@@ -1614,7 +1618,8 @@ static void process_collector(ebpf_module_t *em)
                     ebpf_update_process_cgroup();
                 }
                 netdata_mutex_unlock(&collect_data_mutex);
-                sem_post(shm_mutex_ebpf_integration);
+                if (sem_post(shm_mutex_ebpf_integration))
+                    netdata_log_error("PROCESS: Failed to post semaphore.");
             }
 
             netdata_mutex_lock(&lock);

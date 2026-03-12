@@ -1995,13 +1995,18 @@ void ebpf_read_socket_thread(void *ptr)
         if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
-        sem_wait(shm_mutex_ebpf_integration);
+        if (!ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+            if (errno != ECANCELED)
+                netdata_log_error("SOCKET: Failed to wait on semaphore.");
+            break;
+        }
         ebpf_update_array_vectors(em);
         ebpf_socket_resume_apps_data();
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_socket_cgroup();
 
-        sem_post(shm_mutex_ebpf_integration);
+        if (sem_post(shm_mutex_ebpf_integration))
+            netdata_log_error("SOCKET: Failed to post semaphore.");
 
         counter = 0;
     }
