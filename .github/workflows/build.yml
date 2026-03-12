@@ -478,7 +478,8 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: |
           $installerProc = Start-Process "msiexec" "/qn /i `"$PWD\dist-artifacts\netdata-x64.msi`" /l* `"$PWD\msi.log`" NDDRVINST=0" -Wait -NoNewWindow
-          if ($installerProc.ExitCode -ne 0) {
+          $successCodes = @(0, 3010)
+          if ($installerProc.ExitCode -notin $successCodes) {
               Get-Content "$PWD\msi.log"
               exit 1
           }
