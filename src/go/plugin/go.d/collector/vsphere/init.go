@@ -54,6 +54,21 @@ func (c *Collector) initDiscoverer(cli *client.Client) error {
 	if vmm != nil {
 		d.VMMatcher = vmm
 	}
+	dsm, err := c.DatastoresInclude.Parse()
+	if err != nil {
+		return err
+	}
+	if dsm != nil {
+		d.DatastoreMatcher = dsm
+	}
+
+	cm, err := c.ClustersInclude.Parse()
+	if err != nil {
+		return err
+	}
+	if cm != nil {
+		d.ClusterMatcher = cm
+	}
 
 	c.discoverer = d
 	return nil
@@ -63,4 +78,7 @@ func (c *Collector) initScraper(cli *client.Client) {
 	ms := scrape.New(cli)
 	ms.Logger = c.Logger
 	c.scraper = ms
+	c.dsPropertyCollector = cli
+	c.clusterPropertyCollector = cli
+	c.rpPropertyCollector = cli
 }

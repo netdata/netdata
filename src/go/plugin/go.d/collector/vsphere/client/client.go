@@ -10,6 +10,7 @@ import (
 
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/performance"
+	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/view"
 	"github.com/vmware/govmomi/vim25"
@@ -21,11 +22,13 @@ import (
 )
 
 const (
-	datacenter      = "Datacenter"
-	folder          = "Folder"
-	computeResource = "ComputeResource"
-	hostSystem      = "HostSystem"
-	virtualMachine  = "VirtualMachine"
+	datacenter       = "Datacenter"
+	folder           = "Folder"
+	computeResource  = "ComputeResource"
+	hostSystem       = "HostSystem"
+	virtualMachine   = "VirtualMachine"
+	datastoreType    = "Datastore"
+	resourcePoolType = "ResourcePool"
 
 	maxIdleConnections = 32
 )
@@ -173,6 +176,46 @@ func (c *Client) Hosts(pathSet ...string) (hosts []mo.HostSystem, err error) {
 func (c *Client) VirtualMachines(pathSet ...string) (vms []mo.VirtualMachine, err error) {
 	err = c.root.Retrieve(context.Background(), []string{virtualMachine}, pathSet, &vms)
 	return
+}
+
+func (c *Client) Datastores(pathSet ...string) (datastores []mo.Datastore, err error) {
+	err = c.root.Retrieve(context.Background(), []string{datastoreType}, pathSet, &datastores)
+	return
+}
+
+func (c *Client) DatastoresByRef(refs []types.ManagedObjectReference, pathSet ...string) ([]mo.Datastore, error) {
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	var datastores []mo.Datastore
+	pc := property.DefaultCollector(c.client.Client)
+	err := pc.Retrieve(context.Background(), refs, pathSet, &datastores)
+	return datastores, err
+}
+
+func (c *Client) ClustersByRef(refs []types.ManagedObjectReference, pathSet ...string) ([]mo.ClusterComputeResource, error) {
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	var clusters []mo.ClusterComputeResource
+	pc := property.DefaultCollector(c.client.Client)
+	err := pc.Retrieve(context.Background(), refs, pathSet, &clusters)
+	return clusters, err
+}
+
+func (c *Client) ResourcePools(pathSet ...string) (pools []mo.ResourcePool, err error) {
+	err = c.root.Retrieve(context.Background(), []string{resourcePoolType}, pathSet, &pools)
+	return
+}
+
+func (c *Client) ResourcePoolsByRef(refs []types.ManagedObjectReference, pathSet ...string) ([]mo.ResourcePool, error) {
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	var pools []mo.ResourcePool
+	pc := property.DefaultCollector(c.client.Client)
+	err := pc.Retrieve(context.Background(), refs, pathSet, &pools)
+	return pools, err
 }
 
 func (c *Client) CounterInfoByName() (map[string]*types.PerfCounterInfo, error) {

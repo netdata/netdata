@@ -21,7 +21,7 @@ Module: vsphere
 
 ## Overview
 
-This collector monitors hosts and vms performance statistics from `vCenter` servers.
+This collector monitors hosts, VMs, datastores, clusters, and resource pools from `vCenter` servers.
 
 > **Warning**: The `vsphere` collector cannot re-login and continue collecting metrics after a vCenter reboot.
 > go.d.plugin needs to be restarted.
@@ -48,6 +48,8 @@ The default configuration for this integration does not impose any limits on dat
 
 The default `update_every` is 20 seconds, and it doesn't make sense to decrease the value.
 **VMware real-time statistics are generated at the 20-second specificity**.
+
+**Note**: Datastore and cluster performance metrics use 300-second (5-minute) historical intervals because VMware does not support real-time statistics for these entity types. Datastore capacity/status, cluster properties, and resource pool statistics are updated every collection cycle. Host and VM metrics use real-time 20-second intervals.
 
 It is likely that 20 seconds is not enough for big installations and the value should be tuned.
 
@@ -156,6 +158,98 @@ Metrics:
 | vsphere.host_overall_status | green, red, yellow, gray | status |
 | vsphere.host_system_uptime | uptime | seconds |
 
+### Per datastore
+
+These metrics refer to the Datastore.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| datacenter | Datacenter name |
+| datastore | Datastore name |
+| type | Datastore type (VMFS, NFS, NFS41, vsan, VVOL, PMEM) |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.datastore_disk_io | read, write | KiB/s |
+| vsphere.datastore_disk_iops | reads, writes | operations/s |
+| vsphere.datastore_disk_latency | read, write | milliseconds |
+| vsphere.datastore_space_utilization | used | percentage |
+| vsphere.datastore_space_usage | capacity, free, used | bytes |
+| vsphere.datastore_overall_status | green, red, yellow, gray | status |
+
+### Per cluster
+
+These metrics refer to the vSphere Cluster.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| datacenter | Datacenter name |
+| cluster | Cluster name |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.cluster_hosts | total, effective | hosts |
+| vsphere.cluster_cpu_capacity | total, effective | MHz |
+| vsphere.cluster_mem_capacity | total, effective | bytes |
+| vsphere.cluster_cpu_topology | cores, threads | count |
+| vsphere.cluster_drs_config | enabled | status |
+| vsphere.cluster_ha_config | enabled, admission_control | status |
+| vsphere.cluster_overall_status | green, red, yellow, gray | status |
+| vsphere.cluster_vmotions | vmotions | migrations |
+| vsphere.cluster_drs_score | score | percentage |
+| vsphere.cluster_drs_balance | current, target | score |
+| vsphere.cluster_vm_count | total, powered_off | VMs |
+| vsphere.cluster_usage_cpu | demand, entitled, reserved | MHz |
+| vsphere.cluster_usage_mem | demand, entitled, reserved | MB |
+| vsphere.cluster_cpu_utilization | used | percentage |
+| vsphere.cluster_cpu_usage | used, total | MHz |
+| vsphere.cluster_mem_utilization | used | percentage |
+| vsphere.cluster_mem_usage | consumed, active, granted, shared, overhead, swap_used | KiB |
+| vsphere.cluster_services_fairness | cpu, memory | score |
+| vsphere.cluster_services_effective_cpu | effective_cpu | MHz |
+| vsphere.cluster_services_effective_mem | effective_mem | MB |
+| vsphere.cluster_services_failover | failures_tolerable | failures |
+| vsphere.cluster_vm_migrations | vmotion, svmotion, xvmotion | operations |
+| vsphere.cluster_vm_lifecycle | poweron, poweroff, create, destroy, clone, deploy | operations |
+| vsphere.cluster_vm_management | reconfigure, reset, suspend, register, unregister | operations |
+| vsphere.cluster_vm_guest_ops | reboot, shutdown, standby | operations |
+| vsphere.cluster_vm_cold_migrations | change_ds, change_host, change_host_ds | operations |
+
+### Per resource pool
+
+These metrics refer to the vSphere Resource Pool.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| datacenter | Datacenter name |
+| cluster | Cluster name |
+| resource_pool | Resource Pool name |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.resource_pool_cpu_usage | usage, demand | MHz |
+| vsphere.resource_pool_cpu_entitlement | distributed | MHz |
+| vsphere.resource_pool_cpu_allocation | reservation_used, unreserved_for_vm, max_usage | MHz |
+| vsphere.resource_pool_mem_usage | host, guest | MB |
+| vsphere.resource_pool_mem_entitlement | distributed | MB |
+| vsphere.resource_pool_mem_allocation | reservation_used, unreserved_for_vm, max_usage | bytes |
+| vsphere.resource_pool_mem_breakdown | private, shared, swapped, ballooned, overhead, consumed_overhead, compressed | MB |
+| vsphere.resource_pool_cpu_config | reservation, limit | MHz |
+| vsphere.resource_pool_mem_config | reservation, limit | MB |
+| vsphere.resource_pool_overall_status | green, red, yellow, gray | status |
+
 
 
 ## Alerts
@@ -205,13 +299,15 @@ The following options can be defined globally: update_every, autodetection_retry
 
 | Group | Option | Description | Default | Required |
 |:------|:-----|:------------|:--------|:---------:|
-| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+| **Collection** | update_every | Data collection interval (seconds). | 20 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| **Target** | url | Target endpoint URL. | http://127.0.0.1/server-status?auto | yes |
-|  | timeout | HTTP request timeout (seconds). | 1 | no |
-| **Discovery** | discovery_interval | Hosts and VMs discovery interval (seconds). | 300 | no |
+| **Target** | url | Target endpoint URL. | https://vcenter.local | yes |
+|  | timeout | HTTP request timeout (seconds). | 20 | no |
+| **Discovery** | discovery_interval | Hosts, VMs, datastores, clusters, and resource pools discovery interval (seconds). | 300 | no |
 | **Filters** | [host_include](#option-filters-host-include) | Hosts selector (filter). | /* | no |
 |  | [vm_include](#option-filters-vm-include) | VM selector (filter). | /* | no |
+|  | [datastore_include](#option-filters-datastore-include) | Datastore selector (filter). | /* | no |
+|  | [cluster_include](#option-filters-cluster-include) | Cluster selector (filter). Resource pools follow their owning cluster. | /* | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | yes |
 |  | password | Password for Basic HTTP authentication. |  | yes |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -260,6 +356,38 @@ Metrics of VMs matching the selector will be collected.
     - '/DC1/*'           # all VMs from datacenter DC1
     - '/DC2/*/*/!VM2 *'  # all VMs from DC2 except VM2
     - '/DC3/Cluster3/*'  # all VMs from DC3, cluster Cluster3
+  ```
+
+
+<a id="option-filters-datastore-include"></a>
+##### datastore_include
+
+Metrics of datastores matching the selector will be collected.
+
+- Include pattern syntax: "/Datacenter pattern/Datastore pattern".
+- Match pattern syntax: [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns).
+- Syntax:
+
+  ```yaml
+  datastore_include:
+    - '/DC1/*'           # all datastores from datacenter DC1
+    - '/DC2/!DS2 *'      # all datastores from DC2 except DS2
+  ```
+
+
+<a id="option-filters-cluster-include"></a>
+##### cluster_include
+
+Metrics of clusters and their resource pools matching the selector will be collected.
+
+- Include pattern syntax: "/Datacenter pattern/Cluster pattern".
+- Match pattern syntax: [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns).
+- Syntax:
+
+  ```yaml
+  cluster_include:
+    - '/DC1/*'           # all clusters from datacenter DC1
+    - '/DC2/!Cluster2 *' # all clusters from DC2 except Cluster2
   ```
 
 

@@ -255,6 +255,7 @@ int netdata_main(int argc, char **argv) {
     libjudy_malloc_init();
     string_init();
     analytics_init();
+    nd_log_initialize_mutexes();
 
     netdata_start_time = now_realtime_sec();
     usec_t started_ut = now_monotonic_usec();
