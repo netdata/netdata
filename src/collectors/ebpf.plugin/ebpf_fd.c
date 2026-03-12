@@ -891,7 +891,7 @@ void ebpf_read_fd_thread(void *ptr)
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
         if (ebpf_plugin_stop())
-            continue;
+            break;
 
         if (++counter != update_every)
             continue;
@@ -912,7 +912,7 @@ void ebpf_read_fd_thread(void *ptr)
         counter = 0;
 
         if (ebpf_plugin_stop())
-            continue;
+            break;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
@@ -1355,7 +1355,7 @@ static void fd_collector(ebpf_module_t *em)
         heartbeat_next(&hb);
 
         if (ebpf_plugin_stop())
-            continue;
+            break;
 
         if (++counter != update_every)
             continue;
@@ -1377,7 +1377,7 @@ static void fd_collector(ebpf_module_t *em)
         netdata_mutex_unlock(&lock);
 
         if (ebpf_plugin_stop())
-            continue;
+            break;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)

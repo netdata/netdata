@@ -1169,13 +1169,11 @@ void ebpf_stop_threads(int sig)
                      (unsigned long long)(checks_duration_ut / USEC_PER_MS));
 
     usec_t unload_started_ut = now_monotonic_usec();
-    if (!ebpf_plugin_stop()) {
-        netdata_mutex_lock(&ebpf_exit_cleanup);
-        ebpf_unload_unique_maps();
-        ebpf_unload_filesystems();
-        ebpf_unload_sync();
-        netdata_mutex_unlock(&ebpf_exit_cleanup);
-    }
+    netdata_mutex_lock(&ebpf_exit_cleanup);
+    ebpf_unload_unique_maps();
+    ebpf_unload_filesystems();
+    ebpf_unload_sync();
+    netdata_mutex_unlock(&ebpf_exit_cleanup);
     usec_t unload_duration_ut = now_monotonic_usec() - unload_started_ut;
 
     usec_t total_duration_ut = now_monotonic_usec() - stop_started_ut;
