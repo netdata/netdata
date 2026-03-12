@@ -889,45 +889,59 @@ void get_system_timezone(void)
     if (!timezone || !*timezone)
         timezone = "unknown";
 
-    netdata_configured_timezone = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "timezone", timezone);
+    // inicfg_get returns a config-system-owned pointer, stable for the process lifetime
+    const char *configured_tz = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "timezone", timezone);
 
-    //get the utc offset, and the timezone as returned by strftime
-    //will be sent to the cloud
-    //Note: This will need an agent restart to get new offset on time change (dst, etc).
-    {
-        time_t t;
-        struct tm *tmp, tmbuf;
-        char zone[FILENAME_MAX + 1];
-        char sign[2], hh[3], mm[3];
+    // Compute abbreviation and UTC offset, then set all three atomically
+    refresh_system_timezone(configured_tz);
+}
 
-        t = now_realtime_sec();
-        tmp = localtime_r(&t, &tmbuf);
+void refresh_system_timezone(const char *timezone) {
+    time_t t;
+    struct tm *tmp, tmbuf;
+    char abbrev[64];
+    char offset_str[16];
 
-        if (tmp != NULL) {
-            if (strftime(zone, FILENAME_MAX, "%Z", tmp) == 0) {
-                netdata_configured_abbrev_timezone = strdupz("UTC");
-            } else
-                netdata_configured_abbrev_timezone = strdupz(zone);
+    const char *new_abbrev = "UTC";
+    int32_t new_offset = 0;
 
-            if (strftime(zone, FILENAME_MAX, "%z", tmp) == 0) {
-                netdata_configured_utc_offset = 0;
-            } else {
-                sign[0] = zone[0] == '-' || zone[0] == '+' ? zone[0] : '0';
-                sign[1] = '\0';
-                hh[0] = isdigit((uint8_t)zone[1]) ? zone[1] : '0';
-                hh[1] = isdigit((uint8_t)zone[2]) ? zone[2] : '0';
-                hh[2] = '\0';
-                mm[0] = isdigit((uint8_t)zone[3]) ? zone[3] : '0';
-                mm[1] = isdigit((uint8_t)zone[4]) ? zone[4] : '0';
-                mm[2] = '\0';
+    // Ensure the C library re-reads /etc/localtime or $TZ for DST changes
+    tzset();
 
-                netdata_configured_utc_offset = (str2i(hh) * 3600) + (str2i(mm) * 60);
-                netdata_configured_utc_offset =
-                    sign[0] == '-' ? -netdata_configured_utc_offset : netdata_configured_utc_offset;
+    t = now_realtime_sec();
+    tmp = localtime_r(&t, &tmbuf);
+
+    if (tmp != NULL) {
+        if (strftime(abbrev, sizeof(abbrev), "%Z", tmp) != 0)
+            new_abbrev = abbrev;
+
+        if (strftime(offset_str, sizeof(offset_str), "%z", tmp) != 0) {
+            char sign = offset_str[0] == '-' || offset_str[0] == '+' ? offset_str[0] : '+';
+            int hours = (isdigit((uint8_t)offset_str[1]) ? (offset_str[1] - '0') : 0) * 10 +
+                        (isdigit((uint8_t)offset_str[2]) ? (offset_str[2] - '0') : 0);
+            int minutes = (isdigit((uint8_t)offset_str[3]) ? (offset_str[3] - '0') : 0) * 10 +
+                          (isdigit((uint8_t)offset_str[4]) ? (offset_str[4] - '0') : 0);
+
+            new_offset = (hours * 3600) + (minutes * 60);
+            if (sign == '-')
+                new_offset = -new_offset;
+        }
+    }
+
+    // Atomically update the system timezone triplet
+    system_tz_set(timezone, new_abbrev, new_offset);
+
+    // Update localhost if it exists
+    if (localhost) {
+        if (rrdhost_update_timezone(localhost, timezone, new_abbrev, new_offset)) {
+            // Timezone changed — update the two labels directly, persist, and notify.
+            if (localhost->rrdlabels) {
+                rrdlabels_add(localhost->rrdlabels, "_timezone", timezone, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(localhost->rrdlabels, "_abbrev_timezone", new_abbrev, RRDLABEL_SRC_AUTO);
+                rrdhost_flag_set(localhost, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
+                stream_send_host_labels(localhost);
             }
-        } else {
-            netdata_configured_abbrev_timezone = strdupz("UTC");
-            netdata_configured_utc_offset = 0;
+            aclk_queue_node_info(localhost, false);
         }
     }
 }

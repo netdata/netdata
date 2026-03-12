@@ -139,10 +139,16 @@ static inline void rrdhost_init_os(RRDHOST *host, const char *os) {
     string_freez(old);
 }
 
-static inline void rrdhost_init_timezone(RRDHOST *host, const char *timezone, const char *abbrev_timezone, int32_t utc_offset) {
-    if (host->timezone && timezone && !strcmp(rrdhost_timezone(host), timezone) && host->abbrev_timezone && abbrev_timezone &&
-        !strcmp(rrdhost_abbrev_timezone(host), abbrev_timezone) && host->utc_offset == utc_offset)
-        return;
+// Caller must hold rrdhost_update_lock (or be in single-threaded host creation).
+// Returns true if anything actually changed.
+static inline bool rrdhost_init_timezone(RRDHOST *host, const char *timezone, const char *abbrev_timezone, int32_t utc_offset) {
+    const char *cur_tz = host->timezone ? string2str(host->timezone) : NULL;
+    const char *cur_abbrev = host->abbrev_timezone ? string2str(host->abbrev_timezone) : NULL;
+
+    if (cur_tz && timezone && !strcmp(cur_tz, timezone) &&
+        cur_abbrev && abbrev_timezone && !strcmp(cur_abbrev, abbrev_timezone) &&
+        host->utc_offset == utc_offset)
+        return false;
 
     STRING *old = host->timezone;
     host->timezone = string_strdupz((timezone && *timezone)?timezone:"unknown");
@@ -153,6 +159,7 @@ static inline void rrdhost_init_timezone(RRDHOST *host, const char *timezone, co
     string_freez(old);
 
     host->utc_offset = utc_offset;
+    return true;
 }
 
 void set_host_properties(RRDHOST *host, int update_every,
@@ -171,6 +178,35 @@ void set_host_properties(RRDHOST *host, int update_every,
     host->program_name = string_strdupz((prog_name && *prog_name) ? prog_name : "unknown");
     host->program_version = string_strdupz((prog_version && *prog_version) ? prog_version : "unknown");
     host->registry_hostname = string_strdupz((registry_hostname && *registry_hostname) ? registry_hostname : rrdhost_hostname(host));
+}
+
+bool rrdhost_update_timezone(RRDHOST *host, const char *timezone, const char *abbrev_timezone, int32_t utc_offset) {
+    spinlock_lock(&host->rrdhost_update_lock);
+    bool changed = rrdhost_init_timezone(host, timezone, abbrev_timezone, utc_offset);
+    spinlock_unlock(&host->rrdhost_update_lock);
+
+    if (changed)
+        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
+
+    return changed;
+}
+
+RRDHOST_TZ rrdhost_tz_get(RRDHOST *host) {
+    RRDHOST_TZ tz;
+    spinlock_lock(&host->rrdhost_update_lock);
+    tz.timezone = strdupz(host->timezone ? string2str(host->timezone) : "unknown");
+    tz.abbrev_timezone = strdupz(host->abbrev_timezone ? string2str(host->abbrev_timezone) : "UTC");
+    tz.utc_offset = host->utc_offset;
+    spinlock_unlock(&host->rrdhost_update_lock);
+    return tz;
+}
+
+void rrdhost_tz_free(RRDHOST_TZ *tz) {
+    freez((void *)tz->timezone);
+    freez((void *)tz->abbrev_timezone);
+    tz->timezone = NULL;
+    tz->abbrev_timezone = NULL;
+    tz->utc_offset = 0;
 }
 
 // ----------------------------------------------------------------------------
@@ -447,7 +483,7 @@ RRDHOST *rrdhost_create(
          , rrdhost_registry_hostname(host)
          , host->machine_guid
          , rrdhost_os(host)
-         , rrdhost_timezone(host)
+         , host->timezone ? string2str(host->timezone) : "unknown"
          , rrdhost_program_name(host)
          , rrdhost_program_version(host)
          , host->rrd_update_every

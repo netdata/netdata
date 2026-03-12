@@ -124,14 +124,15 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
         health_load_config_defaults();
     }
 
+    SYSTEM_TZ tz = system_tz_get();
     localhost = rrdhost_create(
         hostname
         , registry_get_this_machine_hostname()
         , machine_guid_get_txt()
         , os_type
-        , netdata_configured_timezone
-        , netdata_configured_abbrev_timezone
-        , netdata_configured_utc_offset
+        , tz.timezone
+        , tz.abbrev_timezone
+        , tz.utc_offset
         , program_name
         , NETDATA_VERSION
         , nd_profile.update_every, default_rrd_history_entries
@@ -148,6 +149,7 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
         , 1
         , 0
     );
+    system_tz_free(&tz);
     rrdhost_system_info_free(system_info);
 
     if (unlikely(!localhost))

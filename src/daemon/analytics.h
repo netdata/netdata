@@ -88,6 +88,7 @@ void analytics_log_dashboard(void);
 void analytics_gather_mutable_meta_data(void);
 void analytics_report_oom_score(long long int score);
 void get_system_timezone(void);
+void refresh_system_timezone(const char *timezone);
 void analytics_reset(void);
 void analytics_init(void);
 

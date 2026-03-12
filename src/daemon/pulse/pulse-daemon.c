@@ -72,8 +72,24 @@ static void pulse_daemon_uptime_do(bool extended __maybe_unused) {
     }
 }
 
+// Called from a single pulse daemon thread, so last_refresh_ut needs no synchronization.
+static void pulse_daemon_timezone_do(bool extended __maybe_unused) {
+    static usec_t last_refresh_ut = 0;
+
+    usec_t now_ut = now_monotonic_usec();
+
+    // refresh every 30 minutes to pick up DST changes
+    if (now_ut - last_refresh_ut >= 30 * 60 * USEC_PER_SEC) {
+        SYSTEM_TZ tz = system_tz_get();
+        refresh_system_timezone(tz.timezone);
+        system_tz_free(&tz);
+        last_refresh_ut = now_ut;
+    }
+}
+
 void pulse_daemon_do(bool extended) {
     pulse_daemon_cpu_usage_do(extended);
     pulse_daemon_uptime_do(extended);
     pulse_daemon_memory_do(extended);
+    pulse_daemon_timezone_do(extended);
 }

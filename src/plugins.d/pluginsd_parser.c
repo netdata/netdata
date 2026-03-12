@@ -205,14 +205,15 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
 
     struct rrdhost_system_info *system_info = rrdhost_system_info_from_host_labels(parser->user.host_define.rrdlabels);
 
+    SYSTEM_TZ tz = system_tz_get();
     RRDHOST *host = rrdhost_find_or_create(
         string2str(parser->user.host_define.hostname),
         string2str(parser->user.host_define.hostname),
         parser->user.host_define.machine_guid_str,
         NETDATA_VIRTUAL_HOST,
-        netdata_configured_timezone,
-        netdata_configured_abbrev_timezone,
-        netdata_configured_utc_offset,
+        tz.timezone,
+        tz.abbrev_timezone,
+        tz.utc_offset,
         program_name,
         NETDATA_VERSION,
         nd_profile.update_every,
@@ -228,6 +229,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         stream_receive.replication.step,
         system_info,
         false);
+    system_tz_free(&tz);
 
     rrdhost_system_info_free(system_info);
 
