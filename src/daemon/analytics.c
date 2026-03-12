@@ -918,9 +918,12 @@ void get_system_timezone(void)
     // inicfg_get returns a config-system-owned pointer, stable for the process lifetime
     const char *configured_tz = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "timezone", timezone);
 
-    // Treat "timezone =" (empty value) as not user-configured.
-    if (timezone_user_configured && (!configured_tz || !*configured_tz))
+    // Treat "timezone =" (empty value) as not user-configured,
+    // and fall back to the auto-detected timezone.
+    if (timezone_user_configured && (!configured_tz || !*configured_tz)) {
         timezone_user_configured = false;
+        configured_tz = timezone;
+    }
 
     // If the user explicitly configured a timezone, treat it as a valid tzdb name
     // (the user is responsible for providing a valid value).
