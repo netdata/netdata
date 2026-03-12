@@ -177,7 +177,7 @@ typedef struct ebpf_tracepoint {
 #define EBPF_SYS_CLONE_IDX 11
 #define EBPF_MAX_MAPS 32
 
-#define EBPF_DEFAULT_UPDATE_EVERY 10
+#define EBPF_DEFAULT_UPDATE_EVERY 5
 
 enum ebpf_algorithms_list { NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX };
 
