@@ -793,11 +793,11 @@ static int map_windows_tz_to_ioanna(char *out, char *win_id, char *geo_name) {
 }
 #endif
 
-void get_system_timezone(void)
-{
-    char buffer[FILENAME_MAX + 1] = "";
+// Detect the current IANA timezone name from the system.
+// Returns a pointer into the provided buffer, or NULL if detection fails.
+static const char *detect_system_timezone_name(char *buffer, size_t buffer_size) {
     const char *timezone = NULL;
-    const char *tz = NULL;
+
 #ifdef OS_WINDOWS
     char geo_name[128];
     char win_zone[256];
@@ -806,47 +806,74 @@ void get_system_timezone(void)
     if (!map_windows_tz_to_ioanna(buffer, win_zone, geo_name))
         timezone = buffer;
 #else
-    // avoid flood calls to stat(/etc/localtime)
-    // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
-    tz = getenv("TZ");
-    if (!tz || !*tz)
-        setenv("TZ", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), 0);
+    // read the /etc/localtime symlink first — this is the authoritative source
+    // on modern Linux (timedatectl always updates it, but /etc/timezone can lag)
+    {
+        ssize_t ret = readlink("/etc/localtime", buffer, buffer_size - 1);
+        if (ret > 0) {
+            buffer[ret] = '\0';
+
+            const char *cmp = "/usr/share/zoneinfo/";
+            size_t cmp_len = strlen(cmp);
+
+            char *s = strstr(buffer, cmp);
+            if (s && s[cmp_len])
+                timezone = &s[cmp_len];
+        }
+    }
+
+    // fall back to /etc/timezone (Debian/Ubuntu)
+    if (!timezone && !read_txt_file("/etc/timezone", buffer, buffer_size)) {
+        timezone = buffer;
+    }
 #endif
 
-    ssize_t ret;
+    if (timezone && *timezone) {
+        // sanitize: keep only alnum, '_', '/'
+        size_t len = strlen(timezone);
+        char tmp[len + 1];
+        char *d = tmp;
+        const char *src = timezone;
+        while (*src) {
+            if (isalnum((uint8_t)*src) || *src == '_' || *src == '/')
+                *d++ = *src;
+            src++;
+        }
+        *d = '\0';
+        strncpyz(buffer, tmp, buffer_size - 1);
+        timezone = buffer;
+    }
 
-    // use the TZ variable
+    return (timezone && *timezone) ? timezone : NULL;
+}
+
+void get_system_timezone(void)
+{
+    char buffer[FILENAME_MAX + 1] = "";
+    const char *timezone = NULL;
+
+#ifndef OS_WINDOWS
+    // avoid flood calls to stat(/etc/localtime)
+    // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
+    const char *tz = getenv("TZ");
+    if (!tz || !*tz)
+        setenv("TZ", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), 0);
+
+    // use the TZ variable if it's an explicit IANA name (not a path starting with ':')
     if (tz && *tz && *tz != ':') {
         timezone = tz;
         netdata_log_info("TIMEZONE: using TZ variable '%s'", timezone);
     }
+#endif
 
-    // use the contents of /etc/timezone
-    if (!timezone && !read_txt_file("/etc/timezone", buffer, sizeof(buffer))) {
-        timezone = buffer;
-        netdata_log_info("TIMEZONE: using the contents of /etc/timezone");
-    }
-
-    // read the link /etc/localtime
+    // Detect from system sources (/etc/timezone, /etc/localtime symlink, Windows API)
     if (!timezone) {
-        ret = readlink("/etc/localtime", buffer, FILENAME_MAX);
-
-        if (ret > 0) {
-            buffer[ret] = '\0';
-
-            char *cmp = "/usr/share/zoneinfo/";
-            size_t cmp_len = strlen(cmp);
-
-            char *s = strstr(buffer, cmp);
-            if (s && s[cmp_len]) {
-                timezone = &s[cmp_len];
-                netdata_log_info("TIMEZONE: using the link of /etc/localtime: '%s'", timezone);
-            }
-        } else
-            buffer[0] = '\0';
+        timezone = detect_system_timezone_name(buffer, sizeof(buffer));
+        if (timezone)
+            netdata_log_info("TIMEZONE: detected '%s'", timezone);
     }
 
-    // find the timezone from strftime()
+    // Last resort: use strftime %Z (gives abbreviation, not IANA name)
     if (!timezone) {
         time_t t;
         struct tm *tmp, tmbuf;
@@ -855,35 +882,12 @@ void get_system_timezone(void)
         tmp = localtime_r(&t, &tmbuf);
 
         if (tmp != NULL) {
-            if (strftime(buffer, FILENAME_MAX, "%Z", tmp) == 0)
-                buffer[0] = '\0';
-            else {
+            if (strftime(buffer, FILENAME_MAX, "%Z", tmp) != 0) {
                 buffer[FILENAME_MAX] = '\0';
                 timezone = buffer;
                 netdata_log_info("TIMEZONE: using strftime(): '%s'", timezone);
             }
         }
-    }
-
-    if (timezone && *timezone) {
-        // make sure it does not have illegal characters
-        // netdata_log_info("TIMEZONE: fixing '%s'", timezone);
-
-        size_t len = strlen(timezone);
-        char tmp[len + 1];
-        char *d = tmp;
-        *d = '\0';
-
-        while (*timezone) {
-            if (isalnum((uint8_t)*timezone) || *timezone == '_' || *timezone == '/')
-                *d++ = *timezone++;
-            else
-                timezone++;
-        }
-        *d = '\0';
-        strncpyz(buffer, tmp, len);
-        timezone = buffer;
-        netdata_log_info("TIMEZONE: fixed as '%s'", timezone);
     }
 
     if (!timezone || !*timezone)
@@ -896,16 +900,32 @@ void get_system_timezone(void)
     refresh_system_timezone(configured_tz);
 }
 
-void refresh_system_timezone(const char *timezone) {
+void refresh_system_timezone(const char *configured_timezone) {
     time_t t;
     struct tm *tmp, tmbuf;
     char abbrev[64];
     char offset_str[16];
+    char tz_buf[FILENAME_MAX + 1] = "";
 
     const char *new_abbrev = "UTC";
     int32_t new_offset = 0;
 
-    // Ensure the C library re-reads /etc/localtime or $TZ for DST changes
+    // Re-detect the timezone name from the system to pick up runtime changes.
+    // This reads /etc/localtime (symlink) which is the authoritative source.
+    const char *detected = detect_system_timezone_name(tz_buf, sizeof(tz_buf));
+    const char *timezone = detected ? detected : configured_timezone;
+
+    // We must set TZ to the IANA timezone name so that glibc loads the correct
+    // timezone data.  Simply calling tzset() is not enough: when TZ=":/etc/localtime"
+    // glibc caches the file and won't notice that the symlink target changed.
+    // Setting TZ to the actual IANA name (e.g. "Europe/Amsterdam") forces a reload.
+    //
+    // Note: setenv/unsetenv are not thread-safe, but tzset() already modifies global
+    // state, and this function is called from a single thread (pulse daemon).
+    const char *old_tz = getenv("TZ");
+    char *saved_tz = old_tz ? strdupz(old_tz) : NULL;
+
+    setenv("TZ", timezone, 1);
     tzset();
 
     t = now_realtime_sec();
@@ -927,6 +947,16 @@ void refresh_system_timezone(const char *timezone) {
                 new_offset = -new_offset;
         }
     }
+
+    // Restore the original TZ so that the rest of the process keeps using
+    // ":/etc/localtime" (avoids flooding stat() calls on every strftime).
+    if (saved_tz) {
+        setenv("TZ", saved_tz, 1);
+        freez(saved_tz);
+    } else {
+        unsetenv("TZ");
+    }
+    tzset();
 
     // Atomically update the system timezone triplet
     system_tz_set(timezone, new_abbrev, new_offset);
