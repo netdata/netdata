@@ -22,6 +22,9 @@ SOURCE_DIR="$(dirname "$(dirname "${SCRIPT_SOURCE}")")"
 
 CMAKE_ARGS="-S ${SOURCE_DIR} -B ${BUILD_DIR}"
 
+export CC=clang
+export CXX=clang++
+
 add_cmake_option() {
     CMAKE_ARGS="${CMAKE_ARGS} -D${1}=${2}"
 }
