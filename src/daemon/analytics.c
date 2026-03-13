@@ -871,7 +871,7 @@ void get_system_timezone(void)
     // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
     const char *tz = getenv("TZ");
     if (!tz || !*tz)
-        setenv("TZ", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), 0);
+        setenv("TZ", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), 1);
 
     // use the TZ variable if it's an explicit IANA name (not a path starting with ':')
     if (tz && *tz && *tz != ':') {
@@ -888,7 +888,8 @@ void get_system_timezone(void)
     }
 
     // Last resort: use strftime %Z (gives abbreviation, not IANA name).
-    // Mark it so refresh_system_timezone() won't feed it into setenv("TZ").
+    // Leave timezone_is_tzdb_name false so refresh_system_timezone() won't
+    // try to resolve it via tzalloc() or the tzfile parser.
     if (!timezone) {
         time_t t;
         struct tm *tmp, tmbuf;
@@ -1024,6 +1025,30 @@ static bool tzif_skip_bytes(FILE *fp, size_t bytes) {
     return true;
 }
 
+// RFC 8536 sane upper bounds — real tzfiles are far smaller,
+// but we allow headroom for unusual / future data.
+#define TZIF_MAX_TIMECNT    2048
+#define TZIF_MAX_TYPECNT     256
+#define TZIF_MAX_CHARCNT    2048
+#define TZIF_MAX_LEAPCNT      50
+#define TZIF_MAX_ISSTDCNT    256
+#define TZIF_MAX_ISGMTCNT   256
+
+static bool tzif_validate_header_counts(uint32_t timecnt, uint32_t typecnt, uint32_t charcnt,
+                                        uint32_t leapcnt, uint32_t ttisstdcnt, uint32_t ttisgmtcnt) {
+    if (timecnt > TZIF_MAX_TIMECNT || typecnt > TZIF_MAX_TYPECNT ||
+        charcnt > TZIF_MAX_CHARCNT || leapcnt > TZIF_MAX_LEAPCNT ||
+        ttisstdcnt > TZIF_MAX_ISSTDCNT || ttisgmtcnt > TZIF_MAX_ISGMTCNT)
+        return false;
+
+    // ttisstdcnt and ttisgmtcnt must be 0 or equal to typecnt per RFC 8536
+    if ((ttisstdcnt != 0 && ttisstdcnt != typecnt) ||
+        (ttisgmtcnt != 0 && ttisgmtcnt != typecnt))
+        return false;
+
+    return true;
+}
+
 static bool tzif_skip_block(FILE *fp, const struct tzif_header *hdr, size_t time_size) {
     uint32_t ttisgmtcnt = tzif_read_be32(hdr->ttisgmtcnt);
     uint32_t ttisstdcnt = tzif_read_be32(hdr->ttisstdcnt);
@@ -1031,6 +1056,9 @@ static bool tzif_skip_block(FILE *fp, const struct tzif_header *hdr, size_t time
     uint32_t timecnt = tzif_read_be32(hdr->timecnt);
     uint32_t typecnt = tzif_read_be32(hdr->typecnt);
     uint32_t charcnt = tzif_read_be32(hdr->charcnt);
+
+    if (!tzif_validate_header_counts(timecnt, typecnt, charcnt, leapcnt, ttisstdcnt, ttisgmtcnt))
+        return false;
 
     size_t bytes = (size_t)timecnt * time_size +
                    (size_t)timecnt +
@@ -1093,9 +1121,15 @@ static bool timezone_info_from_tzfile(const char *timezone, time_t t, char *abbr
     uint32_t timecnt = tzif_read_be32(hdr.timecnt);
     uint32_t typecnt = tzif_read_be32(hdr.typecnt);
     uint32_t charcnt = tzif_read_be32(hdr.charcnt);
+    uint32_t leapcnt = tzif_read_be32(hdr.leapcnt);
+    uint32_t ttisstdcnt = tzif_read_be32(hdr.ttisstdcnt);
+    uint32_t ttisgmtcnt = tzif_read_be32(hdr.ttisgmtcnt);
     size_t time_size = (hdr.version >= '2') ? 8 : 4;
 
     if (!typecnt || !charcnt)
+        goto cleanup;
+
+    if (!tzif_validate_header_counts(timecnt, typecnt, charcnt, leapcnt, ttisstdcnt, ttisgmtcnt))
         goto cleanup;
 
     int64_t *transition_times = callocz(timecnt ? timecnt : 1, sizeof(*transition_times));
@@ -1114,6 +1148,12 @@ static bool timezone_info_from_tzfile(const char *timezone, time_t t, char *abbr
 
     if (timecnt && fread(transition_types, 1, timecnt, fp) != timecnt)
         goto free_and_cleanup;
+
+    // validate all transition type indices before using them
+    for (uint32_t i = 0; i < timecnt; i++) {
+        if (transition_types[i] >= typecnt)
+            goto free_and_cleanup;
+    }
 
     for (uint32_t i = 0; i < typecnt; i++) {
         if (fread(typebuf, 1, sizeof(typebuf), fp) != sizeof(typebuf))
