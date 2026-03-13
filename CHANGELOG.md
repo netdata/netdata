@@ -132,6 +132,7 @@
 - Docs: Update kickstart URL to canonical get.netdata.cloud ([#21938](https://github.com/netdata/netdata/issues/21938))
 - Fix handling of control files for DEB packages. ([#21940](https://github.com/netdata/netdata/issues/21940))
 - Remove `.inf` extension from file filter in build workflow ([#21941](https://github.com/netdata/netdata/issues/21941))
+- Build(deps): bump golang.org/x/net from 0.51.0 to 0.52.0 in /src/go ([#21945](https://github.com/netdata/netdata/issues/21945))
 
 ## [2.9.0] - 2026-02-16
 
