@@ -730,9 +730,6 @@ void ebpf_read_dcstat_thread(void *ptr)
             break;
         }
 
-        if (ebpf_plugin_stop())
-            break;
-
         ebpf_read_dc_apps_table(maps_per_core);
         ebpf_dc_resume_apps_data();
         if (cgroups && shm_ebpf_cgroup.header)
@@ -742,6 +739,10 @@ void ebpf_read_dcstat_thread(void *ptr)
             netdata_log_error("DCSTAT: Failed to post semaphore.");
 
         counter = 0;
+
+        if (ebpf_plugin_stop()) {
+            break;
+        }
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time)
