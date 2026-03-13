@@ -87,7 +87,7 @@ static void softirq_cleanup(void *pptr)
         return;
     }
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
 
         ebpf_obsolete_softirq_global(em);
@@ -210,7 +210,10 @@ static void softirq_collector(ebpf_module_t *em)
     uint32_t lifetime = em->lifetime;
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         counter = 0;
@@ -223,6 +226,9 @@ static void softirq_collector(ebpf_module_t *em)
         ebpf_write_end_chart();
 
         netdata_mutex_unlock(&lock);
+
+        if (ebpf_plugin_stop())
+            break;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         running_time += update_every;

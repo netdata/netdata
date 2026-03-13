@@ -464,7 +464,7 @@ static void ebpf_shm_exit(void *pptr)
     if (ebpf_read_shm.thread)
         nd_thread_signal_cancel(ebpf_read_shm.thread);
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
             ebpf_obsolete_shm_cgroup_charts(em);
@@ -481,17 +481,19 @@ static void ebpf_shm_exit(void *pptr)
         netdata_mutex_unlock(&lock);
     }
 
+    if (!ebpf_plugin_stop()) {
 #ifdef LIBBPF_MAJOR_VERSION
-    if (shm_bpf_obj) {
-        shm_bpf__destroy(shm_bpf_obj);
-        shm_bpf_obj = NULL;
-    }
+        if (shm_bpf_obj) {
+            shm_bpf__destroy(shm_bpf_obj);
+            shm_bpf_obj = NULL;
+        }
 #endif
 
-    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
-        ebpf_unload_legacy_code(em->objects, em->probe_links);
-        em->objects = NULL;
-        em->probe_links = NULL;
+        if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
+            ebpf_unload_legacy_code(em->objects, em->probe_links);
+            em->objects = NULL;
+            em->probe_links = NULL;
+        }
     }
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
@@ -1106,7 +1108,10 @@ void ebpf_read_shm_thread(void *ptr)
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb);
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         if (!ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
@@ -1123,6 +1128,9 @@ void ebpf_read_shm_thread(void *ptr)
             netdata_log_error("SHM: Failed to post semaphore.");
 
         counter = 0;
+
+        if (ebpf_plugin_stop())
+            break;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         running_time += update_every;
@@ -1149,7 +1157,10 @@ static void shm_collector(ebpf_module_t *em)
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
 
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         counter = 0;

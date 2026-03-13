@@ -241,17 +241,19 @@ static void hardirq_cleanup(void *pptr)
         return;
     }
 
-    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
-        ebpf_unload_legacy_code(em->objects, em->probe_links);
-        em->objects = NULL;
-        em->probe_links = NULL;
-    }
+    if (!ebpf_plugin_stop()) {
+        if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
+            ebpf_unload_legacy_code(em->objects, em->probe_links);
+            em->objects = NULL;
+            em->probe_links = NULL;
+        }
 #ifdef LIBBPF_MAJOR_VERSION
-    else if (hardirq_bpf_obj) {
-        //hardirq_bpf__destroy(hardirq_bpf_obj);
-        hardirq_bpf_obj = NULL;
-    }
+        else if (hardirq_bpf_obj) {
+            //hardirq_bpf__destroy(hardirq_bpf_obj);
+            hardirq_bpf_obj = NULL;
+        }
 #endif
+    }
 
     /*
     if (unlikely(ebpf_hardirq_JudyL)) {

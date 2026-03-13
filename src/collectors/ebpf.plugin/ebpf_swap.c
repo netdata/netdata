@@ -427,7 +427,7 @@ static void ebpf_swap_exit(void *pptr)
     if (ebpf_read_swap.thread)
         nd_thread_signal_cancel(ebpf_read_swap.thread);
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
             ebpf_obsolete_swap_cgroup_charts(em);
@@ -451,25 +451,27 @@ static void ebpf_swap_exit(void *pptr)
         return;
     }
 
-    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
-        if ((uintptr_t)em->objects < 4096) {
-            netdata_log_error(
-                "Invalid em->objects pointer (0x%lx) detected during swap cleanup, skipping bpf_object__close",
-                (unsigned long)em->objects);
-            freez(em->probe_links);
-        } else {
-            if (em->objects && em->probe_links)
-                ebpf_unload_legacy_code(em->objects, em->probe_links);
+    if (!ebpf_plugin_stop()) {
+        if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
+            if ((uintptr_t)em->objects < 4096) {
+                netdata_log_error(
+                    "Invalid em->objects pointer (0x%lx) detected during swap cleanup, skipping bpf_object__close",
+                    (unsigned long)em->objects);
+                freez(em->probe_links);
+            } else {
+                if (em->objects && em->probe_links)
+                    ebpf_unload_legacy_code(em->objects, em->probe_links);
+            }
+            em->objects = NULL;
+            em->probe_links = NULL;
         }
-        em->objects = NULL;
-        em->probe_links = NULL;
-    }
 #ifdef LIBBPF_MAJOR_VERSION
-    else if (swap_bpf_obj) {
-        swap_bpf__destroy(swap_bpf_obj);
-        swap_bpf_obj = NULL;
-    }
+        else if (swap_bpf_obj) {
+            swap_bpf__destroy(swap_bpf_obj);
+            swap_bpf_obj = NULL;
+        }
 #endif
+    }
 
     freez(swap_vector);
     swap_vector = NULL;
@@ -653,7 +655,10 @@ void ebpf_read_swap_thread(void *ptr)
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         if (!ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
@@ -1015,7 +1020,10 @@ static void swap_collector(ebpf_module_t *em)
     heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb);
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         counter = 0;
@@ -1033,6 +1041,9 @@ static void swap_collector(ebpf_module_t *em)
             ebpf_swap_send_cgroup_data(update_every);
 
         netdata_mutex_unlock(&lock);
+
+        if (ebpf_plugin_stop())
+            break;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         running_time += update_every;

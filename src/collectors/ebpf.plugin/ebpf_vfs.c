@@ -894,7 +894,7 @@ static void ebpf_vfs_exit(void *pptr)
     if (ebpf_read_vfs.thread)
         nd_thread_signal_cancel(ebpf_read_vfs.thread);
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
             ebpf_obsolete_vfs_cgroup_charts(em);
@@ -911,16 +911,18 @@ static void ebpf_vfs_exit(void *pptr)
         netdata_mutex_unlock(&lock);
     }
 
+    if (!ebpf_plugin_stop()) {
 #ifdef LIBBPF_MAJOR_VERSION
-    if (vfs_bpf_obj) {
-        vfs_bpf__destroy(vfs_bpf_obj);
-        vfs_bpf_obj = NULL;
-    }
+        if (vfs_bpf_obj) {
+            vfs_bpf__destroy(vfs_bpf_obj);
+            vfs_bpf_obj = NULL;
+        }
 #endif
-    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
-        ebpf_unload_legacy_code(em->objects, em->probe_links);
-        em->objects = NULL;
-        em->probe_links = NULL;
+        if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
+            ebpf_unload_legacy_code(em->objects, em->probe_links);
+            em->objects = NULL;
+            em->probe_links = NULL;
+        }
     }
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
@@ -1150,6 +1152,9 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     struct ebpf_target *w;
     netdata_mutex_lock(&collect_data_mutex);
     for (w = root; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_VFS_IDX))))
             continue;
 
@@ -1232,6 +1237,9 @@ static void vfs_apps_accumulator(netdata_ebpf_vfs_t *out, int maps_per_core)
     uint64_t ct = total->ct;
 
     for (i = 1; i < end; i++) {
+        if (ebpf_plugin_stop())
+            break;
+
         netdata_ebpf_vfs_t *w = &out[i];
 
         total->write_bytes += w->write_bytes;
@@ -1280,6 +1288,9 @@ static void ebpf_vfs_read_apps(int maps_per_core)
 
     uint32_t key = 0, next_key = 0;
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (bpf_map_lookup_elem(fd, &key, vv) != 0) {
             goto end_vfs_loop;
         }
@@ -1319,6 +1330,9 @@ static void read_update_vfs_cgroup()
     ebpf_cgroup_target_t *ect;
     netdata_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
@@ -2097,6 +2111,9 @@ static void ebpf_create_systemd_vfs_charts(ebpf_module_t *em)
 
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!w->systemd || w->flags & NETDATA_EBPF_SERVICES_HAS_VFS_CHART))
             continue;
 
@@ -2141,6 +2158,9 @@ static void ebpf_send_systemd_vfs_charts(ebpf_module_t *em)
 {
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(ect->flags & NETDATA_EBPF_SERVICES_HAS_VFS_CHART))) {
             continue;
         }
@@ -2222,6 +2242,9 @@ static void ebpf_vfs_send_cgroup_data(ebpf_module_t *em)
         ebpf_vfs_sum_cgroup_pids(&ect->publish_systemd_vfs, ect->pids);
     }
 
+    if (ebpf_plugin_stop())
+        return;
+
     if (shm_ebpf_cgroup.header->systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_vfs_charts(em);
@@ -2230,6 +2253,9 @@ static void ebpf_vfs_send_cgroup_data(ebpf_module_t *em)
     }
 
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (ect->systemd)
             continue;
 
@@ -2259,6 +2285,9 @@ void ebpf_vfs_resume_apps_data()
     struct ebpf_target *w;
     netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_VFS_IDX))))
             continue;
 
@@ -2296,7 +2325,10 @@ void ebpf_read_vfs_thread(void *ptr)
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         if (!ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
@@ -2313,6 +2345,9 @@ void ebpf_read_vfs_thread(void *ptr)
             netdata_log_error("VFS: Failed to post semaphore.");
 
         counter = 0;
+
+        if (ebpf_plugin_stop())
+            break;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         running_time += update_every;
@@ -2341,7 +2376,10 @@ static void vfs_collector(ebpf_module_t *em)
     heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         counter = 0;
@@ -2360,6 +2398,9 @@ static void vfs_collector(ebpf_module_t *em)
             ebpf_vfs_send_cgroup_data(em);
 
         netdata_mutex_unlock(&lock);
+
+        if (ebpf_plugin_stop())
+            break;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         running_time += update_every;

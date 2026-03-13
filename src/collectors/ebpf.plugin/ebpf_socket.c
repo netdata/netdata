@@ -928,7 +928,7 @@ static void ebpf_socket_exit(void *pptr)
     if (ebpf_read_socket.thread)
         nd_thread_signal_cancel(ebpf_read_socket.thread);
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
 
         if (em->cgroup_charts) {
@@ -1992,7 +1992,10 @@ void ebpf_read_socket_thread(void *ptr)
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         if (!ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
@@ -2794,7 +2797,10 @@ static void socket_collector(ebpf_module_t *em)
     heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         counter = 0;
@@ -2817,6 +2823,9 @@ static void socket_collector(ebpf_module_t *em)
         fflush(stdout);
 
         netdata_mutex_unlock(&lock);
+
+        if (ebpf_plugin_stop())
+            break;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         running_time += update_every;
