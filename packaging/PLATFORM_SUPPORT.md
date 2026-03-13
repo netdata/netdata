@@ -54,6 +54,7 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 | Debian                   | 13.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
 | Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
 | Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
+| Fedora                   | 44             | x86\_64, AArch64              |                                                                                                                |
 | Fedora                   | 43             | x86\_64, AArch64              |                                                                                                                |
 | Fedora                   | 42             | x86\_64, AArch64              |                                                                                                                |
 | openSUSE                 | Tumbleweed     | x86\_64, AArch64              |                                                                                                                |
