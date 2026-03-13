@@ -2324,7 +2324,7 @@ void ebpf_read_vfs_thread(void *ptr)
     uint32_t running_time = 0;
     pids_fd[NETDATA_EBPF_PIDS_VFS_IDX] = vfs_maps[NETDATA_VFS_PID].map_fd;
     heartbeat_t hb;
-    heartbeat_init(&hb, update_every * USEC_PER_SEC);
+    heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
         if (ebpf_plugin_stop())

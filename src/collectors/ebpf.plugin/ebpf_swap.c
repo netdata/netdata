@@ -661,7 +661,7 @@ void ebpf_read_swap_thread(void *ptr)
     pids_fd[NETDATA_EBPF_PIDS_SWAP_IDX] = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
 
     heartbeat_t hb;
-    heartbeat_init(&hb, update_every * USEC_PER_SEC);
+    heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
         if (ebpf_plugin_stop())

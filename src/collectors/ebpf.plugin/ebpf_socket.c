@@ -2007,7 +2007,7 @@ void ebpf_read_socket_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     int cgroups = em->cgroup_charts;
     heartbeat_t hb;
-    heartbeat_init(&hb, update_every * USEC_PER_SEC);
+    heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
         heartbeat_next(&hb);
         if (ebpf_plugin_stop())
