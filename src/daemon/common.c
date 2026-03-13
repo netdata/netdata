@@ -21,8 +21,8 @@ bool netdata_ready = false;
 
 static struct {
     SPINLOCK spinlock;
-    const char *timezone;
-    const char *abbrev_timezone;
+    char *timezone;
+    char *abbrev_timezone;
     int32_t utc_offset;
 } system_tz = {
     .spinlock = SPINLOCK_INITIALIZER,
@@ -33,21 +33,21 @@ static struct {
 
 void system_tz_set(const char *timezone, const char *abbrev_timezone, int32_t utc_offset) {
     // Own copies of both strings
-    const char *new_tz = strdupz(timezone ? timezone : "unknown");
-    const char *new_abbrev = strdupz(abbrev_timezone ? abbrev_timezone : "UTC");
+    char *new_tz = strdupz(timezone ? timezone : "unknown");
+    char *new_abbrev = strdupz(abbrev_timezone ? abbrev_timezone : "UTC");
 
     spinlock_lock(&system_tz.spinlock);
     // All readers use system_tz_get() which holds this same spinlock and copies,
     // so no reader can be using these pointers after we release the lock.
-    const char *old_tz = system_tz.timezone;
-    const char *old_abbrev = system_tz.abbrev_timezone;
+    char *old_tz = system_tz.timezone;
+    char *old_abbrev = system_tz.abbrev_timezone;
     system_tz.timezone = new_tz;
     system_tz.abbrev_timezone = new_abbrev;
     system_tz.utc_offset = utc_offset;
     spinlock_unlock(&system_tz.spinlock);
 
-    freez((void *)old_tz);
-    freez((void *)old_abbrev);
+    freez(old_tz);
+    freez(old_abbrev);
 }
 
 SYSTEM_TZ system_tz_get(void) {
@@ -61,8 +61,8 @@ SYSTEM_TZ system_tz_get(void) {
 }
 
 void system_tz_free(SYSTEM_TZ *tz) {
-    freez((void *)tz->timezone);
-    freez((void *)tz->abbrev_timezone);
+    freez(tz->timezone);
+    freez(tz->abbrev_timezone);
     tz->timezone = NULL;
     tz->abbrev_timezone = NULL;
     tz->utc_offset = 0;

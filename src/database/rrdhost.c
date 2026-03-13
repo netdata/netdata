@@ -202,8 +202,8 @@ RRDHOST_TZ rrdhost_tz_get(RRDHOST *host) {
 }
 
 void rrdhost_tz_free(RRDHOST_TZ *tz) {
-    freez((void *)tz->timezone);
-    freez((void *)tz->abbrev_timezone);
+    freez(tz->timezone);
+    freez(tz->abbrev_timezone);
     tz->timezone = NULL;
     tz->abbrev_timezone = NULL;
     tz->utc_offset = 0;

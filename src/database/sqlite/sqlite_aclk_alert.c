@@ -411,7 +411,7 @@ void health_alarm_log_populate(
         RRDHOST_TZ host_tz = rrdhost_tz_get(host);
         alarm_log->utc_offset = host_tz.utc_offset;
         // Transfer ownership of the strdup'd copy instead of duplicating again
-        alarm_log->timezone = (char *)host_tz.abbrev_timezone;
+        alarm_log->timezone = host_tz.abbrev_timezone;
         host_tz.abbrev_timezone = NULL;
         rrdhost_tz_free(&host_tz);
     }

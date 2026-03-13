@@ -472,9 +472,9 @@ bool rrdhost_update_timezone(RRDHOST *host, const char *timezone, const char *ab
 // Thread-safe timezone snapshot from an RRDHOST.
 // The returned struct owns strdup'd copies; release with rrdhost_tz_free().
 typedef struct {
-    const char *timezone;        // IANA timezone name
-    const char *abbrev_timezone; // abbreviated timezone
-    int32_t utc_offset;          // offset from UTC in seconds
+    char *timezone;        // IANA timezone name (owned, strdup'd)
+    char *abbrev_timezone; // abbreviated timezone (owned, strdup'd)
+    int32_t utc_offset;    // offset from UTC in seconds
 } RRDHOST_TZ;
 
 RRDHOST_TZ rrdhost_tz_get(RRDHOST *host);

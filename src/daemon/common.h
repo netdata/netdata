@@ -89,9 +89,9 @@ extern bool netdata_anonymous_statistics_enabled;
 // that must be released with system_tz_free().
 // Use system_tz_set() to write (called by timezone detection and periodic refresh).
 typedef struct {
-    const char *timezone;        // IANA timezone name, e.g. "America/New_York"
-    const char *abbrev_timezone; // abbreviated timezone, e.g. "EDT"
-    int32_t utc_offset;          // offset from UTC in seconds
+    char *timezone;        // IANA timezone name, e.g. "America/New_York" (owned, strdup'd)
+    char *abbrev_timezone; // abbreviated timezone, e.g. "EDT" (owned, strdup'd)
+    int32_t utc_offset;    // offset from UTC in seconds
 } SYSTEM_TZ;
 
 SYSTEM_TZ system_tz_get(void);
