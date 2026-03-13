@@ -1117,15 +1117,15 @@ static int store_host_metadata(RRDHOST *host)
     if (unlikely(store_rc != SQLITE_DONE))
         error_report("Failed to store host %s, rc = %d", rrdhost_hostname(host), store_rc);
 
-    rrdhost_tz_free(&host_tz);
     SQLITE_FINALIZE(res);
+    rrdhost_tz_free(&host_tz);
 
     return store_rc != SQLITE_DONE;
 
 bind_fail:
-    rrdhost_tz_free(&host_tz);
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+    rrdhost_tz_free(&host_tz);
     return 1;
 }
 

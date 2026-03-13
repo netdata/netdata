@@ -829,18 +829,16 @@ const char *detect_system_timezone_name(char *buffer, size_t buffer_size) {
 #endif
 
     if (timezone && *timezone) {
-        // sanitize: keep only alnum, '_', '/'
-        size_t len = strlen(timezone);
-        char tmp[len + 1];
-        char *d = tmp;
+        // sanitize in-place: keep only alnum, '_', '/', '-', '+'
+        char *d = buffer;
         const char *src = timezone;
-        while (*src) {
+        const char *end = buffer + buffer_size - 1;
+        while (*src && d < end) {
             if (isalnum((uint8_t)*src) || *src == '_' || *src == '/' || *src == '-' || *src == '+')
                 *d++ = *src;
             src++;
         }
         *d = '\0';
-        strncpyz(buffer, tmp, buffer_size - 1);
         timezone = buffer;
     }
 
@@ -959,8 +957,13 @@ void refresh_system_timezone(const char *timezone, bool is_tzdb_name) {
     // would interpret it as a POSIX TZ spec with offset 0.  In that case we
     // just call tzset() to use the process's existing timezone state.
     //
-    // Note: setenv/unsetenv are not thread-safe, but tzset() already modifies
-    // global state, and this function is called from a single thread (pulse daemon).
+    // Thread-safety of setenv("TZ"): on glibc, setenv that overwrites an
+    // existing key replaces the value pointer in-place without reallocating
+    // the environ array, so concurrent getenv() in other threads is safe.
+    // TZ is guaranteed to exist before this function runs (set at startup
+    // in get_system_timezone()), so both the set and restore are overwrites.
+    // No other thread reads TZ at runtime (startup-only and pulse-thread-only).
+    // tzalloc/localtime_rz would be ideal but are not available on glibc.
     char *saved_tz = NULL;
     if (is_tzdb_name) {
         const char *old_tz = getenv("TZ");
