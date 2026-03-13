@@ -478,12 +478,12 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: |
           $installerProc = Start-Process "msiexec" "/qn /i `"$PWD\dist-artifacts\netdata-x64.msi`" /l* `"$PWD\msi.log`" NDDRVINST=0" -Wait -NoNewWindow
+          Write-Output "Exit Code: $installerProc.ExitCode"
+          Get-Content "$PWD\msi.log"
           $successCodes = @(0, 3010)
           if ($installerProc.ExitCode -notin $successCodes) {
-              Get-Content "$PWD\msi.log"
               exit 1
           }
-          Get-Content "$PWD\msi.log"
       - name: Check agent buildinfo
         id: agent-check
         if: needs.file-check.outputs.run == 'true'
