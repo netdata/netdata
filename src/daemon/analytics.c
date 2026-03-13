@@ -749,7 +749,7 @@ static void get_win_geoiso(char *geo_name, int length) {
         geo_name[0] = '\0';
 }
 
-static int map_windows_tz_to_ioanna(char *out, char *win_id, char *geo_name) {
+static int map_windows_tz_to_iana(char *out, char *win_id, char *geo_name) {
     if (*win_id == '\0')
         return -1;
 
@@ -803,7 +803,7 @@ const char *detect_system_timezone_name(char *buffer, size_t buffer_size) {
     char win_zone[256];
     get_timezone_win_id(win_zone, 256);
     get_win_geoiso(geo_name, 128);
-    if (!map_windows_tz_to_ioanna(buffer, win_zone, geo_name))
+    if (!map_windows_tz_to_iana(buffer, win_zone, geo_name))
         timezone = buffer;
 #else
     // read the /etc/localtime symlink first — this is the authoritative source
@@ -932,12 +932,245 @@ void get_system_timezone(void)
     refresh_system_timezone(configured_tz, timezone_is_tzdb_name);
 }
 
-void refresh_system_timezone(const char *timezone, bool is_tzdb_name) {
-    time_t t;
-    struct tm *tmp, tmbuf;
-    char abbrev[64];
+static inline uint32_t tzif_read_be32(const unsigned char *src) {
+    return ((uint32_t)src[0] << 24) |
+           ((uint32_t)src[1] << 16) |
+           ((uint32_t)src[2] << 8)  |
+           (uint32_t)src[3];
+}
+
+static inline int64_t tzif_read_be64(const unsigned char *src) {
+    return ((int64_t)(uint64_t)src[0] << 56) |
+           ((int64_t)(uint64_t)src[1] << 48) |
+           ((int64_t)(uint64_t)src[2] << 40) |
+           ((int64_t)(uint64_t)src[3] << 32) |
+           ((int64_t)(uint64_t)src[4] << 24) |
+           ((int64_t)(uint64_t)src[5] << 16) |
+           ((int64_t)(uint64_t)src[6] << 8)  |
+           (int64_t)(uint64_t)src[7];
+}
+
+static bool timezone_name_is_safe_tzdb_path(const char *timezone) {
+    if (!timezone || !*timezone || *timezone == '/')
+        return false;
+
+    for (const char *p = timezone; *p; p++) {
+        if (!(isalnum((uint8_t)*p) || *p == '_' || *p == '/' || *p == '-' || *p == '+'))
+            return false;
+    }
+
+    return true;
+}
+
+static bool timezone_info_from_tm(struct tm *tmp, char *abbrev, size_t abbrev_size, int32_t *offset) {
+    if (!tmp)
+        return false;
+
+    int32_t new_offset = 0;
     char offset_str[16];
 
+    if (strftime(abbrev, abbrev_size, "%Z", tmp) == 0)
+        strncpyz(abbrev, "UTC", abbrev_size - 1);
+
+    if (strftime(offset_str, sizeof(offset_str), "%z", tmp) != 0) {
+        char sign = offset_str[0] == '-' || offset_str[0] == '+' ? offset_str[0] : '+';
+        int hours = (isdigit((uint8_t)offset_str[1]) ? (offset_str[1] - '0') : 0) * 10 +
+                    (isdigit((uint8_t)offset_str[2]) ? (offset_str[2] - '0') : 0);
+        int minutes = (isdigit((uint8_t)offset_str[3]) ? (offset_str[3] - '0') : 0) * 10 +
+                      (isdigit((uint8_t)offset_str[4]) ? (offset_str[4] - '0') : 0);
+
+        new_offset = (hours * 3600) + (minutes * 60);
+        if (sign == '-')
+            new_offset = -new_offset;
+    }
+
+    *offset = new_offset;
+    return true;
+}
+
+static bool current_process_timezone_info(time_t t, char *abbrev, size_t abbrev_size, int32_t *offset) {
+    struct tm *tmp, tmbuf;
+    tmp = localtime_r(&t, &tmbuf);
+    return timezone_info_from_tm(tmp, abbrev, abbrev_size, offset);
+}
+
+#ifndef OS_WINDOWS
+struct tzif_header {
+    char magic[4];
+    char version;
+    char reserved[15];
+    unsigned char ttisgmtcnt[4];
+    unsigned char ttisstdcnt[4];
+    unsigned char leapcnt[4];
+    unsigned char timecnt[4];
+    unsigned char typecnt[4];
+    unsigned char charcnt[4];
+};
+
+struct tzif_type {
+    int32_t gmtoff;
+    uint8_t isdst;
+    uint8_t abbrind;
+};
+
+static bool tzif_skip_bytes(FILE *fp, size_t bytes) {
+    char buffer[256];
+    while (bytes) {
+        size_t chunk = bytes > sizeof(buffer) ? sizeof(buffer) : bytes;
+        if (fread(buffer, 1, chunk, fp) != chunk)
+            return false;
+        bytes -= chunk;
+    }
+    return true;
+}
+
+static bool tzif_skip_block(FILE *fp, const struct tzif_header *hdr, size_t time_size) {
+    uint32_t ttisgmtcnt = tzif_read_be32(hdr->ttisgmtcnt);
+    uint32_t ttisstdcnt = tzif_read_be32(hdr->ttisstdcnt);
+    uint32_t leapcnt = tzif_read_be32(hdr->leapcnt);
+    uint32_t timecnt = tzif_read_be32(hdr->timecnt);
+    uint32_t typecnt = tzif_read_be32(hdr->typecnt);
+    uint32_t charcnt = tzif_read_be32(hdr->charcnt);
+
+    size_t bytes = (size_t)timecnt * time_size +
+                   (size_t)timecnt +
+                   (size_t)typecnt * 6 +
+                   (size_t)charcnt +
+                   (size_t)leapcnt * (time_size + 4) +
+                   (size_t)ttisstdcnt +
+                   (size_t)ttisgmtcnt;
+
+    return tzif_skip_bytes(fp, bytes);
+}
+
+static int tzif_default_type_index(const struct tzif_type *types, uint32_t typecnt) {
+    if (!types || !typecnt)
+        return -1;
+
+    for (uint32_t i = 0; i < typecnt; i++) {
+        if (!types[i].isdst)
+            return (int)i;
+    }
+
+    return 0;
+}
+
+static bool timezone_info_from_tzfile(const char *timezone, time_t t, char *abbrev, size_t abbrev_size, int32_t *offset) {
+    if (!timezone_name_is_safe_tzdb_path(timezone))
+        return false;
+
+    const char *tzdir = getenv("TZDIR");
+    if (!tzdir || !*tzdir)
+        tzdir = "/usr/share/zoneinfo";
+
+    char path[FILENAME_MAX + 1];
+    snprintfz(path, sizeof(path), "%s/%s", tzdir, timezone);
+
+    FILE *fp = fopen(path, "rb");
+    if (!fp)
+        return false;
+
+    bool ok = false;
+    struct tzif_header hdr;
+
+    if (fread(&hdr, 1, sizeof(hdr), fp) != sizeof(hdr))
+        goto cleanup;
+
+    if (memcmp(hdr.magic, "TZif", 4) != 0)
+        goto cleanup;
+
+    if (hdr.version >= '2') {
+        if (!tzif_skip_block(fp, &hdr, 4))
+            goto cleanup;
+
+        if (fread(&hdr, 1, sizeof(hdr), fp) != sizeof(hdr))
+            goto cleanup;
+
+        if (memcmp(hdr.magic, "TZif", 4) != 0)
+            goto cleanup;
+    }
+
+    uint32_t timecnt = tzif_read_be32(hdr.timecnt);
+    uint32_t typecnt = tzif_read_be32(hdr.typecnt);
+    uint32_t charcnt = tzif_read_be32(hdr.charcnt);
+    size_t time_size = (hdr.version >= '2') ? 8 : 4;
+
+    if (!typecnt || !charcnt)
+        goto cleanup;
+
+    int64_t *transition_times = callocz(timecnt ? timecnt : 1, sizeof(*transition_times));
+    uint8_t *transition_types = callocz(timecnt ? timecnt : 1, sizeof(*transition_types));
+    struct tzif_type *types = callocz(typecnt, sizeof(*types));
+    char *abbrs = callocz(charcnt + 1, sizeof(*abbrs));
+
+    unsigned char timebuf[8];
+    unsigned char typebuf[6];
+
+    for (uint32_t i = 0; i < timecnt; i++) {
+        if (fread(timebuf, 1, time_size, fp) != time_size)
+            goto free_and_cleanup;
+        transition_times[i] = (time_size == 8) ? tzif_read_be64(timebuf) : (int32_t)tzif_read_be32(timebuf);
+    }
+
+    if (timecnt && fread(transition_types, 1, timecnt, fp) != timecnt)
+        goto free_and_cleanup;
+
+    for (uint32_t i = 0; i < typecnt; i++) {
+        if (fread(typebuf, 1, sizeof(typebuf), fp) != sizeof(typebuf))
+            goto free_and_cleanup;
+
+        types[i].gmtoff = (int32_t)tzif_read_be32(typebuf);
+        types[i].isdst = typebuf[4];
+        types[i].abbrind = typebuf[5];
+    }
+
+    if (fread(abbrs, 1, charcnt, fp) != charcnt)
+        goto free_and_cleanup;
+    abbrs[charcnt] = '\0';
+
+    int type_index = -1;
+    if (timecnt == 0) {
+        type_index = tzif_default_type_index(types, typecnt);
+    } else {
+        for (uint32_t i = 0; i < timecnt; i++) {
+            if ((int64_t)t < transition_times[i])
+                break;
+            type_index = transition_types[i];
+        }
+
+        if (type_index < 0)
+            type_index = tzif_default_type_index(types, typecnt);
+    }
+
+    if (type_index < 0 || (uint32_t)type_index >= typecnt)
+        goto free_and_cleanup;
+
+    if (types[type_index].abbrind >= charcnt)
+        goto free_and_cleanup;
+
+    const char *tz_abbrev = &abbrs[types[type_index].abbrind];
+    if (!*tz_abbrev)
+        tz_abbrev = "UTC";
+
+    strncpyz(abbrev, tz_abbrev, abbrev_size - 1);
+    *offset = types[type_index].gmtoff;
+    ok = true;
+
+free_and_cleanup:
+    freez(abbrs);
+    freez(types);
+    freez(transition_types);
+    freez(transition_times);
+
+cleanup:
+    fclose(fp);
+    return ok;
+}
+#endif
+
+void refresh_system_timezone(const char *timezone, bool is_tzdb_name) {
+    time_t t;
+    char abbrev[64];
     const char *new_abbrev = "UTC";
     int32_t new_offset = 0;
 
@@ -947,62 +1180,29 @@ void refresh_system_timezone(const char *timezone, bool is_tzdb_name) {
     if (is_tzdb_name)
         timezone_is_tzdb_name = true;
 
-    // When the timezone is a proper tzdb/IANA name we must set TZ so glibc
-    // loads the correct zone data.  Simply calling tzset() is not enough:
-    // when TZ=":/etc/localtime", glibc caches the file and won't notice
-    // that the symlink target changed.
-    //
-    // When is_tzdb_name is false the value came from strftime("%Z") (a bare
-    // abbreviation like "CEST" or "PST") and must NOT be fed into TZ — glibc
-    // would interpret it as a POSIX TZ spec with offset 0.  In that case we
-    // just call tzset() to use the process's existing timezone state.
-    //
-    // Thread-safety of setenv("TZ"): on glibc, setenv that overwrites an
-    // existing key replaces the value pointer in-place without reallocating
-    // the environ array, so concurrent getenv() in other threads is safe.
-    // TZ is guaranteed to exist before this function runs (set at startup
-    // in get_system_timezone()), so both the set and restore are overwrites.
-    // No other thread reads TZ at runtime (startup-only and pulse-thread-only).
-    // tzalloc/localtime_rz would be ideal but are not available on glibc.
-    char *saved_tz = NULL;
-    if (is_tzdb_name) {
-        const char *old_tz = getenv("TZ");
-        saved_tz = old_tz ? strdupz(old_tz) : NULL;
-        setenv("TZ", timezone, 1);
-    }
-    tzset();
-
     t = now_realtime_sec();
-    tmp = localtime_r(&t, &tmbuf);
+    bool ok = false;
 
-    if (tmp != NULL) {
-        if (strftime(abbrev, sizeof(abbrev), "%Z", tmp) != 0)
-            new_abbrev = abbrev;
-
-        if (strftime(offset_str, sizeof(offset_str), "%z", tmp) != 0) {
-            char sign = offset_str[0] == '-' || offset_str[0] == '+' ? offset_str[0] : '+';
-            int hours = (isdigit((uint8_t)offset_str[1]) ? (offset_str[1] - '0') : 0) * 10 +
-                        (isdigit((uint8_t)offset_str[2]) ? (offset_str[2] - '0') : 0);
-            int minutes = (isdigit((uint8_t)offset_str[3]) ? (offset_str[3] - '0') : 0) * 10 +
-                          (isdigit((uint8_t)offset_str[4]) ? (offset_str[4] - '0') : 0);
-
-            new_offset = (hours * 3600) + (minutes * 60);
-            if (sign == '-')
-                new_offset = -new_offset;
-        }
-    }
-
-    // Restore the original TZ so that the rest of the process keeps using
-    // ":/etc/localtime" (avoids flooding stat() calls on every strftime).
+#if defined(HAVE_TZALLOC) && defined(HAVE_LOCALTIME_RZ) && defined(HAVE_TZFREE)
     if (is_tzdb_name) {
-        if (saved_tz) {
-            setenv("TZ", saved_tz, 1);
-            freez(saved_tz);
-        } else {
-            unsetenv("TZ");
+        timezone_t tz = tzalloc(timezone);
+        if (tz) {
+            struct tm *tmp, tmbuf;
+            tmp = localtime_rz(tz, &t, &tmbuf);
+            ok = timezone_info_from_tm(tmp, abbrev, sizeof(abbrev), &new_offset);
+            tzfree(tz);
         }
-        tzset();
     }
+#elif !defined(OS_WINDOWS)
+    if (is_tzdb_name)
+        ok = timezone_info_from_tzfile(timezone, t, abbrev, sizeof(abbrev), &new_offset);
+#endif
+
+    if (!ok)
+        ok = current_process_timezone_info(t, abbrev, sizeof(abbrev), &new_offset);
+
+    if (ok && *abbrev)
+        new_abbrev = abbrev;
 
     // Atomically update the system timezone triplet
     system_tz_set(timezone, new_abbrev, new_offset);
