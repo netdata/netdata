@@ -870,8 +870,8 @@ void get_system_timezone(void)
     // avoid flood calls to stat(/etc/localtime)
     // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
     const char *tz = getenv("TZ");
-    if (!tz || !*tz)
-        setenv("TZ", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), 1);
+    if (!tz)
+        setenv("TZ", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), 0);
 
     // use the TZ variable if it's an explicit IANA name (not a path starting with ':')
     if (tz && *tz && *tz != ':') {
