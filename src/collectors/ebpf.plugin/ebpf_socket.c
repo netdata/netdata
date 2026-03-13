@@ -2768,8 +2768,10 @@ static void ebpf_socket_send_cgroup_data(int update_every)
         ebpf_socket_sum_cgroup_pids(&ect->publish_socket, ect->pids);
     }
 
-    if (ebpf_plugin_stop())
+    if (ebpf_plugin_stop()) {
+        netdata_mutex_unlock(&mutex_cgroup_shm);
         return;
+    }
 
     if (shm_ebpf_cgroup.header->systemd_enabled) {
         if (send_cgroup_chart) {
