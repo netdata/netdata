@@ -728,6 +728,9 @@ static void fd_apps_accumulator(netdata_fd_stat_t *out, int maps_per_core)
     netdata_fd_stat_t *total = &out[0];
     uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
+        if (ebpf_plugin_stop())
+            break;
+
         netdata_fd_stat_t *w = &out[i];
         total->open_call += w->open_call;
         total->close_call += w->close_call;
@@ -824,6 +827,9 @@ void ebpf_fd_resume_apps_data(void)
 
     netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_FD_IDX))))
             continue;
 
@@ -845,6 +851,9 @@ static void ebpf_update_fd_cgroup(void)
 
     netdata_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
@@ -938,6 +947,9 @@ void ebpf_fd_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     struct ebpf_target *w;
     netdata_mutex_lock(&collect_data_mutex);
     for (w = root; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_FD_IDX))))
             continue;
 
@@ -1243,6 +1255,9 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
     ebpf_cgroup_target_t *w;
     netdata_run_mode_t mode = em->mode;
     for (w = ebpf_cgroup_pids; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!w->systemd || w->flags & NETDATA_EBPF_SERVICES_HAS_FD_CHART))
             continue;
 
@@ -1269,6 +1284,9 @@ static void ebpf_send_systemd_fd_charts(ebpf_module_t *em)
 {
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(ect->flags & NETDATA_EBPF_SERVICES_HAS_FD_CHART))) {
             continue;
         }
@@ -1308,6 +1326,9 @@ static void ebpf_fd_send_cgroup_data(ebpf_module_t *em)
         ebpf_fd_sum_cgroup_pids(&ect->publish_systemd_fd, ect->pids);
     }
 
+    if (ebpf_plugin_stop())
+        return;
+
     if (shm_ebpf_cgroup.header->systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_fd_charts(em);
@@ -1317,6 +1338,9 @@ static void ebpf_fd_send_cgroup_data(ebpf_module_t *em)
     }
 
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (ect->systemd)
             continue;
 
@@ -1411,6 +1435,9 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
     struct ebpf_target *w;
     int update_every = em->update_every;
     for (w = root; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!w->exposed))
             continue;
 

@@ -223,6 +223,9 @@ static void mdflush_read_count_map(int maps_per_core)
     int end = maps_per_core ? ebpf_nprocs : 1;
 
     while (bpf_map_get_next_key(mapfd, &curr_key, &key) == 0) {
+        if (ebpf_plugin_stop())
+            break;
+
         curr_key = key;
 
         int ret = bpf_map_lookup_elem(mapfd, &key, mdflush_ebpf_vals);

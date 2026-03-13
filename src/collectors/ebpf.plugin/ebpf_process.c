@@ -376,6 +376,9 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
     struct ebpf_target *w;
 
     for (w = root; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_PROCESS_IDX))))
             continue;
 
@@ -454,6 +457,9 @@ static void ebpf_update_process_cgroup()
     ebpf_cgroup_target_t *ect;
     netdata_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
@@ -585,6 +591,9 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
     struct ebpf_target *w;
     int update_every = em->update_every;
     for (w = root; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!w->exposed))
             continue;
 
@@ -1337,6 +1346,9 @@ static void ebpf_create_systemd_process_charts(ebpf_module_t *em)
             task_error.update_every = em->update_every;
 
     for (w = ebpf_cgroup_pids; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!w->systemd || w->flags & NETDATA_EBPF_SERVICES_HAS_PROCESS_CHART))
             continue;
 
@@ -1366,6 +1378,9 @@ static void ebpf_send_systemd_process_charts(ebpf_module_t *em)
 {
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(ect->flags & NETDATA_EBPF_SERVICES_HAS_PROCESS_CHART))) {
             continue;
         }
@@ -1407,6 +1422,9 @@ static void ebpf_process_send_cgroup_data(ebpf_module_t *em)
         ebpf_process_sum_cgroup_pids(&ect->publish_systemd_ps, ect->pids);
     }
 
+    if (ebpf_plugin_stop())
+        return;
+
     if (shm_ebpf_cgroup.header->systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_process_charts(em);
@@ -1416,6 +1434,9 @@ static void ebpf_process_send_cgroup_data(ebpf_module_t *em)
     }
 
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (ect->systemd)
             continue;
 
@@ -1465,6 +1486,9 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
     ebpf_process_stat_t *total = &out[0];
     uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
+        if (ebpf_plugin_stop())
+            break;
+
         ebpf_process_stat_t *w = &out[i];
         total->exit_call += w->exit_call;
         total->task_err += w->task_err;
@@ -1525,6 +1549,9 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
     if (tbl_pid_stats_fd != -1) {
         uint32_t key = 0, next_key = 0;
         while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
+            if (ebpf_plugin_stop())
+                break;
+
             if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, process_stat_vector)) {
                 goto end_process_loop;
             }
@@ -1560,6 +1587,9 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
 
     struct ebpf_target *w;
     for (w = apps_groups_root_target; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->processes)))
             continue;
 

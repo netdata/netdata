@@ -364,6 +364,9 @@ static int hardirq_read_latency_map(int mapfd)
     hardirq_ebpf_key_t next_key = {};
 
     while (bpf_map_get_next_key(mapfd, &key, &next_key) == 0) {
+        if (ebpf_plugin_stop())
+            break;
+
         int test = bpf_map_lookup_elem(mapfd, &key, hardirq_ebpf_dynamic_vals);
         if (unlikely(test < 0)) {
             key = next_key;

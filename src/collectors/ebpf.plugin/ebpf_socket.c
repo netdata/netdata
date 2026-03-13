@@ -1098,6 +1098,9 @@ void ebpf_socket_send_apps_data()
     struct ebpf_target *w;
     netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SOCKET_IDX))))
             continue;
 
@@ -1314,6 +1317,9 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
     int order = NETDATA_SOCKET_APPS_ORDER_BASE;
     int update_every = em->update_every;
     for (w = root; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!w->exposed))
             continue;
 
@@ -1616,6 +1622,9 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, int end)
     uint16_t family = AF_UNSPEC;
     uint32_t external_origin = values[0].external_origin;
     for (i = 1; i < end; i++) {
+        if (ebpf_plugin_stop())
+            break;
+
         netdata_socket_t *w = &values[i];
 
         values[0].tcp.call_tcp_sent += w->tcp.call_tcp_sent;
@@ -1803,6 +1812,9 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     memset(values, 0, length);
     time_t update_time = time(NULL);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        if (ebpf_plugin_stop())
+            break;
+
         ret = bpf_map_lookup_elem(fd, &key, values);
         bool deleted = true;
         if (ret < 0) {
@@ -1897,6 +1909,9 @@ void ebpf_socket_resume_apps_data()
 
     netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SOCKET_IDX))))
             continue;
 
@@ -1938,6 +1953,9 @@ static void ebpf_update_socket_cgroup()
 
     netdata_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
@@ -2088,6 +2106,9 @@ static void read_listen_table()
     int fd = socket_maps[NETDATA_SOCKET_LPORTS].map_fd;
     netdata_passive_connection_t value = {};
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        if (ebpf_plugin_stop())
+            break;
+
         int ret = bpf_map_lookup_elem(fd, &key, &value);
         if (ret < 0) {
             key = next_key;
@@ -2637,6 +2658,9 @@ static void ebpf_create_systemd_socket_charts(int update_every)
 
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!w->systemd || w->flags & NETDATA_EBPF_SERVICES_HAS_SOCKET_CHART))
             continue;
 
@@ -2673,6 +2697,9 @@ static void ebpf_send_systemd_socket_charts()
 {
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(ect->flags & NETDATA_EBPF_SERVICES_HAS_SOCKET_CHART))) {
             continue;
         }
@@ -2741,6 +2768,9 @@ static void ebpf_socket_send_cgroup_data(int update_every)
         ebpf_socket_sum_cgroup_pids(&ect->publish_socket, ect->pids);
     }
 
+    if (ebpf_plugin_stop())
+        return;
+
     if (shm_ebpf_cgroup.header->systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_socket_charts(update_every);
@@ -2749,6 +2779,9 @@ static void ebpf_socket_send_cgroup_data(int update_every)
     }
 
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (ect->systemd)
             continue;
 

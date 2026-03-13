@@ -162,6 +162,9 @@ static void oomkill_write_data(int32_t *keys, uint32_t total)
     uint32_t used_pid = 0;
     netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w != NULL; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_OOMKILL_IDX))))
             continue;
 
@@ -381,6 +384,9 @@ static uint32_t oomkill_read_data(int32_t *keys)
     uint32_t key;
     int mapfd = oomkill_maps[0].map_fd;
     while (bpf_map_get_next_key(mapfd, &curr_key, &key) == 0) {
+        if (ebpf_plugin_stop())
+            break;
+
         curr_key = key;
 
         keys[i] = (int32_t)key;
