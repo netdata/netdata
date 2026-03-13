@@ -477,7 +477,7 @@ jobs:
         id: install-netdata
         if: needs.file-check.outputs.run == 'true'
         run: |
-          $installerProc = Start-Process "msiexec" "/qn /i `"$PWD\dist-artifacts\netdata-x64.msi`" /l* `"$PWD\msi.log`" NDDRVINST=0" -Wait -NoNewWindow
+          $installerProc = Start-Process "msiexec" "/qn /i `"$PWD\dist-artifacts\netdata-x64.msi`" /l* `"$PWD\msi.log`" NDDRVINST=0" -Wait -NoNewWindow -PassThru
           Write-Output "Exit Code: $installerProc.ExitCode"
           Get-Content "$PWD\msi.log"
           $successCodes = @(0, 3010)
