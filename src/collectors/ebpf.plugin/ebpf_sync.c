@@ -275,6 +275,11 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
+void ebpf_sync_unload_bpf(ebpf_module_t *em __maybe_unused)
+{
+    ebpf_sync_cleanup_objects();
+}
+
 static void ebpf_sync_exit(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
@@ -286,9 +291,6 @@ static void ebpf_sync_exit(void *pptr)
         ebpf_obsolete_sync_global(em);
         netdata_mutex_unlock(&lock);
     }
-
-    if (em->load & EBPF_LOAD_LEGACY)
-        ebpf_sync_cleanup_objects();
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;

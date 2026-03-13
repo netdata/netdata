@@ -953,13 +953,6 @@ static void ebpf_process_disable_tracepoints()
     }
 }
 
-/**
- * Process Exit
- *
- * Cancel child thread.
- *
- * @param ptr thread data.
- */
 static void ebpf_process_exit(void *pptr)
 {
     pids_fd[NETDATA_EBPF_PIDS_PROCESS_IDX] = -1;
@@ -993,12 +986,6 @@ static void ebpf_process_exit(void *pptr)
 
         fflush(stdout);
         netdata_mutex_unlock(&lock);
-    }
-
-    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
-        ebpf_unload_legacy_code(em->objects, em->probe_links);
-        em->objects = NULL;
-        em->probe_links = NULL;
     }
 
     freez(process_hash_values);

@@ -67,13 +67,6 @@ static void ebpf_obsolete_softirq_global(ebpf_module_t *em)
         em->update_every);
 }
 
-/**
- * Cleanup
- *
- * Clean up allocated memory.
- *
- * @param ptr thread data.
- */
 static void softirq_cleanup(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
@@ -94,12 +87,6 @@ static void softirq_cleanup(void *pptr)
 
         netdata_mutex_unlock(&lock);
         fflush(stdout);
-    }
-
-    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
-        ebpf_unload_legacy_code(em->objects, em->probe_links);
-        em->objects = NULL;
-        em->probe_links = NULL;
     }
 
     for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {

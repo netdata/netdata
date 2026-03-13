@@ -565,6 +565,21 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
  *
  * @param ptr thread data.
  */
+void ebpf_cachestat_unload_bpf(ebpf_module_t *em)
+{
+#ifdef LIBBPF_MAJOR_VERSION
+    if (cachestat_bpf_obj) {
+        cachestat_bpf__destroy(cachestat_bpf_obj);
+        cachestat_bpf_obj = NULL;
+    }
+#endif
+    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
+}
+
 static void ebpf_cachestat_exit(void *pptr)
 {
     pids_fd[NETDATA_EBPF_PIDS_CACHESTAT_IDX] = -1;
@@ -601,21 +616,6 @@ static void ebpf_cachestat_exit(void *pptr)
 
         fflush(stdout);
         netdata_mutex_unlock(&lock);
-    }
-
-    if (!ebpf_plugin_stop()) {
-#ifdef LIBBPF_MAJOR_VERSION
-        if (cachestat_bpf_obj) {
-            cachestat_bpf__destroy(cachestat_bpf_obj);
-            cachestat_bpf_obj = NULL;
-        }
-#endif
-
-        if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
-            ebpf_unload_legacy_code(em->objects, em->probe_links);
-            em->objects = NULL;
-            em->probe_links = NULL;
-        }
     }
 
     netdata_mutex_lock(&ebpf_exit_cleanup);

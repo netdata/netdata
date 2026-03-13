@@ -116,11 +116,6 @@ static void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
     netdata_mutex_unlock(&collect_data_mutex);
 }
 
-/**
- * Clean up the main thread.
- *
- * @param ptr thread data.
- */
 static void oomkill_cleanup(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
@@ -142,12 +137,6 @@ static void oomkill_cleanup(void *pptr)
 
         fflush(stdout);
         netdata_mutex_unlock(&lock);
-    }
-
-    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
-        ebpf_unload_legacy_code(em->objects, em->probe_links);
-        em->objects = NULL;
-        em->probe_links = NULL;
     }
 
     netdata_mutex_lock(&ebpf_exit_cleanup);

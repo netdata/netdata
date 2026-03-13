@@ -597,6 +597,21 @@ static void ebpf_obsolete_fd_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
+void ebpf_fd_unload_bpf(ebpf_module_t *em)
+{
+#ifdef LIBBPF_MAJOR_VERSION
+    if (fd_bpf_obj) {
+        fd_bpf__destroy(fd_bpf_obj);
+        fd_bpf_obj = NULL;
+    }
+#endif
+    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
+}
+
 static void ebpf_fd_exit(void *pptr)
 {
     pids_fd[NETDATA_EBPF_PIDS_FD_IDX] = -1;
@@ -633,20 +648,6 @@ static void ebpf_fd_exit(void *pptr)
 
         fflush(stdout);
         netdata_mutex_unlock(&lock);
-    }
-
-    if (!ebpf_plugin_stop()) {
-#ifdef LIBBPF_MAJOR_VERSION
-        if (fd_bpf_obj) {
-            fd_bpf__destroy(fd_bpf_obj);
-            fd_bpf_obj = NULL;
-        }
-#endif
-        if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
-            ebpf_unload_legacy_code(em->objects, em->probe_links);
-            em->objects = NULL;
-            em->probe_links = NULL;
-        }
     }
 
     freez(fd_vector);

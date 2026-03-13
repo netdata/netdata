@@ -412,6 +412,29 @@ static void ebpf_obsolete_swap_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
+void ebpf_swap_unload_bpf(ebpf_module_t *em)
+{
+    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
+        if ((uintptr_t)em->objects < 4096) {
+            netdata_log_error(
+                "Invalid em->objects pointer (0x%lx) detected during swap cleanup, skipping bpf_object__close",
+                (unsigned long)em->objects);
+            freez(em->probe_links);
+        } else {
+            if (em->objects && em->probe_links)
+                ebpf_unload_legacy_code(em->objects, em->probe_links);
+        }
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
+#ifdef LIBBPF_MAJOR_VERSION
+    else if (swap_bpf_obj) {
+        swap_bpf__destroy(swap_bpf_obj);
+        swap_bpf_obj = NULL;
+    }
+#endif
+}
+
 static void ebpf_swap_exit(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
@@ -449,28 +472,6 @@ static void ebpf_swap_exit(void *pptr)
         em->enabled = NETDATA_THREAD_EBPF_STOPPED;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
         return;
-    }
-
-    if (!ebpf_plugin_stop()) {
-        if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
-            if ((uintptr_t)em->objects < 4096) {
-                netdata_log_error(
-                    "Invalid em->objects pointer (0x%lx) detected during swap cleanup, skipping bpf_object__close",
-                    (unsigned long)em->objects);
-                freez(em->probe_links);
-            } else {
-                if (em->objects && em->probe_links)
-                    ebpf_unload_legacy_code(em->objects, em->probe_links);
-            }
-            em->objects = NULL;
-            em->probe_links = NULL;
-        }
-#ifdef LIBBPF_MAJOR_VERSION
-        else if (swap_bpf_obj) {
-            swap_bpf__destroy(swap_bpf_obj);
-            swap_bpf_obj = NULL;
-        }
-#endif
     }
 
     freez(swap_vector);

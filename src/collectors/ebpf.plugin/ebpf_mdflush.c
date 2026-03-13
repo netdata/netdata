@@ -152,6 +152,7 @@ static void ebpf_obsolete_mdflush_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
+
 static void mdflush_exit(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
@@ -172,12 +173,6 @@ static void mdflush_exit(void *pptr)
 
         netdata_mutex_unlock(&lock);
         fflush(stdout);
-    }
-
-    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
-        ebpf_unload_legacy_code(em->objects, em->probe_links);
-        em->objects = NULL;
-        em->probe_links = NULL;
     }
 
     netdata_mutex_lock(&ebpf_exit_cleanup);

@@ -451,6 +451,21 @@ static void ebpf_obsolete_shm_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
+void ebpf_shm_unload_bpf(ebpf_module_t *em)
+{
+#ifdef LIBBPF_MAJOR_VERSION
+    if (shm_bpf_obj) {
+        shm_bpf__destroy(shm_bpf_obj);
+        shm_bpf_obj = NULL;
+    }
+#endif
+    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
+        ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
+}
+
 static void ebpf_shm_exit(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
@@ -479,21 +494,6 @@ static void ebpf_shm_exit(void *pptr)
 
         fflush(stdout);
         netdata_mutex_unlock(&lock);
-    }
-
-    if (!ebpf_plugin_stop()) {
-#ifdef LIBBPF_MAJOR_VERSION
-        if (shm_bpf_obj) {
-            shm_bpf__destroy(shm_bpf_obj);
-            shm_bpf_obj = NULL;
-        }
-#endif
-
-        if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
-            ebpf_unload_legacy_code(em->objects, em->probe_links);
-            em->objects = NULL;
-            em->probe_links = NULL;
-        }
     }
 
     netdata_mutex_lock(&ebpf_exit_cleanup);

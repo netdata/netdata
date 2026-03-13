@@ -470,13 +470,6 @@ static void ebpf_obsolete_disk_global(ebpf_module_t *em)
     }
 }
 
-/**
- * Disk exit.
- *
- * Cancel child and exit.
- *
- * @param ptr thread data.
- */
 static void ebpf_disk_exit(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
@@ -498,12 +491,6 @@ static void ebpf_disk_exit(void *pptr)
     }
 
     ebpf_disk_disable_tracepoints();
-
-    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
-        ebpf_unload_legacy_code(em->objects, em->probe_links);
-        em->objects = NULL;
-        em->probe_links = NULL;
-    }
 
     if (dimensions) {
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);

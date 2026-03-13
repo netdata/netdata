@@ -50,11 +50,14 @@ struct netdata_static_thread cgroup_integration_thread = {
     .init_routine = NULL,
     .start_routine = NULL};
 
+static void ebpf_socket_unload_bpf(ebpf_module_t *em);
+
 ebpf_module_t ebpf_modules[] = {
     {.info =
          {.thread_name = "process", .config_name = "process", .thread_description = NETDATA_EBPF_MODULE_PROCESS_DESC},
      .functions =
-         {.start_routine = ebpf_process_thread, .apps_routine = ebpf_process_create_apps_charts, .fnct_routine = NULL},
+         {.start_routine = ebpf_process_thread, .apps_routine = ebpf_process_create_apps_charts, .fnct_routine = NULL,
+          .bpf_unload = ebpf_unload_legacy_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
      .global_charts = 1,
@@ -83,6 +86,7 @@ ebpf_module_t ebpf_modules[] = {
          {.start_routine = ebpf_socket_thread,
           .apps_routine = ebpf_socket_create_apps_charts,
           .fnct_routine = ebpf_socket_read_open_connections,
+          .bpf_unload = ebpf_socket_unload_bpf,
           .fcnt_name = EBPF_FUNCTION_SOCKET,
           .fcnt_desc = EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION,
           .fcnt_thread_chart_name = NULL,
@@ -116,7 +120,8 @@ ebpf_module_t ebpf_modules[] = {
      .functions =
          {.start_routine = ebpf_cachestat_thread,
           .apps_routine = ebpf_cachestat_create_apps_charts,
-          .fnct_routine = NULL},
+          .fnct_routine = NULL,
+          .bpf_unload = ebpf_cachestat_unload_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
      .global_charts = 1,
@@ -141,7 +146,8 @@ ebpf_module_t ebpf_modules[] = {
      .lifetime = EBPF_DEFAULT_LIFETIME,
      .running_time = 0},
     {.info = {.thread_name = "sync", .config_name = "sync", .thread_description = NETDATA_EBPF_SYNC_MODULE_DESC},
-     .functions = {.start_routine = ebpf_sync_thread, .apps_routine = NULL, .fnct_routine = NULL},
+     .functions = {.start_routine = ebpf_sync_thread, .apps_routine = NULL, .fnct_routine = NULL,
+                   .bpf_unload = ebpf_sync_unload_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .maps = NULL,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
@@ -167,7 +173,8 @@ ebpf_module_t ebpf_modules[] = {
      .running_time = 0},
     {.info = {.thread_name = "dc", .config_name = "dc", .thread_description = NETDATA_EBPF_DC_MODULE_DESC},
      .functions =
-         {.start_routine = ebpf_dcstat_thread, .apps_routine = ebpf_dcstat_create_apps_charts, .fnct_routine = NULL},
+         {.start_routine = ebpf_dcstat_thread, .apps_routine = ebpf_dcstat_create_apps_charts, .fnct_routine = NULL,
+          .bpf_unload = ebpf_dcstat_unload_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
      .global_charts = 1,
@@ -192,7 +199,8 @@ ebpf_module_t ebpf_modules[] = {
      .running_time = 0},
     {.info = {.thread_name = "swap", .config_name = "swap", .thread_description = NETDATA_EBPF_SWAP_MODULE_DESC},
      .functions =
-         {.start_routine = ebpf_swap_thread, .apps_routine = ebpf_swap_create_apps_charts, .fnct_routine = NULL},
+         {.start_routine = ebpf_swap_thread, .apps_routine = ebpf_swap_create_apps_charts, .fnct_routine = NULL,
+          .bpf_unload = ebpf_swap_unload_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
      .global_charts = 1,
@@ -217,7 +225,8 @@ ebpf_module_t ebpf_modules[] = {
      .lifetime = EBPF_DEFAULT_LIFETIME,
      .running_time = 0},
     {.info = {.thread_name = "vfs", .config_name = "vfs", .thread_description = NETDATA_EBPF_VFS_MODULE_DESC},
-     .functions = {.start_routine = ebpf_vfs_thread, .apps_routine = ebpf_vfs_create_apps_charts, .fnct_routine = NULL},
+     .functions = {.start_routine = ebpf_vfs_thread, .apps_routine = ebpf_vfs_create_apps_charts, .fnct_routine = NULL,
+                   .bpf_unload = ebpf_vfs_unload_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
      .global_charts = 1,
@@ -242,7 +251,8 @@ ebpf_module_t ebpf_modules[] = {
      .running_time = 0},
     {.info =
          {.thread_name = "filesystem", .config_name = "filesystem", .thread_description = NETDATA_EBPF_FS_MODULE_DESC},
-     .functions = {.start_routine = ebpf_filesystem_thread, .apps_routine = NULL, .fnct_routine = NULL},
+     .functions = {.start_routine = ebpf_filesystem_thread, .apps_routine = NULL, .fnct_routine = NULL,
+                   .bpf_unload = ebpf_filesystem_unload_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
      .global_charts = 1,
@@ -267,7 +277,8 @@ ebpf_module_t ebpf_modules[] = {
      .lifetime = EBPF_DEFAULT_LIFETIME,
      .running_time = 0},
     {.info = {.thread_name = "disk", .config_name = "disk", .thread_description = NETDATA_EBPF_DISK_MODULE_DESC},
-     .functions = {.start_routine = ebpf_disk_thread, .apps_routine = NULL, .fnct_routine = NULL},
+     .functions = {.start_routine = ebpf_disk_thread, .apps_routine = NULL, .fnct_routine = NULL,
+                   .bpf_unload = ebpf_unload_legacy_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
      .global_charts = 1,
@@ -291,7 +302,8 @@ ebpf_module_t ebpf_modules[] = {
      .lifetime = EBPF_DEFAULT_LIFETIME,
      .running_time = 0},
     {.info = {.thread_name = "mount", .config_name = "mount", .thread_description = NETDATA_EBPF_MOUNT_MODULE_DESC},
-     .functions = {.start_routine = ebpf_mount_thread, .apps_routine = NULL, .fnct_routine = NULL},
+     .functions = {.start_routine = ebpf_mount_thread, .apps_routine = NULL, .fnct_routine = NULL,
+                   .bpf_unload = ebpf_mount_unload_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
      .global_charts = 1,
@@ -315,7 +327,8 @@ ebpf_module_t ebpf_modules[] = {
      .lifetime = EBPF_DEFAULT_LIFETIME,
      .running_time = 0},
     {.info = {.thread_name = "fd", .config_name = "fd", .thread_description = NETDATA_EBPF_FD_MODULE_DESC},
-     .functions = {.start_routine = ebpf_fd_thread, .apps_routine = ebpf_fd_create_apps_charts, .fnct_routine = NULL},
+     .functions = {.start_routine = ebpf_fd_thread, .apps_routine = ebpf_fd_create_apps_charts, .fnct_routine = NULL,
+                   .bpf_unload = ebpf_fd_unload_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
      .global_charts = 1,
@@ -366,7 +379,8 @@ ebpf_module_t ebpf_modules[] = {
      .running_time = 0},
     {.info =
          {.thread_name = "softirq", .config_name = "softirq", .thread_description = NETDATA_EBPF_SOFTIRQ_MODULE_DESC},
-     .functions = {.start_routine = ebpf_softirq_thread, .apps_routine = NULL, .fnct_routine = NULL},
+     .functions = {.start_routine = ebpf_softirq_thread, .apps_routine = NULL, .fnct_routine = NULL,
+                   .bpf_unload = ebpf_unload_legacy_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
      .global_charts = 1,
@@ -392,7 +406,8 @@ ebpf_module_t ebpf_modules[] = {
     {.info =
          {.thread_name = "oomkill", .config_name = "oomkill", .thread_description = NETDATA_EBPF_OOMKILL_MODULE_DESC},
      .functions =
-         {.start_routine = ebpf_oomkill_thread, .apps_routine = ebpf_oomkill_create_apps_charts, .fnct_routine = NULL},
+         {.start_routine = ebpf_oomkill_thread, .apps_routine = ebpf_oomkill_create_apps_charts, .fnct_routine = NULL,
+          .bpf_unload = ebpf_unload_legacy_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
      .global_charts = 1,
@@ -416,7 +431,8 @@ ebpf_module_t ebpf_modules[] = {
      .lifetime = EBPF_DEFAULT_LIFETIME,
      .running_time = 0},
     {.info = {.thread_name = "shm", .config_name = "shm", .thread_description = NETDATA_EBPF_SHM_MODULE_DESC},
-     .functions = {.start_routine = ebpf_shm_thread, .apps_routine = ebpf_shm_create_apps_charts, .fnct_routine = NULL},
+     .functions = {.start_routine = ebpf_shm_thread, .apps_routine = ebpf_shm_create_apps_charts, .fnct_routine = NULL,
+                   .bpf_unload = ebpf_shm_unload_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
      .global_charts = 1,
@@ -440,7 +456,8 @@ ebpf_module_t ebpf_modules[] = {
      .lifetime = EBPF_DEFAULT_LIFETIME,
      .running_time = 0},
     {.info = {.thread_name = "mdflush", .config_name = "mdflush", .thread_description = NETDATA_EBPF_MD_MODULE_DESC},
-     .functions = {.start_routine = ebpf_mdflush_thread, .apps_routine = NULL, .fnct_routine = NULL},
+     .functions = {.start_routine = ebpf_mdflush_thread, .apps_routine = NULL, .fnct_routine = NULL,
+                   .bpf_unload = ebpf_unload_legacy_bpf},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
      .global_charts = 1,
@@ -1029,76 +1046,25 @@ void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe
     bpf_object__close(objects);
 }
 
-/**
- * Unload Unique maps
- *
- * This function unload all BPF maps from threads using one unique BPF object.
- */
-static void ebpf_unload_unique_maps()
+void ebpf_unload_legacy_bpf(ebpf_module_t *em)
 {
-    ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_SOCKET_IDX];
-    if (em->enabled != NETDATA_THREAD_EBPF_STOPPED)
-        return;
-
-    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links)
+    if ((em->load & EBPF_LOAD_LEGACY) && em->probe_links) {
         ebpf_unload_legacy_code(em->objects, em->probe_links);
+        em->objects = NULL;
+        em->probe_links = NULL;
+    }
+}
+
+static void ebpf_socket_unload_bpf(ebpf_module_t *em)
+{
+    ebpf_unload_legacy_bpf(em);
 
 #ifdef LIBBPF_MAJOR_VERSION
-    if (socket_bpf_obj)
+    if (socket_bpf_obj) {
         socket_bpf__destroy(socket_bpf_obj);
-#endif
-}
-
-/**
- * Unload filesystem maps
- *
- * This function unload all BPF maps from filesystem thread.
- */
-static void ebpf_unload_filesystems()
-{
-    if (ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING ||
-        ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].enabled < NETDATA_THREAD_EBPF_STOPPING)
-        return;
-
-    if (!(ebpf_modules[EBPF_MODULE_FILESYSTEM_IDX].load & EBPF_LOAD_LEGACY))
-        return;
-
-    int i;
-    for (i = 0; localfs[i].filesystem != NULL; i++) {
-        if (!localfs[i].objects)
-            continue;
-
-        ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
+        socket_bpf_obj = NULL;
     }
-}
-
-/**
- * Unload sync maps
- *
- * This function unload all BPF maps from sync thread.
- */
-static void ebpf_unload_sync()
-{
-    if (ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled == NETDATA_THREAD_EBPF_NOT_RUNNING ||
-        ebpf_modules[EBPF_MODULE_SYNC_IDX].enabled < NETDATA_THREAD_EBPF_STOPPING)
-        return;
-
-    if (!(ebpf_modules[EBPF_MODULE_SYNC_IDX].load & EBPF_LOAD_LEGACY))
-        return;
-
-    int i;
-    for (i = 0; local_syscalls[i].syscall != NULL; i++) {
-        if (!local_syscalls[i].enabled)
-            continue;
-
-#ifdef LIBBPF_MAJOR_VERSION
-        if (local_syscalls[i].sync_obj) {
-            sync_bpf__destroy(local_syscalls[i].sync_obj);
-            continue;
-        }
 #endif
-        ebpf_unload_legacy_code(local_syscalls[i].objects, local_syscalls[i].probe_links);
-    }
 }
 
 /**
@@ -1170,9 +1136,10 @@ void ebpf_stop_threads(int sig)
 
     usec_t unload_started_ut = now_monotonic_usec();
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    ebpf_unload_unique_maps();
-    ebpf_unload_filesystems();
-    ebpf_unload_sync();
+    for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
+        if (ebpf_modules[i].functions.bpf_unload)
+            ebpf_modules[i].functions.bpf_unload(&ebpf_modules[i]);
+    }
     netdata_mutex_unlock(&ebpf_exit_cleanup);
     usec_t unload_duration_ut = now_monotonic_usec() - unload_started_ut;
 
