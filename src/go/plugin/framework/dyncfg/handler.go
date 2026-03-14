@@ -50,6 +50,12 @@ type CodedError interface {
 	Code() int
 }
 
+// CommandMessageSource optionally provides a success/warning message
+// for the command that just completed.
+type CommandMessageSource interface {
+	TakeCommandMessage() string
+}
+
 // HandlerOpts configures the handler with component-specific settings.
 type HandlerOpts[C Config] struct {
 	Logger      *logger.Logger
@@ -80,6 +86,14 @@ type Handler[C Config] struct {
 	removeStockOnEnableFail bool
 	jobCommands             []Command
 	waitGate                *waitGate[C]
+}
+
+func takeCommandMessage[C Config](cb Callbacks[C]) string {
+	msgSrc, ok := any(cb).(CommandMessageSource)
+	if !ok {
+		return ""
+	}
+	return msgSrc.TakeCommandMessage()
 }
 
 // WaitTimeoutEvent describes a wait gate timeout transition.
@@ -506,7 +520,7 @@ func (h *Handler[C]) CmdEnable(fn Function) {
 	}
 
 	entry.Status = StatusRunning
-	h.api.SendCodef(fn, 200, "")
+	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 	h.NotifyJobStatus(entry.Cfg, StatusRunning)
 	h.cb.OnStatusChange(entry, oldStatus, fn)
 }
@@ -537,7 +551,7 @@ func (h *Handler[C]) CmdDisable(fn Function) {
 	h.cb.Stop(entry.Cfg)
 
 	entry.Status = StatusDisabled
-	h.api.SendCodef(fn, 200, "")
+	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 	h.NotifyJobStatus(entry.Cfg, StatusDisabled)
 	h.cb.OnStatusChange(entry, oldStatus, fn)
 }
@@ -565,7 +579,7 @@ func (h *Handler[C]) CmdRemove(fn Function) {
 	h.exposed.Remove(entry.Cfg)
 	h.cb.Stop(entry.Cfg)
 
-	h.api.SendCodef(fn, 200, "")
+	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 	h.NotifyJobRemove(entry.Cfg)
 }
 
@@ -632,7 +646,7 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 		if isConversion {
 			h.NotifyJobCreate(newCfg, StatusDisabled)
 		}
-		h.api.SendCodef(fn, 200, "")
+		h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 		h.NotifyJobStatus(newCfg, StatusDisabled)
 		h.cb.OnStatusChange(newEntry, oldStatus, fn)
 		return
@@ -672,7 +686,7 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 	if isConversion {
 		h.NotifyJobCreate(newCfg, StatusRunning)
 	}
-	h.api.SendCodef(fn, 200, "")
+	h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
 	h.NotifyJobStatus(newCfg, StatusRunning)
 	h.cb.OnStatusChange(newEntry, oldStatus, fn)
 }

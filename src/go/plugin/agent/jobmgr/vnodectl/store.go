@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package jobmgr
+package vnodectl
 
 import (
 	"fmt"
@@ -8,8 +8,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
-// vnodeStore owns manager vnode state. It is intentionally lock-free because
-// mutations are serialized by Manager.run and startup initialization.
+// vnodeStore is intentionally lock-free because mutations are serialized by jobmgr.
+// Any caller outside that serialized path must add its own synchronization first.
 type vnodeStore struct {
 	items map[string]*vnodes.VirtualNode
 }
@@ -26,23 +26,23 @@ func (s *vnodeStore) Lookup(name string) (*vnodes.VirtualNode, bool) {
 	return cfg, ok
 }
 
-func (s *vnodeStore) Upsert(cfg *vnodes.VirtualNode) (changed bool, affectedJobNames []string, err error) {
+func (s *vnodeStore) Upsert(cfg *vnodes.VirtualNode) (bool, error) {
 	if cfg == nil {
-		return false, nil, fmt.Errorf("nil vnode config")
+		return false, fmt.Errorf("nil vnode config")
 	}
-	if orig, ok := s.items[cfg.Name]; ok && orig.Equal(cfg) {
-		return false, nil, nil
-	}
-	s.items[cfg.Name] = cfg
-	return true, nil, nil
-}
-
-func (s *vnodeStore) Remove(name string) (removed bool, err error) {
-	if _, ok := s.items[name]; !ok {
+	if orig, ok := s.items[cfg.Name]; ok && sameStoredVnode(orig, cfg) {
 		return false, nil
 	}
-	delete(s.items, name)
+	s.items[cfg.Name] = cfg
 	return true, nil
+}
+
+func (s *vnodeStore) Remove(name string) bool {
+	if _, ok := s.items[name]; !ok {
+		return false
+	}
+	delete(s.items, name)
+	return true
 }
 
 func (s *vnodeStore) ForEach(fn func(cfg *vnodes.VirtualNode) bool) {
@@ -51,4 +51,12 @@ func (s *vnodeStore) ForEach(fn func(cfg *vnodes.VirtualNode) bool) {
 			return
 		}
 	}
+}
+
+func sameStoredVnode(orig, next *vnodes.VirtualNode) bool {
+	if orig == nil || next == nil {
+		return orig == next
+	}
+	return orig.Equal(next) &&
+		orig.SourceType == next.SourceType
 }
