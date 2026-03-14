@@ -1134,19 +1134,13 @@ void ebpf_stop_threads(int sig)
     netdata_log_info("EBPF SHUTDOWN: post-cancel checks finished in %llums.",
                      (unsigned long long)(checks_duration_ut / USEC_PER_MS));
 
-    usec_t unload_started_ut = now_monotonic_usec();
-    netdata_mutex_lock(&ebpf_exit_cleanup);
-    for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
-        if (ebpf_modules[i].functions.bpf_unload)
-            ebpf_modules[i].functions.bpf_unload(&ebpf_modules[i]);
-    }
-    netdata_mutex_unlock(&ebpf_exit_cleanup);
-    usec_t unload_duration_ut = now_monotonic_usec() - unload_started_ut;
+    // BPF unload is handled by each module's exit function (in parallel with thread shutdown).
+    // During forced shutdown, the kernel cleans up BPF programs automatically on process exit.
+    // Sequential unload here would add several seconds of delay with no benefit.
 
     usec_t total_duration_ut = now_monotonic_usec() - stop_started_ut;
-    netdata_log_info("EBPF SHUTDOWN: total stop duration %llums (unload=%llums).",
-                     (unsigned long long)(total_duration_ut / USEC_PER_MS),
-                     (unsigned long long)(unload_duration_ut / USEC_PER_MS));
+    netdata_log_info("EBPF SHUTDOWN: total stop duration %llums.",
+                     (unsigned long long)(total_duration_ut / USEC_PER_MS));
 
     ebpf_exit();
 }

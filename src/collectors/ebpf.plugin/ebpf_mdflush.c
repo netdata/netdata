@@ -175,6 +175,9 @@ static void mdflush_exit(void *pptr)
         fflush(stdout);
     }
 
+    if (!ebpf_plugin_stop() && em->functions.bpf_unload)
+        em->functions.bpf_unload(em);
+
     netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     netdata_mutex_unlock(&ebpf_exit_cleanup);

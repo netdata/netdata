@@ -95,6 +95,9 @@ static void softirq_cleanup(void *pptr)
     freez(softirq_ebpf_vals);
     softirq_ebpf_vals = NULL;
 
+    if (!ebpf_plugin_stop() && em->functions.bpf_unload)
+        em->functions.bpf_unload(em);
+
     netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     netdata_mutex_unlock(&ebpf_exit_cleanup);

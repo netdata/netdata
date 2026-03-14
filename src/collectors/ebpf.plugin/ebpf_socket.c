@@ -946,6 +946,9 @@ static void ebpf_socket_exit(void *pptr)
         netdata_mutex_unlock(&lock);
     }
 
+    if (!ebpf_plugin_stop() && em->functions.bpf_unload)
+        em->functions.bpf_unload(em);
+
     ebpf_socket_free(em);
 }
 

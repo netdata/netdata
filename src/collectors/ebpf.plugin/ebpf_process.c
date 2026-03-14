@@ -993,6 +993,9 @@ static void ebpf_process_exit(void *pptr)
 
     ebpf_process_disable_tracepoints();
 
+    if (!ebpf_plugin_stop() && em->functions.bpf_unload)
+        em->functions.bpf_unload(em);
+
     netdata_mutex_lock(&ebpf_exit_cleanup);
     process_pid_fd = -1;
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;

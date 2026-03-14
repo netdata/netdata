@@ -506,6 +506,9 @@ static void ebpf_disk_exit(void *pptr)
     if (disk_list)
         ebpf_cleanup_disk_list();
 
+    if (!ebpf_plugin_stop() && em->functions.bpf_unload)
+        em->functions.bpf_unload(em);
+
     netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     netdata_mutex_unlock(&ebpf_exit_cleanup);
