@@ -19,22 +19,24 @@ static void ebpf_initialize_sync_maps(void)
         "tbl_sync", "tbl_syncfs", "tbl_msync", "tbl_fsync", "tbl_fdatasync", "tbl_syncfr"};
 
     for (int i = 0; i < NETDATA_SYNC_IDX_END; i++) {
-        sync_maps[i][0] = (ebpf_local_maps_t){.name = map_names[i],
-                                              .internal_input = NETDATA_SYNC_END,
-                                              .user_input = 0,
-                                              .type = NETDATA_EBPF_MAP_STATIC,
-                                              .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+        sync_maps[i][0] = (ebpf_local_maps_t){
+            .name = map_names[i],
+            .internal_input = NETDATA_SYNC_END,
+            .user_input = 0,
+            .type = NETDATA_EBPF_MAP_STATIC,
+            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                              .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+            .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
         };
-        sync_maps[i][1] = (ebpf_local_maps_t){.name = NULL,
-                                              .internal_input = 0,
-                                              .user_input = 0,
-                                              .type = NETDATA_EBPF_MAP_CONTROLLER,
-                                              .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+        sync_maps[i][1] = (ebpf_local_maps_t){
+            .name = NULL,
+            .internal_input = 0,
+            .user_input = 0,
+            .type = NETDATA_EBPF_MAP_CONTROLLER,
+            .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
 #ifdef LIBBPF_MAJOR_VERSION
-                                              .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+            .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
 #endif
         };
     }
@@ -500,6 +502,9 @@ static void sync_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
+        if (ebpf_plugin_stop())
+            break;
+
         heartbeat_next(&hb);
         if (ebpf_plugin_stop())
             break;

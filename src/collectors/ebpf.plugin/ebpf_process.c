@@ -1615,6 +1615,9 @@ static void process_collector(ebpf_module_t *em)
     heartbeat_init(&hb, USEC_PER_SEC);
     int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     while (!ebpf_plugin_stop() && running_time < lifetime) {
+        if (ebpf_plugin_stop())
+            break;
+
         heartbeat_next(&hb);
 
         if (ebpf_plugin_stop())

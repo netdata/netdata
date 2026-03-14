@@ -390,6 +390,9 @@ void ebpf_cgroup_integration(void *ptr __maybe_unused)
     heartbeat_init(&hb, USEC_PER_SEC);
     //Plugin will be killed when it receives a signal
     while (!ebpf_plugin_stop()) {
+        if (ebpf_plugin_stop())
+            break;
+
         heartbeat_next(&hb);
 
         if (ebpf_plugin_stop())

@@ -568,6 +568,9 @@ static void hardirq_collector(ebpf_module_t *em)
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     while (!ebpf_plugin_stop() && running_time < lifetime) {
+        if (ebpf_plugin_stop())
+            break;
+
         heartbeat_next(&hb);
 
         if (ebpf_plugin_stop())
