@@ -747,8 +747,10 @@ void ebpf_read_dcstat_thread(void *ptr)
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_dc_cgroup();
 
-        if (sem_post(shm_mutex_ebpf_integration))
+        if (sem_post(shm_mutex_ebpf_integration)) {
             netdata_log_error("DCSTAT: Failed to post semaphore.");
+            break;
+        }
 
         counter = 0;
 

@@ -2356,8 +2356,10 @@ void ebpf_read_vfs_thread(void *ptr)
         if (cgroups && shm_ebpf_cgroup.header)
             read_update_vfs_cgroup();
 
-        if (sem_post(shm_mutex_ebpf_integration))
+        if (sem_post(shm_mutex_ebpf_integration)) {
             netdata_log_error("VFS: Failed to post semaphore.");
+            break;
+        }
 
         counter = 0;
 

@@ -2038,8 +2038,10 @@ void ebpf_read_socket_thread(void *ptr)
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_socket_cgroup();
 
-        if (sem_post(shm_mutex_ebpf_integration))
+        if (sem_post(shm_mutex_ebpf_integration)) {
             netdata_log_error("SOCKET: Failed to post semaphore.");
+            break;
+        }
 
         counter = 0;
 

@@ -930,8 +930,10 @@ void ebpf_read_fd_thread(void *ptr)
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_fd_cgroup();
 
-        if (sem_post(shm_mutex_ebpf_integration))
+        if (sem_post(shm_mutex_ebpf_integration)) {
             netdata_log_error("FD: Failed to post semaphore.");
+            break;
+        }
 
         counter = 0;
 

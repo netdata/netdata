@@ -1643,8 +1643,10 @@ static void process_collector(ebpf_module_t *em)
                     ebpf_update_process_cgroup();
                 }
                 netdata_mutex_unlock(&collect_data_mutex);
-                if (sem_post(shm_mutex_ebpf_integration))
+                if (sem_post(shm_mutex_ebpf_integration)) {
                     netdata_log_error("PROCESS: Failed to post semaphore.");
+                    break;
+                }
             }
 
             netdata_mutex_lock(&lock);
