@@ -1040,14 +1040,24 @@ void ebpf_read_cachestat_thread(void *ptr)
                 netdata_log_error("CACHESTAT: Failed to wait on semaphore.");
             break;
         }
+
         ebpf_read_cachestat_apps_table(maps_per_core);
         ebpf_cachestat_resume_apps_data();
+        if (ebpf_plugin_stop()) {
+            if (sem_post(shm_mutex_ebpf_integration))
+                netdata_log_error("CACHESTAT: Failed to post semaphore.");
+            break;
+        }
+
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_cachestat_cgroup();
         if (sem_post(shm_mutex_ebpf_integration))
             netdata_log_error("CACHESTAT: Failed to post semaphore.");
 
         counter = 0;
+
+        if (ebpf_plugin_stop())
+            break;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time)
@@ -1606,10 +1616,18 @@ static void cachestat_collector(ebpf_module_t *em)
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_cache_send_apps_data(apps_groups_root_target);
 
+        if (ebpf_plugin_stop()) {
+            netdata_mutex_unlock(&lock);
+            break;
+        }
+
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_cachestat_send_cgroup_data(update_every);
 
         netdata_mutex_unlock(&lock);
+
+        if (ebpf_plugin_stop())
+            break;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         if (running_time)
