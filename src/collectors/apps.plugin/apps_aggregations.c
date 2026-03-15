@@ -185,7 +185,7 @@ static STRING *other_service_name = NULL;
 
 static void assign_service_to_all_processes(void) {
     if(!other_service_name)
-        other_service_name = string_strdupz("Other");
+        other_service_name = string_strdupz("not-services");
 
     // Clear walk-up assigned service_names from previous iteration.
     // Direct matches (got_service) are kept — they persist per process lifetime.
