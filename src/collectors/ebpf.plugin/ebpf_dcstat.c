@@ -738,6 +738,12 @@ void ebpf_read_dcstat_thread(void *ptr)
 
         ebpf_read_dc_apps_table(maps_per_core);
         ebpf_dc_resume_apps_data();
+        if (ebpf_plugin_stop()) {
+            if (sem_post(shm_mutex_ebpf_integration))
+                netdata_log_error("DCSTAT: Failed to post semaphore.");
+            break;
+        }
+
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_dc_cgroup();
 
@@ -1410,6 +1416,11 @@ static void dcstat_collector(ebpf_module_t *em)
 
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_dcache_send_apps_data(apps_groups_root_target);
+
+        if (ebpf_plugin_stop()) {
+            netdata_mutex_unlock(&lock);
+            break;
+        }
 
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_dc_send_cgroup_data(update_every);

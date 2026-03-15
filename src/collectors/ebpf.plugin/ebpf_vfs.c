@@ -2347,6 +2347,12 @@ void ebpf_read_vfs_thread(void *ptr)
         }
         ebpf_vfs_read_apps(maps_per_core);
         ebpf_vfs_resume_apps_data();
+        if (ebpf_plugin_stop()) {
+            if (sem_post(shm_mutex_ebpf_integration))
+                netdata_log_error("VFS: Failed to post semaphore.");
+            break;
+        }
+
         if (cgroups && shm_ebpf_cgroup.header)
             read_update_vfs_cgroup();
 
@@ -2405,6 +2411,11 @@ static void vfs_collector(ebpf_module_t *em)
 
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_vfs_send_apps_data(em, apps_groups_root_target);
+
+        if (ebpf_plugin_stop()) {
+            netdata_mutex_unlock(&lock);
+            break;
+        }
 
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_vfs_send_cgroup_data(em);

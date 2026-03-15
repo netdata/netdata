@@ -1153,6 +1153,12 @@ void ebpf_read_shm_thread(void *ptr)
         }
         ebpf_read_shm_apps_table(maps_per_core);
         ebpf_shm_resume_apps_data();
+        if (ebpf_plugin_stop()) {
+            if (sem_post(shm_mutex_ebpf_integration))
+                netdata_log_error("SHM: Failed to post semaphore.");
+            break;
+        }
+
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_shm_cgroup();
 
@@ -1209,11 +1215,19 @@ static void shm_collector(ebpf_module_t *em)
             ebpf_shm_send_apps_data(apps_groups_root_target);
         }
 
+        if (ebpf_plugin_stop()) {
+            netdata_mutex_unlock(&lock);
+            break;
+        }
+
         if (cgroups && shm_ebpf_cgroup.header) {
             ebpf_shm_send_cgroup_data(update_every);
         }
 
         netdata_mutex_unlock(&lock);
+
+        if (ebpf_plugin_stop())
+            break;
 
         netdata_mutex_lock(&ebpf_exit_cleanup);
         running_time += update_every;

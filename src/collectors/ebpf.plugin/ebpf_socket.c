@@ -2029,6 +2029,12 @@ void ebpf_read_socket_thread(void *ptr)
         }
         ebpf_update_array_vectors(em);
         ebpf_socket_resume_apps_data();
+        if (ebpf_plugin_stop()) {
+            if (sem_post(shm_mutex_ebpf_integration))
+                netdata_log_error("SOCKET: Failed to post semaphore.");
+            break;
+        }
+
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_socket_cgroup();
 
@@ -2036,6 +2042,9 @@ void ebpf_read_socket_thread(void *ptr)
             netdata_log_error("SOCKET: Failed to post semaphore.");
 
         counter = 0;
+
+        if (ebpf_plugin_stop())
+            break;
     }
 }
 
@@ -2860,6 +2869,11 @@ static void socket_collector(ebpf_module_t *em)
 
         if (socket_apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_socket_send_apps_data();
+
+        if (ebpf_plugin_stop()) {
+            netdata_mutex_unlock(&lock);
+            break;
+        }
 
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_socket_send_cgroup_data(update_every);

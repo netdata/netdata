@@ -921,6 +921,12 @@ void ebpf_read_fd_thread(void *ptr)
         }
         ebpf_read_fd_apps_table(maps_per_core);
         ebpf_fd_resume_apps_data();
+        if (ebpf_plugin_stop()) {
+            if (sem_post(shm_mutex_ebpf_integration))
+                netdata_log_error("FD: Failed to post semaphore.");
+            break;
+        }
+
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_fd_cgroup();
 
@@ -1408,6 +1414,11 @@ static void fd_collector(ebpf_module_t *em)
 
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_fd_send_apps_data(em, apps_groups_root_target);
+
+        if (ebpf_plugin_stop()) {
+            netdata_mutex_unlock(&lock);
+            break;
+        }
 
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_fd_send_cgroup_data(em);

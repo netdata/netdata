@@ -1658,12 +1658,21 @@ static void process_collector(ebpf_module_t *em)
                 ebpf_process_send_apps_data(apps_groups_root_target, em);
             }
 
+            if (ebpf_plugin_stop()) {
+                netdata_mutex_unlock(&collect_data_mutex);
+                netdata_mutex_unlock(&lock);
+                break;
+            }
+
             if (cgroups && shm_ebpf_cgroup.header) {
                 ebpf_process_send_cgroup_data(em);
             }
 
             netdata_mutex_unlock(&collect_data_mutex);
             netdata_mutex_unlock(&lock);
+
+            if (ebpf_plugin_stop())
+                break;
 
             netdata_mutex_lock(&ebpf_exit_cleanup);
             running_time += update_every;
