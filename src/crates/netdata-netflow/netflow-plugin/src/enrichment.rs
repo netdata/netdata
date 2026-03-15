@@ -379,7 +379,11 @@ impl FlowEnricher {
         let in_if = parse_u32_field(fields, "IN_IF");
         let out_if = parse_u32_field(fields, "OUT_IF");
 
-        let mut exporter_name = String::new();
+        let mut exporter_name = fields
+            .get("EXPORTER_NAME")
+            .cloned()
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| exporter_ip_str.clone());
         let mut exporter_classification = ExporterClassification::default();
         let mut in_interface = InterfaceInfo {
             index: in_if,
@@ -430,15 +434,6 @@ impl FlowEnricher {
             out_classification.boundary = lookup.interface.boundary;
         }
 
-        // Akvorado parity: reject records lacking interface identity.
-        if in_if == 0 && out_if == 0 {
-            return false;
-        }
-        // Akvorado parity: metadata lookup must yield an exporter name.
-        if exporter_name.is_empty() {
-            return false;
-        }
-
         if let Some(sampling_rate) = self
             .override_sampling_rate
             .lookup(exporter_ip)
@@ -455,9 +450,6 @@ impl FlowEnricher {
                 .filter(|rate| *rate > 0)
             {
                 fields.insert("SAMPLING_RATE", sampling_rate.to_string());
-            } else {
-                // Akvorado parity: sampling rate is required after overrides/defaults.
-                return false;
             }
         }
 
@@ -587,7 +579,11 @@ impl FlowEnricher {
         let in_if = rec.in_if;
         let out_if = rec.out_if;
 
-        let mut exporter_name = String::new();
+        let mut exporter_name = if rec.exporter_name.is_empty() {
+            exporter_ip_str.clone()
+        } else {
+            rec.exporter_name.clone()
+        };
         let mut exporter_classification = ExporterClassification::default();
         let mut in_interface = InterfaceInfo {
             index: in_if,
@@ -638,13 +634,6 @@ impl FlowEnricher {
             out_classification.boundary = lookup.interface.boundary;
         }
 
-        if in_if == 0 && out_if == 0 {
-            return false;
-        }
-        if exporter_name.is_empty() {
-            return false;
-        }
-
         // Sampling rate overrides.
         if let Some(sampling_rate) = self
             .override_sampling_rate
@@ -662,8 +651,6 @@ impl FlowEnricher {
                 .filter(|rate| *rate > 0)
             {
                 rec.sampling_rate = sampling_rate;
-            } else {
-                return false;
             }
         }
 
@@ -2802,6 +2789,7 @@ pub(crate) struct NetworkAttributes {
     pub(crate) city: String,
     pub(crate) tenant: String,
     pub(crate) asn: u32,
+    pub(crate) asn_name: String,
 }
 
 impl NetworkAttributes {
@@ -2816,6 +2804,7 @@ impl NetworkAttributes {
             city: config.city.clone(),
             tenant: config.tenant.clone(),
             asn: config.asn,
+            asn_name: String::new(),
         }
     }
 
@@ -2829,11 +2818,15 @@ impl NetworkAttributes {
             && self.city.is_empty()
             && self.tenant.is_empty()
             && self.asn == 0
+            && self.asn_name.is_empty()
     }
 
     fn merge_from(&mut self, overlay: &Self) {
         if overlay.asn != 0 {
             self.asn = overlay.asn;
+        }
+        if !overlay.asn_name.is_empty() {
+            self.asn_name = overlay.asn_name.clone();
         }
         if !overlay.name.is_empty() {
             self.name = overlay.name.clone();
@@ -2909,6 +2902,8 @@ struct GeoIpFileSignature {
 struct AsnLookupRecord {
     #[serde(default)]
     autonomous_system_number: Option<u32>,
+    #[serde(default)]
+    autonomous_system_organization: Option<String>,
     #[serde(default)]
     asn: Option<String>,
 }
@@ -3031,10 +3026,13 @@ impl GeoIpResolver {
         let mut out = NetworkAttributes::default();
 
         for db in &self.asn_databases {
-            if let Ok(record) = db.lookup::<AsnLookupRecord>(address)
-                && let Some(asn) = decode_asn_record(&record)
-            {
-                out.asn = asn;
+            if let Ok(record) = db.lookup::<AsnLookupRecord>(address) {
+                if let Some(asn) = decode_asn_record(&record) {
+                    out.asn = asn;
+                }
+                if let Some(asn_name) = decode_asn_name(&record) {
+                    out.asn_name = asn_name;
+                }
             }
         }
 
@@ -3132,6 +3130,15 @@ fn decode_asn_record(record: &AsnLookupRecord) -> Option<u32> {
         .as_deref()
         .and_then(parse_asn_text)
         .filter(|asn| *asn != 0)
+}
+
+fn decode_asn_name(record: &AsnLookupRecord) -> Option<String> {
+    record
+        .autonomous_system_organization
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
 }
 
 fn parse_asn_text(value: &str) -> Option<u32> {
@@ -3416,16 +3423,13 @@ impl<T> PrefixMap<T> {
 }
 
 fn apply_network_asn_override(current_asn: u32, network_asn: u32) -> u32 {
-    if current_asn == 0 {
-        network_asn
-    } else {
-        current_asn
-    }
+    if network_asn != 0 { network_asn } else { current_asn }
 }
 
 /// Pre-defined static keys for SRC/DST network attribute fields.
 #[cfg(test)]
 struct SideKeys {
+    as_name: &'static str,
     net_name: &'static str,
     net_role: &'static str,
     net_site: &'static str,
@@ -3438,6 +3442,7 @@ struct SideKeys {
 
 #[cfg(test)]
 const SRC_KEYS: SideKeys = SideKeys {
+    as_name: "SRC_AS_NAME",
     net_name: "SRC_NET_NAME",
     net_role: "SRC_NET_ROLE",
     net_site: "SRC_NET_SITE",
@@ -3450,6 +3455,7 @@ const SRC_KEYS: SideKeys = SideKeys {
 
 #[cfg(test)]
 const DST_KEYS: SideKeys = SideKeys {
+    as_name: "DST_AS_NAME",
     net_name: "DST_NET_NAME",
     net_role: "DST_NET_ROLE",
     net_site: "DST_NET_SITE",
@@ -3467,6 +3473,7 @@ fn write_network_attributes(
     attrs: Option<&NetworkAttributes>,
 ) {
     let attrs = attrs.cloned().unwrap_or_default();
+    fields.insert(keys.as_name, attrs.asn_name);
     fields.insert(keys.net_name, attrs.name);
     fields.insert(keys.net_role, attrs.role);
     fields.insert(keys.net_site, attrs.site);
@@ -3483,6 +3490,7 @@ fn write_network_attributes(
 
 fn write_network_attributes_record_src(rec: &mut FlowRecord, attrs: Option<&NetworkAttributes>) {
     let attrs = attrs.cloned().unwrap_or_default();
+    rec.src_as_name = attrs.asn_name;
     rec.src_net_name = attrs.name;
     rec.src_net_role = attrs.role;
     rec.src_net_site = attrs.site;
@@ -3495,6 +3503,7 @@ fn write_network_attributes_record_src(rec: &mut FlowRecord, attrs: Option<&Netw
 
 fn write_network_attributes_record_dst(rec: &mut FlowRecord, attrs: Option<&NetworkAttributes>) {
     let attrs = attrs.cloned().unwrap_or_default();
+    rec.dst_as_name = attrs.asn_name;
     rec.dst_net_name = attrs.name;
     rec.dst_net_role = attrs.role;
     rec.dst_net_site = attrs.site;
@@ -4691,21 +4700,30 @@ mod tests {
     }
 
     #[test]
-    fn parity_drops_flow_when_metadata_is_missing() {
+    fn geoip_only_enrichment_keeps_flow_without_static_metadata() {
         let cfg = EnrichmentConfig {
-            default_sampling_rate: Some(SamplingRateSetting::Single(1000)),
+            geoip: GeoIpConfig {
+                asn_database: vec!["/path/that/does/not/exist/asn.mmdb".to_string()],
+                geo_database: vec!["/path/that/does/not/exist/geo.mmdb".to_string()],
+                optional: true,
+            },
             ..Default::default()
         };
         let mut enricher = FlowEnricher::from_config(&cfg)
             .expect("build enricher")
             .expect("enricher must be enabled");
 
-        let mut fields = base_fields("192.0.2.10", 10, 20, 100, 10, 300);
-        assert!(!enricher.enrich_fields(&mut fields));
+        let mut fields = base_fields("192.0.2.10", 10, 20, 0, 10, 300);
+        assert!(enricher.enrich_fields(&mut fields));
+        assert_eq!(
+            fields.get("EXPORTER_NAME").map(String::as_str),
+            Some("192.0.2.10")
+        );
+        assert_eq!(fields.get("SAMPLING_RATE").map(String::as_str), Some("0"));
     }
 
     #[test]
-    fn parity_drops_flow_when_sampling_rate_is_missing() {
+    fn static_metadata_without_sampling_keeps_flow() {
         let cfg = EnrichmentConfig {
             metadata_static: metadata_config_for_192(),
             ..Default::default()
@@ -4715,7 +4733,12 @@ mod tests {
             .expect("enricher must be enabled");
 
         let mut fields = base_fields("192.0.2.10", 10, 20, 0, 10, 300);
-        assert!(!enricher.enrich_fields(&mut fields));
+        assert!(enricher.enrich_fields(&mut fields));
+        assert_eq!(
+            fields.get("EXPORTER_NAME").map(String::as_str),
+            Some("edge-router")
+        );
+        assert_eq!(fields.get("SAMPLING_RATE").map(String::as_str), Some("0"));
     }
 
     #[test]
@@ -5153,7 +5176,7 @@ mod tests {
     }
 
     #[test]
-    fn network_enrichment_does_not_override_non_zero_flow_asn() {
+    fn network_enrichment_prefers_network_asn_when_present() {
         let cfg = EnrichmentConfig {
             metadata_static: metadata_config_for_192(),
             default_sampling_rate: Some(SamplingRateSetting::Single(1000)),
@@ -5180,7 +5203,7 @@ mod tests {
         fields.insert("DST_MASK", "24".to_string());
 
         assert!(enricher.enrich_fields(&mut fields));
-        assert_eq!(fields.get("SRC_AS").map(String::as_str), Some("65001"));
+        assert_eq!(fields.get("SRC_AS").map(String::as_str), Some("64500"));
         assert_eq!(fields.get("DST_AS").map(String::as_str), Some("64500"));
     }
 
@@ -5316,6 +5339,24 @@ mod tests {
         assert_eq!(parse_asn_text("as64513"), Some(64_513));
         assert_eq!(parse_asn_text("64514"), Some(64_514));
         assert_eq!(parse_asn_text("ASX"), None);
+    }
+
+    #[test]
+    fn decode_asn_name_returns_non_empty_organization() {
+        let record = AsnLookupRecord {
+            autonomous_system_number: Some(64_512),
+            autonomous_system_organization: Some("Example Transit".to_string()),
+            asn: None,
+        };
+
+        assert_eq!(decode_asn_name(&record).as_deref(), Some("Example Transit"));
+    }
+
+    #[test]
+    fn network_asn_override_prefers_network_asn_when_present() {
+        assert_eq!(apply_network_asn_override(65_001, 64_500), 64_500);
+        assert_eq!(apply_network_asn_override(65_001, 0), 65_001);
+        assert_eq!(apply_network_asn_override(0, 64_500), 64_500);
     }
 
     fn metadata_config_for_192() -> StaticMetadataConfig {
@@ -5480,6 +5521,7 @@ mod tests {
             "SAMPLING_RATE",
             "SRC_MASK", "DST_MASK",
             "SRC_AS", "DST_AS",
+            "SRC_AS_NAME", "DST_AS_NAME",
             "NEXT_HOP",
             "SRC_NET_NAME", "SRC_NET_ROLE", "SRC_NET_SITE", "SRC_NET_REGION", "SRC_NET_TENANT",
             "SRC_COUNTRY", "SRC_GEO_CITY", "SRC_GEO_STATE",
@@ -5536,7 +5578,7 @@ mod tests {
     }
 
     #[test]
-    fn enrich_record_rejects_missing_interfaces() {
+    fn enrich_record_matches_without_interface_indexes() {
         let cfg = EnrichmentConfig {
             metadata_static: metadata_config_for_192(),
             ..Default::default()

@@ -12,6 +12,11 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+const DEFAULT_NETDATA_CACHE_DIR: &str = "/var/cache/netdata";
+const TOPOLOGY_IP_INTEL_DIR: &str = "topology-ip-intel";
+const TOPOLOGY_IP_ASN_MMDB: &str = "topology-ip-asn.mmdb";
+const TOPOLOGY_IP_COUNTRY_MMDB: &str = "topology-ip-country.mmdb";
+
 fn parse_duration(value: &str) -> Result<Duration, String> {
     humantime::parse_duration(value).map_err(|e| {
         format!(
@@ -935,10 +940,57 @@ impl PluginConfig {
         cfg._netdata_env = netdata_env.clone();
         cfg.journal.journal_dir =
             resolve_relative_path(&cfg.journal.journal_dir, netdata_env.cache_dir.as_deref());
+        cfg.auto_detect_geoip_databases();
         cfg.ensure_storage_layout()?;
 
         cfg.validate()?;
         Ok(cfg)
+    }
+
+    fn auto_detect_geoip_databases(&mut self) {
+        let cache_dir = self.inferred_cache_dir();
+        let geoip = &mut self.enrichment.geoip;
+        if !geoip.asn_database.is_empty() || !geoip.geo_database.is_empty() {
+            return;
+        }
+
+        let intel_dir = cache_dir.join(TOPOLOGY_IP_INTEL_DIR);
+        let asn_db = intel_dir.join(TOPOLOGY_IP_ASN_MMDB);
+        let geo_db = intel_dir.join(TOPOLOGY_IP_COUNTRY_MMDB);
+
+        let mut detected = false;
+        if asn_db.is_file() {
+            geoip
+                .asn_database
+                .push(asn_db.to_string_lossy().to_string());
+            detected = true;
+        }
+        if geo_db.is_file() {
+            geoip
+                .geo_database
+                .push(geo_db.to_string_lossy().to_string());
+            detected = true;
+        }
+
+        if detected {
+            // Auto-detected databases should not prevent startup if they disappear.
+            geoip.optional = true;
+        }
+    }
+
+    fn inferred_cache_dir(&self) -> PathBuf {
+        let base_dir = self.journal.base_dir();
+        if base_dir.is_absolute()
+            && let Some(parent) = base_dir.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            return parent.to_path_buf();
+        }
+
+        self._netdata_env
+            .cache_dir
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(DEFAULT_NETDATA_CACHE_DIR))
     }
 
     fn load_from_netdata_config(netdata_env: &NetdataEnv) -> Result<Self> {
@@ -1227,6 +1279,7 @@ fn validate_network_source_tls(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     #[test]
     fn dynamic_bmp_decode_error_threshold_defaults_to_8() {
@@ -1403,5 +1456,81 @@ journal:
             minute_1.duration_of_journal_files,
             Duration::from_secs(11 * 24 * 60 * 60)
         );
+    }
+
+    #[test]
+    fn auto_detect_geoip_databases_uses_absolute_journal_parent() {
+        let dir = tempdir().expect("create tempdir");
+        let cache_dir = dir.path();
+        let intel_dir = cache_dir.join(TOPOLOGY_IP_INTEL_DIR);
+        fs::create_dir_all(&intel_dir).expect("create intel dir");
+        fs::write(intel_dir.join(TOPOLOGY_IP_ASN_MMDB), b"asn").expect("write asn db");
+        fs::write(intel_dir.join(TOPOLOGY_IP_COUNTRY_MMDB), b"geo").expect("write geo db");
+
+        let mut cfg = PluginConfig::default();
+        cfg.journal.journal_dir = cache_dir.join("flows").to_string_lossy().to_string();
+
+        cfg.auto_detect_geoip_databases();
+
+        assert_eq!(
+            cfg.enrichment.geoip.asn_database,
+            vec![intel_dir
+                .join(TOPOLOGY_IP_ASN_MMDB)
+                .to_string_lossy()
+                .to_string()]
+        );
+        assert_eq!(
+            cfg.enrichment.geoip.geo_database,
+            vec![intel_dir
+                .join(TOPOLOGY_IP_COUNTRY_MMDB)
+                .to_string_lossy()
+                .to_string()]
+        );
+        assert!(cfg.enrichment.geoip.optional);
+    }
+
+    #[test]
+    fn auto_detect_geoip_databases_uses_netdata_cache_dir_for_relative_journal_dir() {
+        let dir = tempdir().expect("create tempdir");
+        let cache_dir = dir.path();
+        let intel_dir = cache_dir.join(TOPOLOGY_IP_INTEL_DIR);
+        fs::create_dir_all(&intel_dir).expect("create intel dir");
+        fs::write(intel_dir.join(TOPOLOGY_IP_ASN_MMDB), b"asn").expect("write asn db");
+
+        let mut cfg = PluginConfig::default();
+        cfg._netdata_env.cache_dir = Some(cache_dir.to_path_buf());
+        cfg.journal.journal_dir = "flows".to_string();
+
+        cfg.auto_detect_geoip_databases();
+
+        assert_eq!(
+            cfg.enrichment.geoip.asn_database,
+            vec![intel_dir
+                .join(TOPOLOGY_IP_ASN_MMDB)
+                .to_string_lossy()
+                .to_string()]
+        );
+        assert!(cfg.enrichment.geoip.geo_database.is_empty());
+        assert!(cfg.enrichment.geoip.optional);
+    }
+
+    #[test]
+    fn auto_detect_geoip_databases_does_not_override_explicit_config() {
+        let dir = tempdir().expect("create tempdir");
+        let cache_dir = dir.path();
+        let intel_dir = cache_dir.join(TOPOLOGY_IP_INTEL_DIR);
+        fs::create_dir_all(&intel_dir).expect("create intel dir");
+        fs::write(intel_dir.join(TOPOLOGY_IP_ASN_MMDB), b"asn").expect("write asn db");
+        fs::write(intel_dir.join(TOPOLOGY_IP_COUNTRY_MMDB), b"geo").expect("write geo db");
+
+        let mut cfg = PluginConfig::default();
+        cfg.journal.journal_dir = cache_dir.join("flows").to_string_lossy().to_string();
+        cfg.enrichment.geoip.asn_database = vec!["/custom/asn.mmdb".to_string()];
+        cfg.enrichment.geoip.geo_database = vec!["/custom/geo.mmdb".to_string()];
+
+        cfg.auto_detect_geoip_databases();
+
+        assert_eq!(cfg.enrichment.geoip.asn_database, vec!["/custom/asn.mmdb"]);
+        assert_eq!(cfg.enrichment.geoip.geo_database, vec!["/custom/geo.mmdb"]);
     }
 }

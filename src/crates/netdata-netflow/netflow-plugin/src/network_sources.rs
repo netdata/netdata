@@ -254,6 +254,7 @@ fn decode_remote_records(
             city: remote.city,
             tenant: remote.tenant,
             asn: decode_remote_asn(remote.asn),
+            asn_name: String::new(),
         };
         out.push(NetworkSourceRecord { prefix, attrs });
     }

@@ -114,6 +114,8 @@ pub(crate) struct RollupDimensions {
     // AS numbers
     pub(crate) src_as: u32,
     pub(crate) dst_as: u32,
+    pub(crate) src_as_name: String,
+    pub(crate) dst_as_name: String,
 
     // Exporter identity
     pub(crate) exporter_ip: Option<IpAddr>,
@@ -186,6 +188,8 @@ impl RollupDimensions {
             icmpv6_code: rec.icmpv6_code,
             src_as: rec.src_as,
             dst_as: rec.dst_as,
+            src_as_name: rec.src_as_name.clone(),
+            dst_as_name: rec.dst_as_name.clone(),
             exporter_ip: rec.exporter_ip,
             exporter_port: rec.exporter_port,
             exporter_name: rec.exporter_name.clone(),
@@ -247,6 +251,8 @@ impl RollupDimensions {
             && self.icmpv6_code == rec.icmpv6_code
             && self.src_as == rec.src_as
             && self.dst_as == rec.dst_as
+            && self.src_as_name == rec.src_as_name
+            && self.dst_as_name == rec.dst_as_name
             && self.exporter_ip == rec.exporter_ip
             && self.exporter_port == rec.exporter_port
             && self.exporter_name == rec.exporter_name
@@ -309,6 +315,8 @@ impl RollupDimensions {
         f.insert("ICMPV6_CODE", ibuf.format(self.icmpv6_code as u64).to_string());
         f.insert("SRC_AS", ibuf.format(self.src_as as u64).to_string());
         f.insert("DST_AS", ibuf.format(self.dst_as as u64).to_string());
+        f.insert("SRC_AS_NAME", self.src_as_name.clone());
+        f.insert("DST_AS_NAME", self.dst_as_name.clone());
         f.insert("EXPORTER_IP", self.exporter_ip.map(|ip| ip.to_string()).unwrap_or_default());
         f.insert("EXPORTER_PORT", ibuf.format(self.exporter_port as u64).to_string());
         f.insert("EXPORTER_NAME", self.exporter_name.clone());
@@ -372,6 +380,8 @@ pub(crate) fn rollup_dimension_hash(rec: &FlowRecord) -> u64 {
     rec.icmpv6_code.hash(&mut hasher);
     rec.src_as.hash(&mut hasher);
     rec.dst_as.hash(&mut hasher);
+    rec.src_as_name.hash(&mut hasher);
+    rec.dst_as_name.hash(&mut hasher);
     rec.exporter_ip.hash(&mut hasher);
     rec.exporter_port.hash(&mut hasher);
     rec.exporter_name.hash(&mut hasher);
@@ -645,6 +655,8 @@ mod tests {
         rec.etype = 2048;
         rec.src_as = 64512;
         rec.dst_as = 15169;
+        rec.src_as_name = "Example Transit".to_string();
+        rec.dst_as_name = "Google LLC".to_string();
         rec.in_if = 10;
         rec.out_if = 20;
         rec.sampling_rate = 100;
@@ -660,6 +672,14 @@ mod tests {
         assert_eq!(fields.get("ETYPE").map(String::as_str), Some("2048"));
         assert_eq!(fields.get("SRC_AS").map(String::as_str), Some("64512"));
         assert_eq!(fields.get("DST_AS").map(String::as_str), Some("15169"));
+        assert_eq!(
+            fields.get("SRC_AS_NAME").map(String::as_str),
+            Some("Example Transit")
+        );
+        assert_eq!(
+            fields.get("DST_AS_NAME").map(String::as_str),
+            Some("Google LLC")
+        );
         assert_eq!(fields.get("SRC_COUNTRY").map(String::as_str), Some("US"));
         assert_eq!(fields.get("DST_COUNTRY").map(String::as_str), Some("DE"));
         assert_eq!(fields.get("DIRECTION").map(String::as_str), Some("ingress"));

@@ -88,6 +88,8 @@ const CANONICAL_FLOW_DEFAULTS: &[(&str, &str)] = &[
     ("DST_MASK", "0"),
     ("SRC_AS", "0"),
     ("DST_AS", "0"),
+    ("SRC_AS_NAME", ""),
+    ("DST_AS_NAME", ""),
     ("SRC_NET_NAME", ""),
     ("DST_NET_NAME", ""),
     ("SRC_NET_ROLE", ""),
@@ -195,7 +197,7 @@ pub(crate) fn intern_field_name(name: &str) -> Option<&'static str> {
 }
 
 // ---------------------------------------------------------------------------
-// FlowRecord: flat struct with native types for all 87 canonical fields.
+// FlowRecord: flat struct with native types for all 89 canonical fields.
 // Replaces BTreeMap<&'static str, String> on the hot path. Fields that are
 // numbers, IPs, MACs, or enums are stored in their natural representation,
 // eliminating String allocations during decode.
@@ -235,8 +237,8 @@ impl std::fmt::Display for FlowDirection {
 }
 
 /// Flat, typed representation of a canonical flow record.
-/// All 87 canonical fields stored with native types. Only enrichment-derived
-/// text fields remain as String (34 fields, most empty by default).
+/// All 89 canonical fields stored with native types. Only enrichment-derived
+/// text fields remain as String (36 fields, most empty by default).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct FlowRecord {
     // --- Protocol version / exporter identity ---
@@ -275,6 +277,8 @@ pub(crate) struct FlowRecord {
     pub(crate) dst_mask: u8,
     pub(crate) src_as: u32,
     pub(crate) dst_as: u32,
+    pub(crate) src_as_name: String,
+    pub(crate) dst_as_name: String,
 
     // --- Network attributes (enrichment-derived strings) ---
     pub(crate) src_net_name: String,
@@ -418,6 +422,8 @@ impl FlowRecord {
         f.insert("DST_MASK", self.dst_mask.to_string());
         f.insert("SRC_AS", self.src_as.to_string());
         f.insert("DST_AS", self.dst_as.to_string());
+        f.insert("SRC_AS_NAME", self.src_as_name.clone());
+        f.insert("DST_AS_NAME", self.dst_as_name.clone());
         // Network attributes
         f.insert("SRC_NET_NAME", self.src_net_name.clone());
         f.insert("DST_NET_NAME", self.dst_net_name.clone());
@@ -549,6 +555,8 @@ impl FlowRecord {
             dst_mask: get_u8("DST_MASK"),
             src_as: get_u32("SRC_AS"),
             dst_as: get_u32("DST_AS"),
+            src_as_name: get_string("SRC_AS_NAME"),
+            dst_as_name: get_string("DST_AS_NAME"),
             src_net_name: get_string("SRC_NET_NAME"),
             dst_net_name: get_string("DST_NET_NAME"),
             src_net_role: get_string("SRC_NET_ROLE"),
@@ -763,6 +771,8 @@ impl FlowRecord {
         push_u8!("DST_MASK", self.dst_mask);
         push_u32!("SRC_AS", self.src_as);
         push_u32!("DST_AS", self.dst_as);
+        push_str!("SRC_AS_NAME", &self.src_as_name);
+        push_str!("DST_AS_NAME", &self.dst_as_name);
         push_str!("SRC_NET_NAME", &self.src_net_name);
         push_str!("DST_NET_NAME", &self.dst_net_name);
         push_str!("SRC_NET_ROLE", &self.src_net_role);
@@ -4106,6 +4116,8 @@ fn set_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
         "DST_MASK" => { rec.dst_mask = value.parse().unwrap_or(0); }
         "SRC_AS" => { rec.src_as = value.parse().unwrap_or(0); }
         "DST_AS" => { rec.dst_as = value.parse().unwrap_or(0); }
+        "SRC_AS_NAME" => { rec.src_as_name = value.to_string(); }
+        "DST_AS_NAME" => { rec.dst_as_name = value.to_string(); }
         "SRC_NET_NAME" => { rec.src_net_name = value.to_string(); }
         "DST_NET_NAME" => { rec.dst_net_name = value.to_string(); }
         "SRC_NET_ROLE" => { rec.src_net_role = value.to_string(); }
@@ -8175,6 +8187,8 @@ mod tests {
             dst_mask: 48,
             src_as: 64512,
             dst_as: 15169,
+            src_as_name: "Example Source ASN".into(),
+            dst_as_name: "Example Destination ASN".into(),
             src_net_name: "internal".into(),
             dst_net_name: "google-dns".into(),
             src_net_role: "private".into(),
@@ -8269,6 +8283,8 @@ mod tests {
         assert_eq!(rec.dst_mask, rec2.dst_mask);
         assert_eq!(rec.src_as, rec2.src_as);
         assert_eq!(rec.dst_as, rec2.dst_as);
+        assert_eq!(rec.src_as_name, rec2.src_as_name);
+        assert_eq!(rec.dst_as_name, rec2.dst_as_name);
         assert_eq!(rec.src_net_name, rec2.src_net_name);
         assert_eq!(rec.dst_net_name, rec2.dst_net_name);
         assert_eq!(rec.src_net_role, rec2.src_net_role);

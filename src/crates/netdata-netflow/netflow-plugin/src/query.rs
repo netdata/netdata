@@ -36,6 +36,10 @@ const GROUP_BY_DEFAULT_AGGREGATED: &[&str] = &[
     "PROTOCOL",
     "SRC_AS",
     "DST_AS",
+    "SRC_AS_NAME",
+    "DST_AS_NAME",
+    "SRC_COUNTRY",
+    "DST_COUNTRY",
     "SRC_NET_NAME",
     "DST_NET_NAME",
     "SRC_NET_ROLE",
@@ -1492,6 +1496,12 @@ mod tests {
         let group_by = resolve_effective_group_by(&request);
         assert!(group_by.iter().any(|field| field == "PROTOCOL"));
         assert!(group_by.iter().any(|field| field == "EXPORTER_IP"));
+        assert!(group_by.iter().any(|field| field == "SRC_AS"));
+        assert!(group_by.iter().any(|field| field == "DST_AS"));
+        assert!(group_by.iter().any(|field| field == "SRC_AS_NAME"));
+        assert!(group_by.iter().any(|field| field == "DST_AS_NAME"));
+        assert!(group_by.iter().any(|field| field == "SRC_COUNTRY"));
+        assert!(group_by.iter().any(|field| field == "DST_COUNTRY"));
         assert!(!group_by.iter().any(|field| field == "SRC_ADDR"));
     }
 
