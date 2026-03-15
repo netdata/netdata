@@ -551,6 +551,9 @@ static void read_hard_disk_tables(int table, int maps_per_core)
     netdata_ebpf_disks_t *ret = NULL;
 
     while (bpf_map_get_next_key(table, &key, &next_key) == 0) {
+        if (ebpf_plugin_stop())
+            break;
+
         int test = bpf_map_lookup_elem(table, &key, values);
         if (test < 0) {
             key = next_key;

@@ -611,6 +611,9 @@ static void ebpf_read_swap_apps_table(int maps_per_core)
 
     uint32_t key = 0, next_key = 0;
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (bpf_map_lookup_elem(fd, &key, cv)) {
             goto end_swap_loop;
         }
