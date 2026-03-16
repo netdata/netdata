@@ -848,10 +848,10 @@ const char *detect_system_timezone_name(char *buffer, size_t buffer_size) {
 // Set at startup: true when the user explicitly set "timezone" in netdata.conf.
 static bool timezone_user_configured = false;
 
-// Set at startup: true when the timezone name came from a proper source (config,
+// True when the timezone name came from a proper source (config,
 // /etc/localtime, /etc/timezone, TZ env var) rather than from the strftime("%Z")
 // fallback which only produces bare abbreviations like "CEST" or "PST".
-static bool timezone_is_tzdb_name = true;
+static bool timezone_is_tzdb_name = false;
 
 bool system_timezone_is_user_configured(void) {
     return timezone_user_configured;
@@ -878,6 +878,7 @@ void get_system_timezone(void)
     // use the TZ variable if it's an explicit IANA name (not a path starting with ':')
     if (tz && *tz && *tz != ':') {
         timezone = tz;
+        timezone_is_tzdb_name = true;
         netdata_log_info("TIMEZONE: using TZ variable '%s'", timezone);
     }
 #endif
@@ -885,12 +886,14 @@ void get_system_timezone(void)
     // Detect from system sources (/etc/localtime symlink, /etc/timezone, Windows API)
     if (!timezone) {
         timezone = detect_system_timezone_name(buffer, sizeof(buffer));
-        if (timezone)
+        if (timezone) {
+            timezone_is_tzdb_name = true;
             netdata_log_info("TIMEZONE: detected '%s'", timezone);
+        }
     }
 
     // Last resort: use strftime %Z (gives abbreviation, not IANA name).
-    // Leave timezone_is_tzdb_name false so refresh_system_timezone() won't
+    // timezone_is_tzdb_name stays false so refresh_system_timezone() won't
     // try to resolve it via tzalloc() or the tzfile parser.
     if (!timezone) {
         time_t t;
@@ -903,7 +906,6 @@ void get_system_timezone(void)
             if (strftime(buffer, FILENAME_MAX, "%Z", tmp) != 0) {
                 buffer[FILENAME_MAX] = '\0';
                 timezone = buffer;
-                timezone_is_tzdb_name = false;
                 netdata_log_info("TIMEZONE: using strftime(): '%s'", timezone);
             }
         }
