@@ -902,31 +902,42 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         if(query_instance_add(qtl, qn, qc, qt->request.ria, queryable_context, false))
             added++;
     }
-    else if(unlikely(qtl->st && qtl->st->rrdcontexts.rrdcontext == rca && qtl->st->rrdcontexts.rrdinstance)) {
+    else if(unlikely(qtl->st && qtl->st->rrdcontexts.rrdcontext == rca)) {
         // Single chart requested
-        RRDINSTANCE *ri = rrdinstance_acquired_value(qtl->st->rrdcontexts.rrdinstance);
+        RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_get_and_acquire_item(
+            rc->rrdinstances, string2str(qtl->st->id));
+        if(unlikely(!ria))
+            return 0;
+
+        RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
         
         // Check scope_instances
         if(qt->instances.scope_pattern) {
-            QUERY_INSTANCE qi = { .ria = qtl->st->rrdcontexts.rrdinstance };
+            QUERY_INSTANCE qi = { .ria = ria };
             SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri,
                 qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
                 qt->request.version, qtl->host_node_id_str);
             query_instance_strings_free(&qi);
-            if(ret != SP_MATCHED_POSITIVE)
+            if(ret != SP_MATCHED_POSITIVE) {
+                rrdinstance_release(ria);
                 return 0;
+            }
         }
         
         // Check scope_labels
         if(qt->instances.scope_labels_pa || qt->instances.scope_chart_label_key_pattern) {
             if(!query_instance_matches_labels(ri,
                 qt->instances.scope_chart_label_key_pattern,
-                qt->instances.scope_labels_pa))
+                qt->instances.scope_labels_pa)) {
+                rrdinstance_release(ria);
                 return 0;
+            }
         }
         
-        if(query_instance_add(qtl, qn, qc, qtl->st->rrdcontexts.rrdinstance, queryable_context, false))
+        if(query_instance_add(qtl, qn, qc, ria, queryable_context, false))
             added++;
+
+        rrdinstance_release(ria);
     }
     else {
         // Pattern query - iterate through all instances
