@@ -215,7 +215,7 @@ if command -v setcap >/dev/null 2>&1; then
     fi
   fi
   if [ -f "usr/libexec/netdata/plugins.d/systemd-journal.plugin" ]; then
-    if ! run setcap "cap_dac_read_search=epi" "usr/libexec/netdata/plugins.d/systemd-journal.plugin"; then
+    if ! run setcap "cap_dac_read_search=eip" "usr/libexec/netdata/plugins.d/systemd-journal.plugin"; then
       run chmod 4750 "usr/libexec/netdata/plugins.d/systemd-journal.plugin"
     fi
   fi
