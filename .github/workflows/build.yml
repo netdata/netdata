@@ -490,6 +490,7 @@ jobs:
         run: |
           & "C:\Program Files\Netdata\usr\bin\netdata.exe" -W buildinfo
           if ($LastExitcode -ne 0) {
+              Write-Output "Exit Code: $LastExitCode"
               exit 1
           }
       - name: Failure Notification
