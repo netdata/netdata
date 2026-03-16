@@ -2406,6 +2406,9 @@ static void vfs_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_vfs_read_global_table(stats, maps_per_core);
 
+        if (ebpf_plugin_stop())
+            break;
+
         netdata_mutex_lock(&lock);
 
         ebpf_vfs_send_data(em);

@@ -2865,6 +2865,9 @@ static void socket_collector(ebpf_module_t *em)
             ebpf_socket_read_hash_global_tables(stats, maps_per_core);
         }
 
+        if (ebpf_plugin_stop())
+            break;
+
         netdata_mutex_lock(&lock);
         if (socket_global_enabled)
             ebpf_socket_send_data(em);

@@ -2358,10 +2358,15 @@ int main(int argc, char **argv)
     int update_apps_list = update_apps_every - 1;
     //Plugin will be killed when it receives a signal
     for (; !ebpf_plugin_stop(); global_iterations_counter++) {
+        (void)heartbeat_next(&hb);
+
+        // Skip all work (including expensive apps-parsing) if shutdown was requested
+        // while we were sleeping. Without this check the main thread runs
+        // ebpf_parse_proc_files()+ebpf_create_apps_charts() while holding lock +
+        // collect_data_mutex, blocking module threads from exiting and doubling
+        // shutdown time when fd/process/socket/vfs modules are enabled.
         if (ebpf_plugin_stop())
             break;
-
-        (void)heartbeat_next(&hb);
 
         if (global_iterations_counter % EBPF_DEFAULT_UPDATE_EVERY == 0) {
             netdata_mutex_lock(&lock);

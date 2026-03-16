@@ -1413,6 +1413,9 @@ static void fd_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_fd_read_global_tables(stats, maps_per_core);
 
+        if (ebpf_plugin_stop())
+            break;
+
         netdata_mutex_lock(&lock);
 
         ebpf_fd_send_data(em);

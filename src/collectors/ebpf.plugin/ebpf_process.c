@@ -1652,6 +1652,12 @@ static void process_collector(ebpf_module_t *em)
                 }
             }
 
+            // Avoid acquiring lock for data-send when shutdown is in progress;
+            // the main thread may be holding lock for apps-parsing at this point,
+            // which would delay this thread's join and compound the shutdown time.
+            if (ebpf_plugin_stop())
+                break;
+
             netdata_mutex_lock(&lock);
 
             if (publish_global) {
