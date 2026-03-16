@@ -590,7 +590,7 @@ modules:
     overview:
       data_collection:
         metrics_description: "This integration monitors resource utilization grouped by Windows Service."
-        method_description: "It auto-discovers running Windows services via the Service Control Manager and groups each service's process tree to aggregate CPU, memory, I/O, and other metrics per service. Processes not belonging to any service are grouped under 'Other'."
+        method_description: "It auto-discovers running Windows services via the Service Control Manager and groups each service's process tree to aggregate CPU, memory, I/O, and other metrics per service. Processes not belonging to any service are grouped under 'not-services'."
       supported_platforms:
         include:
           - windows
@@ -604,7 +604,7 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: "Zero additional overhead. The service list is already queried by apps.plugin for process naming."
+          description: "No additional SCM query overhead. The service list is already queried by apps.plugin for process naming. Per-iteration work involves walking parent chains to assign service names."
     setup:
       prerequisites:
         list: []
@@ -613,7 +613,7 @@ modules:
           name: ""
           description: ""
         options:
-          description: "Service charts are enabled by default. Use the `without-services` command line option to disable them."
+          description: "Service charts are enabled by default. Use the `without-services` (or `no-services`) command line option to disable them."
           folding:
             title: ""
             enabled: true
