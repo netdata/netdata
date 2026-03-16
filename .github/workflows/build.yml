@@ -488,9 +488,15 @@ jobs:
         id: agent-check
         if: needs.file-check.outputs.run == 'true'
         run: |
-          & "C:\Program Files\Netdata\usr\bin\netdata.exe" -W buildinfo
-          if ($LastExitcode -ne 0) {
-              Write-Output "Exit Code: $LastExitCode"
+          $ndPath = "C:\Program Files\Netdata\usr\bin\netdata.exe"
+          if (Test-Path -Path $ndPath) {
+              & $ndPath -W buildinfo
+              if ($LastExitcode -ne 0) {
+                  Write-Output "Exit Code: $LastExitCode"
+                  exit 1
+              }
+          } else {
+              Write-Output "$ndPath does not exist"
               exit 1
           }
       - name: Failure Notification
