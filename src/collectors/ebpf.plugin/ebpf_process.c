@@ -1504,6 +1504,9 @@ void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_
 {
     memset(process, 0, sizeof(ebpf_process_stat_t));
     for (; root; root = root->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         uint32_t pid = root->pid;
         netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_PROCESS_IDX);
         if (!local_pid)
@@ -1680,9 +1683,9 @@ static void process_collector(ebpf_module_t *em)
             running_time += update_every;
             em->running_time = running_time;
             netdata_mutex_unlock(&ebpf_exit_cleanup);
-        }
 
-        fflush(stdout);
+            fflush(stdout);
+        }
     }
 }
 

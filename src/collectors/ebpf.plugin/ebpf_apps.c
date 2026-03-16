@@ -79,6 +79,9 @@ size_t zero_all_targets(struct ebpf_target *root)
     size_t count = 0;
 
     for (w = root; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         count++;
 
         if (unlikely(w->root_pid)) {
@@ -106,6 +109,9 @@ void clean_apps_groups_target(struct ebpf_target *agrt)
 {
     struct ebpf_target *current_target;
     while (agrt) {
+        if (ebpf_plugin_stop())
+            break;
+
         current_target = agrt;
         agrt = current_target->target;
 
@@ -144,6 +150,9 @@ get_apps_groups_target(struct ebpf_target **agrt, const char *id, struct ebpf_ta
     // find if it already exists
     struct ebpf_target *w, *last = *agrt;
     for (w = *agrt; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (w->idhash == hash && strncmp(nid, w->id, EBPF_MAX_NAME) == 0)
             return w;
 
@@ -418,6 +427,9 @@ static inline void assign_target_to_pid(ebpf_pid_data_t *p)
     struct ebpf_target *w;
     bool assigned = false;
     for (w = apps_groups_root_target; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         // if(debug_enabled || (p->target && p->target->debug_enabled)) debug_log_int("\t\tcomparing '%s' with '%s'", w->compare, p->comm);
 
         // find it - 4 cases:
@@ -607,6 +619,9 @@ static inline void link_all_processes_to_their_parents(void)
     for (p = ebpf_pids_link_list; p; p = p->next) {
         // for each process found
 
+        if (ebpf_plugin_stop())
+            break;
+
         p->parent = NULL;
 
         if (unlikely(!p->ppid)) {
@@ -675,6 +690,9 @@ static void apply_apps_groups_targets_inheritance(void)
     while (found) {
         found = 0;
         for (p = ebpf_pids_link_list; p; p = p->next) {
+            if (ebpf_plugin_stop())
+                break;
+
             if (unlikely(
                     !p->children_count && !p->merged && p->parent && p->parent->children_count &&
                     (p->target == p->parent->target || !p->parent->target) && p->ppid != INIT_PID)) {
@@ -721,6 +739,9 @@ static inline void post_aggregate_targets(struct ebpf_target *root)
 {
     struct ebpf_target *w;
     for (w = root; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (w->collected_starttime) {
             if (!w->starttime || w->collected_starttime < w->starttime) {
                 w->starttime = w->collected_starttime;
@@ -806,6 +827,9 @@ static int ebpf_read_proc_filesystem()
     struct dirent *de = NULL;
 
     while ((de = readdir(dir))) {
+        if (ebpf_plugin_stop())
+            break;
+
         char *endptr = de->d_name;
 
         if (unlikely(de->d_type != DT_DIR || de->d_name[0] < '0' || de->d_name[0] > '9'))
@@ -859,6 +883,9 @@ void ebpf_parse_proc_files()
 {
     ebpf_pid_data_t *pids;
     for (pids = ebpf_pids_link_list; pids;) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (kill(pids->pid, 0)) { // No PID found
             ebpf_pid_data_t *next = pids->next;
             ebpf_reset_specific_pid_data(pids);
@@ -881,8 +908,12 @@ void ebpf_parse_proc_files()
 
     apps_groups_targets_count = zero_all_targets(apps_groups_root_target);
 
-    for (pids = ebpf_pids_link_list; pids; pids = pids->next)
+    for (pids = ebpf_pids_link_list; pids; pids = pids->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         aggregate_pid_on_target(pids->target, pids, NULL);
+    }
 
     ebpf_cleanup_exited_pids();
 }
