@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sqlite_metadata.h"
-#include "database/sqlite/vendored/sqlite3recover.h"
+#include "sqlite3recover.h"
 #include "health/health-alert-entry.h"
 
 #include "sqlite_db_migration.h"
