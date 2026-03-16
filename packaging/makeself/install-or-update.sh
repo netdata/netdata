@@ -214,8 +214,11 @@ if command -v setcap >/dev/null 2>&1; then
       run chmod 4750 "usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
     fi
   fi
+  if ! run setcap "cap_dac_read_search=epi" "usr/libexec/netdata/plugins.d/systemd-journal.plugin"; then
+    run chmod 4750 "usr/libexec/netdata/plugins.d/systemd-journal.plugin"
+  fi
 else
-  for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
+  for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin systemd-journal.plugin; do
     f="usr/libexec/netdata/plugins.d/${x}"
     run chmod 4750 "${f}"
   done
@@ -224,7 +227,7 @@ else
   fi
 fi
 
-for x in ndsudo freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin systemd-journal.plugin; do
+for x in ndsudo freeipmi.plugin ioping cgroup-network local-listeners network-viewer.plugin ebpf.plugin nfacct.plugin xenstat.plugin; do
   f="usr/libexec/netdata/plugins.d/${x}"
 
   if [ -f "${f}" ]; then
