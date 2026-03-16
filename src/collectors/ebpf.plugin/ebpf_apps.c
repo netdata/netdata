@@ -548,8 +548,8 @@ static inline int read_proc_pid_stat(ebpf_pid_data_t *p)
     p->ppid = ppid;
 
     char cmdline[MAX_CMDLINE + 1];
-    read_proc_pid_cmdline(p, cmdline);
-    p->cmdline = cmdline; /* point at filled buffer so assign_target_to_pid can match *pattern* rules */
+    if (read_proc_pid_cmdline(p, cmdline))
+        p->cmdline = cmdline; /* point at filled buffer so assign_target_to_pid can match *pattern* rules */
     if (strcmp(p->comm, comm) != 0) {
         if (unlikely(debug_enabled)) {
             if (p->comm[0])

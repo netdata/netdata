@@ -869,19 +869,21 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
  */
 void ebpf_filesystem_unload_bpf(ebpf_module_t *em)
 {
-    if (!(em->load & EBPF_LOAD_LEGACY))
-        return;
-
     int i;
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
-        if (!efp->probe_links)
-            continue;
-
-        ebpf_unload_legacy_code(efp->objects, efp->probe_links);
-        efp->objects = NULL;
-        efp->probe_links = NULL;
-        efp->flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION;
+#ifdef LIBBPF_MAJOR_VERSION
+        if (efp->fs_obj) {
+            filesystem_bpf__destroy(efp->fs_obj);
+            efp->fs_obj = NULL;
+        }
+#endif
+        if ((em->load & EBPF_LOAD_LEGACY) && efp->probe_links) {
+            ebpf_unload_legacy_code(efp->objects, efp->probe_links);
+            efp->objects = NULL;
+            efp->probe_links = NULL;
+            efp->flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION;
+        }
     }
 }
 
@@ -923,7 +925,7 @@ static void ebpf_filesystem_exit(void *pptr)
 
     freez(filesystem_hash_values);
 
-    if (!ebpf_plugin_stop() && em->functions.bpf_unload)
+    if (em->functions.bpf_unload)
         em->functions.bpf_unload(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);

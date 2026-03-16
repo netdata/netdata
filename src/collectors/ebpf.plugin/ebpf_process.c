@@ -1569,7 +1569,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
                 w->task_err = process_stat_vector[0].task_err;
             } else {
                 if (kill((pid_t)key, 0)) { // No PID found
-                    if (netdata_ebpf_reset_shm_pointer_unsafe(tbl_pid_stats_fd, key, NETDATA_EBPF_PIDS_CACHESTAT_IDX))
+                    if (netdata_ebpf_reset_shm_pointer_unsafe(tbl_pid_stats_fd, key, NETDATA_EBPF_PIDS_PROCESS_IDX))
                         memset(w, 0, sizeof(*w));
                 }
             }
@@ -1669,18 +1669,15 @@ static void process_collector(ebpf_module_t *em)
                 ebpf_process_send_apps_data(apps_groups_root_target, em);
             }
 
-            if (ebpf_plugin_stop()) {
-                netdata_mutex_unlock(&collect_data_mutex);
-                netdata_mutex_unlock(&lock);
-                break;
-            }
-
             if (cgroups && shm_ebpf_cgroup.header) {
-                ebpf_process_send_cgroup_data(em);
+                if (!ebpf_plugin_stop())
+                    ebpf_process_send_cgroup_data(em);
             }
 
             netdata_mutex_unlock(&collect_data_mutex);
             netdata_mutex_unlock(&lock);
+
+            fflush(stdout);
 
             if (ebpf_plugin_stop())
                 break;
@@ -1689,8 +1686,6 @@ static void process_collector(ebpf_module_t *em)
             running_time += update_every;
             em->running_time = running_time;
             netdata_mutex_unlock(&ebpf_exit_cleanup);
-
-            fflush(stdout);
         }
     }
 }

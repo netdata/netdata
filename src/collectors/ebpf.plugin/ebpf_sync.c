@@ -294,7 +294,7 @@ static void ebpf_sync_exit(void *pptr)
         netdata_mutex_unlock(&lock);
     }
 
-    if (!ebpf_plugin_stop() && em->functions.bpf_unload)
+    if (em->functions.bpf_unload)
         em->functions.bpf_unload(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);

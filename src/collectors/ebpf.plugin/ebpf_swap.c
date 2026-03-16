@@ -447,8 +447,10 @@ static void ebpf_swap_exit(void *pptr)
     collect_pids &= ~(1 << EBPF_MODULE_SWAP_IDX);
     netdata_mutex_unlock(&lock);
 
-    if (ebpf_read_swap.thread)
+    if (ebpf_read_swap.thread) {
         nd_thread_signal_cancel(ebpf_read_swap.thread);
+        nd_thread_join(ebpf_read_swap.thread);
+    }
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
