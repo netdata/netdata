@@ -277,7 +277,7 @@ int netdata_main(int argc, char **argv) {
 
     static_threads = static_threads_get();
 
-    netdata_ready = false;
+    netdata_ready_store(false);
     // set the name for logging
     program_name = "netdata";
 
@@ -1156,7 +1156,7 @@ int netdata_main(int argc, char **argv) {
         (ready_ut - started_ut) / USEC_PER_MS, median_start_time / USEC_PER_MS);
 
     cleanup_agent_event_log();
-    netdata_ready = true;
+    netdata_ready_store(true);
 
     // ----------------------------------------------------------------------------------------------------------------
 

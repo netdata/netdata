@@ -61,7 +61,7 @@ static command_info_t command_info_array[] = {
     {"reload-labels", "", "Reload all localhost labels.", cmd_reload_labels_execute, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},                 // reload the labels
     {"read-config", "", "", cmd_read_config_execute, CMD_TYPE_CONCURRENT, CMD_INIT_STATUS_FULL},
     {"write-config", "", "", cmd_write_config_execute, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
-    {"ping", "", "Return with 'pong' if agent is alive.", cmd_ping_execute, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_INIT},                       // ping command
+    {"ping", "", "Return with 'pong'; exit 0 when ready, 1 while initializing.", cmd_ping_execute, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_INIT},     // ping command
     {"aclk-state", "[json]",  "Returns current state of ACLK and Netdata Cloud connection. (optionally in json).", cmd_aclk_state, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
     {"version", "", "Returns the netdata version.", cmd_version, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_INIT},
     {"dumpconfig", "", "Returns the current netdata.conf on stdout.", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
@@ -309,7 +309,7 @@ static cmd_status_t cmd_ping_execute(char *args, char **message)
 
     *message = strdupz("pong");
 
-    return CMD_STATUS_SUCCESS;
+    return netdata_ready_load() ? CMD_STATUS_SUCCESS : CMD_STATUS_FAILURE;
 }
 
 static cmd_status_t cmd_aclk_state(char *args, char **message)
