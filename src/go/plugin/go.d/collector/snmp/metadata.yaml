@@ -481,6 +481,39 @@ modules:
                       auth_key: auth_protocol_passphrase
                       priv_proto: aes256
                       priv_key: priv_protocol_passphrase
+            - name: SNMPv3 with multiple devices
+              description: |
+                This example monitors multiple SNMP devices that share the same SNMPv3 credentials.
+
+                It uses [YAML anchors](https://yaml.org/spec/1.2.2/#3222-anchors-and-aliases) (`&snmp_v3` to define, `*snmp_v3` to reuse) so you only
+                write the credentials once. To add another device, copy any job block
+                and change `name` and `hostname` — no need to duplicate the `user` section.
+              config: |
+                jobs:
+                  - name: switch1
+                    update_every: 10
+                    hostname: 192.0.2.1
+                    options: &snmp_v3
+                      version: 3
+                    user: &snmp_v3_user
+                      name: username
+                      level: authPriv
+                      auth_proto: sha256
+                      auth_key: auth_protocol_passphrase
+                      priv_proto: aes256
+                      priv_key: priv_protocol_passphrase
+
+                  - name: switch2
+                    update_every: 10
+                    hostname: 192.0.2.2
+                    options: *snmp_v3
+                    user: *snmp_v3_user
+
+                  - name: switch3
+                    update_every: 10
+                    hostname: 192.0.2.3
+                    options: *snmp_v3
+                    user: *snmp_v3_user
     alerts: []
     functions:
       description: |
