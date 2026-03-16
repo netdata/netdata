@@ -357,6 +357,7 @@ RRDHOST *rrdhost_create(
     host->health.enabled = ((memory_mode == RRD_DB_MODE_NONE)) ? false : health;
 
     spinlock_init(&host->receiver_lock);
+    spinlock_init(&host->rrdhost_update_lock);
 
     if (likely(!archived)) {
         rrd_functions_host_init(host);
