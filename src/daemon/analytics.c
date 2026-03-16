@@ -758,11 +758,15 @@ static int map_windows_tz_to_iana(char *out, char *win_id, char *geo_name) {
         return -1;
 
     char buffer[CONFIG_FILE_LINE_MAX + 1];
+    char win_id_match[512];
     bool copied = 0;
+
+    snprintfz(win_id_match, sizeof(win_id_match), "\"%s\"", win_id);
+
     while (fgets(buffer, CONFIG_FILE_LINE_MAX, fp) != NULL) {
         buffer[CONFIG_FILE_LINE_MAX] = '\0';
 
-        char *s = strstr(buffer, win_id);
+        char *s = strstr(buffer, win_id_match);
         if (!s) {
             if (!copied)
                 continue;
