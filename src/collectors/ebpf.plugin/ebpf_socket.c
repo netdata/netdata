@@ -948,7 +948,7 @@ static void ebpf_socket_exit(void *pptr)
         netdata_mutex_unlock(&lock);
     }
 
-    if (em->functions.bpf_unload)
+    if (!ebpf_plugin_stop() && em->functions.bpf_unload)
         em->functions.bpf_unload(em);
 
     ebpf_socket_free(em);
@@ -3089,7 +3089,7 @@ void ebpf_socket_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(ebpf_socket_exit) cleanup_ptr = em;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         collector_error("There is already a thread %s running", em->info.thread_name);
         return;
     }

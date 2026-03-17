@@ -622,10 +622,12 @@ static inline void link_all_processes_to_their_parents(void)
     for (p = ebpf_pids_link_list; p; p = p->next) {
         // for each process found
 
+        // Reset before the stop check: breaking early must not leave stale parent
+        // pointers that apply_apps_groups_targets_inheritance() would dereference.
+        p->parent = NULL;
+
         if (ebpf_plugin_stop())
             break;
-
-        p->parent = NULL;
 
         if (unlikely(!p->ppid)) {
             continue;

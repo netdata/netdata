@@ -876,6 +876,7 @@ void ebpf_filesystem_unload_bpf(ebpf_module_t *em)
         if (efp->fs_obj) {
             filesystem_bpf__destroy(efp->fs_obj);
             efp->fs_obj = NULL;
+            efp->flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION;
         }
 #endif
         if ((em->load & EBPF_LOAD_LEGACY) && efp->probe_links) {
@@ -925,7 +926,7 @@ static void ebpf_filesystem_exit(void *pptr)
 
     freez(filesystem_hash_values);
 
-    if (em->functions.bpf_unload)
+    if (!ebpf_plugin_stop() && em->functions.bpf_unload)
         em->functions.bpf_unload(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
