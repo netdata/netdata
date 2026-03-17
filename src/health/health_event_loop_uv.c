@@ -488,7 +488,7 @@ static void health_process_timer_tick(struct health_event_loop_config *config) {
         RRDHOST *host;
 
         dfe_start_reentrant(rrdhost_root_index, host) {
-            size_t idx = host_dfe.counter - 1;
+            size_t idx = host_dfe.counter;
 
             if ((pass == 0 && idx < start_index) || (pass == 1 && idx >= start_index))
                 continue;
@@ -680,8 +680,17 @@ static void health_event_loop(void *arg) {
             health_process_pending_alerts(config);
             health_process_pending_deletions(config);
 
-            if (!health_has_pending_work(config))
-                break;
+            if (!health_has_pending_work(config)) {
+                // Stop accepting new commands before the final drained check so no
+                // producer can enqueue after we decide to leave the loop.
+                __atomic_store_n(&config->initialized, false, __ATOMIC_RELEASE);
+                uv_run(loop, UV_RUN_NOWAIT);
+                health_process_pending_alerts(config);
+                health_process_pending_deletions(config);
+
+                if (!health_has_pending_work(config))
+                    break;
+            }
         }
     }
 
