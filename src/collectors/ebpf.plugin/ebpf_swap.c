@@ -1272,7 +1272,7 @@ static int ebpf_swap_set_internal_value(void)
     for (i = 0; swap_functions[i]; i++) {
         address.function = swap_functions[i];
         ebpf_load_addresses(&address, -1);
-        if (address.addr && address.type == 'T') {
+        if (address.addr) {
             int key = (i < 2) ? NETDATA_KEY_SWAP_READPAGE_CALL : NETDATA_KEY_SWAP_WRITEPAGE_CALL;
             swap_targets[key].name = address.function;
             address.addr = 0;

@@ -621,30 +621,20 @@ static void ebpf_read_shm_apps_table(int maps_per_core)
 }
 
 /**
-* Send SHM dimension
-*
-* Send a single SHM dimension to the chart.
-*
-* @param chart The chart name
-* @param idx The SHM syscall index
-* @param value The value to send
-*/
-static void shm_send_dimension(const char *chart, int idx, uint64_t value)
-{
-    ebpf_write_begin_chart(NETDATA_EBPF_SYSTEM_GROUP, chart, "");
-    write_chart_dimension(shm_publish_aggregated[idx].dimension, (long long)value);
-    ebpf_write_end_chart();
-}
-
-/**
 * Send global charts to netdata agent.
 */
 static void shm_send_global(void)
 {
-    shm_send_dimension(NETDATA_SHM_GLOBAL_CHART, NETDATA_KEY_SHMGET_CALL, shm_hash_values[NETDATA_KEY_SHMGET_CALL]);
-    shm_send_dimension(NETDATA_SHM_GLOBAL_CHART, NETDATA_KEY_SHMAT_CALL, shm_hash_values[NETDATA_KEY_SHMAT_CALL]);
-    shm_send_dimension(NETDATA_SHM_GLOBAL_CHART, NETDATA_KEY_SHMDT_CALL, shm_hash_values[NETDATA_KEY_SHMDT_CALL]);
-    shm_send_dimension(NETDATA_SHM_GLOBAL_CHART, NETDATA_KEY_SHMCTL_CALL, shm_hash_values[NETDATA_KEY_SHMCTL_CALL]);
+    ebpf_write_begin_chart(NETDATA_EBPF_SYSTEM_GROUP, NETDATA_SHM_GLOBAL_CHART, "");
+    write_chart_dimension(
+        shm_publish_aggregated[NETDATA_KEY_SHMGET_CALL].dimension, (long long)shm_hash_values[NETDATA_KEY_SHMGET_CALL]);
+    write_chart_dimension(
+        shm_publish_aggregated[NETDATA_KEY_SHMAT_CALL].dimension, (long long)shm_hash_values[NETDATA_KEY_SHMAT_CALL]);
+    write_chart_dimension(
+        shm_publish_aggregated[NETDATA_KEY_SHMDT_CALL].dimension, (long long)shm_hash_values[NETDATA_KEY_SHMDT_CALL]);
+    write_chart_dimension(
+        shm_publish_aggregated[NETDATA_KEY_SHMCTL_CALL].dimension, (long long)shm_hash_values[NETDATA_KEY_SHMCTL_CALL]);
+    ebpf_write_end_chart();
 }
 
 /**
