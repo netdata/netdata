@@ -45,7 +45,7 @@ rm -rf /opt/netdata/msys64/
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Configure Editor"}
-if [ ! -f "/opt/netdata/etc/profile" ]; then
+if [ -f "/opt/netdata/etc/profile" ]; then
     echo 'EDITOR="/usr/bin/nano.exe"' >> /opt/netdata/etc/profile
 fi
 ${GITHUB_ACTIONS+echo "::endgroup::"}
@@ -56,4 +56,3 @@ ${GITHUB_ACTIONS+echo "::endgroup::"}
 #cp "${build}/usr/bin/netdata_driver.*" "${build}/driver"
 #powershell.exe -ExecutionPolicy Bypass -File "${repo_root}/packaging/windows/generate-driver-catalog.ps1"
 #${GITHUB_ACTIONS+echo "::endgroup::"}
-
