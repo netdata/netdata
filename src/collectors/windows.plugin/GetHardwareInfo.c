@@ -25,6 +25,8 @@ bool cpus_lock_initialized = false;
 static HANDLE msr_device = INVALID_HANDLE_VALUE;
 static CRITICAL_SECTION device_lock;
 bool device_lock_initialized = false;
+// Set by the worker immediately before exit so cleanup can distinguish
+// "join failed but thread is done" from "join failed and thread may still run".
 static volatile LONG hardware_info_thread_finished = 0;
 static int consecutive_errors = 0;
 static const int MAX_CONSECUTIVE_ERRORS = 5;
@@ -514,12 +516,21 @@ void do_GetHardwareInfo_cleanup()
             // nd_thread_join() frees the ND_THREAD object even on failure,
             // so we cannot retry. The Windows/MSYS2 UV_EINVAL fast-exit case
             // is already handled inside nd_thread_join(). For any other error,
-            // wait for the worker to report completion before tearing down
-            // local resources it may still be touching.
+            // wait briefly for the worker to report completion before tearing
+            // down local resources it may still be touching. If it never does,
+            // abort cleanup: leaking here is safer than racing a live worker
+            // or hanging plugin shutdown indefinitely.
             nd_log_daemon(NDLP_ERR, "Failed to join Get Hardware Info thread");
 
-            while (!InterlockedCompareExchange(&hardware_info_thread_finished, 1, 1)) {
+            size_t retries = 0;
+            while (!InterlockedCompareExchange(&hardware_info_thread_finished, 1, 1) && retries < 1000) {
                 Sleep(1);
+                retries++;
+            }
+
+            if (!InterlockedCompareExchange(&hardware_info_thread_finished, 1, 1)) {
+                hardware_info_thread = NULL;
+                return;
             }
         }
         hardware_info_thread = NULL;
