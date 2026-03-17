@@ -234,24 +234,35 @@ static inline HANDLE netdata_open_device()
 
 static bool netdata_reopen_device_if_needed()
 {
+    EnterCriticalSection(&device_lock);
     if (msr_device != INVALID_HANDLE_VALUE) {
+        LeaveCriticalSection(&device_lock);
         return true;
     }
 
     msr_device = netdata_open_device();
-    return (msr_device != INVALID_HANDLE_VALUE);
+    bool ok = (msr_device != INVALID_HANDLE_VALUE);
+    LeaveCriticalSection(&device_lock);
+    return ok;
 }
 
 static bool netdata_read_msr(MSR_REQUEST *req)
 {
-    if (!req || msr_device == INVALID_HANDLE_VALUE) {
+    if (!req)
+        return false;
+
+    EnterCriticalSection(&device_lock);
+    if (msr_device == INVALID_HANDLE_VALUE) {
+        LeaveCriticalSection(&device_lock);
         return false;
     }
 
+    bool success = false;
     for (int retry = 0; retry < IOCTL_RETRIES; retry++) {
         DWORD bytes = 0;
         if (DeviceIoControl(msr_device, IOCTL_MSR_READ, req, sizeof(*req), req, sizeof(*req), &bytes, NULL)) {
-            return true;
+            success = true;
+            break;
         }
 
         if (retry < IOCTL_RETRIES - 1) {
@@ -259,7 +270,8 @@ static bool netdata_read_msr(MSR_REQUEST *req)
         }
     }
 
-    return false;
+    LeaveCriticalSection(&device_lock);
+    return success;
 }
 
 static collected_number netdata_intel_cpu_temp(MSR_REQUEST *req)
@@ -493,27 +505,49 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
 
 void do_GetHardwareInfo_cleanup()
 {
+    bool thread_joined = true;
     if (hardware_info_thread) {
-        if (nd_thread_join(hardware_info_thread))
+        if (nd_thread_join(hardware_info_thread)) {
+            // nd_thread_join() frees the ND_THREAD object even on failure,
+            // so we cannot retry. The most common failure on Windows is
+            // UV_EINVAL where the thread exited too fast for its handle to
+            // remain valid — the thread is almost certainly not running.
+            // Still, if it is genuinely still executing, we must leave all
+            // worker-visible resources intact to avoid teardown races.
             nd_log_daemon(NDLP_ERR, "Failed to join Get Hardware Info thread");
+            thread_joined = false;
+        }
+        hardware_info_thread = NULL;
     }
 
-    if (msr_device != INVALID_HANDLE_VALUE) {
-        CloseHandle(msr_device);
-        msr_device = INVALID_HANDLE_VALUE;
-    }
+    // Only tear down worker-visible resources if we know the thread has stopped.
+    // If join failed, leak these to avoid racing a live thread against driver or
+    // lock teardown.
+    if (thread_joined) {
+        if (device_lock_initialized) {
+            EnterCriticalSection(&device_lock);
+            if (msr_device != INVALID_HANDLE_VALUE) {
+                CloseHandle(msr_device);
+                msr_device = INVALID_HANDLE_VALUE;
+            }
+            LeaveCriticalSection(&device_lock);
+        } else if (msr_device != INVALID_HANDLE_VALUE) {
+            CloseHandle(msr_device);
+            msr_device = INVALID_HANDLE_VALUE;
+        }
 
-    netdata_stop_driver();
+        netdata_stop_driver();
 
-    if (cpus_lock_initialized)
-        DeleteCriticalSection(&cpus_lock);
+        if (cpus_lock_initialized)
+            DeleteCriticalSection(&cpus_lock);
 
-    if (device_lock_initialized)
-        DeleteCriticalSection(&device_lock);
+        if (device_lock_initialized)
+            DeleteCriticalSection(&device_lock);
 
-    if (cpus) {
-        freez(cpus);
-        cpus = NULL;
-        ncpus = 0;
+        if (cpus) {
+            freez(cpus);
+            cpus = NULL;
+            ncpus = 0;
+        }
     }
 }
