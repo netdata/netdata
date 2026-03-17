@@ -461,6 +461,13 @@ jobs:
         id: skip
         if: needs.file-check.outputs.run != 'true'
         run: Write-Output "SKIPPED"
+      - name: Checkout
+        uses: actions/checkout@v6
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        with:
+          submodules: false
+          lfs: false
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
@@ -487,18 +494,7 @@ jobs:
       - name: Check agent buildinfo
         id: agent-check
         if: needs.file-check.outputs.run == 'true'
-        run: |
-          $ndPath = "C:\Program Files\Netdata\usr\bin\netdata.exe"
-          if (Test-Path -Path $ndPath) {
-              & $ndPath -W buildinfo
-              if ($LastExitcode -ne 0) {
-                  Write-Output "Exit Code: $LastExitCode"
-                  exit 1
-              }
-          } else {
-              Write-Output "$ndPath does not exist"
-              exit 1
-          }
+        run: ./.github/scripts/windows-exec-test.ps1
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
