@@ -505,49 +505,40 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
 
 void do_GetHardwareInfo_cleanup()
 {
-    bool thread_joined = true;
     if (hardware_info_thread) {
         if (nd_thread_join(hardware_info_thread)) {
             // nd_thread_join() frees the ND_THREAD object even on failure,
-            // so we cannot retry. The most common failure on Windows is
-            // UV_EINVAL where the thread exited too fast for its handle to
-            // remain valid — the thread is almost certainly not running.
-            // Still, if it is genuinely still executing, we must leave all
-            // worker-visible resources intact to avoid teardown races.
+            // so we cannot retry. The Windows/MSYS2 UV_EINVAL fast-exit case
+            // is already handled inside nd_thread_join(), so still tear down
+            // local resources after logging the error.
             nd_log_daemon(NDLP_ERR, "Failed to join Get Hardware Info thread");
-            thread_joined = false;
         }
         hardware_info_thread = NULL;
     }
 
-    // Only tear down worker-visible resources if we know the thread has stopped.
-    // If join failed, leak these to avoid racing a live thread against driver or
-    // lock teardown.
-    if (thread_joined) {
-        if (device_lock_initialized) {
-            EnterCriticalSection(&device_lock);
-            if (msr_device != INVALID_HANDLE_VALUE) {
-                CloseHandle(msr_device);
-                msr_device = INVALID_HANDLE_VALUE;
-            }
-            LeaveCriticalSection(&device_lock);
-        } else if (msr_device != INVALID_HANDLE_VALUE) {
+    if (device_lock_initialized) {
+        EnterCriticalSection(&device_lock);
+        if (msr_device != INVALID_HANDLE_VALUE) {
             CloseHandle(msr_device);
             msr_device = INVALID_HANDLE_VALUE;
         }
+        LeaveCriticalSection(&device_lock);
+    } else if (msr_device != INVALID_HANDLE_VALUE) {
+        CloseHandle(msr_device);
+        msr_device = INVALID_HANDLE_VALUE;
+    }
 
-        netdata_stop_driver();
+    netdata_stop_driver();
 
-        if (cpus_lock_initialized)
-            DeleteCriticalSection(&cpus_lock);
+    if (cpus_lock_initialized)
+        DeleteCriticalSection(&cpus_lock);
 
-        if (device_lock_initialized)
-            DeleteCriticalSection(&device_lock);
+    if (device_lock_initialized)
+        DeleteCriticalSection(&device_lock);
 
-        if (cpus) {
-            freez(cpus);
-            cpus = NULL;
-            ncpus = 0;
-        }
+    if (cpus) {
+        freez(cpus);
+        cpus = NULL;
+        ncpus = 0;
     }
 }
