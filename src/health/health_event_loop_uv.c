@@ -17,34 +17,8 @@
 #define HEALTH_MAX_SHUTDOWN_TIMEOUT_SECONDS (60)
 #define HEALTH_CLEANUP_FIRST_RUN_DELAY (1800)     // First cleanup 30 min after startup
 #define HEALTH_CLEANUP_INTERVAL (3600)            // Cleanup every hour
-
-// Worker job types
-#define WORKER_HEALTH_JOB_RRD_LOCK              0
-#define WORKER_HEALTH_JOB_HOST_LOCK             1
-#define WORKER_HEALTH_JOB_DB_QUERY              2
-#define WORKER_HEALTH_JOB_CALC_EVAL             3
-#define WORKER_HEALTH_JOB_WARNING_EVAL          4
-#define WORKER_HEALTH_JOB_CRITICAL_EVAL         5
-#define WORKER_HEALTH_JOB_ALARM_LOG_ENTRY       6
-#define WORKER_HEALTH_JOB_ALARM_LOG_PROCESS     7
-#define WORKER_HEALTH_JOB_ALARM_LOG_QUEUE       8
-#define WORKER_HEALTH_JOB_WAIT_EXEC             9
-#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET   10
-#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM   11
-#define WORKER_HEALTH_JOB_SAVE_ALERT_TRANSITION 12
-#define WORKER_HEALTH_JOB_CLEANUP               13
-#define WORKER_HEALTH_JOB_DELETE_ALERT          14
-
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 15
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 15
-#endif
-
 // Global configuration structure
 static struct health_event_loop_config health_config = { 0 };
-
-// External declaration for the per-host processing function
-extern void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, time_t now, time_t *next_run, struct health_stmt_set *stmts);
-extern uint64_t health_evloop_iteration;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Statement set pool management
@@ -159,9 +133,12 @@ bool health_queue_alert_save(ALARM_ENTRY *ae) {
     cmd.param[0] = ae;
 
     if (unlikely(!health_enq_cmd(&cmd, false))) {
-        // Failed to queue, reset counters
+        // Failed to queue (pool full or shutting down), reset counters.
+        // Caller will fall back to a synchronous save.
         __atomic_sub_fetch(&ae->host->health.pending_transitions, 1, __ATOMIC_RELAXED);
         __atomic_sub_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "HEALTH: alert save queue full or shutting down, falling back to sync save");
         return false;
     }
     return true;
@@ -176,9 +153,15 @@ bool health_queue_alert_deletion(ALARM_ENTRY *ae) {
     cmd.param[0] = ae;
 
     if (!health_enq_cmd(&cmd, true)) {
-        // If the loop is already gone, only free directly once no save still owns the entry.
-        if (!__atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE))
-            health_alarm_entry_free_direct(ae);
+        // Enqueue failed — the loop is either not initialized or fully shut down.
+        // In both cases no in-flight save still references the entry:
+        //   - Not initialized: no saves were ever queued.
+        //   - Shut down: initialized is cleared only after the main loop exits and
+        //     health_process_pending_alerts() has drained every queued save, so all
+        //     pending_save_count decrements have already happened.
+        // Free unconditionally to avoid leaking unlinked entries whose caller
+        // (health_alarm_log_free_one_nochecks_nounlink) has no other owner path.
+        health_alarm_entry_free_direct(ae);
         return false;
     }
     return true;
@@ -207,6 +190,9 @@ static bool health_has_pending_work(struct health_event_loop_config *config) {
     if (config->ae_pending_deletion)
         return true;
 
+    if (config->cleanup_running)
+        return true;
+
     return false;
 }
 
@@ -216,25 +202,41 @@ static void health_process_pending_deletions(struct health_event_loop_config *co
 
     worker_is_busy(WORKER_HEALTH_JOB_DELETE_ALERT);
 
-    Word_t Index = 0;
-    Pvoid_t *Pvalue;
-    bool first = true;
+    // First pass: collect indices that are ready to delete
+    Word_t ready_indices[128];
+    size_t ready_count;
 
-    while ((Pvalue = JudyLFirstThenNext(config->ae_pending_deletion, &Index, &first))) {
-        ALARM_ENTRY *ae = (ALARM_ENTRY *)*Pvalue;
-        // Use ACQUIRE to synchronize with the RELEASE in health_process_pending_alerts()
-        // This ensures all save operations are complete before we free the entry
-        if (!__atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE)) {
-            // No more pending saves, safe to free.
-            // Use health_alarm_entry_free_direct() instead of health_alarm_log_free_one_nochecks_nounlink()
-            // to avoid recursive re-queueing for deletion.
-            health_alarm_entry_free_direct(ae);
-            (void)JudyLDel(&config->ae_pending_deletion, Index, PJE0);
-            // Restart iteration since we modified the array
-            first = true;
-            Index = 0;
+    do {
+        ready_count = 0;
+        Word_t Index = 0;
+        Pvoid_t *Pvalue;
+        bool first = true;
+
+        while ((Pvalue = JudyLFirstThenNext(config->ae_pending_deletion, &Index, &first))) {
+            ALARM_ENTRY *ae = (ALARM_ENTRY *)*Pvalue;
+            // Use ACQUIRE to synchronize with the RELEASE in health_process_pending_alerts()
+            // This ensures all save operations are complete before we free the entry
+            if (!__atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE)) {
+                ready_indices[ready_count++] = Index;
+                if (ready_count >= 128)
+                    break;
+            }
         }
-    }
+
+        // Second pass: delete collected entries
+        for (size_t i = 0; i < ready_count; i++) {
+            Pvalue = JudyLGet(config->ae_pending_deletion, ready_indices[i], PJE0);
+            if (Pvalue) {
+                ALARM_ENTRY *ae = (ALARM_ENTRY *)*Pvalue;
+                // Use health_alarm_entry_free_direct() instead of
+                // health_alarm_log_free_one_nochecks_nounlink() to avoid
+                // recursive re-queueing for deletion.  These entries have
+                // already been unlinked from the host's alarm log.
+                health_alarm_entry_free_direct(ae);
+                (void)JudyLDel(&config->ae_pending_deletion, ready_indices[i], PJE0);
+            }
+        }
+    } while (ready_count == 128);  // Continue if batch was full (more may be ready)
 
     worker_is_idle();
 }
@@ -288,21 +290,13 @@ static void health_process_pending_alerts(struct health_event_loop_config *confi
 #define SQL_DELETE_ORPHAN_ALERT_VERSION \
     "DELETE FROM alert_version WHERE health_log_id NOT IN (SELECT health_log_id FROM health_log)"
 
-static void health_cleanup_log(struct health_event_loop_config *config) {
-    time_t now = now_realtime_sec();
+// Work item for cleanup running on a UV worker thread
+struct health_cleanup_work {
+    uv_work_t request;
+    struct health_event_loop_config *config;
+};
 
-    // Initialize next cleanup time on first call
-    if (!config->next_cleanup_time)
-        config->next_cleanup_time = now + HEALTH_CLEANUP_FIRST_RUN_DELAY;
-
-    // Check if it's time to run cleanup
-    if (now < config->next_cleanup_time)
-        return;
-
-    config->next_cleanup_time = now + HEALTH_CLEANUP_INTERVAL;
-
-    worker_is_busy(WORKER_HEALTH_JOB_CLEANUP);
-
+static void health_cleanup_work_cb(uv_work_t *req) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "HEALTH: Starting health log cleanup");
 
     // Cleanup each host's health log
@@ -314,10 +308,8 @@ static void health_cleanup_log(struct health_event_loop_config *config) {
     }
     dfe_done(host);
 
-    if (unlikely(health_should_stop())) {
-        worker_is_idle();
+    if (unlikely(health_should_stop()))
         return;
-    }
 
     // Delete orphan records
     (void)db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG, NULL);
@@ -325,7 +317,38 @@ static void health_cleanup_log(struct health_event_loop_config *config) {
     (void)db_execute(db_meta, SQL_DELETE_ORPHAN_ALERT_VERSION, NULL);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "HEALTH: Health log cleanup completed");
-    worker_is_idle();
+}
+
+static void health_cleanup_after_work_cb(uv_work_t *req, int status __maybe_unused) {
+    struct health_cleanup_work *work = req->data;
+    work->config->cleanup_running = false;
+    freez(work);
+}
+
+static void health_cleanup_log(struct health_event_loop_config *config) {
+    time_t now = now_realtime_sec();
+
+    // Initialize next cleanup time on first call
+    if (!config->next_cleanup_time)
+        config->next_cleanup_time = now + HEALTH_CLEANUP_FIRST_RUN_DELAY;
+
+    // Check if it's time to run cleanup, and not already running
+    if (now < config->next_cleanup_time || config->cleanup_running)
+        return;
+
+    config->next_cleanup_time = now + HEALTH_CLEANUP_INTERVAL;
+    config->cleanup_running = true;
+
+    struct health_cleanup_work *work = callocz(1, sizeof(*work));
+    work->request.data = work;
+    work->config = config;
+
+    int rc = uv_queue_work(&config->loop, &work->request, health_cleanup_work_cb, health_cleanup_after_work_cb);
+    if (rc != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "HEALTH: failed to queue cleanup work: %s", uv_strerror(rc));
+        config->cleanup_running = false;
+        freez(work);
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -479,6 +502,9 @@ static void health_process_timer_tick(struct health_event_loop_config *config) {
     // Increment global iteration counter
     __atomic_add_fetch(&health_evloop_iteration, 1, __ATOMIC_RELAXED);
 
+    // Note: host_count and host_dfe.counter may shift between ticks if hosts are
+    // added/removed, so the round-robin cursor is approximate — it ensures fairness
+    // over time but a host may occasionally be visited out of order.
     size_t host_count = dictionary_entries(rrdhost_root_index);
     size_t start_index = host_count ? (config->next_host_scan_index % host_count) : 0;
     size_t next_start_index = start_index;
@@ -627,10 +653,6 @@ static void health_event_loop(void *arg) {
                     health_cleanup_log(config);
                     break;
 
-                case HEALTH_HOST_COMPLETED:
-                    // Host completion is handled in after_work callback
-                    break;
-
                 case HEALTH_SAVE_ALERT_TRANSITION: {
                     // Collect alert transitions for batch processing
                     ALARM_ENTRY *ae = (ALARM_ENTRY *)cmd.param[0];
@@ -690,6 +712,11 @@ static void health_event_loop(void *arg) {
 
                 if (!health_has_pending_work(config))
                     break;
+
+                // Work appeared after we sealed the queue (e.g. a worker completion
+                // callback produced new alerts).  Re-arm so producers can enqueue
+                // during the next drain iteration.
+                __atomic_store_n(&config->initialized, true, __ATOMIC_RELEASE);
             }
         }
     }
@@ -725,9 +752,8 @@ static void health_event_loop(void *arg) {
             nd_log(NDLS_DAEMON, NDLP_DEBUG, "HEALTH: freed %zu pending alert deletions at shutdown", count);
     }
 
-    // Shutdown sequence
-    // Use RELEASE to ensure any pending work sees this before we tear down
-    __atomic_store_n(&config->initialized, false, __ATOMIC_RELEASE);
+    // initialized was already set to false inside the drain loop (line above)
+    // before the final break — no need to set it again.
 
     // Stop timer
     if (!uv_is_closing((uv_handle_t *)&config->timer_req) &&

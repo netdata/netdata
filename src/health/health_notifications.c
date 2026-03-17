@@ -5,6 +5,9 @@
 #include "health_event_loop_uv.h"
 
 // the queue of executed alarm notifications that haven't been waited for yet
+// Protected by alarm_notifications_spinlock since multiple UV worker threads
+// can call enqueue/unlink concurrently via health_send_notification()
+static SPINLOCK alarm_notifications_spinlock = SPINLOCK_INITIALIZER;
 static ALARM_ENTRY *alarm_notifications_in_progress = NULL;
 
 struct health_raised_summary {
@@ -51,10 +54,18 @@ cleanup:
         unlink_alarm_notify_in_progress(ae);
 }
 
+// Called only from the health event loop main thread during shutdown, after all
+// host-processing workers have completed.  Because no workers are active, no
+// concurrent enqueue/unlink can occur, making the lock-read-unlock-then-use
+// pattern on `ae` safe.
 void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up(void) {
     ALARM_ENTRY *ae;
-    while (NULL != (ae = alarm_notifications_in_progress)) {
-        if(unlikely(health_should_stop()))
+    while (true) {
+        spinlock_lock(&alarm_notifications_spinlock);
+        ae = alarm_notifications_in_progress;
+        spinlock_unlock(&alarm_notifications_spinlock);
+
+        if (!ae || unlikely(health_should_stop()))
             break;
 
         health_alarm_wait_for_execution(ae);
@@ -63,14 +74,18 @@ void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_u
 
 void unlink_alarm_notify_in_progress(ALARM_ENTRY *ae)
 {
+    spinlock_lock(&alarm_notifications_spinlock);
     fatal_assert(ae->prev_in_progress || ae->next_in_progress);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(alarm_notifications_in_progress, ae, prev_in_progress, next_in_progress);
+    spinlock_unlock(&alarm_notifications_spinlock);
 }
 
 static inline void enqueue_alarm_notify_in_progress(ALARM_ENTRY *ae)
 {
+    spinlock_lock(&alarm_notifications_spinlock);
     fatal_assert(!ae->prev_in_progress && !ae->next_in_progress);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(alarm_notifications_in_progress, ae, prev_in_progress, next_in_progress);
+    spinlock_unlock(&alarm_notifications_spinlock);
 }
 
 static bool prepare_command(BUFFER *wb,

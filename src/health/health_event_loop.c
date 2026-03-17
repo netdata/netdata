@@ -5,25 +5,7 @@
 #include "health-alert-entry.h"
 #include "health_event_loop_uv.h"
 
-// Worker job IDs - shared with health_event_loop_uv.c
-#define WORKER_HEALTH_JOB_RRD_LOCK              0
-#define WORKER_HEALTH_JOB_HOST_LOCK             1
-#define WORKER_HEALTH_JOB_DB_QUERY              2
-#define WORKER_HEALTH_JOB_CALC_EVAL             3
-#define WORKER_HEALTH_JOB_WARNING_EVAL          4
-#define WORKER_HEALTH_JOB_CRITICAL_EVAL         5
-#define WORKER_HEALTH_JOB_ALARM_LOG_ENTRY       6
-#define WORKER_HEALTH_JOB_ALARM_LOG_PROCESS     7
-#define WORKER_HEALTH_JOB_ALARM_LOG_QUEUE       8
-#define WORKER_HEALTH_JOB_WAIT_EXEC             9
-#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET   10
-#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM   11
-
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 12
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 12
-#endif
-
-// Global iteration counter - accessed from health_event_loop_uv.c
+// Worker job IDs and health_evloop_iteration are defined in health_event_loop_uv.h
 uint64_t health_evloop_iteration = 0;
 
 uint64_t health_evloop_current_iteration(void) {

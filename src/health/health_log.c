@@ -276,11 +276,16 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
         }
     }
 
-    // Protect update_ae from being freed while we save it.
-    // Increment before releasing the lock to prevent cleanup from freeing it.
-    // Note: health_queue_alert_save() has its own increment that will be decremented
-    // by health_process_pending_alerts(). Our protection increment is only decremented
-    // if async queueing fails (fallback to sync) or if doing sync save directly.
+    // Two-layer pending_save_count protocol for update_ae:
+    //
+    // Layer 1 (protection): We increment here, before releasing the spinlock,
+    //   to prevent health_alarm_log_cleanup() or deletion from freeing the entry
+    //   while we still need it. We always decrement this after the save completes.
+    //
+    // Layer 2 (async ownership): health_queue_alert_save() does its own
+    //   increment/decrement cycle managed by health_process_pending_alerts().
+    //   The two layers are independent — layer 1 is always short-lived (this
+    //   function scope), layer 2 may persist until the event loop drains.
     if (update_ae)
         __atomic_add_fetch(&update_ae->pending_save_count, 1, __ATOMIC_RELAXED);
 
@@ -293,13 +298,16 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
         if (do_sync_save)
             sql_health_alarm_log_save(host, update_ae, stmts);
 
-        // Release our protection increment (async path has its own pending_save_count management).
+        // Release layer-1 (protection) increment
         __atomic_sub_fetch(&update_ae->pending_save_count, 1, __ATOMIC_RELEASE);
     }
 
     health_alarm_log_save(host, ae, async, stmts);
 }
 
+// Free an alarm entry unconditionally — no pending_save_count or linked-list checks.
+// Callers are responsible for ensuring the entry has been unlinked from the host's
+// alarm log and that no in-flight save still references it.
 void health_alarm_entry_free_direct(ALARM_ENTRY *ae) {
     string_freez(ae->name);
     string_freez(ae->chart);

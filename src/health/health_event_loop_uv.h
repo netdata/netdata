@@ -12,11 +12,31 @@ typedef struct sqlite3_stmt sqlite3_stmt;
 // Default/fallback for max concurrent workers (actual value from config)
 #define HEALTH_DEFAULT_CONCURRENT_WORKERS 4
 
+// Worker job IDs shared between health_event_loop.c and health_event_loop_uv.c
+#define WORKER_HEALTH_JOB_RRD_LOCK              0
+#define WORKER_HEALTH_JOB_HOST_LOCK             1
+#define WORKER_HEALTH_JOB_DB_QUERY              2
+#define WORKER_HEALTH_JOB_CALC_EVAL             3
+#define WORKER_HEALTH_JOB_WARNING_EVAL          4
+#define WORKER_HEALTH_JOB_CRITICAL_EVAL         5
+#define WORKER_HEALTH_JOB_ALARM_LOG_ENTRY       6
+#define WORKER_HEALTH_JOB_ALARM_LOG_PROCESS     7
+#define WORKER_HEALTH_JOB_ALARM_LOG_QUEUE       8
+#define WORKER_HEALTH_JOB_WAIT_EXEC             9
+#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET   10
+#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM   11
+#define WORKER_HEALTH_JOB_SAVE_ALERT_TRANSITION 12
+#define WORKER_HEALTH_JOB_CLEANUP               13
+#define WORKER_HEALTH_JOB_DELETE_ALERT          14
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 15
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 15
+#endif
+
 // Opcodes for the health event loop
 enum health_opcode {
     HEALTH_NOOP = 0,
     HEALTH_TIMER_TICK,           // Timer fired, check which hosts need processing
-    HEALTH_HOST_COMPLETED,       // A host finished processing (param[0] = work ptr)
     HEALTH_SAVE_ALERT_TRANSITION,// Save an alert transition (param[0] = ae)
     HEALTH_DELETE_ALERT_ENTRY,   // Delete an alert entry when saves complete (param[0] = ae)
     HEALTH_SYNC_SHUTDOWN,        // Clean shutdown request
@@ -104,8 +124,9 @@ struct health_event_loop_config {
     usec_t last_realtime;
     usec_t last_monotonic;
 
-    // Health log cleanup timing
+    // Health log cleanup timing and state
     time_t next_cleanup_time;
+    bool cleanup_running;  // true while cleanup work is queued/executing on a worker
 
     // Round-robin host scan cursor to avoid starving hosts later in the dictionary.
     size_t next_host_scan_index;
@@ -138,5 +159,11 @@ bool health_queue_alert_save(ALARM_ENTRY *ae);
 // Queue an alert entry for deletion (will be freed when pending saves complete)
 // Returns true if queued successfully, false if health loop is not running
 bool health_queue_alert_deletion(ALARM_ENTRY *ae);
+
+// Global health iteration counter (defined in health_event_loop.c)
+extern uint64_t health_evloop_iteration;
+
+// Per-host health processing function (defined in health_event_loop.c, called from UV workers)
+void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, time_t now, time_t *next_run, struct health_stmt_set *stmts);
 
 #endif //NETDATA_HEALTH_EVENT_LOOP_UV_H

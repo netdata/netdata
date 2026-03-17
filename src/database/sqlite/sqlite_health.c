@@ -182,14 +182,13 @@ static void insert_alert_queue(
     }
 
     int rc;
+    int param = 0;
 
     struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
     if (!aclk_host_config)
-        return;
+        goto done;
 
     time_t submit_delay = trigger_time + calculate_delay(old_status, new_status);
-
-    int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)health_log_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, unique_id));
