@@ -514,18 +514,12 @@ void do_GetHardwareInfo_cleanup()
             // nd_thread_join() frees the ND_THREAD object even on failure,
             // so we cannot retry. The Windows/MSYS2 UV_EINVAL fast-exit case
             // is already handled inside nd_thread_join(). For any other error,
-            // only tear down local resources if the worker has actually exited.
+            // wait for the worker to report completion before tearing down
+            // local resources it may still be touching.
             nd_log_daemon(NDLP_ERR, "Failed to join Get Hardware Info thread");
 
-            size_t retries = 0;
-            while (!InterlockedCompareExchange(&hardware_info_thread_finished, 1, 1) && retries < 1000) {
+            while (!InterlockedCompareExchange(&hardware_info_thread_finished, 1, 1)) {
                 Sleep(1);
-                retries++;
-            }
-
-            if (!InterlockedCompareExchange(&hardware_info_thread_finished, 1, 1)) {
-                hardware_info_thread = NULL;
-                return;
             }
         }
         hardware_info_thread = NULL;
