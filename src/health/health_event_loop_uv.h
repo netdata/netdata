@@ -106,6 +106,9 @@ struct health_event_loop_config {
 
     // Health log cleanup timing
     time_t next_cleanup_time;
+
+    // Round-robin host scan cursor to avoid starving hosts later in the dictionary.
+    size_t next_host_scan_index;
 };
 
 // Initialize and start the health event loop
