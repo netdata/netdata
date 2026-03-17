@@ -955,7 +955,7 @@ static void ebpf_process_disable_tracepoints()
 
 static void ebpf_process_exit(void *pptr)
 {
-    pids_fd[NETDATA_EBPF_PIDS_PROCESS_IDX] = -1;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_PROCESS_IDX, -1);
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if (!em)
         return;
@@ -1536,7 +1536,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
     if (tbl_pid_stats_fd == -1)
         return;
 
-    pids_fd[NETDATA_EBPF_PIDS_PROCESS_IDX] = tbl_pid_stats_fd;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_PROCESS_IDX, tbl_pid_stats_fd);
     size_t length = sizeof(ebpf_process_stat_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
@@ -1794,7 +1794,7 @@ void ebpf_process_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(ebpf_process_exit) cleanup_ptr = em;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+    if (!ebpf_module_thread_has_valid_state(em)) {
         em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
         netdata_mutex_lock(&ebpf_exit_cleanup);
         ebpf_update_disabled_plugin_stats(em);

@@ -672,7 +672,7 @@ void ebpf_sync_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(ebpf_sync_exit) cleanup_ptr = em;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+    if (!ebpf_module_thread_has_valid_state(em)) {
         goto endsync;
     }
 

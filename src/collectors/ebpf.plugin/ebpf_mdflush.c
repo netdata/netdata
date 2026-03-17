@@ -398,7 +398,7 @@ void ebpf_mdflush_thread(void *ptr)
 
     char *md_flush_request = NULL;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+    if (!ebpf_module_thread_has_valid_state(em)) {
         goto endmdflush;
     }
 

@@ -614,7 +614,7 @@ void ebpf_fd_unload_bpf(ebpf_module_t *em)
 
 static void ebpf_fd_exit(void *pptr)
 {
-    pids_fd[NETDATA_EBPF_PIDS_FD_IDX] = -1;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_FD_IDX, -1);
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if (!em)
         return;
@@ -904,7 +904,7 @@ void ebpf_read_fd_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     int cgroups = em->cgroup_charts;
     uint32_t running_time = 0;
-    pids_fd[NETDATA_EBPF_PIDS_FD_IDX] = fd_maps[NETDATA_FD_PID_STATS].map_fd;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_FD_IDX, fd_maps[NETDATA_FD_PID_STATS].map_fd);
 
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
@@ -1669,7 +1669,7 @@ void ebpf_fd_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(ebpf_fd_exit) cleanup_ptr = em;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+    if (!ebpf_module_thread_has_valid_state(em)) {
         goto endfd;
     }
 

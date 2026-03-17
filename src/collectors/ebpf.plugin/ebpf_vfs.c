@@ -2326,7 +2326,7 @@ void ebpf_read_vfs_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     int cgroups = em->cgroup_charts;
     uint32_t running_time = 0;
-    pids_fd[NETDATA_EBPF_PIDS_VFS_IDX] = vfs_maps[NETDATA_VFS_PID].map_fd;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_VFS_IDX, vfs_maps[NETDATA_VFS_PID].map_fd);
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
@@ -2957,12 +2957,12 @@ static int ebpf_vfs_load_bpf(ebpf_module_t *em)
  */
 void ebpf_vfs_thread(void *ptr)
 {
-    pids_fd[NETDATA_EBPF_PIDS_VFS_IDX] = -1;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_VFS_IDX, -1);
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     CLEANUP_FUNCTION_REGISTER(ebpf_vfs_exit) cleanup_ptr = em;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+    if (!ebpf_module_thread_has_valid_state(em)) {
         goto endvfs;
     }
 

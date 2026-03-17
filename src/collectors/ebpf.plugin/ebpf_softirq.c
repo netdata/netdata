@@ -246,7 +246,7 @@ void ebpf_softirq_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(softirq_cleanup) cleanup_ptr = em;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+    if (!ebpf_module_thread_has_valid_state(em)) {
         goto endsoftirq;
     }
 

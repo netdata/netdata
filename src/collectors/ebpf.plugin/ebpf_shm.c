@@ -1137,7 +1137,7 @@ void ebpf_read_shm_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     int cgroups = em->cgroup_charts;
     uint32_t running_time = 0;
-    pids_fd[NETDATA_EBPF_PIDS_SHM_IDX] = shm_maps[NETDATA_PID_SHM_TABLE].map_fd;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_SHM_IDX, shm_maps[NETDATA_PID_SHM_TABLE].map_fd);
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
@@ -1431,12 +1431,12 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
  */
 void ebpf_shm_thread(void *ptr)
 {
-    pids_fd[NETDATA_EBPF_PIDS_SHM_IDX] = -1;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_SHM_IDX, -1);
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     CLEANUP_FUNCTION_REGISTER(ebpf_shm_exit) cleanup_ptr = em;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+    if (!ebpf_module_thread_has_valid_state(em)) {
         goto endshm;
     }
 

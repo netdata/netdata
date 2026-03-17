@@ -486,7 +486,7 @@ void ebpf_dcstat_unload_bpf(ebpf_module_t *em)
 
 static void ebpf_dcstat_exit(void *pptr)
 {
-    pids_fd[NETDATA_EBPF_PIDS_DCSTAT_IDX] = -1;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_DCSTAT_IDX, -1);
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if (!em)
         return;
@@ -716,7 +716,7 @@ void ebpf_read_dcstat_thread(void *ptr)
 
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
-    pids_fd[NETDATA_EBPF_PIDS_DCSTAT_IDX] = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_DCSTAT_IDX, dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd);
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
@@ -1568,7 +1568,7 @@ void ebpf_dcstat_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     CLEANUP_FUNCTION_REGISTER(ebpf_dcstat_exit) cleanup_ptr = em;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+    if (!ebpf_module_thread_has_valid_state(em)) {
         goto enddcstat;
     }
 

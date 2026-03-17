@@ -375,7 +375,28 @@ struct ebpf_target *apps_groups_default_target = NULL, // the default target
 
 size_t apps_groups_targets_count = 0; // # of apps_groups.conf targets
 
-int pids_fd[NETDATA_EBPF_PIDS_END_IDX];
+static int ebpf_pid_map_fds[NETDATA_EBPF_PIDS_END_IDX];
+
+void ebpf_reset_pid_map_fds(void)
+{
+    memset(ebpf_pid_map_fds, -1, sizeof(ebpf_pid_map_fds));
+}
+
+void ebpf_set_pid_map_fd(int idx, int fd)
+{
+    if (unlikely(idx < 0 || idx >= NETDATA_EBPF_PIDS_END_IDX))
+        return;
+
+    ebpf_pid_map_fds[idx] = fd;
+}
+
+int ebpf_get_pid_map_fd(int idx)
+{
+    if (unlikely(idx < 0 || idx >= NETDATA_EBPF_PIDS_END_IDX))
+        return -1;
+
+    return ebpf_pid_map_fds[idx];
+}
 
 // ----------------------------------------------------------------------------
 // internal counters

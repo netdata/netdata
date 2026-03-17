@@ -515,7 +515,7 @@ void ebpf_mount_thread(void *ptr)
     ebpf_module_t *em = ptr;
     CLEANUP_FUNCTION_REGISTER(ebpf_mount_exit) cleanup_ptr = em;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+    if (!ebpf_module_thread_has_valid_state(em)) {
         goto endmount;
     }
 

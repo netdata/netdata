@@ -308,7 +308,6 @@ void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em);
 void ebpf_update_disabled_plugin_stats(ebpf_module_t *em);
 ARAL *ebpf_allocate_pid_aral(char *name, size_t size);
 void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links);
-
 void ebpf_read_global_table_stats(
     netdata_idx_t *stats,
     netdata_idx_t *values,
@@ -334,6 +333,15 @@ static inline bool ebpf_plugin_stop(void)
     return __atomic_load_n(&ebpf_plugin_exit, __ATOMIC_ACQUIRE) ||
            ebpf_stop_signal ||
            nd_thread_signaled_to_cancel();
+}
+
+static inline bool ebpf_module_thread_has_valid_state(ebpf_module_t *em)
+{
+    if (likely(em->enabled == NETDATA_THREAD_EBPF_RUNNING || em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING))
+        return true;
+
+    collector_error("Cannot start thread %s with invalid state %u.", em->info.thread_name, (unsigned int)em->enabled);
+    return false;
 }
 
 static inline bool ebpf_shm_sem_wait_or_stop(sem_t *sem)

@@ -889,7 +889,7 @@ void ebpf_disk_thread(void *ptr)
 
     disk_safe_clean = false;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+    if (!ebpf_module_thread_has_valid_state(em)) {
         goto enddisk;
     }
 

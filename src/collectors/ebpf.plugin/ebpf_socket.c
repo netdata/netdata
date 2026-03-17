@@ -3084,15 +3084,13 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
  */
 void ebpf_socket_thread(void *ptr)
 {
-    pids_fd[NETDATA_EBPF_PIDS_SOCKET_IDX] = -1;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_SOCKET_IDX, -1);
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     CLEANUP_FUNCTION_REGISTER(ebpf_socket_exit) cleanup_ptr = em;
 
-    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-        collector_error("There is already a thread %s running, or it was not initialized.", em->info.thread_name);
-        return;
-    }
+    if (!ebpf_module_thread_has_valid_state(em))
+        goto endsocket;
 
     em->maps = socket_maps;
 

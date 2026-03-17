@@ -680,7 +680,7 @@ void ebpf_hardirq_thread(void *ptr)
 
     CLEANUP_FUNCTION_REGISTER(hardirq_cleanup) cleanup_ptr = em;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+    if (!ebpf_module_thread_has_valid_state(em)) {
         goto endhardirq;
     }
 

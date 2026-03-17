@@ -441,7 +441,7 @@ static void ebpf_swap_exit(void *pptr)
     if (!em)
         return;
 
-    pids_fd[NETDATA_EBPF_PIDS_SWAP_IDX] = -1;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_SWAP_IDX, -1);
 
     netdata_mutex_lock(&lock);
     collect_pids &= ~(1 << EBPF_MODULE_SWAP_IDX);
@@ -667,7 +667,7 @@ void ebpf_read_swap_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
     int cgroups = em->cgroup_charts;
-    pids_fd[NETDATA_EBPF_PIDS_SWAP_IDX] = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_SWAP_IDX, swap_maps[NETDATA_PID_SWAP_TABLE].map_fd);
 
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
@@ -1302,12 +1302,12 @@ static int ebpf_swap_set_internal_value(void)
  */
 void ebpf_swap_thread(void *ptr)
 {
-    pids_fd[NETDATA_EBPF_PIDS_SWAP_IDX] = -1;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_SWAP_IDX, -1);
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     CLEANUP_FUNCTION_REGISTER(ebpf_swap_exit) cleanup_ptr = em;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_NOT_RUNNING) {
+    if (!ebpf_module_thread_has_valid_state(em)) {
         goto endswap;
     }
 
