@@ -175,13 +175,39 @@ bool health_queue_alert_deletion(ALARM_ENTRY *ae) {
     cmd.opcode = HEALTH_DELETE_ALERT_ENTRY;
     cmd.param[0] = ae;
 
-    if (!health_enq_cmd(&cmd, false)) {
-        // Queue failed (shutdown in progress or queue full)
-        // Free directly to avoid memory leak
-        health_alarm_entry_free_direct(ae);
+    if (!health_enq_cmd(&cmd, true)) {
+        // If the loop is already gone, only free directly once no save still owns the entry.
+        if (!__atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE))
+            health_alarm_entry_free_direct(ae);
         return false;
     }
     return true;
+}
+
+static size_t health_cmd_queue_depth(struct health_event_loop_config *config) {
+    size_t count;
+
+    netdata_mutex_lock(&config->cmd_pool.lock);
+    count = (size_t)config->cmd_pool.count;
+    netdata_mutex_unlock(&config->cmd_pool.lock);
+
+    return count;
+}
+
+static bool health_has_pending_work(struct health_event_loop_config *config) {
+    if (health_cmd_queue_depth(config) > 0)
+        return true;
+
+    if (__atomic_load_n(&config->active_workers, __ATOMIC_RELAXED) > 0)
+        return true;
+
+    if (config->pending_alerts && config->pending_alerts->count)
+        return true;
+
+    if (config->ae_pending_deletion)
+        return true;
+
+    return false;
 }
 
 static void health_process_pending_deletions(struct health_event_loop_config *config) {
@@ -453,27 +479,48 @@ static void health_process_timer_tick(struct health_event_loop_config *config) {
     // Increment global iteration counter
     __atomic_add_fetch(&health_evloop_iteration, 1, __ATOMIC_RELAXED);
 
-    // Iterate over all hosts and queue those that need processing
-    RRDHOST *host;
-    dfe_start_reentrant(rrdhost_root_index, host) {
-        if (unlikely(health_should_stop()))
+    size_t host_count = dictionary_entries(rrdhost_root_index);
+    size_t start_index = host_count ? (config->next_host_scan_index % host_count) : 0;
+    size_t next_start_index = start_index;
+    bool saturated = false;
+
+    for (size_t pass = 0; pass < 2 && host_count; pass++) {
+        RRDHOST *host;
+
+        dfe_start_reentrant(rrdhost_root_index, host) {
+            size_t idx = host_dfe.counter - 1;
+
+            if ((pass == 0 && idx < start_index) || (pass == 1 && idx >= start_index))
+                continue;
+
+            next_start_index = (idx + 1) % host_count;
+
+            if (unlikely(health_should_stop())) {
+                saturated = true;
+                break;
+            }
+
+            if (__atomic_load_n(&host->health.processing, __ATOMIC_ACQUIRE))
+                continue;
+
+            if (__atomic_load_n(&host->health.next_run, __ATOMIC_ACQUIRE) > now)
+                continue;
+
+            if (__atomic_load_n(&config->active_workers, __ATOMIC_RELAXED) >= config->max_concurrent_workers) {
+                saturated = true;
+                break;
+            }
+
+            health_queue_host_work(config, host, now, apply_hibernation_delay);
+        }
+        dfe_done(host);
+
+        if (saturated || health_should_stop())
             break;
-
-        // Skip if host is already being processed
-        if (__atomic_load_n(&host->health.processing, __ATOMIC_ACQUIRE))
-            continue;
-
-        // Skip if not time to run yet (use atomic load since workers update this)
-        if (__atomic_load_n(&host->health.next_run, __ATOMIC_ACQUIRE) > now)
-            continue;
-
-        // Skip if we've reached max concurrent workers
-        if (__atomic_load_n(&config->active_workers, __ATOMIC_RELAXED) >= config->max_concurrent_workers)
-            break;
-
-        health_queue_host_work(config, host, now, apply_hibernation_delay);
     }
-    dfe_done(host);
+
+    if (host_count)
+        config->next_host_scan_index = next_start_index;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -554,11 +601,12 @@ static void health_event_loop(void *arg) {
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "HEALTH: event loop started");
 
     // Main event loop
-    while (likely(!health_should_stop())) {
+    while (true) {
         enum health_opcode opcode;
+        bool shutdown_requested = __atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED);
 
         worker_is_idle();
-        uv_run(loop, UV_RUN_ONCE);
+        uv_run(loop, shutdown_requested ? UV_RUN_NOWAIT : UV_RUN_ONCE);
 
         // Process commands from queue
         do {
@@ -613,6 +661,9 @@ static void health_event_loop(void *arg) {
 
                 case HEALTH_SYNC_SHUTDOWN:
                     __atomic_store_n(&config->shutdown_requested, true, __ATOMIC_RELAXED);
+                    if (!uv_is_closing((uv_handle_t *)&config->timer_req) &&
+                        !uv_timer_stop(&config->timer_req))
+                        uv_close((uv_handle_t *)&config->timer_req, NULL);
                     break;
 
                 default:
@@ -623,7 +674,15 @@ static void health_event_loop(void *arg) {
             if (likely(opcode != HEALTH_NOOP))
                 uv_run(loop, UV_RUN_NOWAIT);
 
-        } while (opcode != HEALTH_NOOP && !health_should_stop());
+        } while (opcode != HEALTH_NOOP);
+
+        if (__atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED)) {
+            health_process_pending_alerts(config);
+            health_process_pending_deletions(config);
+
+            if (!health_has_pending_work(config))
+                break;
+        }
     }
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "HEALTH: event loop shutting down");
@@ -662,7 +721,8 @@ static void health_event_loop(void *arg) {
     __atomic_store_n(&config->initialized, false, __ATOMIC_RELEASE);
 
     // Stop timer
-    if (!uv_timer_stop(&config->timer_req))
+    if (!uv_is_closing((uv_handle_t *)&config->timer_req) &&
+        !uv_timer_stop(&config->timer_req))
         uv_close((uv_handle_t *)&config->timer_req, NULL);
 
     // Close async handle
