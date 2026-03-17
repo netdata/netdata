@@ -79,7 +79,6 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Microsoft SQL Server](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/mssql/integrations/microsoft_sql_server.md) | This collector monitors the health and performance of Microsoft SQL Server instances. |
 | [MongoDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/mongodb/integrations/mongodb.md) | This collector monitors MongoDB servers. |
 | [mosquitto](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/mosquitto.md) | Keep an eye on Mosquitto MQTT broker metrics for efficient IoT message transport and performance. |
-| [MS SQL Server](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/ms_sql_server.md) | This collector monitors Microsoft SQL Server statistics. |
 | [MySQL](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/mysql/integrations/mysql.md) | This collector monitors the health and performance of MySQL servers and collects general statistics, replication and user metrics. |
 | [NATS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/nats/integrations/nats.md) | This collector monitors the activity and performance of NATS servers. |
 | [OpenSearch](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/elasticsearch/integrations/opensearch.md) | This collector monitors the performance and health of the Elasticsearch cluster. |
@@ -170,7 +169,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [systemd-nspawn Containers](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/systemd-nspawn_containers.md) | Monitor systemd-nspawn container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
 | [vCenter Server Appliance](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/vcsa/integrations/vcenter_server_appliance.md) | This collector monitors [health statistics](https://developer.vmware.com/apis/vsphere-automation/latest/appliance/health/) of vCenter Server Appliance servers. |
 | [Virtual Machines](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/integrations/virtual_machines.md) | Monitor virtual machine resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups. |
-| [VMware vCenter Server](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/vsphere/integrations/vmware_vcenter_server.md) | This collector monitors hosts and vms performance statistics from `vCenter` servers. |
+| [VMware vCenter Server](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/vsphere/integrations/vmware_vcenter_server.md) | This collector monitors hosts, VMs, datastores, clusters, and resource pools from `vCenter` servers. |
 | [Xen XCP-ng](https://github.com/netdata/netdata/blob/master/src/collectors/xenstat.plugin/integrations/xen_xcp-ng.md) | This collector monitors XenServer and XCP-ng host and domains statistics. |
 
 ### Operating Systems

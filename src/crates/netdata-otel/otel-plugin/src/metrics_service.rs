@@ -86,6 +86,7 @@ impl ChartManager {
         });
     }
 
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.charts.len()
     }
@@ -548,18 +549,6 @@ impl NetdataMetricsService {
                 budget
             );
         }
-
-        let mut stored_dimensions = 0;
-        for (_, chart) in chart_manager.charts.iter() {
-            stored_dimensions += chart.len();
-        }
-
-        tracing::trace!(
-            "charts: {}, dimensions: {}, new charts in request: {}",
-            chart_manager.len(),
-            stored_dimensions,
-            new_charts
-        );
     }
 }
 

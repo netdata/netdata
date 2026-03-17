@@ -71,11 +71,13 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
     if (host != localhost && !is_virtual_host)
         host_version = stream_receiver_program_version_strdupz(host);
 
+    RRDHOST_TZ host_tz = rrdhost_tz_get(host);
+
     node_info.data.name = rrdhost_hostname(host);
     node_info.data.os = rrdhost_os(host);
     node_info.data.version = host_version ? host_version : NETDATA_VERSION;
     node_info.data.release_channel = get_release_channel();
-    node_info.data.timezone = rrdhost_abbrev_timezone(host);
+    node_info.data.timezone = host_tz.abbrev_timezone;
     node_info.data.custom_info = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
     node_info.data.machine_guid = host->machine_guid;
     node_info.node_capabilities = (struct capability *)aclk_get_agent_capas();
@@ -94,6 +96,7 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
         host == localhost ? "parent" : "child");
 
     rrd_rdunlock();
+    rrdhost_tz_free(&host_tz);
     freez(node_info.node_instance_capabilities);
     freez(host_version);
 

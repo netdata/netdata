@@ -47,8 +47,9 @@ The following options can be defined for this notification
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | SEND_PD | Set `SEND_PD` to YES | YES | yes |
-| DEFAULT_RECIPIENT_PD | Set `DEFAULT_RECIPIENT_PD` to the PagerDuty service key you want the alert notifications to be sent to. You can define multiple service keys like this: `pd_service_key_1` `pd_service_key_2`. |  | yes |
+| [DEFAULT_RECIPIENT_PD](#option-default-recipient-pd) | Set `DEFAULT_RECIPIENT_PD` to the PagerDuty service key you want the alert notifications to be sent to. You can define multiple service keys like this: `pd_service_key_1` `pd_service_key_2`. |  | yes |
 
+<a id="option-default-recipient-pd"></a>
 ##### DEFAULT_RECIPIENT_PD
 
 All roles will default to this variable if left unconfigured.

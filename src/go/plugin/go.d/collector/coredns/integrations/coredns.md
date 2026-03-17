@@ -169,8 +169,8 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | url | Target endpoint URL. | http://127.0.0.1:9153/metrics | yes |
 |  | timeout | HTTP request timeout (seconds). | 1 | no |
-| **Filters** | per_server_stats | Server filter. |  | no |
-|  | per_zone_stats | Zone filter. |  | no |
+| **Filters** | [per_server_stats](#option-filters-per-server-stats) | Server filter. |  | no |
+|  | [per_zone_stats](#option-filters-per-zone-stats) | Zone filter. |  | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -188,6 +188,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
+<a id="option-filters-per-server-stats"></a>
 ##### per_server_stats
 
 Metrics of servers matching the selector will be collected.
@@ -206,6 +207,7 @@ per_server_stats:
 ```
 
 
+<a id="option-filters-per-zone-stats"></a>
 ##### per_zone_stats
 
 Metrics of zones matching the selector will be collected.

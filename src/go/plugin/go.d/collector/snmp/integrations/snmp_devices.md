@@ -240,10 +240,10 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Target** | hostname | Target host (IP or DNS name, IPv4/IPv6). |  | yes |
 | **SNMPv1/2** | community | SNMPv1/2 community string. | public | no |
 | **SNMPv3** | user.name | SNMPv3 user name. |  | no |
-|  | user.level | Security level of SNMPv3 messages. |  | no |
-|  | user.auth_proto | Authentication protocol for SNMPv3 messages. |  | no |
+|  | [user.level](#option-snmpv3-user-level) | Security level of SNMPv3 messages. |  | no |
+|  | [user.auth_proto](#option-snmpv3-user-auth-proto) | Authentication protocol for SNMPv3 messages. |  | no |
 |  | user.auth_key | Authentication protocol pass phrase for SNMPv3 messages. |  | no |
-|  | user.priv_proto | Privacy protocol for SNMPv3 messages. |  | no |
+|  | [user.priv_proto](#option-snmpv3-user-priv-proto) | Privacy protocol for SNMPv3 messages. |  | no |
 |  | user.priv_key | Privacy protocol pass phrase for SNMPv3 messages. |  | no |
 | **SNMP transport** | options.version | SNMP version. Available versions: 1, 2, 3. | 2 | no |
 |  | options.port | Target port. | 161 | no |
@@ -263,6 +263,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used. |  | no |
 |  | vnode.labels | Additional key-value pairs to associate with the Virtual Node. |  | no |
 
+<a id="option-snmpv3-user-level"></a>
 ##### user.level
 
 The security of an SNMPv3 message as per RFC 3414 (`user.level`):
@@ -274,6 +275,7 @@ The security of an SNMPv3 message as per RFC 3414 (`user.level`):
 |   authPriv   |     3     | message authentication and encryption    |
 
 
+<a id="option-snmpv3-user-auth-proto"></a>
 ##### user.auth_proto
 
 The digest algorithm for SNMPv3 messages that require authentication (`user.auth_proto`):
@@ -289,6 +291,7 @@ The digest algorithm for SNMPv3 messages that require authentication (`user.auth
 |    sha512    |     7     | SHA message authentication (HMAC-SHA-512) |
 
 
+<a id="option-snmpv3-user-priv-proto"></a>
 ##### user.priv_proto
 
 The encryption algorithm for SNMPv3 messages that require privacy (`user.priv_proto`):
@@ -395,6 +398,44 @@ jobs:
       auth_key: auth_protocol_passphrase
       priv_proto: aes256
       priv_key: priv_protocol_passphrase
+
+```
+</details>
+
+###### SNMPv3 with multiple devices
+
+This example monitors multiple SNMP devices that share the same SNMPv3 credentials.
+
+It uses [YAML anchors](https://yaml.org/spec/1.2.2/#3222-anchors-and-aliases) to define the
+full job once (`&snmp_v3_job`) and then reuse it with `<<: *snmp_v3_job`,
+overriding only `name` and `hostname` for each additional device.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - &snmp_v3_job
+    name: switch1
+    update_every: 10
+    hostname: 192.0.2.1
+    options:
+      version: 3
+    user:
+      name: username
+      level: authPriv
+      auth_proto: sha256
+      auth_key: auth_protocol_passphrase
+      priv_proto: aes256
+      priv_key: priv_protocol_passphrase
+
+  - <<: *snmp_v3_job
+    name: switch2
+    hostname: 192.0.2.2
+
+  - <<: *snmp_v3_job
+    name: switch3
+    hostname: 192.0.2.3
 
 ```
 </details>

@@ -1,5 +1,13 @@
 # Configure Health Alerts
 
+:::tip
+
+**Don't want to write alert configs manually?** [Alerts Automation](/docs/netdata-ai/alerts-automation/alerts-automation.md) uses AI to suggest alerts, generate the configuration, and test it against historical data — so you can validate thresholds before deployment without learning the syntax. You can also use the visual [Alerts Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md).
+
+:::
+
+This page covers **manual alert configuration** — editing config files directly. For a comparison of all configuration methods, see [How alert configuration works in Netdata](/docs/netdata-ai/alerts-automation/alerts-automation.md#how-alert-configuration-works-in-netdata).
+
 ## Quick Start Guide
 
 :::tip
@@ -1568,5 +1576,12 @@ When seeking help, include:
 - [Netdata GitHub Issues](https://github.com/netdata/netdata/issues)
 - [Netdata Community Forum](https://community.netdata.cloud)
 - [Netdata Discord](https://discord.gg/mPZ6WZKKG2)
+
+## Related Pages
+
+- [Alerts Automation](/docs/netdata-ai/alerts-automation/alerts-automation.md) - Create and tune alerts using natural language with AI assistance (no manual configuration needed)
+- [Alerts Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md) - Visual UI wizard for creating alerts
+- [ML Anomaly Detection](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md) - Machine learning based anomaly detection for all metrics
+- [Alert Troubleshooting](/docs/troubleshooting/troubleshoot.md) - AI-powered alert investigation and root-cause analysis
 
 **Next Steps:** You now have comprehensive knowledge of Netdata health configuration. Start with the [Quick Start Guide](#quick-start-guide) for immediate needs or dive into [Common Tasks](#common-tasks) for specific workflows.

@@ -5,7 +5,7 @@
 **What's the difference between unclaiming/reclaiming and removing a node?**
 
 | Action                | What it does                                          | Agent status                            |
-|-----------------------|-------------------------------------------------------|-----------------------------------------|
+| --------------------- | ----------------------------------------------------- | --------------------------------------- |
 | **Unclaim & Reclaim** | Disconnect from current Space, connect to a new Space | Agent keeps running                     |
 | **Remove**            | Permanently delete node from Netdata Cloud            | Agent may keep running but disconnected |
 
@@ -65,7 +65,7 @@ sudo systemctl restart netdata
 Run the standard claim command with your new Space's token:
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token YOUR_NEW_TOKEN --claim-rooms YOUR_ROOMS --claim-url https://app.netdata.cloud
+bash <(curl -Ss https://get.netdata.cloud/kickstart.sh) --claim-token YOUR_NEW_TOKEN --claim-rooms YOUR_ROOMS --claim-url https://app.netdata.cloud
 ```
 
 ### Option 2: Configuration File
@@ -109,9 +109,9 @@ After reclaiming, verify the node appears in:
 - Verify the claim token is correct for the new Space
 - Check `/var/lib/netdata/cloud.d/` was removed before reclaiming
 - Review agent logs using:
-    - `journalctl --namespace netdata -b 0 | grep -i CLAIM`
-    - or:
-    - `grep -i CLAIM /var/log/netdata/daemon.log`
+  - `journalctl --namespace netdata -b 0 | grep -i CLAIM`
+  - or:
+  - `grep -i CLAIM /var/log/netdata/daemon.log`
 
 **Reconnection fails:**
 

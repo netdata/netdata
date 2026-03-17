@@ -28,12 +28,20 @@ func (d Discoverer) collectMetricLists(res *rs.Resources) error {
 	for _, v := range res.VMs {
 		v.MetricList = vmML
 	}
+	dsML := simpleDatastoreMetricList(perfCounters)
+	for _, ds := range res.Datastores {
+		ds.MetricList = dsML
+	}
+	clusterML := simpleClusterMetricList(perfCounters)
+	for _, c := range res.Clusters {
+		c.MetricList = clusterML
+	}
 
-	d.Infof("discovering : metric lists : collected metric lists for %d/%d hosts, %d/%d vms, process took %s",
-		len(res.Hosts),
+	d.Infof("discovering : metric lists : collected metric lists for %d clusters, %d hosts, %d vms, %d datastores, process took %s",
+		len(res.Clusters),
 		len(res.Hosts),
 		len(res.VMs),
-		len(res.VMs),
+		len(res.Datastores),
 		time.Since(t),
 	)
 
@@ -46,6 +54,14 @@ func simpleHostMetricList(pci map[string]*types.PerfCounterInfo) performance.Met
 
 func simpleVMMetricList(pci map[string]*types.PerfCounterInfo) performance.MetricList {
 	return simpleMetricList(vmMetrics, pci)
+}
+
+func simpleDatastoreMetricList(pci map[string]*types.PerfCounterInfo) performance.MetricList {
+	return simpleMetricList(datastoreMetrics, pci)
+}
+
+func simpleClusterMetricList(pci map[string]*types.PerfCounterInfo) performance.MetricList {
+	return simpleMetricList(clusterMetrics, pci)
 }
 
 func simpleMetricList(metrics []string, pci map[string]*types.PerfCounterInfo) performance.MetricList {
@@ -103,6 +119,18 @@ var (
 		"sys.uptime.latest",
 	}
 
+	datastoreMetrics = []string{
+		// Level 1 - available at default vCenter settings
+		"datastore.numberReadAveraged.average",
+		"datastore.numberWriteAveraged.average",
+		"datastore.totalReadLatency.average",
+		"datastore.totalWriteLatency.average",
+
+		// Level 2 - requires elevated stats level
+		"datastore.read.average",
+		"datastore.write.average",
+	}
+
 	hostMetrics = []string{
 		"cpu.usage.average",
 
@@ -131,5 +159,53 @@ var (
 		"disk.maxTotalLatency.latest",
 
 		"sys.uptime.latest",
+	}
+
+	// All Level 1 (available at default vCenter settings), IntervalId=300 (historical)
+	clusterMetrics = []string{
+		// clusterServices counters
+		"clusterServices.effectivecpu.average",
+		"clusterServices.effectivemem.average",
+		"clusterServices.cpufairness.latest",
+		"clusterServices.memfairness.latest",
+		"clusterServices.failover.latest",
+
+		// cpu/mem aggregate counters
+		"cpu.usage.average",
+		"cpu.usagemhz.average",
+		"cpu.totalmhz.average",
+		"mem.usage.average",
+		"mem.consumed.average",
+		"mem.overhead.average",
+		"mem.active.average",
+		"mem.granted.average",
+		"mem.shared.average",
+		"mem.swapused.average",
+
+		// vmop counters — VM operations per cluster
+		"vmop.numVMotion.latest",
+		"vmop.numSVMotion.latest",
+		"vmop.numXVMotion.latest",
+		"vmop.numPoweron.latest",
+		"vmop.numPoweroff.latest",
+		"vmop.numCreate.latest",
+		"vmop.numDestroy.latest",
+		"vmop.numClone.latest",
+		"vmop.numDeploy.latest",
+		"vmop.numReset.latest",
+		"vmop.numSuspend.latest",
+		"vmop.numReconfigure.latest",
+		"vmop.numRegister.latest",
+		"vmop.numUnregister.latest",
+		"vmop.numChangeDS.latest",
+		"vmop.numChangeHost.latest",
+		"vmop.numChangeHostDS.latest",
+		"vmop.numRebootGuest.latest",
+		"vmop.numShutdownGuest.latest",
+		"vmop.numStandbyGuest.latest",
+
+		// vSphere 7.0+ only — automatically skipped if not available
+		"clusterServices.clusterDrsScore.latest",
+		"clusterServices.vmDrsScore.latest",
 	}
 )

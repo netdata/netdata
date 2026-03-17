@@ -68,6 +68,16 @@ metadata:
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/fortinet/FORTINET-FORTIGATE-MIB
 
 metrics:
+  ### VPN
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12356.101.12.1.1.0
+      name: fgVpnTunnelUpCount
+      chart_meta:
+        description: Total number of active IPSec VPN tunnels
+        family: 'Network/VPN/IPSec/Tunnel/Active'
+        unit: "{tunnel}"
+
   ### CPU
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:

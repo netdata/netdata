@@ -173,8 +173,9 @@ The following options can be defined globally: update_every.
 | **Target** | device_selector | Pattern to match the 'info name' of devices as reported by `smartctl --scan --json`. | * | no |
 |  | extra_devices | Manually specify devices not auto-detected by `smartctl --scan`. Each entry must include both a name and a type. | [] | no |
 | **Performance** | concurrent_scans | Number of devices to scan concurrently. Set 0 for sequential scanning (default). Helps performance when monitoring many devices. | 0 | no |
-|  | no_check_power_mode | Skip data collection when device is in low-power mode (avoids unnecessary spin-up). | standby | no |
+|  | [no_check_power_mode](#option-performance-no-check-power-mode) | Skip data collection when device is in low-power mode (avoids unnecessary spin-up). | standby | no |
 
+<a id="option-performance-no-check-power-mode"></a>
 ##### no_check_power_mode
 
 Valid arguments:

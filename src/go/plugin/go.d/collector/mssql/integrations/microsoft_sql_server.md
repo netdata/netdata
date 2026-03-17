@@ -28,6 +28,7 @@ It collects metrics from:
 - Dynamic management views (DMVs) for wait statistics, locks, and sessions
 - Per-database transaction and lock statistics
 - SQL Server Agent job status
+- Always On Availability Group health, replica states, and per-database synchronization metrics
 
 
 It connects to the SQL Server instance via TCP using the go-mssqldb driver and executes queries against:
@@ -41,6 +42,13 @@ It connects to the SQL Server instance via TCP using the go-mssqldb driver and e
 - `sys.dm_os_sys_memory` - OS physical memory and page file
 - `sys.master_files` - Database file sizes
 - `msdb.dbo.sysjobs` - SQL Agent job status
+- `sys.dm_hadr_availability_group_states` - AG health rollup
+- `sys.dm_hadr_availability_replica_states` - Replica operational state
+- `sys.dm_hadr_database_replica_states` - Database sync queues and rates
+- `sys.dm_hadr_cluster` / `sys.dm_hadr_cluster_members` - WSFC cluster health
+- `sys.dm_hadr_database_replica_cluster_states` - Failover readiness
+- `sys.dm_hadr_auto_page_repair` - Automatic page repair events
+- `sys.dm_hadr_ag_threads` - AG thread usage (SQL Server 2019+)
 
 
 This collector is supported on all platforms.
@@ -50,6 +58,8 @@ This collector supports collecting metrics from multiple instances of this integ
 The monitoring user requires the VIEW SERVER STATE permission to access DMVs.
 SQL Agent job monitoring is part of collector startup, so access to
 `msdb.dbo.sysjobs` is required.
+Always On AG monitoring requires VIEW ANY DEFINITION for access to availability group catalog views.
+On SQL Server 2022+, HADR DMVs may additionally require VIEW SERVER PERFORMANCE STATE.
 
 
 Microsoft SQL Server can be monitored further using the following other integrations:
@@ -236,6 +246,117 @@ Metrics:
 | mssql.replication_warning | expiration, latency, merge_expiration, merge_slow_duration, merge_fast_duration, merge_fast_speed, merge_slow_speed | flags | • | • |
 | mssql.replication_latency | average, best, worst | seconds | • | • |
 | mssql.replication_subscriptions | total, agents_running | subscriptions | • | • |
+
+### Per availability group
+
+These metrics refer to Always On Availability Groups. Auto-detected when HADR is enabled.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| ag_name | Availability group name |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.ag_sync_health | not_healthy, partially_healthy, healthy | state | • | • |
+| mssql.ag_recovery_health | primary_online, primary_in_progress, secondary_online, secondary_in_progress | state | • | • |
+| mssql.ag_threads | capture, redo, parallel_redo | threads | • | • |
+
+### Per availability group replica
+
+These metrics refer to per-replica state within an Availability Group. Note: on secondary replicas, the replica states DMV returns only local information.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| ag_name | Availability group name |
+| replica_server | Replica server name |
+| availability_mode | Availability mode (synchronous_commit or asynchronous_commit) |
+| failover_mode | Failover mode (automatic or manual) |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.ag_replica_role | primary, secondary, resolving, unknown | state | • | • |
+| mssql.ag_replica_connected_state | connected, disconnected, unknown | state | • | • |
+| mssql.ag_replica_sync_health | not_healthy, partially_healthy, healthy | state | • | • |
+
+### Per availability group database replica
+
+These metrics refer to per-database synchronization within an Availability Group.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| ag_name | Availability group name |
+| replica_server | Replica server name |
+| database | Database name |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.ag_db_sync_state | not_synchronizing, synchronizing, synchronized, reverting, initializing | state | • | • |
+| mssql.ag_db_log_send_queue | queue_size | bytes | • | • |
+| mssql.ag_db_log_send_rate | send_rate | bytes/s | • | • |
+| mssql.ag_db_redo_queue | queue_size | bytes | • | • |
+| mssql.ag_db_redo_rate | redo_rate | bytes/s | • | • |
+| mssql.ag_db_filestream_send_rate | send_rate | bytes/s | • | • |
+| mssql.ag_db_secondary_lag | lag | seconds | • | • |
+| mssql.ag_db_suspended | active, suspended | state | • | • |
+| mssql.ag_db_failover_readiness | ready, not_ready | state | • | • |
+| mssql.ag_db_joined_state | joined, not_joined | state | • | • |
+
+### Per WSFC cluster
+
+These metrics refer to the Windows Server Failover Clustering quorum state.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.ag_cluster_quorum_state | normal, forced, unknown | state | • | • |
+
+### Per WSFC cluster member
+
+These metrics refer to individual WSFC cluster members.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| cluster_member | Cluster member name |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.ag_cluster_member_state | up, down | state | • | • |
+| mssql.ag_cluster_member_quorum_votes | votes | votes | • | • |
+
+### Per AG page repair
+
+These metrics refer to automatic page repair events per database in an Availability Group.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| database | Database name |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.ag_page_repair | successful, failed | repairs | • | • |
 
 
 
@@ -546,6 +667,12 @@ CREATE LOGIN netdata_user WITH PASSWORD = 'YourStrongPassword!';
 -- Grant VIEW SERVER STATE (required for DMVs)
 GRANT VIEW SERVER STATE TO netdata_user;
 
+-- Grant VIEW ANY DEFINITION (required for Always On AG monitoring)
+GRANT VIEW ANY DEFINITION TO netdata_user;
+
+-- Grant VIEW SERVER PERFORMANCE STATE (required for HADR DMVs on SQL Server 2022+)
+-- GRANT VIEW SERVER PERFORMANCE STATE TO netdata_user;
+
 -- Grant access to msdb for SQL Agent job monitoring (required)
 USE msdb;
 CREATE USER netdata_user FOR LOGIN netdata_user;
@@ -565,6 +692,8 @@ GRANT SELECT ON dbo.MSsubscriptions TO netdata_user;
 - `SELECT on msdb.dbo.sysjobs` - SQL Agent job status monitoring
 
 **Optional permissions:**
+- `VIEW ANY DEFINITION` - Always On Availability Group monitoring
+- `VIEW SERVER PERFORMANCE STATE` - HADR DMVs on SQL Server 2022+
 - `SELECT on distribution.dbo.MSreplication_monitordata` - Replication monitoring
 - `SELECT on distribution.dbo.MSpublications` - Publication information
 - `SELECT on distribution.dbo.MSsubscriptions` - Subscription counts
@@ -586,8 +715,14 @@ The following options can be defined globally: update_every, autodetection_retry
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Data collection interval (seconds). | 10 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| **Target** | dsn | SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). | sqlserver://localhost:1433 | yes |
-|  | timeout | Query timeout (seconds). | 5 | no |
+| **Target** | dsn | SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). When `cloud_auth.provider` is `azure_ad`, use URL format with `sqlserver://` scheme. | sqlserver://localhost:1433 | yes |
+| **Cloud Auth** | cloud_auth.provider | Cloud auth provider (`none` or `azure_ad`). | none | no |
+| **Cloud Auth/Azure** | cloud_auth.azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). | default | no |
+|  | cloud_auth.azure_ad.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.client_id | Azure client ID. Required for `service_principal`; optional for user-assigned managed identity. |  | no |
+|  | cloud_auth.azure_ad.client_secret | Azure client secret for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.managed_identity_client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
+| **Target** | timeout | Query timeout (seconds). | 5 | no |
 | **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
 |  | functions.top_queries.timeout | Query timeout for top-queries function (seconds). Uses collector timeout if not set. |  | no |
 |  | functions.top_queries.limit | Maximum number of queries to return in the top-queries response. | 500 | no |
@@ -694,6 +829,45 @@ Connect to a remote SQL Server.
 jobs:
   - name: remote
     dsn: "sqlserver://netdata_user:password@192.168.1.100:1433"
+
+```
+</details>
+
+###### Azure SQL with service principal
+
+Use Microsoft Entra service principal authentication for Azure SQL.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: azure_sql_sp
+    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
+    cloud_auth:
+      provider: azure_ad
+      azure_ad:
+        mode: service_principal
+        tenant_id: "00000000-0000-0000-0000-000000000000"
+        client_id: "11111111-1111-1111-1111-111111111111"
+        client_secret: "super-secret-value"
+
+```
+</details>
+
+###### Azure SQL with managed identity
+
+Use managed identity authentication (system-assigned by default).
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: azure_sql_mi
+    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
+    cloud_auth:
+      provider: azure_ad
+      azure_ad:
+        mode: managed_identity
 
 ```
 </details>

@@ -20,7 +20,7 @@
 - **Cycle-scoped collector writes** — `CollectorStore` writes are staged between `BeginCycle` and `CommitCycleSuccess`. Nothing is visible to readers until commit.
 - **Stateful runtime writes** — `RuntimeStore` writes are committed immediately (no cycle API). Each write produces a new overlay snapshot.
 - **Label canonicalization** — Label maps (`map[string]string`) are sorted and encoded into a canonical key that uniquely identifies a series (metric name + labels).
-- **Typed + flattened views** — Reader supports canonical typed families (Histogram, Summary, StateSet) and a flattened scalar view where complex types are projected into individual scalar series.
+- **Typed + flattened views** — Reader supports canonical typed families (Histogram, Summary, StateSet, MeasureSet) and a flattened scalar view where complex types are projected into individual scalar series.
 
 ## Key Definitions
 
@@ -33,12 +33,12 @@
 
 ## Stores and Interfaces
 
-| Interface           | Key methods                                  | Notes                                   |
-|---------------------|----------------------------------------------|-----------------------------------------|
-| `CollectorStore`    | `Read(...)`, `Write()`                       | Default collector-facing store          |
-| `RuntimeStore`      | `Read(...)`, `Write()`                       | Stateful-only writes                    |
-| `CycleManagedStore` | `CycleController()`                          | Runtime/orchestrator-only cycle control |
-| `Reader`            | `Value/Delta/Histogram/Summary/StateSet/...` | Immutable snapshot read API             |
+| Interface           | Key methods                                             | Notes                                   |
+|---------------------|---------------------------------------------------------|-----------------------------------------|
+| `CollectorStore`    | `Read(...)`, `Write()`                                  | Default collector-facing store          |
+| `RuntimeStore`      | `Read(...)`, `Write()`                                  | Stateful-only writes                    |
+| `CycleManagedStore` | `CycleController()`                                     | Runtime/orchestrator-only cycle control |
+| `Reader`            | `Value/Delta/Histogram/Summary/StateSet/MeasureSet/...` | Immutable snapshot read API             |
 
 ## Write Model
 
@@ -72,23 +72,107 @@
 
 ## Instrument Options
 
-| Option                                                          | Scope                                                                                       |
-|-----------------------------------------------------------------|---------------------------------------------------------------------------------------------|
-| `WithFreshness(...)`                                            | Freshness policy override (subject to mode constraints)                                     |
-| `WithWindow(...)`                                               | Stateful histogram/summary window mode                                                      |
-| `WithHistogramBounds(...)`                                      | Histogram bucket boundaries                                                                 |
-| `WithSummaryQuantiles(...)`                                     | Summary quantile output (required for quantile series in flattened view)                    |
-| `WithSummaryReservoirSize(...)`                                 | Stateful summary estimator size                                                             |
-| `WithStateSetStates(...)`                                       | StateSet allowed states                                                                     |
-| `WithStateSetMode(...)`                                         | `ModeBitSet` (multiple simultaneous active states) or `ModeEnum` (exactly one active state) |
+| Option                                                                            | Scope                                                                                          |
+|-----------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| `WithFreshness(...)`                                                              | Freshness policy override (subject to mode constraints)                                        |
+| `WithWindow(...)`                                                                 | Stateful histogram/summary window mode                                                         |
+| `WithHistogramBounds(...)`                                                        | Histogram bucket boundaries                                                                    |
+| `WithSummaryQuantiles(...)`                                                       | Summary quantile output (required for quantile series in flattened view)                       |
+| `WithSummaryReservoirSize(...)`                                                   | Stateful summary estimator size                                                                |
+| `WithStateSetStates(...)`                                                         | StateSet allowed states                                                                        |
+| `WithStateSetMode(...)`                                                           | `ModeBitSet` (multiple simultaneous active states) or `ModeEnum` (exactly one active state)    |
+| `WithMeasureSetFields(...)`                                                       | MeasureSet fixed ordered field schema (required for MeasureSet instruments)                    |
 | `WithDescription(...)`, `WithChartFamily(...)`, `WithUnit(...)`, `WithFloat(...)` | Metric metadata hints for downstream consumers (e.g., autogen chart identity + float SET mode) |
+
+## MeasureSet
+
+- **Structured numeric family** — `MeasureSet` stores one logical metric family with a fixed ordered list of named numeric fields.
+- **Family-level semantics** — one `MeasureSet` family is either gauge-like or counter-like; semantics are never mixed per field.
+- **Family-level metadata** — `Description`, `ChartFamily`, and `Unit` apply to the whole family.
+- **Field-level schema** — `MeasureFieldSpec` declares per-field `Name` and `Float`.
+- **Chartengine integration** — chart autogen treats `MeasureSet` as a structured family, similar to `StateSet`; flatten remains the generic reader/tooling path.
+
+### Writers
+
+| Mode     | Gauge-like family                                                                                                               | Counter-like family                                                                                           |
+|----------|---------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| Snapshot | `MeasureSetGauge(...).ObservePoint(...)` or preferred `ObserveFields(...)`                                                      | `MeasureSetCounter(...).ObserveTotalPoint(...)` or preferred `ObserveTotalFields(...)`                       |
+| Stateful | `MeasureSetGauge(...).SetPoint(...)`, `AddPoint(...)`, `SetFields(...)`, `AddFields(...)`, `SetField(...)`, `AddField(...)`    | `MeasureSetCounter(...).AddPoint(...)`, `AddFields(...)`, `AddField(...)`                                    |
+
+### Phase-1 write contract
+
+- **Preferred collector-facing API** — use named write helpers instead of raw positional `MeasureSetPoint` values whenever practical.
+- **Snapshot handles** support:
+  - full-family positional writes (`ObservePoint(...)`, `ObserveTotalPoint(...)`)
+  - full-family named writes (`ObserveFields(...)`, `ObserveTotalFields(...)`)
+- **Stateful handles** support:
+  - full-family positional writes
+  - full-family named writes
+  - singular field writes (`SetField(...)`, `AddField(...)`)
+- **Snapshot singular field writes do not exist in phase 1.**
+  - `MeasureSet` still models one sampled family point per collect cycle in snapshot mode.
+  - Partial snapshot field visibility/completeness semantics are intentionally deferred.
+- **Named full-family writes require the exact declared field set.**
+  - Missing fields panic.
+  - Unknown extra fields panic.
+- **Stateful singular field writes update only the addressed field.**
+  - Gauge-like `SetField(...)` overwrites one field on top of the committed/staged family.
+  - Gauge-like `AddField(...)` and counter-like `AddField(...)` apply a delta to one field.
+
+### Schema example
+
+```go
+store := metrix.NewCollectorStore()
+meter := store.Write().SnapshotMeter("svc")
+latency := meter.MeasureSetGauge(
+	"latency",
+	metrix.WithMeasureSetFields(
+		metrix.MeasureFieldSpec{Name: "value"},
+		metrix.MeasureFieldSpec{Name: "ratio", Float: true},
+	),
+	metrix.WithUnit("seconds"),
+)
+latency.ObserveFields(map[string]metrix.SampleValue{
+	"value": 1.5,
+	"ratio": 0.5,
+})
+```
+
+Re-registering the same metric name with a different `MeasureSet` schema is rejected like other structured families.
+
+### Stateful singular-write example
+
+```go
+store := metrix.NewRuntimeStore()
+meter := store.Write().StatefulMeter("svc")
+usage := meter.MeasureSetGauge(
+	"usage",
+	metrix.WithMeasureSetFields(
+		metrix.MeasureFieldSpec{Name: "value"},
+		metrix.MeasureFieldSpec{Name: "limit"},
+	),
+)
+
+usage.SetFields(map[string]metrix.SampleValue{
+	"value": 10,
+	"limit": 20,
+})
+usage.SetField("value", 15)
+usage.AddField("limit", 3)
+```
+
+This yields a committed `MeasureSet` point equivalent to:
+
+```go
+metrix.MeasureSetPoint{Values: []metrix.SampleValue{15, 23}}
+```
 
 ## Read Modes
 
 `Read(...)` accepts option functions that control two independent axes:
 
 - **Raw** (`ReadRaw()`) — bypasses freshness filtering, returning all committed series regardless of when they were last observed.
-- **Flatten** (`ReadFlatten()`) — projects complex types (Histogram, Summary, StateSet) into individual scalar series.
+- **Flatten** (`ReadFlatten()`) — projects complex types (Histogram, Summary, StateSet, MeasureSet) into individual scalar series.
 
 | Read options                     | Visibility           | Shape                    |
 |----------------------------------|----------------------|--------------------------|
@@ -106,8 +190,11 @@
 | Histogram   | `<name>_bucket{le=...}`, `<name>_count`, `<name>_sum`                                                            |
 | Summary     | `<name>_count`, `<name>_sum` (always); `<name>{quantile=...}` (only when `WithSummaryQuantiles()` is configured) |
 | StateSet    | `<name>{<name>=state}` with scalar 0/1 values                                                                    |
+| MeasureSet  | `<name>_<field>{measure_field=field}`; flattened kind follows family semantics (`Gauge` or `Counter`)            |
 
 Flatten metadata is exposed via `SeriesMeta.Kind`, `SeriesMeta.SourceKind`, and `SeriesMeta.FlattenRole`.
+
+`MeasureSet` flattening keeps per-field metric names for `MetricMeta(name)` compatibility and also adds a synthetic `measure_field=<field>` label. This gives chartengine explicit field identity without widening the reader metadata API.
 
 ## Minimal Usage Snippets
 
@@ -129,6 +216,15 @@ _ = value
 _ = ok
 ```
 
+### Direct MeasureSet read
+
+```go
+reader := store.Read()
+point, ok := reader.MeasureSet("svc.latency", nil)
+_ = point
+_ = ok
+```
+
 For a complete collector integration pattern (cycle management, error handling),
 see [how-to-write-a-collector.md](/src/go/plugin/go.d/docs/how-to-write-a-collector.md).
 
@@ -141,8 +237,12 @@ see [how-to-write-a-collector.md](/src/go/plugin/go.d/docs/how-to-write-a-collec
 - **Snapshot freshness** — Snapshot-mode instruments cannot use `FreshnessCommitted`.
 - **Runtime writes** — `RuntimeStore` rejects snapshot-mode instrument registration with an error.
   Calling snapshot-mode record methods (`ObserveTotal`, `ObservePoint`) **panics**.
+- **MeasureSet runtime writes** — `RuntimeStore` supports both gauge-like and counter-like `MeasureSet` families, but only through `StatefulMeter(...)`.
+- **MeasureSet named writes** — `ObserveFields(...)`, `ObserveTotalFields(...)`, `SetFields(...)`, and `AddFields(...)` require the exact declared field set. Snapshot singular field writes are intentionally absent in phase 1.
 - **Window/freshness coupling** — Stateful histogram/summary with `WindowCycle` requires (and silently forces) `FreshnessCycle`. Setting an explicit non-Cycle freshness with `WindowCycle` returns an error.
 - **Schema stability** — Re-registering an existing metric name with different kind/mode/schema returns an error (or panics in strict runtime paths).
+- **MeasureSet flatten naming** — Flattened `MeasureSet` series use per-field metric names like `<name>_<field>` and also carry a synthetic `measure_field=<field>` label.
+- **MeasureSet counter semantics** — Stateful counter-like `MeasureSet` families reject negative `AddPoint(...)` deltas, just like scalar counters.
 - **Collector retention** — `CollectorStore` evicts series not seen for 10 successful cycles by default.
 
 ## Internal Architecture Notes
