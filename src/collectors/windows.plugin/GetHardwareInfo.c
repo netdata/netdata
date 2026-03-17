@@ -32,6 +32,7 @@ static int consecutive_errors = 0;
 static const int MAX_CONSECUTIVE_ERRORS = 5;
 static const int IOCTL_RETRIES = 3;
 static const int IOCTL_RETRY_DELAY_MS = 10;
+static const int THREAD_JOIN_FALLBACK_WAIT_MS = 2000;
 #define INVALID_TEMP ((collected_number)(-1))
 
 static void netdata_stop_driver()
@@ -516,14 +517,16 @@ void do_GetHardwareInfo_cleanup()
             // nd_thread_join() frees the ND_THREAD object even on failure,
             // so we cannot retry. The Windows/MSYS2 UV_EINVAL fast-exit case
             // is already handled inside nd_thread_join(). For any other error,
-            // wait briefly for the worker to report completion before tearing
-            // down local resources it may still be touching. If it never does,
-            // abort cleanup: leaking here is safer than racing a live worker
-            // or hanging plugin shutdown indefinitely.
+            // wait for up to one heartbeat interval plus slack for the worker
+            // to report completion before tearing down local resources it may
+            // still be touching. If it never does, abort cleanup: leaking here
+            // is safer than racing a live worker or hanging plugin shutdown
+            // indefinitely.
             nd_log_daemon(NDLP_ERR, "Failed to join Get Hardware Info thread");
 
             size_t retries = 0;
-            while (!InterlockedCompareExchange(&hardware_info_thread_finished, 1, 1) && retries < 1000) {
+            while (!InterlockedCompareExchange(&hardware_info_thread_finished, 1, 1) &&
+                   retries < (size_t)THREAD_JOIN_FALLBACK_WAIT_MS) {
                 Sleep(1);
                 retries++;
             }
