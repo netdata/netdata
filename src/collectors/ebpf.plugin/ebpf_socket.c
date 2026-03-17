@@ -3090,7 +3090,7 @@ void ebpf_socket_thread(void *ptr)
     CLEANUP_FUNCTION_REGISTER(ebpf_socket_exit) cleanup_ptr = em;
 
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-        collector_error("There is already a thread %s running", em->info.thread_name);
+        collector_error("There is already a thread %s running, or it was not initialized.", em->info.thread_name);
         return;
     }
 
