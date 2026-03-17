@@ -407,8 +407,14 @@ void health_alarm_log_populate(
 
     alarm_log->config_hash = sqlite3_uuid_unparse_strdupz(res, CONFIG_HASH_ID);
 
-    alarm_log->utc_offset = host->utc_offset;
-    alarm_log->timezone = strdupz(rrdhost_abbrev_timezone(host));
+    {
+        RRDHOST_TZ host_tz = rrdhost_tz_get(host);
+        alarm_log->utc_offset = host_tz.utc_offset;
+        // Transfer ownership of the strdup'd copy instead of duplicating again
+        alarm_log->timezone = host_tz.abbrev_timezone;
+        host_tz.abbrev_timezone = NULL;
+        rrdhost_tz_free(&host_tz);
+    }
     alarm_log->exec_path =  sqlite3_column_bytes(res, EXEC) ?
                                strdupz((char *)sqlite3_column_text(res, EXEC)) :
                                strdupz((char *)string2str(host->health.default_exec));
