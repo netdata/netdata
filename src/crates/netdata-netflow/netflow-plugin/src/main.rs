@@ -26,6 +26,8 @@ use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
 const FLOWS_SCHEMA_VERSION: &str = "2.0";
+const FLOWS_FUNCTION_VERSION: u32 = 3;
+const FLOWS_UPDATE_EVERY_SECONDS: u32 = 60;
 
 #[derive(Debug, Serialize)]
 struct RequiredParamOption {
@@ -81,10 +83,13 @@ struct FlowMetricsData {
 #[derive(Debug, Serialize)]
 struct FlowsResponse {
     status: u32,
+    #[serde(rename = "v")]
+    version: u32,
     #[serde(rename = "type")]
     response_type: String,
     data: FlowsData,
     has_history: bool,
+    update_every: u32,
     accepted_params: Vec<String>,
     required_params: Vec<RequiredParam>,
     help: String,
@@ -93,10 +98,13 @@ struct FlowsResponse {
 #[derive(Debug, Serialize)]
 struct FlowMetricsResponse {
     status: u32,
+    #[serde(rename = "v")]
+    version: u32,
     #[serde(rename = "type")]
     response_type: String,
     data: FlowMetricsData,
     has_history: bool,
+    update_every: u32,
     accepted_params: Vec<String>,
     required_params: Vec<RequiredParam>,
     help: String,
@@ -134,6 +142,7 @@ impl NetflowFlowsHandler {
 
             Ok(FlowsFunctionResponse::Metrics(FlowMetricsResponse {
                 status: 200,
+                version: FLOWS_FUNCTION_VERSION,
                 response_type: "metrics".to_string(),
                 data: FlowMetricsData {
                     schema_version: FLOWS_SCHEMA_VERSION.to_string(),
@@ -149,6 +158,7 @@ impl NetflowFlowsHandler {
                     warnings: query_output.warnings,
                 },
                 has_history: true,
+                update_every: FLOWS_UPDATE_EVERY_SECONDS,
                 accepted_params: flows_accepted_params(),
                 required_params: flows_required_params(
                     request.normalized_view(),
@@ -170,6 +180,7 @@ impl NetflowFlowsHandler {
 
             Ok(FlowsFunctionResponse::Table(FlowsResponse {
                 status: 200,
+                version: FLOWS_FUNCTION_VERSION,
                 response_type: "flows".to_string(),
                 data: FlowsData {
                     schema_version: FLOWS_SCHEMA_VERSION.to_string(),
@@ -185,6 +196,7 @@ impl NetflowFlowsHandler {
                     facets: query_output.facets,
                 },
                 has_history: true,
+                update_every: FLOWS_UPDATE_EVERY_SECONDS,
                 accepted_params: flows_accepted_params(),
                 required_params: flows_required_params(
                     request.normalized_view(),
@@ -331,6 +343,7 @@ impl FunctionHandler for NetflowFlowsHandler {
         func_decl.access =
             Some(HttpAccess::SIGNED_ID | HttpAccess::SAME_SPACE | HttpAccess::SENSITIVE_DATA);
         func_decl.timeout = 30;
+        func_decl.version = Some(FLOWS_FUNCTION_VERSION);
         func_decl
     }
 }
@@ -575,7 +588,8 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::{
-        FlowsFunctionResponse, NetflowFlowsHandler, ingest, plugin_config, query, tiering,
+        FLOWS_FUNCTION_VERSION, FLOWS_UPDATE_EVERY_SECONDS, FlowsFunctionResponse,
+        NetflowFlowsHandler, ingest, plugin_config, query, tiering,
     };
     use chrono::Utc;
     use etherparse::{SlicedPacket, TransportSlice};
@@ -675,6 +689,8 @@ mod tests {
         };
 
         assert_eq!(response.status, 200);
+        assert_eq!(response.version, FLOWS_FUNCTION_VERSION);
+        assert_eq!(response.update_every, FLOWS_UPDATE_EVERY_SECONDS);
         assert_eq!(response.response_type, "flows");
         assert_eq!(response.data.view, "table-sankey");
         assert!(
@@ -768,6 +784,8 @@ mod tests {
         };
 
         assert_eq!(response.status, 200);
+        assert_eq!(response.version, FLOWS_FUNCTION_VERSION);
+        assert_eq!(response.update_every, FLOWS_UPDATE_EVERY_SECONDS);
         assert_eq!(response.response_type, "metrics");
         assert_eq!(response.data.view, "timeseries");
         assert_eq!(response.data.metric, "bytes");
@@ -1031,6 +1049,58 @@ mod tests {
                 .unwrap_or(0),
             0,
             "expected no matched entries for FLOW_VERSION=999"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn e2e_post_style_nested_required_controls_still_filter_correctly() {
+        let (cfg, _metrics, open_tiers, _tmp) = ingest_fixture("nfv5.pcap").await;
+        let (query_service, _notify_rx) =
+            query::FlowQueryService::new(&cfg, Arc::clone(&open_tiers))
+                .await
+                .expect("create query service");
+        let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+        let payload = format!(
+            r#"{{
+                "after":1,
+                "before":{before},
+                "query":"",
+                "selections":{{
+                    "view":"table-sankey",
+                    "group_by":["SRC_ADDR","DST_ADDR","PROTOCOL"],
+                    "sort_by":"bytes",
+                    "top_n":"100",
+                    "FLOW_VERSION":["v5"]
+                }},
+                "timeout":120000,
+                "last":200
+            }}"#
+        );
+        let request = serde_json::from_str::<query::FlowsRequest>(&payload)
+            .expect("request should deserialize");
+
+        let output = query_service
+            .query_flows(&request)
+            .await
+            .expect("query should honor nested required controls");
+
+        assert_eq!(
+            output.stats.get("query_reader_path").copied().unwrap_or(0),
+            1,
+            "expected query to use journal-session reader path"
+        );
+        assert!(
+            output
+                .stats
+                .get("query_matched_entries")
+                .copied()
+                .unwrap_or(0)
+                > 0,
+            "expected nested required controls not to suppress real filtering"
+        );
+        assert!(
+            !output.flows.is_empty(),
+            "expected rows after hoisting nested required controls out of selections"
         );
     }
 

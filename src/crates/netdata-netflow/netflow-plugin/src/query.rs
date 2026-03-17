@@ -59,24 +59,36 @@ const FACET_EXCLUDED_FIELDS: &[&str] = &[
     "RAW_PACKETS",
 ];
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone)]
 pub(crate) struct FlowsRequest {
-    #[serde(default)]
     pub(crate) view: ViewMode,
-    #[serde(default)]
     pub(crate) after: Option<u32>,
-    #[serde(default)]
     pub(crate) before: Option<u32>,
-    #[serde(default)]
     pub(crate) query: String,
-    #[serde(default, deserialize_with = "deserialize_selections")]
     pub(crate) selections: HashMap<String, Vec<String>>,
-    #[serde(default = "default_group_by", deserialize_with = "deserialize_group_by")]
     pub(crate) group_by: Vec<String>,
-    #[serde(default)]
     pub(crate) sort_by: SortBy,
-    #[serde(default)]
     pub(crate) top_n: TopN,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct RawFlowsRequest {
+    #[serde(default)]
+    view: Option<ViewMode>,
+    #[serde(default)]
+    after: Option<u32>,
+    #[serde(default)]
+    before: Option<u32>,
+    #[serde(default)]
+    query: String,
+    #[serde(default, deserialize_with = "deserialize_selections")]
+    selections: HashMap<String, Vec<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_group_by")]
+    group_by: Option<Vec<String>>,
+    #[serde(default)]
+    sort_by: Option<SortBy>,
+    #[serde(default)]
+    top_n: Option<TopN>,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
@@ -150,6 +162,66 @@ impl Default for FlowsRequest {
             sort_by: SortBy::Bytes,
             top_n: TopN::N25,
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for FlowsRequest {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let mut raw = RawFlowsRequest::deserialize(deserializer)?;
+        let view = match raw.view {
+            Some(view) => {
+                raw.selections.remove("VIEW");
+                view
+            }
+            None => take_selection_view(&mut raw.selections)
+                .transpose()
+                .map_err(D::Error::custom)?
+                .unwrap_or_default(),
+        };
+        let group_by = match raw.group_by {
+            Some(group_by) => {
+                raw.selections.remove("GROUP_BY");
+                group_by
+            }
+            None => take_selection_group_by(&mut raw.selections)
+                .transpose()
+                .map_err(D::Error::custom)?
+                .unwrap_or_else(default_group_by),
+        };
+        let sort_by = match raw.sort_by {
+            Some(sort_by) => {
+                raw.selections.remove("SORT_BY");
+                sort_by
+            }
+            None => take_selection_sort_by(&mut raw.selections)
+                .transpose()
+                .map_err(D::Error::custom)?
+                .unwrap_or_default(),
+        };
+        let top_n = match raw.top_n {
+            Some(top_n) => {
+                raw.selections.remove("TOP_N");
+                top_n
+            }
+            None => take_selection_top_n(&mut raw.selections)
+                .transpose()
+                .map_err(D::Error::custom)?
+                .unwrap_or_default(),
+        };
+
+        Ok(Self {
+            view,
+            after: raw.after,
+            before: raw.before,
+            query: raw.query,
+            selections: raw.selections,
+            group_by,
+            sort_by,
+            top_n,
+        })
     }
 }
 
@@ -260,16 +332,28 @@ static GROUP_BY_ALLOWED_OPTIONS: LazyLock<Vec<String>> = LazyLock::new(|| {
         .collect()
 });
 
-fn deserialize_group_by<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+fn deserialize_optional_group_by<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Vec<String>>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let selection = GroupBySelection::deserialize(deserializer)?;
+    let selection = Option::<GroupBySelection>::deserialize(deserializer)?;
+    selection
+        .map(group_by_selection_to_values)
+        .transpose()
+        .map_err(D::Error::custom)
+}
+
+fn group_by_selection_to_values(selection: GroupBySelection) -> std::result::Result<Vec<String>, String> {
     let raw_values = match selection {
         GroupBySelection::One(value) => vec![value],
         GroupBySelection::Many(values) => values,
     };
+    normalize_group_by_values(raw_values)
+}
 
+fn normalize_group_by_values(raw_values: Vec<String>) -> std::result::Result<Vec<String>, String> {
     let mut out = Vec::new();
     let mut seen = HashSet::new();
 
@@ -282,9 +366,7 @@ where
 
             let normalized = field.to_ascii_uppercase();
             if !GROUP_BY_ALLOWED_FIELDS.contains(normalized.as_str()) {
-                return Err(D::Error::custom(format!(
-                    "unsupported group_by field `{normalized}`"
-                )));
+                return Err(format!("unsupported group_by field `{normalized}`"));
             }
 
             if seen.insert(normalized.clone()) {
@@ -297,12 +379,61 @@ where
     }
 
     if out.is_empty() {
-        return Err(D::Error::custom(
-            "group_by must contain at least one supported field",
-        ));
+        return Err("group_by must contain at least one supported field".to_string());
     }
 
     Ok(out)
+}
+
+fn take_selection_view(
+    selections: &mut HashMap<String, Vec<String>>,
+) -> Option<std::result::Result<ViewMode, String>> {
+    take_single_selection_value(selections, "VIEW").map(|value| {
+        value.and_then(|value| parse_enum_selection("view", &value))
+    })
+}
+
+fn take_selection_sort_by(
+    selections: &mut HashMap<String, Vec<String>>,
+) -> Option<std::result::Result<SortBy, String>> {
+    take_single_selection_value(selections, "SORT_BY").map(|value| {
+        value.and_then(|value| parse_enum_selection("sort_by", &value))
+    })
+}
+
+fn take_selection_top_n(
+    selections: &mut HashMap<String, Vec<String>>,
+) -> Option<std::result::Result<TopN, String>> {
+    take_single_selection_value(selections, "TOP_N").map(|value| {
+        value.and_then(|value| parse_enum_selection("top_n", &value))
+    })
+}
+
+fn take_selection_group_by(
+    selections: &mut HashMap<String, Vec<String>>,
+) -> Option<std::result::Result<Vec<String>, String>> {
+    selections
+        .remove("GROUP_BY")
+        .map(normalize_group_by_values)
+}
+
+fn take_single_selection_value(
+    selections: &mut HashMap<String, Vec<String>>,
+    key: &str,
+) -> Option<std::result::Result<String, String>> {
+    selections.remove(key).map(|values| match values.as_slice() {
+        [] => Err(format!("selection `{key}` is empty")),
+        [value] => Ok(value.clone()),
+        _ => Err(format!("selection `{key}` must contain exactly one value")),
+    })
+}
+
+fn parse_enum_selection<T>(field: &str, value: &str) -> std::result::Result<T, String>
+where
+    T: for<'de> Deserialize<'de>,
+{
+    serde_json::from_value::<T>(Value::String(value.to_string()))
+        .map_err(|err| format!("invalid {field}: {err}"))
 }
 
 pub(crate) fn supported_group_by_fields() -> &'static [String] {
@@ -331,11 +462,20 @@ struct QuerySetup {
     sort_by: SortBy,
     after: u32,
     before: u32,
+    timeseries_layout: Option<TimeseriesLayout>,
     effective_group_by: Vec<String>,
     selected_tier: TierKind,
     limit: usize,
     files: Vec<RegistryFile>,
     stats: HashMap<String, u64>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct TimeseriesLayout {
+    after: u32,
+    before: u32,
+    bucket_seconds: u32,
+    bucket_count: usize,
 }
 
 #[derive(Default)]
@@ -489,15 +629,18 @@ impl FlowQueryService {
 
     fn prepare_query(&self, request: &FlowsRequest) -> Result<QuerySetup> {
         let sort_by = request.normalized_sort_by();
-        let (after, before) = resolve_time_bounds(request);
+        let (requested_after, requested_before) = resolve_time_bounds(request);
+        let timeseries_layout = request
+            .is_timeseries_view()
+            .then(|| init_timeseries_layout(requested_after, requested_before));
+        let (after, before) = timeseries_layout
+            .map(|layout| (layout.after, layout.before))
+            .unwrap_or((requested_after, requested_before));
         let effective_group_by = resolve_effective_group_by(request);
         let force_raw_tier =
             requires_raw_tier_for_fields(&effective_group_by, &request.selections, &request.query);
-        let bucket_seconds = request
-            .is_timeseries_view()
-            .then(|| init_histogram_buckets(after, before).0);
-        let selected_tier = if let Some(bucket_seconds) = bucket_seconds {
-            self.select_timeseries_query_tier(bucket_seconds, force_raw_tier)
+        let selected_tier = if let Some(layout) = timeseries_layout {
+            self.select_timeseries_query_tier(layout.bucket_seconds, force_raw_tier)
         } else {
             self.select_query_tier(after, before, force_raw_tier)
         };
@@ -530,6 +673,8 @@ impl FlowQueryService {
         );
         stats.insert("query_after".to_string(), after as u64);
         stats.insert("query_before".to_string(), before as u64);
+        stats.insert("query_requested_after".to_string(), requested_after as u64);
+        stats.insert("query_requested_before".to_string(), requested_before as u64);
         stats.insert("query_limit".to_string(), limit as u64);
         stats.insert("query_files".to_string(), files.len() as u64);
         stats.insert(
@@ -555,14 +700,19 @@ impl FlowQueryService {
             "query_facet_accumulator_value_limit".to_string(),
             self.facet_max_values_per_field as u64,
         );
-        if let Some(bucket_seconds) = bucket_seconds {
-            stats.insert("query_bucket_seconds".to_string(), bucket_seconds as u64);
+        if let Some(layout) = timeseries_layout {
+            stats.insert("query_bucket_seconds".to_string(), layout.bucket_seconds as u64);
+            stats.insert(
+                "query_bucket_count".to_string(),
+                layout.bucket_count as u64,
+            );
         }
 
         Ok(QuerySetup {
             sort_by,
             after,
             before,
+            timeseries_layout,
             effective_group_by,
             selected_tier,
             limit,
@@ -813,6 +963,9 @@ impl FlowQueryService {
         request: &FlowsRequest,
     ) -> Result<FlowMetricsQueryOutput> {
         let setup = self.prepare_query(request)?;
+        let layout = setup
+            .timeseries_layout
+            .context("timeseries query missing aligned layout")?;
         let open_records =
             self.open_records_for_tier(setup.selected_tier, setup.after, setup.before);
 
@@ -838,8 +991,7 @@ impl FlowQueryService {
             setup.limit,
         );
         let top_rows = ranked.rows;
-        let (bucket_seconds, bucket_template) = init_histogram_buckets(setup.after, setup.before);
-        let mut series_buckets = vec![vec![0_u64; top_rows.len()]; bucket_template.len()];
+        let mut series_buckets = vec![vec![0_u64; top_rows.len()]; layout.bucket_count];
         let top_keys: HashMap<GroupKey, usize> = top_rows
             .iter()
             .enumerate()
@@ -860,9 +1012,9 @@ impl FlowQueryService {
                 accumulate_series_bucket(
                     &mut series_buckets,
                     chart_timestamp_usec(record),
-                    setup.after,
-                    setup.before,
-                    bucket_seconds,
+                    layout.after,
+                    layout.before,
+                    layout.bucket_seconds,
                     index,
                     metric_value,
                 );
@@ -915,9 +1067,9 @@ impl FlowQueryService {
 
         let warnings = build_query_warnings(group_overflow.dropped_records, 0, 0);
         let chart = metrics_chart_from_top_groups(
-            setup.after,
-            setup.before,
-            bucket_seconds,
+            layout.after,
+            layout.before,
+            layout.bucket_seconds,
             setup.sort_by,
             &top_rows,
             &series_buckets,
@@ -2069,15 +2221,49 @@ fn build_facets_from_accumulator(
     })
 }
 
-fn init_histogram_buckets(after: u32, before: u32) -> (u32, Vec<FlowMetrics>) {
+fn align_down(timestamp: u32, step: u32) -> u32 {
+    if step == 0 {
+        timestamp
+    } else {
+        (timestamp / step) * step
+    }
+}
+
+fn align_up(timestamp: u32, step: u32) -> u32 {
+    if step == 0 {
+        timestamp
+    } else {
+        timestamp
+            .saturating_add(step.saturating_sub(1))
+            .saturating_div(step)
+            .saturating_mul(step)
+    }
+}
+
+fn init_timeseries_layout(after: u32, before: u32) -> TimeseriesLayout {
     if before <= after {
-        return (0, Vec::new());
+        return TimeseriesLayout {
+            after,
+            before,
+            bucket_seconds: 0,
+            bucket_count: 0,
+        };
     }
     let window = before - after;
-    let bucket_seconds = ((window + HISTOGRAM_TARGET_BUCKETS - 1) / HISTOGRAM_TARGET_BUCKETS)
+    let raw_bucket_seconds = ((window + HISTOGRAM_TARGET_BUCKETS - 1) / HISTOGRAM_TARGET_BUCKETS)
         .max(MIN_TIMESERIES_BUCKET_SECONDS);
-    let bucket_count = ((window + bucket_seconds - 1) / bucket_seconds).max(1) as usize;
-    (bucket_seconds, vec![FlowMetrics::default(); bucket_count])
+    let bucket_seconds = align_up(raw_bucket_seconds, MIN_TIMESERIES_BUCKET_SECONDS)
+        .max(MIN_TIMESERIES_BUCKET_SECONDS);
+    let aligned_after = align_down(after, bucket_seconds);
+    let aligned_before = align_up(before, bucket_seconds);
+    let bucket_count = ((aligned_before.saturating_sub(aligned_after)) / bucket_seconds).max(1);
+
+    TimeseriesLayout {
+        after: aligned_after,
+        before: aligned_before,
+        bucket_seconds,
+        bucket_count: bucket_count as usize,
+    }
 }
 
 fn accumulate_series_bucket(
@@ -2660,6 +2846,78 @@ mod tests {
     }
 
     #[test]
+    fn request_deserialization_hoists_required_controls_from_selections() {
+        let request = serde_json::from_str::<FlowsRequest>(
+            r#"{
+                "after":1773734839,
+                "before":1773735439,
+                "query":"",
+                "selections":{
+                    "view":"table-sankey",
+                    "group_by":["PROTOCOL","SRC_AS_NAME","DST_AS_NAME"],
+                    "sort_by":"bytes",
+                    "top_n":"25",
+                    "IN_IF":["30","35"]
+                },
+                "timeout":120000,
+                "last":200
+            }"#,
+        )
+        .expect("request should deserialize");
+
+        assert_eq!(request.view, super::ViewMode::TableSankey);
+        assert_eq!(
+            request.group_by,
+            vec![
+                "PROTOCOL".to_string(),
+                "SRC_AS_NAME".to_string(),
+                "DST_AS_NAME".to_string()
+            ]
+        );
+        assert_eq!(request.sort_by, SortBy::Bytes);
+        assert_eq!(request.top_n, super::TopN::N25);
+        assert_eq!(
+            request.selections,
+            HashMap::from([(
+                "IN_IF".to_string(),
+                vec!["30".to_string(), "35".to_string()]
+            )])
+        );
+    }
+
+    #[test]
+    fn request_deserialization_prefers_top_level_controls_over_selections() {
+        let request = serde_json::from_str::<FlowsRequest>(
+            r#"{
+                "view":"timeseries",
+                "group_by":["PROTOCOL"],
+                "sort_by":"packets",
+                "top_n":"50",
+                "selections":{
+                    "view":"table-sankey",
+                    "group_by":["SRC_AS_NAME","DST_AS_NAME"],
+                    "sort_by":"bytes",
+                    "top_n":"25",
+                    "IN_IF":["30","35"]
+                }
+            }"#,
+        )
+        .expect("request should deserialize");
+
+        assert_eq!(request.view, super::ViewMode::TimeSeries);
+        assert_eq!(request.group_by, vec!["PROTOCOL".to_string()]);
+        assert_eq!(request.sort_by, SortBy::Packets);
+        assert_eq!(request.top_n, super::TopN::N50);
+        assert_eq!(
+            request.selections,
+            HashMap::from([(
+                "IN_IF".to_string(),
+                vec!["30".to_string(), "35".to_string()]
+            )])
+        );
+    }
+
+    #[test]
     fn cursor_prefilter_skips_multi_value_selections() {
         let selections = HashMap::from([
             ("FLOW_VERSION".to_string(), vec!["v5".to_string()]),
@@ -2871,8 +3129,8 @@ mod tests {
             Some(&"6".to_string())
         );
 
-        let (bucket_seconds, bucket_template) = super::init_histogram_buckets(0, 60);
-        let mut series_buckets = vec![vec![0_u64; ranked.rows.len()]; bucket_template.len()];
+        let layout = super::init_timeseries_layout(0, 60);
+        let mut series_buckets = vec![vec![0_u64; ranked.rows.len()]; layout.bucket_count];
         let top_keys: HashMap<super::GroupKey, usize> = ranked
             .rows
             .iter()
@@ -2886,9 +3144,9 @@ mod tests {
                 super::accumulate_series_bucket(
                     &mut series_buckets,
                     record.timestamp_usec,
-                    0,
-                    60,
-                    bucket_seconds,
+                    layout.after,
+                    layout.before,
+                    layout.bucket_seconds,
                     index,
                     super::sampled_metric_value(SortBy::Bytes, &record.fields),
                 );
@@ -2896,9 +3154,9 @@ mod tests {
         }
 
         let chart = super::metrics_chart_from_top_groups(
-            0,
-            60,
-            bucket_seconds,
+            layout.after,
+            layout.before,
+            layout.bucket_seconds,
             SortBy::Bytes,
             &ranked.rows,
             &series_buckets,
@@ -2959,9 +3217,20 @@ mod tests {
     }
 
     #[test]
-    fn init_histogram_buckets_have_one_minute_floor() {
-        let (bucket_seconds, buckets) = super::init_histogram_buckets(0, 300);
-        assert_eq!(bucket_seconds, 60);
-        assert_eq!(buckets.len(), 5);
+    fn init_timeseries_layout_has_one_minute_floor_and_wall_clock_alignment() {
+        let layout = super::init_timeseries_layout(65, 305);
+        assert_eq!(layout.bucket_seconds, 60);
+        assert_eq!(layout.after, 60);
+        assert_eq!(layout.before, 360);
+        assert_eq!(layout.bucket_count, 5);
+    }
+
+    #[test]
+    fn init_timeseries_layout_rounds_up_to_whole_minutes() {
+        let layout = super::init_timeseries_layout(61, 7_261);
+        assert_eq!(layout.bucket_seconds, 120);
+        assert_eq!(layout.after, 0);
+        assert_eq!(layout.before, 7_320);
+        assert_eq!(layout.bucket_count, 61);
     }
 }
