@@ -25,10 +25,14 @@ bool cpus_lock_initialized = false;
 static HANDLE msr_device = INVALID_HANDLE_VALUE;
 static CRITICAL_SECTION device_lock;
 bool device_lock_initialized = false;
+// Set by the worker immediately before exit so cleanup can distinguish
+// "join failed but thread is done" from "join failed and thread may still run".
+static volatile LONG hardware_info_thread_finished = 0;
 static int consecutive_errors = 0;
 static const int MAX_CONSECUTIVE_ERRORS = 5;
 static const int IOCTL_RETRIES = 3;
 static const int IOCTL_RETRY_DELAY_MS = 10;
+static const int THREAD_JOIN_FALLBACK_WAIT_MS = 2000;
 #define INVALID_TEMP ((collected_number)(-1))
 
 static void netdata_stop_driver()
@@ -234,24 +238,35 @@ static inline HANDLE netdata_open_device()
 
 static bool netdata_reopen_device_if_needed()
 {
+    EnterCriticalSection(&device_lock);
     if (msr_device != INVALID_HANDLE_VALUE) {
+        LeaveCriticalSection(&device_lock);
         return true;
     }
 
     msr_device = netdata_open_device();
-    return (msr_device != INVALID_HANDLE_VALUE);
+    bool ok = (msr_device != INVALID_HANDLE_VALUE);
+    LeaveCriticalSection(&device_lock);
+    return ok;
 }
 
 static bool netdata_read_msr(MSR_REQUEST *req)
 {
-    if (!req || msr_device == INVALID_HANDLE_VALUE) {
+    if (!req)
+        return false;
+
+    EnterCriticalSection(&device_lock);
+    if (msr_device == INVALID_HANDLE_VALUE) {
+        LeaveCriticalSection(&device_lock);
         return false;
     }
 
+    bool success = false;
     for (int retry = 0; retry < IOCTL_RETRIES; retry++) {
         DWORD bytes = 0;
         if (DeviceIoControl(msr_device, IOCTL_MSR_READ, req, sizeof(*req), req, sizeof(*req), &bytes, NULL)) {
-            return true;
+            success = true;
+            break;
         }
 
         if (retry < IOCTL_RETRIES - 1) {
@@ -259,7 +274,8 @@ static bool netdata_read_msr(MSR_REQUEST *req)
         }
     }
 
-    return false;
+    LeaveCriticalSection(&device_lock);
+    return success;
 }
 
 static collected_number netdata_intel_cpu_temp(MSR_REQUEST *req)
@@ -342,6 +358,8 @@ static void get_hardware_info_thread(void *ptr __maybe_unused)
 
         netdata_collect_cpu_chart();
     }
+
+    InterlockedExchange(&hardware_info_thread_finished, 1);
 }
 
 static void netdata_detect_cpu()
@@ -415,6 +433,7 @@ static int initialize()
         cpus[i].read_errors = 0;
     }
 
+    InterlockedExchange(&hardware_info_thread_finished, 0);
     hardware_info_thread =
         nd_thread_create("hw_info_thread", NETDATA_THREAD_OPTION_DEFAULT, get_hardware_info_thread, NULL);
 
@@ -494,11 +513,40 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
 void do_GetHardwareInfo_cleanup()
 {
     if (hardware_info_thread) {
-        if (nd_thread_join(hardware_info_thread))
+        if (nd_thread_join(hardware_info_thread)) {
+            // nd_thread_join() frees the ND_THREAD object even on failure,
+            // so we cannot retry. The Windows/MSYS2 UV_EINVAL fast-exit case
+            // is already handled inside nd_thread_join(). For any other error,
+            // wait for up to one heartbeat interval plus slack for the worker
+            // to report completion before tearing down local resources it may
+            // still be touching. If it never does, abort cleanup: leaking here
+            // is safer than racing a live worker or hanging plugin shutdown
+            // indefinitely.
             nd_log_daemon(NDLP_ERR, "Failed to join Get Hardware Info thread");
+
+            size_t retries = 0;
+            while (!InterlockedCompareExchange(&hardware_info_thread_finished, 1, 1) &&
+                   retries < (size_t)THREAD_JOIN_FALLBACK_WAIT_MS) {
+                Sleep(1);
+                retries++;
+            }
+
+            if (!InterlockedCompareExchange(&hardware_info_thread_finished, 1, 1)) {
+                hardware_info_thread = NULL;
+                return;
+            }
+        }
+        hardware_info_thread = NULL;
     }
 
-    if (msr_device != INVALID_HANDLE_VALUE) {
+    if (device_lock_initialized) {
+        EnterCriticalSection(&device_lock);
+        if (msr_device != INVALID_HANDLE_VALUE) {
+            CloseHandle(msr_device);
+            msr_device = INVALID_HANDLE_VALUE;
+        }
+        LeaveCriticalSection(&device_lock);
+    } else if (msr_device != INVALID_HANDLE_VALUE) {
         CloseHandle(msr_device);
         msr_device = INVALID_HANDLE_VALUE;
     }
