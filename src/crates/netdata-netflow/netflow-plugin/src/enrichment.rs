@@ -1,3 +1,6 @@
+#[cfg(test)]
+use crate::decoder::FlowFields;
+use crate::decoder::FlowRecord;
 use crate::plugin_config::{
     AsnProviderConfig, EnrichmentConfig, GeoIpConfig, NetProviderConfig, NetworkAttributesConfig,
     NetworkAttributesValue, SamplingRateSetting, StaticExporterConfig, StaticInterfaceConfig,
@@ -9,9 +12,6 @@ use ipnet_trie::IpnetTrie;
 use maxminddb::Reader;
 use regex::Regex;
 use serde::Deserialize;
-#[cfg(test)]
-use crate::decoder::FlowFields;
-use crate::decoder::FlowRecord;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::net::{IpAddr, SocketAddr};
@@ -205,9 +205,7 @@ impl DynamicRoutingRuntime {
             .collect();
         for prefix in affected {
             if let Some(mut routes) = state.entries.remove(prefix) {
-                routes.retain(|r| {
-                    r.peer.exporter != exporter || r.peer.session_id != session_id
-                });
+                routes.retain(|r| r.peer.exporter != exporter || r.peer.session_id != session_id);
                 if !routes.is_empty() {
                     state.entries.insert(prefix, routes);
                 }
@@ -260,11 +258,7 @@ impl DynamicRoutingRuntime {
         let Ok(state) = self.state.read() else {
             return 0;
         };
-        state
-            .entries
-            .iter()
-            .map(|(_, routes)| routes.len())
-            .sum()
+        state.entries.iter().map(|(_, routes)| routes.len()).sum()
     }
 }
 
@@ -525,46 +519,22 @@ impl FlowEnricher {
         fields.insert("EXPORTER_GROUP", exporter_classification.group);
         fields.insert("EXPORTER_ROLE", exporter_classification.role);
         fields.insert("EXPORTER_SITE", exporter_classification.site);
-        fields.insert(
-            "EXPORTER_REGION",
-            exporter_classification.region,
-        );
-        fields.insert(
-            "EXPORTER_TENANT",
-            exporter_classification.tenant,
-        );
+        fields.insert("EXPORTER_REGION", exporter_classification.region);
+        fields.insert("EXPORTER_TENANT", exporter_classification.tenant);
 
         fields.insert("IN_IF_NAME", in_classification.name);
-        fields.insert(
-            "IN_IF_DESCRIPTION",
-            in_classification.description,
-        );
+        fields.insert("IN_IF_DESCRIPTION", in_classification.description);
         fields.insert("IN_IF_SPEED", in_interface.speed.to_string());
         fields.insert("IN_IF_PROVIDER", in_classification.provider);
-        fields.insert(
-            "IN_IF_CONNECTIVITY",
-            in_classification.connectivity,
-        );
-        fields.insert(
-            "IN_IF_BOUNDARY",
-            in_classification.boundary.to_string(),
-        );
+        fields.insert("IN_IF_CONNECTIVITY", in_classification.connectivity);
+        fields.insert("IN_IF_BOUNDARY", in_classification.boundary.to_string());
 
         fields.insert("OUT_IF_NAME", out_classification.name);
-        fields.insert(
-            "OUT_IF_DESCRIPTION",
-            out_classification.description,
-        );
+        fields.insert("OUT_IF_DESCRIPTION", out_classification.description);
         fields.insert("OUT_IF_SPEED", out_interface.speed.to_string());
         fields.insert("OUT_IF_PROVIDER", out_classification.provider);
-        fields.insert(
-            "OUT_IF_CONNECTIVITY",
-            out_classification.connectivity,
-        );
-        fields.insert(
-            "OUT_IF_BOUNDARY",
-            out_classification.boundary.to_string(),
-        );
+        fields.insert("OUT_IF_CONNECTIVITY", out_classification.connectivity);
+        fields.insert("OUT_IF_BOUNDARY", out_classification.boundary.to_string());
 
         true
     }
@@ -3423,7 +3393,11 @@ impl<T> PrefixMap<T> {
 }
 
 fn apply_network_asn_override(current_asn: u32, network_asn: u32) -> u32 {
-    if network_asn != 0 { network_asn } else { current_asn }
+    if network_asn != 0 {
+        network_asn
+    } else {
+        current_asn
+    }
 }
 
 /// Pre-defined static keys for SRC/DST network attribute fields.
@@ -3530,10 +3504,7 @@ fn append_u32_csv(target: &mut String, values: &[u32]) {
 }
 
 /// Append large communities as CSV to a String field.
-fn append_large_communities_csv(
-    target: &mut String,
-    values: &[StaticRoutingLargeCommunity],
-) {
+fn append_large_communities_csv(target: &mut String, values: &[StaticRoutingLargeCommunity]) {
     for lc in values {
         if !target.is_empty() {
             target.push(',');
@@ -5497,7 +5468,11 @@ mod tests {
 
     /// Compare enriched FlowFields from enrich_fields with to_fields() output
     /// from an equivalently enriched FlowRecord.
-    fn assert_enrich_equivalence(cfg: &EnrichmentConfig, fields: &mut FlowFields, rec: &mut FlowRecord) {
+    fn assert_enrich_equivalence(
+        cfg: &EnrichmentConfig,
+        fields: &mut FlowFields,
+        rec: &mut FlowRecord,
+    ) {
         let mut enricher1 = FlowEnricher::from_config(cfg)
             .expect("build enricher")
             .expect("enricher must be enabled");
@@ -5519,21 +5494,50 @@ mod tests {
         // Compare all enrichment-written fields.
         let enrichment_keys = [
             "SAMPLING_RATE",
-            "SRC_MASK", "DST_MASK",
-            "SRC_AS", "DST_AS",
-            "SRC_AS_NAME", "DST_AS_NAME",
+            "SRC_MASK",
+            "DST_MASK",
+            "SRC_AS",
+            "DST_AS",
+            "SRC_AS_NAME",
+            "DST_AS_NAME",
             "NEXT_HOP",
-            "SRC_NET_NAME", "SRC_NET_ROLE", "SRC_NET_SITE", "SRC_NET_REGION", "SRC_NET_TENANT",
-            "SRC_COUNTRY", "SRC_GEO_CITY", "SRC_GEO_STATE",
-            "DST_NET_NAME", "DST_NET_ROLE", "DST_NET_SITE", "DST_NET_REGION", "DST_NET_TENANT",
-            "DST_COUNTRY", "DST_GEO_CITY", "DST_GEO_STATE",
-            "DST_AS_PATH", "DST_COMMUNITIES", "DST_LARGE_COMMUNITIES",
-            "EXPORTER_NAME", "EXPORTER_GROUP", "EXPORTER_ROLE",
-            "EXPORTER_SITE", "EXPORTER_REGION", "EXPORTER_TENANT",
-            "IN_IF_NAME", "IN_IF_DESCRIPTION", "IN_IF_SPEED",
-            "IN_IF_PROVIDER", "IN_IF_CONNECTIVITY", "IN_IF_BOUNDARY",
-            "OUT_IF_NAME", "OUT_IF_DESCRIPTION", "OUT_IF_SPEED",
-            "OUT_IF_PROVIDER", "OUT_IF_CONNECTIVITY", "OUT_IF_BOUNDARY",
+            "SRC_NET_NAME",
+            "SRC_NET_ROLE",
+            "SRC_NET_SITE",
+            "SRC_NET_REGION",
+            "SRC_NET_TENANT",
+            "SRC_COUNTRY",
+            "SRC_GEO_CITY",
+            "SRC_GEO_STATE",
+            "DST_NET_NAME",
+            "DST_NET_ROLE",
+            "DST_NET_SITE",
+            "DST_NET_REGION",
+            "DST_NET_TENANT",
+            "DST_COUNTRY",
+            "DST_GEO_CITY",
+            "DST_GEO_STATE",
+            "DST_AS_PATH",
+            "DST_COMMUNITIES",
+            "DST_LARGE_COMMUNITIES",
+            "EXPORTER_NAME",
+            "EXPORTER_GROUP",
+            "EXPORTER_ROLE",
+            "EXPORTER_SITE",
+            "EXPORTER_REGION",
+            "EXPORTER_TENANT",
+            "IN_IF_NAME",
+            "IN_IF_DESCRIPTION",
+            "IN_IF_SPEED",
+            "IN_IF_PROVIDER",
+            "IN_IF_CONNECTIVITY",
+            "IN_IF_BOUNDARY",
+            "OUT_IF_NAME",
+            "OUT_IF_DESCRIPTION",
+            "OUT_IF_SPEED",
+            "OUT_IF_PROVIDER",
+            "OUT_IF_CONNECTIVITY",
+            "OUT_IF_BOUNDARY",
         ];
 
         for key in enrichment_keys {
@@ -5594,22 +5598,20 @@ mod tests {
     fn enrich_record_matches_with_routing_and_network_attributes() {
         let cfg = EnrichmentConfig {
             metadata_static: metadata_config_for_192(),
-            networks: BTreeMap::from([
-                (
-                    "10.0.0.0/8".to_string(),
-                    NetworkAttributesValue::Attributes(NetworkAttributesConfig {
-                        name: "internal".to_string(),
-                        role: "server".to_string(),
-                        site: "dc1".to_string(),
-                        region: "us-east".to_string(),
-                        tenant: "ops".to_string(),
-                        country: String::new(),
-                        state: String::new(),
-                        city: String::new(),
-                        asn: 0,
-                    }),
-                ),
-            ]),
+            networks: BTreeMap::from([(
+                "10.0.0.0/8".to_string(),
+                NetworkAttributesValue::Attributes(NetworkAttributesConfig {
+                    name: "internal".to_string(),
+                    role: "server".to_string(),
+                    site: "dc1".to_string(),
+                    region: "us-east".to_string(),
+                    tenant: "ops".to_string(),
+                    country: String::new(),
+                    state: String::new(),
+                    city: String::new(),
+                    asn: 0,
+                }),
+            )]),
             routing_static: StaticRoutingConfig {
                 prefixes: BTreeMap::from([(
                     "10.0.0.0/8".to_string(),

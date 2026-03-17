@@ -426,13 +426,9 @@ impl IngestService {
                     self.metrics.apply_decode_stats(&batch.stats);
 
                     for flow in batch.flows {
-                        let timestamps = if let Some(source_realtime_usec) = flow.source_realtime_usec {
-                            EntryTimestamps::default()
-                                .with_source_realtime_usec(source_realtime_usec)
-                                .with_entry_realtime_usec(source_realtime_usec)
-                        } else {
-                            EntryTimestamps::default()
-                        };
+                        let timestamps = EntryTimestamps::default()
+                            .with_source_realtime_usec(receive_time_usec)
+                            .with_entry_realtime_usec(receive_time_usec);
 
                         if let Err(err) = self
                             .encode_buf
@@ -450,8 +446,7 @@ impl IngestService {
                             .fetch_add(1, Ordering::Relaxed);
                         entries_since_sync += 1;
 
-                        let ts = flow.source_realtime_usec.unwrap_or_else(now_usec);
-                        self.observe_tiers_record(ts, &flow.record);
+                        self.observe_tiers_record(receive_time_usec, &flow.record);
                     }
 
                     if let Err(err) = self.flush_closed_tiers(now_usec()) {
@@ -640,20 +635,14 @@ impl IngestService {
 
         for entry in entries {
             let mut fields = crate::decoder::FlowFields::new();
-            let mut source_realtime_usec = None;
             for pair in entry.fields {
                 let name = pair.field();
-                if name == "_SOURCE_REALTIME_TIMESTAMP" {
-                    source_realtime_usec = pair.value().parse::<u64>().ok();
-                    continue;
-                }
                 if let Some(interned) = crate::decoder::intern_field_name(name) {
                     fields.insert(interned, pair.value().to_string());
                 }
             }
 
-            let timestamp_usec = source_realtime_usec.unwrap_or(entry.timestamp);
-            self.observe_tiers_with_cutoffs(timestamp_usec, &fields, &tier_cutoffs);
+            self.observe_tiers_with_cutoffs(entry.timestamp, &fields, &tier_cutoffs);
         }
 
         self.flush_closed_tiers(now)?;
@@ -663,11 +652,7 @@ impl IngestService {
 
     /// Hot path: observe tiers from a FlowRecord. Hash + lookup is zero-alloc
     /// when the dimension combination already exists in the current bucket.
-    fn observe_tiers_record(
-        &mut self,
-        timestamp_usec: u64,
-        record: &crate::decoder::FlowRecord,
-    ) {
+    fn observe_tiers_record(&mut self, timestamp_usec: u64, record: &crate::decoder::FlowRecord) {
         use crate::tiering::{FlowMetrics, rollup_dimension_hash};
         let dim_hash = rollup_dimension_hash(record);
         let metrics = FlowMetrics::from_record(record);
@@ -1110,7 +1095,12 @@ mod tests {
             let packet = packet.unwrap_or_else(|e| panic!("read packet {}: {e}", path.display()));
             if let Some((source, payload)) = extract_udp_payload(packet.data.as_ref()) {
                 let decoded = decoders.decode_udp_payload(source, payload);
-                flows.extend(decoded.flows.into_iter().map(|flow| flow.record.to_fields()));
+                flows.extend(
+                    decoded
+                        .flows
+                        .into_iter()
+                        .map(|flow| flow.record.to_fields()),
+                );
             }
         }
         flows
@@ -1206,12 +1196,12 @@ mod tests {
 
         // Phase 2: Extract data payloads into memory.
         let data_files = [
-            "data.pcap",                          // v9 data
-            "ipfixprobe-data.pcap",               // IPFIX biflows
-            "nfv5.pcap",                          // NetFlow v5
-            "icmp-data.pcap",                     // ICMP
-            "samplingrate-data.pcap",             // v9 with sampling
-            "multiplesamplingrates-data.pcap",    // v9 multiple sampling
+            "data.pcap",                       // v9 data
+            "ipfixprobe-data.pcap",            // IPFIX biflows
+            "nfv5.pcap",                       // NetFlow v5
+            "icmp-data.pcap",                  // ICMP
+            "samplingrate-data.pcap",          // v9 with sampling
+            "multiplesamplingrates-data.pcap", // v9 multiple sampling
         ];
         let mut data_payloads = Vec::new();
         for df in &data_files {
@@ -1241,20 +1231,15 @@ mod tests {
                         .decoders
                         .decode_udp_payload_at(p.source, &p.data, receive_time_usec);
                 for flow in batch.flows {
-                    let timestamps = if let Some(ts) = flow.source_realtime_usec {
-                        EntryTimestamps::default()
-                            .with_source_realtime_usec(ts)
-                            .with_entry_realtime_usec(ts)
-                    } else {
-                        EntryTimestamps::default()
-                    };
+                    let timestamps = EntryTimestamps::default()
+                        .with_source_realtime_usec(receive_time_usec)
+                        .with_entry_realtime_usec(receive_time_usec);
                     let _ = service.encode_buf.encode_record_and_write(
                         &flow.record,
                         &mut service.raw_journal,
                         timestamps,
                     );
-                    let ts = flow.source_realtime_usec.unwrap_or_else(super::now_usec);
-                    service.observe_tiers_record(ts, &flow.record);
+                    service.observe_tiers_record(receive_time_usec, &flow.record);
                 }
             }
         }
@@ -1273,20 +1258,15 @@ mod tests {
                         .decoders
                         .decode_udp_payload_at(p.source, &p.data, receive_time_usec);
                 for flow in batch.flows {
-                    let timestamps = if let Some(ts) = flow.source_realtime_usec {
-                        EntryTimestamps::default()
-                            .with_source_realtime_usec(ts)
-                            .with_entry_realtime_usec(ts)
-                    } else {
-                        EntryTimestamps::default()
-                    };
+                    let timestamps = EntryTimestamps::default()
+                        .with_source_realtime_usec(receive_time_usec)
+                        .with_entry_realtime_usec(receive_time_usec);
                     let _ = service.encode_buf.encode_record_and_write(
                         &flow.record,
                         &mut service.raw_journal,
                         timestamps,
                     );
-                    let ts = flow.source_realtime_usec.unwrap_or_else(super::now_usec);
-                    service.observe_tiers_record(ts, &flow.record);
+                    service.observe_tiers_record(receive_time_usec, &flow.record);
                 }
             }
         }
@@ -1338,13 +1318,9 @@ mod tests {
         let start_write = std::time::Instant::now();
         for _ in 0..bench_rounds {
             for flow in &prebuilt_flows {
-                let timestamps = if let Some(ts) = flow.source_realtime_usec {
-                    EntryTimestamps::default()
-                        .with_source_realtime_usec(ts)
-                        .with_entry_realtime_usec(ts)
-                } else {
-                    EntryTimestamps::default()
-                };
+                let timestamps = EntryTimestamps::default()
+                    .with_source_realtime_usec(120_000_000)
+                    .with_entry_realtime_usec(120_000_000);
                 let _ = service.encode_buf.encode_record_and_write(
                     &flow.record,
                     &mut service.raw_journal,
@@ -1368,8 +1344,7 @@ mod tests {
         let start_tier = std::time::Instant::now();
         for _ in 0..bench_rounds {
             for flow in &prebuilt_flows {
-                let ts = flow.source_realtime_usec.unwrap_or(120_000_000);
-                service.observe_tiers_record(ts, &flow.record);
+                service.observe_tiers_record(120_000_000, &flow.record);
             }
         }
         let elapsed_tier = start_tier.elapsed();
@@ -1385,9 +1360,21 @@ mod tests {
         eprintln!();
 
         eprintln!("=== Summary ===");
-        eprintln!("Full pipeline:  {:.0} flows/s ({:.2} µs/flow)", flows_per_sec, usec_per_flow);
-        eprintln!("  Decode:       {:.0} flows/s ({:.2} µs/flow)", decode_flows_per_sec, decode_usec_per_flow);
-        eprintln!("  Encode+Write: {:.0} flows/s ({:.2} µs/flow)", write_flows_per_sec, write_usec_per_flow);
-        eprintln!("  Tier observe: {:.0} flows/s ({:.2} µs/flow)", tier_flows_per_sec, tier_usec_per_flow);
+        eprintln!(
+            "Full pipeline:  {:.0} flows/s ({:.2} µs/flow)",
+            flows_per_sec, usec_per_flow
+        );
+        eprintln!(
+            "  Decode:       {:.0} flows/s ({:.2} µs/flow)",
+            decode_flows_per_sec, decode_usec_per_flow
+        );
+        eprintln!(
+            "  Encode+Write: {:.0} flows/s ({:.2} µs/flow)",
+            write_flows_per_sec, write_usec_per_flow
+        );
+        eprintln!(
+            "  Tier observe: {:.0} flows/s ({:.2} µs/flow)",
+            tier_flows_per_sec, tier_usec_per_flow
+        );
     }
 }

@@ -1474,17 +1474,21 @@ journal:
 
         assert_eq!(
             cfg.enrichment.geoip.asn_database,
-            vec![intel_dir
-                .join(TOPOLOGY_IP_ASN_MMDB)
-                .to_string_lossy()
-                .to_string()]
+            vec![
+                intel_dir
+                    .join(TOPOLOGY_IP_ASN_MMDB)
+                    .to_string_lossy()
+                    .to_string()
+            ]
         );
         assert_eq!(
             cfg.enrichment.geoip.geo_database,
-            vec![intel_dir
-                .join(TOPOLOGY_IP_COUNTRY_MMDB)
-                .to_string_lossy()
-                .to_string()]
+            vec![
+                intel_dir
+                    .join(TOPOLOGY_IP_COUNTRY_MMDB)
+                    .to_string_lossy()
+                    .to_string()
+            ]
         );
         assert!(cfg.enrichment.geoip.optional);
     }
@@ -1505,10 +1509,12 @@ journal:
 
         assert_eq!(
             cfg.enrichment.geoip.asn_database,
-            vec![intel_dir
-                .join(TOPOLOGY_IP_ASN_MMDB)
-                .to_string_lossy()
-                .to_string()]
+            vec![
+                intel_dir
+                    .join(TOPOLOGY_IP_ASN_MMDB)
+                    .to_string_lossy()
+                    .to_string()
+            ]
         );
         assert!(cfg.enrichment.geoip.geo_database.is_empty());
         assert!(cfg.enrichment.geoip.optional);

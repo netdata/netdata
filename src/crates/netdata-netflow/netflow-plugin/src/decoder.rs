@@ -126,10 +126,8 @@ const CANONICAL_FLOW_DEFAULTS: &[(&str, &str)] = &[
     ("NEXT_HOP", ""),
     ("SRC_PORT", "0"),
     ("DST_PORT", "0"),
-    ("FLOW_START_SECONDS", "0"),
-    ("FLOW_END_SECONDS", "0"),
-    ("FLOW_START_MILLIS", "0"),
-    ("FLOW_END_MILLIS", "0"),
+    ("FLOW_START_USEC", "0"),
+    ("FLOW_END_USEC", "0"),
     ("OBSERVATION_TIME_MILLIS", "0"),
     ("SRC_ADDR_NAT", ""),
     ("DST_ADDR_NAT", ""),
@@ -151,6 +149,10 @@ const CANONICAL_FLOW_DEFAULTS: &[(&str, &str)] = &[
     ("ICMPV6_CODE", "0"),
     ("MPLS_LABELS", ""),
 ];
+
+pub(crate) fn canonical_flow_field_names() -> impl Iterator<Item = &'static str> {
+    CANONICAL_FLOW_DEFAULTS.iter().map(|&(name, _)| name)
+}
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DecodeStats {
@@ -325,10 +327,8 @@ pub(crate) struct FlowRecord {
     pub(crate) dst_port: u16,
 
     // --- Timestamps ---
-    pub(crate) flow_start_seconds: u64,
-    pub(crate) flow_end_seconds: u64,
-    pub(crate) flow_start_millis: u64,
-    pub(crate) flow_end_millis: u64,
+    pub(crate) flow_start_usec: u64,
+    pub(crate) flow_end_usec: u64,
     pub(crate) observation_time_millis: u64,
 
     // --- NAT ---
@@ -465,11 +465,12 @@ impl FlowRecord {
         f.insert("SRC_PORT", self.src_port.to_string());
         f.insert("DST_PORT", self.dst_port.to_string());
         // Timestamps
-        f.insert("FLOW_START_SECONDS", self.flow_start_seconds.to_string());
-        f.insert("FLOW_END_SECONDS", self.flow_end_seconds.to_string());
-        f.insert("FLOW_START_MILLIS", self.flow_start_millis.to_string());
-        f.insert("FLOW_END_MILLIS", self.flow_end_millis.to_string());
-        f.insert("OBSERVATION_TIME_MILLIS", self.observation_time_millis.to_string());
+        f.insert("FLOW_START_USEC", self.flow_start_usec.to_string());
+        f.insert("FLOW_END_USEC", self.flow_end_usec.to_string());
+        f.insert(
+            "OBSERVATION_TIME_MILLIS",
+            self.observation_time_millis.to_string(),
+        );
         // NAT
         f.insert("SRC_ADDR_NAT", opt_ip_to_string(self.src_addr_nat));
         f.insert("DST_ADDR_NAT", opt_ip_to_string(self.dst_addr_nat));
@@ -479,8 +480,22 @@ impl FlowRecord {
         f.insert("SRC_VLAN", self.src_vlan.to_string());
         f.insert("DST_VLAN", self.dst_vlan.to_string());
         // MAC
-        f.insert("SRC_MAC", if self.src_mac == [0u8; 6] { String::new() } else { format_mac(&self.src_mac) });
-        f.insert("DST_MAC", if self.dst_mac == [0u8; 6] { String::new() } else { format_mac(&self.dst_mac) });
+        f.insert(
+            "SRC_MAC",
+            if self.src_mac == [0u8; 6] {
+                String::new()
+            } else {
+                format_mac(&self.src_mac)
+            },
+        );
+        f.insert(
+            "DST_MAC",
+            if self.dst_mac == [0u8; 6] {
+                String::new()
+            } else {
+                format_mac(&self.dst_mac)
+            },
+        );
         // IP header
         f.insert("IPTTL", self.ipttl.to_string());
         f.insert("IPTOS", self.iptos.to_string());
@@ -502,13 +517,37 @@ impl FlowRecord {
     /// record decode) and tests. Not on the hot path.
     pub(crate) fn from_fields(fields: &FlowFields) -> Self {
         let get_str = |k: &str| fields.get(k).map(|s| s.as_str()).unwrap_or("");
-        let get_u8 = |k: &str| fields.get(k).and_then(|s| s.parse::<u8>().ok()).unwrap_or(0);
-        let get_u16 = |k: &str| fields.get(k).and_then(|s| s.parse::<u16>().ok()).unwrap_or(0);
-        let get_u32 = |k: &str| fields.get(k).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
-        let get_u64 = |k: &str| fields.get(k).and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+        let get_u8 = |k: &str| {
+            fields
+                .get(k)
+                .and_then(|s| s.parse::<u8>().ok())
+                .unwrap_or(0)
+        };
+        let get_u16 = |k: &str| {
+            fields
+                .get(k)
+                .and_then(|s| s.parse::<u16>().ok())
+                .unwrap_or(0)
+        };
+        let get_u32 = |k: &str| {
+            fields
+                .get(k)
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(0)
+        };
+        let get_u64 = |k: &str| {
+            fields
+                .get(k)
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(0)
+        };
         let get_ip = |k: &str| {
             fields.get(k).and_then(|s| {
-                if s.is_empty() { None } else { s.parse::<IpAddr>().ok() }
+                if s.is_empty() {
+                    None
+                } else {
+                    s.parse::<IpAddr>().ok()
+                }
             })
         };
         let get_string = |k: &str| fields.get(k).cloned().unwrap_or_default();
@@ -593,10 +632,8 @@ impl FlowRecord {
             next_hop: get_ip("NEXT_HOP"),
             src_port: get_u16("SRC_PORT"),
             dst_port: get_u16("DST_PORT"),
-            flow_start_seconds: get_u64("FLOW_START_SECONDS"),
-            flow_end_seconds: get_u64("FLOW_END_SECONDS"),
-            flow_start_millis: get_u64("FLOW_START_MILLIS"),
-            flow_end_millis: get_u64("FLOW_END_MILLIS"),
+            flow_start_usec: get_u64("FLOW_START_USEC"),
+            flow_end_usec: get_u64("FLOW_END_USEC"),
             observation_time_millis: get_u64("OBSERVATION_TIME_MILLIS"),
             src_addr_nat: get_ip("SRC_ADDR_NAT"),
             dst_addr_nat: get_ip("DST_ADDR_NAT"),
@@ -625,7 +662,11 @@ impl FlowRecord {
     /// (`from_fields`) defaults missing fields to the same values, so the
     /// round-trip is lossless. Reduces per-entry item count from 87 to ~20-25
     /// for typical flows, proportionally cutting journal write overhead.
-    pub(crate) fn encode_to_journal_buf(&self, data: &mut Vec<u8>, refs: &mut Vec<std::ops::Range<usize>>) {
+    pub(crate) fn encode_to_journal_buf(
+        &self,
+        data: &mut Vec<u8>,
+        refs: &mut Vec<std::ops::Range<usize>>,
+    ) {
         data.clear();
         refs.clear();
         let mut ibuf = itoa::Buffer::new();
@@ -706,8 +747,11 @@ impl FlowRecord {
                     data.extend_from_slice($name.as_bytes());
                     data.push(b'=');
                     use std::io::Write;
-                    let _ = write!(data, "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-                        $val[0], $val[1], $val[2], $val[3], $val[4], $val[5]);
+                    let _ = write!(
+                        data,
+                        "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+                        $val[0], $val[1], $val[2], $val[3], $val[4], $val[5]
+                    );
                     refs.push(start..data.len());
                 }
             }};
@@ -809,10 +853,8 @@ impl FlowRecord {
         push_opt_ip!("NEXT_HOP", self.next_hop);
         push_u16!("SRC_PORT", self.src_port);
         push_u16!("DST_PORT", self.dst_port);
-        push_u64!("FLOW_START_SECONDS", self.flow_start_seconds);
-        push_u64!("FLOW_END_SECONDS", self.flow_end_seconds);
-        push_u64!("FLOW_START_MILLIS", self.flow_start_millis);
-        push_u64!("FLOW_END_MILLIS", self.flow_end_millis);
+        push_u64!("FLOW_START_USEC", self.flow_start_usec);
+        push_u64!("FLOW_END_USEC", self.flow_end_usec);
         push_u64!("OBSERVATION_TIME_MILLIS", self.observation_time_millis);
         push_opt_ip!("SRC_ADDR_NAT", self.src_addr_nat);
         push_opt_ip!("DST_ADDR_NAT", self.dst_addr_nat);
@@ -870,6 +912,12 @@ fn parse_prefix_ip(s: &str) -> Option<IpAddr> {
 pub(crate) struct DecodedFlow {
     pub(crate) record: FlowRecord,
     pub(crate) source_realtime_usec: Option<u64>,
+}
+
+fn apply_missing_flow_time_fallback(flow: &mut DecodedFlow, reception_usec: u64) {
+    if flow.record.flow_end_usec == 0 {
+        flow.record.flow_end_usec = reception_usec;
+    }
 }
 
 #[derive(Debug, Default)]
@@ -1229,9 +1277,7 @@ impl SamplingState {
     }
 
     fn has_any_v9_datalink_templates(&self) -> bool {
-        self.v9_datalink_templates
-            .values()
-            .any(|m| !m.is_empty())
+        self.v9_datalink_templates.values().any(|m| !m.is_empty())
     }
 
     fn has_any_ipfix_datalink_templates(&self) -> bool {
@@ -1559,6 +1605,10 @@ impl FlowDecoders {
             )
         };
 
+        for flow in &mut batch.flows {
+            apply_missing_flow_time_fallback(flow, input_realtime_usec);
+        }
+
         if let Some(enricher) = &mut self.enricher {
             batch
                 .flows
@@ -1885,10 +1935,8 @@ fn flow_identity_hash(flow: &DecodedFlow) -> u64 {
     r.out_if.hash(&mut hasher);
     r.bytes.hash(&mut hasher);
     r.packets.hash(&mut hasher);
-    r.flow_start_millis.hash(&mut hasher);
-    r.flow_end_millis.hash(&mut hasher);
-    r.flow_start_seconds.hash(&mut hasher);
-    r.flow_end_seconds.hash(&mut hasher);
+    r.flow_start_usec.hash(&mut hasher);
+    r.flow_end_usec.hash(&mut hasher);
     r.direction.hash(&mut hasher);
     hasher.finish()
 }
@@ -1908,10 +1956,8 @@ fn same_flow_identity(existing: &DecodedFlow, incoming: &DecodedFlow) -> bool {
         && a.out_if == b.out_if
         && a.bytes == b.bytes
         && a.packets == b.packets
-        && a.flow_start_millis == b.flow_start_millis
-        && a.flow_end_millis == b.flow_end_millis
-        && a.flow_start_seconds == b.flow_start_seconds
-        && a.flow_end_seconds == b.flow_end_seconds
+        && a.flow_start_usec == b.flow_start_usec
+        && a.flow_end_usec == b.flow_end_usec
         && a.direction == b.direction
 }
 
@@ -2024,10 +2070,8 @@ fn merge_enriched_records(existing: &mut DecodedFlow, incoming: &DecodedFlow) ->
     merge_copy!(dst_port);
 
     // Timestamps
-    merge_copy!(flow_start_seconds);
-    merge_copy!(flow_end_seconds);
-    merge_copy!(flow_start_millis);
-    merge_copy!(flow_end_millis);
+    merge_copy!(flow_start_usec);
+    merge_copy!(flow_end_usec);
     merge_copy!(observation_time_millis);
 
     // NAT
@@ -2375,6 +2419,8 @@ fn decode_v9_special_from_raw_payload(
         return Vec::new();
     }
 
+    let sys_uptime_millis =
+        u32::from_be_bytes([payload[4], payload[5], payload[6], payload[7]]) as u64;
     let export_time = u32::from_be_bytes([payload[8], payload[9], payload[10], payload[11]]) as u64;
     let packet_realtime_usec = Some(unix_timestamp_to_usec(export_time, 0));
     let exporter_ip = source.ip().to_string();
@@ -2411,6 +2457,8 @@ fn decode_v9_special_from_raw_payload(
                     timestamp_source,
                     input_realtime_usec,
                     packet_realtime_usec,
+                    export_time,
+                    sys_uptime_millis,
                     &template,
                     &record_values,
                     decapsulation_mode,
@@ -2453,6 +2501,8 @@ fn decode_v9_special_record(
     timestamp_source: TimestampSource,
     input_realtime_usec: u64,
     packet_realtime_usec: Option<u64>,
+    export_time_seconds: u64,
+    sys_uptime_millis: u64,
     template: &V9DataLinkTemplate,
     values: &[&[u8]],
     decapsulation_mode: DecapsulationMode,
@@ -2461,7 +2511,9 @@ fn decode_v9_special_record(
     fields.insert("SRC_VLAN", "0".to_string());
     let mut has_datalink_section = false;
     let mut has_decoded_datalink = false;
-    let mut flow_start_millis: Option<u64> = None;
+    let mut flow_start_usec: Option<u64> = None;
+    let mut flow_end_usec: Option<u64> = None;
+    let system_init_usec = netflow_v9_system_init_usec(export_time_seconds, sys_uptime_millis);
 
     for (template_field, raw_value) in template.fields.iter().zip(values.iter()) {
         let field = V9Field::from(template_field.field_type);
@@ -2509,11 +2561,24 @@ fn decode_v9_special_record(
                 .or_insert_with(|| canonical_value(canonical, &value).to_string());
         }
 
-        if matches!(
-            field,
-            V9Field::FirstSwitched | V9Field::FlowStartMilliseconds
-        ) {
-            flow_start_millis = value.parse::<u64>().ok();
+        if matches!(field, V9Field::FirstSwitched | V9Field::FlowStartMilliseconds) {
+            flow_start_usec = value
+                .parse::<u64>()
+                .ok()
+                .map(|switched_millis| {
+                    netflow_v9_uptime_millis_to_absolute_usec(system_init_usec, switched_millis)
+                });
+            continue;
+        }
+
+        if matches!(field, V9Field::LastSwitched | V9Field::FlowEndMilliseconds) {
+            flow_end_usec = value
+                .parse::<u64>()
+                .ok()
+                .map(|switched_millis| {
+                    netflow_v9_uptime_millis_to_absolute_usec(system_init_usec, switched_millis)
+                });
+            continue;
         }
     }
 
@@ -2521,9 +2586,13 @@ fn decode_v9_special_record(
         return None;
     }
 
-    fields
-        .entry("FLOWS")
-        .or_insert_with(|| "1".to_string());
+    fields.entry("FLOWS").or_insert_with(|| "1".to_string());
+    if let Some(start_usec) = flow_start_usec {
+        fields.insert("FLOW_START_USEC", start_usec.to_string());
+    }
+    if let Some(end_usec) = flow_end_usec {
+        fields.insert("FLOW_END_USEC", end_usec.to_string());
+    }
     finalize_canonical_flow_fields(&mut fields);
 
     Some(DecodedFlow {
@@ -2531,7 +2600,7 @@ fn decode_v9_special_record(
         source_realtime_usec: timestamp_source.select(
             input_realtime_usec,
             packet_realtime_usec,
-            flow_start_millis.map(|value| value.saturating_mul(1_000)),
+            flow_start_usec,
         ),
     })
 }
@@ -2588,7 +2657,7 @@ fn decode_ipfix_special_record(
     let mut has_datalink_section = false;
     let mut has_decoded_datalink = false;
     let mut has_mpls_labels = false;
-    let mut flow_start_millis: Option<u64> = None;
+    let mut flow_start_usec: Option<u64> = None;
 
     for (template_field, raw_value) in template.fields.iter().zip(values.iter()) {
         if let Some(pen) = template_field.enterprise_number {
@@ -2609,34 +2678,19 @@ fn decode_ipfix_special_record(
 
         match template_field.field_type {
             IPFIX_FIELD_OCTET_DELTA_COUNT => {
-                fields.insert(
-                    "BYTES",
-                    decode_akvorado_unsigned(raw_value).to_string(),
-                );
+                fields.insert("BYTES", decode_akvorado_unsigned(raw_value).to_string());
             }
             IPFIX_FIELD_PACKET_DELTA_COUNT => {
-                fields.insert(
-                    "PACKETS",
-                    decode_akvorado_unsigned(raw_value).to_string(),
-                );
+                fields.insert("PACKETS", decode_akvorado_unsigned(raw_value).to_string());
             }
             IPFIX_FIELD_PROTOCOL_IDENTIFIER => {
-                fields.insert(
-                    "PROTOCOL",
-                    decode_akvorado_unsigned(raw_value).to_string(),
-                );
+                fields.insert("PROTOCOL", decode_akvorado_unsigned(raw_value).to_string());
             }
             IPFIX_FIELD_SOURCE_TRANSPORT_PORT => {
-                fields.insert(
-                    "SRC_PORT",
-                    decode_akvorado_unsigned(raw_value).to_string(),
-                );
+                fields.insert("SRC_PORT", decode_akvorado_unsigned(raw_value).to_string());
             }
             IPFIX_FIELD_DESTINATION_TRANSPORT_PORT => {
-                fields.insert(
-                    "DST_PORT",
-                    decode_akvorado_unsigned(raw_value).to_string(),
-                );
+                fields.insert("DST_PORT", decode_akvorado_unsigned(raw_value).to_string());
             }
             IPFIX_FIELD_SOURCE_IPV4_ADDRESS | IPFIX_FIELD_SOURCE_IPV6_ADDRESS => {
                 if let Some(ip) = parse_ip_value(raw_value) {
@@ -2660,22 +2714,13 @@ fn decode_ipfix_special_record(
                 }
             }
             IPFIX_FIELD_INPUT_SNMP => {
-                fields.insert(
-                    "IN_IF",
-                    decode_akvorado_unsigned(raw_value).to_string(),
-                );
+                fields.insert("IN_IF", decode_akvorado_unsigned(raw_value).to_string());
             }
             IPFIX_FIELD_OUTPUT_SNMP => {
-                fields.insert(
-                    "OUT_IF",
-                    decode_akvorado_unsigned(raw_value).to_string(),
-                );
+                fields.insert("OUT_IF", decode_akvorado_unsigned(raw_value).to_string());
             }
             IPFIX_FIELD_DIRECTION => {
-                fields.insert(
-                    "DIRECTION",
-                    decode_akvorado_unsigned(raw_value).to_string(),
-                );
+                fields.insert("DIRECTION", decode_akvorado_unsigned(raw_value).to_string());
             }
             IPFIX_FIELD_FORWARDING_STATUS => {
                 fields.insert(
@@ -2685,13 +2730,18 @@ fn decode_ipfix_special_record(
             }
             IPFIX_FIELD_FLOW_START_MILLISECONDS => {
                 let value = decode_akvorado_unsigned(raw_value);
-                flow_start_millis = Some(value);
-                fields.insert("FLOW_START_MILLIS", value.to_string());
+                flow_start_usec = Some(value.saturating_mul(USEC_PER_MILLISECOND));
+                fields.insert(
+                    "FLOW_START_USEC",
+                    value.saturating_mul(USEC_PER_MILLISECOND).to_string(),
+                );
             }
             IPFIX_FIELD_FLOW_END_MILLISECONDS => {
                 fields.insert(
-                    "FLOW_END_MILLIS",
-                    decode_akvorado_unsigned(raw_value).to_string(),
+                    "FLOW_END_USEC",
+                    decode_akvorado_unsigned(raw_value)
+                        .saturating_mul(USEC_PER_MILLISECOND)
+                        .to_string(),
                 );
             }
             IPFIX_FIELD_MINIMUM_TTL | IPFIX_FIELD_MAXIMUM_TTL => {
@@ -2730,9 +2780,7 @@ fn decode_ipfix_special_record(
         return None;
     }
 
-    fields
-        .entry("FLOWS")
-        .or_insert_with(|| "1".to_string());
+    fields.entry("FLOWS").or_insert_with(|| "1".to_string());
     finalize_canonical_flow_fields(&mut fields);
 
     Some(DecodedFlow {
@@ -2740,7 +2788,7 @@ fn decode_ipfix_special_record(
         source_realtime_usec: timestamp_source.select(
             input_realtime_usec,
             packet_realtime_usec,
-            flow_start_millis.map(|value| value.saturating_mul(1_000)),
+            flow_start_usec,
         ),
     })
 }
@@ -2838,10 +2886,7 @@ fn parse_ipv4_packet(
         fields.insert("IPTOS", data[1].to_string());
         fields.insert("IPTTL", data[8].to_string());
         fields.insert("IP_FRAGMENT_ID", fragment_id.to_string());
-        fields.insert(
-                    "IP_FRAGMENT_OFFSET",
-            fragment_offset.to_string(),
-        );
+        fields.insert("IP_FRAGMENT_OFFSET", fragment_offset.to_string());
     }
 
     if fragment_offset == 0 {
@@ -3296,6 +3341,11 @@ fn append_v9_records(
                     let mut sampler_id: Option<u64> = None;
                     let mut observed_sampling_rate: Option<u64> = None;
                     let mut first_switched_millis: Option<u64> = None;
+                    let mut last_switched_millis: Option<u64> = None;
+                    let system_init_usec = netflow_v9_system_init_usec(
+                        packet.header.unix_secs as u64,
+                        packet.header.sys_up_time as u64,
+                    );
 
                     for (field, value) in record {
                         let value_str = field_value_to_string(&value);
@@ -3309,6 +3359,9 @@ fn append_v9_records(
                             }
                             V9Field::FirstSwitched => {
                                 first_switched_millis = value_str.parse::<u64>().ok();
+                            }
+                            V9Field::LastSwitched => {
+                                last_switched_millis = value_str.parse::<u64>().ok();
                             }
                             _ => {}
                         }
@@ -3345,13 +3398,14 @@ fn append_v9_records(
                     if rec.flows == 0 {
                         rec.flows = 1;
                     }
+                    rec.flow_start_usec = first_switched_millis
+                        .map(|value| netflow_v9_uptime_millis_to_absolute_usec(system_init_usec, value))
+                        .unwrap_or(0);
+                    rec.flow_end_usec = last_switched_millis
+                        .map(|value| netflow_v9_uptime_millis_to_absolute_usec(system_init_usec, value))
+                        .unwrap_or(0);
                     finalize_record(&mut rec);
-                    let first_switched_usec = first_switched_millis.map(|value| {
-                        (packet.header.unix_secs as u64)
-                            .saturating_sub(packet.header.sys_up_time as u64)
-                            .saturating_add(value)
-                            .saturating_mul(1_000_000)
-                    });
+                    let first_switched_usec = (rec.flow_start_usec != 0).then_some(rec.flow_start_usec);
                     out.push(DecodedFlow {
                         record: rec,
                         source_realtime_usec: timestamp_source.select(
@@ -3406,10 +3460,21 @@ fn append_ipfix_records(
                     let mut observed_sampling_rate: Option<u64> = None;
                     let mut sampling_packet_interval: Option<u64> = None;
                     let mut sampling_packet_space: Option<u64> = None;
+                    let mut system_init_millis: Option<u64> = None;
                     let mut flow_start_seconds: Option<u64> = None;
+                    let mut flow_end_seconds: Option<u64> = None;
                     let mut flow_start_millis: Option<u64> = None;
+                    let mut flow_end_millis: Option<u64> = None;
                     let mut flow_start_micros: Option<u64> = None;
+                    let mut flow_end_micros: Option<u64> = None;
                     let mut flow_start_nanos: Option<u64> = None;
+                    let mut flow_end_nanos: Option<u64> = None;
+                    let mut flow_start_delta_micros: Option<u64> = None;
+                    let mut flow_end_delta_micros: Option<u64> = None;
+                    let mut flow_start_sysuptime_millis: Option<u64> = None;
+                    let mut flow_end_sysuptime_millis: Option<u64> = None;
+                    let mut reverse_flow_start_usec: Option<u64> = None;
+                    let mut reverse_flow_end_usec: Option<u64> = None;
 
                     for (field, value) in record {
                         if let IPFixField::IANA(IANAIPFixField::DataLinkFrameSection) = &field {
@@ -3428,9 +3493,39 @@ fn append_ipfix_records(
                             continue;
                         }
 
-                        let value_str = field_value_to_string(&value);
                         if let IPFixField::ReverseInformationElement(reverse_field) = &field {
                             reverse_present = true;
+                            if let Some(usec) = reverse_ipfix_timestamp_to_usec(
+                                reverse_field,
+                                &value,
+                                export_usec,
+                                system_init_millis,
+                            ) {
+                                match reverse_field {
+                                    ReverseInformationElement::ReverseFlowStartSeconds
+                                    | ReverseInformationElement::ReverseFlowStartMilliseconds
+                                    | ReverseInformationElement::ReverseFlowStartMicroseconds
+                                    | ReverseInformationElement::ReverseFlowStartNanoseconds
+                                    | ReverseInformationElement::ReverseFlowStartDeltaMicroseconds
+                                    | ReverseInformationElement::ReverseFlowStartSysUpTime
+                                    | ReverseInformationElement::ReverseMinFlowStartMicroseconds
+                                    | ReverseInformationElement::ReverseMinFlowStartNanoseconds => {
+                                        reverse_flow_start_usec = Some(usec);
+                                    }
+                                    ReverseInformationElement::ReverseFlowEndSeconds
+                                    | ReverseInformationElement::ReverseFlowEndMilliseconds
+                                    | ReverseInformationElement::ReverseFlowEndMicroseconds
+                                    | ReverseInformationElement::ReverseFlowEndNanoseconds
+                                    | ReverseInformationElement::ReverseFlowEndDeltaMicroseconds
+                                    | ReverseInformationElement::ReverseFlowEndSysUpTime
+                                    | ReverseInformationElement::ReverseMaxFlowEndMicroseconds
+                                    | ReverseInformationElement::ReverseMaxFlowEndNanoseconds => {
+                                        reverse_flow_end_usec = Some(usec);
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            let value_str = field_value_to_string(&value);
                             apply_reverse_ipfix_special_mappings(
                                 &mut reverse_overrides,
                                 reverse_field,
@@ -3447,6 +3542,11 @@ fn append_ipfix_records(
                             continue;
                         }
 
+                        if let IPFixField::IANA(IANAIPFixField::SystemInitTimeMilliseconds) = &field {
+                            system_init_millis = field_value_unsigned(&value);
+                        }
+
+                        let value_str = field_value_to_string(&value);
                         if let IPFixField::IANA(IANAIPFixField::ResponderOctets) = &field {
                             reverse_present = true;
                             reverse_overrides.insert("BYTES", value_str);
@@ -3478,17 +3578,44 @@ fn append_ipfix_records(
                             IPFixField::IANA(IANAIPFixField::FlowStartSeconds) => {
                                 flow_start_seconds = value_str.parse::<u64>().ok();
                             }
+                            IPFixField::IANA(IANAIPFixField::FlowEndSeconds) => {
+                                flow_end_seconds = value_str.parse::<u64>().ok();
+                            }
                             IPFixField::IANA(IANAIPFixField::FlowStartMilliseconds)
                             | IPFixField::IANA(IANAIPFixField::MinFlowStartMilliseconds) => {
                                 flow_start_millis = value_str.parse::<u64>().ok();
                             }
+                            IPFixField::IANA(IANAIPFixField::FlowEndMilliseconds)
+                            | IPFixField::IANA(IANAIPFixField::MaxFlowEndMilliseconds) => {
+                                flow_end_millis = value_str.parse::<u64>().ok();
+                            }
                             IPFixField::IANA(IANAIPFixField::FlowStartMicroseconds)
                             | IPFixField::IANA(IANAIPFixField::MinFlowStartMicroseconds) => {
-                                flow_start_micros = value_str.parse::<u64>().ok();
+                                flow_start_micros = field_value_duration_usec(&value);
+                            }
+                            IPFixField::IANA(IANAIPFixField::FlowEndMicroseconds)
+                            | IPFixField::IANA(IANAIPFixField::MaxFlowEndMicroseconds) => {
+                                flow_end_micros = field_value_duration_usec(&value);
                             }
                             IPFixField::IANA(IANAIPFixField::FlowStartNanoseconds)
                             | IPFixField::IANA(IANAIPFixField::MinFlowStartNanoseconds) => {
-                                flow_start_nanos = value_str.parse::<u64>().ok();
+                                flow_start_nanos = field_value_duration_usec(&value);
+                            }
+                            IPFixField::IANA(IANAIPFixField::FlowEndNanoseconds)
+                            | IPFixField::IANA(IANAIPFixField::MaxFlowEndNanoseconds) => {
+                                flow_end_nanos = field_value_duration_usec(&value);
+                            }
+                            IPFixField::IANA(IANAIPFixField::FlowStartDeltaMicroseconds) => {
+                                flow_start_delta_micros = field_value_unsigned(&value);
+                            }
+                            IPFixField::IANA(IANAIPFixField::FlowEndDeltaMicroseconds) => {
+                                flow_end_delta_micros = field_value_unsigned(&value);
+                            }
+                            IPFixField::IANA(IANAIPFixField::FlowStartSysUpTime) => {
+                                flow_start_sysuptime_millis = field_value_unsigned(&value);
+                            }
+                            IPFixField::IANA(IANAIPFixField::FlowEndSysUpTime) => {
+                                flow_end_sysuptime_millis = field_value_unsigned(&value);
                             }
                             _ => {}
                         }
@@ -3533,14 +3660,36 @@ fn append_ipfix_records(
                     if rec.flows == 0 {
                         rec.flows = 1;
                     }
+                    rec.flow_start_usec = resolve_ipfix_time_usec(
+                        flow_start_seconds,
+                        flow_start_millis,
+                        flow_start_micros,
+                        flow_start_nanos,
+                        flow_start_delta_micros,
+                        flow_start_sysuptime_millis,
+                        system_init_millis,
+                        export_usec,
+                    )
+                    .unwrap_or(0);
+                    rec.flow_end_usec = resolve_ipfix_time_usec(
+                        flow_end_seconds,
+                        flow_end_millis,
+                        flow_end_micros,
+                        flow_end_nanos,
+                        flow_end_delta_micros,
+                        flow_end_sysuptime_millis,
+                        system_init_millis,
+                        export_usec,
+                    )
+                    .unwrap_or(0);
+                    if let Some(start_usec) = reverse_flow_start_usec {
+                        reverse_overrides.insert("FLOW_START_USEC", start_usec.to_string());
+                    }
+                    if let Some(end_usec) = reverse_flow_end_usec {
+                        reverse_overrides.insert("FLOW_END_USEC", end_usec.to_string());
+                    }
                     finalize_record(&mut rec);
-                    let first_switched_usec = flow_start_seconds
-                        .map(|value| value.saturating_mul(1_000_000))
-                        .or_else(|| flow_start_millis.map(|value| value.saturating_mul(1_000)))
-                        .or(flow_start_micros)
-                        .or_else(|| {
-                            flow_start_nanos.map(|value| export_usec.saturating_add(value / 1_000))
-                        });
+                    let first_switched_usec = (rec.flow_start_usec != 0).then_some(rec.flow_start_usec);
                     let source_ts = timestamp_source.select(
                         input_realtime_usec,
                         Some(export_usec),
@@ -3755,26 +3904,16 @@ fn build_sflow_flow(
                 let needs_l3_l4_data = true;
                 if needs_ip_data || needs_l2_data || needs_l3_l4_data || need_decap {
                     let parsed_len = match sampled.protocol {
-                        HeaderProtocol::EthernetIso88023 => {
-                            parse_datalink_frame_section_record(
-                                &sampled.header,
-                                &mut rec,
-                                decapsulation_mode,
-                            )
-                        }
+                        HeaderProtocol::EthernetIso88023 => parse_datalink_frame_section_record(
+                            &sampled.header,
+                            &mut rec,
+                            decapsulation_mode,
+                        ),
                         HeaderProtocol::Ipv4 => {
-                            parse_ipv4_packet_record(
-                                &sampled.header,
-                                &mut rec,
-                                decapsulation_mode,
-                            )
+                            parse_ipv4_packet_record(&sampled.header, &mut rec, decapsulation_mode)
                         }
                         HeaderProtocol::Ipv6 => {
-                            parse_ipv6_packet_record(
-                                &sampled.header,
-                                &mut rec,
-                                decapsulation_mode,
-                            )
+                            parse_ipv6_packet_record(&sampled.header, &mut rec, decapsulation_mode)
                         }
                         _ => None,
                     };
@@ -3937,10 +4076,7 @@ fn finalize_canonical_flow_fields(fields: &mut FlowFields) {
         .map(String::is_empty)
         .unwrap_or(true);
     if exporter_name_missing && let Some(exporter_ip) = fields.get("EXPORTER_IP") {
-        fields.insert(
-            "EXPORTER_NAME",
-            default_exporter_name(exporter_ip),
-        );
+        fields.insert("EXPORTER_NAME", default_exporter_name(exporter_ip));
     }
 
     apply_icmp_port_fallback(fields);
@@ -3973,6 +4109,22 @@ fn canonical_value<'a>(canonical: &'a str, raw_value: &'a str) -> &'a str {
     } else {
         raw_value
     }
+}
+
+const USEC_PER_SECOND: u64 = 1_000_000;
+const USEC_PER_MILLISECOND: u64 = 1_000;
+
+fn unix_seconds_to_usec(seconds: u64) -> u64 {
+    seconds.saturating_mul(USEC_PER_SECOND)
+}
+
+fn netflow_v9_system_init_usec(export_time_seconds: u64, sys_uptime_millis: u64) -> u64 {
+    unix_seconds_to_usec(export_time_seconds)
+        .saturating_sub(sys_uptime_millis.saturating_mul(USEC_PER_MILLISECOND))
+}
+
+fn netflow_v9_uptime_millis_to_absolute_usec(system_init_usec: u64, switched_millis: u64) -> u64 {
+    system_init_usec.saturating_add(switched_millis.saturating_mul(USEC_PER_MILLISECOND))
 }
 
 // ---------------------------------------------------------------------------
@@ -4090,100 +4242,282 @@ fn swap_directional_record_fields(rec: &mut FlowRecord) {
 fn set_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
     match key {
         "FLOW_VERSION" => {} // set by base_record, not overridden
-        "EXPORTER_IP" => { if let Ok(ip) = value.parse::<IpAddr>() { rec.exporter_ip = Some(ip); } }
-        "EXPORTER_PORT" => { rec.exporter_port = value.parse().unwrap_or(rec.exporter_port); }
-        "EXPORTER_NAME" => { rec.exporter_name = value.to_string(); }
-        "EXPORTER_GROUP" => { rec.exporter_group = value.to_string(); }
-        "EXPORTER_ROLE" => { rec.exporter_role = value.to_string(); }
-        "EXPORTER_SITE" => { rec.exporter_site = value.to_string(); }
-        "EXPORTER_REGION" => { rec.exporter_region = value.to_string(); }
-        "EXPORTER_TENANT" => { rec.exporter_tenant = value.to_string(); }
-        "SAMPLING_RATE" => { rec.sampling_rate = value.parse().unwrap_or(0); }
-        "ETYPE" => { rec.etype = value.parse().unwrap_or(0); }
-        "PROTOCOL" => { rec.protocol = value.parse().unwrap_or(0); }
-        "BYTES" => { rec.bytes = value.parse().unwrap_or(0); }
-        "PACKETS" => { rec.packets = value.parse().unwrap_or(0); }
-        "FLOWS" => { rec.flows = value.parse().unwrap_or(0); }
-        "RAW_BYTES" => { rec.raw_bytes = value.parse().unwrap_or(0); }
-        "RAW_PACKETS" => { rec.raw_packets = value.parse().unwrap_or(0); }
-        "FORWARDING_STATUS" => { rec.forwarding_status = value.parse().unwrap_or(0); }
-        "DIRECTION" => { rec.direction = FlowDirection::from_str_value(value); }
-        "SRC_ADDR" => { if let Ok(ip) = value.parse::<IpAddr>() { rec.src_addr = Some(ip); } }
-        "DST_ADDR" => { if let Ok(ip) = value.parse::<IpAddr>() { rec.dst_addr = Some(ip); } }
-        "SRC_PREFIX" => { rec.src_prefix = parse_prefix_ip(value); }
-        "DST_PREFIX" => { rec.dst_prefix = parse_prefix_ip(value); }
-        "SRC_MASK" => { rec.src_mask = value.parse().unwrap_or(0); }
-        "DST_MASK" => { rec.dst_mask = value.parse().unwrap_or(0); }
-        "SRC_AS" => { rec.src_as = value.parse().unwrap_or(0); }
-        "DST_AS" => { rec.dst_as = value.parse().unwrap_or(0); }
-        "SRC_AS_NAME" => { rec.src_as_name = value.to_string(); }
-        "DST_AS_NAME" => { rec.dst_as_name = value.to_string(); }
-        "SRC_NET_NAME" => { rec.src_net_name = value.to_string(); }
-        "DST_NET_NAME" => { rec.dst_net_name = value.to_string(); }
-        "SRC_NET_ROLE" => { rec.src_net_role = value.to_string(); }
-        "DST_NET_ROLE" => { rec.dst_net_role = value.to_string(); }
-        "SRC_NET_SITE" => { rec.src_net_site = value.to_string(); }
-        "DST_NET_SITE" => { rec.dst_net_site = value.to_string(); }
-        "SRC_NET_REGION" => { rec.src_net_region = value.to_string(); }
-        "DST_NET_REGION" => { rec.dst_net_region = value.to_string(); }
-        "SRC_NET_TENANT" => { rec.src_net_tenant = value.to_string(); }
-        "DST_NET_TENANT" => { rec.dst_net_tenant = value.to_string(); }
-        "SRC_COUNTRY" => { rec.src_country = value.to_string(); }
-        "DST_COUNTRY" => { rec.dst_country = value.to_string(); }
-        "SRC_GEO_CITY" => { rec.src_geo_city = value.to_string(); }
-        "DST_GEO_CITY" => { rec.dst_geo_city = value.to_string(); }
-        "SRC_GEO_STATE" => { rec.src_geo_state = value.to_string(); }
-        "DST_GEO_STATE" => { rec.dst_geo_state = value.to_string(); }
-        "DST_AS_PATH" => { rec.dst_as_path = value.to_string(); }
-        "DST_COMMUNITIES" => { rec.dst_communities = value.to_string(); }
-        "DST_LARGE_COMMUNITIES" => { rec.dst_large_communities = value.to_string(); }
+        "EXPORTER_IP" => {
+            if let Ok(ip) = value.parse::<IpAddr>() {
+                rec.exporter_ip = Some(ip);
+            }
+        }
+        "EXPORTER_PORT" => {
+            rec.exporter_port = value.parse().unwrap_or(rec.exporter_port);
+        }
+        "EXPORTER_NAME" => {
+            rec.exporter_name = value.to_string();
+        }
+        "EXPORTER_GROUP" => {
+            rec.exporter_group = value.to_string();
+        }
+        "EXPORTER_ROLE" => {
+            rec.exporter_role = value.to_string();
+        }
+        "EXPORTER_SITE" => {
+            rec.exporter_site = value.to_string();
+        }
+        "EXPORTER_REGION" => {
+            rec.exporter_region = value.to_string();
+        }
+        "EXPORTER_TENANT" => {
+            rec.exporter_tenant = value.to_string();
+        }
+        "SAMPLING_RATE" => {
+            rec.sampling_rate = value.parse().unwrap_or(0);
+        }
+        "ETYPE" => {
+            rec.etype = value.parse().unwrap_or(0);
+        }
+        "PROTOCOL" => {
+            rec.protocol = value.parse().unwrap_or(0);
+        }
+        "BYTES" => {
+            rec.bytes = value.parse().unwrap_or(0);
+        }
+        "PACKETS" => {
+            rec.packets = value.parse().unwrap_or(0);
+        }
+        "FLOWS" => {
+            rec.flows = value.parse().unwrap_or(0);
+        }
+        "RAW_BYTES" => {
+            rec.raw_bytes = value.parse().unwrap_or(0);
+        }
+        "RAW_PACKETS" => {
+            rec.raw_packets = value.parse().unwrap_or(0);
+        }
+        "FORWARDING_STATUS" => {
+            rec.forwarding_status = value.parse().unwrap_or(0);
+        }
+        "DIRECTION" => {
+            rec.direction = FlowDirection::from_str_value(value);
+        }
+        "SRC_ADDR" => {
+            if let Ok(ip) = value.parse::<IpAddr>() {
+                rec.src_addr = Some(ip);
+            }
+        }
+        "DST_ADDR" => {
+            if let Ok(ip) = value.parse::<IpAddr>() {
+                rec.dst_addr = Some(ip);
+            }
+        }
+        "SRC_PREFIX" => {
+            rec.src_prefix = parse_prefix_ip(value);
+        }
+        "DST_PREFIX" => {
+            rec.dst_prefix = parse_prefix_ip(value);
+        }
+        "SRC_MASK" => {
+            rec.src_mask = value.parse().unwrap_or(0);
+        }
+        "DST_MASK" => {
+            rec.dst_mask = value.parse().unwrap_or(0);
+        }
+        "SRC_AS" => {
+            rec.src_as = value.parse().unwrap_or(0);
+        }
+        "DST_AS" => {
+            rec.dst_as = value.parse().unwrap_or(0);
+        }
+        "SRC_AS_NAME" => {
+            rec.src_as_name = value.to_string();
+        }
+        "DST_AS_NAME" => {
+            rec.dst_as_name = value.to_string();
+        }
+        "SRC_NET_NAME" => {
+            rec.src_net_name = value.to_string();
+        }
+        "DST_NET_NAME" => {
+            rec.dst_net_name = value.to_string();
+        }
+        "SRC_NET_ROLE" => {
+            rec.src_net_role = value.to_string();
+        }
+        "DST_NET_ROLE" => {
+            rec.dst_net_role = value.to_string();
+        }
+        "SRC_NET_SITE" => {
+            rec.src_net_site = value.to_string();
+        }
+        "DST_NET_SITE" => {
+            rec.dst_net_site = value.to_string();
+        }
+        "SRC_NET_REGION" => {
+            rec.src_net_region = value.to_string();
+        }
+        "DST_NET_REGION" => {
+            rec.dst_net_region = value.to_string();
+        }
+        "SRC_NET_TENANT" => {
+            rec.src_net_tenant = value.to_string();
+        }
+        "DST_NET_TENANT" => {
+            rec.dst_net_tenant = value.to_string();
+        }
+        "SRC_COUNTRY" => {
+            rec.src_country = value.to_string();
+        }
+        "DST_COUNTRY" => {
+            rec.dst_country = value.to_string();
+        }
+        "SRC_GEO_CITY" => {
+            rec.src_geo_city = value.to_string();
+        }
+        "DST_GEO_CITY" => {
+            rec.dst_geo_city = value.to_string();
+        }
+        "SRC_GEO_STATE" => {
+            rec.src_geo_state = value.to_string();
+        }
+        "DST_GEO_STATE" => {
+            rec.dst_geo_state = value.to_string();
+        }
+        "DST_AS_PATH" => {
+            rec.dst_as_path = value.to_string();
+        }
+        "DST_COMMUNITIES" => {
+            rec.dst_communities = value.to_string();
+        }
+        "DST_LARGE_COMMUNITIES" => {
+            rec.dst_large_communities = value.to_string();
+        }
         "IN_IF" => {
             let v: u32 = value.parse().unwrap_or(0);
-            if rec.in_if == 0 { rec.in_if = v; }
+            if rec.in_if == 0 {
+                rec.in_if = v;
+            }
         }
         "OUT_IF" => {
             let v: u32 = value.parse().unwrap_or(0);
-            if rec.out_if == 0 { rec.out_if = v; }
+            if rec.out_if == 0 {
+                rec.out_if = v;
+            }
         }
-        "IN_IF_NAME" => { rec.in_if_name = value.to_string(); }
-        "OUT_IF_NAME" => { rec.out_if_name = value.to_string(); }
-        "IN_IF_DESCRIPTION" => { rec.in_if_description = value.to_string(); }
-        "OUT_IF_DESCRIPTION" => { rec.out_if_description = value.to_string(); }
-        "IN_IF_SPEED" => { rec.in_if_speed = value.parse().unwrap_or(0); }
-        "OUT_IF_SPEED" => { rec.out_if_speed = value.parse().unwrap_or(0); }
-        "IN_IF_PROVIDER" => { rec.in_if_provider = value.to_string(); }
-        "OUT_IF_PROVIDER" => { rec.out_if_provider = value.to_string(); }
-        "IN_IF_CONNECTIVITY" => { rec.in_if_connectivity = value.to_string(); }
-        "OUT_IF_CONNECTIVITY" => { rec.out_if_connectivity = value.to_string(); }
-        "IN_IF_BOUNDARY" => { rec.in_if_boundary = value.parse().unwrap_or(0); }
-        "OUT_IF_BOUNDARY" => { rec.out_if_boundary = value.parse().unwrap_or(0); }
-        "NEXT_HOP" => { if let Ok(ip) = value.parse::<IpAddr>() { rec.next_hop = Some(ip); } }
-        "SRC_PORT" => { rec.src_port = value.parse().unwrap_or(0); }
-        "DST_PORT" => { rec.dst_port = value.parse().unwrap_or(0); }
-        "FLOW_START_SECONDS" => { rec.flow_start_seconds = value.parse().unwrap_or(0); }
-        "FLOW_END_SECONDS" => { rec.flow_end_seconds = value.parse().unwrap_or(0); }
-        "FLOW_START_MILLIS" => { rec.flow_start_millis = value.parse().unwrap_or(0); }
-        "FLOW_END_MILLIS" => { rec.flow_end_millis = value.parse().unwrap_or(0); }
-        "OBSERVATION_TIME_MILLIS" => { rec.observation_time_millis = value.parse().unwrap_or(0); }
-        "SRC_ADDR_NAT" => { if let Ok(ip) = value.parse::<IpAddr>() { rec.src_addr_nat = Some(ip); } }
-        "DST_ADDR_NAT" => { if let Ok(ip) = value.parse::<IpAddr>() { rec.dst_addr_nat = Some(ip); } }
-        "SRC_PORT_NAT" => { rec.src_port_nat = value.parse().unwrap_or(0); }
-        "DST_PORT_NAT" => { rec.dst_port_nat = value.parse().unwrap_or(0); }
-        "SRC_VLAN" => { rec.src_vlan = value.parse().unwrap_or(0); }
-        "DST_VLAN" => { rec.dst_vlan = value.parse().unwrap_or(0); }
-        "SRC_MAC" => { rec.src_mac = parse_mac(&value.to_ascii_lowercase()); }
-        "DST_MAC" => { rec.dst_mac = parse_mac(&value.to_ascii_lowercase()); }
-        "IPTTL" => { rec.ipttl = value.parse().unwrap_or(0); }
-        "IPTOS" => { rec.iptos = value.parse().unwrap_or(0); }
-        "IPV6_FLOW_LABEL" => { rec.ipv6_flow_label = value.parse().unwrap_or(0); }
-        "TCP_FLAGS" => { rec.tcp_flags = value.parse().unwrap_or(0); }
-        "IP_FRAGMENT_ID" => { rec.ip_fragment_id = value.parse().unwrap_or(0); }
-        "IP_FRAGMENT_OFFSET" => { rec.ip_fragment_offset = value.parse().unwrap_or(0); }
-        "ICMPV4_TYPE" => { rec.icmpv4_type = value.parse().unwrap_or(0); }
-        "ICMPV4_CODE" => { rec.icmpv4_code = value.parse().unwrap_or(0); }
-        "ICMPV6_TYPE" => { rec.icmpv6_type = value.parse().unwrap_or(0); }
-        "ICMPV6_CODE" => { rec.icmpv6_code = value.parse().unwrap_or(0); }
-        "MPLS_LABELS" => { rec.mpls_labels = value.to_string(); }
+        "IN_IF_NAME" => {
+            rec.in_if_name = value.to_string();
+        }
+        "OUT_IF_NAME" => {
+            rec.out_if_name = value.to_string();
+        }
+        "IN_IF_DESCRIPTION" => {
+            rec.in_if_description = value.to_string();
+        }
+        "OUT_IF_DESCRIPTION" => {
+            rec.out_if_description = value.to_string();
+        }
+        "IN_IF_SPEED" => {
+            rec.in_if_speed = value.parse().unwrap_or(0);
+        }
+        "OUT_IF_SPEED" => {
+            rec.out_if_speed = value.parse().unwrap_or(0);
+        }
+        "IN_IF_PROVIDER" => {
+            rec.in_if_provider = value.to_string();
+        }
+        "OUT_IF_PROVIDER" => {
+            rec.out_if_provider = value.to_string();
+        }
+        "IN_IF_CONNECTIVITY" => {
+            rec.in_if_connectivity = value.to_string();
+        }
+        "OUT_IF_CONNECTIVITY" => {
+            rec.out_if_connectivity = value.to_string();
+        }
+        "IN_IF_BOUNDARY" => {
+            rec.in_if_boundary = value.parse().unwrap_or(0);
+        }
+        "OUT_IF_BOUNDARY" => {
+            rec.out_if_boundary = value.parse().unwrap_or(0);
+        }
+        "NEXT_HOP" => {
+            if let Ok(ip) = value.parse::<IpAddr>() {
+                rec.next_hop = Some(ip);
+            }
+        }
+        "SRC_PORT" => {
+            rec.src_port = value.parse().unwrap_or(0);
+        }
+        "DST_PORT" => {
+            rec.dst_port = value.parse().unwrap_or(0);
+        }
+        "FLOW_START_USEC" => {
+            rec.flow_start_usec = value.parse().unwrap_or(0);
+        }
+        "FLOW_END_USEC" => {
+            rec.flow_end_usec = value.parse().unwrap_or(0);
+        }
+        "OBSERVATION_TIME_MILLIS" => {
+            rec.observation_time_millis = value.parse().unwrap_or(0);
+        }
+        "SRC_ADDR_NAT" => {
+            if let Ok(ip) = value.parse::<IpAddr>() {
+                rec.src_addr_nat = Some(ip);
+            }
+        }
+        "DST_ADDR_NAT" => {
+            if let Ok(ip) = value.parse::<IpAddr>() {
+                rec.dst_addr_nat = Some(ip);
+            }
+        }
+        "SRC_PORT_NAT" => {
+            rec.src_port_nat = value.parse().unwrap_or(0);
+        }
+        "DST_PORT_NAT" => {
+            rec.dst_port_nat = value.parse().unwrap_or(0);
+        }
+        "SRC_VLAN" => {
+            rec.src_vlan = value.parse().unwrap_or(0);
+        }
+        "DST_VLAN" => {
+            rec.dst_vlan = value.parse().unwrap_or(0);
+        }
+        "SRC_MAC" => {
+            rec.src_mac = parse_mac(&value.to_ascii_lowercase());
+        }
+        "DST_MAC" => {
+            rec.dst_mac = parse_mac(&value.to_ascii_lowercase());
+        }
+        "IPTTL" => {
+            rec.ipttl = value.parse().unwrap_or(0);
+        }
+        "IPTOS" => {
+            rec.iptos = value.parse().unwrap_or(0);
+        }
+        "IPV6_FLOW_LABEL" => {
+            rec.ipv6_flow_label = value.parse().unwrap_or(0);
+        }
+        "TCP_FLAGS" => {
+            rec.tcp_flags = value.parse().unwrap_or(0);
+        }
+        "IP_FRAGMENT_ID" => {
+            rec.ip_fragment_id = value.parse().unwrap_or(0);
+        }
+        "IP_FRAGMENT_OFFSET" => {
+            rec.ip_fragment_offset = value.parse().unwrap_or(0);
+        }
+        "ICMPV4_TYPE" => {
+            rec.icmpv4_type = value.parse().unwrap_or(0);
+        }
+        "ICMPV4_CODE" => {
+            rec.icmpv4_code = value.parse().unwrap_or(0);
+        }
+        "ICMPV6_TYPE" => {
+            rec.icmpv6_type = value.parse().unwrap_or(0);
+        }
+        "ICMPV6_CODE" => {
+            rec.icmpv6_code = value.parse().unwrap_or(0);
+        }
+        "MPLS_LABELS" => {
+            rec.mpls_labels = value.to_string();
+        }
         _ => {} // non-canonical fields are dropped
     }
 }
@@ -4192,8 +4526,12 @@ fn set_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
 fn override_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
     // IN_IF/OUT_IF always overwrite in the override path (unlike set_record_field)
     match key {
-        "IN_IF" => { rec.in_if = value.parse().unwrap_or(0); }
-        "OUT_IF" => { rec.out_if = value.parse().unwrap_or(0); }
+        "IN_IF" => {
+            rec.in_if = value.parse().unwrap_or(0);
+        }
+        "OUT_IF" => {
+            rec.out_if = value.parse().unwrap_or(0);
+        }
         _ => set_record_field(rec, key, value),
     }
 }
@@ -4547,11 +4885,7 @@ fn apply_v9_special_mappings_record(rec: &mut FlowRecord, field: V9Field, value:
     }
 }
 
-fn apply_ipfix_special_mappings_record(
-    rec: &mut FlowRecord,
-    field: &IPFixField,
-    value: &str,
-) {
+fn apply_ipfix_special_mappings_record(rec: &mut FlowRecord, field: &IPFixField, value: &str) {
     match field {
         IPFixField::IANA(IANAIPFixField::IpVersion) => {
             if let Some(etype) = etype_u16_from_ip_version(value) {
@@ -5033,8 +5367,6 @@ fn v9_canonical_key(field: V9Field) -> Option<&'static str> {
         V9Field::Ipv6FlowLabel => Some("IPV6_FLOW_LABEL"),
         V9Field::Ipv4Ident => Some("IP_FRAGMENT_ID"),
         V9Field::FragmentOffset => Some("IP_FRAGMENT_OFFSET"),
-        V9Field::FirstSwitched => Some("FLOW_START_MILLIS"),
-        V9Field::LastSwitched => Some("FLOW_END_MILLIS"),
         V9Field::ObservationTimeMilliseconds => Some("OBSERVATION_TIME_MILLIS"),
         V9Field::InSrcMac | V9Field::OutSrcMac => Some("SRC_MAC"),
         V9Field::InDstMac | V9Field::OutDstMac => Some("DST_MAC"),
@@ -5104,12 +5436,6 @@ fn ipfix_canonical_key(field: &IPFixField) -> Option<&'static str> {
         IPFixField::IANA(IANAIPFixField::IcmpCodeIpv4) => Some("ICMPV4_CODE"),
         IPFixField::IANA(IANAIPFixField::IcmpTypeIpv6) => Some("ICMPV6_TYPE"),
         IPFixField::IANA(IANAIPFixField::IcmpCodeIpv6) => Some("ICMPV6_CODE"),
-        IPFixField::IANA(IANAIPFixField::FlowStartSeconds) => Some("FLOW_START_SECONDS"),
-        IPFixField::IANA(IANAIPFixField::FlowEndSeconds) => Some("FLOW_END_SECONDS"),
-        IPFixField::IANA(IANAIPFixField::FlowStartMilliseconds)
-        | IPFixField::IANA(IANAIPFixField::MinFlowStartMilliseconds) => Some("FLOW_START_MILLIS"),
-        IPFixField::IANA(IANAIPFixField::FlowEndMilliseconds)
-        | IPFixField::IANA(IANAIPFixField::MaxFlowEndMilliseconds) => Some("FLOW_END_MILLIS"),
         IPFixField::IANA(IANAIPFixField::SourceMacaddress)
         | IPFixField::IANA(IANAIPFixField::PostSourceMacaddress) => Some("SRC_MAC"),
         IPFixField::IANA(IANAIPFixField::DestinationMacaddress)
@@ -5179,10 +5505,6 @@ fn reverse_ipfix_canonical_key(field: &ReverseInformationElement) -> Option<&'st
         ReverseInformationElement::ReverseIcmpCodeIPv4 => Some("ICMPV4_CODE"),
         ReverseInformationElement::ReverseIcmpTypeIPv6 => Some("ICMPV6_TYPE"),
         ReverseInformationElement::ReverseIcmpCodeIPv6 => Some("ICMPV6_CODE"),
-        ReverseInformationElement::ReverseFlowStartSeconds => Some("FLOW_START_SECONDS"),
-        ReverseInformationElement::ReverseFlowEndSeconds => Some("FLOW_END_SECONDS"),
-        ReverseInformationElement::ReverseFlowStartMilliseconds => Some("FLOW_START_MILLIS"),
-        ReverseInformationElement::ReverseFlowEndMilliseconds => Some("FLOW_END_MILLIS"),
         ReverseInformationElement::ReverseIpVersion => Some("ETYPE"),
         _ => None,
     }
@@ -5206,6 +5528,34 @@ fn field_value_to_string(value: &FieldValue) -> String {
         FieldValue::MacAddr(v) => v.to_string(),
         FieldValue::Vec(v) | FieldValue::Unknown(v) => bytes_to_hex(v),
         FieldValue::ProtocolType(v) => u8::from(*v).to_string(),
+    }
+}
+
+fn field_value_unsigned(value: &FieldValue) -> Option<u64> {
+    match value {
+        FieldValue::DataNumber(number) => match number {
+            DataNumber::U8(v) => Some(u64::from(*v)),
+            DataNumber::U16(v) => Some(u64::from(*v)),
+            DataNumber::U24(v) => Some(u64::from(*v)),
+            DataNumber::U32(v) => Some(u64::from(*v)),
+            DataNumber::U64(v) => Some(*v),
+            DataNumber::I8(v) if *v >= 0 => Some(*v as u64),
+            DataNumber::I16(v) if *v >= 0 => Some(*v as u64),
+            DataNumber::I24(v) if *v >= 0 => Some(*v as u64),
+            DataNumber::I32(v) if *v >= 0 => Some(*v as u64),
+            DataNumber::I64(v) if *v >= 0 => Some(*v as u64),
+            DataNumber::U128(v) => u64::try_from(*v).ok(),
+            DataNumber::I128(v) if *v >= 0 => u64::try_from(*v).ok(),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn field_value_duration_usec(value: &FieldValue) -> Option<u64> {
+    match value {
+        FieldValue::Duration(duration) => u64::try_from(duration.as_micros()).ok(),
+        _ => None,
     }
 }
 
@@ -5234,6 +5584,65 @@ fn bytes_to_hex(bytes: &[u8]) -> String {
         out.push(HEX[(byte & 0x0f) as usize] as char);
     }
     out
+}
+
+fn reverse_ipfix_timestamp_to_usec(
+    field: &ReverseInformationElement,
+    value: &FieldValue,
+    export_usec: u64,
+    system_init_millis: Option<u64>,
+) -> Option<u64> {
+    match field {
+        ReverseInformationElement::ReverseFlowStartSeconds
+        | ReverseInformationElement::ReverseFlowEndSeconds => {
+            field_value_unsigned(value).map(unix_seconds_to_usec)
+        }
+        ReverseInformationElement::ReverseFlowStartMilliseconds
+        | ReverseInformationElement::ReverseFlowEndMilliseconds => field_value_unsigned(value)
+            .map(|v| v.saturating_mul(USEC_PER_MILLISECOND)),
+        ReverseInformationElement::ReverseFlowStartMicroseconds
+        | ReverseInformationElement::ReverseFlowEndMicroseconds
+        | ReverseInformationElement::ReverseMinFlowStartMicroseconds
+        | ReverseInformationElement::ReverseMaxFlowEndMicroseconds => field_value_duration_usec(value),
+        ReverseInformationElement::ReverseFlowStartNanoseconds
+        | ReverseInformationElement::ReverseFlowEndNanoseconds
+        | ReverseInformationElement::ReverseMinFlowStartNanoseconds
+        | ReverseInformationElement::ReverseMaxFlowEndNanoseconds => field_value_duration_usec(value),
+        ReverseInformationElement::ReverseFlowStartDeltaMicroseconds
+        | ReverseInformationElement::ReverseFlowEndDeltaMicroseconds => {
+            field_value_unsigned(value).map(|delta| export_usec.saturating_sub(delta))
+        }
+        ReverseInformationElement::ReverseFlowStartSysUpTime
+        | ReverseInformationElement::ReverseFlowEndSysUpTime => {
+            let system_init_usec = system_init_millis?.saturating_mul(USEC_PER_MILLISECOND);
+            field_value_unsigned(value)
+                .map(|uptime_millis| system_init_usec.saturating_add(uptime_millis.saturating_mul(USEC_PER_MILLISECOND)))
+        }
+        _ => None,
+    }
+}
+
+fn resolve_ipfix_time_usec(
+    seconds: Option<u64>,
+    millis: Option<u64>,
+    micros: Option<u64>,
+    nanos: Option<u64>,
+    delta_micros: Option<u64>,
+    sys_uptime_millis: Option<u64>,
+    system_init_millis: Option<u64>,
+    export_usec: u64,
+) -> Option<u64> {
+    seconds
+        .map(unix_seconds_to_usec)
+        .or_else(|| millis.map(|value| value.saturating_mul(USEC_PER_MILLISECOND)))
+        .or(micros)
+        .or(nanos)
+        .or_else(|| delta_micros.map(|value| export_usec.saturating_sub(value)))
+        .or_else(|| {
+            let system_init_usec = system_init_millis?.saturating_mul(USEC_PER_MILLISECOND);
+            let uptime_millis = sys_uptime_millis?;
+            Some(system_init_usec.saturating_add(uptime_millis.saturating_mul(USEC_PER_MILLISECOND)))
+        })
 }
 
 fn decode_sampling_interval(raw: u16) -> u32 {
@@ -5991,8 +6400,8 @@ mod tests {
                     ("FORWARDING_STATUS", "64"),
                     ("DIRECTION", DIRECTION_INGRESS),
                     ("TCP_FLAGS", "16"),
-                    ("FLOW_START_MILLIS", "944948659"),
-                    ("FLOW_END_MILLIS", "944948659"),
+                    ("FLOW_START_USEC", "1647285925050000"),
+                    ("FLOW_END_USEC", "1647285925050000"),
                 ],
             ),
             expected_full_flow(
@@ -6017,8 +6426,8 @@ mod tests {
                     ("FORWARDING_STATUS", "64"),
                     ("DIRECTION", DIRECTION_INGRESS),
                     ("TCP_FLAGS", "16"),
-                    ("FLOW_START_MILLIS", "944948659"),
-                    ("FLOW_END_MILLIS", "944948659"),
+                    ("FLOW_START_USEC", "1647285925050000"),
+                    ("FLOW_END_USEC", "1647285925050000"),
                 ],
             ),
             expected_full_flow(
@@ -6043,8 +6452,8 @@ mod tests {
                     ("FORWARDING_STATUS", "64"),
                     ("DIRECTION", DIRECTION_INGRESS),
                     ("TCP_FLAGS", "16"),
-                    ("FLOW_START_MILLIS", "944948660"),
-                    ("FLOW_END_MILLIS", "944948660"),
+                    ("FLOW_START_USEC", "1647285925051000"),
+                    ("FLOW_END_USEC", "1647285925051000"),
                 ],
             ),
             expected_full_flow(
@@ -6069,8 +6478,8 @@ mod tests {
                     ("FORWARDING_STATUS", "64"),
                     ("DIRECTION", DIRECTION_INGRESS),
                     ("TCP_FLAGS", "16"),
-                    ("FLOW_START_MILLIS", "944948661"),
-                    ("FLOW_END_MILLIS", "944948661"),
+                    ("FLOW_START_USEC", "1647285925052000"),
+                    ("FLOW_END_USEC", "1647285925052000"),
                 ],
             ),
         ];
@@ -6424,8 +6833,8 @@ mod tests {
                 ("DIRECTION", DIRECTION_INGRESS),
                 ("IN_IF", "13"),
                 ("SRC_VLAN", "701"),
-                ("FLOW_START_MILLIS", "3872101141"),
-                ("FLOW_END_MILLIS", "3872101141"),
+                ("FLOW_START_USEC", "1691746198012000"),
+                ("FLOW_END_USEC", "1691746198012000"),
             ],
         );
         assert_eq!(got, want);
@@ -6545,8 +6954,8 @@ mod tests {
                 ("IN_IF", "97"),
                 ("OUT_IF", "6"),
                 ("NEXT_HOP", "ffff::2"),
-                ("FLOW_START_MILLIS", "1098319359"),
-                ("FLOW_END_MILLIS", "1098324270"),
+                ("FLOW_START_USEC", "1701360969980000"),
+                ("FLOW_END_USEC", "1701360974891000"),
             ],
         );
         assert_eq!(got_first, want_first);
@@ -6585,8 +6994,8 @@ mod tests {
                 ("IN_IF", "103"),
                 ("OUT_IF", "6"),
                 ("NEXT_HOP", "ffff::3c"),
-                ("FLOW_START_MILLIS", "1098321011"),
-                ("FLOW_END_MILLIS", "1098322881"),
+                ("FLOW_START_USEC", "1701360971632000"),
+                ("FLOW_END_USEC", "1701360973502000"),
             ],
         );
         assert_eq!(got_second, want_second);
@@ -6864,8 +7273,8 @@ mod tests {
                     ("MPLS_LABELS", "20005,524250"),
                     ("FORWARDING_STATUS", "66"),
                     ("DIRECTION", DIRECTION_EGRESS),
-                    ("FLOW_START_MILLIS", "1699893330381"),
-                    ("FLOW_END_MILLIS", "1699893330381"),
+                    ("FLOW_START_USEC", "1699893330381000"),
+                    ("FLOW_END_USEC", "1699893330381000"),
                 ],
             ),
             expected_full_flow(
@@ -6887,8 +7296,8 @@ mod tests {
                     ("MPLS_LABELS", "20006,524275"),
                     ("FORWARDING_STATUS", "66"),
                     ("DIRECTION", DIRECTION_EGRESS),
-                    ("FLOW_START_MILLIS", "1699893297901"),
-                    ("FLOW_END_MILLIS", "1699893381901"),
+                    ("FLOW_START_USEC", "1699893297901000"),
+                    ("FLOW_END_USEC", "1699893381901000"),
                 ],
             ),
         ];
@@ -7195,6 +7604,8 @@ mod tests {
                     ("DST_PORT", "53"),
                     ("TCP_FLAGS", "0"),
                     ("ETYPE", ETYPE_IPV4),
+                    ("FLOW_START_USEC", "3463711567492059"),
+                    ("FLOW_END_USEC", "3463711567526084"),
                 ],
             ),
             expected_full_flow(
@@ -7215,6 +7626,8 @@ mod tests {
                     ("DST_PORT", "56166"),
                     ("TCP_FLAGS", "0"),
                     ("ETYPE", ETYPE_IPV4),
+                    ("FLOW_START_USEC", "3463711567492059"),
+                    ("FLOW_END_USEC", "3463711567526084"),
                 ],
             ),
             expected_full_flow(
@@ -7235,6 +7648,8 @@ mod tests {
                     ("DST_PORT", "138"),
                     ("TCP_FLAGS", "0"),
                     ("ETYPE", ETYPE_IPV4),
+                    ("FLOW_START_USEC", "3463711576690443"),
+                    ("FLOW_END_USEC", "3463711576690443"),
                 ],
             ),
             expected_full_flow(
@@ -7255,6 +7670,8 @@ mod tests {
                     ("DST_PORT", "25"),
                     ("TCP_FLAGS", "27"),
                     ("ETYPE", ETYPE_IPV4),
+                    ("FLOW_START_USEC", "3463711567529045"),
+                    ("FLOW_END_USEC", "3463711575106758"),
                 ],
             ),
             expected_full_flow(
@@ -7275,6 +7692,8 @@ mod tests {
                     ("DST_PORT", "1470"),
                     ("TCP_FLAGS", "27"),
                     ("ETYPE", ETYPE_IPV4),
+                    ("FLOW_START_USEC", "3463711567529045"),
+                    ("FLOW_END_USEC", "3463711575106758"),
                 ],
             ),
             expected_full_flow(
@@ -7295,6 +7714,8 @@ mod tests {
                     ("DST_PORT", "0"),
                     ("TCP_FLAGS", "0"),
                     ("ETYPE", ETYPE_IPV4),
+                    ("FLOW_START_USEC", "3463711570695114"),
+                    ("FLOW_END_USEC", "3463711570696633"),
                 ],
             ),
         ];
@@ -7495,21 +7916,22 @@ mod tests {
         const PACKET_TS_SECONDS: u64 = 1_647_285_928;
         const SYS_UPTIME_MILLIS: u64 = 944_951_609;
         for flow in &flows {
-            let first_switched_millis = flow.record.flow_start_millis;
-            let expected = PACKET_TS_SECONDS
-                .saturating_sub(SYS_UPTIME_MILLIS)
-                .saturating_add(first_switched_millis)
-                .saturating_mul(1_000_000);
+            let expected = flow.record.flow_start_usec;
             assert_eq!(
                 flow.source_realtime_usec,
                 Some(expected),
-                "first_switched mode must use packet_ts - sys_uptime + first_switched"
+                "first_switched mode must use the normalized absolute flow start timestamp"
+            );
+            assert!(
+                expected
+                    >= super::netflow_v9_system_init_usec(PACKET_TS_SECONDS, SYS_UPTIME_MILLIS),
+                "normalized v9 timestamps must be on or after system init"
             );
         }
     }
 
     #[test]
-    fn akvorado_timestamp_source_first_switched_uses_ipfix_flow_start_millis() {
+    fn akvorado_timestamp_source_first_switched_uses_ipfix_flow_start_usec() {
         let flows = decode_fixture_sequence_with_options(
             &["mpls.pcap"],
             DecapsulationMode::None,
@@ -7807,6 +8229,8 @@ mod tests {
         );
     }
 
+    const TEST_INPUT_REALTIME_USEC: u64 = 1_700_000_000_000_000;
+
     fn decode_fixture_sequence(fixtures: &[&str]) -> Vec<DecodedFlow> {
         decode_fixture_sequence_with_mode(fixtures, DecapsulationMode::None)
     }
@@ -7815,7 +8239,6 @@ mod tests {
         fixtures: &[&str],
         decapsulation_mode: DecapsulationMode,
     ) -> Vec<DecodedFlow> {
-        const TEST_INPUT_REALTIME_USEC: u64 = 1_700_000_000_000_000;
         decode_fixture_sequence_with_options(
             fixtures,
             decapsulation_mode,
@@ -7860,10 +8283,7 @@ mod tests {
                     .map(|k| {
                         (
                             *k,
-                            fields
-                                .get(*k)
-                                .cloned()
-                                .unwrap_or_else(|| "".to_string()),
+                            fields.get(*k).cloned().unwrap_or_else(|| "".to_string()),
                         )
                     })
                     .collect::<FlowFields>()
@@ -7872,10 +8292,7 @@ mod tests {
     }
 
     fn expected_projection(values: &[(&'static str, &str)]) -> FlowFields {
-        values
-            .iter()
-            .map(|(k, v)| (*k, (*v).to_string()))
-            .collect()
+        values.iter().map(|(k, v)| (*k, (*v).to_string())).collect()
     }
 
     fn expected_full_flow(
@@ -7892,10 +8309,8 @@ mod tests {
         row.insert("FLOW_VERSION", flow_version.to_string());
         row.insert("EXPORTER_IP", exporter_ip.to_string());
         row.insert("EXPORTER_PORT", exporter_port.to_string());
-        row.insert(
-                    "EXPORTER_NAME",
-            default_exporter_name(exporter_ip),
-        );
+        row.insert("EXPORTER_NAME", default_exporter_name(exporter_ip));
+        row.insert("FLOW_END_USEC", TEST_INPUT_REALTIME_USEC.to_string());
 
         for (k, v) in overrides {
             row.insert(*k, (*v).to_string());
@@ -7937,10 +8352,7 @@ mod tests {
             .join("|")
     }
 
-    fn find_flow(
-        flows: &[DecodedFlow],
-        predicates: &[(&str, &str)],
-    ) -> FlowFields {
+    fn find_flow(flows: &[DecodedFlow], predicates: &[(&str, &str)]) -> FlowFields {
         let flow = find_decoded_flow(flows, predicates);
         flow.record.to_fields()
     }
@@ -7991,10 +8403,8 @@ mod tests {
             ("OUT_IF", "16".to_string()),
             ("BYTES", "62".to_string()),
             ("PACKETS", "1".to_string()),
-            ("FLOW_START_MILLIS", "1699893330381".to_string()),
-            ("FLOW_END_MILLIS", "1699893330381".to_string()),
-            ("FLOW_START_SECONDS", "0".to_string()),
-            ("FLOW_END_SECONDS", "0".to_string()),
+            ("FLOW_START_USEC", "1699893330381000".to_string()),
+            ("FLOW_END_USEC", "1699893330381000".to_string()),
             ("DIRECTION", DIRECTION_INGRESS.to_string()),
             ("IPTTL", "0".to_string()),
             ("MPLS_LABELS", "".to_string()),
@@ -8225,10 +8635,8 @@ mod tests {
             next_hop: Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 254))),
             src_port: 12345,
             dst_port: 443,
-            flow_start_seconds: 1700000000,
-            flow_end_seconds: 1700000060,
-            flow_start_millis: 1700000000000,
-            flow_end_millis: 1700000060000,
+            flow_start_usec: 1700000000000000,
+            flow_end_usec: 1700000060000000,
             observation_time_millis: 1700000030000,
             src_addr_nat: Some(IpAddr::V4(Ipv4Addr::new(203, 0, 113, 1))),
             dst_addr_nat: Some(IpAddr::V4(Ipv4Addr::new(203, 0, 113, 2))),
@@ -8321,10 +8729,8 @@ mod tests {
         assert_eq!(rec.next_hop, rec2.next_hop);
         assert_eq!(rec.src_port, rec2.src_port);
         assert_eq!(rec.dst_port, rec2.dst_port);
-        assert_eq!(rec.flow_start_seconds, rec2.flow_start_seconds);
-        assert_eq!(rec.flow_end_seconds, rec2.flow_end_seconds);
-        assert_eq!(rec.flow_start_millis, rec2.flow_start_millis);
-        assert_eq!(rec.flow_end_millis, rec2.flow_end_millis);
+        assert_eq!(rec.flow_start_usec, rec2.flow_start_usec);
+        assert_eq!(rec.flow_end_usec, rec2.flow_end_usec);
         assert_eq!(rec.observation_time_millis, rec2.observation_time_millis);
         assert_eq!(rec.src_addr_nat, rec2.src_addr_nat);
         assert_eq!(rec.dst_addr_nat, rec2.dst_addr_nat);
@@ -8385,8 +8791,14 @@ mod tests {
         }
 
         // Verify key fields survived encode → parse
-        assert_eq!(parsed.get("FLOW_VERSION").map(String::as_str), Some("ipfix"));
-        assert_eq!(parsed.get("EXPORTER_IP").map(String::as_str), Some("10.0.0.1"));
+        assert_eq!(
+            parsed.get("FLOW_VERSION").map(String::as_str),
+            Some("ipfix")
+        );
+        assert_eq!(
+            parsed.get("EXPORTER_IP").map(String::as_str),
+            Some("10.0.0.1")
+        );
         assert_eq!(parsed.get("PROTOCOL").map(String::as_str), Some("17"));
         assert_eq!(parsed.get("SRC_PORT").map(String::as_str), Some("53"));
         assert_eq!(parsed.get("DST_PORT").map(String::as_str), Some("12345"));

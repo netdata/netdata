@@ -31,6 +31,7 @@ members = [
     "netdata-otel/flatten_otel",
 
     # Netdata NetFlow workspace members
+    "netdata-netflow/flow-index",
     "netdata-netflow/netflow-plugin",
 ]
 
@@ -61,6 +62,7 @@ lzma-rust2 = { version = "0.15", default-features = false, features = ["std", "x
 md5 = "0.7"
 
 roaring = { git = "https://github.com/netdata/roaring-rs.git", branch="allocative" }
+hashbrown = "0.15"
 serde = { version = "1.0" }
 rustc-hash = "2.1"
 bincode = { version = "1.3" }

@@ -39,7 +39,6 @@ pub(crate) const MATERIALIZED_TIERS: [TierKind; 3] =
 pub(crate) struct FlowMetrics {
     pub(crate) bytes: u64,
     pub(crate) packets: u64,
-    pub(crate) flows: u64,
     pub(crate) raw_bytes: u64,
     pub(crate) raw_packets: u64,
 }
@@ -48,14 +47,12 @@ impl FlowMetrics {
     pub(crate) fn from_fields(fields: &FlowFields) -> Self {
         let bytes = parse_u64(fields.get("BYTES"));
         let packets = parse_u64(fields.get("PACKETS"));
-        let flows = parse_u64(fields.get("FLOWS")).max(1);
         let raw_bytes = parse_u64(fields.get("RAW_BYTES"));
         let raw_packets = parse_u64(fields.get("RAW_PACKETS"));
 
         Self {
             bytes,
             packets,
-            flows,
             raw_bytes,
             raw_packets,
         }
@@ -66,7 +63,6 @@ impl FlowMetrics {
         Self {
             bytes: rec.bytes,
             packets: rec.packets,
-            flows: rec.flows.max(1),
             raw_bytes: rec.raw_bytes,
             raw_packets: rec.raw_packets,
         }
@@ -75,7 +71,6 @@ impl FlowMetrics {
     pub(crate) fn add(&mut self, other: FlowMetrics) {
         self.bytes = self.bytes.saturating_add(other.bytes);
         self.packets = self.packets.saturating_add(other.packets);
-        self.flows = self.flows.saturating_add(other.flows);
         self.raw_bytes = self.raw_bytes.saturating_add(other.raw_bytes);
         self.raw_packets = self.raw_packets.saturating_add(other.raw_packets);
     }
@@ -83,7 +78,6 @@ impl FlowMetrics {
     pub(crate) fn write_fields(self, fields: &mut FlowFields) {
         fields.insert("BYTES", self.bytes.to_string());
         fields.insert("PACKETS", self.packets.to_string());
-        fields.insert("FLOWS", self.flows.to_string());
         fields.insert("RAW_BYTES", self.raw_bytes.to_string());
         fields.insert("RAW_PACKETS", self.raw_packets.to_string());
     }
@@ -305,20 +299,43 @@ impl RollupDimensions {
         f.insert("DIRECTION", self.direction.as_str().to_string());
         f.insert("PROTOCOL", ibuf.format(self.protocol as u64).to_string());
         f.insert("ETYPE", ibuf.format(self.etype as u64).to_string());
-        f.insert("FORWARDING_STATUS", ibuf.format(self.forwarding_status as u64).to_string());
+        f.insert(
+            "FORWARDING_STATUS",
+            ibuf.format(self.forwarding_status as u64).to_string(),
+        );
         f.insert("FLOW_VERSION", self.flow_version.to_string());
         f.insert("IPTOS", ibuf.format(self.iptos as u64).to_string());
         f.insert("TCP_FLAGS", ibuf.format(self.tcp_flags as u64).to_string());
-        f.insert("ICMPV4_TYPE", ibuf.format(self.icmpv4_type as u64).to_string());
-        f.insert("ICMPV4_CODE", ibuf.format(self.icmpv4_code as u64).to_string());
-        f.insert("ICMPV6_TYPE", ibuf.format(self.icmpv6_type as u64).to_string());
-        f.insert("ICMPV6_CODE", ibuf.format(self.icmpv6_code as u64).to_string());
+        f.insert(
+            "ICMPV4_TYPE",
+            ibuf.format(self.icmpv4_type as u64).to_string(),
+        );
+        f.insert(
+            "ICMPV4_CODE",
+            ibuf.format(self.icmpv4_code as u64).to_string(),
+        );
+        f.insert(
+            "ICMPV6_TYPE",
+            ibuf.format(self.icmpv6_type as u64).to_string(),
+        );
+        f.insert(
+            "ICMPV6_CODE",
+            ibuf.format(self.icmpv6_code as u64).to_string(),
+        );
         f.insert("SRC_AS", ibuf.format(self.src_as as u64).to_string());
         f.insert("DST_AS", ibuf.format(self.dst_as as u64).to_string());
         f.insert("SRC_AS_NAME", self.src_as_name.clone());
         f.insert("DST_AS_NAME", self.dst_as_name.clone());
-        f.insert("EXPORTER_IP", self.exporter_ip.map(|ip| ip.to_string()).unwrap_or_default());
-        f.insert("EXPORTER_PORT", ibuf.format(self.exporter_port as u64).to_string());
+        f.insert(
+            "EXPORTER_IP",
+            self.exporter_ip
+                .map(|ip| ip.to_string())
+                .unwrap_or_default(),
+        );
+        f.insert(
+            "EXPORTER_PORT",
+            ibuf.format(self.exporter_port as u64).to_string(),
+        );
         f.insert("EXPORTER_NAME", self.exporter_name.clone());
         f.insert("EXPORTER_GROUP", self.exporter_group.clone());
         f.insert("EXPORTER_ROLE", self.exporter_role.clone());
@@ -337,8 +354,14 @@ impl RollupDimensions {
         f.insert("OUT_IF_PROVIDER", self.out_if_provider.clone());
         f.insert("IN_IF_CONNECTIVITY", self.in_if_connectivity.clone());
         f.insert("OUT_IF_CONNECTIVITY", self.out_if_connectivity.clone());
-        f.insert("IN_IF_BOUNDARY", ibuf.format(self.in_if_boundary as u64).to_string());
-        f.insert("OUT_IF_BOUNDARY", ibuf.format(self.out_if_boundary as u64).to_string());
+        f.insert(
+            "IN_IF_BOUNDARY",
+            ibuf.format(self.in_if_boundary as u64).to_string(),
+        );
+        f.insert(
+            "OUT_IF_BOUNDARY",
+            ibuf.format(self.out_if_boundary as u64).to_string(),
+        );
         f.insert("SRC_NET_NAME", self.src_net_name.clone());
         f.insert("DST_NET_NAME", self.dst_net_name.clone());
         f.insert("SRC_NET_ROLE", self.src_net_role.clone());
@@ -355,7 +378,10 @@ impl RollupDimensions {
         f.insert("DST_GEO_CITY", self.dst_geo_city.clone());
         f.insert("SRC_GEO_STATE", self.src_geo_state.clone());
         f.insert("DST_GEO_STATE", self.dst_geo_state.clone());
-        f.insert("NEXT_HOP", self.next_hop.map(|ip| ip.to_string()).unwrap_or_default());
+        f.insert(
+            "NEXT_HOP",
+            self.next_hop.map(|ip| ip.to_string()).unwrap_or_default(),
+        );
         f.insert("SRC_VLAN", ibuf.format(self.src_vlan as u64).to_string());
         f.insert("DST_VLAN", ibuf.format(self.dst_vlan as u64).to_string());
         f.insert("SAMPLING_RATE", ibuf.format(self.sampling_rate).to_string());
@@ -503,7 +529,10 @@ impl TierAccumulator {
             chain.push((RollupDimensions::from_record(rec), metrics));
         } else {
             // First time seeing this dimension combination in this bucket.
-            bucket.insert(dim_hash, vec![(RollupDimensions::from_record(rec), metrics)]);
+            bucket.insert(
+                dim_hash,
+                vec![(RollupDimensions::from_record(rec), metrics)],
+            );
         }
     }
 
@@ -570,7 +599,7 @@ fn bucket_start_usec(timestamp_usec: u64, bucket_usec: u64) -> u64 {
 /// debug (V9_*, IPFIX_*), and metric fields. Used by query tests only.
 #[cfg(test)]
 pub(crate) fn dimensions_for_rollup(fields: &FlowFields) -> FlowFields {
-    const METRIC_FIELDS: [&str; 5] = ["BYTES", "PACKETS", "FLOWS", "RAW_BYTES", "RAW_PACKETS"];
+    const METRIC_FIELDS: [&str; 4] = ["BYTES", "PACKETS", "RAW_BYTES", "RAW_PACKETS"];
     const DEBUG_PREFIXES: [&str; 2] = ["V9_", "IPFIX_"];
 
     fields
@@ -623,10 +652,13 @@ mod tests {
     }
 
     #[test]
-    fn metrics_defaults_flows_to_one() {
+    fn metrics_defaults_to_zero() {
         let fields = BTreeMap::new();
         let m = FlowMetrics::from_fields(&fields);
-        assert_eq!(m.flows, 1);
+        assert_eq!(m.bytes, 0);
+        assert_eq!(m.packets, 0);
+        assert_eq!(m.raw_bytes, 0);
+        assert_eq!(m.raw_packets, 0);
     }
 
     #[test]
@@ -634,7 +666,6 @@ mod tests {
         let mut rec = FlowRecord::default();
         rec.bytes = 12345;
         rec.packets = 67;
-        rec.flows = 3;
         rec.raw_bytes = 12345;
         rec.raw_packets = 67;
 

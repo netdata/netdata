@@ -60,12 +60,22 @@ struct FlowsData {
     warnings: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     facets: Option<Value>,
+}
+
+#[derive(Debug, Serialize)]
+struct FlowMetricsData {
+    schema_version: String,
+    source: String,
+    layer: String,
+    agent_id: String,
+    collected_at: String,
+    view: String,
+    group_by: Vec<String>,
+    metric: String,
+    chart: Value,
+    stats: HashMap<String, u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    histogram: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    visualizations: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pagination: Option<Value>,
+    warnings: Option<Value>,
 }
 
 #[derive(Debug, Serialize)]
@@ -80,6 +90,25 @@ struct FlowsResponse {
     help: String,
 }
 
+#[derive(Debug, Serialize)]
+struct FlowMetricsResponse {
+    status: u32,
+    #[serde(rename = "type")]
+    response_type: String,
+    data: FlowMetricsData,
+    has_history: bool,
+    accepted_params: Vec<String>,
+    required_params: Vec<RequiredParam>,
+    help: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+enum FlowsFunctionResponse {
+    Table(FlowsResponse),
+    Metrics(FlowMetricsResponse),
+}
+
 struct NetflowFlowsHandler {
     metrics: Arc<ingest::IngestMetrics>,
     query: Arc<query::FlowQueryService>,
@@ -90,101 +119,201 @@ impl NetflowFlowsHandler {
         Self { metrics, query }
     }
 
-    async fn handle_request(&self, request: query::FlowsRequest) -> Result<FlowsResponse> {
-        let query_output =
-            self.query
-                .query_flows(&request)
+    async fn handle_request(&self, request: query::FlowsRequest) -> Result<FlowsFunctionResponse> {
+        if request.is_timeseries_view() {
+            let query_output = self
+                .query
+                .query_flow_metrics(&request)
                 .await
                 .map_err(|err| NetdataPluginError::Other {
-                    message: format!("failed to query flows: {err:#}"),
+                    message: format!("failed to query flow metrics: {err:#}"),
                 })?;
-        let view = request.normalized_view().to_string();
-        let mut stats = self.metrics.snapshot();
-        stats.extend(query_output.stats);
+            let view = request.normalized_view().to_string();
+            let mut stats = self.metrics.snapshot();
+            stats.extend(query_output.stats);
 
-        Ok(FlowsResponse {
-            status: 200,
-            response_type: "flows".to_string(),
-            data: FlowsData {
-                schema_version: FLOWS_SCHEMA_VERSION.to_string(),
-                source: "netflow".to_string(),
-                layer: "3".to_string(),
-                agent_id: query_output.agent_id,
-                collected_at: Utc::now().to_rfc3339(),
-                view,
-                flows: query_output.flows,
-                stats,
-                metrics: query_output.metrics,
-                warnings: query_output.warnings,
-                facets: query_output.facets,
-                histogram: query_output.histogram,
-                visualizations: query_output.visualizations,
-                pagination: query_output.pagination,
-            },
-            has_history: true,
-            accepted_params: vec![
-                "view".to_string(),
-                "after".to_string(),
-                "before".to_string(),
-                "last".to_string(),
-                "query".to_string(),
-                "selections".to_string(),
-                "group_by".to_string(),
-                "sort_by".to_string(),
-            ],
-            required_params: vec![
-                RequiredParam {
-                    id: "view".to_string(),
-                    name: "View".to_string(),
-                    kind: "select".to_string(),
-                    options: vec![
-                        RequiredParamOption {
-                            id: "aggregated".to_string(),
-                            name: "Aggregated".to_string(),
-                            default_selected: true,
-                        },
-                        RequiredParamOption {
-                            id: "detailed".to_string(),
-                            name: "Detailed".to_string(),
-                            default_selected: false,
-                        },
-                    ],
-                    help: "Select aggregated or detailed flow view.".to_string(),
+            Ok(FlowsFunctionResponse::Metrics(FlowMetricsResponse {
+                status: 200,
+                response_type: "metrics".to_string(),
+                data: FlowMetricsData {
+                    schema_version: FLOWS_SCHEMA_VERSION.to_string(),
+                    source: "netflow".to_string(),
+                    layer: "3".to_string(),
+                    agent_id: query_output.agent_id,
+                    collected_at: Utc::now().to_rfc3339(),
+                    view,
+                    group_by: query_output.group_by,
+                    metric: query_output.metric,
+                    chart: query_output.chart,
+                    stats,
+                    warnings: query_output.warnings,
                 },
-                RequiredParam {
-                    id: "sort_by".to_string(),
-                    name: "Sort By".to_string(),
-                    kind: "select".to_string(),
-                    options: vec![
-                        RequiredParamOption {
-                            id: "bytes".to_string(),
-                            name: "Bytes".to_string(),
-                            default_selected: true,
-                        },
-                        RequiredParamOption {
-                            id: "packets".to_string(),
-                            name: "Packets".to_string(),
-                            default_selected: false,
-                        },
-                        RequiredParamOption {
-                            id: "flows".to_string(),
-                            name: "Flows".to_string(),
-                            default_selected: false,
-                        },
-                    ],
-                    help: "Choose the metric used to rank top groups and the other bucket."
-                        .to_string(),
+                has_history: true,
+                accepted_params: flows_accepted_params(),
+                required_params: flows_required_params(
+                    request.normalized_view(),
+                    &request.normalized_group_by(),
+                    request.normalized_sort_by(),
+                    request.normalized_top_n(),
+                ),
+                help: "NetFlow/IPFIX/sFlow Top-N time-series for grouped flow tuples".to_string(),
+            }))
+        } else {
+            let query_output = self.query.query_flows(&request).await.map_err(|err| {
+                NetdataPluginError::Other {
+                    message: format!("failed to query flows: {err:#}"),
+                }
+            })?;
+            let view = request.normalized_view().to_string();
+            let mut stats = self.metrics.snapshot();
+            stats.extend(query_output.stats);
+
+            Ok(FlowsFunctionResponse::Table(FlowsResponse {
+                status: 200,
+                response_type: "flows".to_string(),
+                data: FlowsData {
+                    schema_version: FLOWS_SCHEMA_VERSION.to_string(),
+                    source: "netflow".to_string(),
+                    layer: "3".to_string(),
+                    agent_id: query_output.agent_id,
+                    collected_at: Utc::now().to_rfc3339(),
+                    view,
+                    flows: query_output.flows,
+                    stats,
+                    metrics: query_output.metrics,
+                    warnings: query_output.warnings,
+                    facets: query_output.facets,
                 },
-            ],
-            help: "NetFlow/IPFIX/sFlow flow analysis data from journal-backed storage".to_string(),
-        })
+                has_history: true,
+                accepted_params: flows_accepted_params(),
+                required_params: flows_required_params(
+                    request.normalized_view(),
+                    &request.normalized_group_by(),
+                    request.normalized_sort_by(),
+                    request.normalized_top_n(),
+                ),
+                help: "NetFlow/IPFIX/sFlow flow analysis data from journal-backed storage"
+                    .to_string(),
+            }))
+        }
     }
+}
+
+fn flows_accepted_params() -> Vec<String> {
+    vec![
+        "view".to_string(),
+        "after".to_string(),
+        "before".to_string(),
+        "query".to_string(),
+        "selections".to_string(),
+        "group_by".to_string(),
+        "sort_by".to_string(),
+        "top_n".to_string(),
+    ]
+}
+
+fn flows_required_params(
+    view: &str,
+    group_by: &[String],
+    sort_by: query::SortBy,
+    top_n: usize,
+) -> Vec<RequiredParam> {
+    vec![
+        RequiredParam {
+            id: "view".to_string(),
+            name: "View".to_string(),
+            kind: "select".to_string(),
+            options: vec![
+                RequiredParamOption {
+                    id: "table-sankey".to_string(),
+                    name: "Table / Sankey".to_string(),
+                    default_selected: view == "table-sankey",
+                },
+                RequiredParamOption {
+                    id: "timeseries".to_string(),
+                    name: "Time-Series".to_string(),
+                    default_selected: view == "timeseries",
+                },
+                RequiredParamOption {
+                    id: "country-map".to_string(),
+                    name: "Country-Map".to_string(),
+                    default_selected: view == "country-map",
+                },
+            ],
+            help: "Select the flow view to render.".to_string(),
+        },
+        RequiredParam {
+            id: "group_by".to_string(),
+            name: "Group By".to_string(),
+            kind: "multiselect".to_string(),
+            options: query::supported_group_by_fields()
+                .iter()
+                .map(|field| RequiredParamOption {
+                    id: field.clone(),
+                    name: field.clone(),
+                    default_selected: group_by.iter().any(|selected| selected == field),
+                })
+                .collect(),
+            help: "Select up to 10 tuple fields used to group and rank flows.".to_string(),
+        },
+        RequiredParam {
+            id: "sort_by".to_string(),
+            name: "Sort By".to_string(),
+            kind: "select".to_string(),
+            options: vec![
+                RequiredParamOption {
+                    id: "bytes".to_string(),
+                    name: "Bytes".to_string(),
+                    default_selected: sort_by == query::SortBy::Bytes,
+                },
+                RequiredParamOption {
+                    id: "packets".to_string(),
+                    name: "Packets".to_string(),
+                    default_selected: sort_by == query::SortBy::Packets,
+                },
+            ],
+            help: "Choose the metric used to rank top groups and the other bucket.".to_string(),
+        },
+        RequiredParam {
+            id: "top_n".to_string(),
+            name: "Top N".to_string(),
+            kind: "select".to_string(),
+            options: vec![
+                RequiredParamOption {
+                    id: "25".to_string(),
+                    name: "25".to_string(),
+                    default_selected: top_n == 25,
+                },
+                RequiredParamOption {
+                    id: "50".to_string(),
+                    name: "50".to_string(),
+                    default_selected: top_n == 50,
+                },
+                RequiredParamOption {
+                    id: "100".to_string(),
+                    name: "100".to_string(),
+                    default_selected: top_n == 100,
+                },
+                RequiredParamOption {
+                    id: "200".to_string(),
+                    name: "200".to_string(),
+                    default_selected: top_n == 200,
+                },
+                RequiredParamOption {
+                    id: "500".to_string(),
+                    name: "500".to_string(),
+                    default_selected: top_n == 500,
+                },
+            ],
+            help: "Choose how many grouped tuples the backend returns.".to_string(),
+        },
+    ]
 }
 
 #[async_trait]
 impl FunctionHandler for NetflowFlowsHandler {
     type Request = query::FlowsRequest;
-    type Response = FlowsResponse;
+    type Response = FlowsFunctionResponse;
 
     async fn on_call(
         &self,
@@ -445,7 +574,9 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{NetflowFlowsHandler, ingest, plugin_config, query, tiering};
+    use super::{
+        FlowsFunctionResponse, NetflowFlowsHandler, ingest, plugin_config, query, tiering,
+    };
     use chrono::Utc;
     use etherparse::{SlicedPacket, TransportSlice};
     use pcap_file::pcap::PcapReader;
@@ -475,16 +606,21 @@ mod tests {
                 .expect("create query service");
         let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
         let request = query::FlowsRequest {
-            view: "detailed".to_string(),
+            view: query::ViewMode::TableSankey,
             after: Some(1),
             before: Some(before),
-            last: Some(100),
+            group_by: vec![
+                "SRC_ADDR".to_string(),
+                "DST_ADDR".to_string(),
+                "PROTOCOL".to_string(),
+            ],
+            top_n: query::TopN::N100,
             ..Default::default()
         };
         let output = query_service
             .query_flows(&request)
             .await
-            .expect("query detailed flows");
+            .expect("query tuple flows");
 
         assert!(
             !output.flows.is_empty(),
@@ -499,12 +635,8 @@ mod tests {
             "expected facets in query output for UI filtering"
         );
         assert!(
-            output.histogram.is_some(),
-            "expected histogram in query output for timeline visualization"
-        );
-        assert!(
-            output.visualizations.is_some(),
-            "expected visualizations metadata in query output"
+            !output.stats.is_empty(),
+            "expected stats to remain available for backend debugging"
         );
         assert!(
             metrics.journal_entries_written.load(Ordering::Relaxed) > 0,
@@ -524,18 +656,27 @@ mod tests {
 
         let response = handler
             .handle_request(query::FlowsRequest {
-                view: "detailed".to_string(),
+                view: query::ViewMode::TableSankey,
                 after: Some(1),
                 before: Some(before),
-                last: Some(100),
+                group_by: vec![
+                    "SRC_ADDR".to_string(),
+                    "DST_ADDR".to_string(),
+                    "PROTOCOL".to_string(),
+                ],
+                top_n: query::TopN::N100,
                 ..Default::default()
             })
             .await
             .expect("flows function call");
+        let response = match response {
+            FlowsFunctionResponse::Table(response) => response,
+            FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
+        };
 
         assert_eq!(response.status, 200);
         assert_eq!(response.response_type, "flows");
-        assert_eq!(response.data.view, "detailed");
+        assert_eq!(response.data.view, "table-sankey");
         assert!(
             !response.data.flows.is_empty(),
             "expected non-empty flows data section"
@@ -545,12 +686,8 @@ mod tests {
             "expected facets section in flows response"
         );
         assert!(
-            response.data.histogram.is_some(),
-            "expected histogram section in flows response"
-        );
-        assert!(
-            response.data.visualizations.is_some(),
-            "expected visualizations section in flows response"
+            !response.data.metrics.is_empty(),
+            "expected top-level metrics to remain in table-family response"
         );
         assert!(
             response
@@ -563,21 +700,129 @@ mod tests {
             response
                 .required_params
                 .iter()
+                .any(|param| param.id == "group_by"),
+            "expected required 'group_by' parameter declaration"
+        );
+        let group_by_param = response
+            .required_params
+            .iter()
+            .find(|param| param.id == "group_by")
+            .expect("group_by required param");
+        assert_eq!(group_by_param.kind, "multiselect");
+        assert!(
+            group_by_param
+                .options
+                .iter()
+                .any(|option| option.id == "SRC_AS_NAME"),
+            "expected SRC_AS_NAME group_by option to be available"
+        );
+        assert!(
+            group_by_param
+                .options
+                .iter()
+                .any(|option| option.id == "SRC_ADDR" && option.default_selected),
+            "expected current request group_by selection to be reflected"
+        );
+        assert!(
+            response
+                .required_params
+                .iter()
                 .any(|param| param.id == "sort_by"),
             "expected required 'sort_by' parameter declaration"
+        );
+        assert!(
+            response
+                .required_params
+                .iter()
+                .any(|param| param.id == "top_n"),
+            "expected required 'top_n' parameter declaration"
         );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn e2e_aggregated_view_reads_from_materialized_rollup_tier() {
+    async fn e2e_flows_metrics_function_returns_top_n_chart() {
+        let (cfg, metrics, open_tiers, _tmp) = ingest_fixture("nfv5.pcap").await;
+        let (query_service, _notify_rx) =
+            query::FlowQueryService::new(&cfg, Arc::clone(&open_tiers))
+                .await
+                .expect("create query service");
+        let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
+        let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+        let after = before.saturating_sub(3600);
+
+        let response = handler
+            .handle_request(query::FlowsRequest {
+                view: query::ViewMode::TimeSeries,
+                after: Some(after),
+                before: Some(before),
+                group_by: vec!["PROTOCOL".to_string()],
+                sort_by: query::SortBy::Bytes,
+                top_n: query::TopN::N50,
+                ..Default::default()
+            })
+            .await
+            .expect("flow metrics function call");
+        let response = match response {
+            FlowsFunctionResponse::Metrics(response) => response,
+            FlowsFunctionResponse::Table(_) => panic!("expected metrics response"),
+        };
+
+        assert_eq!(response.status, 200);
+        assert_eq!(response.response_type, "metrics");
+        assert_eq!(response.data.view, "timeseries");
+        assert_eq!(response.data.metric, "bytes");
+        assert_eq!(response.data.group_by, vec!["PROTOCOL".to_string()]);
+        assert_eq!(response.data.chart["view"]["units"], "bytes/s");
+        assert!(
+            response.data.stats.get("query_tier").copied().unwrap_or(0) > 0,
+            "expected timeseries query to use a materialized tier when raw-only fields are absent"
+        );
+        assert_eq!(response.data.stats.get("query_bucket_seconds").copied(), Some(60));
+        assert!(
+            response.data.chart["view"]["dimensions"]["ids"]
+                .as_array()
+                .map(|dims| !dims.is_empty() && dims.len() <= 50)
+                .unwrap_or(false),
+            "expected Top-N chart dimensions limited by request"
+        );
+        assert!(
+            response.data.chart["result"]["data"]
+                .as_array()
+                .map(|rows| !rows.is_empty())
+                .unwrap_or(false),
+            "expected chart datapoints in metrics response"
+        );
+        assert!(
+            response
+                .required_params
+                .iter()
+                .any(|param| param.id == "sort_by"),
+            "expected required 'sort_by' parameter declaration"
+        );
+        assert!(
+            response
+                .required_params
+                .iter()
+                .any(|param| param.id == "top_n"),
+            "expected required 'top_n' parameter declaration"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn e2e_aggregated_safe_group_by_reads_from_materialized_rollup_tier() {
         let (cfg, metrics, open_tiers, _tmp) = ingest_fixture_with_timestamp_source(
             "nfv5.pcap",
-            plugin_config::TimestampSource::NetflowPacket,
+            plugin_config::TimestampSource::Input,
         )
         .await;
         assert!(
-            tier_file_count(&cfg.journal.hour_1_tier_dir()) > 0,
-            "expected hour_1 tier files to exist for deterministic rollup-tier query"
+            tier_file_count(&cfg.journal.hour_1_tier_dir()) > 0
+                || !open_tiers
+                    .read()
+                    .expect("read open tiers")
+                    .hour_1
+                    .is_empty(),
+            "expected hour_1 rollup data to exist for deterministic non-raw query"
         );
 
         let (query_service, _notify_rx) =
@@ -586,37 +831,91 @@ mod tests {
                 .expect("create query service");
         let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
         let request = query::FlowsRequest {
-            view: "aggregated".to_string(),
+            view: query::ViewMode::TableSankey,
             after: Some(1),
             before: Some(before),
-            last: Some(100),
+            group_by: vec![
+                "SRC_AS_NAME".to_string(),
+                "DST_AS_NAME".to_string(),
+                "PROTOCOL".to_string(),
+            ],
+            top_n: query::TopN::N100,
             ..Default::default()
         };
         let output = query_service
             .query_flows(&request)
             .await
-            .expect("query aggregated flows");
+            .expect("query aggregated-safe flows");
         assert!(
             !output.flows.is_empty(),
-            "expected non-empty aggregated flows from materialized tier"
+            "expected non-empty aggregated-safe flows from materialized tier"
         );
         assert!(
             output.stats.get("query_tier").copied().unwrap_or(0) > 0,
-            "expected aggregated query to use non-raw tier"
+            "expected aggregated-safe query to use non-raw tier"
         );
 
         let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
         let response = handler
             .handle_request(request)
             .await
-            .expect("flows function call for aggregated view");
+            .expect("flows function call for aggregated-safe view");
+        let response = match response {
+            FlowsFunctionResponse::Table(response) => response,
+            FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
+        };
         assert!(
             !response.data.flows.is_empty(),
-            "expected non-empty function flows for aggregated view"
+            "expected non-empty function flows for aggregated-safe view"
         );
         assert!(
             response.data.stats.get("query_tier").copied().unwrap_or(0) > 0,
             "expected function response to report non-raw query tier"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn e2e_country_map_reuses_tuple_table_shape_with_country_keys() {
+        let (cfg, metrics, open_tiers, _tmp) = ingest_fixture("nfv5.pcap").await;
+        let (query_service, _notify_rx) =
+            query::FlowQueryService::new(&cfg, Arc::clone(&open_tiers))
+                .await
+                .expect("create query service");
+        let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
+        let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+
+        let response = handler
+            .handle_request(query::FlowsRequest {
+                view: query::ViewMode::CountryMap,
+                after: Some(1),
+                before: Some(before),
+                group_by: vec!["SRC_ADDR".to_string(), "DST_ADDR".to_string()],
+                top_n: query::TopN::N25,
+                ..Default::default()
+            })
+            .await
+            .expect("country-map function call");
+        let response = match response {
+            FlowsFunctionResponse::Table(response) => response,
+            FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
+        };
+
+        assert_eq!(response.status, 200);
+        assert_eq!(response.response_type, "flows");
+        assert_eq!(response.data.view, "country-map");
+        assert!(
+            !response.data.flows.is_empty(),
+            "expected non-empty country-map tuple rows"
+        );
+
+        let first = response.data.flows.first().expect("first flow row");
+        assert!(
+            first["key"].get("SRC_COUNTRY").is_some(),
+            "expected country-map rows to expose SRC_COUNTRY"
+        );
+        assert!(
+            first["key"].get("DST_COUNTRY").is_some(),
+            "expected country-map rows to expose DST_COUNTRY"
         );
     }
 
@@ -629,13 +928,21 @@ mod tests {
                 .expect("create query service");
         let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
 
-        let request_match = query::FlowsRequest {
-            view: "detailed".to_string(),
+        let request_base = query::FlowsRequest {
+            view: query::ViewMode::TableSankey,
             after: Some(1),
             before: Some(before),
-            last: Some(100),
-            selections: HashMap::from([("FLOW_VERSION".to_string(), vec!["v5".to_string()])]),
+            group_by: vec![
+                "SRC_ADDR".to_string(),
+                "DST_ADDR".to_string(),
+                "PROTOCOL".to_string(),
+            ],
+            top_n: query::TopN::N100,
             ..Default::default()
+        };
+        let request_match = query::FlowsRequest {
+            selections: HashMap::from([("FLOW_VERSION".to_string(), vec!["v5".to_string()])]),
+            ..request_base
         };
         let matched = query_service
             .query_flows(&request_match)
@@ -656,9 +963,61 @@ mod tests {
             "expected at least one matched entry for FLOW_VERSION=v5"
         );
 
+        let request_multi = query::FlowsRequest {
+            selections: HashMap::from([(
+                "PROTOCOL".to_string(),
+                vec!["6".to_string(), "17".to_string()],
+            )]),
+            ..Default::default()
+        };
+        let request_multi = query::FlowsRequest {
+            view: query::ViewMode::TableSankey,
+            after: Some(1),
+            before: Some(before),
+            group_by: vec![
+                "SRC_ADDR".to_string(),
+                "DST_ADDR".to_string(),
+                "PROTOCOL".to_string(),
+            ],
+            top_n: query::TopN::N100,
+            ..request_multi
+        };
+        let multi = query_service
+            .query_flows(&request_multi)
+            .await
+            .expect("query with multi-value PROTOCOL selection");
+        assert_eq!(
+            multi.stats.get("query_reader_path").copied().unwrap_or(0),
+            1,
+            "expected multi-value selection query to use journal-session reader path"
+        );
+        assert!(
+            multi.stats.get("query_matched_entries").copied().unwrap_or(0) > 0,
+            "expected at least one matched entry for PROTOCOL in [6,17]"
+        );
+        assert!(
+            multi.flows.iter().all(|row| {
+                row["key"]
+                    .get("PROTOCOL")
+                    .and_then(|value| value.as_str())
+                    .map(|value| value == "6" || value == "17")
+                    .unwrap_or(false)
+            }),
+            "expected every returned row to respect the multi-value protocol filter"
+        );
+
         let request_miss = query::FlowsRequest {
             selections: HashMap::from([("FLOW_VERSION".to_string(), vec!["999".to_string()])]),
-            ..request_match
+            view: query::ViewMode::TableSankey,
+            after: Some(1),
+            before: Some(before),
+            group_by: vec![
+                "SRC_ADDR".to_string(),
+                "DST_ADDR".to_string(),
+                "PROTOCOL".to_string(),
+            ],
+            top_n: query::TopN::N100,
+            ..Default::default()
         };
         let missed = query_service
             .query_flows(&request_miss)
