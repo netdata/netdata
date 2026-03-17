@@ -1674,6 +1674,25 @@ void ebpf_send_statistic_data()
         NETDATA_EBPF_HASH_TABLES_INSERT_PID_ELEMENTS, NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_ADD);
     ebpf_send_hash_table_pid_data(
         NETDATA_EBPF_HASH_TABLES_REMOVE_PID_ELEMENTS, NETDATA_EBPF_GLOBAL_TABLE_PID_TABLE_DEL);
+
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *wem = &ebpf_modules[i];
+        if (!wem->functions.fnct_routine || !wem->functions.fcnt_thread_chart_name ||
+            !wem->functions.fcnt_thread_lifetime_name)
+            continue;
+
+        ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, wem->functions.fcnt_thread_chart_name, "");
+        write_chart_dimension((char *)wem->info.thread_name, (wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ? 1 : 0);
+        ebpf_write_end_chart();
+
+        ebpf_write_begin_chart(NETDATA_MONITORING_FAMILY, wem->functions.fcnt_thread_lifetime_name, "");
+        write_chart_dimension(
+            (char *)wem->info.thread_name,
+            (wem->lifetime && wem->enabled < NETDATA_THREAD_EBPF_STOPPING) ?
+                (long long)(wem->lifetime - wem->running_time) :
+                0);
+        ebpf_write_end_chart();
+    }
 }
 
 /**
@@ -2016,10 +2035,12 @@ static void ebpf_create_statistic_charts(int update_every)
 
         em->functions.order_thread_chart = j;
         snprintfz(name, sizeof(name) - 1, "%s_%s", NETDATA_EBPF_THREADS, em->info.thread_name);
+        em->functions.fcnt_thread_chart_name = strdupz(name);
         ebpf_create_thread_chart(name, "Threads running.", "boolean", j++, update_every, em);
 
         em->functions.order_thread_lifetime = j;
         snprintfz(name, sizeof(name) - 1, "%s_%s", NETDATA_EBPF_LIFE_TIME, em->info.thread_name);
+        em->functions.fcnt_thread_lifetime_name = strdupz(name);
         ebpf_create_thread_chart(name, "Time remaining for thread.", "seconds", j++, update_every, em);
     }
 

@@ -486,7 +486,10 @@ void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_
 
     uint32_t enabled = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, "disable apps", CONFIG_BOOLEAN_NO);
     if (!enabled) {
-        enabled = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION, CONFIG_BOOLEAN_NO);
+        // `application` is a positive option, but the legacy `disable apps`
+        // setting is negative. Preserve the original compatibility semantics.
+        enabled = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_APPLICATION, CONFIG_BOOLEAN_YES);
+        enabled = (enabled == CONFIG_BOOLEAN_NO) ? CONFIG_BOOLEAN_YES : CONFIG_BOOLEAN_NO;
     }
 
     ebpf_set_apps_mode(!enabled);
