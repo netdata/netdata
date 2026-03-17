@@ -25,6 +25,7 @@ bool cpus_lock_initialized = false;
 static HANDLE msr_device = INVALID_HANDLE_VALUE;
 static CRITICAL_SECTION device_lock;
 bool device_lock_initialized = false;
+static volatile LONG hardware_info_thread_finished = 0;
 static int consecutive_errors = 0;
 static const int MAX_CONSECUTIVE_ERRORS = 5;
 static const int IOCTL_RETRIES = 3;
@@ -354,6 +355,8 @@ static void get_hardware_info_thread(void *ptr __maybe_unused)
 
         netdata_collect_cpu_chart();
     }
+
+    InterlockedExchange(&hardware_info_thread_finished, 1);
 }
 
 static void netdata_detect_cpu()
@@ -427,6 +430,7 @@ static int initialize()
         cpus[i].read_errors = 0;
     }
 
+    InterlockedExchange(&hardware_info_thread_finished, 0);
     hardware_info_thread =
         nd_thread_create("hw_info_thread", NETDATA_THREAD_OPTION_DEFAULT, get_hardware_info_thread, NULL);
 
@@ -509,9 +513,20 @@ void do_GetHardwareInfo_cleanup()
         if (nd_thread_join(hardware_info_thread)) {
             // nd_thread_join() frees the ND_THREAD object even on failure,
             // so we cannot retry. The Windows/MSYS2 UV_EINVAL fast-exit case
-            // is already handled inside nd_thread_join(), so still tear down
-            // local resources after logging the error.
+            // is already handled inside nd_thread_join(). For any other error,
+            // only tear down local resources if the worker has actually exited.
             nd_log_daemon(NDLP_ERR, "Failed to join Get Hardware Info thread");
+
+            size_t retries = 0;
+            while (!InterlockedCompareExchange(&hardware_info_thread_finished, 1, 1) && retries < 1000) {
+                Sleep(1);
+                retries++;
+            }
+
+            if (!InterlockedCompareExchange(&hardware_info_thread_finished, 1, 1)) {
+                hardware_info_thread = NULL;
+                return;
+            }
         }
         hardware_info_thread = NULL;
     }
