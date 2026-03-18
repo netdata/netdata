@@ -14,42 +14,12 @@
 extern "C" {
 # endif
 
-#include "config.h"
-
-#if defined(NETDATA_DEV_MODE) && !defined(NETDATA_INTERNAL_CHECKS)
-#define NETDATA_INTERNAL_CHECKS 1
-#endif
-
-#ifndef SIZEOF_VOID_P
-#error SIZEOF_VOID_P is not defined
-#endif
-
-#if SIZEOF_VOID_P == 4
-#define ENV32BIT 1
-#else
-#define ENV64BIT 1
-#endif
-
-#ifdef HAVE_LIBDATACHANNEL
-#define ENABLE_WEBRTC 1
-#endif
-
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
+#include "libnetdata-base.h"
+#include "libnetdata-types.h"
+#include "libnetdata-platform-fwd.h"
 
 // --------------------------------------------------------------------------------------------------------------------
 // NETDATA_OS_TYPE
-
-#if defined(__FreeBSD__)
-#include <pthread_np.h>
-#define NETDATA_OS_TYPE "freebsd"
-#elif defined(__APPLE__)
-#define NETDATA_OS_TYPE "macos"
-#elif defined(OS_WINDOWS)
-#define NETDATA_OS_TYPE "windows"
-#else
-#define NETDATA_OS_TYPE "linux"
-#endif /* __FreeBSD__, __APPLE__*/
 
 // --------------------------------------------------------------------------------------------------------------------
 // memory allocators
@@ -245,12 +215,6 @@ typedef uint32_t uid_t;
 
 #include <math.h>
 #include <float.h>
-
-#if defined(HAVE_INTTYPES_H)
-#include <inttypes.h>
-#elif defined(HAVE_STDINT_H)
-#include <stdint.h>
-#endif
 
 #include <zlib.h>
 
