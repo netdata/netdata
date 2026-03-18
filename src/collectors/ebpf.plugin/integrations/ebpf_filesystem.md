@@ -136,7 +136,7 @@ This configuration file have two different sections. The `[global]` overwrites d
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
-| update every | Data collection frequency. | 5 | no |
+| update every | Data collection frequency. | 10 | no |
 | ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
 | lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
 | btrfsdist | Enable or disable latency monitoring for functions associated with btrfs filesystem. | yes | no |

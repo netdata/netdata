@@ -110,7 +110,7 @@ All options are defined inside section `[global]`.
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
-| update every | Data collection frequency. | 5 | no |
+| update every | Data collection frequency. | 10 | no |
 | ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
 | lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
 
