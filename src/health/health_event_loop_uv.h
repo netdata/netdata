@@ -82,7 +82,7 @@ struct health_event_loop_config {
     uv_timer_t timer_req;
 
     bool initialized;           // true while accepting commands (toggled during drain)
-    bool started;               // true once the event loop has been initialized (never reset)
+    bool started;               // true once initialized, cleared atomically on first shutdown call
     bool shutdown_requested;
 
     struct completion start_stop_complete;
