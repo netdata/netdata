@@ -70,7 +70,10 @@ func (c *Client) login() (string, error) {
 		return "", fmt.Errorf("login: error decoding response: %v", err)
 	}
 	if len(result.Status) == 0 || result.Status[0].ResponseType != "Success" {
-		return "", fmt.Errorf("login: authentication failed")
+		if len(result.Status) > 0 {
+			return "", fmt.Errorf("login: authentication failed: %s (rc=%d)", result.Status[0].Response, result.Status[0].ReturnCode)
+		}
+		return "", fmt.Errorf("login: authentication failed: empty status response")
 	}
 
 	return result.Status[0].Response, nil

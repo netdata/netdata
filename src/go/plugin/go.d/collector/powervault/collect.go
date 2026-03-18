@@ -13,10 +13,13 @@ const discoveryEvery = 10
 
 func (c *Collector) collect() error {
 	c.runs++
-	if !c.lastDiscoveryOK || c.runs%discoveryEvery == 0 {
+	needsDiscovery := !c.lastDiscoveryOK || c.runs%discoveryEvery == 0
+	wasOK := c.lastDiscoveryOK
+
+	if needsDiscovery {
 		if err := c.discovery(); err != nil {
 			// Initial discovery must succeed.
-			if !c.lastDiscoveryOK {
+			if !wasOK {
 				return err
 			}
 			// Refresh failure — continue with previous data.
