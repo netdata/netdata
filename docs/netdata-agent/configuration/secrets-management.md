@@ -1,17 +1,17 @@
 # Secrets Management
 
-Netdata collectors can resolve secrets at startup instead of storing plain-text credentials in configuration files.
+Netdata supports secrets management for collector configurations, so you don't need to store plain-text credentials in configuration files. Instead, you use secret references that are resolved when a collector starts.
 
 | Reference Type       | Syntax                             | Use Case                                                   |
 |:---------------------|:-----------------------------------|:-----------------------------------------------------------|
-| Environment variable | `${env:VAR_NAME}`                  | Secrets available as env vars                              |
+| Environment variable | `${env:VAR_NAME}`                  | Secrets available as environment variables                 |
 | File                 | `${file:/path/to/secret}`          | Secrets stored in files on disk                            |
 | Command              | `${cmd:/path/to/command args}`     | Secrets retrieved by running a command                     |
 | Secretstore          | `${store:<kind>:<name>:<operand>}` | Secrets stored in remote backends (Vault, AWS, Azure, GCP) |
 
 ## Environment Variables
 
-Use `${env:VARIABLE_NAME}` to resolve an environment variable.
+Use `${env:VARIABLE_NAME}` to reference an environment variable.
 
 ```yaml
 jobs:
@@ -21,7 +21,7 @@ jobs:
 
 ## Files
 
-Use `${file:/absolute/path}` to read a secret from a file. Leading and trailing whitespace is trimmed.
+Use `${file:/absolute/path}` to read a secret from a file. Leading and trailing whitespace is trimmed automatically.
 
 ```yaml
 jobs:
@@ -41,14 +41,15 @@ jobs:
 
 :::warning
 
-Command paths must be absolute. Commands have a 10-second timeout.
-Arguments are split on whitespace, not shell-parsed. Quoting, pipes, redirects, variable expansion, and other shell syntax are not interpreted unless you run a shell explicitly.
+- Command paths must be absolute.
+- Commands have a 10-second timeout.
+- Arguments are split on whitespace. Quoting, pipes, redirects, and variable expansion are not interpreted unless you run a shell explicitly (e.g., `${cmd:/bin/sh -c "your command here"}`).
 
 :::
 
 ## Secretstores
 
-For remote secret backends, you first configure a **secretstore** and then reference it from collector configs.
+For remote secret backends (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, GCP Secret Manager), you configure a **secretstore** and then reference it from collector configurations.
 
 ### Supported Providers
 
@@ -65,13 +66,13 @@ For remote secret backends, you first configure a **secretstore** and then refer
 ${store:<kind>:<name>:<operand>}
 ```
 
-| Part      | Description                                       |
-|:----------|:--------------------------------------------------|
-| `kind`    | Provider kind from the table above                |
-| `name`    | Name you gave the secretstore when you created it |
-| `operand` | Provider-specific secret path (see table above)   |
+| Part      | Description                                              |
+|:----------|:---------------------------------------------------------|
+| `kind`    | Provider kind from the table above (e.g., `vault`)       |
+| `name`    | The name you gave the secretstore when you configured it |
+| `operand` | Provider-specific path to the secret (see table above)   |
 
-### Usage Examples
+### Examples
 
 ```yaml
 jobs:
@@ -88,30 +89,29 @@ jobs:
     password: "${store:gcp-sm:gcp_prod:my-project/mysql-password}"
 ```
 
-### Setup Through Dynamic Configuration
+### Configuring a Secretstore
 
-1. Create a secretstore through the Netdata Dynamic Configuration UI.
-2. Choose a provider kind and give it a name.
-3. Provide the provider-specific configuration.
-4. Reference it from collector configs using `${store:<kind>:<name>:<operand>}`.
+#### Option 1: Dynamic Configuration (UI)
 
-### File-Defined Secretstores
+1. Open the Netdata Dynamic Configuration UI.
+2. Choose a provider kind and give your secretstore a name.
+3. Fill in the provider-specific settings (address, credentials, etc.).
+4. Use the reference syntax `${store:<kind>:<name>:<operand>}` in your collector configs.
 
-Netdata can also load secretstores from `go.d/ss` during agent startup.
+#### Option 2: Configuration Files
 
-- User-defined files live under `/etc/netdata/go.d/ss/`.
-- Stock examples live under `/usr/lib/netdata/conf.d/go.d/ss/`.
-- Use one file per backend with a top-level `jobs:` array.
-- `kind` is inferred from the filename and must not be written inside the job payload.
+You can define secretstores in configuration files. Each provider has its own file:
 
-| File          | Secretstore Kind |
-|:--------------|:-----------------|
-| `vault.conf`     | `vault`          |
-| `aws-sm.conf`    | `aws-sm`         |
-| `azure-kv.conf`  | `azure-kv`       |
-| `gcp-sm.conf`    | `gcp-sm`         |
+| File                                 | Provider            |
+|:-------------------------------------|:--------------------|
+| `/etc/netdata/go.d/ss/vault.conf`    | HashiCorp Vault     |
+| `/etc/netdata/go.d/ss/aws-sm.conf`   | AWS Secrets Manager |
+| `/etc/netdata/go.d/ss/azure-kv.conf` | Azure Key Vault     |
+| `/etc/netdata/go.d/ss/gcp-sm.conf`   | GCP Secret Manager  |
 
-Example:
+Each file contains a `jobs` array. The provider kind is determined by the filename.
+
+Example (`/etc/netdata/go.d/ss/vault.conf`):
 
 ```yaml
 jobs:
@@ -119,32 +119,23 @@ jobs:
     mode: token
     mode_token:
       token: your-vault-token
-    addr: https://vault.example
+    addr: https://vault.example.com
 ```
 
-:::info File-Defined Behavior
+:::note
 
-- File-defined secretstores are loaded at startup only. If you edit `go.d/ss` files, restart the agent to apply the changes.
-- Secretstores do not support `enable` or `disable`.
-- Updating a file-defined secretstore through Dynamic Configuration creates a `dyncfg` override. That runtime state can diverge from the file on disk until restart.
-- Precedence is strict: `dyncfg` overrides user files, and user files override stock files.
-- A higher-priority startup config still wins even if it fails to initialize.
-- Removing a `dyncfg` override does not reveal a lower-priority file-defined secretstore until the agent restarts.
+File-based secretstores are loaded at agent startup. If you edit these files, restart the Netdata Agent to apply the changes.
 
 :::
 
-:::info Behavior
+## How It Works
 
-- Secrets are resolved when a collector job starts or restarts.
-- Updating a secretstore automatically restarts any collector jobs that depend on it, so they pick up the new configuration.
-- If secret resolution fails, the collector job fails to start with an error.
+- Secrets are resolved each time a collector job starts or restarts.
+- If a secret cannot be resolved, the collector job will fail to start and log an error.
+- Updating a secretstore automatically restarts any collector jobs that use it, so they pick up the new credentials.
 
-:::
+:::tip
 
-:::tip Security
-
-- Only string configuration values are scanned for secret references.
-- Secret resolution is single-pass — a resolved value is not scanned again.
-- Avoid storing plain-text credentials in collector configs when an environment variable, file, command, or secretstore can be used instead.
+Avoid storing plain-text credentials in collector configurations. Use environment variables, files, commands, or secretstores instead.
 
 :::
