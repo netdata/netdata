@@ -43,6 +43,16 @@ type Client struct {
 // Login authenticates with the PowerVault API.
 // Hashes "username_password" with SHA-256 or MD5, then GET /api/login/<hash>.
 func (c *Client) Login() error {
+	key, err := c.login()
+	if err != nil {
+		return err
+	}
+	c.setSessionKey(key)
+	return nil
+}
+
+// login authenticates and returns the session key without publishing it.
+func (c *Client) login() (string, error) {
 	hash := c.authHash()
 
 	req := c.newRequest("/api/login/" + hash)
@@ -50,21 +60,20 @@ func (c *Client) Login() error {
 	resp, err := c.doOK(req)
 	defer web.CloseBody(resp)
 	if err != nil {
-		return fmt.Errorf("login failed: %v", err)
+		return "", fmt.Errorf("login failed: %v", err)
 	}
 
 	var result struct {
 		Status []StatusResponse `json:"status"`
 	}
 	if err = json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Errorf("login: error decoding response: %v", err)
+		return "", fmt.Errorf("login: error decoding response: %v", err)
 	}
 	if len(result.Status) == 0 || result.Status[0].ResponseType != "Success" {
-		return fmt.Errorf("login: authentication failed")
+		return "", fmt.Errorf("login: authentication failed")
 	}
 
-	c.setSessionKey(result.Status[0].Response)
-	return nil
+	return result.Status[0].Response, nil
 }
 
 func (c *Client) setSessionKey(key string) {
@@ -76,6 +85,17 @@ func (c *Client) setSessionKey(key string) {
 // SetLocale sets the CLI output to English to prevent locale-dependent parsing.
 func (c *Client) SetLocale() error {
 	req := c.newSessionRequest("/api/set/cli-parameters/locale/English")
+	resp, err := c.doOK(req)
+	web.CloseBody(resp)
+	return err
+}
+
+// setLocale sets the CLI locale to English using the given session key.
+func (c *Client) setLocale(sessionKey string) error {
+	req := c.newRequest("/api/set/cli-parameters/locale/English")
+	if sessionKey != "" {
+		req.Headers["sessionKey"] = sessionKey
+	}
 	resp, err := c.doOK(req)
 	web.CloseBody(resp)
 	return err
@@ -200,13 +220,20 @@ func doShow[T any](c *Client, urlPath, key string) ([]T, error) {
 
 // reAuth re-authenticates and restores session locale.
 // Serialized so concurrent 401 retries don't race on session state.
+// The new session key is published only after locale setup, preventing
+// concurrent requests from seeing a session with non-English locale.
 func (c *Client) reAuth() error {
 	c.authMu.Lock()
 	defer c.authMu.Unlock()
-	if err := c.Login(); err != nil {
+	key, err := c.login()
+	if err != nil {
 		return err
 	}
-	return c.SetLocale()
+	if err := c.setLocale(key); err != nil {
+		return err
+	}
+	c.setSessionKey(key)
+	return nil
 }
 
 func (c *Client) authHash() string {
