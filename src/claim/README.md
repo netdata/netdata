@@ -193,9 +193,28 @@ To remove a node from your Space and connect it to another, follow these steps:
 
 4. **Connect to new Space**
 
-   Go to your new Space, copy the installation command with the new claim token and run it. If you're using a `docker-compose.yml` file, you will have to overwrite it with the new claiming token. The node should now appear online in that Space.
+    Go to your new Space, copy the installation command with the new claim token and run it. If you're using a `docker-compose.yml` file, you will have to overwrite it with the new claiming token. The node should now appear online in that Space.
 
 </details>
+
+### cloud.d Directory Contents
+
+When an Agent is claimed to Netdata Cloud, the `cloud.d/` directory (located in your Netdata library directory, typically `/var/lib/netdata/cloud.d/`) stores the credentials and identity information for the Agent-Cloud Link (ACLK).
+
+| File | Description |
+|------|-------------|
+| `cloud.conf` | Cloud configuration file containing the `claimed_id` |
+| `private.pem` | RSA private key for ACLK authentication |
+| `public.pem` | RSA public key for ACLK authentication |
+| `claimed_id` | File storing the claimed ID (a UUID identifying the ACLK connection) |
+
+:::note
+
+The `claimed_id` is separate from the Machine GUID. It uniquely identifies the connection between the Agent and Cloud, while the Machine GUID identifies the node itself.
+
+:::
+
+For detailed explanations of all identity types and their relationships, see [Node Identities](/docs/learn/node-identities.md).
 
 ### Regenerate Claiming Token
 
