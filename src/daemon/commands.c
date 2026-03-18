@@ -33,6 +33,14 @@ struct command_context {
     unsigned command_string_size;
 };
 
+static inline char command_reply_prefix(const struct command_context *cmd_ctx, cmd_status_t status)
+{
+    if (cmd_ctx->idx == CMD_PING)
+        return CMD_PREFIX_INFO;
+
+    return cmd_prefix_by_status[status];
+}
+
 /* Forward declarations */
 static cmd_status_t cmd_help_execute(char *args, char **message);
 static cmd_status_t cmd_reload_health_execute(char *args, char **message);
@@ -585,7 +593,7 @@ static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t sta
     add_char_to_command_reply(reply_string, &reply_string_size, '\0');
 
     if (message) {
-        add_char_to_command_reply(reply_string, &reply_string_size, cmd_prefix_by_status[status]);
+        add_char_to_command_reply(reply_string, &reply_string_size, command_reply_prefix(cmd_ctx, status));
         add_string_to_command_reply(reply_string, &reply_string_size, message);
     }
 
