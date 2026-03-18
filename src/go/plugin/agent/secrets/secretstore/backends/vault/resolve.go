@@ -116,25 +116,30 @@ func (s *publishedStore) token() (string, error) {
 }
 
 func parseResponse(body []byte, key string, req secretstore.ResolveRequest) (string, error) {
-	var resp struct {
-		Data json.RawMessage `json:"data"`
-	}
+	var resp vaultReadResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return "", fmt.Errorf("resolving secret '%s': store '%s': parsing vault response: %w", req.Original, req.StoreKey, err)
 	}
 
-	var payload map[string]any
-	if err := json.Unmarshal(resp.Data, &payload); err != nil {
+	var kvV2 vaultKV2ReadPayload
+	if err := json.Unmarshal(resp.Data, &kvV2); err != nil {
 		return "", fmt.Errorf("resolving secret '%s': store '%s': parsing vault response data: %w", req.Original, req.StoreKey, err)
 	}
-
-	if kvV2Data, ok := kvV2DataEnvelope(payload); ok {
-		if val, ok := kvV2Data[key]; ok {
+	if kvV2.isDetected() {
+		data, err := unmarshalVaultDataPayload(kvV2.Data)
+		if err != nil {
+			return "", fmt.Errorf("resolving secret '%s': store '%s': parsing vault response data: %w", req.Original, req.StoreKey, err)
+		}
+		if val, ok := data[key]; ok {
 			return valueToString(val)
 		}
 		return "", fmt.Errorf("resolving secret '%s': store '%s': key '%s' not found in vault response", req.Original, req.StoreKey, key)
 	}
 
+	payload, err := unmarshalVaultDataPayload(resp.Data)
+	if err != nil {
+		return "", fmt.Errorf("resolving secret '%s': store '%s': parsing vault response data: %w", req.Original, req.StoreKey, err)
+	}
 	if val, ok := payload[key]; ok {
 		return valueToString(val)
 	}
@@ -142,32 +147,40 @@ func parseResponse(body []byte, key string, req secretstore.ResolveRequest) (str
 	return "", fmt.Errorf("resolving secret '%s': store '%s': key '%s' not found in vault response", req.Original, req.StoreKey, key)
 }
 
-func kvV2DataEnvelope(payload map[string]any) (map[string]any, bool) {
-	data, ok := payload["data"].(map[string]any)
-	if !ok || data == nil {
-		return nil, false
-	}
-
-	metadata, ok := payload["metadata"].(map[string]any)
-	if !ok || metadata == nil {
-		return nil, false
-	}
-
-	// KV v2 read responses expose secret values under data.data and include
-	// version metadata alongside it. Requiring the standard metadata fields
-	// avoids misclassifying KV v1 secrets that happen to have a top-level
-	// key named "data".
-	if !hasKey(metadata, "created_time") || !hasKey(metadata, "deletion_time") ||
-		!hasKey(metadata, "destroyed") || !hasKey(metadata, "version") {
-		return nil, false
-	}
-
-	return data, true
+type vaultReadResponse struct {
+	Data json.RawMessage `json:"data"`
 }
 
-func hasKey(m map[string]any, key string) bool {
-	_, ok := m[key]
-	return ok
+type vaultKV2ReadPayload struct {
+	Data     json.RawMessage   `json:"data"`
+	Metadata *vaultKV2Metadata `json:"metadata"`
+}
+
+type vaultKV2Metadata struct {
+	CreatedTime  *string `json:"created_time"`
+	DeletionTime *string `json:"deletion_time"`
+	Destroyed    *bool   `json:"destroyed"`
+	Version      *int    `json:"version"`
+}
+
+func (p vaultKV2ReadPayload) isDetected() bool {
+	// KV v2 read responses expose secret values under data.data and include
+	// version metadata alongside it. Requiring the standard metadata fields
+	// avoids misclassifying KV v1 secrets that happen to have top-level
+	// keys named "data" and "metadata".
+	return len(p.Data) != 0 && p.Metadata != nil &&
+		p.Metadata.CreatedTime != nil &&
+		p.Metadata.DeletionTime != nil &&
+		p.Metadata.Destroyed != nil &&
+		p.Metadata.Version != nil
+}
+
+func unmarshalVaultDataPayload(data json.RawMessage) (map[string]any, error) {
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
 }
 
 func valueToString(val any) (string, error) {
