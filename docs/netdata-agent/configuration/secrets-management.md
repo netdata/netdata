@@ -132,7 +132,9 @@ File-based secretstores are loaded at agent startup. If you edit these files, re
 
 - Secrets are resolved each time a collector job starts or restarts.
 - If a secret cannot be resolved, the collector job will fail to start and log an error.
-- Updating a secretstore automatically restarts any collector jobs that use it, so they pick up the new credentials.
+- Updating a secretstore automatically restarts running and failed collector jobs that use it, so they pick up the new credentials.
+- Accepted or disabled jobs keep their state and use the updated secretstore the next time they start.
+- If a secretstore change applies successfully but some dependent collector restarts fail, the command reports those restart failures.
 
 :::tip
 

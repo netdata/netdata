@@ -290,7 +290,7 @@ addr: https://vault.example
 				var resp map[string]any
 				mustDecodeFunctionPayload(t, out.String(), "ss-test-affected", &resp)
 				assert.Equal(t, float64(202), resp["status"])
-				assert.Equal(t, "Updated configuration will affect: success:mysql.", resp["message"])
+				assert.Equal(t, "Updated configuration is used by jobs: success:mysql. Running or failed jobs that would be restarted automatically: success:mysql.", resp["message"])
 			},
 		},
 		"test command reports no-op for unchanged payload": {
@@ -390,7 +390,42 @@ addr: https://vault.example
 				var resp map[string]any
 				mustDecodeFunctionPayload(t, out.String(), "ss-test-empty-affected", &resp)
 				assert.Equal(t, float64(202), resp["status"])
-				assert.Equal(t, "Stored configuration is valid. Jobs currently using this secretstore: success:mysql.", resp["message"])
+				assert.Equal(t, "Stored configuration is valid. This secretstore is used by jobs: success:mysql. Running or failed jobs that would be restarted automatically by a change: success:mysql.", resp["message"])
+			},
+		},
+		"test command reports all dependent jobs and restartable subset": {
+			run: func(t *testing.T, mgr *Manager, out *bytes.Buffer) {
+				seedSecretStore(t, mgr, secretstore.KindVault, "vault_prod", testVaultConfig(), dyncfg.StatusRunning)
+
+				runningCfg := prepareDyncfgCfg("success", "mysql")
+				mgr.collectorExposed.Add(&dyncfg.Entry[confgroup.Config]{
+					Cfg:    runningCfg,
+					Status: dyncfg.StatusRunning,
+				})
+				mgr.secretStoreDeps.SetActiveJobStores(runningCfg.FullName(), "success:mysql", []string{secretstore.StoreKey(secretstore.KindVault, "vault_prod")})
+
+				acceptedCfg := prepareDyncfgCfg("success", "nginx")
+				mgr.collectorExposed.Add(&dyncfg.Entry[confgroup.Config]{
+					Cfg:    acceptedCfg,
+					Status: dyncfg.StatusAccepted,
+				})
+				mgr.secretStoreDeps.SetActiveJobStores(acceptedCfg.FullName(), "success:nginx", []string{secretstore.StoreKey(secretstore.KindVault, "vault_prod")})
+
+				testFn := dyncfg.NewFunction(functions.Function{
+					UID:         "ss-test-all-deps",
+					ContentType: "application/json",
+					Payload:     mustJSON(t, testVaultConfigTokenFile()),
+					Args: []string{
+						mgr.dyncfgSecretStoreID(secretstore.StoreKey(secretstore.KindVault, "vault_prod")),
+						string(dyncfg.CommandTest),
+					},
+				})
+				mgr.dyncfgSecretStoreSeqExec(testFn)
+
+				var resp map[string]any
+				mustDecodeFunctionPayload(t, out.String(), "ss-test-all-deps", &resp)
+				assert.Equal(t, float64(202), resp["status"])
+				assert.Equal(t, "Updated configuration is used by jobs: success:mysql, success:nginx. Running or failed jobs that would be restarted automatically: success:mysql.", resp["message"])
 			},
 		},
 		"test command reports no affected jobs for changed payload": {
@@ -411,7 +446,7 @@ addr: https://vault.example
 				var resp map[string]any
 				mustDecodeFunctionPayload(t, out.String(), "ss-test-no-affected", &resp)
 				assert.Equal(t, float64(202), resp["status"])
-				assert.Equal(t, "No jobs will be affected by this change.", resp["message"])
+				assert.Equal(t, "No jobs currently use this secretstore.", resp["message"])
 			},
 		},
 		"enable is unsupported": {
@@ -472,6 +507,41 @@ addr: https://vault.example
 				assert.False(t, ok)
 				_, ok = mustSecretStoreService(t, mgr).GetStatus(secretstore.StoreKey(secretstore.KindVault, "vault_prod"))
 				assert.False(t, ok)
+			},
+		},
+		"remove blocks when dependent jobs use the store": {
+			run: func(t *testing.T, mgr *Manager, out *bytes.Buffer) {
+				seedSecretStore(t, mgr, secretstore.KindVault, "vault_prod", testVaultConfig(), dyncfg.StatusRunning)
+
+				runningCfg := prepareDyncfgCfg("success", "mysql")
+				mgr.collectorExposed.Add(&dyncfg.Entry[confgroup.Config]{
+					Cfg:    runningCfg,
+					Status: dyncfg.StatusRunning,
+				})
+				mgr.secretStoreDeps.SetActiveJobStores(runningCfg.FullName(), "success:mysql", []string{secretstore.StoreKey(secretstore.KindVault, "vault_prod")})
+
+				disabledCfg := prepareDyncfgCfg("success", "nginx")
+				mgr.collectorExposed.Add(&dyncfg.Entry[confgroup.Config]{
+					Cfg:    disabledCfg,
+					Status: dyncfg.StatusDisabled,
+				})
+				mgr.secretStoreDeps.SetActiveJobStores(disabledCfg.FullName(), "success:nginx", []string{secretstore.StoreKey(secretstore.KindVault, "vault_prod")})
+
+				removeFn := dyncfg.NewFunction(functions.Function{
+					UID:  "ss-remove-blocked",
+					Args: []string{mgr.dyncfgSecretStoreID(secretstore.StoreKey(secretstore.KindVault, "vault_prod")), string(dyncfg.CommandRemove)},
+				})
+				mgr.dyncfgSecretStoreSeqExec(removeFn)
+
+				var resp map[string]any
+				mustDecodeFunctionPayload(t, out.String(), "ss-remove-blocked", &resp)
+				assert.Equal(t, float64(409), resp["status"])
+				assert.Equal(t, "The specified secretstore 'vault:vault_prod' is used by jobs (success:mysql, success:nginx).", resp["errorMessage"])
+
+				_, ok := mgr.lookupSecretStoreEntry(secretstore.StoreKey(secretstore.KindVault, "vault_prod"))
+				assert.True(t, ok)
+				_, ok = mustSecretStoreService(t, mgr).GetStatus(secretstore.StoreKey(secretstore.KindVault, "vault_prod"))
+				assert.True(t, ok)
 			},
 		},
 		"userconfig returns yaml from payload": {

@@ -319,3 +319,36 @@ func TestServiceValidateStored_RemovedDuringValidationReturnsNotFound(t *testing
 	require.Error(t, err)
 	assert.ErrorIs(t, err, secretstore.ErrStoreNotFound)
 }
+
+func TestServiceValidateStored_UpdatedDuringValidationReturnsRetryWithoutOverwritingStatus(t *testing.T) {
+	validateStarted := make(chan struct{})
+	validateRelease := make(chan struct{})
+
+	svc := secretstore.NewService(newValidateRaceCreator(secretstore.KindVault, validateStarted, validateRelease))
+	store := newFakeStore(t, svc, secretstore.KindVault, fakeConfig{
+		Auth: map[string]any{"mode": "token_env"},
+	}, "vault_prod")
+	require.NoError(t, svc.Add(store))
+
+	storeKey := secretstore.StoreKey(secretstore.KindVault, "vault_prod")
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- svc.ValidateStored(storeKey)
+	}()
+
+	<-validateStarted
+	require.NoError(t, svc.Update(storeKey, newFakeStore(t, svc, secretstore.KindVault, fakeConfig{
+		Auth: map[string]any{"mode": "token_env", "tag": "new"},
+	}, "vault_prod")))
+	close(validateRelease)
+
+	err := <-errCh
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "changed during validation")
+
+	status, ok := svc.GetStatus(storeKey)
+	require.True(t, ok)
+	assert.Nil(t, status.LastValidation)
+	assert.Empty(t, status.LastErrorSummary)
+}

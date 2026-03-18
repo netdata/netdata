@@ -122,3 +122,10 @@ func (c *Controller) affectedJobsFor(storeKey string) []secretstore.JobRef {
 	}
 	return c.affectedJobs(storeKey)
 }
+
+func (c *Controller) restartableAffectedJobsFor(storeKey string) []secretstore.JobRef {
+	if c.restartableAffectedJobs == nil {
+		return nil
+	}
+	return c.restartableAffectedJobs(storeKey)
+}

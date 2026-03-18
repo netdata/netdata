@@ -25,8 +25,9 @@ type Options struct {
 	Plugin  string
 	Initial []secretstore.Config
 
-	AffectedJobs         func(string) []secretstore.JobRef
-	RestartDependentJobs func(string) string
+	AffectedJobs            func(string) []secretstore.JobRef
+	RestartableAffectedJobs func(string) []secretstore.JobRef
+	RestartDependentJobs    func(string) string
 }
 
 type Entry struct {
@@ -44,8 +45,9 @@ type Controller struct {
 	pluginName string
 	initial    []secretstore.Config
 
-	affectedJobs         func(string) []secretstore.JobRef
-	restartDependentJobs func(string) string
+	affectedJobs            func(string) []secretstore.JobRef
+	restartableAffectedJobs func(string) []secretstore.JobRef
+	restartDependentJobs    func(string) string
 
 	handler *dyncfg.Handler[secretstore.Config]
 	cb      *secretStoreCallbacks
@@ -62,15 +64,16 @@ func New(opts Options) *Controller {
 	}
 
 	c := &Controller{
-		Logger:               opts.Logger,
-		api:                  opts.API,
-		seen:                 seen,
-		exposed:              exposed,
-		service:              opts.Service,
-		pluginName:           opts.Plugin,
-		initial:              append([]secretstore.Config(nil), opts.Initial...),
-		affectedJobs:         opts.AffectedJobs,
-		restartDependentJobs: opts.RestartDependentJobs,
+		Logger:                  opts.Logger,
+		api:                     opts.API,
+		seen:                    seen,
+		exposed:                 exposed,
+		service:                 opts.Service,
+		pluginName:              opts.Plugin,
+		initial:                 append([]secretstore.Config(nil), opts.Initial...),
+		affectedJobs:            opts.AffectedJobs,
+		restartableAffectedJobs: opts.RestartableAffectedJobs,
+		restartDependentJobs:    opts.RestartDependentJobs,
 	}
 	c.cb = newSecretStoreCallbacks(secretStoreCallbackDeps{
 		pluginName:           c.pluginName,

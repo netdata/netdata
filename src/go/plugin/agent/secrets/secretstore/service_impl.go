@@ -154,6 +154,7 @@ func (s *inMemoryService) ValidateStored(key string) error {
 	if !ok {
 		return storeNotConfiguredError(key)
 	}
+	validatedHash := record.configHash
 
 	_, err = s.prepareConfig(context.Background(), record.rawConfig)
 
@@ -172,6 +173,9 @@ func (s *inMemoryService) ValidateStored(key string) error {
 	updated, ok := current.records[key]
 	if !ok {
 		return storeNotConfiguredError(key)
+	}
+	if updated.configHash != validatedHash {
+		return fmt.Errorf("store '%s' changed during validation; retry", key)
 	}
 	updated.status.LastValidation = validation
 	if err != nil {

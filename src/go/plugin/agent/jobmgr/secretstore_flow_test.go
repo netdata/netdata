@@ -199,7 +199,7 @@ func TestDyncfgSecretStoreUpdate_DependentRestartBehavior(t *testing.T) {
 				var badResp map[string]any
 				mustDecodeFunctionPayload(t, out.String(), "ss-update-bad", &badResp)
 				assert.Equal(t, float64(200), badResp["status"])
-				assert.Contains(t, badResp["message"], "Dependent collector restart failures")
+				assert.Contains(t, badResp["message"], "Secretstore change applied, but dependent collector restarts failed")
 				assert.Contains(t, badResp["message"], "gated:mysql")
 
 				entry, ok := mgr.lookupExposedByFullName(cfg.FullName())

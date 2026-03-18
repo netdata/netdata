@@ -50,6 +50,7 @@ func TestControllerSeqExec(t *testing.T) {
 
 				key := secretstore.StoreKey(secretstore.KindVault, "vault_prod")
 				seams.affectedJobs[key] = []secretstore.JobRef{{ID: "mysql:prod", Display: "mysql:prod"}}
+				seams.restartableJobs[key] = []secretstore.JobRef{{ID: "mysql:prod", Display: "mysql:prod"}}
 
 				testFn := dyncfg.NewFunction(functions.Function{
 					UID:  "ss-test",
@@ -60,8 +61,37 @@ func TestControllerSeqExec(t *testing.T) {
 				var payload map[string]any
 				mustDecodeFunctionPayload(t, out.String(), "ss-test", &payload)
 				assert.Equal(t, float64(202), payload["status"])
-				assert.Contains(t, payload["message"], "Jobs currently using this secretstore: mysql:prod")
+				assert.Contains(t, payload["message"], "This secretstore is used by jobs: mysql:prod.")
+				assert.Contains(t, payload["message"], "Running or failed jobs that would be restarted automatically by a change: mysql:prod.")
 				assert.Equal(t, []string{key}, seams.affectedJobsCalls)
+				assert.Equal(t, []string{key}, seams.restartableJobsCalls)
+			},
+		},
+		"remove blocks when dependent jobs exist": {
+			run: func(t *testing.T, ctl *Controller, out *bytes.Buffer, seams *controllerSeams) {
+				addFn := dyncfg.NewFunction(functions.Function{
+					UID:         "ss-add-remove-blocked",
+					ContentType: "application/json",
+					Payload:     mustJSON(t, map[string]any{"value": "one"}),
+					Args:        []string{ctl.templateID(secretstore.KindVault), string(dyncfg.CommandAdd), "vault_prod"},
+				})
+				ctl.SeqExec(addFn)
+
+				key := secretstore.StoreKey(secretstore.KindVault, "vault_prod")
+				seams.affectedJobs[key] = []secretstore.JobRef{{ID: "mysql:prod", Display: "mysql:prod"}, {ID: "nginx:prod", Display: "nginx:prod"}}
+
+				removeFn := dyncfg.NewFunction(functions.Function{
+					UID:  "ss-remove-blocked",
+					Args: []string{ctl.configID(key), string(dyncfg.CommandRemove)},
+				})
+				ctl.SeqExec(removeFn)
+
+				var payload map[string]any
+				mustDecodeFunctionPayload(t, out.String(), "ss-remove-blocked", &payload)
+				assert.Equal(t, float64(409), payload["status"])
+				assert.Equal(t, "The specified secretstore 'vault:vault_prod' is used by jobs (mysql:prod, nginx:prod).", payload["errorMessage"])
+				_, ok := ctl.Lookup(key)
+				assert.True(t, ok)
 			},
 		},
 	}
@@ -241,10 +271,12 @@ func TestControllerPublishExisting(t *testing.T) {
 }
 
 type controllerSeams struct {
-	affectedJobs      map[string][]secretstore.JobRef
-	affectedJobsCalls []string
-	restartMessages   map[string]string
-	restartCalls      []string
+	affectedJobs         map[string][]secretstore.JobRef
+	affectedJobsCalls    []string
+	restartableJobs      map[string][]secretstore.JobRef
+	restartableJobsCalls []string
+	restartMessages      map[string]string
+	restartCalls         []string
 }
 
 func newControllerTestSubject() (*Controller, *bytes.Buffer, *controllerSeams) {
@@ -255,6 +287,7 @@ func newControllerTestSubjectWithOptions(opts Options) (*Controller, *bytes.Buff
 	var out bytes.Buffer
 	seams := &controllerSeams{
 		affectedJobs:    make(map[string][]secretstore.JobRef),
+		restartableJobs: make(map[string][]secretstore.JobRef),
 		restartMessages: make(map[string]string),
 	}
 	svc := opts.Service
@@ -280,6 +313,13 @@ func newControllerTestSubjectWithOptions(opts Options) (*Controller, *bytes.Buff
 			return seams.affectedJobs[storeKey]
 		}
 	}
+	restartableJobs := opts.RestartableAffectedJobs
+	if restartableJobs == nil {
+		restartableJobs = func(storeKey string) []secretstore.JobRef {
+			seams.restartableJobsCalls = append(seams.restartableJobsCalls, storeKey)
+			return seams.restartableJobs[storeKey]
+		}
+	}
 	restartDependentJobs := opts.RestartDependentJobs
 	if restartDependentJobs == nil {
 		restartDependentJobs = func(storeKey string) string {
@@ -288,15 +328,16 @@ func newControllerTestSubjectWithOptions(opts Options) (*Controller, *bytes.Buff
 		}
 	}
 	ctl := New(Options{
-		Logger:               log,
-		API:                  api,
-		Plugin:               plugin,
-		Service:              svc,
-		AffectedJobs:         affectedJobs,
-		RestartDependentJobs: restartDependentJobs,
-		Initial:              opts.Initial,
-		Seen:                 opts.Seen,
-		Exposed:              opts.Exposed,
+		Logger:                  log,
+		API:                     api,
+		Plugin:                  plugin,
+		Service:                 svc,
+		AffectedJobs:            affectedJobs,
+		RestartableAffectedJobs: restartableJobs,
+		RestartDependentJobs:    restartDependentJobs,
+		Initial:                 opts.Initial,
+		Seen:                    opts.Seen,
+		Exposed:                 opts.Exposed,
 	})
 	return ctl, &out, seams
 }

@@ -34,7 +34,7 @@ func (c *Controller) SeqExec(fn dyncfg.Function) {
 	case dyncfg.CommandUserconfig:
 		c.dyncfgCmdUserconfig(fn)
 	case dyncfg.CommandRemove:
-		c.handler.CmdRemove(fn)
+		c.dyncfgCmdRemove(fn)
 	default:
 		c.Warningf("dyncfg: function '%s' command '%s' not implemented", fn.Fn().Name, fn.Command())
 		c.api.SendCodef(fn, 501, "Function '%s' command '%s' is not implemented.", fn.Fn().Name, fn.Command())
@@ -170,7 +170,7 @@ func (c *Controller) dyncfgCmdTest(fn dyncfg.Function) {
 			c.api.SendCodef(fn, secretStoreErrorCode(err), "%v", err)
 			return
 		}
-		c.dyncfgSendSecretStoreTestImpactMessage(fn, c.affectedJobsFor(storeKey), true)
+		c.dyncfgSendSecretStoreTestImpactMessage(fn, c.affectedJobsFor(storeKey), c.restartableAffectedJobsFor(storeKey), true)
 		return
 	}
 
@@ -197,7 +197,7 @@ func (c *Controller) dyncfgCmdTest(fn dyncfg.Function) {
 		return
 	}
 
-	c.dyncfgSendSecretStoreTestImpactMessage(fn, c.affectedJobsFor(storeKey), false)
+	c.dyncfgSendSecretStoreTestImpactMessage(fn, c.affectedJobsFor(storeKey), c.restartableAffectedJobsFor(storeKey), false)
 }
 
 func (c *Controller) dyncfgCmdUserconfig(fn dyncfg.Function) {
@@ -224,6 +224,26 @@ func (c *Controller) dyncfgCmdUserconfig(fn dyncfg.Function) {
 	}
 
 	c.api.SendYAML(fn, string(bs))
+}
+
+func (c *Controller) dyncfgCmdRemove(fn dyncfg.Function) {
+	storeKey, ok := c.dyncfgExtractSecretStoreKey(fn.ID())
+	if !ok {
+		c.api.SendCodef(fn, 400, "Invalid ID format for secretstore remove: %s.", fn.ID())
+		return
+	}
+
+	if _, ok := c.lookup(storeKey); !ok {
+		c.api.SendCodef(fn, 404, "The specified secretstore '%s' is not configured.", storeKey)
+		return
+	}
+
+	if affected := formatAffectedJobs(c.affectedJobsFor(storeKey)); affected != "" {
+		c.api.SendCodef(fn, 409, "The specified secretstore '%s' is used by jobs (%s).", storeKey, affected)
+		return
+	}
+
+	c.handler.CmdRemove(fn)
 }
 
 func (c *Controller) dyncfgTypedConfigFromPayload(fn dyncfg.Function, kind secretstore.StoreKind) (any, error) {
@@ -301,11 +321,16 @@ func formatAffectedJobs(refs []secretstore.JobRef) string {
 	return b.String()
 }
 
-func (c *Controller) dyncfgSendSecretStoreTestImpactMessage(fn dyncfg.Function, refs []secretstore.JobRef, validationOnly bool) {
+func (c *Controller) dyncfgSendSecretStoreTestImpactMessage(fn dyncfg.Function, refs, restartable []secretstore.JobRef, validationOnly bool) {
 	affected := formatAffectedJobs(refs)
+	restartableAffected := formatAffectedJobs(restartable)
 	if validationOnly {
 		if affected != "" {
-			c.api.SendCodef(fn, 202, "Stored configuration is valid. Jobs currently using this secretstore: %s.", affected)
+			if restartableAffected != "" {
+				c.api.SendCodef(fn, 202, "Stored configuration is valid. This secretstore is used by jobs: %s. Running or failed jobs that would be restarted automatically by a change: %s.", affected, restartableAffected)
+				return
+			}
+			c.api.SendCodef(fn, 202, "Stored configuration is valid. This secretstore is used by jobs: %s. No running or failed jobs would be restarted automatically by a change.", affected)
 			return
 		}
 		c.api.SendCodef(fn, 202, "Stored configuration is valid. No jobs are currently using this secretstore.")
@@ -313,10 +338,14 @@ func (c *Controller) dyncfgSendSecretStoreTestImpactMessage(fn dyncfg.Function, 
 	}
 
 	if affected != "" {
-		c.api.SendCodef(fn, 202, "Updated configuration will affect: %s.", affected)
+		if restartableAffected != "" {
+			c.api.SendCodef(fn, 202, "Updated configuration is used by jobs: %s. Running or failed jobs that would be restarted automatically: %s.", affected, restartableAffected)
+			return
+		}
+		c.api.SendCodef(fn, 202, "Updated configuration is used by jobs: %s. No running or failed jobs would be restarted automatically.", affected)
 		return
 	}
-	c.api.SendCodef(fn, 202, "No jobs will be affected by this change.")
+	c.api.SendCodef(fn, 202, "No jobs currently use this secretstore.")
 }
 
 func secretStoreErrorCode(err error) int {
