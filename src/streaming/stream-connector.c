@@ -308,9 +308,13 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     buffer_key_value_urlencode(wb, "&machine_guid", host->machine_guid);
     buffer_sprintf(wb, "&update_every=%d", (int)nd_profile.update_every);
     buffer_key_value_urlencode(wb, "&os", rrdhost_os(host));
-    buffer_key_value_urlencode(wb, "&timezone", rrdhost_timezone(host));
-    buffer_key_value_urlencode(wb, "&abbrev_timezone", rrdhost_abbrev_timezone(host));
-    buffer_sprintf(wb, "&utc_offset=%d", host->utc_offset);
+    {
+        RRDHOST_TZ host_tz = rrdhost_tz_get(host);
+        buffer_key_value_urlencode(wb, "&timezone", host_tz.timezone);
+        buffer_key_value_urlencode(wb, "&abbrev_timezone", host_tz.abbrev_timezone);
+        buffer_sprintf(wb, "&utc_offset=%d", host_tz.utc_offset);
+        rrdhost_tz_free(&host_tz);
+    }
     buffer_sprintf(wb, "&hops=%d", s->hops);
     buffer_sprintf(wb, "&ver=%u", s->capabilities);
     rrdhost_system_info_to_url_encode_stream(wb, host->system_info);

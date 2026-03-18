@@ -26,6 +26,8 @@ void nd_log_chown_log_files(uid_t uid, gid_t gid) {
 }
 
 bool nd_logger_file(int fd, FILE *fp, netdata_mutex_t *mutex, ND_LOG_FORMAT format, struct log_field *fields, size_t fields_max) {
+    (void)fp;
+
     BUFFER *wb = buffer_create(1024, NULL);
 
     if(format == NDLF_JSON)
