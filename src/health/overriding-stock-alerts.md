@@ -241,6 +241,8 @@ Yes. Your override is a complete alert definition, not a "patch" on the stock al
 
 If you omit a field, the alert uses its default value—not the stock alert's value.
 
+> **Important:** Alarm-type alerts (like `used_swap` in `swap.conf`) require ALL fields including `calc`, `units`, `every`, `warn`, `crit`, `delay`, `summary`, and `info` even when just silencing with `to: silent`. Incomplete definitions will use default values instead of stock values, potentially breaking the alert. Only the special `host labels: _hostname=!*` pattern allows minimal field sets for complete disabling.
+
 ### How do I override the same alert differently on different hosts?
 
 Use `host labels` to create host-specific overrides:
