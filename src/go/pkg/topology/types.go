@@ -22,16 +22,16 @@ type Match struct {
 }
 
 type Actor struct {
-	ActorID     string                       `json:"actor_id,omitempty"`
-	ActorType   string                       `json:"actor_type"`
-	Layer       string                       `json:"layer"`
-	Source      string                       `json:"source"`
-	Match       Match                        `json:"match"`
-	ParentMatch *Match                       `json:"parent_match,omitempty"`
-	Attributes  map[string]any               `json:"attributes,omitempty"`
-	Derived     map[string]any               `json:"derived,omitempty"`
-	Labels      map[string]string            `json:"labels,omitempty"`
-	Tables      map[string][]map[string]any  `json:"tables,omitempty"`
+	ActorID     string                      `json:"actor_id,omitempty"`
+	ActorType   string                      `json:"actor_type"`
+	Layer       string                      `json:"layer"`
+	Source      string                      `json:"source"`
+	Match       Match                       `json:"match"`
+	ParentMatch *Match                      `json:"parent_match,omitempty"`
+	Attributes  map[string]any              `json:"attributes,omitempty"`
+	Derived     map[string]any              `json:"derived,omitempty"`
+	Labels      map[string]string           `json:"labels,omitempty"`
+	Tables      map[string][]map[string]any `json:"tables,omitempty"`
 }
 
 type LinkEndpoint struct {
@@ -72,7 +72,7 @@ type PresentationTableColumn struct {
 type PresentationTable struct {
 	Label        string                    `json:"label"`
 	Source       string                    `json:"source"`
-	BulletSource bool                     `json:"bullet_source,omitempty"`
+	BulletSource bool                      `json:"bullet_source,omitempty"`
 	Order        int                       `json:"order,omitempty"`
 	Columns      []PresentationTableColumn `json:"columns"`
 }
