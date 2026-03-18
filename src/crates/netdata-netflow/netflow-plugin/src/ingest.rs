@@ -7,7 +7,9 @@ use crate::plugin_config::{
     DecapsulationMode as ConfigDecapsulationMode, PluginConfig,
     TimestampSource as ConfigTimestampSource,
 };
-use crate::tiering::{MATERIALIZED_TIERS, OpenTierState, TierAccumulator, TierKind};
+use crate::tiering::{
+    MATERIALIZED_TIERS, OpenTierState, TierAccumulator, TierFlowIndexStore, TierKind,
+};
 use anyhow::{Context, Result, anyhow};
 use journal_common::load_machine_id;
 use journal_engine::{
@@ -226,6 +228,7 @@ pub(crate) struct IngestService {
     tier_writers: MaterializedTierWriters,
     tier_accumulators: HashMap<TierKind, TierAccumulator>,
     open_tiers: Arc<RwLock<OpenTierState>>,
+    tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
     routing_runtime: Option<DynamicRoutingRuntime>,
     network_sources_runtime: Option<NetworkSourcesRuntime>,
     encode_buf: JournalEncodeBuffer,
@@ -236,6 +239,7 @@ impl IngestService {
         cfg: PluginConfig,
         metrics: Arc<IngestMetrics>,
         open_tiers: Arc<RwLock<OpenTierState>>,
+        tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
     ) -> Result<Self> {
         let machine_id = load_machine_id().context("failed to load machine id")?;
         let build_journal_cfg = |tier: TierKind| {
@@ -360,6 +364,7 @@ impl IngestService {
             tier_writers,
             tier_accumulators,
             open_tiers,
+            tier_flow_indexes,
             routing_runtime,
             network_sources_runtime,
             encode_buf: JournalEncodeBuffer::new(),
@@ -397,6 +402,7 @@ impl IngestService {
                     if let Err(err) = self.flush_closed_tiers(now) {
                         tracing::warn!("tier flush failed: {}", err);
                     }
+                    self.prune_unused_tier_flow_indexes();
                     self.refresh_open_tier_state(now);
                     entries_since_sync = self.sync_if_needed(entries_since_sync);
                     self.persist_decoder_state_if_due(now);
@@ -452,6 +458,7 @@ impl IngestService {
                     if let Err(err) = self.flush_closed_tiers(now_usec()) {
                         tracing::warn!("tier flush failed: {}", err);
                     }
+                    self.prune_unused_tier_flow_indexes();
                     self.refresh_open_tier_state(now_usec());
 
                     if entries_since_sync >= self.cfg.listener.sync_every_entries {
@@ -464,6 +471,7 @@ impl IngestService {
         if let Err(err) = self.flush_closed_tiers(now_usec()) {
             tracing::warn!("tier flush failed during shutdown: {}", err);
         }
+        self.prune_unused_tier_flow_indexes();
         self.refresh_open_tier_state(now_usec());
         let _ = self.sync_if_needed(entries_since_sync);
         let _ = self.sync_all_tiers();
@@ -646,19 +654,30 @@ impl IngestService {
         }
 
         self.flush_closed_tiers(now)?;
+        self.prune_unused_tier_flow_indexes();
         self.refresh_open_tier_state(now);
         Ok(())
     }
 
-    /// Hot path: observe tiers from a FlowRecord. Hash + lookup is zero-alloc
-    /// when the dimension combination already exists in the current bucket.
     fn observe_tiers_record(&mut self, timestamp_usec: u64, record: &crate::decoder::FlowRecord) {
-        use crate::tiering::{FlowMetrics, rollup_dimension_hash};
-        let dim_hash = rollup_dimension_hash(record);
+        use crate::tiering::FlowMetrics;
         let metrics = FlowMetrics::from_record(record);
+        let flow_ref = {
+            let Ok(mut tier_flow_indexes) = self.tier_flow_indexes.write() else {
+                tracing::warn!("failed to lock tier flow index store for write");
+                return;
+            };
+            match tier_flow_indexes.get_or_insert_record_flow(timestamp_usec, record) {
+                Ok(flow_ref) => flow_ref,
+                Err(err) => {
+                    tracing::warn!("failed to intern tier flow dimensions: {}", err);
+                    return;
+                }
+            }
+        };
         for tier in MATERIALIZED_TIERS {
             if let Some(acc) = self.tier_accumulators.get_mut(&tier) {
-                acc.observe_record(timestamp_usec, record, dim_hash, metrics);
+                acc.observe_flow(timestamp_usec, flow_ref, metrics);
             }
         }
     }
@@ -672,10 +691,22 @@ impl IngestService {
         fields: &crate::decoder::FlowFields,
         cutoffs: &HashMap<TierKind, u64>,
     ) {
-        use crate::tiering::{FlowMetrics, rollup_dimension_hash};
+        use crate::tiering::FlowMetrics;
         let record = crate::decoder::FlowRecord::from_fields(fields);
-        let dim_hash = rollup_dimension_hash(&record);
         let metrics = FlowMetrics::from_fields(fields);
+        let flow_ref = {
+            let Ok(mut tier_flow_indexes) = self.tier_flow_indexes.write() else {
+                tracing::warn!("failed to lock tier flow index store for rebuild write");
+                return;
+            };
+            match tier_flow_indexes.get_or_insert_record_flow(timestamp_usec, &record) {
+                Ok(flow_ref) => flow_ref,
+                Err(err) => {
+                    tracing::warn!("failed to intern rebuild tier flow dimensions: {}", err);
+                    return;
+                }
+            }
+        };
         for tier in MATERIALIZED_TIERS {
             if let Some(&cutoff) = cutoffs.get(&tier) {
                 if timestamp_usec <= cutoff {
@@ -683,12 +714,16 @@ impl IngestService {
                 }
             }
             if let Some(acc) = self.tier_accumulators.get_mut(&tier) {
-                acc.observe_record(timestamp_usec, &record, dim_hash, metrics);
+                acc.observe_flow(timestamp_usec, flow_ref, metrics);
             }
         }
     }
 
     fn flush_closed_tiers(&mut self, now_usec: u64) -> Result<()> {
+        let tier_flow_indexes = self
+            .tier_flow_indexes
+            .read()
+            .map_err(|_| anyhow!("failed to lock tier flow index store for read"))?;
         for tier in MATERIALIZED_TIERS {
             let rows = if let Some(acc) = self.tier_accumulators.get_mut(&tier) {
                 acc.flush_closed_rows(now_usec)
@@ -702,7 +737,16 @@ impl IngestService {
 
             let writer = self.tier_writers.get_mut(tier);
             for row in rows {
-                self.encode_buf.encode(&row.fields);
+                let Some(mut fields) = tier_flow_indexes.materialize_fields(row.flow_ref) else {
+                    tracing::warn!(
+                        "failed to materialize tier flow {:?} for {:?}",
+                        row.flow_ref,
+                        tier
+                    );
+                    continue;
+                };
+                row.metrics.write_fields(&mut fields);
+                self.encode_buf.encode(&fields);
                 let refs = self.encode_buf.field_slices();
                 let timestamps = EntryTimestamps::default()
                     .with_source_realtime_usec(row.timestamp_usec)
@@ -724,8 +768,24 @@ impl IngestService {
         Ok(())
     }
 
+    fn prune_unused_tier_flow_indexes(&self) {
+        let mut active_hours = std::collections::BTreeSet::new();
+        for tier in MATERIALIZED_TIERS {
+            if let Some(acc) = self.tier_accumulators.get(&tier) {
+                active_hours.extend(acc.active_hours());
+            }
+        }
+
+        if let Ok(mut tier_flow_indexes) = self.tier_flow_indexes.write() {
+            tier_flow_indexes.prune_unused_hours(&active_hours);
+        }
+    }
+
     fn refresh_open_tier_state(&self, now_usec: u64) {
         let mut snapshot = OpenTierState::default();
+        if let Ok(tier_flow_indexes) = self.tier_flow_indexes.read() {
+            snapshot.generation = tier_flow_indexes.generation();
+        }
         if let Some(acc) = self.tier_accumulators.get(&TierKind::Minute1) {
             snapshot.minute_1 = acc.snapshot_open_rows(now_usec);
         }
@@ -1059,6 +1119,7 @@ mod tests {
             cfg,
             Arc::new(IngestMetrics::default()),
             Arc::new(RwLock::new(OpenTierState::default())),
+            Arc::new(RwLock::new(TierFlowIndexStore::default())),
         )
         .expect("create ingest service")
     }

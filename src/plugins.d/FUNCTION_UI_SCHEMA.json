@@ -507,6 +507,13 @@
             "agent_id": { "type": "string" },
             "collected_at": { "type": "string", "format": "date-time" },
             "view": { "type": "string" },
+            "group_by": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "columns": { "$ref": "#/definitions/columns" },
+            "metric": { "type": "string" },
+            "chart": { "type": "object" },
             "ip_policy": { "$ref": "#/definitions/topology_ip_policy" },
             "actors": {
               "type": "array",

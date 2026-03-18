@@ -54,6 +54,7 @@ socket2 = "0.5.8"
 tonic = { workspace = true, features = ["transport", "tls-native-roots"] }
 tonic-prost = "0.14"
 prost = "0.14"
+netdata-flow-index = { path = "../flow-index" }
 
 rt = { workspace = true }
 netdata-plugin-error = { workspace = true }

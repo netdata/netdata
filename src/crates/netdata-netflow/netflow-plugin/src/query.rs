@@ -1,18 +1,24 @@
 use crate::decoder::canonical_flow_field_names;
 use crate::plugin_config::PluginConfig;
+use crate::presentation;
 #[cfg(test)]
 use crate::tiering::dimensions_for_rollup;
-use crate::tiering::{OpenTierState, TierKind};
+use crate::tiering::{OpenTierState, TierFlowIndexStore, TierKind};
 use anyhow::{Context, Result};
 use chrono::{TimeZone, Utc};
 use journal_common::{Seconds, load_machine_id};
 use journal_registry::{Monitor, Registry, repository::File as RegistryFile};
 use journal_session::{Direction as SessionDirection, JournalSession};
+use netdata_flow_index::{
+    FieldKind as IndexFieldKind, FieldSpec as IndexFieldSpec, FieldValue as IndexFieldValue,
+    FlowId as IndexedFlowId, FlowIndex,
+};
 use notify::Event;
 use regex::Regex;
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer};
 use serde_json::{Map, Value, json};
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -42,7 +48,10 @@ const COUNTRY_MAP_GROUP_BY_FIELDS: &[&str] = &["SRC_COUNTRY", "DST_COUNTRY"];
 const RAW_ONLY_FIELDS: &[&str] = &["SRC_ADDR", "DST_ADDR", "SRC_PORT", "DST_PORT"];
 
 fn default_group_by() -> Vec<String> {
-    DEFAULT_GROUP_BY_FIELDS.iter().map(|s| s.to_string()).collect()
+    DEFAULT_GROUP_BY_FIELDS
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
 }
 
 const FACET_EXCLUDED_FIELDS: &[&str] = &[
@@ -282,8 +291,9 @@ fn selection_values_from_json(value: Value) -> std::result::Result<Vec<String>, 
             }
             Ok(out)
         }
-        Value::Object(map) => selection_scalar_from_object(&map)
-            .map(|value| value.into_iter().collect()),
+        Value::Object(map) => {
+            selection_scalar_from_object(&map).map(|value| value.into_iter().collect())
+        }
     }
 }
 
@@ -345,7 +355,9 @@ where
         .map_err(D::Error::custom)
 }
 
-fn group_by_selection_to_values(selection: GroupBySelection) -> std::result::Result<Vec<String>, String> {
+fn group_by_selection_to_values(
+    selection: GroupBySelection,
+) -> std::result::Result<Vec<String>, String> {
     let raw_values = match selection {
         GroupBySelection::One(value) => vec![value],
         GroupBySelection::Many(values) => values,
@@ -388,44 +400,41 @@ fn normalize_group_by_values(raw_values: Vec<String>) -> std::result::Result<Vec
 fn take_selection_view(
     selections: &mut HashMap<String, Vec<String>>,
 ) -> Option<std::result::Result<ViewMode, String>> {
-    take_single_selection_value(selections, "VIEW").map(|value| {
-        value.and_then(|value| parse_enum_selection("view", &value))
-    })
+    take_single_selection_value(selections, "VIEW")
+        .map(|value| value.and_then(|value| parse_enum_selection("view", &value)))
 }
 
 fn take_selection_sort_by(
     selections: &mut HashMap<String, Vec<String>>,
 ) -> Option<std::result::Result<SortBy, String>> {
-    take_single_selection_value(selections, "SORT_BY").map(|value| {
-        value.and_then(|value| parse_enum_selection("sort_by", &value))
-    })
+    take_single_selection_value(selections, "SORT_BY")
+        .map(|value| value.and_then(|value| parse_enum_selection("sort_by", &value)))
 }
 
 fn take_selection_top_n(
     selections: &mut HashMap<String, Vec<String>>,
 ) -> Option<std::result::Result<TopN, String>> {
-    take_single_selection_value(selections, "TOP_N").map(|value| {
-        value.and_then(|value| parse_enum_selection("top_n", &value))
-    })
+    take_single_selection_value(selections, "TOP_N")
+        .map(|value| value.and_then(|value| parse_enum_selection("top_n", &value)))
 }
 
 fn take_selection_group_by(
     selections: &mut HashMap<String, Vec<String>>,
 ) -> Option<std::result::Result<Vec<String>, String>> {
-    selections
-        .remove("GROUP_BY")
-        .map(normalize_group_by_values)
+    selections.remove("GROUP_BY").map(normalize_group_by_values)
 }
 
 fn take_single_selection_value(
     selections: &mut HashMap<String, Vec<String>>,
     key: &str,
 ) -> Option<std::result::Result<String, String>> {
-    selections.remove(key).map(|values| match values.as_slice() {
-        [] => Err(format!("selection `{key}` is empty")),
-        [value] => Ok(value.clone()),
-        _ => Err(format!("selection `{key}` must contain exactly one value")),
-    })
+    selections
+        .remove(key)
+        .map(|values| match values.as_slice() {
+            [] => Err(format!("selection `{key}` is empty")),
+            [value] => Ok(value.clone()),
+            _ => Err(format!("selection `{key}` must contain exactly one value")),
+        })
 }
 
 fn parse_enum_selection<T>(field: &str, value: &str) -> std::result::Result<T, String>
@@ -442,6 +451,8 @@ pub(crate) fn supported_group_by_fields() -> &'static [String] {
 
 pub(crate) struct FlowQueryOutput {
     pub(crate) agent_id: String,
+    pub(crate) group_by: Vec<String>,
+    pub(crate) columns: Value,
     pub(crate) flows: Vec<Value>,
     pub(crate) stats: HashMap<String, u64>,
     pub(crate) metrics: HashMap<String, u64>,
@@ -452,6 +463,7 @@ pub(crate) struct FlowQueryOutput {
 pub(crate) struct FlowMetricsQueryOutput {
     pub(crate) agent_id: String,
     pub(crate) group_by: Vec<String>,
+    pub(crate) columns: Value,
     pub(crate) metric: String,
     pub(crate) chart: Value,
     pub(crate) stats: HashMap<String, u64>,
@@ -514,6 +526,7 @@ pub(crate) struct FlowQueryService {
     agent_id: String,
     tier_dirs: HashMap<TierKind, PathBuf>,
     open_tiers: Arc<RwLock<OpenTierState>>,
+    tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
     tier_1m_threshold_secs: u32,
     tier_5m_threshold_secs: u32,
     max_groups: usize,
@@ -524,6 +537,7 @@ impl FlowQueryService {
     pub(crate) async fn new(
         cfg: &PluginConfig,
         open_tiers: Arc<RwLock<OpenTierState>>,
+        tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
     ) -> Result<(Self, UnboundedReceiver<Event>)> {
         let tier_dirs = HashMap::from([
             (TierKind::Raw, cfg.journal.raw_tier_dir()),
@@ -561,6 +575,7 @@ impl FlowQueryService {
                 agent_id,
                 tier_dirs,
                 open_tiers,
+                tier_flow_indexes,
                 tier_1m_threshold_secs,
                 tier_5m_threshold_secs,
                 max_groups,
@@ -579,23 +594,46 @@ impl FlowQueryService {
     fn open_records_for_tier(&self, tier: TierKind, after: u32, before: u32) -> Vec<FlowRecord> {
         let after_usec = (after as u64).saturating_mul(1_000_000);
         let before_usec = (before as u64).saturating_mul(1_000_000);
-        let Ok(state) = self.open_tiers.read() else {
-            return Vec::new();
-        };
-
-        state
-            .rows_for_tier(tier)
-            .iter()
-            .filter(|row| row.timestamp_usec >= after_usec && row.timestamp_usec < before_usec)
-            .map(|row| FlowRecord {
-                timestamp_usec: row.timestamp_usec,
-                fields: row
-                    .fields
+        for _ in 0..3 {
+            let (generation, rows) = {
+                let Ok(state) = self.open_tiers.read() else {
+                    return Vec::new();
+                };
+                let rows = state
+                    .rows_for_tier(tier)
                     .iter()
-                    .map(|(&k, v)| (k.to_string(), v.clone()))
-                    .collect(),
-            })
-            .collect()
+                    .copied()
+                    .filter(|row| {
+                        row.timestamp_usec >= after_usec && row.timestamp_usec < before_usec
+                    })
+                    .collect::<Vec<_>>();
+                (state.generation, rows)
+            };
+
+            let Ok(tier_flow_indexes) = self.tier_flow_indexes.read() else {
+                return Vec::new();
+            };
+            if tier_flow_indexes.generation() != generation {
+                continue;
+            }
+
+            return rows
+                .into_iter()
+                .filter_map(|row| {
+                    let mut fields = tier_flow_indexes.materialize_fields(row.flow_ref)?;
+                    row.metrics.write_fields(&mut fields);
+                    Some(FlowRecord {
+                        timestamp_usec: row.timestamp_usec,
+                        fields: fields
+                            .into_iter()
+                            .map(|(key, value)| (key.to_string(), value))
+                            .collect(),
+                    })
+                })
+                .collect();
+        }
+
+        Vec::new()
     }
 
     fn select_query_tier(&self, after: u32, before: u32, force_raw: bool) -> TierKind {
@@ -674,7 +712,10 @@ impl FlowQueryService {
         stats.insert("query_after".to_string(), after as u64);
         stats.insert("query_before".to_string(), before as u64);
         stats.insert("query_requested_after".to_string(), requested_after as u64);
-        stats.insert("query_requested_before".to_string(), requested_before as u64);
+        stats.insert(
+            "query_requested_before".to_string(),
+            requested_before as u64,
+        );
         stats.insert("query_limit".to_string(), limit as u64);
         stats.insert("query_files".to_string(), files.len() as u64);
         stats.insert(
@@ -701,11 +742,11 @@ impl FlowQueryService {
             self.facet_max_values_per_field as u64,
         );
         if let Some(layout) = timeseries_layout {
-            stats.insert("query_bucket_seconds".to_string(), layout.bucket_seconds as u64);
             stats.insert(
-                "query_bucket_count".to_string(),
-                layout.bucket_count as u64,
+                "query_bucket_seconds".to_string(),
+                layout.bucket_seconds as u64,
             );
+            stats.insert("query_bucket_count".to_string(), layout.bucket_count as u64);
         }
 
         Ok(QuerySetup {
@@ -852,25 +893,290 @@ impl FlowQueryService {
         Ok(counts)
     }
 
+    fn scan_matching_grouped_records_projected(
+        &self,
+        setup: &QuerySetup,
+        request: &FlowsRequest,
+        grouped_aggregates: &mut CompactGroupAccumulator,
+        facet_values: &mut BTreeMap<String, FacetFieldAccumulator>,
+    ) -> Result<ScanCounts> {
+        let after_usec = (setup.after as u64).saturating_mul(1_000_000);
+        let before_usec = (setup.before as u64).saturating_mul(1_000_000);
+        let until_usec = before_usec.saturating_sub(1);
+        let mut counts = ScanCounts::default();
+
+        if setup.files.is_empty() {
+            return Ok(counts);
+        }
+
+        let tier_paths: Vec<PathBuf> = setup
+            .files
+            .iter()
+            .map(|file| PathBuf::from(file.path()))
+            .collect();
+
+        let session = JournalSession::builder()
+            .files(tier_paths)
+            .load_remappings(false)
+            .build()
+            .context("failed to open journal session for projected grouped query")?;
+
+        let mut cursor_builder = session
+            .cursor_builder()
+            .direction(SessionDirection::Forward)
+            .since(after_usec)
+            .until(until_usec);
+        for (field, value) in cursor_prefilter_pairs(&request.selections) {
+            let pair = format!("{}={}", field, value);
+            cursor_builder = cursor_builder.add_match(pair.as_bytes());
+        }
+        let mut cursor = cursor_builder
+            .build()
+            .context("failed to build journal session cursor for projected grouped query")?;
+
+        let group_by_positions: HashMap<&str, usize> = setup
+            .effective_group_by
+            .iter()
+            .enumerate()
+            .map(|(index, field)| (field.as_str(), index))
+            .collect();
+        let mut row_group_field_ids = vec![None; setup.effective_group_by.len()];
+        let mut row_missing_values = std::iter::repeat_with(|| None)
+            .take(setup.effective_group_by.len())
+            .collect::<Vec<Option<String>>>();
+        let mut empty_field_ids = vec![None; setup.effective_group_by.len()];
+        let mut facet_field_positions: HashMap<String, usize> = HashMap::new();
+        let mut facet_field_names: Vec<String> = Vec::new();
+        let mut row_facet_values: Vec<String> = Vec::new();
+        let mut row_facet_touched: Vec<usize> = Vec::new();
+
+        loop {
+            let has_entry = cursor
+                .step()
+                .context("failed to step projected grouped query cursor")?;
+            if !has_entry {
+                break;
+            }
+
+            counts.streamed_entries = counts.streamed_entries.saturating_add(1);
+            let timestamp_usec = cursor.realtime_usec();
+            if timestamp_usec < after_usec || timestamp_usec >= before_usec {
+                continue;
+            }
+
+            row_group_field_ids.fill(None);
+            for value in &mut row_missing_values {
+                let _ = value.take();
+            }
+            for slot in row_facet_touched.drain(..) {
+                row_facet_values[slot].clear();
+            }
+
+            let mut metrics = FlowMetrics::default();
+            let mut src_hash = None;
+            let mut dst_hash = None;
+            let mut exporter_ip_hash = None;
+            let mut exporter_name_hash = None;
+            let mut flow_version_hash = None;
+            let mut sampling_rate_hash = None;
+
+            let mut payloads = cursor
+                .payloads()
+                .context("failed to open projected payload iterator for journal entry")?;
+            while let Some(payload) = payloads
+                .next()
+                .context("failed to read projected journal payload")?
+            {
+                let Some((key, value_bytes)) = split_payload(payload) else {
+                    continue;
+                };
+                match key {
+                    "BYTES" => {
+                        if let Some(value) = parse_u64_ascii(value_bytes) {
+                            metrics.bytes = value;
+                        }
+                        continue;
+                    }
+                    "PACKETS" => {
+                        if let Some(value) = parse_u64_ascii(value_bytes) {
+                            metrics.packets = value;
+                        }
+                        continue;
+                    }
+                    "RAW_BYTES" => {
+                        if let Some(value) = parse_u64_ascii(value_bytes) {
+                            metrics.raw_bytes = value;
+                        }
+                        continue;
+                    }
+                    "RAW_PACKETS" => {
+                        if let Some(value) = parse_u64_ascii(value_bytes) {
+                            metrics.raw_packets = value;
+                        }
+                        continue;
+                    }
+                    _ => {}
+                }
+
+                let group_slot = group_by_positions.get(key).copied();
+                let needs_facet = facet_field_allowed(key);
+                let needs_identity = matches!(
+                    key,
+                    "SRC_ADDR"
+                        | "DST_ADDR"
+                        | "EXPORTER_IP"
+                        | "EXPORTER_NAME"
+                        | "FLOW_VERSION"
+                        | "SAMPLING_RATE"
+                );
+                if group_slot.is_none() && !needs_facet && !needs_identity {
+                    continue;
+                }
+
+                let value = payload_value(value_bytes);
+                let value_ref = value.as_ref();
+
+                if let Some(field_index) = group_slot {
+                    if !value_ref.is_empty() {
+                        match grouped_aggregates
+                            .index
+                            .find_field_value(field_index, IndexFieldValue::Text(value_ref))
+                            .context("failed to resolve projected grouped field value from compact query index")?
+                        {
+                            Some(field_id) => row_group_field_ids[field_index] = Some(field_id),
+                            None if grouped_aggregates.grouped_total() < self.max_groups => {
+                                row_missing_values[field_index] = Some(value_ref.to_string());
+                            }
+                            None => {}
+                        }
+                    }
+                }
+
+                if needs_facet && !value_ref.is_empty() {
+                    let slot = if let Some(slot) = facet_field_positions.get(key).copied() {
+                        slot
+                    } else {
+                        let slot = facet_field_names.len();
+                        facet_field_names.push(key.to_string());
+                        row_facet_values.push(String::new());
+                        facet_field_positions.insert(facet_field_names[slot].clone(), slot);
+                        slot
+                    };
+                    if row_facet_values[slot].is_empty() {
+                        row_facet_touched.push(slot);
+                    }
+                    row_facet_values[slot].clear();
+                    row_facet_values[slot].push_str(value_ref);
+                }
+
+                if value_ref.is_empty() {
+                    continue;
+                }
+                match key {
+                    "SRC_ADDR" => src_hash = Some(fingerprint_value(value_ref)),
+                    "DST_ADDR" => dst_hash = Some(fingerprint_value(value_ref)),
+                    "EXPORTER_IP" => exporter_ip_hash = Some(fingerprint_value(value_ref)),
+                    "EXPORTER_NAME" => exporter_name_hash = Some(fingerprint_value(value_ref)),
+                    "FLOW_VERSION" => flow_version_hash = Some(fingerprint_value(value_ref)),
+                    "SAMPLING_RATE" => sampling_rate_hash = Some(fingerprint_value(value_ref)),
+                    _ => {}
+                }
+            }
+
+            for &slot in &row_facet_touched {
+                let value = row_facet_values[slot].as_str();
+                if value.is_empty() {
+                    continue;
+                }
+                accumulate_facet_value(
+                    facet_values,
+                    facet_field_names[slot].as_str(),
+                    value,
+                    metrics,
+                    self.facet_max_values_per_field,
+                );
+            }
+
+            accumulate_projected_compact_grouped_record(
+                timestamp_usec,
+                RecordHandle::JournalRealtime(timestamp_usec),
+                metrics,
+                grouped_aggregates,
+                self.max_groups,
+                &mut row_group_field_ids,
+                &mut row_missing_values,
+                &mut empty_field_ids,
+                src_hash,
+                dst_hash,
+                combined_exporter_fingerprint(
+                    exporter_ip_hash,
+                    exporter_name_hash,
+                    flow_version_hash,
+                    sampling_rate_hash,
+                ),
+            )?;
+            counts.matched_entries = counts.matched_entries.saturating_add(1);
+        }
+
+        Ok(counts)
+    }
+
     pub(crate) async fn query_flows(&self, request: &FlowsRequest) -> Result<FlowQueryOutput> {
         let setup = self.prepare_query(request)?;
         let open_records =
             self.open_records_for_tier(setup.selected_tier, setup.after, setup.before);
 
-        let mut grouped_aggregates = CompactGroupAccumulator::default();
+        let mut grouped_aggregates = CompactGroupAccumulator::new(&setup.effective_group_by)?;
         let mut facet_values: BTreeMap<String, FacetFieldAccumulator> = BTreeMap::new();
-        let counts =
-            self.scan_matching_records(&setup, request, &open_records, |record, handle| {
-                accumulate_record(
-                    record,
-                    handle,
-                    &setup.effective_group_by,
-                    &mut grouped_aggregates,
-                    &mut facet_values,
-                    self.max_groups,
-                    self.facet_max_values_per_field,
-                );
-            })?;
+        let counts = if grouped_query_can_use_projected_scan(request) {
+            let mut counts = self.scan_matching_grouped_records_projected(
+                &setup,
+                request,
+                &mut grouped_aggregates,
+                &mut facet_values,
+            )?;
+            if setup.selected_tier != TierKind::Raw {
+                counts.open_bucket_records = open_records.len() as u64;
+                for (index, record) in open_records.iter().enumerate() {
+                    if !record_matches_selections(record, &request.selections) {
+                        continue;
+                    }
+                    accumulate_record(
+                        record,
+                        RecordHandle::OpenRowIndex(index),
+                        &setup.effective_group_by,
+                        &mut grouped_aggregates,
+                        &mut facet_values,
+                        self.max_groups,
+                        self.facet_max_values_per_field,
+                    )?;
+                    counts.matched_entries = counts.matched_entries.saturating_add(1);
+                }
+            }
+            counts
+        } else {
+            let mut accumulate_error = None;
+            let counts =
+                self.scan_matching_records(&setup, request, &open_records, |record, handle| {
+                    if accumulate_error.is_some() {
+                        return;
+                    }
+                    accumulate_record(
+                        record,
+                        handle,
+                        &setup.effective_group_by,
+                        &mut grouped_aggregates,
+                        &mut facet_values,
+                        self.max_groups,
+                        self.facet_max_values_per_field,
+                    )
+                    .unwrap_or_else(|err| accumulate_error = Some(err));
+                })?;
+            if let Some(err) = accumulate_error {
+                return Err(err);
+            }
+            counts
+        };
         let facet_overflow_records: u64 = facet_values
             .values()
             .map(|field| field.overflow_records)
@@ -950,6 +1256,8 @@ impl FlowQueryService {
 
         Ok(FlowQueryOutput {
             agent_id: self.agent_id.clone(),
+            group_by: setup.effective_group_by.clone(),
+            columns: presentation::build_table_columns(&setup.effective_group_by),
             flows: build_result.flows,
             stats,
             metrics: build_result.metrics.to_map(),
@@ -1077,7 +1385,8 @@ impl FlowQueryService {
 
         Ok(FlowMetricsQueryOutput {
             agent_id: self.agent_id.clone(),
-            group_by: setup.effective_group_by,
+            group_by: setup.effective_group_by.clone(),
+            columns: presentation::build_timeseries_columns(&setup.effective_group_by),
             metric: setup.sort_by.as_str().to_string(),
             chart,
             stats,
@@ -1094,13 +1403,19 @@ impl FlowQueryService {
         limit: usize,
     ) -> Result<CompactBuildResult> {
         let overflow_records = aggregates.overflow.dropped_records;
+        let grouped_total = aggregates.grouped_total();
+        let CompactGroupAccumulator {
+            index,
+            rows: aggregate_rows,
+            overflow,
+            ..
+        } = aggregates;
         let RankedCompactAggregates {
             rows,
             other,
-            grouped_total,
             truncated,
             other_count,
-        } = rank_compact_aggregates(aggregates, sort_by, limit);
+        } = rank_compact_aggregates(aggregate_rows, overflow.aggregate, sort_by, limit);
 
         let session = if setup.files.is_empty() {
             None
@@ -1126,6 +1441,7 @@ impl FlowQueryService {
                 session.as_ref(),
                 open_records,
                 &setup.effective_group_by,
+                &index,
                 agg,
             )?;
             totals.add(materialized.metrics);
@@ -1153,6 +1469,7 @@ impl FlowQueryService {
         session: Option<&JournalSession>,
         open_records: &[FlowRecord],
         group_by: &[String],
+        index: &FlowIndex,
         agg: CompactAggregatedFlow,
     ) -> Result<AggregatedFlow> {
         let record = self
@@ -1163,9 +1480,12 @@ impl FlowQueryService {
                     agg.representative
                 )
             })?;
+        let flow_id = agg
+            .flow_id
+            .context("missing compact flow id for grouped aggregate materialization")?;
 
         Ok(AggregatedFlow {
-            labels: labels_for_group(&record, group_by),
+            labels: labels_for_compact_flow(index, group_by, flow_id)?,
             first_ts: agg.first_ts,
             last_ts: agg.last_ts,
             metrics: agg.metrics,
@@ -1282,7 +1602,7 @@ enum RecordHandle {
 #[derive(Debug, Clone)]
 struct CompactAggregatedFlow {
     representative: RecordHandle,
-    secondary_hash: u64,
+    flow_id: Option<IndexedFlowId>,
     first_ts: u64,
     last_ts: u64,
     metrics: FlowMetrics,
@@ -1302,13 +1622,13 @@ impl CompactAggregatedFlow {
         record: &FlowRecord,
         handle: RecordHandle,
         metrics: FlowMetrics,
-        secondary_hash: u64,
+        flow_id: IndexedFlowId,
     ) -> Self {
         let mut entry = Self {
             representative: handle,
-            secondary_hash,
-            first_ts: record.timestamp_usec,
-            last_ts: record.timestamp_usec,
+            flow_id: Some(flow_id),
+            first_ts: 0,
+            last_ts: 0,
             metrics: FlowMetrics::default(),
             src_hash: 0,
             dst_hash: 0,
@@ -1320,14 +1640,20 @@ impl CompactAggregatedFlow {
             dst_mixed: false,
             exporter_mixed: false,
         };
-        entry.update(record, metrics);
+        entry.update_projected(
+            record.timestamp_usec,
+            metrics,
+            record_src_fingerprint(record),
+            record_dst_fingerprint(record),
+            exporter_identity_fingerprint(record),
+        );
         entry
     }
 
     fn new_overflow() -> Self {
         Self {
             representative: RecordHandle::JournalRealtime(0),
-            secondary_hash: 0,
+            flow_id: None,
             first_ts: 0,
             last_ts: 0,
             metrics: FlowMetrics::default(),
@@ -1343,32 +1669,78 @@ impl CompactAggregatedFlow {
         }
     }
 
+    fn new_projected(
+        handle: RecordHandle,
+        flow_id: IndexedFlowId,
+        timestamp_usec: u64,
+        metrics: FlowMetrics,
+        src_hash: Option<u64>,
+        dst_hash: Option<u64>,
+        exporter_hash: Option<u64>,
+    ) -> Self {
+        let mut entry = Self {
+            representative: handle,
+            flow_id: Some(flow_id),
+            first_ts: 0,
+            last_ts: 0,
+            metrics: FlowMetrics::default(),
+            src_hash: 0,
+            dst_hash: 0,
+            exporter_hash: 0,
+            has_src: false,
+            has_dst: false,
+            has_exporter: false,
+            src_mixed: false,
+            dst_mixed: false,
+            exporter_mixed: false,
+        };
+        entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash, exporter_hash);
+        entry
+    }
+
     fn update(&mut self, record: &FlowRecord, metrics: FlowMetrics) {
-        if self.first_ts == 0 || record.timestamp_usec < self.first_ts {
-            self.first_ts = record.timestamp_usec;
+        self.update_projected(
+            record.timestamp_usec,
+            metrics,
+            record_src_fingerprint(record),
+            record_dst_fingerprint(record),
+            exporter_identity_fingerprint(record),
+        );
+    }
+
+    fn update_projected(
+        &mut self,
+        timestamp_usec: u64,
+        metrics: FlowMetrics,
+        src_hash: Option<u64>,
+        dst_hash: Option<u64>,
+        exporter_hash: Option<u64>,
+    ) {
+        if self.first_ts == 0 || timestamp_usec < self.first_ts {
+            self.first_ts = timestamp_usec;
         }
-        if record.timestamp_usec > self.last_ts {
-            self.last_ts = record.timestamp_usec;
+        if timestamp_usec > self.last_ts {
+            self.last_ts = timestamp_usec;
         }
         self.metrics.add(metrics);
 
-        merge_value_fingerprint(
+        merge_prehashed_fingerprint(
             &mut self.src_hash,
             &mut self.has_src,
             &mut self.src_mixed,
-            record.fields.get("SRC_ADDR"),
+            src_hash,
         );
-        merge_value_fingerprint(
+        merge_prehashed_fingerprint(
             &mut self.dst_hash,
             &mut self.has_dst,
             &mut self.dst_mixed,
-            record.fields.get("DST_ADDR"),
+            dst_hash,
         );
         merge_prehashed_fingerprint(
             &mut self.exporter_hash,
             &mut self.has_exporter,
             &mut self.exporter_mixed,
-            exporter_identity_fingerprint(record),
+            exporter_hash,
         );
     }
 }
@@ -1379,16 +1751,29 @@ struct CompactGroupOverflow {
     dropped_records: u64,
 }
 
-#[derive(Debug, Default)]
 struct CompactGroupAccumulator {
-    buckets: HashMap<u64, Vec<CompactAggregatedFlow>>,
+    index: FlowIndex,
+    rows: Vec<CompactAggregatedFlow>,
+    scratch_field_ids: Vec<u32>,
     overflow: CompactGroupOverflow,
-    grouped_total: usize,
 }
 
 impl CompactGroupAccumulator {
+    fn new(group_by: &[String]) -> Result<Self> {
+        let schema = group_by
+            .iter()
+            .map(|field| IndexFieldSpec::new(field.clone(), IndexFieldKind::Text));
+        Ok(Self {
+            index: FlowIndex::new(schema)
+                .context("failed to build compact flow index for grouped query")?,
+            rows: Vec::new(),
+            scratch_field_ids: Vec::with_capacity(group_by.len()),
+            overflow: CompactGroupOverflow::default(),
+        })
+    }
+
     fn grouped_total(&self) -> usize {
-        self.grouped_total
+        self.rows.len()
     }
 }
 
@@ -1404,7 +1789,6 @@ struct CompactBuildResult {
 struct RankedCompactAggregates {
     rows: Vec<CompactAggregatedFlow>,
     other: Option<CompactAggregatedFlow>,
-    grouped_total: usize,
     truncated: bool,
     other_count: usize,
 }
@@ -1610,35 +1994,276 @@ fn accumulate_compact_grouped_record(
     group_by: &[String],
     aggregates: &mut CompactGroupAccumulator,
     max_groups: usize,
-) {
-    let (primary_hash, secondary_hash) = group_hashes(record, group_by);
-    if let Some(chain) = aggregates.buckets.get_mut(&primary_hash) {
-        if let Some(entry) = chain
-            .iter_mut()
-            .find(|entry| entry.secondary_hash == secondary_hash)
+) -> Result<()> {
+    aggregates.scratch_field_ids.clear();
+    let mut needs_field_inserts = false;
+
+    for (field_index, field_name) in group_by.iter().enumerate() {
+        let value = record
+            .fields
+            .get(field_name.as_str())
+            .map(String::as_str)
+            .unwrap_or_default();
+        match aggregates
+            .index
+            .find_field_value(field_index, IndexFieldValue::Text(value))
+            .context("failed to resolve grouped field value from compact query index")?
         {
-            entry.update(record, metrics);
-            return;
+            Some(field_id) => aggregates.scratch_field_ids.push(field_id),
+            None => {
+                needs_field_inserts = true;
+                break;
+            }
         }
     }
 
-    if aggregates.grouped_total >= max_groups {
+    if !needs_field_inserts {
+        if let Some(flow_id) = aggregates
+            .index
+            .find_flow_by_field_ids(&aggregates.scratch_field_ids)
+            .context("failed to resolve grouped tuple from compact query index")?
+        {
+            if let Some(entry) = aggregates.rows.get_mut(flow_id as usize) {
+                entry.update(record, metrics);
+                return Ok(());
+            }
+            anyhow::bail!("compact query index returned missing flow row for flow id {flow_id}");
+        }
+    }
+
+    if aggregates.grouped_total() >= max_groups {
         let entry = aggregates
             .overflow
             .aggregate
             .get_or_insert_with(CompactAggregatedFlow::new_overflow);
         aggregates.overflow.dropped_records = aggregates.overflow.dropped_records.saturating_add(1);
         entry.update(record, metrics);
-        return;
+        return Ok(());
     }
 
-    let entry = CompactAggregatedFlow::new(record, handle, metrics, secondary_hash);
+    if needs_field_inserts {
+        aggregates.scratch_field_ids.clear();
+        for (field_index, field_name) in group_by.iter().enumerate() {
+            let value = record
+                .fields
+                .get(field_name.as_str())
+                .map(String::as_str)
+                .unwrap_or_default();
+            let field_id = aggregates
+                .index
+                .get_or_insert_field_value(field_index, IndexFieldValue::Text(value))
+                .context("failed to intern grouped field value into compact query index")?;
+            aggregates.scratch_field_ids.push(field_id);
+        }
+    }
+
+    if let Some(flow_id) = aggregates
+        .index
+        .find_flow_by_field_ids(&aggregates.scratch_field_ids)
+        .context("failed to recheck grouped tuple from compact query index")?
+    {
+        if let Some(entry) = aggregates.rows.get_mut(flow_id as usize) {
+            entry.update(record, metrics);
+            return Ok(());
+        }
+        anyhow::bail!("compact query index returned missing flow row for flow id {flow_id}");
+    }
+
+    let flow_id = aggregates
+        .index
+        .insert_flow_by_field_ids(&aggregates.scratch_field_ids)
+        .context("failed to store grouped tuple into compact query index")?;
+    if flow_id as usize != aggregates.rows.len() {
+        anyhow::bail!(
+            "compact query index returned non-dense flow id {} for row slot {}",
+            flow_id,
+            aggregates.rows.len()
+        );
+    }
     aggregates
-        .buckets
-        .entry(primary_hash)
-        .or_default()
-        .push(entry);
-    aggregates.grouped_total = aggregates.grouped_total.saturating_add(1);
+        .rows
+        .push(CompactAggregatedFlow::new(record, handle, metrics, flow_id));
+    Ok(())
+}
+
+fn accumulate_projected_compact_grouped_record(
+    timestamp_usec: u64,
+    handle: RecordHandle,
+    metrics: FlowMetrics,
+    aggregates: &mut CompactGroupAccumulator,
+    max_groups: usize,
+    row_group_field_ids: &mut [Option<u32>],
+    row_missing_values: &mut [Option<String>],
+    empty_field_ids: &mut [Option<u32>],
+    src_hash: Option<u64>,
+    dst_hash: Option<u64>,
+    exporter_hash: Option<u64>,
+) -> Result<()> {
+    anyhow::ensure!(
+        row_group_field_ids.len() == row_missing_values.len()
+            && row_group_field_ids.len() == empty_field_ids.len(),
+        "projected grouped row buffers are misaligned"
+    );
+
+    aggregates.scratch_field_ids.clear();
+    let mut needs_field_inserts = false;
+
+    for field_index in 0..row_group_field_ids.len() {
+        if let Some(field_id) = row_group_field_ids[field_index] {
+            aggregates.scratch_field_ids.push(field_id);
+            continue;
+        }
+
+        if row_missing_values[field_index].is_some() {
+            needs_field_inserts = true;
+            break;
+        }
+
+        let field_id = match empty_field_ids[field_index] {
+            Some(field_id) => field_id,
+            None => match aggregates
+                .index
+                .find_field_value(field_index, IndexFieldValue::Text(""))
+                .context("failed to resolve empty grouped field value from compact query index")?
+            {
+                Some(field_id) => {
+                    empty_field_ids[field_index] = Some(field_id);
+                    field_id
+                }
+                None => {
+                    needs_field_inserts = true;
+                    break;
+                }
+            },
+        };
+        row_group_field_ids[field_index] = Some(field_id);
+        aggregates.scratch_field_ids.push(field_id);
+    }
+
+    if !needs_field_inserts {
+        if let Some(flow_id) = aggregates
+            .index
+            .find_flow_by_field_ids(&aggregates.scratch_field_ids)
+            .context("failed to resolve projected grouped tuple from compact query index")?
+        {
+            if let Some(entry) = aggregates.rows.get_mut(flow_id as usize) {
+                entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash, exporter_hash);
+                return Ok(());
+            }
+            anyhow::bail!("compact query index returned missing flow row for flow id {flow_id}");
+        }
+
+        if aggregates.grouped_total() >= max_groups {
+            let entry = aggregates
+                .overflow
+                .aggregate
+                .get_or_insert_with(CompactAggregatedFlow::new_overflow);
+            aggregates.overflow.dropped_records =
+                aggregates.overflow.dropped_records.saturating_add(1);
+            entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash, exporter_hash);
+            return Ok(());
+        }
+
+        let flow_id = aggregates
+            .index
+            .insert_flow_by_field_ids(&aggregates.scratch_field_ids)
+            .context("failed to store projected grouped tuple into compact query index")?;
+        if flow_id as usize != aggregates.rows.len() {
+            anyhow::bail!(
+                "compact query index returned non-dense flow id {} for row slot {}",
+                flow_id,
+                aggregates.rows.len()
+            );
+        }
+        aggregates.rows.push(CompactAggregatedFlow::new_projected(
+            handle,
+            flow_id,
+            timestamp_usec,
+            metrics,
+            src_hash,
+            dst_hash,
+            exporter_hash,
+        ));
+        return Ok(());
+    }
+
+    if aggregates.grouped_total() >= max_groups {
+        let entry = aggregates
+            .overflow
+            .aggregate
+            .get_or_insert_with(CompactAggregatedFlow::new_overflow);
+        aggregates.overflow.dropped_records = aggregates.overflow.dropped_records.saturating_add(1);
+        entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash, exporter_hash);
+        return Ok(());
+    }
+
+    aggregates.scratch_field_ids.clear();
+    for field_index in 0..row_group_field_ids.len() {
+        let field_id = if let Some(field_id) = row_group_field_ids[field_index] {
+            field_id
+        } else if let Some(value) = row_missing_values[field_index].take() {
+            let field_id = aggregates
+                .index
+                .get_or_insert_field_value(field_index, IndexFieldValue::Text(value.as_str()))
+                .context(
+                    "failed to intern projected grouped field value into compact query index",
+                )?;
+            row_group_field_ids[field_index] = Some(field_id);
+            field_id
+        } else {
+            let field_id = match empty_field_ids[field_index] {
+                Some(field_id) => field_id,
+                None => {
+                    let field_id = aggregates
+                        .index
+                        .get_or_insert_field_value(field_index, IndexFieldValue::Text(""))
+                        .context(
+                            "failed to intern empty projected grouped field value into compact query index",
+                        )?;
+                    empty_field_ids[field_index] = Some(field_id);
+                    field_id
+                }
+            };
+            row_group_field_ids[field_index] = Some(field_id);
+            field_id
+        };
+        aggregates.scratch_field_ids.push(field_id);
+    }
+
+    if let Some(flow_id) = aggregates
+        .index
+        .find_flow_by_field_ids(&aggregates.scratch_field_ids)
+        .context("failed to recheck projected grouped tuple from compact query index")?
+    {
+        if let Some(entry) = aggregates.rows.get_mut(flow_id as usize) {
+            entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash, exporter_hash);
+            return Ok(());
+        }
+        anyhow::bail!("compact query index returned missing flow row for flow id {flow_id}");
+    }
+
+    let flow_id = aggregates
+        .index
+        .insert_flow_by_field_ids(&aggregates.scratch_field_ids)
+        .context("failed to store projected grouped tuple into compact query index")?;
+    if flow_id as usize != aggregates.rows.len() {
+        anyhow::bail!(
+            "compact query index returned non-dense flow id {} for row slot {}",
+            flow_id,
+            aggregates.rows.len()
+        );
+    }
+
+    aggregates.rows.push(CompactAggregatedFlow::new_projected(
+        handle,
+        flow_id,
+        timestamp_usec,
+        metrics,
+        src_hash,
+        dst_hash,
+        exporter_hash,
+    ));
+    Ok(())
 }
 
 fn new_overflow_aggregate() -> AggregatedFlow {
@@ -1701,6 +2326,40 @@ fn labels_for_group(record: &FlowRecord, group_by: &[String]) -> BTreeMap<String
     labels
 }
 
+fn labels_for_compact_flow(
+    index: &FlowIndex,
+    group_by: &[String],
+    flow_id: IndexedFlowId,
+) -> Result<BTreeMap<String, String>> {
+    let field_ids = index
+        .flow_field_ids(flow_id)
+        .context("missing compact flow field ids for grouped query result")?;
+    let mut labels = BTreeMap::new();
+    for (field_index, field_name) in group_by.iter().enumerate() {
+        let field_id = field_ids
+            .get(field_index)
+            .copied()
+            .context("missing compact flow field id for grouped query result")?;
+        let value = index
+            .field_value(field_index, field_id)
+            .map(compact_index_value_to_string)
+            .context("missing compact flow field value for grouped query result")?;
+        labels.insert(field_name.clone(), value);
+    }
+    Ok(labels)
+}
+
+fn compact_index_value_to_string(value: IndexFieldValue<'_>) -> String {
+    match value {
+        IndexFieldValue::Text(value) => value.to_string(),
+        IndexFieldValue::U8(value) => value.to_string(),
+        IndexFieldValue::U16(value) => value.to_string(),
+        IndexFieldValue::U32(value) => value.to_string(),
+        IndexFieldValue::U64(value) => value.to_string(),
+        IndexFieldValue::IpAddr(value) => value.to_string(),
+    }
+}
+
 fn group_key_from_labels(labels: &BTreeMap<String, String>) -> GroupKey {
     GroupKey(
         labels
@@ -1708,52 +2367,6 @@ fn group_key_from_labels(labels: &BTreeMap<String, String>) -> GroupKey {
             .map(|(name, value)| (name.clone(), value.clone()))
             .collect(),
     )
-}
-
-fn group_hashes(record: &FlowRecord, group_by: &[String]) -> (u64, u64) {
-    (
-        hash_group_tuple::<XxHash64>(record, group_by),
-        hash_group_tuple::<DefaultHasher>(record, group_by),
-    )
-}
-
-fn hash_group_tuple<H>(record: &FlowRecord, group_by: &[String]) -> u64
-where
-    H: Hasher + Default,
-{
-    let mut hasher = H::default();
-    for field in group_by {
-        field.hash(&mut hasher);
-        record
-            .fields
-            .get(field)
-            .map(String::as_str)
-            .unwrap_or_default()
-            .hash(&mut hasher);
-    }
-    hasher.finish()
-}
-
-fn merge_value_fingerprint(
-    current: &mut u64,
-    initialized: &mut bool,
-    mixed: &mut bool,
-    next: Option<&String>,
-) {
-    if *mixed {
-        return;
-    }
-    let Some(next_value) = next.map(String::as_str).filter(|value| !value.is_empty()) else {
-        return;
-    };
-    let next_hash = fingerprint_value(next_value);
-
-    if !*initialized {
-        *current = next_hash;
-        *initialized = true;
-    } else if *current != next_hash {
-        *mixed = true;
-    }
 }
 
 fn merge_prehashed_fingerprint(
@@ -1777,42 +2390,78 @@ fn merge_prehashed_fingerprint(
     }
 }
 
-fn exporter_identity_fingerprint(record: &FlowRecord) -> Option<u64> {
-    let exporter_ip = record
+fn record_src_fingerprint(record: &FlowRecord) -> Option<u64> {
+    record
         .fields
-        .get("EXPORTER_IP")
+        .get("SRC_ADDR")
         .map(String::as_str)
-        .unwrap_or_default();
-    let exporter_name = record
-        .fields
-        .get("EXPORTER_NAME")
-        .map(String::as_str)
-        .unwrap_or_default();
-    let flow_version = record
-        .fields
-        .get("FLOW_VERSION")
-        .map(String::as_str)
-        .unwrap_or_default();
-    let sampling_rate = record
-        .fields
-        .get("SAMPLING_RATE")
-        .map(String::as_str)
-        .unwrap_or_default();
+        .filter(|value| !value.is_empty())
+        .map(fingerprint_value)
+}
 
-    if exporter_ip.is_empty()
-        && exporter_name.is_empty()
-        && flow_version.is_empty()
-        && sampling_rate.is_empty()
+fn record_dst_fingerprint(record: &FlowRecord) -> Option<u64> {
+    record
+        .fields
+        .get("DST_ADDR")
+        .map(String::as_str)
+        .filter(|value| !value.is_empty())
+        .map(fingerprint_value)
+}
+
+fn combined_exporter_fingerprint(
+    exporter_ip_hash: Option<u64>,
+    exporter_name_hash: Option<u64>,
+    flow_version_hash: Option<u64>,
+    sampling_rate_hash: Option<u64>,
+) -> Option<u64> {
+    if exporter_ip_hash.is_none()
+        && exporter_name_hash.is_none()
+        && flow_version_hash.is_none()
+        && sampling_rate_hash.is_none()
     {
         return None;
     }
 
     let mut hasher = DefaultHasher::default();
-    exporter_ip.hash(&mut hasher);
-    exporter_name.hash(&mut hasher);
-    flow_version.hash(&mut hasher);
-    sampling_rate.hash(&mut hasher);
+    exporter_ip_hash.hash(&mut hasher);
+    exporter_name_hash.hash(&mut hasher);
+    flow_version_hash.hash(&mut hasher);
+    sampling_rate_hash.hash(&mut hasher);
     Some(hasher.finish())
+}
+
+fn exporter_identity_fingerprint(record: &FlowRecord) -> Option<u64> {
+    let exporter_ip_hash = record
+        .fields
+        .get("EXPORTER_IP")
+        .map(String::as_str)
+        .filter(|value| !value.is_empty())
+        .map(fingerprint_value);
+    let exporter_name_hash = record
+        .fields
+        .get("EXPORTER_NAME")
+        .map(String::as_str)
+        .filter(|value| !value.is_empty())
+        .map(fingerprint_value);
+    let flow_version_hash = record
+        .fields
+        .get("FLOW_VERSION")
+        .map(String::as_str)
+        .filter(|value| !value.is_empty())
+        .map(fingerprint_value);
+    let sampling_rate_hash = record
+        .fields
+        .get("SAMPLING_RATE")
+        .map(String::as_str)
+        .filter(|value| !value.is_empty())
+        .map(fingerprint_value);
+
+    combined_exporter_fingerprint(
+        exporter_ip_hash,
+        exporter_name_hash,
+        flow_version_hash,
+        sampling_rate_hash,
+    )
 }
 
 fn fingerprint_value(value: &str) -> u64 {
@@ -1842,17 +2491,13 @@ fn compare_compact_aggregated(
 }
 
 fn rank_compact_aggregates(
-    aggregates: CompactGroupAccumulator,
+    aggregates: Vec<CompactAggregatedFlow>,
+    overflow: Option<CompactAggregatedFlow>,
     sort_by: SortBy,
     limit: usize,
 ) -> RankedCompactAggregates {
-    let grouped_total = aggregates.grouped_total();
-    let mut grouped: Vec<CompactAggregatedFlow> = aggregates
-        .buckets
-        .into_values()
-        .flat_map(|chain| chain.into_iter())
-        .collect();
-    if let Some(overflow_row) = aggregates.overflow.aggregate {
+    let mut grouped = aggregates;
+    if let Some(overflow_row) = overflow {
         grouped.push(overflow_row);
     }
     grouped.sort_by(|a, b| compare_compact_aggregated(a, b, sort_by));
@@ -1871,12 +2516,12 @@ fn rank_compact_aggregates(
     RankedCompactAggregates {
         rows,
         other,
-        grouped_total,
         truncated,
         other_count,
     }
 }
 
+#[cfg(test)]
 fn merge_other_bucket(rows: Vec<AggregatedFlow>) -> AggregatedFlow {
     let mut other = AggregatedFlow {
         labels: BTreeMap::from([(String::from("_bucket"), String::from(OTHER_BUCKET_LABEL))]),
@@ -1996,6 +2641,14 @@ fn resolve_effective_group_by(request: &FlowsRequest) -> Vec<String> {
     request.normalized_group_by()
 }
 
+fn grouped_query_can_use_projected_scan(request: &FlowsRequest) -> bool {
+    request.query.is_empty()
+        && request
+            .selections
+            .values()
+            .all(|values| !values.is_empty() && values.iter().all(|value| !value.is_empty()))
+}
+
 fn record_matches_selections(
     record: &FlowRecord,
     selections: &HashMap<String, Vec<String>>,
@@ -2024,16 +2677,31 @@ fn record_matches_regex(record: &FlowRecord, regex: Option<&Regex>) -> bool {
 }
 
 fn cursor_prefilter_pairs(selections: &HashMap<String, Vec<String>>) -> Vec<(String, String)> {
-    selections
+    let mut pairs = selections
         .iter()
-        .filter_map(|(field, values)| {
-            let value = values.first()?;
-            if values.len() != 1 || value.is_empty() {
-                return None;
-            }
-            Some((field.to_ascii_uppercase(), value.clone()))
+        .flat_map(|(field, values)| {
+            values
+                .iter()
+                .filter(|value| !value.is_empty())
+                .map(|value| (field.to_ascii_uppercase(), value.clone()))
         })
-        .collect()
+        .collect::<Vec<_>>();
+    pairs.sort_unstable();
+    pairs
+}
+
+fn split_payload(payload: &[u8]) -> Option<(&str, &[u8])> {
+    let eq_pos = payload.iter().position(|&byte| byte == b'=')?;
+    let key = std::str::from_utf8(&payload[..eq_pos]).ok()?;
+    Some((key, &payload[eq_pos + 1..]))
+}
+
+fn parse_u64_ascii(bytes: &[u8]) -> Option<u64> {
+    std::str::from_utf8(bytes).ok()?.parse::<u64>().ok()
+}
+
+fn payload_value(value_bytes: &[u8]) -> Cow<'_, str> {
+    String::from_utf8_lossy(value_bytes)
 }
 
 fn field_is_raw_only(field: &str) -> bool {
@@ -2115,7 +2783,7 @@ fn accumulate_record(
     facet_values: &mut BTreeMap<String, FacetFieldAccumulator>,
     max_groups: usize,
     facet_max_values_per_field: usize,
-) {
+) -> Result<()> {
     let metrics = metrics_from_fields(&record.fields);
     accumulate_compact_grouped_record(
         record,
@@ -2124,8 +2792,9 @@ fn accumulate_record(
         group_by,
         grouped_aggregates,
         max_groups,
-    );
+    )?;
     accumulate_facet_record(record, metrics, facet_values, facet_max_values_per_field);
+    Ok(())
 }
 
 fn accumulate_facet_record(
@@ -2152,6 +2821,39 @@ fn accumulate_facet_record(
         field_acc.overflow_metrics.add(metrics);
         field_acc.overflow_records = field_acc.overflow_records.saturating_add(1);
     }
+}
+
+fn accumulate_facet_value(
+    by_field: &mut BTreeMap<String, FacetFieldAccumulator>,
+    field: &str,
+    value: &str,
+    metrics: FlowMetrics,
+    facet_max_values_per_field: usize,
+) {
+    if let Some(field_acc) = by_field.get_mut(field) {
+        if let Some(existing) = field_acc.values.get_mut(value) {
+            existing.add(metrics);
+            return;
+        }
+
+        if field_acc.values.len() < facet_max_values_per_field {
+            field_acc.values.insert(value.to_string(), metrics);
+            return;
+        }
+
+        field_acc.overflow_metrics.add(metrics);
+        field_acc.overflow_records = field_acc.overflow_records.saturating_add(1);
+        return;
+    }
+
+    let mut field_acc = FacetFieldAccumulator::default();
+    if facet_max_values_per_field > 0 {
+        field_acc.values.insert(value.to_string(), metrics);
+    } else {
+        field_acc.overflow_metrics.add(metrics);
+        field_acc.overflow_records = 1;
+    }
+    by_field.insert(field.to_string(), field_acc);
 }
 
 fn build_facets_from_accumulator(
@@ -2186,6 +2888,7 @@ fn build_facets_from_accumulator(
             .map(|(value, metrics)| {
                 json!({
                     "value": value,
+                    "name": presentation::field_value_name(&field, &value).unwrap_or_else(|| value.clone()),
                     "metrics": metrics.to_value(),
                 })
             })
@@ -2193,6 +2896,7 @@ fn build_facets_from_accumulator(
 
         fields.push(json!({
             "field": field,
+            "name": presentation::field_display_name(&field),
             "total_values": total_values,
             "truncated": truncated,
             "overflowed": field_acc.overflow_records > 0,
@@ -2309,7 +3013,7 @@ fn metrics_chart_from_top_groups(
         .map(|row| {
             row.labels
                 .iter()
-                .map(|(key, value)| format!("{key}={value}"))
+                .map(|(key, value)| presentation::format_group_name(key, value))
                 .collect::<Vec<_>>()
                 .join(", ")
         })
@@ -2559,6 +3263,7 @@ mod tests {
     };
     use crate::rollup::build_rollup_key;
     use std::collections::{BTreeMap, HashMap};
+    use std::time::Instant;
 
     #[test]
     fn rollup_dimensions_exclude_only_metrics_and_internal() {
@@ -2918,16 +3623,26 @@ mod tests {
     }
 
     #[test]
-    fn cursor_prefilter_skips_multi_value_selections() {
+    fn cursor_prefilter_includes_multi_value_selections_as_or_matches() {
         let selections = HashMap::from([
             ("FLOW_VERSION".to_string(), vec!["v5".to_string()]),
-            ("PROTOCOL".to_string(), vec!["6".to_string(), "17".to_string()]),
+            (
+                "PROTOCOL".to_string(),
+                vec!["6".to_string(), "17".to_string()],
+            ),
             ("DST_PORT".to_string(), vec!["".to_string()]),
         ]);
 
         let pairs = super::cursor_prefilter_pairs(&selections);
 
-        assert_eq!(pairs, vec![("FLOW_VERSION".to_string(), "v5".to_string())]);
+        assert_eq!(
+            pairs,
+            vec![
+                ("FLOW_VERSION".to_string(), "v5".to_string()),
+                ("PROTOCOL".to_string(), "17".to_string()),
+                ("PROTOCOL".to_string(), "6".to_string()),
+            ]
+        );
     }
 
     #[test]
@@ -2974,8 +3689,9 @@ mod tests {
 
     #[test]
     fn compact_grouped_accumulator_routes_new_groups_to_overflow_after_cap() {
-        let mut aggregates = super::CompactGroupAccumulator::default();
         let group_by = vec!["PROTOCOL".to_string()];
+        let mut aggregates =
+            super::CompactGroupAccumulator::new(&group_by).expect("compact accumulator");
 
         for idx in 0..super::DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS {
             let record = super::FlowRecord {
@@ -2993,7 +3709,8 @@ mod tests {
                 &group_by,
                 &mut aggregates,
                 super::DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS,
-            );
+            )
+            .expect("accumulate compact record");
         }
 
         let overflow_record = super::FlowRecord {
@@ -3011,7 +3728,8 @@ mod tests {
             &group_by,
             &mut aggregates,
             super::DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS,
-        );
+        )
+        .expect("accumulate compact overflow record");
 
         assert_eq!(
             aggregates.grouped_total(),
@@ -3162,7 +3880,7 @@ mod tests {
             &series_buckets,
         );
 
-        assert_eq!(chart["result"]["labels"][1], "PROTOCOL=6");
+        assert_eq!(chart["result"]["labels"][1], "Protocol=TCP");
         assert_eq!(chart["view"]["chart_type"], "stacked");
         assert_eq!(
             chart["view"]["dimensions"]["ids"]
@@ -3178,6 +3896,215 @@ mod tests {
             .map(|row| row[1][0].as_f64().unwrap_or(0.0))
             .sum();
         assert_eq!(total, 2.5);
+    }
+
+    fn synthetic_rollup_record(group: usize, timestamp_usec: u64) -> super::FlowRecord {
+        let protocol = if group % 2 == 0 { "6" } else { "17" };
+        let src_as = 64_512 + (group % 4_096);
+        let dst_as = 65_000 + (group % 4_096);
+        let in_if = 10 + (group % 128);
+        let out_if = 20 + (group % 128);
+        let exporter_id = group % 32;
+        let site = format!("site-{}", group % 8);
+        let region = format!("region-{}", group % 4);
+        let tenant = format!("tenant-{}", group % 16);
+        let src_country = if group % 3 == 0 { "US" } else { "DE" };
+        let dst_country = if group % 5 == 0 { "GB" } else { "FR" };
+
+        super::FlowRecord {
+            timestamp_usec,
+            fields: BTreeMap::from([
+                (
+                    "DIRECTION".to_string(),
+                    if group % 2 == 0 { "ingress" } else { "egress" }.to_string(),
+                ),
+                ("PROTOCOL".to_string(), protocol.to_string()),
+                ("ETYPE".to_string(), "2048".to_string()),
+                ("FORWARDING_STATUS".to_string(), "0".to_string()),
+                ("FLOW_VERSION".to_string(), "ipfix".to_string()),
+                ("IPTOS".to_string(), "0".to_string()),
+                (
+                    "TCP_FLAGS".to_string(),
+                    if protocol == "6" { "24" } else { "0" }.to_string(),
+                ),
+                ("ICMPV4_TYPE".to_string(), "0".to_string()),
+                ("ICMPV4_CODE".to_string(), "0".to_string()),
+                ("ICMPV6_TYPE".to_string(), "0".to_string()),
+                ("ICMPV6_CODE".to_string(), "0".to_string()),
+                ("SRC_AS".to_string(), src_as.to_string()),
+                ("DST_AS".to_string(), dst_as.to_string()),
+                ("SRC_AS_NAME".to_string(), format!("Source AS {}", src_as)),
+                (
+                    "DST_AS_NAME".to_string(),
+                    format!("Destination AS {}", dst_as),
+                ),
+                (
+                    "EXPORTER_IP".to_string(),
+                    format!("192.0.2.{}", exporter_id + 1),
+                ),
+                ("EXPORTER_PORT".to_string(), "2055".to_string()),
+                (
+                    "EXPORTER_NAME".to_string(),
+                    format!("edge-router-{}", exporter_id),
+                ),
+                (
+                    "EXPORTER_GROUP".to_string(),
+                    format!("group-{}", exporter_id % 4),
+                ),
+                ("EXPORTER_ROLE".to_string(), "edge".to_string()),
+                ("EXPORTER_SITE".to_string(), site.clone()),
+                ("EXPORTER_REGION".to_string(), region.clone()),
+                ("EXPORTER_TENANT".to_string(), tenant.clone()),
+                ("IN_IF".to_string(), in_if.to_string()),
+                ("OUT_IF".to_string(), out_if.to_string()),
+                ("IN_IF_NAME".to_string(), format!("xe-0/0/{}", in_if % 16)),
+                ("OUT_IF_NAME".to_string(), format!("xe-0/1/{}", out_if % 16)),
+                (
+                    "IN_IF_DESCRIPTION".to_string(),
+                    format!("uplink-{}", in_if % 8),
+                ),
+                (
+                    "OUT_IF_DESCRIPTION".to_string(),
+                    format!("peer-{}", out_if % 8),
+                ),
+                ("IN_IF_SPEED".to_string(), "10000000000".to_string()),
+                ("OUT_IF_SPEED".to_string(), "10000000000".to_string()),
+                ("IN_IF_PROVIDER".to_string(), "isp-a".to_string()),
+                ("OUT_IF_PROVIDER".to_string(), "isp-b".to_string()),
+                ("IN_IF_CONNECTIVITY".to_string(), "transit".to_string()),
+                ("OUT_IF_CONNECTIVITY".to_string(), "transit".to_string()),
+                ("IN_IF_BOUNDARY".to_string(), "1".to_string()),
+                ("OUT_IF_BOUNDARY".to_string(), "1".to_string()),
+                (
+                    "SRC_NET_NAME".to_string(),
+                    format!("src-net-{}", group % 64),
+                ),
+                (
+                    "DST_NET_NAME".to_string(),
+                    format!("dst-net-{}", group % 64),
+                ),
+                ("SRC_NET_ROLE".to_string(), "application".to_string()),
+                ("DST_NET_ROLE".to_string(), "service".to_string()),
+                ("SRC_NET_SITE".to_string(), site.clone()),
+                ("DST_NET_SITE".to_string(), site),
+                ("SRC_NET_REGION".to_string(), region.clone()),
+                ("DST_NET_REGION".to_string(), region),
+                ("SRC_NET_TENANT".to_string(), tenant.clone()),
+                ("DST_NET_TENANT".to_string(), tenant),
+                ("SRC_COUNTRY".to_string(), src_country.to_string()),
+                ("DST_COUNTRY".to_string(), dst_country.to_string()),
+                ("SRC_GEO_CITY".to_string(), "Athens".to_string()),
+                ("DST_GEO_CITY".to_string(), "Paris".to_string()),
+                ("SRC_GEO_STATE".to_string(), "Attica".to_string()),
+                ("DST_GEO_STATE".to_string(), "Ile-de-France".to_string()),
+                ("NEXT_HOP".to_string(), "198.51.100.1".to_string()),
+                ("SRC_VLAN".to_string(), "100".to_string()),
+                ("DST_VLAN".to_string(), "200".to_string()),
+                ("SAMPLING_RATE".to_string(), "1".to_string()),
+                (
+                    "BYTES".to_string(),
+                    (1_500 + (group % 4_000) as u64).to_string(),
+                ),
+                (
+                    "PACKETS".to_string(),
+                    (10 + (group % 200) as u64).to_string(),
+                ),
+                (
+                    "RAW_BYTES".to_string(),
+                    (1_500 + (group % 4_000) as u64).to_string(),
+                ),
+                (
+                    "RAW_PACKETS".to_string(),
+                    (10 + (group % 200) as u64).to_string(),
+                ),
+            ]),
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_long_window_accumulation_cost_centers() {
+        let group_by = vec![
+            "PROTOCOL".to_string(),
+            "SRC_AS_NAME".to_string(),
+            "DST_AS_NAME".to_string(),
+        ];
+        let record_count = 200_000usize;
+        let group_count = 20_000usize;
+        let records = (0..record_count)
+            .map(|idx| synthetic_rollup_record(idx % group_count, idx as u64 * 1_000_000))
+            .collect::<Vec<_>>();
+
+        let start = Instant::now();
+        let mut compact_only =
+            super::CompactGroupAccumulator::new(&group_by).expect("compact accumulator");
+        for record in &records {
+            super::accumulate_compact_grouped_record(
+                record,
+                super::RecordHandle::JournalRealtime(record.timestamp_usec),
+                metrics_from_fields(&record.fields),
+                &group_by,
+                &mut compact_only,
+                super::DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS,
+            )
+            .expect("compact accumulation");
+        }
+        let compact_elapsed = start.elapsed();
+
+        let start = Instant::now();
+        let mut compact_with_facets =
+            super::CompactGroupAccumulator::new(&group_by).expect("compact accumulator");
+        let mut facet_values: BTreeMap<String, super::FacetFieldAccumulator> = BTreeMap::new();
+        for record in &records {
+            super::accumulate_record(
+                record,
+                super::RecordHandle::JournalRealtime(record.timestamp_usec),
+                &group_by,
+                &mut compact_with_facets,
+                &mut facet_values,
+                super::DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS,
+                super::DEFAULT_FACET_ACCUMULATOR_MAX_VALUES_PER_FIELD,
+            )
+            .expect("table accumulation with facets");
+        }
+        let with_facets_elapsed = start.elapsed();
+
+        let start = Instant::now();
+        let facets_payload = super::build_facets_from_accumulator(
+            facet_values,
+            SortBy::Bytes,
+            &group_by,
+            &HashMap::new(),
+            super::DEFAULT_FACET_ACCUMULATOR_MAX_VALUES_PER_FIELD,
+        );
+        let facet_finalize_elapsed = start.elapsed();
+
+        let compact_ms = compact_elapsed.as_secs_f64() * 1_000.0;
+        let with_facets_ms = with_facets_elapsed.as_secs_f64() * 1_000.0;
+        let finalize_ms = facet_finalize_elapsed.as_secs_f64() * 1_000.0;
+        let ratio = if compact_ms > 0.0 {
+            with_facets_ms / compact_ms
+        } else {
+            0.0
+        };
+
+        eprintln!();
+        eprintln!("=== Long Window Query Cost Centers ===");
+        eprintln!("records:                 {}", record_count);
+        eprintln!("distinct groups:         {}", group_count);
+        eprintln!("group-by:                {:?}", group_by);
+        eprintln!("compact grouping only:   {:.2} ms", compact_ms);
+        eprintln!("grouping + facets scan:  {:.2} ms", with_facets_ms);
+        eprintln!("facet finalize only:     {:.2} ms", finalize_ms);
+        eprintln!("facet scan ratio:        {:.2}x", ratio);
+        eprintln!(
+            "facet fields returned:   {}",
+            facets_payload["fields"]
+                .as_array()
+                .map(|rows| rows.len())
+                .unwrap_or(0)
+        );
+        eprintln!();
     }
 
     #[test]

@@ -2302,6 +2302,7 @@ dependencies = [
  "journal-registry",
  "journal-session",
  "maxminddb",
+ "netdata-flow-index",
  "netdata-plugin-error",
  "netdata-plugin-protocol",
  "netflow_parser",

@@ -330,6 +330,26 @@ where
         self.field_stores[field_index].get_or_insert(value, &self.hasher)
     }
 
+    pub fn find_field_value(
+        &self,
+        field_index: usize,
+        value: FieldValue<'_>,
+    ) -> Result<Option<FieldId>, FlowIndexError> {
+        let field = self
+            .schema
+            .field(field_index)
+            .ok_or(FlowIndexError::InvalidFieldIndex { field_index })?;
+        if value.kind() != field.kind() {
+            return Err(FlowIndexError::FieldKindMismatch {
+                field_name: field.name().to_string(),
+                expected: field.kind(),
+                actual: value.kind(),
+            });
+        }
+
+        Ok(self.field_stores[field_index].find(value, &self.hasher))
+    }
+
     pub fn field_value(&self, field_index: usize, field_id: FieldId) -> Option<FieldValue<'_>> {
         self.field_stores.get(field_index)?.value(field_id)
     }
@@ -377,20 +397,67 @@ where
             field_ids.push(self.get_or_insert_field_value(index, value)?);
         }
 
-        let hash = self.hasher.hash_u32_slice(&field_ids);
-        if let Some(existing_id) = self
-            .flow_lookup
-            .find(hash, |flow_id| {
-                self.flow_slice(*flow_id)
-                    .is_some_and(|ids| ids == field_ids.as_slice())
-            })
-            .copied()
-        {
+        if let Some(existing_id) = self.find_flow_by_field_ids(&field_ids)? {
             return Ok(existing_id);
         }
 
+        self.insert_flow_by_field_ids(&field_ids)
+    }
+
+    pub fn find_flow(&self, values: &[FieldValue<'_>]) -> Result<Option<FlowId>, FlowIndexError> {
+        if values.len() != self.schema.len() {
+            return Err(FlowIndexError::FieldCountMismatch {
+                expected: self.schema.len(),
+                actual: values.len(),
+            });
+        }
+
+        let mut field_ids = Vec::with_capacity(values.len());
+        for (index, value) in values.iter().copied().enumerate() {
+            let Some(field_id) = self.find_field_value(index, value)? else {
+                return Ok(None);
+            };
+            field_ids.push(field_id);
+        }
+
+        self.find_flow_by_field_ids(&field_ids)
+    }
+
+    pub fn find_flow_by_field_ids(
+        &self,
+        field_ids: &[FieldId],
+    ) -> Result<Option<FlowId>, FlowIndexError> {
+        if field_ids.len() != self.schema.len() {
+            return Err(FlowIndexError::FieldCountMismatch {
+                expected: self.schema.len(),
+                actual: field_ids.len(),
+            });
+        }
+
+        let hash = self.hasher.hash_u32_slice(field_ids);
+        Ok(self
+            .flow_lookup
+            .find(hash, |flow_id| {
+                self.flow_slice(*flow_id)
+                    .is_some_and(|ids| ids == field_ids)
+            })
+            .copied())
+    }
+
+    pub fn insert_flow_by_field_ids(
+        &mut self,
+        field_ids: &[FieldId],
+    ) -> Result<FlowId, FlowIndexError> {
+        if field_ids.len() != self.schema.len() {
+            return Err(FlowIndexError::FieldCountMismatch {
+                expected: self.schema.len(),
+                actual: field_ids.len(),
+            });
+        }
+
+        let hash = self.hasher.hash_u32_slice(field_ids);
         let flow_id = next_flow_id(self.flow_count())?;
-        self.flow_values.extend_from_slice(&field_ids);
+        self.flow_values.extend_from_slice(field_ids);
 
         let flow_values = &self.flow_values;
         let arity = self.schema.len();
@@ -573,6 +640,13 @@ impl TextFieldStore {
         Ok(field_id)
     }
 
+    fn find<H: HashStrategy>(&self, value: &str, hasher: &H) -> Option<FieldId> {
+        let hash = hasher.hash_bytes(value.as_bytes());
+        self.lookup
+            .find(hash, |field_id| self.value_str(*field_id) == Some(value))
+            .copied()
+    }
+
     fn value_str(&self, field_id: FieldId) -> Option<&str> {
         let entry = self.entries.get(field_id as usize)?;
         let start = entry.offset as usize;
@@ -629,6 +703,13 @@ macro_rules! define_numeric_store {
                     });
 
                 Ok(field_id)
+            }
+
+            fn find<H: HashStrategy>(&self, value: $ty, hasher: &H) -> Option<FieldId> {
+                let hash = hasher.$hash_method(value);
+                self.lookup
+                    .find(hash, |field_id| self.values[*field_id as usize] == value)
+                    .copied()
             }
 
             fn value(&self, field_id: FieldId) -> Option<FieldValue<'_>> {
@@ -691,6 +772,14 @@ impl IpFieldStore {
         Ok(field_id)
     }
 
+    fn find<H: HashStrategy>(&self, value: IpAddr, hasher: &H) -> Option<FieldId> {
+        let packed = PackedIpAddr::from_ip(value);
+        let hash = hasher.hash_ip_parts(packed.family, &packed.bytes);
+        self.lookup
+            .find(hash, |field_id| self.values[*field_id as usize] == packed)
+            .copied()
+    }
+
     fn value(&self, field_id: FieldId) -> Option<FieldValue<'_>> {
         Some(FieldValue::IpAddr(
             self.values.get(field_id as usize)?.to_owned().into_ip(),
@@ -737,6 +826,18 @@ impl FieldStore {
             (Self::U32(store), FieldValue::U32(value)) => store.get_or_insert(value, hasher),
             (Self::U64(store), FieldValue::U64(value)) => store.get_or_insert(value, hasher),
             (Self::IpAddr(store), FieldValue::IpAddr(value)) => store.get_or_insert(value, hasher),
+            _ => unreachable!("field kind mismatch is validated by caller"),
+        }
+    }
+
+    fn find<H: HashStrategy>(&self, value: FieldValue<'_>, hasher: &H) -> Option<FieldId> {
+        match (self, value) {
+            (Self::Text(store), FieldValue::Text(value)) => store.find(value, hasher),
+            (Self::U8(store), FieldValue::U8(value)) => store.find(value, hasher),
+            (Self::U16(store), FieldValue::U16(value)) => store.find(value, hasher),
+            (Self::U32(store), FieldValue::U32(value)) => store.find(value, hasher),
+            (Self::U64(store), FieldValue::U64(value)) => store.find(value, hasher),
+            (Self::IpAddr(store), FieldValue::IpAddr(value)) => store.find(value, hasher),
             _ => unreachable!("field kind mismatch is validated by caller"),
         }
     }
@@ -893,6 +994,76 @@ mod tests {
                 OwnedFieldValue::U64(123456),
                 OwnedFieldValue::Text("CLOUDFLARENET".into()),
             ])
+        );
+    }
+
+    #[test]
+    fn find_flow_does_not_insert_missing_values() {
+        let mut index = FlowIndex::new([
+            FieldSpec::new("SRC_AS_NAME", FieldKind::Text),
+            FieldSpec::new("PROTOCOL", FieldKind::Text),
+        ])
+        .expect("index");
+
+        assert_eq!(
+            index
+                .find_flow(&[FieldValue::Text("CLOUDFLARE"), FieldValue::Text("TCP")])
+                .expect("find flow"),
+            None
+        );
+        assert_eq!(index.flow_count(), 0);
+
+        let flow_id = index
+            .get_or_insert_flow(&[FieldValue::Text("CLOUDFLARE"), FieldValue::Text("TCP")])
+            .expect("insert flow");
+
+        assert_eq!(
+            index
+                .find_flow(&[FieldValue::Text("CLOUDFLARE"), FieldValue::Text("TCP")])
+                .expect("find inserted flow"),
+            Some(flow_id)
+        );
+    }
+
+    #[test]
+    fn find_flow_by_field_ids_reuses_exact_tuple_under_total_hash_collision() {
+        let mut index = FlowIndex::with_hasher(
+            [
+                FieldSpec::new("SRC_AS_NAME", FieldKind::Text),
+                FieldSpec::new("DST_PORT", FieldKind::U16),
+            ],
+            ConstantHashStrategy,
+        )
+        .expect("index");
+
+        let src_a = index
+            .get_or_insert_field_value(0, FieldValue::Text("A"))
+            .expect("src a");
+        let src_b = index
+            .get_or_insert_field_value(0, FieldValue::Text("B"))
+            .expect("src b");
+        let port_443 = index
+            .get_or_insert_field_value(1, FieldValue::U16(443))
+            .expect("port 443");
+
+        let flow_a = index
+            .insert_flow_by_field_ids(&[src_a, port_443])
+            .expect("insert flow a");
+        let flow_b = index
+            .insert_flow_by_field_ids(&[src_b, port_443])
+            .expect("insert flow b");
+
+        assert_eq!(
+            index
+                .find_flow_by_field_ids(&[src_a, port_443])
+                .expect("find a"),
+            Some(flow_a)
+        );
+        assert_eq!(
+            index
+                .find_flow_by_field_ids(&[src_b, port_443])
+                .expect("find b"),
+            Some(flow_b)
         );
     }
 

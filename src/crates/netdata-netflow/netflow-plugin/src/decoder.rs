@@ -2561,23 +2561,20 @@ fn decode_v9_special_record(
                 .or_insert_with(|| canonical_value(canonical, &value).to_string());
         }
 
-        if matches!(field, V9Field::FirstSwitched | V9Field::FlowStartMilliseconds) {
-            flow_start_usec = value
-                .parse::<u64>()
-                .ok()
-                .map(|switched_millis| {
-                    netflow_v9_uptime_millis_to_absolute_usec(system_init_usec, switched_millis)
-                });
+        if matches!(
+            field,
+            V9Field::FirstSwitched | V9Field::FlowStartMilliseconds
+        ) {
+            flow_start_usec = value.parse::<u64>().ok().map(|switched_millis| {
+                netflow_v9_uptime_millis_to_absolute_usec(system_init_usec, switched_millis)
+            });
             continue;
         }
 
         if matches!(field, V9Field::LastSwitched | V9Field::FlowEndMilliseconds) {
-            flow_end_usec = value
-                .parse::<u64>()
-                .ok()
-                .map(|switched_millis| {
-                    netflow_v9_uptime_millis_to_absolute_usec(system_init_usec, switched_millis)
-                });
+            flow_end_usec = value.parse::<u64>().ok().map(|switched_millis| {
+                netflow_v9_uptime_millis_to_absolute_usec(system_init_usec, switched_millis)
+            });
             continue;
         }
     }
@@ -3399,13 +3396,18 @@ fn append_v9_records(
                         rec.flows = 1;
                     }
                     rec.flow_start_usec = first_switched_millis
-                        .map(|value| netflow_v9_uptime_millis_to_absolute_usec(system_init_usec, value))
+                        .map(|value| {
+                            netflow_v9_uptime_millis_to_absolute_usec(system_init_usec, value)
+                        })
                         .unwrap_or(0);
                     rec.flow_end_usec = last_switched_millis
-                        .map(|value| netflow_v9_uptime_millis_to_absolute_usec(system_init_usec, value))
+                        .map(|value| {
+                            netflow_v9_uptime_millis_to_absolute_usec(system_init_usec, value)
+                        })
                         .unwrap_or(0);
                     finalize_record(&mut rec);
-                    let first_switched_usec = (rec.flow_start_usec != 0).then_some(rec.flow_start_usec);
+                    let first_switched_usec =
+                        (rec.flow_start_usec != 0).then_some(rec.flow_start_usec);
                     out.push(DecodedFlow {
                         record: rec,
                         source_realtime_usec: timestamp_source.select(
@@ -3542,7 +3544,8 @@ fn append_ipfix_records(
                             continue;
                         }
 
-                        if let IPFixField::IANA(IANAIPFixField::SystemInitTimeMilliseconds) = &field {
+                        if let IPFixField::IANA(IANAIPFixField::SystemInitTimeMilliseconds) = &field
+                        {
                             system_init_millis = field_value_unsigned(&value);
                         }
 
@@ -3689,7 +3692,8 @@ fn append_ipfix_records(
                         reverse_overrides.insert("FLOW_END_USEC", end_usec.to_string());
                     }
                     finalize_record(&mut rec);
-                    let first_switched_usec = (rec.flow_start_usec != 0).then_some(rec.flow_start_usec);
+                    let first_switched_usec =
+                        (rec.flow_start_usec != 0).then_some(rec.flow_start_usec);
                     let source_ts = timestamp_source.select(
                         input_realtime_usec,
                         Some(export_usec),
@@ -5598,16 +5602,21 @@ fn reverse_ipfix_timestamp_to_usec(
             field_value_unsigned(value).map(unix_seconds_to_usec)
         }
         ReverseInformationElement::ReverseFlowStartMilliseconds
-        | ReverseInformationElement::ReverseFlowEndMilliseconds => field_value_unsigned(value)
-            .map(|v| v.saturating_mul(USEC_PER_MILLISECOND)),
+        | ReverseInformationElement::ReverseFlowEndMilliseconds => {
+            field_value_unsigned(value).map(|v| v.saturating_mul(USEC_PER_MILLISECOND))
+        }
         ReverseInformationElement::ReverseFlowStartMicroseconds
         | ReverseInformationElement::ReverseFlowEndMicroseconds
         | ReverseInformationElement::ReverseMinFlowStartMicroseconds
-        | ReverseInformationElement::ReverseMaxFlowEndMicroseconds => field_value_duration_usec(value),
+        | ReverseInformationElement::ReverseMaxFlowEndMicroseconds => {
+            field_value_duration_usec(value)
+        }
         ReverseInformationElement::ReverseFlowStartNanoseconds
         | ReverseInformationElement::ReverseFlowEndNanoseconds
         | ReverseInformationElement::ReverseMinFlowStartNanoseconds
-        | ReverseInformationElement::ReverseMaxFlowEndNanoseconds => field_value_duration_usec(value),
+        | ReverseInformationElement::ReverseMaxFlowEndNanoseconds => {
+            field_value_duration_usec(value)
+        }
         ReverseInformationElement::ReverseFlowStartDeltaMicroseconds
         | ReverseInformationElement::ReverseFlowEndDeltaMicroseconds => {
             field_value_unsigned(value).map(|delta| export_usec.saturating_sub(delta))
@@ -5615,8 +5624,9 @@ fn reverse_ipfix_timestamp_to_usec(
         ReverseInformationElement::ReverseFlowStartSysUpTime
         | ReverseInformationElement::ReverseFlowEndSysUpTime => {
             let system_init_usec = system_init_millis?.saturating_mul(USEC_PER_MILLISECOND);
-            field_value_unsigned(value)
-                .map(|uptime_millis| system_init_usec.saturating_add(uptime_millis.saturating_mul(USEC_PER_MILLISECOND)))
+            field_value_unsigned(value).map(|uptime_millis| {
+                system_init_usec.saturating_add(uptime_millis.saturating_mul(USEC_PER_MILLISECOND))
+            })
         }
         _ => None,
     }
@@ -5641,7 +5651,9 @@ fn resolve_ipfix_time_usec(
         .or_else(|| {
             let system_init_usec = system_init_millis?.saturating_mul(USEC_PER_MILLISECOND);
             let uptime_millis = sys_uptime_millis?;
-            Some(system_init_usec.saturating_add(uptime_millis.saturating_mul(USEC_PER_MILLISECOND)))
+            Some(
+                system_init_usec.saturating_add(uptime_millis.saturating_mul(USEC_PER_MILLISECOND)),
+            )
         })
 }
 
