@@ -17,6 +17,7 @@
 #define HEALTH_MAX_SHUTDOWN_TIMEOUT_SECONDS (60)
 #define HEALTH_CLEANUP_FIRST_RUN_DELAY (1800)     // First cleanup 30 min after startup
 #define HEALTH_CLEANUP_INTERVAL (3600)            // Cleanup every hour
+#define HEALTH_MAX_DRAIN_ITERATIONS (50)          // Max drain loop iterations during shutdown
 // Global configuration structure
 static struct health_event_loop_config health_config = { 0 };
 
@@ -297,6 +298,8 @@ struct health_cleanup_work {
 };
 
 static void health_cleanup_work_cb(uv_work_t *req) {
+    register_libuv_worker_jobs();
+    worker_is_busy(UV_EVENT_HEALTH_CLEANUP);
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "HEALTH: Starting health log cleanup");
 
     // Cleanup each host's health log
@@ -317,6 +320,7 @@ static void health_cleanup_work_cb(uv_work_t *req) {
     (void)db_execute(db_meta, SQL_DELETE_ORPHAN_ALERT_VERSION, NULL);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "HEALTH: Health log cleanup completed");
+    worker_is_idle();
 }
 
 static void health_cleanup_after_work_cb(uv_work_t *req, int status __maybe_unused) {
@@ -392,6 +396,10 @@ static inline bool check_if_resumed_from_suspension(struct health_event_loop_con
 
 static void health_host_work_cb(uv_work_t *req) {
     struct health_host_work *work = req->data;
+
+    // Register this pool thread with the LIBUV worker utilization system
+    // (one-time per thread via thread-local guard inside register_libuv_worker_jobs)
+    register_libuv_worker_jobs();
 
     // Check for shutdown before starting work
     if (__atomic_load_n(&work->config->shutdown_requested, __ATOMIC_RELAXED)) {
@@ -568,6 +576,61 @@ static void health_finalize_all_statements(struct health_event_loop_config *conf
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// Shutdown helpers
+
+// Drain all remaining commands from the cmd_pool, collecting save/delete
+// entries so they can be processed before final teardown.  Commands other
+// than SAVE/DELETE (e.g. stale TIMER_TICKs) are harmlessly discarded.
+static void health_drain_remaining_commands(struct health_event_loop_config *config) {
+    size_t saved = 0, deleted = 0, discarded = 0;
+
+    while (true) {
+        cmd_data_t cmd = { 0 };
+        cmd.opcode = HEALTH_NOOP;
+        (void)pop_cmd(&config->cmd_pool, &cmd);
+
+        if (cmd.opcode == HEALTH_NOOP)
+            break;
+
+        switch (cmd.opcode) {
+            case HEALTH_SAVE_ALERT_TRANSITION: {
+                ALARM_ENTRY *ae = (ALARM_ENTRY *)cmd.param[0];
+                if (!config->pending_alerts)
+                    config->pending_alerts = callocz(1, sizeof(*config->pending_alerts));
+
+                Pvoid_t *Pvalue = JudyLIns(&config->pending_alerts->JudyL,
+                                           ++config->pending_alerts->count, PJE0);
+                if (unlikely(Pvalue == PJERR))
+                    fatal("HEALTH: Failed to insert ae into pending_alerts Judy array");
+                *Pvalue = (void *)ae;
+                saved++;
+                break;
+            }
+
+            case HEALTH_DELETE_ALERT_ENTRY: {
+                ALARM_ENTRY *ae = (ALARM_ENTRY *)cmd.param[0];
+                Pvoid_t *Pvalue = JudyLIns(&config->ae_pending_deletion, ++config->ae_deletion_next_id, PJE0);
+                if (Pvalue == PJERR)
+                    nd_log(NDLS_DAEMON, NDLP_ERR, "HEALTH: Failed to track alert entry for deletion");
+                else
+                    *Pvalue = ae;
+                deleted++;
+                break;
+            }
+
+            default:
+                discarded++;
+                break;
+        }
+    }
+
+    if (saved || deleted || discarded)
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "HEALTH: drained remaining commands at shutdown: %zu saves, %zu deletes, %zu discarded",
+               saved, deleted, discarded);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // Main event loop
 
 static void health_event_loop(void *arg) {
@@ -577,22 +640,12 @@ static void health_event_loop(void *arg) {
 
     init_cmd_pool(&config->cmd_pool, HEALTH_CMD_POOL_SIZE);
 
-    // Register worker job names
-    worker_register_job_name(WORKER_HEALTH_JOB_RRD_LOCK, "rrd lock");
-    worker_register_job_name(WORKER_HEALTH_JOB_HOST_LOCK, "host lock");
-    worker_register_job_name(WORKER_HEALTH_JOB_DB_QUERY, "db lookup");
-    worker_register_job_name(WORKER_HEALTH_JOB_CALC_EVAL, "calc eval");
-    worker_register_job_name(WORKER_HEALTH_JOB_WARNING_EVAL, "warning eval");
-    worker_register_job_name(WORKER_HEALTH_JOB_CRITICAL_EVAL, "critical eval");
-    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY, "alert log entry");
-    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS, "alert log process");
-    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE, "alert log queue");
-    worker_register_job_name(WORKER_HEALTH_JOB_WAIT_EXEC, "alert wait exec");
-    worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET, "rrdset init");
-    worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM, "rrddim init");
+    // Register worker job names for the main event loop thread.
+    // Per-host processing jobs on libuv pool threads are registered
+    // via register_libuv_worker_jobs() in the work callbacks.
     worker_register_job_name(WORKER_HEALTH_JOB_SAVE_ALERT_TRANSITION, "alert save");
-    worker_register_job_name(WORKER_HEALTH_JOB_CLEANUP, "health cleanup");
     worker_register_job_name(WORKER_HEALTH_JOB_DELETE_ALERT, "alert delete");
+    worker_register_job_name(WORKER_HEALTH_JOB_WAIT_EXEC, "alert wait exec");
 
     // Initialize statement pool (size from config, fall back to default)
     config->max_concurrent_workers = health_globals.config.max_concurrent_workers;
@@ -622,6 +675,7 @@ static void health_event_loop(void *arg) {
     // before other threads see initialized=true
     __atomic_store_n(&config->shutdown_requested, false, __ATOMIC_RELAXED);
     __atomic_store_n(&config->initialized, true, __ATOMIC_RELEASE);
+    __atomic_store_n(&config->started, true, __ATOMIC_RELEASE);
     completion_mark_complete(&config->start_stop_complete);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "HEALTH: event loop started");
@@ -713,6 +767,13 @@ static void health_event_loop(void *arg) {
                 if (!health_has_pending_work(config))
                     break;
 
+                if (++config->drain_iterations >= HEALTH_MAX_DRAIN_ITERATIONS) {
+                    nd_log(NDLS_DAEMON, NDLP_WARNING,
+                           "HEALTH: shutdown drain loop reached %zu iterations, forcing exit",
+                           config->drain_iterations);
+                    break;
+                }
+
                 // Work appeared after we sealed the queue (e.g. a worker completion
                 // callback produced new alerts).  Re-arm so producers can enqueue
                 // during the next drain iteration.
@@ -723,8 +784,41 @@ static void health_event_loop(void *arg) {
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "HEALTH: event loop shutting down");
 
-    // Process any remaining pending alerts before shutdown
+    // Ensure initialized is sealed so no new commands can be enqueued.
+    // (The drain loop sets it to false before breaking, but if we exited via
+    // the outer while(true) break path without entering the drain, seal it now.)
+    __atomic_store_n(&config->initialized, false, __ATOMIC_RELEASE);
+
+    // Stop timer so no new HEALTH_TIMER_TICK commands are enqueued
+    if (!uv_is_closing((uv_handle_t *)&config->timer_req) &&
+        !uv_timer_stop(&config->timer_req))
+        uv_close((uv_handle_t *)&config->timer_req, NULL);
+
+    // Close async handle
+    uv_close((uv_handle_t *)&config->async, NULL);
+
+    // Wait for active workers to complete, pumping the event loop so their
+    // after_work callbacks fire and any resulting commands land in the queue.
+    size_t loop_count = (HEALTH_MAX_SHUTDOWN_TIMEOUT_SECONDS * 1000) / HEALTH_SHUTDOWN_SLEEP_INTERVAL_MS;
+    while (__atomic_load_n(&config->active_workers, __ATOMIC_RELAXED) > 0 && loop_count > 0) {
+        uv_run(loop, UV_RUN_NOWAIT);
+        sleep_usec(HEALTH_SHUTDOWN_SLEEP_INTERVAL_MS * USEC_PER_MS);
+        loop_count--;
+    }
+
+    if (__atomic_load_n(&config->active_workers, __ATOMIC_RELAXED) > 0) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "HEALTH: %zu workers still active at shutdown",
+               __atomic_load_n(&config->active_workers, __ATOMIC_RELAXED));
+    }
+
+    // Drain any remaining commands from the queue.  This picks up
+    // HEALTH_SAVE_ALERT_TRANSITION / HEALTH_DELETE_ALERT_ENTRY commands that
+    // were enqueued before we sealed, or produced by after_work callbacks above.
+    health_drain_remaining_commands(config);
+
+    // Process all collected alert saves and deletions
     health_process_pending_alerts(config);
+    health_process_pending_deletions(config);
 
     // Wait for all in-flight notifications to complete before freeing alert entries
     // This prevents use-after-free when notification processes access alert data
@@ -752,31 +846,14 @@ static void health_event_loop(void *arg) {
             nd_log(NDLS_DAEMON, NDLP_DEBUG, "HEALTH: freed %zu pending alert deletions at shutdown", count);
     }
 
-    // initialized was already set to false inside the drain loop (line above)
-    // before the final break — no need to set it again.
-
-    // Stop timer
-    if (!uv_is_closing((uv_handle_t *)&config->timer_req) &&
-        !uv_timer_stop(&config->timer_req))
-        uv_close((uv_handle_t *)&config->timer_req, NULL);
-
-    // Close async handle
-    uv_close((uv_handle_t *)&config->async, NULL);
-
-    // Walk and close all handles
+    // Walk and close all remaining handles (e.g. timer/async close callbacks)
     uv_walk(loop, libuv_close_callback, NULL);
 
-    // Wait for pending workers and callbacks with timeout
-    size_t loop_count = (HEALTH_MAX_SHUTDOWN_TIMEOUT_SECONDS * 1000) / HEALTH_SHUTDOWN_SLEEP_INTERVAL_MS;
-    while ((__atomic_load_n(&config->active_workers, __ATOMIC_RELAXED) > 0 || uv_run(loop, UV_RUN_NOWAIT)) &&
-           loop_count > 0) {
+    // Run the loop until all close callbacks have fired
+    loop_count = (HEALTH_MAX_SHUTDOWN_TIMEOUT_SECONDS * 1000) / HEALTH_SHUTDOWN_SLEEP_INTERVAL_MS;
+    while (uv_run(loop, UV_RUN_NOWAIT) && loop_count > 0) {
         sleep_usec(HEALTH_SHUTDOWN_SLEEP_INTERVAL_MS * USEC_PER_MS);
         loop_count--;
-    }
-
-    if (__atomic_load_n(&config->active_workers, __ATOMIC_RELAXED) > 0) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "HEALTH: %zu workers still active at shutdown",
-               __atomic_load_n(&config->active_workers, __ATOMIC_RELAXED));
     }
 
     // Close the loop
@@ -819,7 +896,10 @@ void health_event_loop_init(void)
 }
 
 void health_event_loop_shutdown(void) {
-    if (!__atomic_load_n(&health_config.initialized, __ATOMIC_ACQUIRE)) {
+    // Check 'started' (set once, never cleared) instead of 'initialized' which is
+    // toggled during the shutdown drain loop — avoiding a race where the drain loop
+    // temporarily sets initialized=false and we'd skip shutdown entirely.
+    if (!__atomic_load_n(&health_config.started, __ATOMIC_ACQUIRE)) {
         nd_log(NDLS_DAEMON, NDLP_WARNING, "HEALTH: event loop not initialized, skipping shutdown");
         return;
     }

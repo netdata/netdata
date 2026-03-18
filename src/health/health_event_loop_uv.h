@@ -12,26 +12,12 @@ typedef struct sqlite3_stmt sqlite3_stmt;
 // Default/fallback for max concurrent workers (actual value from config)
 #define HEALTH_DEFAULT_CONCURRENT_WORKERS 4
 
-// Worker job IDs shared between health_event_loop.c and health_event_loop_uv.c
-#define WORKER_HEALTH_JOB_RRD_LOCK              0
-#define WORKER_HEALTH_JOB_HOST_LOCK             1
-#define WORKER_HEALTH_JOB_DB_QUERY              2
-#define WORKER_HEALTH_JOB_CALC_EVAL             3
-#define WORKER_HEALTH_JOB_WARNING_EVAL          4
-#define WORKER_HEALTH_JOB_CRITICAL_EVAL         5
-#define WORKER_HEALTH_JOB_ALARM_LOG_ENTRY       6
-#define WORKER_HEALTH_JOB_ALARM_LOG_PROCESS     7
-#define WORKER_HEALTH_JOB_ALARM_LOG_QUEUE       8
-#define WORKER_HEALTH_JOB_WAIT_EXEC             9
-#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET   10
-#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM   11
-#define WORKER_HEALTH_JOB_SAVE_ALERT_TRANSITION 12
-#define WORKER_HEALTH_JOB_CLEANUP               13
-#define WORKER_HEALTH_JOB_DELETE_ALERT          14
-
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 15
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 15
-#endif
+// Worker job IDs for the health main event loop thread only.
+// Per-host processing jobs that run on libuv pool threads use UV_EVENT_HEALTH_*
+// from libuv_workers.h (registered via register_libuv_worker_jobs()).
+#define WORKER_HEALTH_JOB_SAVE_ALERT_TRANSITION 0
+#define WORKER_HEALTH_JOB_DELETE_ALERT          1
+#define WORKER_HEALTH_JOB_WAIT_EXEC             2
 
 // Opcodes for the health event loop
 enum health_opcode {
@@ -95,7 +81,8 @@ struct health_event_loop_config {
     uv_async_t async;
     uv_timer_t timer_req;
 
-    bool initialized;
+    bool initialized;           // true while accepting commands (toggled during drain)
+    bool started;               // true once the event loop has been initialized (never reset)
     bool shutdown_requested;
 
     struct completion start_stop_complete;
@@ -127,6 +114,9 @@ struct health_event_loop_config {
     // Health log cleanup timing and state
     time_t next_cleanup_time;
     bool cleanup_running;  // true while cleanup work is queued/executing on a worker
+
+    // Shutdown drain loop iteration counter
+    size_t drain_iterations;
 
     // Round-robin host scan cursor to avoid starving hosts later in the dictionary.
     size_t next_host_scan_index;
