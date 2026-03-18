@@ -3,7 +3,11 @@
 #ifndef NETDATA_FILE_LOCK_H
 #define NETDATA_FILE_LOCK_H
 
-#include "libnetdata/libnetdata.h"
+#include "libnetdata/libnetdata-platform-fwd.h"
+
+#if defined(OS_WINDOWS)
+#include <windows.h>
+#endif
 
 typedef struct file_lock {
 #if defined(OS_LINUX) || defined(OS_FREEBSD) || defined(OS_MACOS)
