@@ -16,6 +16,26 @@ Free users will have limited functionality.
 | Standalone Agent | UI is locked — No local monitoring                                                    |
 | Child Agent      | No monitoring data in parent dashboard when streaming to a Linux-based Netdata parent |
 
+## Windows Agent Roles: Parent vs Child
+
+:::important
+
+**Windows can only operate as a Child Agent** in Netdata's streaming architecture.
+
+Windows cannot act as a Parent node that receives metrics from other nodes.
+
+:::
+
+The Windows Netdata Agent is designed to:
+
+- **Collect metrics** from the Windows system it's installed on
+- **Stream those metrics** to a Linux-based Netdata Parent node
+- **Send data** to Netdata Cloud
+
+If you need a Parent node in your infrastructure hierarchy, you must deploy it on a **Linux system**.
+
+The `stream.conf` file included with the Windows installation is for configuring the Child-to-Parent streaming connection, not for receiving streams from other agents.
+
 ## Download the Windows Installer (MSI)
 
 Choose the version that suits your needs:
