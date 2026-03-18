@@ -23,7 +23,7 @@ if (Test-Path -Path $ndPath) {
             Write-Output "Linking OK"
         }
     } else {
-        Write-Output "$lldPath not found, unable to check linking"
+        Write-Output "$lddPath not found, unable to check linking"
         exit 2
     }
 } else {
