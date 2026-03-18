@@ -185,7 +185,7 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
         rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
 
-        worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
+        worker_is_busy(UV_EVENT_HEALTH_DELAYED_INIT_RRDSET);
 
         health_prototype_alerts_for_rrdset_incrementally(st);
 
@@ -314,7 +314,7 @@ void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, tim
         host->health.delay_up_to = 0;
     }
 
-    worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
+    worker_is_busy(UV_EVENT_HEALTH_HOST_LOCK);
     {
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
         if (aclk_host_config && aclk_host_config->send_snapshot == 2)
@@ -344,7 +344,7 @@ void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, tim
                      now > (rc->rrdset->last_collected_time.tv_sec + 60))) {
 
             if (!rrdcalc_isrepeating(rc)) {
-                worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
+                worker_is_busy(UV_EVENT_HEALTH_ALARM_LOG_ENTRY);
                 time_t now_tmp = now_realtime_sec();
 
                 ALARM_ENTRY *ae =
@@ -388,7 +388,7 @@ void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, tim
         // if there is database lookup, do it
 
         if (unlikely(RRDCALC_HAS_DB_LOOKUP(rc))) {
-            worker_is_busy(WORKER_HEALTH_JOB_DB_QUERY);
+            worker_is_busy(UV_EVENT_HEALTH_DB_QUERY);
 
             /* time_t old_db_timestamp = rc->db_before; */
             int value_is_null = 0;
@@ -455,7 +455,7 @@ void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, tim
         // ------------------------------------------------------------
         // if there is calculation expression, run it
 
-        do_eval_expression(rc, rc->config.calculation, "calculation", WORKER_HEALTH_JOB_CALC_EVAL, RRDCALC_FLAG_CALC_ERROR, NULL, &rc->value);
+        do_eval_expression(rc, rc->config.calculation, "calculation", UV_EVENT_HEALTH_CALC_EVAL, RRDCALC_FLAG_CALC_ERROR, NULL, &rc->value);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
 
@@ -477,8 +477,8 @@ void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, tim
             RRDCALC_STATUS warning_status = RRDCALC_STATUS_UNDEFINED;
             RRDCALC_STATUS critical_status = RRDCALC_STATUS_UNDEFINED;
 
-            do_eval_expression(rc, rc->config.warning, "warning", WORKER_HEALTH_JOB_WARNING_EVAL, RRDCALC_FLAG_WARN_ERROR, &warning_status, NULL);
-            do_eval_expression(rc, rc->config.critical, "critical", WORKER_HEALTH_JOB_CRITICAL_EVAL, RRDCALC_FLAG_CRIT_ERROR, &critical_status, NULL);
+            do_eval_expression(rc, rc->config.warning, "warning", UV_EVENT_HEALTH_WARNING_EVAL, RRDCALC_FLAG_WARN_ERROR, &warning_status, NULL);
+            do_eval_expression(rc, rc->config.critical, "critical", UV_EVENT_HEALTH_CRITICAL_EVAL, RRDCALC_FLAG_CRIT_ERROR, &critical_status, NULL);
 
             // --------------------------------------------------------
             // decide the final alarm status
@@ -517,7 +517,7 @@ void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, tim
 
             if (status != rc->status) {
 
-                worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
+                worker_is_busy(UV_EVENT_HEALTH_ALARM_LOG_ENTRY);
                 int delay;
 
                 // apply trigger hysteresis
@@ -625,7 +625,7 @@ void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, tim
                 continue;
 
             if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
-                worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
+                worker_is_busy(UV_EVENT_HEALTH_ALARM_LOG_ENTRY);
                 rc->last_repeat = now;
                 if (likely(rc->times_repeat < UINT32_MAX)) rc->times_repeat++;
                 ALARM_ENTRY *ae =
@@ -674,7 +674,7 @@ void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, tim
     // execute notifications
     // and cleanup
 
-    worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS);
+    worker_is_busy(UV_EVENT_HEALTH_ALARM_LOG_PROCESS);
     health_alarm_log_process_to_send_notifications(host, hrm, stmts);
     alerts_raised_summary_free(hrm);
 
@@ -684,7 +684,7 @@ void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, tim
             aclk_host_config->send_snapshot = 2;
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
         } else {
-            worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE);
+            worker_is_busy(UV_EVENT_HEALTH_ALARM_LOG_QUEUE);
             if (process_alert_pending_queue(host, stmts))
                 rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
         }
