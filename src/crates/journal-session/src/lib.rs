@@ -23,7 +23,7 @@
 mod cursor;
 
 pub use cursor::{Cursor, CursorBuilder, Payloads};
-pub use journal_core::Direction;
+pub use journal_file::Direction;
 
 use journal_registry::repository::file::scan_journal_files;
 
@@ -31,7 +31,7 @@ use journal_registry::repository::file::scan_journal_files;
 #[derive(Debug, thiserror::Error)]
 pub enum SessionError {
     #[error("journal error: {0}")]
-    Journal(#[from] journal_core::JournalError),
+    Journal(#[from] journal_file::JournalError),
 
     #[error("repository error: {0}")]
     Repository(#[from] journal_registry::repository::error::RepositoryError),
@@ -97,6 +97,9 @@ impl JournalSession {
         CursorBuilder::new(self.files.clone(), self.window_size, self.load_remappings)
     }
 }
+
+#[cfg(test)]
+mod tests;
 
 /// Builder for creating a [`JournalSession`] with custom configuration.
 #[derive(Default)]

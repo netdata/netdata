@@ -1,7 +1,7 @@
 use crate::{
     cursor::{JournalCursor, Location},
     file::{FieldDataIterator, FieldIterator, JournalFile},
-    filter::{JournalFilter, LogicalOp},
+    filter::{FilterExpr, JournalFilter, LogicalOp},
     object::{DataObject, FieldObject},
     offset_array::Direction,
     value_guard::ValueGuard,
@@ -73,6 +73,21 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
         }
 
         self.cursor.step(journal_file, direction)
+    }
+
+    /// Build the pending filter expression (if any) and return it.
+    ///
+    /// This consumes the unresolved filter state so callers that drive
+    /// [`JournalCursor`] directly can resolve per-file matches once and
+    /// reuse the resulting expression.
+    pub fn build_filter(&mut self, journal_file: &JournalFile<M>) -> Result<Option<FilterExpr>> {
+        if let Some(filter) = self.filter.as_mut() {
+            let expr = filter.build(journal_file)?;
+            self.filter = None;
+            Ok(Some(expr))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn add_match(&mut self, data: &[u8]) {

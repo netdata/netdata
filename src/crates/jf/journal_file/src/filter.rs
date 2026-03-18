@@ -8,6 +8,7 @@ use window_manager::MemoryMap;
 
 #[derive(Clone, Debug)]
 pub enum FilterExpr {
+    None,
     Match(u64, Option<InlinedCursor>),
     Conjunction(Vec<FilterExpr>),
     Disjunction(Vec<FilterExpr>),
@@ -28,6 +29,7 @@ impl FilterExpr {
             move |entry_offset: NonZeroU64| -> Result<bool> { Ok(entry_offset < needle_offset) };
 
         match self {
+            FilterExpr::None => Ok(None),
             FilterExpr::Match(data_offset, _) => {
                 let Some(data_offset) = NonZeroU64::new(*data_offset) else {
                     return Err(JournalError::InvalidOffset);
@@ -87,6 +89,7 @@ impl FilterExpr {
 
     pub fn head(&mut self) -> &mut Self {
         match self {
+            FilterExpr::None => (),
             FilterExpr::Match(_, None) => (),
             FilterExpr::Match(_, Some(ic)) => {
                 *ic = ic.head();
@@ -108,6 +111,7 @@ impl FilterExpr {
 
     pub fn tail<M: MemoryMap>(&mut self, journal_file: &JournalFile<M>) -> Result<&mut Self> {
         match self {
+            FilterExpr::None => (),
             FilterExpr::Match(_, None) => (),
             FilterExpr::Match(_, Some(ic)) => {
                 *ic = ic.tail(journal_file)?;
@@ -135,6 +139,7 @@ impl FilterExpr {
         needle_offset: NonZeroU64,
     ) -> Result<Option<NonZeroU64>> {
         match self {
+            FilterExpr::None => Ok(None),
             FilterExpr::Match(_, None) => Ok(None),
             FilterExpr::Match(_, Some(ic)) => ic.next_until(journal_file, needle_offset),
             FilterExpr::Conjunction(filter_exprs) => {
@@ -181,6 +186,7 @@ impl FilterExpr {
         needle_offset: NonZeroU64,
     ) -> Result<Option<NonZeroU64>> {
         match self {
+            FilterExpr::None => Ok(None),
             FilterExpr::Match(_, None) => Ok(None),
             FilterExpr::Match(_, Some(ic)) => ic.previous_until(journal_file, needle_offset),
             FilterExpr::Conjunction(filter_exprs) => {
@@ -235,6 +241,9 @@ impl FilterExpr {
         let indent = "  ".repeat(indent_level);
 
         match self {
+            FilterExpr::None => {
+                output.push_str(&format!("{indent}None\n"));
+            }
             FilterExpr::Match(data_offset, inlined_cursor) => {
                 // Load the data object
                 let Some(data_offset) = NonZeroU64::new(*data_offset) else {
@@ -337,25 +346,27 @@ impl JournalFilter {
                 for idx in start..i {
                     let data = self.current_matches[idx].as_slice();
                     let hash = journal_file.hash(data);
-                    let Some(offset) = journal_file.find_data_offset(hash, data)? else {
-                        // TODO: should we really return an error?
-                        return Err(JournalError::InvalidOffset);
+                    let match_expr = match journal_file.find_data_offset(hash, data)? {
+                        Some(offset) => match journal_file.data_ref(offset)?.inlined_cursor() {
+                            Some(ic) => FilterExpr::Match(offset.get(), Some(ic)),
+                            None => FilterExpr::None,
+                        },
+                        None => FilterExpr::None,
                     };
-
-                    let ic = journal_file.data_ref(offset)?.inlined_cursor();
-                    matches.push(FilterExpr::Match(offset.get(), ic));
+                    matches.push(match_expr);
                 }
                 elements.push(FilterExpr::Disjunction(matches));
             } else {
                 let data = self.current_matches[start].as_slice();
                 let hash = journal_file.hash(data);
-                let Some(offset) = journal_file.find_data_offset(hash, data)? else {
-                    // TODO: should we really return an error?
-                    return Err(JournalError::InvalidOffset);
+                let match_expr = match journal_file.find_data_offset(hash, data)? {
+                    Some(offset) => match journal_file.data_ref(offset)?.inlined_cursor() {
+                        Some(ic) => FilterExpr::Match(offset.get(), Some(ic)),
+                        None => FilterExpr::None,
+                    },
+                    None => FilterExpr::None,
                 };
-
-                let ic = journal_file.data_ref(offset)?.inlined_cursor();
-                elements.push(FilterExpr::Match(offset.get(), ic));
+                elements.push(match_expr);
             }
         }
 
