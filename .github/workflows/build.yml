@@ -491,10 +491,10 @@ jobs:
           if ($installerProc.ExitCode -notin $successCodes) {
               exit 1
           }
-      - name: Check agent buildinfo
-        id: agent-check
+      - name: Check agent linking
+        id: linker-check
         if: needs.file-check.outputs.run == 'true'
-        run: ./.github/scripts/windows-exec-test.ps1
+        run: ./.github/scripts/windows-linker-check.ps1
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -505,9 +505,10 @@ jobs:
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Windows install test failed.
+              Checkout agent sources: ${{ steps.checkout.outcome }}
               Fetch Windows installers: ${{ steps.fetch-windows.outcome }}
               Install Netdata: ${{ steps.install-netdata.outcome }}
-              Check agent buildinfo: ${{ steps.agent-check.outcome }}
+              Check agent linking: ${{ steps.linker-check.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{

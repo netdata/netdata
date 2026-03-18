@@ -23,14 +23,8 @@ if (Test-Path -Path $ndPath) {
             Write-Output "Linking OK"
         }
     } else {
-        Write-Output "$lldPath not found, skipping linking check"
-    }
-
-    & $ndPath -W buildinfo
-
-    if ($LastExitCode -ne 0) {
-        Write-Output "Exit Code: $LastExitCode"
-        exit 1
+        Write-Output "$lldPath not found, unable to check linking"
+        exit 2
     }
 } else {
     Write-Output "$ndPath does not exist"
