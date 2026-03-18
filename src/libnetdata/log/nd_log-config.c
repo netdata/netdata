@@ -192,14 +192,18 @@ void nd_log_set_facility(const char *facility) {
 
 void nd_log_set_flood_protection(size_t logs, time_t period) {
     // daemon logs
+    spinlock_lock(&nd_log.sources[NDLS_DAEMON].limits.spinlock);
     nd_log.sources[NDLS_DAEMON].limits.logs_per_period = logs;
     nd_log.sources[NDLS_DAEMON].limits.logs_per_period_backup = logs;
     nd_log.sources[NDLS_DAEMON].limits.throttle_period = period;
+    spinlock_unlock(&nd_log.sources[NDLS_DAEMON].limits.spinlock);
 
     // collectors logs
+    spinlock_lock(&nd_log.sources[NDLS_COLLECTORS].limits.spinlock);
     nd_log.sources[NDLS_COLLECTORS].limits.logs_per_period = logs;
     nd_log.sources[NDLS_COLLECTORS].limits.logs_per_period_backup = logs;
     nd_log.sources[NDLS_COLLECTORS].limits.throttle_period = period;
+    spinlock_unlock(&nd_log.sources[NDLS_COLLECTORS].limits.spinlock);
 
     char buf[100];
     snprintfz(buf, sizeof(buf), "%" PRIu64, (uint64_t)period);

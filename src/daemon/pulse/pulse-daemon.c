@@ -72,8 +72,52 @@ static void pulse_daemon_uptime_do(bool extended __maybe_unused) {
     }
 }
 
+// Called from a single pulse daemon thread, so last_refresh_ut needs no synchronization.
+static void pulse_daemon_timezone_do(bool extended __maybe_unused) {
+    static usec_t last_refresh_ut = 0;
+
+    usec_t now_ut = now_monotonic_usec();
+
+    // refresh every 30 minutes to pick up DST changes
+    if (now_ut - last_refresh_ut >= 30 * 60 * USEC_PER_SEC) {
+        if (system_timezone_is_user_configured()) {
+            // User explicitly configured a timezone in netdata.conf — respect it,
+            // just refresh the abbreviation and offset (handles DST transitions).
+            static bool mismatch_logged = false;
+            if (!mismatch_logged) {
+                mismatch_logged = true;
+                char sys_buf[FILENAME_MAX + 1];
+                const char *sys_tz = detect_system_timezone_name(sys_buf, sizeof(sys_buf));
+                SYSTEM_TZ tz = system_tz_get();
+                if (sys_tz && tz.timezone && strcmp(sys_tz, tz.timezone) != 0)
+                    nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                           "TIMEZONE: configured '%s' differs from system '%s'",
+                           tz.timezone, sys_tz);
+                system_tz_free(&tz);
+            }
+            SYSTEM_TZ tz = system_tz_get();
+            refresh_system_timezone(tz.timezone, true);
+            system_tz_free(&tz);
+        } else {
+            // Auto-detected timezone — re-detect to pick up system changes.
+            char buf[FILENAME_MAX + 1];
+            const char *detected = detect_system_timezone_name(buf, sizeof(buf));
+            if (detected) {
+                refresh_system_timezone(detected, true);
+            } else {
+                // Detection failed — use the stored name with its original tzdb flag.
+                SYSTEM_TZ tz = system_tz_get();
+                refresh_system_timezone(tz.timezone, system_timezone_is_tzdb_name());
+                system_tz_free(&tz);
+            }
+        }
+        last_refresh_ut = now_ut;
+    }
+}
+
 void pulse_daemon_do(bool extended) {
     pulse_daemon_cpu_usage_do(extended);
     pulse_daemon_uptime_do(extended);
     pulse_daemon_memory_do(extended);
+    pulse_daemon_timezone_do(extended);
 }

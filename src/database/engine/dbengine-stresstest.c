@@ -8,14 +8,15 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {
     /* We don't want to drop metrics when generating load,
      * we prefer to block data generation itself */
 
-    return rrdhost_find_or_create(
+    SYSTEM_TZ tz = system_tz_get();
+    RRDHOST *host = rrdhost_find_or_create(
         name,
         name,
         name,
         os_type,
-        netdata_configured_timezone,
-        netdata_configured_abbrev_timezone,
-        netdata_configured_utc_offset,
+        tz.timezone,
+        tz.abbrev_timezone,
+        tz.utc_offset,
         program_name,
         NETDATA_VERSION,
         nd_profile.update_every,
@@ -32,6 +33,8 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {
         NULL,
         0
     );
+    system_tz_free(&tz);
+    return host;
 }
 
 static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number value, time_t now) {

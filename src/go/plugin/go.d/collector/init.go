@@ -91,6 +91,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/powerdns"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/powerdns_recursor"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/powervault"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/powerstore"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/proxysql"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/pulsar"

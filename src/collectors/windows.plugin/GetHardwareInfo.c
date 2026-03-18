@@ -3,10 +3,10 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
-#include "netdata_win_driver.h"
+#include "driver/netdata_driver.h"
 
 static const char *srv_name = "NetdataDriver";
-static const char *drv_path = "%SystemRoot%\\system32\\netdata_driver.sys";
+static const char *drv_path = "%SystemRoot%\\system32\\drivers\\netdata_driver.sys";
 
 struct cpu_data {
     RRDDIM *rd_cpu_temp;
@@ -25,10 +25,14 @@ bool cpus_lock_initialized = false;
 static HANDLE msr_device = INVALID_HANDLE_VALUE;
 static CRITICAL_SECTION device_lock;
 bool device_lock_initialized = false;
+// Set by the worker immediately before exit so cleanup can distinguish
+// "join failed but thread is done" from "join failed and thread may still run".
+static volatile LONG hardware_info_thread_finished = 0;
 static int consecutive_errors = 0;
 static const int MAX_CONSECUTIVE_ERRORS = 5;
 static const int IOCTL_RETRIES = 3;
 static const int IOCTL_RETRY_DELAY_MS = 10;
+static const int THREAD_JOIN_FALLBACK_WAIT_MS = 2000;
 #define INVALID_TEMP ((collected_number)(-1))
 
 static void netdata_stop_driver()
@@ -99,6 +103,32 @@ int netdata_install_driver()
 
     if (unlikely(!service)) {
         if (GetLastError() == ERROR_SERVICE_EXISTS) {
+            SC_HANDLE existing = OpenServiceA(scm, srv_name, SERVICE_CHANGE_CONFIG);
+            if (!existing) {
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open existing service. Error= %lu \n", GetLastError());
+                CloseServiceHandle(scm);
+                return -1;
+            }
+
+            if (!ChangeServiceConfigA(
+                    existing,
+                    SERVICE_KERNEL_DRIVER,
+                    SERVICE_DEMAND_START,
+                    SERVICE_ERROR_NORMAL,
+                    expanded_path,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL)) {
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot reconfigure existing service. Error= %lu \n", GetLastError());
+                CloseServiceHandle(existing);
+                CloseServiceHandle(scm);
+                return -1;
+            }
+
+            CloseServiceHandle(existing);
             CloseServiceHandle(scm);
             return 0;
         }
@@ -114,6 +144,16 @@ int netdata_install_driver()
     return 0;
 }
 
+static inline void log_invalid_image_hash_error(void)
+{
+    nd_log(
+        NDLS_COLLECTORS,
+        NDLP_ERR,
+        "Driver failed to start: ERROR_INVALID_IMAGE_HASH (577). "
+        "This usually indicates a driver signature verification failure. "
+        "The driver binary may be corrupted, unsigned, or signed with an untrusted certificate.\n");
+}
+
 int netdata_start_driver()
 {
     SC_HANDLE scm = OpenSCManagerA(NULL, NULL, SC_MANAGER_CONNECT);
@@ -124,22 +164,65 @@ int netdata_start_driver()
 
     SC_HANDLE service = OpenServiceA(scm, srv_name, SERVICE_START | SERVICE_QUERY_STATUS);
     if (unlikely(!service)) {
+        DWORD open_err = GetLastError();
         CloseServiceHandle(scm);
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open Service. Error= %lu \n", GetLastError());
-        return -1;
+        scm = NULL;
+
+        // Service missing: attempt self-healing install then retry
+        if (open_err == ERROR_SERVICE_DOES_NOT_EXIST) {
+            nd_log(NDLS_COLLECTORS, NDLP_INFO, "Service not found, attempting to install driver and retry start\n");
+
+            if (netdata_install_driver() != 0) {
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to install driver during self-healing\n");
+                return -1;
+            }
+
+            scm = OpenSCManagerA(NULL, NULL, SC_MANAGER_CONNECT);
+            if (unlikely(!scm)) {
+                nd_log(
+                    NDLS_COLLECTORS,
+                    NDLP_ERR,
+                    "Cannot open Service Manager after install. Error= %lu \n",
+                    GetLastError());
+                return -1;
+            }
+
+            service = OpenServiceA(scm, srv_name, SERVICE_START | SERVICE_QUERY_STATUS);
+            if (unlikely(!service)) {
+                nd_log(
+                    NDLS_COLLECTORS,
+                    NDLP_ERR,
+                    "Cannot open Service after install. Error= %lu \n",
+                    GetLastError());
+                CloseServiceHandle(scm);
+                return -1;
+            }
+            // fall through to StartServiceA with the newly opened handle
+        } else {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open Service. Error= %lu \n", open_err);
+            return -1;
+        }
     }
 
     int ret = 0;
     if (!StartServiceA(service, 0, NULL)) {
         DWORD err = GetLastError();
-        if (err != ERROR_SERVICE_ALREADY_RUNNING) {
+
+        if (err == ERROR_SERVICE_ALREADY_RUNNING) {
+            ret = 0;
+        } else if (err == ERROR_INVALID_IMAGE_HASH) {
+            log_invalid_image_hash_error();
+            ret = -1;
+        } else {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot start Service. Error= %lu \n", err);
             ret = -1;
         }
     }
 
-    CloseServiceHandle(service);
-    CloseServiceHandle(scm);
+    if (service)
+        CloseServiceHandle(service);
+    if (scm)
+        CloseServiceHandle(scm);
     return ret;
 }
 
@@ -155,24 +238,35 @@ static inline HANDLE netdata_open_device()
 
 static bool netdata_reopen_device_if_needed()
 {
+    EnterCriticalSection(&device_lock);
     if (msr_device != INVALID_HANDLE_VALUE) {
+        LeaveCriticalSection(&device_lock);
         return true;
     }
 
     msr_device = netdata_open_device();
-    return (msr_device != INVALID_HANDLE_VALUE);
+    bool ok = (msr_device != INVALID_HANDLE_VALUE);
+    LeaveCriticalSection(&device_lock);
+    return ok;
 }
 
 static bool netdata_read_msr(MSR_REQUEST *req)
 {
-    if (!req || msr_device == INVALID_HANDLE_VALUE) {
+    if (!req)
+        return false;
+
+    EnterCriticalSection(&device_lock);
+    if (msr_device == INVALID_HANDLE_VALUE) {
+        LeaveCriticalSection(&device_lock);
         return false;
     }
 
+    bool success = false;
     for (int retry = 0; retry < IOCTL_RETRIES; retry++) {
         DWORD bytes = 0;
         if (DeviceIoControl(msr_device, IOCTL_MSR_READ, req, sizeof(*req), req, sizeof(*req), &bytes, NULL)) {
-            return true;
+            success = true;
+            break;
         }
 
         if (retry < IOCTL_RETRIES - 1) {
@@ -180,7 +274,8 @@ static bool netdata_read_msr(MSR_REQUEST *req)
         }
     }
 
-    return false;
+    LeaveCriticalSection(&device_lock);
+    return success;
 }
 
 static collected_number netdata_intel_cpu_temp(MSR_REQUEST *req)
@@ -263,6 +358,8 @@ static void get_hardware_info_thread(void *ptr __maybe_unused)
 
         netdata_collect_cpu_chart();
     }
+
+    InterlockedExchange(&hardware_info_thread_finished, 1);
 }
 
 static void netdata_detect_cpu()
@@ -336,6 +433,7 @@ static int initialize()
         cpus[i].read_errors = 0;
     }
 
+    InterlockedExchange(&hardware_info_thread_finished, 0);
     hardware_info_thread =
         nd_thread_create("hw_info_thread", NETDATA_THREAD_OPTION_DEFAULT, get_hardware_info_thread, NULL);
 
@@ -415,11 +513,40 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
 void do_GetHardwareInfo_cleanup()
 {
     if (hardware_info_thread) {
-        if (nd_thread_join(hardware_info_thread))
+        if (nd_thread_join(hardware_info_thread)) {
+            // nd_thread_join() frees the ND_THREAD object even on failure,
+            // so we cannot retry. The Windows/MSYS2 UV_EINVAL fast-exit case
+            // is already handled inside nd_thread_join(). For any other error,
+            // wait for up to one heartbeat interval plus slack for the worker
+            // to report completion before tearing down local resources it may
+            // still be touching. If it never does, abort cleanup: leaking here
+            // is safer than racing a live worker or hanging plugin shutdown
+            // indefinitely.
             nd_log_daemon(NDLP_ERR, "Failed to join Get Hardware Info thread");
+
+            size_t retries = 0;
+            while (!InterlockedCompareExchange(&hardware_info_thread_finished, 1, 1) &&
+                   retries < (size_t)THREAD_JOIN_FALLBACK_WAIT_MS) {
+                Sleep(1);
+                retries++;
+            }
+
+            if (!InterlockedCompareExchange(&hardware_info_thread_finished, 1, 1)) {
+                hardware_info_thread = NULL;
+                return;
+            }
+        }
+        hardware_info_thread = NULL;
     }
 
-    if (msr_device != INVALID_HANDLE_VALUE) {
+    if (device_lock_initialized) {
+        EnterCriticalSection(&device_lock);
+        if (msr_device != INVALID_HANDLE_VALUE) {
+            CloseHandle(msr_device);
+            msr_device = INVALID_HANDLE_VALUE;
+        }
+        LeaveCriticalSection(&device_lock);
+    } else if (msr_device != INVALID_HANDLE_VALUE) {
         CloseHandle(msr_device);
         msr_device = INVALID_HANDLE_VALUE;
     }
