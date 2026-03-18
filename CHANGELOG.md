@@ -138,6 +138,10 @@
 - Fix health api call ([#21952](https://github.com/netdata/netdata/issues/21952))
 - Docs(go.d/snmp): add multi-device SNMPv3 config example with YAML anchors ([#21955](https://github.com/netdata/netdata/issues/21955))
 - Regenerate integrations docs ([#21956](https://github.com/netdata/netdata/issues/21956))
+- Run periodical refresh of timezone ([#21944](https://github.com/netdata/netdata/issues/21944))
+- Fix permissions for systemd-journal.plugin on offline installs ([#21953](https://github.com/netdata/netdata/issues/21953))
+- Ensure thread safety and proper cleanup in `GetHardwareInfo` ([#21958](https://github.com/netdata/netdata/issues/21958))
+- Fix windows config editor ([#21957](https://github.com/netdata/netdata/issues/21957))
 
 ## [2.9.0] - 2026-02-16
 
