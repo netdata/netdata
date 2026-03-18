@@ -69,7 +69,7 @@ static command_info_t command_info_array[] = {
     {"reload-labels", "", "Reload all localhost labels.", cmd_reload_labels_execute, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},                 // reload the labels
     {"read-config", "", "", cmd_read_config_execute, CMD_TYPE_CONCURRENT, CMD_INIT_STATUS_FULL},
     {"write-config", "", "", cmd_write_config_execute, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
-    {"ping", "", "Return with 'pong'; exit 0 when ready, 1 while initializing.", cmd_ping_execute, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_INIT},     // ping command
+    {"ping", "", "Return with 'pong'; exit 0 when ready, 1 while initializing, 255 if the agent cannot be contacted.", cmd_ping_execute, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_INIT},     // ping command
     {"aclk-state", "[json]",  "Returns current state of ACLK and Netdata Cloud connection. (optionally in json).", cmd_aclk_state, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
     {"version", "", "Returns the netdata version.", cmd_version, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_INIT},
     {"dumpconfig", "", "Returns the current netdata.conf on stdout.", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
@@ -735,6 +735,7 @@ static void connection_cb(uv_stream_t *server, int status)
 
     /* combined allocation of client pipe and command context */
     cmd_ctx = mallocz(sizeof(*cmd_ctx));
+    cmd_ctx->idx = CMD_HELP;
     client = (uv_pipe_t *)cmd_ctx;
     ret = uv_pipe_init(server->loop, client, 1);
     if (ret) {
