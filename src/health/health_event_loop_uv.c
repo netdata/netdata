@@ -311,8 +311,10 @@ static void health_cleanup_work_cb(uv_work_t *req) {
     }
     dfe_done(host);
 
-    if (unlikely(health_should_stop()))
+    if (unlikely(health_should_stop())) {
+        worker_is_idle();
         return;
+    }
 
     // Delete orphan records
     (void)db_execute(db_meta, SQL_DELETE_ORPHAN_HEALTH_LOG, NULL);
@@ -896,11 +898,12 @@ void health_event_loop_init(void)
 }
 
 void health_event_loop_shutdown(void) {
-    // Check 'started' (set once, never cleared) instead of 'initialized' which is
-    // toggled during the shutdown drain loop — avoiding a race where the drain loop
-    // temporarily sets initialized=false and we'd skip shutdown entirely.
-    if (!__atomic_load_n(&health_config.started, __ATOMIC_ACQUIRE)) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "HEALTH: event loop not initialized, skipping shutdown");
+    // Use atomic exchange: 'started' is set once during init and cleared here on
+    // first shutdown call.  This avoids the race where the drain loop temporarily
+    // sets initialized=false (which the old check used), and also prevents a second
+    // shutdown call from driving teardown against already-destroyed state.
+    if (!__atomic_exchange_n(&health_config.started, false, __ATOMIC_ACQ_REL)) {
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "HEALTH: event loop not initialized or already shut down, skipping");
         return;
     }
 
