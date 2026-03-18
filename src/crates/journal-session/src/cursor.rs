@@ -1,7 +1,7 @@
 use std::num::NonZeroU64;
 
 use journal_core::file::mmap::Mmap;
-use journal_core::file::{EntryDataIterator, HashableObject};
+use journal_core::file::HashableObject;
 use journal_core::{Direction, JournalCursor, JournalFile, JournalReader, Location};
 
 use crate::SessionError;
@@ -129,6 +129,7 @@ pub struct Cursor {
     journal_file: Option<JournalFile<Mmap>>,
     cursor: JournalCursor,
     decompress_buf: Vec<u8>,
+    entry_data_offsets: Vec<NonZeroU64>,
     exhausted: bool,
 
     // Set by step(), read by accessors and fields().
@@ -168,6 +169,7 @@ impl Cursor {
             journal_file: None,
             cursor: JournalCursor::new(),
             decompress_buf: Vec::new(),
+            entry_data_offsets: Vec::new(),
             exhausted: false,
             entry_offset: None,
             realtime_usec: 0,
@@ -286,6 +288,7 @@ impl Cursor {
     fn advance_to_next_file(&mut self) -> bool {
         self.journal_file = None;
         self.entry_offset = None;
+        self.entry_data_offsets.clear();
 
         match self.direction {
             Direction::Forward => {
@@ -471,10 +474,17 @@ impl Cursor {
     /// Must be called after [`step()`](Cursor::step) returns `true`.
     pub fn payloads(&mut self) -> Result<Payloads<'_>, SessionError> {
         let entry_offset = self.entry_offset.expect("fields() called without step()");
+        self.entry_data_offsets.clear();
+        {
+            let jf = self.journal_file.as_ref().unwrap();
+            jf.entry_data_object_offsets(entry_offset, &mut self.entry_data_offsets)?;
+        }
+
         let jf = self.journal_file.as_ref().unwrap();
-        let iter = jf.entry_data_objects(entry_offset)?;
         Ok(Payloads {
-            iter,
+            journal: jf,
+            data_offsets: &self.entry_data_offsets,
+            current_index: 0,
             buf: &mut self.decompress_buf,
         })
     }
@@ -489,7 +499,9 @@ impl Cursor {
 /// This cannot implement [`Iterator`] because the yielded reference
 /// borrows from `self` (lending iterator pattern).
 pub struct Payloads<'a> {
-    iter: EntryDataIterator<'a, Mmap>,
+    journal: &'a JournalFile<Mmap>,
+    data_offsets: &'a [NonZeroU64],
+    current_index: usize,
     buf: &'a mut Vec<u8>,
 }
 
@@ -498,10 +510,14 @@ impl Payloads<'_> {
     ///
     /// Returns `Ok(Some(payload))` for each data object, `Ok(None)` when done.
     pub fn next(&mut self) -> Result<Option<&[u8]>, SessionError> {
-        let guard = match self.iter.next() {
-            Some(result) => result?,
-            None => return Ok(None),
-        };
+        if self.current_index >= self.data_offsets.len() {
+            return Ok(None);
+        }
+
+        let data_offset = self.data_offsets[self.current_index];
+        self.current_index += 1;
+
+        let guard = self.journal.data_ref(data_offset)?;
 
         if guard.is_compressed() {
             guard.decompress(self.buf)?;
