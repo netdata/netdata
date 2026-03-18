@@ -57,6 +57,7 @@ struct config cachestat_config = APPCONFIG_INITIALIZER;
 netdata_ebpf_targets_t cachestat_targets[] = {
     {.name = "add_to_page_cache_lru", .mode = EBPF_LOAD_TRAMPOLINE},
     {.name = "mark_page_accessed", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE},  // slot ACCOUNT_PAGE_DIRTIED: resolved dynamically at runtime
     {.name = "mark_buffer_dirty", .mode = EBPF_LOAD_TRAMPOLINE},
     {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
