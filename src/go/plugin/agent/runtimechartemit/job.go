@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"sort"
 	"sync/atomic"
 	"time"
@@ -24,6 +25,46 @@ type runtimeComponentState struct {
 	engine      *chartengine.Engine
 	prev        time.Time
 	knownCharts map[string]chartengine.ChartMeta
+}
+
+type runtimePreparedEmission struct {
+	attempt         chartengine.PlanAttempt
+	nextPrev        time.Time
+	nextKnownCharts map[string]chartengine.ChartMeta
+}
+
+type runtimeTickCommitStep struct {
+	attempt  chartengine.PlanAttempt
+	finalize func()
+}
+
+type runtimeTickCommit struct {
+	steps []runtimeTickCommitStep
+}
+
+func (c *runtimeTickCommit) add(step runtimeTickCommitStep) {
+	c.steps = append(c.steps, step)
+}
+
+func (c *runtimeTickCommit) abort() {
+	for _, step := range c.steps {
+		step.attempt.Abort()
+	}
+}
+
+func (c *runtimeTickCommit) commit() error {
+	for i, step := range c.steps {
+		if err := step.attempt.Commit(); err != nil {
+			for _, remaining := range c.steps[i+1:] {
+				remaining.attempt.Abort()
+			}
+			return err
+		}
+		if step.finalize != nil {
+			step.finalize()
+		}
+	}
+	return nil
 }
 
 type runtimeMetricsJob struct {
@@ -123,6 +164,7 @@ func (j *runtimeMetricsJob) runOnce(clock int) {
 	specs := j.registry.snapshot()
 	seen := make(map[string]struct{}, len(specs))
 	now := time.Now()
+	var commit runtimeTickCommit
 
 	for _, spec := range specs {
 		seen[spec.Name] = struct{}{}
@@ -131,59 +173,41 @@ func (j *runtimeMetricsJob) runOnce(clock int) {
 			continue
 		}
 
-		component, err := j.ensureComponent(spec)
-		if err != nil {
-			j.Warningf("runtime metrics component %q init failed: %v", spec.Name, err)
+		step, buf, ok := j.prepareComponentStep(spec, now)
+		if !ok {
 			continue
 		}
-
-		reader := spec.Store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
-		plan, err := component.engine.BuildPlan(reader)
-		if err != nil {
-			j.Warningf("runtime metrics component %q build plan failed: %v", spec.Name, err)
-			continue
+		if buf != nil && buf.Len() > 0 {
+			_, _ = j.buf.Write(buf.Bytes())
 		}
-		if len(plan.Actions) == 0 {
-			continue
-		}
-
-		env := cloneEmitEnv(spec.EmitEnv)
-		env.MSSinceLast = calcRuntimeSinceLast(now, component.prev)
-		component.prev = now
-
-		if err := chartemit.ApplyPlan(j.api, plan, env); err != nil {
-			j.Warningf("runtime metrics component %q apply plan failed: %v", spec.Name, err)
-			continue
-		}
-		component.trackPlan(plan)
+		commit.add(step)
 	}
 
 	for name := range j.components {
-		state, ok := j.components[name]
-		if ok && state != nil {
-			if _, exists := seen[name]; exists {
-				continue
-			}
-			j.emitComponentObsolete(state)
-		}
 		if _, ok := seen[name]; ok {
 			continue
 		}
-		delete(j.components, name)
+		state := j.components[name]
+		step, buf, ok := j.prepareRemovalStep(name, state)
+		if !ok {
+			continue
+		}
+		if buf != nil && buf.Len() > 0 {
+			_, _ = j.buf.Write(buf.Bytes())
+		}
+		commit.add(step)
 	}
 
 	if j.buf.Len() > 0 {
 		_, _ = io.Copy(j.out, j.buf)
-		j.buf.Reset()
 	}
+	if err := commit.commit(); err != nil {
+		j.Warningf("runtime metrics commit failed: %v", err)
+	}
+	j.buf.Reset()
 }
 
-func (j *runtimeMetricsJob) ensureComponent(spec componentSpec) (*runtimeComponentState, error) {
-	current, ok := j.components[spec.Name]
-	if ok && current.spec.Generation == spec.Generation {
-		return current, nil
-	}
-
+func (j *runtimeMetricsJob) newComponentState(spec componentSpec) (*runtimeComponentState, error) {
 	engineLog := j.Logger.With(slog.String("runtime_component", spec.Name))
 	engine, err := chartengine.New(
 		chartengine.WithRuntimeStore(nil), // Two-engine policy: observer engine has no self-metrics.
@@ -205,16 +229,110 @@ func (j *runtimeMetricsJob) ensureComponent(spec componentSpec) (*runtimeCompone
 		engine:      engine,
 		knownCharts: make(map[string]chartengine.ChartMeta),
 	}
-	if ok && current != nil && current.spec.Generation != spec.Generation {
-		j.emitComponentObsolete(current)
-	}
-	j.components[spec.Name] = state
 	return state, nil
 }
 
-func (j *runtimeMetricsJob) emitComponentObsolete(state *runtimeComponentState) {
+func (j *runtimeMetricsJob) prepareComponentStep(spec componentSpec, now time.Time) (runtimeTickCommitStep, *bytes.Buffer, bool) {
+	current := j.components[spec.Name]
+	if current != nil && current.spec.Generation == spec.Generation {
+		emission, buf, ok := j.prepareEmissionToBuffer(current, now)
+		if !ok {
+			return runtimeTickCommitStep{}, nil, false
+		}
+		return runtimeTickCommitStep{
+			attempt: emission.attempt,
+			finalize: func() {
+				current.prev = emission.nextPrev
+				current.knownCharts = emission.nextKnownCharts
+			},
+		}, buf, true
+	}
+
+	next, err := j.newComponentState(spec)
+	if err != nil {
+		j.Warningf("runtime metrics component %q init failed: %v", spec.Name, err)
+		return runtimeTickCommitStep{}, nil, false
+	}
+
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+	if err := j.emitComponentObsolete(api, current); err != nil {
+		j.Warningf("runtime metrics component %q obsolete emit failed: %v", spec.Name, err)
+		return runtimeTickCommitStep{}, nil, false
+	}
+	emission, ok := j.prepareEmission(api, next, now)
+	if !ok {
+		return runtimeTickCommitStep{}, nil, false
+	}
+	return runtimeTickCommitStep{
+		attempt: emission.attempt,
+		finalize: func() {
+			next.prev = emission.nextPrev
+			next.knownCharts = emission.nextKnownCharts
+			j.components[spec.Name] = next
+		},
+	}, &buf, true
+}
+
+func (j *runtimeMetricsJob) prepareRemovalStep(name string, state *runtimeComponentState) (runtimeTickCommitStep, *bytes.Buffer, bool) {
+	if state == nil {
+		return runtimeTickCommitStep{}, nil, false
+	}
+
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+	if err := j.emitComponentObsolete(api, state); err != nil {
+		j.Warningf("runtime metrics component %q obsolete emit failed: %v", state.spec.Name, err)
+		return runtimeTickCommitStep{}, nil, false
+	}
+	return runtimeTickCommitStep{
+		finalize: func() {
+			delete(j.components, name)
+		},
+	}, &buf, true
+}
+
+func (j *runtimeMetricsJob) prepareEmissionToBuffer(state *runtimeComponentState, now time.Time) (runtimePreparedEmission, *bytes.Buffer, bool) {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+	emission, ok := j.prepareEmission(api, state, now)
+	if !ok {
+		return runtimePreparedEmission{}, nil, false
+	}
+	return emission, &buf, true
+}
+
+func (j *runtimeMetricsJob) prepareEmission(api *netdataapi.API, state *runtimeComponentState, now time.Time) (runtimePreparedEmission, bool) {
+	if state == nil {
+		return runtimePreparedEmission{}, false
+	}
+
+	reader := state.spec.Store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
+	attempt, err := state.engine.PreparePlan(reader)
+	if err != nil {
+		j.Warningf("runtime metrics component %q build plan failed: %v", state.spec.Name, err)
+		return runtimePreparedEmission{}, false
+	}
+
+	plan := attempt.Plan()
+	env := cloneEmitEnv(state.spec.EmitEnv)
+	env.MSSinceLast = calcRuntimeSinceLast(now, state.prev)
+	if err := chartemit.ApplyPlan(api, plan, env); err != nil {
+		attempt.Abort()
+		j.Warningf("runtime metrics component %q apply plan failed: %v", state.spec.Name, err)
+		return runtimePreparedEmission{}, false
+	}
+
+	return runtimePreparedEmission{
+		attempt:         attempt,
+		nextPrev:        now,
+		nextKnownCharts: applyEffectiveChartSet(state.knownCharts, plan),
+	}, true
+}
+
+func (j *runtimeMetricsJob) emitComponentObsolete(api *netdataapi.API, state *runtimeComponentState) error {
 	if state == nil || len(state.knownCharts) == 0 {
-		return
+		return nil
 	}
 
 	chartIDs := make([]string, 0, len(state.knownCharts))
@@ -234,28 +352,42 @@ func (j *runtimeMetricsJob) emitComponentObsolete(state *runtimeComponentState) 
 
 	env := cloneEmitEnv(state.spec.EmitEnv)
 	env.MSSinceLast = 0
-	if err := chartemit.ApplyPlan(j.api, chartengine.Plan{Actions: actions}, env); err != nil {
-		j.Warningf("runtime metrics component %q obsolete emit failed: %v", state.spec.Name, err)
-		return
-	}
-	clear(state.knownCharts)
+	return chartemit.ApplyPlan(api, chartengine.Plan{Actions: actions}, env)
 }
 
-func (s *runtimeComponentState) trackPlan(plan chartengine.Plan) {
-	if s == nil {
-		return
+func applyEffectiveChartSet(known map[string]chartengine.ChartMeta, plan chartengine.Plan) map[string]chartengine.ChartMeta {
+	out := maps.Clone(known)
+	if out == nil {
+		out = make(map[string]chartengine.ChartMeta)
 	}
-	if s.knownCharts == nil {
-		s.knownCharts = make(map[string]chartengine.ChartMeta)
-	}
+
+	createCharts := make(map[string]chartengine.ChartMeta)
+	dimensionOnlyCharts := make(map[string]chartengine.ChartMeta)
 	for _, action := range plan.Actions {
 		switch v := action.(type) {
 		case chartengine.CreateChartAction:
-			s.knownCharts[v.ChartID] = v.Meta
+			createCharts[v.ChartID] = v.Meta
+		case chartengine.CreateDimensionAction:
+			if _, ok := createCharts[v.ChartID]; ok {
+				continue
+			}
+			if _, ok := dimensionOnlyCharts[v.ChartID]; !ok {
+				dimensionOnlyCharts[v.ChartID] = v.ChartMeta
+			}
 		case chartengine.RemoveChartAction:
-			delete(s.knownCharts, v.ChartID)
+			delete(out, v.ChartID)
 		}
 	}
+	for chartID, meta := range createCharts {
+		out[chartID] = meta
+	}
+	for chartID, meta := range dimensionOnlyCharts {
+		if _, ok := out[chartID]; ok {
+			continue
+		}
+		out[chartID] = meta
+	}
+	return out
 }
 
 func calcRuntimeSinceLast(cur, prev time.Time) int {

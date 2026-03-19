@@ -9,12 +9,12 @@
 
 ## Purpose
 
-| Stage                 | Responsibility                            |
-|-----------------------|-------------------------------------------|
-| `charttpl`            | Template decode/defaults/validation       |
-| `chartengine.Compile` | Build immutable program IR                |
-| `Engine.BuildPlan`    | Produce plan actions from metric snapshot |
-| `chartemit.ApplyPlan` | Emit plan to Netdata wire protocol        |
+| Stage                 | Responsibility                                           |
+|-----------------------|----------------------------------------------------------|
+| `charttpl`            | Template decode/defaults/validation                      |
+| `chartengine.Compile` | Build immutable program IR                               |
+| `Engine.PreparePlan`  | Prepare plan actions plus explicit commit/abort boundary |
+| `chartemit.ApplyPlan` | Emit plan to Netdata wire protocol                       |
 
 ## Collector-Facing Contract
 
@@ -33,7 +33,7 @@ For `ModuleV2` collectors, the runtime integration expects:
 |-----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `New(opts...)`                                      | Create engine with policy/runtime options                                                                                                                               |
 | `Load(spec, revision)` / `LoadYAML(data, revision)` | Compile and publish program revision                                                                                                                                    |
-| `BuildPlan(reader)`                                 | Build deterministic action plan from reader snapshot                                                                                                                    |
+| `PreparePlan(reader)`                               | Build deterministic action plan from reader snapshot and return an explicit attempt                                                                                     |
 | `RuntimeStore()`                                    | Access chartengine internal runtime metrics store                                                                                                                       |
 | `WithEnginePolicy(...)`                             | Configure selector + autogen behavior                                                                                                                                   |
 | `WithRuntimeStore(...)`                             | Override/disable self-metrics store                                                                                                                                     |
@@ -51,9 +51,9 @@ meter.Counter("requests_total").ObserveTotal(100)
 
 // 2) Engine loads chart template.
 engine, err := chartengine.New(
-    chartengine.WithEnginePolicy(chartengine.EnginePolicy{
-        Autogen: &chartengine.AutogenPolicy{Enabled: false},
-    }),
+chartengine.WithEnginePolicy(chartengine.EnginePolicy{
+Autogen: &chartengine.AutogenPolicy{Enabled: false},
+}),
 )
 // handle err
 
@@ -73,12 +73,14 @@ groups:
 `), 1)
 // handle err
 
-// 3) Build plan from flattened+raw reader and emit.
+// 3) Prepare plan from flattened+raw reader, emit it, then commit.
 // ReadFlatten() is included even for templates with static dimensions
 // because it is required for inferred dimensions, structured-family autogen,
 // and is the standard pattern.
-plan, err := engine.BuildPlan(store.Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+attempt, err := engine.PreparePlan(store.Read(metrix.ReadRaw(), metrix.ReadFlatten()))
 // handle err
+plan := attempt.Plan()
+defer attempt.Abort()
 
 err = chartemit.ApplyPlan(api, plan, chartemit.EmitEnv{
 TypeID:      "plugin.job",
@@ -88,11 +90,13 @@ Module:      "example",
 JobName:     "example",
 })
 // handle err
+err = attempt.Commit()
+// handle err
 ```
 
-## BuildPlan Lifecycle
+## PreparePlan Lifecycle
 
-`BuildPlan` executes a deterministic phase pipeline.
+`PreparePlan` executes a deterministic phase pipeline.
 Terms like "materialized state" and "route cache" are defined in the Engine State section below.
 
 | Phase           | Summary                                                                                        |
@@ -115,7 +119,7 @@ Terms like "materialized state" and "route cache" are defined in the Engine Stat
 | Structured autogen families (`Histogram`, `Summary`, `StateSet`, `MeasureSet`) | Must use flattened reader metadata (`ReadFlatten`) or they are not visible |
 | Runtime/default `ModuleV2` path                                                | `Read(ReadRaw(), ReadFlatten())`                                           |
 
-If inferred dimensions are present without flattened reader metadata, `BuildPlan` returns an explicit error.
+If inferred dimensions are present without flattened reader metadata, `PreparePlan` returns an explicit error.
 
 ## Action Semantics
 
@@ -183,12 +187,12 @@ Default lifecycle policy when template omits lifecycle:
 
 These label keys are treated specially by chartengine when consuming flattened structured-family or distribution inputs:
 
-| Key / Pattern     | Meaning |
-|-------------------|---------|
-| `le`              | Histogram bucket bound label |
-| `quantile`        | Summary quantile label |
-| `measure_field`   | `MeasureSet` field identity label |
-| `<metric-name>`   | `StateSet` special case: the flattened state name is carried under a synthetic label whose key is the base metric name |
+| Key / Pattern   | Meaning                                                                                                                |
+|-----------------|------------------------------------------------------------------------------------------------------------------------|
+| `le`            | Histogram bucket bound label                                                                                           |
+| `quantile`      | Summary quantile label                                                                                                 |
+| `measure_field` | `MeasureSet` field identity label                                                                                      |
+| `<metric-name>` | `StateSet` special case: the flattened state name is carried under a synthetic label whose key is the base metric name |
 
 Notes:
 

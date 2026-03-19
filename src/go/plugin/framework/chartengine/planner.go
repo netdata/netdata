@@ -106,6 +106,7 @@ type planBuildContext struct {
 	chartsByID       map[string]*chartState
 	chartOwners      map[string]string
 	dimCapHints      map[string]int
+	materialized     *materializedState
 	materializedByID map[string]*materializedChartState
 
 	planRouteStats
@@ -115,18 +116,12 @@ type flattenedReadChecker interface {
 	FlattenedRead() bool
 }
 
-// BuildPlan builds a minimal plan snapshot from the provided reader.
-//
-// Current scope:
-//   - template routes with cache,
-//   - optional unmatched-series autogen fallback,
-//   - runtime-inferred dimension names from flattened metadata.
-func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
+func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uint64, uint64, uint64, bool, error) {
 	if e == nil {
-		return Plan{}, fmt.Errorf("chartengine: nil engine")
+		return Plan{}, materializedState{}, 0, 0, 0, false, fmt.Errorf("chartengine: nil engine")
 	}
 	if reader == nil {
-		return Plan{}, fmt.Errorf("chartengine: nil metrics reader")
+		return Plan{}, materializedState{}, 0, 0, 0, false, fmt.Errorf("chartengine: nil metrics reader")
 	}
 	sample := planRuntimeSample{startedAt: time.Now()}
 	defer func() { e.observeBuildSample(sample) }()
@@ -136,15 +131,18 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 		InferredDimensions: make([]InferredDimension, 0),
 	}
 	collectMeta := reader.CollectMeta()
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.state.outstanding != 0 {
+		return Plan{}, materializedState{}, 0, 0, 0, false, ErrOutstandingPlanAttempt
+	}
 	// Failed attempt must not trigger lifecycle transitions.
 	if collectMeta.LastAttemptStatus != metrix.CollectStatusSuccess {
 		sample.skippedFailed = true
 		e.logDebugf("chartengine build skipped: collect status=%d", collectMeta.LastAttemptStatus)
-		return out, nil
+		return out, materializedState{}, 0, 0, 0, false, nil
 	}
-
-	e.mu.Lock()
-	defer e.mu.Unlock()
 
 	obs := e.observeBuildSuccessSeq(collectMeta.LastSuccessSeq)
 	buildCycle := e.nextBuildCycle(collectMeta.LastSuccessSeq)
@@ -168,19 +166,20 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	}
 
 	phaseStartedAt := time.Now()
-	ctx, err := e.preparePlanBuildContext(reader, &out, collectMeta, buildCycle)
+	staged := e.state.materialized.clone()
+	ctx, err := e.preparePlanBuildContext(reader, &out, collectMeta, buildCycle, &staged)
 	sample.phasePrepareSeconds = time.Since(phaseStartedAt).Seconds()
 	if err != nil {
 		sample.buildErr = true
 		e.logWarningf("chartengine build prepare failed: %v", err)
-		return Plan{}, err
+		return Plan{}, materializedState{}, 0, 0, 0, false, err
 	}
 	phaseStartedAt = time.Now()
 	if err := validateBuildReaderForInferredDimensions(ctx.index, reader); err != nil {
 		sample.phaseValidateSeconds = time.Since(phaseStartedAt).Seconds()
 		sample.buildErr = true
 		e.logWarningf("chartengine build reader validation failed: %v", err)
-		return Plan{}, err
+		return Plan{}, materializedState{}, 0, 0, 0, false, err
 	}
 	sample.phaseValidateSeconds = time.Since(phaseStartedAt).Seconds()
 	phaseStartedAt = time.Now()
@@ -188,7 +187,7 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 		sample.phaseScanSeconds = time.Since(phaseStartedAt).Seconds()
 		sample.buildErr = true
 		e.logWarningf("chartengine build scan failed: %v", err)
-		return Plan{}, err
+		return Plan{}, materializedState{}, 0, 0, 0, false, err
 	}
 	sample.phaseScanSeconds = time.Since(phaseStartedAt).Seconds()
 
@@ -202,7 +201,7 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	sample.routeCacheFullDrop = retainStats.FullDrop
 
 	phaseStartedAt = time.Now()
-	removeByCapDims, removeByCapCharts := enforceLifecycleCaps(ctx.collectMeta.LastSuccessSeq, ctx.chartsByID, &e.state.materialized)
+	removeByCapDims, removeByCapCharts := enforceLifecycleCaps(ctx.collectMeta.LastSuccessSeq, ctx.chartsByID, ctx.materialized)
 	sample.phaseLifecycleCapsSec = time.Since(phaseStartedAt).Seconds()
 	sample.lifecycleRemovedDimensionByCap = len(removeByCapDims)
 	sample.lifecycleRemovedChartByCap = len(removeByCapCharts)
@@ -217,11 +216,11 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 		sample.phaseMaterializeSeconds = time.Since(phaseStartedAt).Seconds()
 		sample.buildErr = true
 		e.logWarningf("chartengine build materialization failed: %v", err)
-		return Plan{}, err
+		return Plan{}, materializedState{}, 0, 0, 0, false, err
 	}
 	sample.phaseMaterializeSeconds = time.Since(phaseStartedAt).Seconds()
 	phaseStartedAt = time.Now()
-	removeDims, removeCharts := collectExpiryRemovals(ctx.collectMeta.LastSuccessSeq, &e.state.materialized)
+	removeDims, removeCharts := collectExpiryRemovals(ctx.collectMeta.LastSuccessSeq, ctx.materialized)
 	sample.phaseExpirySeconds = time.Since(phaseStartedAt).Seconds()
 	sample.lifecycleRemovedDimensionByExpiry = len(removeDims)
 	sample.lifecycleRemovedChartByExpiry = len(removeCharts)
@@ -249,7 +248,9 @@ func (e *Engine) BuildPlan(reader metrix.Reader) (Plan, error) {
 	e.state.hints.chartsByID = len(ctx.chartsByID)
 	e.state.hints.seenInfer = len(ctx.seenInfer)
 
-	return out, nil
+	attemptID := e.nextAttemptIDLocked()
+	e.state.outstanding = attemptID
+	return out, staged, e.state.engineEpoch, e.state.commitSeq, attemptID, true, nil
 }
 
 func validateBuildReaderForInferredDimensions(index matchIndex, reader metrix.Reader) error {
@@ -293,6 +294,7 @@ func (e *Engine) preparePlanBuildContext(
 	out *Plan,
 	collectMeta metrix.CollectMeta,
 	buildCycle uint64,
+	materialized *materializedState,
 ) (*planBuildContext, error) {
 	prog := e.state.program
 	if prog == nil {
@@ -303,25 +305,28 @@ func (e *Engine) preparePlanBuildContext(
 		cache = newRouteCache()
 		e.state.routeCache = cache
 	}
-	if e.state.materialized.charts == nil {
-		e.state.materialized = newMaterializedState()
+	if materialized == nil {
+		return nil, fmt.Errorf("chartengine: nil materialized state")
+	}
+	if materialized.charts == nil {
+		*materialized = newMaterializedState()
 	}
 	index := e.state.matchIndex
 	if index.chartsByID == nil {
 		index = buildMatchIndex(prog.Charts())
 		e.state.matchIndex = index
 	}
-	chartOwners := make(map[string]string, len(e.state.materialized.charts))
-	dimCapHints := make(map[string]int, len(e.state.materialized.charts))
-	for chartID, matChart := range e.state.materialized.charts {
+	chartOwners := make(map[string]string, len(materialized.charts))
+	dimCapHints := make(map[string]int, len(materialized.charts))
+	for chartID, matChart := range materialized.charts {
 		chartOwners[chartID] = matChart.templateID
 		if n := len(matChart.dimensions); n > 0 {
 			dimCapHints[chartID] = n
 		}
 	}
 	chartsCap := e.state.hints.chartsByID
-	if chartsCap < len(e.state.materialized.charts) {
-		chartsCap = len(e.state.materialized.charts)
+	if chartsCap < len(materialized.charts) {
+		chartsCap = len(materialized.charts)
 	}
 	seenInferCap := e.state.hints.seenInfer
 	return &planBuildContext{
@@ -337,7 +342,8 @@ func (e *Engine) preparePlanBuildContext(
 		chartsByID:       make(map[string]*chartState, chartsCap),
 		chartOwners:      chartOwners,
 		dimCapHints:      dimCapHints,
-		materializedByID: e.state.materialized.charts,
+		materialized:     materialized,
+		materializedByID: materialized.charts,
 	}, nil
 }
 
@@ -550,7 +556,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 
 	for _, chartID := range chartIDs {
 		cs := ctx.chartsByID[chartID]
-		matChart, chartCreated := e.state.materialized.ensureChart(cs.chartID, cs.templateID, cs.meta, cs.lifecycle)
+		matChart, chartCreated := ctx.materialized.ensureChart(cs.chartID, cs.templateID, cs.meta, cs.lifecycle)
 		if chartCreated {
 			chartLabels := map[string]string(nil)
 			if cs.labels != nil {
@@ -658,14 +664,6 @@ func sortInferredDimensions(in []InferredDimension) {
 		}
 		return lhs.Name < rhs.Name
 	})
-}
-
-// buildPlan is a package-level convenience wrapper around Engine.BuildPlan.
-func buildPlan(engine *Engine, reader metrix.Reader) (Plan, error) {
-	if engine == nil {
-		return Plan{}, fmt.Errorf("chartengine: nil engine")
-	}
-	return engine.BuildPlan(reader)
 }
 
 func isAutogenTemplateID(templateID string) bool {
