@@ -144,3 +144,20 @@ Or via API (requires Admin/Manager role via Cloud):
 ```
 POST /api/v3/bearer_protection
 ```
+
+**HTTP 412 "Schema error" when editing alert configurations:**
+
+When you see "Schema error" with HTTP status 412 while editing alert configurations via `/api/v3/config`, the issue is actually authentication, not schema validation.
+
+:::note
+The error label "Schema error" is misleading. HTTP 412 (Precondition Failed) in this context means your request lacks a valid bearer token, which is required when bearer token protection is enabled.
+:::
+
+To resolve this:
+
+1. Verify your agent is claimed to Netdata Cloud: Check `http://your-server:19999/api/v3/info` for `cloud-available: true`
+2. Ensure you have an active Netdata Cloud session: Log in to Netdata Cloud in your browser
+3. Re-authenticate through Cloud SSO: Visit your agent's dashboard, which will redirect you to Cloud for authentication
+4. After successful authentication, your browser will have the required bearer token for API calls
+
+The `/api/v3/config` endpoint (used for alert configuration editing) is protected when bearer token protection is enabled. All API calls require a valid bearer token obtained through Cloud SSO.
