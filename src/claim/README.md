@@ -197,7 +197,7 @@ To remove a node from your Space and connect it to another, follow these steps:
 
 </details>
 
-### cloud.d Directory Contents
+### `cloud.d` Directory Contents
 
 When an Agent is claimed to Netdata Cloud, the `cloud.d/` directory (located in your Netdata library directory, typically `/var/lib/netdata/cloud.d/`) stores the credentials and identity information for the Agent-Cloud Link (ACLK).
 
