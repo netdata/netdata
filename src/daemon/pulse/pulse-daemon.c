@@ -110,8 +110,14 @@ static void pulse_daemon_timezone_do(bool extended __maybe_unused) {
                     netdata_log_error("TIMEZONE: detected unsafe timezone name '%s', ignoring", detected);
 
                 // Detection failed or was rejected — re-use the stored name with its original tzdb flag.
+                // Validate the stored name before reusing it: a previously persisted unsafe tzdb path
+                // must not reach refresh_system_timezone() and propagate to labels or ACLK.
                 SYSTEM_TZ tz = system_tz_get();
-                refresh_system_timezone(tz.timezone, system_timezone_is_tzdb_name());
+                bool is_tzdb = system_timezone_is_tzdb_name();
+                if (!is_tzdb || timezone_name_is_safe_tzdb_path(tz.timezone))
+                    refresh_system_timezone(tz.timezone, is_tzdb);
+                else
+                    netdata_log_error("TIMEZONE: stored unsafe tzdb timezone name '%s', ignoring", tz.timezone ? tz.timezone : "(null)");
                 system_tz_free(&tz);
             }
         }

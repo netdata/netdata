@@ -929,7 +929,8 @@ void get_system_timezone(void)
 
     if (timezone_is_tzdb_name) {
         if (!timezone_name_is_safe_tzdb_path(timezone)) {
-            netdata_log_error("TIMEZONE: detected unsafe tzdb timezone '%s', using as-is", timezone);
+            netdata_log_error("TIMEZONE: detected unsafe tzdb timezone '%s', ignoring", timezone);
+            default_timezone = "unknown";
         }
     } else if (!timezone_abbrev_normalize(safe_timezone, sizeof(safe_timezone), timezone)) {
         default_timezone = "unknown";
