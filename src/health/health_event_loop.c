@@ -321,7 +321,6 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     size_t runnable = 0;
     struct health_alert_status_counts status_counts = { 0 };
     bool snapshot_complete = true;
-    uint64_t snapshot_generation = 0;
 
     if(unlikely(!rrdhost_should_run_health(host)))
         return;
@@ -509,9 +508,6 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     foreach_rrdcalc_in_rrdhost_done(rc);
 
     struct health_raised_summary *hrm = alerts_raised_summary_create(host);
-
-    if(likely(snapshot_complete))
-        snapshot_generation = health_alert_status_snapshot_begin_update(host);
 
     if (unlikely(runnable && service_running(SERVICE_HEALTH))) {
         foreach_rrdcalc_in_rrdhost_read(host, rc) {
@@ -713,8 +709,10 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         foreach_rrdcalc_in_rrdhost_done(rc);
     }
 
-    if(likely(snapshot_complete))
+    if(likely(snapshot_complete)) {
+        uint64_t snapshot_generation = health_alert_status_snapshot_begin_update(host);
         health_alert_status_snapshot_finish_update(host, &status_counts, snapshot_generation);
+    }
 
     if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host))) {
         alerts_raised_summary_free(hrm);
