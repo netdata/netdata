@@ -105,7 +105,11 @@ static void pulse_daemon_timezone_do(bool extended __maybe_unused) {
             if (detected && timezone_name_is_safe_tzdb_path(detected)) {
                 refresh_system_timezone(detected, true);
             } else {
-                // Detection failed — use the stored name with its original tzdb flag.
+                if (detected)
+                    // Detected a timezone that failed the safe-path check; skip it.
+                    netdata_log_error("TIMEZONE: detected unsafe timezone name '%s', ignoring", detected);
+
+                // Detection failed or was rejected — re-use the stored name with its original tzdb flag.
                 SYSTEM_TZ tz = system_tz_get();
                 refresh_system_timezone(tz.timezone, system_timezone_is_tzdb_name());
                 system_tz_free(&tz);

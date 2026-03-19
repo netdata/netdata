@@ -988,7 +988,7 @@ static bool timezone_abbrev_normalize(char *dst, size_t dst_size, const char *sr
         return false;
 
     size_t len = 0;
-    const char *end = dst + dst_size - 1;
+    char *end = dst + dst_size - 1;
 
     while (*src && dst < end) {
         if (!(isalnum((uint8_t)*src) || *src == '_' || *src == '+' || *src == '-'))
