@@ -102,7 +102,7 @@ static void pulse_daemon_timezone_do(bool extended __maybe_unused) {
             // Auto-detected timezone — re-detect to pick up system changes.
             char buf[FILENAME_MAX + 1];
             const char *detected = detect_system_timezone_name(buf, sizeof(buf));
-            if (detected) {
+            if (detected && timezone_name_is_safe_tzdb_path(detected)) {
                 refresh_system_timezone(detected, true);
             } else {
                 // Detection failed — use the stored name with its original tzdb flag.

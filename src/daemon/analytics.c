@@ -857,6 +857,8 @@ static bool timezone_user_configured = false;
 // fallback which only produces bare abbreviations like "CEST" or "PST".
 static bool timezone_is_tzdb_name = false;
 
+static bool timezone_abbrev_normalize(char *dst, size_t dst_size, const char *src);
+
 bool system_timezone_is_user_configured(void) {
     return timezone_user_configured;
 }
@@ -922,8 +924,18 @@ void get_system_timezone(void)
     // inicfg_get auto-populates it with the detected default.
     timezone_user_configured = inicfg_exists(&netdata_config, CONFIG_SECTION_GLOBAL, "timezone");
 
+    char safe_timezone[FILENAME_MAX + 1];
+    const char *default_timezone = "unknown";
+
+    if (timezone_is_tzdb_name) {
+        if (timezone_name_is_safe_tzdb_path(timezone))
+            default_timezone = timezone;
+    }
+    else if (timezone_abbrev_normalize(safe_timezone, sizeof(safe_timezone), timezone))
+        default_timezone = safe_timezone;
+
     // inicfg_get returns a config-system-owned pointer, stable for the process lifetime
-    const char *configured_tz = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "timezone", timezone);
+    const char *configured_tz = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "timezone", default_timezone);
 
     // Treat "timezone =" (empty value) as not user-configured,
     // and fall back to the auto-detected timezone.
@@ -959,7 +971,7 @@ static inline int64_t tzif_read_be64(const unsigned char *src) {
            (int64_t)(uint64_t)src[7];
 }
 
-static bool timezone_name_is_safe_tzdb_path(const char *timezone) {
+bool timezone_name_is_safe_tzdb_path(const char *timezone) {
     if (!timezone || !*timezone || *timezone == '/')
         return false;
 
@@ -969,6 +981,25 @@ static bool timezone_name_is_safe_tzdb_path(const char *timezone) {
     }
 
     return true;
+}
+
+static bool timezone_abbrev_normalize(char *dst, size_t dst_size, const char *src) {
+    if (!dst || dst_size < 2 || !src || !*src)
+        return false;
+
+    size_t len = 0;
+    const char *end = dst + dst_size - 1;
+
+    while (*src && dst < end) {
+        if (!(isalnum((uint8_t)*src) || *src == '_' || *src == '+' || *src == '-'))
+            return false;
+
+        *dst++ = *src++;
+        len++;
+    }
+
+    *dst = '\0';
+    return len != 0 && *src == '\0';
 }
 
 static bool timezone_info_from_tm(struct tm *tmp, char *abbrev, size_t abbrev_size, int32_t *offset) {
@@ -1219,6 +1250,7 @@ cleanup:
 void refresh_system_timezone(const char *timezone, bool is_tzdb_name) {
     time_t t;
     char abbrev[64];
+    char safe_abbrev[64];
     const char *new_abbrev = "UTC";
     int32_t new_offset = 0;
 
@@ -1249,8 +1281,8 @@ void refresh_system_timezone(const char *timezone, bool is_tzdb_name) {
     if (!ok)
         ok = current_process_timezone_info(t, abbrev, sizeof(abbrev), &new_offset);
 
-    if (ok && *abbrev)
-        new_abbrev = abbrev;
+    if (ok && timezone_abbrev_normalize(safe_abbrev, sizeof(safe_abbrev), abbrev))
+        new_abbrev = safe_abbrev;
 
     // Atomically update the system timezone triplet
     system_tz_set(timezone, new_abbrev, new_offset);
