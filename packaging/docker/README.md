@@ -7,6 +7,21 @@ import TabItem from '@theme/TabItem';
 
 We don’t officially support using Docker’s `--user` option or Docker Compose’s `user:` parameter with our images. While they may work, some features could be unavailable. The Agent drops privileges at startup, so most processes don’t run as UID 0 even without these options.
 
+## Cloud Subscription Requirements
+
+The local dashboard at `http://NODE:19999` provides full monitoring capabilities without requiring a Netdata Cloud subscription. However, some advanced configuration features require an active Netdata Cloud paid subscription:
+
+- **Alert Configuration Manager** - Create and edit Alerts directly from the Dashboard using a visual UI wizard
+- **Dynamic Configuration Manager** - Configure collectors and data collection settings through the Netdata UI
+
+These UI-based configuration tools eliminate the need for manual command-line edits and node access, streamlining your workflow for managing Alerts and collectors across your infrastructure.
+
+:::tip
+
+To access these features, [view Netdata subscription plans](https://www.netdata.cloud/pricing/). Learn more about [Dynamic Configuration Manager](/docs/netdata-agent/configuration/dynamic-configuration.md) and [Alert Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md).
+
+:::
+
 ## Create a new Netdata Agent container
 
 You can create a new Agent container with `docker run` or `docker-compose`, then access the dashboard at `http://NODE:19999`.
