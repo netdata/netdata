@@ -12,6 +12,11 @@
 #include <windows.h>
 #include <stdlib.h>
 
+#if defined(__CYGWIN__) || defined(__MSYS__)
+#include <sys/types.h>
+#include <sys/cygwin.h>
+#endif
+
 static wchar_t *file_lock_utf8_to_utf16(const char *filename) {
     int wpath_size = MultiByteToWideChar(CP_UTF8, 0, filename, -1, NULL, 0);
     if(wpath_size <= 0)
@@ -27,6 +32,28 @@ static wchar_t *file_lock_utf8_to_utf16(const char *filename) {
     }
 
     return wpath;
+}
+
+static wchar_t *file_lock_windows_path(const char *filename) {
+#if defined(__CYGWIN__) || defined(__MSYS__)
+    ssize_t wpath_size = cygwin_conv_path(CCP_POSIX_TO_WIN_W, filename, NULL, 0);
+    if(wpath_size > 0) {
+        wchar_t *wpath = malloc((size_t)wpath_size);
+        if(!wpath)
+            return NULL;
+
+        if(cygwin_conv_path(CCP_POSIX_TO_WIN_W, filename, wpath, wpath_size) == 0)
+            return wpath;
+
+        free(wpath);
+    }
+
+    // Absolute POSIX-style paths require runtime translation before Win32 APIs can use them.
+    if(filename[0] == '/')
+        return NULL;
+#endif
+
+    return file_lock_utf8_to_utf16(filename);
 }
 #endif
 
@@ -49,7 +76,7 @@ FILE_LOCK file_lock_get(const char *filename) {
     return (FILE_LOCK){ .fd = fd };
 
 #elif defined(OS_WINDOWS)
-    wchar_t *wpath = file_lock_utf8_to_utf16(filename);
+    wchar_t *wpath = file_lock_windows_path(filename);
     if(!wpath)
         return FILE_LOCK_INVALID;
 
