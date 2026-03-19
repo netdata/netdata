@@ -88,6 +88,43 @@ If you prefer to manage the Agent through the GUI, you can start-stop and restar
 - To **stop** Netdata, run `Stop-Service Netdata`.
 - To **restart** Netdata, run `Restart-Service Netdata`.
 
+## Network Namespace Execution
+
+Netdata is designed as a **host-level monitoring agent** that collects metrics from the entire system, including all processes, containers, and network namespaces on the host.
+
+### Why Netdata Requires Host Network Namespace
+
+:::important
+
+**Host Network Namespace Required**
+
+Netdata **must run in the host network namespace** to function properly as a system monitoring agent. Running Netdata in a specific network namespace (using systemd's `NetworkNamespacePath=` or `JoinsNamespaceOf=` directives) is not supported and will prevent Netdata from:
+
+- Monitoring processes in all network namespaces on the system
+- Accessing system-level metrics from `/proc` and `/sys`
+- Collecting network metrics from all network interfaces
+- Providing comprehensive system visibility
+
+:::
+
+### Network Namespace vs Journal Namespace
+
+It's important to distinguish between two different types of namespaces:
+
+1. **Network Namespace** (runtime execution environment): Controls which network namespace the Netdata process itself runs in. Netdata requires the host network namespace for proper monitoring.
+
+2. **Journal Namespace** (logging destination): Controls where Netdata sends its logs via systemd journal. You can configure Netdata to log to a specific journal namespace using `LogNamespace=` in the systemd service file. This is unrelated to network namespaces.
+
+### Monitoring Network Namespaces
+
+While Netdata itself must run in the host network namespace, it can **monitor processes and network interfaces across all network namespaces** on the system. Netdata automatically discovers and monitors:
+
+- Network interfaces in all namespaces
+- Processes running in containers with network namespace isolation
+- Network traffic from all namespaces
+
+This design allows Netdata to provide complete system visibility while running in the host network namespace.
+
 ## Quick Reference
 
 ### UNIX Commands Summary
