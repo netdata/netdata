@@ -134,7 +134,17 @@ func buildPlanFromTemplate(templateYAML string, revision uint64, reader metrix.R
 	if err := engine.LoadYAML([]byte(templateYAML), revision); err != nil {
 		return chartengine.Plan{}, err
 	}
-	return engine.BuildPlan(reader)
+	attempt, err := engine.PreparePlan(reader)
+	if err != nil {
+		return chartengine.Plan{}, err
+	}
+	defer attempt.Abort()
+
+	plan := attempt.Plan()
+	if err := attempt.Commit(); err != nil {
+		return chartengine.Plan{}, err
+	}
+	return plan, nil
 }
 
 type planFilter struct {
