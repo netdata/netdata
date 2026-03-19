@@ -58,6 +58,16 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Version Compatibility
+
+This collector works with any version of Apache that exposes the `server-status` endpoint via `mod_status`. Some metrics require specific configuration:
+
+| Feature | Requirement |
+|:--------|:------------|
+| Extended metrics (requests, bandwidth, etc.) | Apache v2.3.6+ with `ExtendedStatus On` |
+
+`ExtendedStatus` is enabled by default since Apache v2.3.6. For earlier versions, you must explicitly set `ExtendedStatus On` in your Apache configuration to collect the full set of metrics.
+
 ## Metrics
 
 Metrics grouped by *scope*.

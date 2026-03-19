@@ -45,6 +45,10 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Version Compatibility
+
+This collector works with any version of PHP-FPM that exposes the required status page endpoint. There are no version-specific requirements beyond enabling the status page in your PHP-FPM configuration.
+
 ## Metrics
 
 Metrics grouped by *scope*.

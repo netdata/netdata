@@ -65,6 +65,24 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Version Compatibility
+
+This collector works with any version of MySQL or MariaDB that exposes the required status endpoints. Some features require specific minimum versions:
+
+| Feature | Minimum Version |
+|:--------|:----------------|
+| User Statistics (`SHOW USER_STATISTICS`) | MariaDB 10.1.1+ |
+| Multi-source replication (`SHOW ALL SLAVES STATUS`) | MariaDB 10.2+ |
+| `SLAVE MONITOR` privilege (required for replication monitoring) | MariaDB 10.5.9+ |
+| Replica status via `SHOW REPLICA STATUS` | MySQL 8.0.22+ |
+| Performance Schema P95/P99 metrics | MySQL 8.0+ |
+
+:::note
+
+For MariaDB 10.5.9 and later, use `SLAVE MONITOR` privilege instead of `REPLICATION CLIENT` when creating the monitoring user.
+
+:::
+
 ## Metrics
 
 Metrics grouped by *scope*.
