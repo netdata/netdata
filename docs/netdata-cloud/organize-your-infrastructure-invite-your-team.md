@@ -73,3 +73,33 @@ All nodes automatically appear in the "All nodes" Room. Each Room has independen
 
 1. Click the ⚙️ next to the Room name
 2. Manage room access, node grouping, dashboard settings, and monitoring configurations
+
+### System Rooms
+
+Netdata Cloud includes special system rooms that have unique behavior:
+
+**All Nodes Room**
+
+The "All Nodes" room is automatically created in every Space and provides a complete view of your infrastructure:
+
+- Automatically includes all nodes connected to the Space
+- Cannot have node assignment rules (it includes all nodes by default)
+- Provides infrastructure-wide dashboards and monitoring
+
+:::note
+
+Some actions on the "All Nodes" room may be restricted based on your role and the room's system properties. If you encounter limitations when trying to rename, delete, or leave this room, check your [role permissions](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) or contact your Space administrator.
+
+:::
+
+## Troubleshooting
+
+### I can't rename or leave a room
+
+If you're unable to rename or leave a room:
+
+1. **Check your role**: Ensure you have the necessary permissions. Admins and Managers can rename rooms, while all roles can typically leave rooms. See [Role-Based Access Control](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for details.
+
+2. **System room restrictions**: Some system rooms (like "All Nodes") may have additional restrictions that prevent certain actions regardless of your role.
+
+3. **Contact your administrator**: If you believe you should have access but are still encountering issues, contact your Space administrator for assistance.
