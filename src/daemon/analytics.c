@@ -945,7 +945,7 @@ void get_system_timezone(void)
     // and fall back to the auto-detected timezone.
     if (timezone_user_configured && (!configured_tz || !*configured_tz)) {
         timezone_user_configured = false;
-        configured_tz = timezone;
+        configured_tz = default_timezone;
     }
 
     // If the user explicitly configured a timezone, treat it as a valid tzdb name
