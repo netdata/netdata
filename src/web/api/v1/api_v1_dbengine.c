@@ -71,7 +71,7 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
 }
 
 int api_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
-    if (!netdata_ready)
+    if (!netdata_ready_load())
         return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;

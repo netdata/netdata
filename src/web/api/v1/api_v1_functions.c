@@ -3,7 +3,7 @@
 #include "api_v1_calls.h"
 
 int api_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
-    if (!netdata_ready)
+    if (!netdata_ready_load())
         return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;

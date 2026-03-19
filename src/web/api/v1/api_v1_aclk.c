@@ -5,7 +5,7 @@
 int api_v1_aclk(RRDHOST *host, struct web_client *w, char *url) {
     UNUSED(url);
     UNUSED(host);
-    if (!netdata_ready) return HTTP_RESP_SERVICE_UNAVAILABLE;
+    if (!netdata_ready_load()) return HTTP_RESP_SERVICE_UNAVAILABLE;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -17,4 +17,3 @@ int api_v1_aclk(RRDHOST *host, struct web_client *w, char *url) {
     buffer_no_cacheable(wb);
     return HTTP_RESP_OK;
 }
-
