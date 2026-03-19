@@ -1,0 +1,107 @@
+name: netdata
+base: core24
+adopt-info: netdata
+summary: Real-time system and application monitoring
+description: |
+  Netdata is distributed, real-time, performance and health monitoring
+  for systems and applications.
+grade: devel
+confinement: strict
+
+apps:
+  netdata:
+    command: bin/run-netdata
+    daemon: simple
+    restart-condition: always
+    plugs:
+      - network
+      - network-bind
+      - network-observe
+      - system-observe
+      - hardware-observe
+      - kernel-module-observe
+      - mount-observe
+      - log-observe
+      - process-control
+
+parts:
+  netdata:
+    plugin: cmake
+    source: .
+    override-pull: |
+      craftctl default
+      version="$(tr -d '\n' < "${CRAFT_PART_SRC}/packaging/version")"
+      version="${version#v}"
+      craftctl set version="${version}"
+      aclk_proto_file="${CRAFT_PART_SRC}/src/aclk/aclk-schemas/proto/aclk/v1/lib.proto"
+      if [ ! -f "${aclk_proto_file}" ]; then
+        echo "aclk-schemas submodule missing in source tree, fetching pinned commit."
+        rm -rf "${CRAFT_PART_SRC}/src/aclk/aclk-schemas"
+        git clone https://github.com/netdata/aclk-schemas.git "${CRAFT_PART_SRC}/src/aclk/aclk-schemas"
+        git -C "${CRAFT_PART_SRC}/src/aclk/aclk-schemas" checkout --detach ec319a14394436f62663548d32eb320eeddd264a
+      fi
+      libsensors_file="${CRAFT_PART_SRC}/src/collectors/debugfs.plugin/libsensors/vendored/lib/access.c"
+      if [ ! -f "${libsensors_file}" ]; then
+        echo "libsensors submodule missing in source tree, fetching pinned commit."
+        rm -rf "${CRAFT_PART_SRC}/src/collectors/debugfs.plugin/libsensors/vendored"
+        git clone https://github.com/lm-sensors/lm-sensors.git "${CRAFT_PART_SRC}/src/collectors/debugfs.plugin/libsensors/vendored"
+        git -C "${CRAFT_PART_SRC}/src/collectors/debugfs.plugin/libsensors/vendored" checkout --detach 42f240d2a457834bcbdf4dc8b57237f97b5f5854
+      fi
+    cmake-generator: Ninja
+    cmake-parameters:
+      - -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - -DCMAKE_INSTALL_PREFIX=/
+      - -DBUILD_FOR_PACKAGING=ON
+      - -DDEFAULT_FEATURE_STATE=OFF
+      - -DENABLE_DASHBOARD=ON
+      - -DENABLE_DBENGINE=ON
+      - -DENABLE_PLUGIN_APPS=ON
+      - -DENABLE_PLUGIN_GO=OFF
+      - -DENABLE_PLUGIN_DEBUGFS=ON
+      - -DENABLE_LIBBACKTRACE=OFF
+      - -DENABLE_BUNDLED_PROTOBUF=OFF
+      - -DENABLE_BUNDLED_JSONC=OFF
+      - -DENABLE_BUNDLED_YAML=OFF
+    build-packages:
+      - bison
+      - build-essential
+      - cmake
+      - flex
+      - git
+      - libcurl4-openssl-dev
+      - libjson-c-dev
+      - liblz4-dev
+      - libprotobuf-dev
+      - libssl-dev
+      - libuv1-dev
+      - libyaml-dev
+      - ninja-build
+      - pkg-config
+      - protobuf-compiler
+      - uuid-dev
+      - zlib1g-dev
+    stage-packages:
+      - bash
+      - ca-certificates
+      - coreutils
+      - curl
+      - iproute2
+      - jq
+      - libatomic1
+      - libcurl4
+      - libjson-c5
+      - liblz4-1
+      - lm-sensors
+      - libprotobuf32
+      - libssl3
+      - libuv1
+      - libyaml-0-2
+      - procps
+      - uuid-runtime
+      - zlib1g
+
+  snap-local:
+    plugin: dump
+    source: snap/local
+    organize:
+      run-netdata: bin/run-netdata
