@@ -17,6 +17,14 @@ When using OAuth, your Netdata Cloud account will be automatically associated wi
 
 :::
 
+### Magic Link Authentication
+
+When you sign in using your email address, Netdata Cloud sends a magic link to your inbox. This passwordless authentication method has the following security properties:
+
+- **Expiration**: Magic links expire 15 minutes after generation
+- **Single-use**: Magic links are automatically invalidated after successful authentication
+- **Device flexibility**: If you open a magic link on one device, the link remains valid until used or expired, allowing you to complete the login on another device within the 15-minute window
+
 ## Authorization
 
 Once logged in, you can manage role-based access in your Space to give each team member the appropriate role. For more information, see [Role-Based Access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
