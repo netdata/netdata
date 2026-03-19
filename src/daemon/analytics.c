@@ -925,14 +925,17 @@ void get_system_timezone(void)
     timezone_user_configured = inicfg_exists(&netdata_config, CONFIG_SECTION_GLOBAL, "timezone");
 
     char safe_timezone[FILENAME_MAX + 1];
-    const char *default_timezone = "unknown";
+    const char *default_timezone = timezone;
 
     if (timezone_is_tzdb_name) {
-        if (timezone_name_is_safe_tzdb_path(timezone))
-            default_timezone = timezone;
-    }
-    else if (timezone_abbrev_normalize(safe_timezone, sizeof(safe_timezone), timezone))
+        if (!timezone_name_is_safe_tzdb_path(timezone)) {
+            netdata_log_error("TIMEZONE: detected unsafe tzdb timezone '%s', using as-is", timezone);
+        }
+    } else if (!timezone_abbrev_normalize(safe_timezone, sizeof(safe_timezone), timezone)) {
+        default_timezone = "unknown";
+    } else {
         default_timezone = safe_timezone;
+    }
 
     // inicfg_get returns a config-system-owned pointer, stable for the process lifetime
     const char *configured_tz = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "timezone", default_timezone);
