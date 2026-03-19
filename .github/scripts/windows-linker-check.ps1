@@ -16,7 +16,7 @@ if (Test-Path -Path $ndPath) {
             exit 1
         }
 
-        if ($lddResult.Contains('missing')) {
+        if ($lddResult -match 'missing|not found') {
             Write-Output "Libraries missing from install"
             exit 1
         } else {
