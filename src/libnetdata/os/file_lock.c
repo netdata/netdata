@@ -10,6 +10,24 @@
 
 #if defined(OS_WINDOWS)
 #include <windows.h>
+#include <stdlib.h>
+
+static wchar_t *file_lock_utf8_to_utf16(const char *filename) {
+    int wpath_size = MultiByteToWideChar(CP_UTF8, 0, filename, -1, NULL, 0);
+    if(wpath_size <= 0)
+        return NULL;
+
+    wchar_t *wpath = malloc((size_t)wpath_size * sizeof(*wpath));
+    if(!wpath)
+        return NULL;
+
+    if(MultiByteToWideChar(CP_UTF8, 0, filename, -1, wpath, wpath_size) <= 0) {
+        free(wpath);
+        return NULL;
+    }
+
+    return wpath;
+}
 #endif
 
 FILE_LOCK file_lock_get(const char *filename) {
@@ -31,16 +49,9 @@ FILE_LOCK file_lock_get(const char *filename) {
     return (FILE_LOCK){ .fd = fd };
 
 #elif defined(OS_WINDOWS)
-    // Convert MSYS2/Cygwin path directly to Windows wide-char path
-    ssize_t wpath_size = cygwin_conv_path(CCP_POSIX_TO_WIN_W, filename, NULL, 0);
-    if(wpath_size < 0)
+    wchar_t *wpath = file_lock_utf8_to_utf16(filename);
+    if(!wpath)
         return FILE_LOCK_INVALID;
-
-    wchar_t *wpath = mallocz(wpath_size);
-    if(cygwin_conv_path(CCP_POSIX_TO_WIN_W, filename, wpath, wpath_size) != 0) {
-        freez(wpath);
-        return FILE_LOCK_INVALID;
-    }
 
     // Open existing file or create new one
     HANDLE hFile = CreateFileW(
@@ -53,7 +64,7 @@ FILE_LOCK file_lock_get(const char *filename) {
         NULL
     );
 
-    freez(wpath);
+    free(wpath);
 
     if(hFile == INVALID_HANDLE_VALUE)
         return FILE_LOCK_INVALID;
