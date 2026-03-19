@@ -620,6 +620,201 @@ When the database settings between Parent and Child nodes don't match, it can ca
 
 </details>
 
+## Streaming Disconnect Alert Notifications
+
+Netdata provides built-in alerts to notify you when Child nodes disconnect from a Parent or never establish a streaming connection.
+
+### Built-in Streaming Alerts
+
+The Parent node includes two pre-configured alerts in `health.d/streaming.conf`:
+
+- **streaming_disconnected**: Triggers when permanent Child nodes disconnect from the Parent
+- **streaming_never_connected**: Triggers when permanent Child nodes never connected during the current session
+
+By default, both alerts are configured with `to: silent`, meaning they are active but do not send notifications.
+
+### Enabling Notifications
+
+To receive notifications when streaming disconnects occur:
+
+1. Create or edit the streaming alert configuration on the Parent node:
+
+   ```bash
+   cd /etc/netdata
+   sudo ./edit-config health.d/streaming.conf
+   ```
+
+2. Change the `to:` setting from `silent` to a recipient role for both alerts:
+
+   ```ini
+   template: streaming_disconnected
+         on: netdata.streaming_inbound
+        class: Availability
+         type: Streaming
+    component: Streaming
+   chart labels: type=permanent
+         calc: ${stale disconnected}
+        units: nodes
+        every: 10s
+         warn: $netdata.uptime.uptime > 30 * 60 AND $this > 0
+        delay: up 5m down 5m multiplier 1.5 max 30m
+      summary: Permanent streaming nodes disconnected
+         info: Permanent child nodes disconnected from this parent.
+           to: sysadmin
+   ```
+
+   Replace `sysadmin` with your desired recipient role (e.g., `webmaster`, `dba`).
+
+3. Reload the health configuration:
+
+   ```bash
+   sudo netdatacli reload-health
+   ```
+
+:::note
+
+These alerts only trigger for permanent nodes after the Parent has been running for at least 30 minutes (`$netdata.uptime.uptime > 30 * 60`). This prevents false alerts during initial startup. Ephemeral nodes are excluded from these alerts.
+
+:::
+
+### Configuring Webhook Notifications
+
+You can send streaming disconnect notifications to webhooks or custom endpoints using one of two methods:
+
+#### Option 1: Use Built-in Webhook Integrations
+
+Netdata includes webhook integrations for popular services:
+
+- **Slack**: Set `SLACK_WEBHOOK_URL` in `health_alarm_notify.conf`
+- **Discord**: Set `DISCORD_WEBHOOK_URL` in `health_alarm_notify.conf`
+- **Microsoft Teams**: Set `MSTEAMS_WEBHOOK_URL` in `health_alarm_notify.conf`
+- **Rocket.Chat**: Set `ROCKETCHAT_WEBHOOK_URL` in `health_alarm_notify.conf`
+
+To configure webhook notifications:
+
+1. Edit the notification configuration:
+
+   ```bash
+   cd /etc/netdata
+   sudo ./edit-config health_alarm_notify.conf
+   ```
+
+2. Set the webhook URL for your chosen service (e.g., Slack):
+
+   ```bash
+   SLACK_WEBHOOK_URL="https://hooks.slack.com/services/TXXXXXXXX/BXXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXX"
+   ```
+
+3. Configure the default recipient for your chosen notification method:
+
+   ```bash
+   DEFAULT_RECIPIENT_SLACK="alarms"
+   ```
+
+4. Test the notification:
+
+   ```bash
+   /usr/libexec/netdata/plugins.d/alarm-notify.sh test
+   ```
+
+#### Option 2: Use Custom Webhook Sender
+
+For custom webhook endpoints, use the `custom_sender()` function:
+
+1. Edit the notification configuration:
+
+   ```bash
+   cd /etc/netdata
+   sudo ./edit-config health_alarm_notify.conf
+   ```
+
+2. Enable custom notifications and configure the sender:
+
+   ```bash
+   SEND_CUSTOM="YES"
+   DEFAULT_RECIPIENT_CUSTOM="webhook_endpoint"
+   
+   custom_sender() {
+       local webhook_url="https://your-webhook-endpoint.com/notify"
+       local payload
+       
+       payload=$(cat <<EOF
+   {
+       "text": "${host} - ${status_message}: ${alarm}",
+       "node": "${host}",
+       "alert": "${name}",
+       "status": "${status}",
+       "severity": "${severity}",
+       "timestamp": "${raised_for}"
+   }
+   EOF
+   )
+       
+       httpcode=$(docurl -X POST \
+           -H "Content-Type: application/json" \
+           -d "${payload}" \
+           "${webhook_url}")
+       
+       if [ "${httpcode}" = "200" ]; then
+           info "sent custom notification to webhook"
+       else
+           error "failed to send custom notification (HTTP ${httpcode})"
+       fi
+   }
+   ```
+
+3. Test the notification:
+
+   ```bash
+   /usr/libexec/netdata/plugins.d/alarm-notify.sh test
+   ```
+
+### Testing Notification Setup
+
+After configuring notifications, verify the setup works correctly:
+
+1. Run the notification test command:
+
+   ```bash
+   /usr/libexec/netdata/plugins.d/alarm-notify.sh test
+   ```
+
+2. Check the test sends notifications to all configured endpoints
+
+3. Verify logs for any errors:
+
+   ```bash
+   grep "alarm-notify" /var/log/netdata/error.log
+   ```
+
+### Managing Stale Nodes
+
+If you see alerts for nodes that should be ephemeral (temporary nodes that are expected to disconnect):
+
+**Mark all stale nodes as ephemeral:**
+
+```bash
+netdatacli mark-stale-nodes-ephemeral ALL_NODES
+```
+
+**Remove specific stale nodes:**
+
+```bash
+netdatacli remove-stale-node <MACHINE_GUID>
+```
+
+**Remove all stale nodes:**
+
+```bash
+netdatacli remove-stale-node ALL_NODES
+```
+
+:::tip
+
+Configure ephemeral nodes proactively by setting `is ephemeral node = yes` in the Child node's `netdata.conf` under the `[global]` section. This prevents unnecessary alerts for nodes that regularly disconnect.
+
+:::
+
 ## FAQ
 
 <details>
