@@ -154,10 +154,10 @@ bool health_queue_alert_deletion(ALARM_ENTRY *ae) {
     cmd.param[0] = ae;
 
     if (!health_enq_cmd(&cmd, true)) {
-        // Enqueue failed — the loop is either not initialized or fully shut down.
+        // Enqueue failed — the loop is either not initialized or shutting down.
         // In both cases no in-flight save still references the entry:
         //   - Not initialized: no saves were ever queued.
-        //   - Shut down: initialized is cleared only after the main loop exits and
+        //   - Shutting down: initialized is cleared only after
         //     health_process_pending_alerts() has drained every queued save, so all
         //     pending_save_count decrements have already happened.
         // Free unconditionally to avoid leaking unlinked entries whose caller
@@ -903,7 +903,7 @@ void health_event_loop_shutdown(void) {
     // sets initialized=false (which the old check used), and also prevents a second
     // shutdown call from driving teardown against already-destroyed state.
     if (!__atomic_exchange_n(&health_config.started, false, __ATOMIC_ACQ_REL)) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "HEALTH: event loop not initialized or already shut down, skipping");
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "HEALTH: event loop not initialized or already shut down, skipping");
         return;
     }
 

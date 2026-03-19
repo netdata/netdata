@@ -5,7 +5,8 @@
 #include "health-alert-entry.h"
 #include "health_event_loop_uv.h"
 
-// Worker job IDs and health_evloop_iteration are defined in health_event_loop_uv.h
+// Main-loop worker job IDs are defined in health_event_loop_uv.h;
+// health_evloop_iteration is declared extern there and defined here.
 uint64_t health_evloop_iteration = 0;
 
 uint64_t health_evloop_current_iteration(void) {
@@ -267,8 +268,8 @@ static void do_eval_expression(
         *result = expression_result(expression);
 }
 
-// Returns the number of runnable alerts
-// Called from health_event_loop_uv.c for each host
+// Process health alerts for a single host.
+// Called from health_event_loop_uv.c worker callbacks for each host.
 void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, time_t now, time_t *next_run, struct health_stmt_set *stmts) {
     size_t runnable = 0;
     struct health_alert_status_counts status_counts = { 0 };
@@ -324,7 +325,7 @@ void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, tim
     // the first loop is to lookup values from the db
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(unlikely(health_should_stop() || !rrdhost_should_run_health(host)))
+        if(unlikely(health_should_stop() || !rrdhost_should_run_health(host))) {
             snapshot_complete = false;
             break;
         }
