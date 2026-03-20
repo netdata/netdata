@@ -230,7 +230,7 @@ typedef struct {
 typedef struct {
     netdata_cond_t cond;
     netdata_mutex_t cond_mutex;
-    uint64_t run_flag;
+    uint64_t run_flag;  // accessed by multiple threads via __atomic builtins
 } mrg_bench_thread_control_t;
 
 typedef enum {
@@ -259,7 +259,7 @@ typedef struct {
 
 static void mrg_bench_wait_for_start(netdata_cond_t *cond, netdata_mutex_t *mutex, uint64_t *flag) {
     netdata_mutex_lock(mutex);
-    while (*flag == 0)
+    while (__atomic_load_n(flag, __ATOMIC_RELAXED) == 0)
         netdata_cond_wait(cond, mutex);
     netdata_mutex_unlock(mutex);
 }
@@ -273,7 +273,7 @@ static void mrg_bench_thread(void *arg) {
     while(1) {
         mrg_bench_wait_for_start(&tc->cond, &tc->cond_mutex, &tc->run_flag);
 
-        if(tc->run_flag == MRG_BENCH_STOP_SIGNAL)
+        if(__atomic_load_n(&tc->run_flag, __ATOMIC_RELAXED) == MRG_BENCH_STOP_SIGNAL)
             break;
 
         usec_t start = now_monotonic_high_precision_usec();
@@ -374,7 +374,7 @@ static void mrg_bench_run_test(const char *name, int readers, int writers,
     // Signal threads to start
     for(int i = 0; i < total_threads; i++) {
         netdata_mutex_lock(&controls[i].cond_mutex);
-        controls[i].run_flag = 1;
+        __atomic_store_n(&controls[i].run_flag, 1, __ATOMIC_RELAXED);
         netdata_cond_signal(&controls[i].cond);
         netdata_mutex_unlock(&controls[i].cond_mutex);
     }
@@ -446,7 +446,7 @@ int mrg_retention_benchmark(void) {
     for(int i = 0; i < MRG_BENCH_MAX_THREADS; i++) {
         netdata_cond_init(&controls[i].cond);
         netdata_mutex_init(&controls[i].cond_mutex);
-        controls[i].run_flag = 0;
+        __atomic_store_n(&controls[i].run_flag, 0, __ATOMIC_RELAXED);
     }
 
     // Create threads
@@ -515,7 +515,7 @@ int mrg_retention_benchmark(void) {
     fprintf(stderr, "Stopping threads...\n");
     for(int i = 0; i < MRG_BENCH_MAX_THREADS; i++) {
         netdata_mutex_lock(&controls[i].cond_mutex);
-        controls[i].run_flag = MRG_BENCH_STOP_SIGNAL;
+        __atomic_store_n(&controls[i].run_flag, MRG_BENCH_STOP_SIGNAL, __ATOMIC_RELAXED);
         netdata_cond_signal(&controls[i].cond);
         netdata_mutex_unlock(&controls[i].cond_mutex);
     }

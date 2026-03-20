@@ -5,9 +5,9 @@
 struct aral_statistics mrg_aral_statistics;
 
 // ----------------------------------------------------------------------------
-// public API
+// private helpers
 
-inline MRG *mrg_create(void) {
+static MRG *mrg_create_internal(bool load_from_db) {
     MRG *mrg = callocz(1, sizeof(MRG));
 
     for(size_t i = 0; i < _countof(mrg->index) ; i++) {
@@ -21,27 +21,23 @@ inline MRG *mrg_create(void) {
     }
     pulse_aral_register_statistics(&mrg_aral_statistics, "mrg");
 
-    mrg_load(mrg);
+    if(load_from_db)
+        mrg_load(mrg);
+
     return mrg;
 }
 
+// ----------------------------------------------------------------------------
+// public API
+
+inline MRG *mrg_create(void) {
+    return mrg_create_internal(true);
+}
+
 inline MRG *mrg_create_for_unittest(void) {
-    MRG *mrg = callocz(1, sizeof(MRG));
-
-    for(size_t i = 0; i < _countof(mrg->index) ; i++) {
-        rw_spinlock_init(&mrg->index[i].rw_spinlock);
-
-        char buf[ARAL_MAX_NAME + 1];
-        snprintfz(buf, ARAL_MAX_NAME, "mrg[%zu]", i);
-
-        mrg->index[i].aral = aral_create(buf, sizeof(METRIC), 0, 16384, &mrg_aral_statistics, NULL, NULL,
-                                         false, false, true);
-    }
-    pulse_aral_register_statistics(&mrg_aral_statistics, "mrg");
-
-    // Note: Skip mrg_load() to avoid pre-loaded metrics with writer counts
+    // Skip mrg_load() to avoid pre-loaded metrics with writer counts
     // This allows deletion tests to work without interference from database metrics
-    return mrg;
+    return mrg_create_internal(false);
 }
 
 struct aral_statistics *mrg_aral_stats(void) {
