@@ -51,9 +51,50 @@ func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 	if err := validateTypeIDBudget(env.TypeID, normalized); err != nil {
 		return err
 	}
+	if !hasEmissions(normalized) {
+		return nil
+	}
+	if err := emitHostSelection(api, env); err != nil {
+		return err
+	}
 	emitCreatePhase(api, env, normalized)
 	emitUpdatePhase(api, env, normalized.updateCharts)
 	emitRemovePhase(api, env, normalized)
+	return nil
+}
+
+func hasEmissions(actions normalizedActions) bool {
+	return len(actions.createCharts) > 0 ||
+		len(actions.createDimsByID) > 0 ||
+		len(actions.updateCharts) > 0 ||
+		len(actions.removeDimensions) > 0 ||
+		len(actions.removeCharts) > 0
+}
+
+func emitHostSelection(api *netdataapi.API, env EmitEnv) error {
+	if env.HostScope == nil {
+		api.HOST("")
+		return nil
+	}
+
+	guid := sanitizeWireID(env.HostScope.GUID)
+	if guid == "" {
+		return fmt.Errorf("chartemit: emit env host scope guid is required")
+	}
+	if env.HostScope.Define != nil {
+		defineGUID := sanitizeWireID(env.HostScope.Define.GUID)
+		if defineGUID == "" {
+			return fmt.Errorf("chartemit: host define guid is required")
+		}
+		if defineGUID != guid {
+			return fmt.Errorf("chartemit: host define guid %q does not match host scope guid %q", env.HostScope.Define.GUID, env.HostScope.GUID)
+		}
+		if strings.TrimSpace(env.HostScope.Define.Hostname) == "" {
+			return fmt.Errorf("chartemit: host define hostname is required")
+		}
+		api.HOSTINFO(*env.HostScope.Define)
+	}
+	api.HOST(guid)
 	return nil
 }
 

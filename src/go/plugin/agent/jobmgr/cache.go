@@ -41,6 +41,8 @@ type (
 	}
 
 	retryingTasks struct {
+		// retryingTasks is intentionally lock-free. All access must remain serialized
+		// through manager-owned command flow and synchronous dyncfg handler callbacks.
 		// [cfg.UID()]
 		items map[string]*retryTask
 	}

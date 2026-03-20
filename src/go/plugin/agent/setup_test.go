@@ -3,10 +3,14 @@
 package agent
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -207,6 +211,63 @@ func TestAgent_loadEnabledModules(t *testing.T) {
 func TestIsStockConfig(t *testing.T) {
 	assert.True(t, isStockConfig("/usr/lib/netdata/conf.d/go.d/module.conf"))
 	assert.False(t, isStockConfig("/etc/netdata/go.d/module.conf"))
+}
+
+func TestAgent_setupSecretStoreConfigs(t *testing.T) {
+	t.Run("loads merged configs from collectors dirs only", func(t *testing.T) {
+		base := t.TempDir()
+		configRoot := filepath.Join(base, "etc", "netdata")
+		userCollectors := filepath.Join(base, "etc", "netdata", "go.d")
+		stockCollectors := filepath.Join(base, "usr", "lib", "netdata", "conf.d", "go.d")
+
+		mustWriteAgentSecretStoreConfigFile(t, filepath.Join(configRoot, "ss", "vault.conf"), `
+jobs:
+  - name: ignored
+    mode: token
+    mode_token:
+      token: config-dir-should-not-load
+    addr: https://vault.example
+`)
+		mustWriteAgentSecretStoreConfigFile(t, filepath.Join(userCollectors, "ss", "vault.conf"), `
+jobs:
+  - name: vault_prod
+    mode: token
+    mode_token:
+      token: user-token
+    addr: https://vault.example
+`)
+		mustWriteAgentSecretStoreConfigFile(t, filepath.Join(stockCollectors, "ss", "aws-sm.conf"), `
+jobs:
+  - name: aws_prod
+    auth_mode: env
+    region: us-east-1
+`)
+
+		agent := &Agent{
+			ConfigDir:         []string{configRoot},
+			CollectorsConfDir: []string{userCollectors, stockCollectors},
+		}
+
+		cfgs := agent.setupSecretStoreConfigs()
+		require.Len(t, cfgs, 2)
+		assert.Equal(t, "vault_prod", cfgs[0].Name())
+		assert.Equal(t, secretstore.KindVault, cfgs[0].Kind())
+		assert.Equal(t, confgroup.TypeUser, cfgs[0].SourceType())
+		assert.Equal(t, "aws_prod", cfgs[1].Name())
+		assert.Equal(t, secretstore.KindAWSSM, cfgs[1].Kind())
+		assert.Equal(t, confgroup.TypeStock, cfgs[1].SourceType())
+	})
+
+	t.Run("no collectors config dirs returns nil", func(t *testing.T) {
+		agent := &Agent{}
+		assert.Nil(t, agent.setupSecretStoreConfigs())
+	})
+}
+
+func mustWriteAgentSecretStoreConfigFile(t *testing.T, path, content string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 }
 
 func TestAgent_buildDiscoveryConf(t *testing.T) {

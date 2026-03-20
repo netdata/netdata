@@ -74,7 +74,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -300,7 +300,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -550,7 +550,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -655,7 +655,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -763,7 +763,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -994,7 +994,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -1171,7 +1171,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -1280,7 +1280,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -1469,7 +1469,7 @@ modules:
         list:
           - name: update every
             description: Data collection frequency.
-            default_value: 5
+            default_value: 10
             required: false
           - name: ebpf load mode
             description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -1590,7 +1590,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -1946,7 +1946,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -2169,7 +2169,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -2332,7 +2332,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -2562,7 +2562,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -2669,7 +2669,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -2795,7 +2795,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).

@@ -22,12 +22,12 @@ func (m *Manager) enqueueDyncfgFunction(fn dyncfg.Function) {
 		return
 	case dyncfg.BoundedSendContextDone:
 		if m.baseContext().Err() != nil {
-			m.dyncfgApi.SendCodef(fn, 503, dyncfgShuttingDownMsg)
+			m.dyncfgResponder.SendCodef(fn, 503, dyncfgShuttingDownMsg)
 			return
 		}
-		m.dyncfgApi.SendCodef(fn, 503, dyncfgBusyMsg)
+		m.dyncfgResponder.SendCodef(fn, 503, dyncfgBusyMsg)
 	case dyncfg.BoundedSendTimeout:
-		m.dyncfgApi.SendCodef(fn, 503, dyncfgBusyMsg)
+		m.dyncfgResponder.SendCodef(fn, 503, dyncfgBusyMsg)
 	}
 }
 

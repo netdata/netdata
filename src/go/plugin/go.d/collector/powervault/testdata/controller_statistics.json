@@ -1,0 +1,44 @@
+{
+  "controller-statistics": [
+    {
+      "durable-id": "controller_a",
+      "iops": 1250,
+      "bytes-per-second-numeric": 52428800,
+      "cpu-load": 23.5,
+      "data-read-numeric": 107374182400,
+      "data-written-numeric": 53687091200,
+      "number-of-reads": 5000000,
+      "number-of-writes": 2500000,
+      "write-cache-used": 45,
+      "write-cache-hits": 1800000,
+      "write-cache-misses": 200000,
+      "read-cache-hits": 3500000,
+      "read-cache-misses": 500000,
+      "num-forwarded-cmds": 12500
+    },
+    {
+      "durable-id": "controller_b",
+      "iops": 980,
+      "bytes-per-second-numeric": 41943040,
+      "cpu-load": 18.2,
+      "data-read-numeric": 85899345920,
+      "data-written-numeric": 42949672960,
+      "number-of-reads": 4000000,
+      "number-of-writes": 2000000,
+      "write-cache-used": 32,
+      "write-cache-hits": 1400000,
+      "write-cache-misses": 160000,
+      "read-cache-hits": 2800000,
+      "read-cache-misses": 400000,
+      "num-forwarded-cmds": 8700
+    }
+  ],
+  "status": [
+    {
+      "response-type": "Success",
+      "response": "Command completed successfully.",
+      "return-code": 0,
+      "response-type-numeric": 0
+    }
+  ]
+}

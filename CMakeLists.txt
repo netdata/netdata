@@ -531,6 +531,9 @@ check_function_exists(getrandom HAVE_GETRANDOM)
 check_function_exists(sysinfo HAVE_SYSINFO)
 
 check_function_exists(timegm HAVE_TIMEGM)
+check_function_exists(tzalloc HAVE_TZALLOC)
+check_function_exists(localtime_rz HAVE_LOCALTIME_RZ)
+check_function_exists(tzfree HAVE_TZFREE)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     # -fno-omit-frame-pointer = add frame pointers to all functions
@@ -2912,9 +2915,11 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_unittest.h
             src/collectors/ebpf.plugin/ebpf_functions.c
             src/collectors/ebpf.plugin/ebpf_functions.h
-            src/collectors/ebpf.plugin/libbpf_api/ebpf.c
-            src/collectors/ebpf.plugin/libbpf_api/ebpf.h
-    )
+             src/collectors/ebpf.plugin/libbpf_api/ebpf.c
+             src/collectors/ebpf.plugin/libbpf_api/ebpf.h
+             src/collectors/ebpf.plugin/libbpf_api/ebpf_library.c
+             src/collectors/ebpf.plugin/libbpf_api/ebpf_library.h
+     )
 
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES} ${INTERCOMMUNICATION_COLLECTORS_FILES})
     target_link_libraries(ebpf.plugin libnetdata)

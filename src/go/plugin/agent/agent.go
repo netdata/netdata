@@ -247,6 +247,7 @@ func (a *Agent) run(ctx context.Context) {
 		VarLibDir:      a.VarLibDir,
 		FnReg:          fnMgr,
 		Vnodes:         a.setupVnodeRegistry(),
+		SecretStores:   a.setupSecretStoreConfigs(),
 		AuditMode:      a.auditDuration > 0,
 		AuditAnalyzer:  a.auditAnalyzer,
 		AuditDataDir:   a.auditDataDir,

@@ -402,6 +402,44 @@ jobs:
 ```
 </details>
 
+###### SNMPv3 with multiple devices
+
+This example monitors multiple SNMP devices that share the same SNMPv3 credentials.
+
+It uses [YAML anchors](https://yaml.org/spec/1.2.2/#3222-anchors-and-aliases) to define the
+full job once (`&snmp_v3_job`) and then reuse it with `<<: *snmp_v3_job`,
+overriding only `name` and `hostname` for each additional device.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - &snmp_v3_job
+    name: switch1
+    update_every: 10
+    hostname: 192.0.2.1
+    options:
+      version: 3
+    user:
+      name: username
+      level: authPriv
+      auth_proto: sha256
+      auth_key: auth_protocol_passphrase
+      priv_proto: aes256
+      priv_key: priv_protocol_passphrase
+
+  - <<: *snmp_v3_job
+    name: switch2
+    hostname: 192.0.2.2
+
+  - <<: *snmp_v3_job
+    name: switch3
+    hostname: 192.0.2.3
+
+```
+</details>
+
 
 
 ## Troubleshooting

@@ -1,0 +1,1 @@
+[{"id":"F1","name":"Fan-1","type":"Fan","lifecycle_state":"Healthy","appliance_id":"A1"},{"id":"F2","name":"Fan-2","type":"Fan","lifecycle_state":"Healthy","appliance_id":"A1"},{"id":"F3","name":"Fan-3","type":"Fan","lifecycle_state":"Degraded","appliance_id":"A1"}]
