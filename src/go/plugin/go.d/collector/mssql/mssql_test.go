@@ -32,9 +32,11 @@ func TestCollector_Init_InvalidAzureADConfig(t *testing.T) {
 	c := New()
 	c.CloudAuth.Provider = cloudauth.ProviderAzureAD
 	c.CloudAuth.AzureAD = &cloudauth.AzureADAuthConfig{
-		Mode:     cloudauth.AzureADAuthModeServicePrincipal,
-		ClientID: "client-id",
-		TenantID: "tenant-id",
+		Mode: cloudauth.AzureADAuthModeServicePrincipal,
+		ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
+			ClientID: "client-id",
+			TenantID: "tenant-id",
+		},
 	}
 	// Missing client_secret.
 

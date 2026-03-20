@@ -155,26 +155,25 @@ modules:
               required: false
               group: Cloud Auth
             - name: cloud_auth.azure_ad.mode
-              description: Azure AD credential mode (`service_principal`, `managed_identity`, or `default`).
-              default_value: default
-              required: false
+              description: Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). Required when `cloud_auth.provider` is `azure_ad`.
+              required: true
               group: Cloud Auth/Azure
-            - name: cloud_auth.azure_ad.tenant_id
+            - name: cloud_auth.azure_ad.mode_service_principal.tenant_id
               description: Azure tenant ID. Required for `service_principal` mode.
               default_value: ""
               required: false
               group: Cloud Auth/Azure
-            - name: cloud_auth.azure_ad.client_id
-              description: Azure client ID. Required for `service_principal`; optional for user-assigned managed identity.
+            - name: cloud_auth.azure_ad.mode_service_principal.client_id
+              description: Azure client ID. Required for `service_principal` mode.
               default_value: ""
               required: false
               group: Cloud Auth/Azure
-            - name: cloud_auth.azure_ad.client_secret
+            - name: cloud_auth.azure_ad.mode_service_principal.client_secret
               description: Azure client secret for `service_principal` mode.
               default_value: ""
               required: false
               group: Cloud Auth/Azure
-            - name: cloud_auth.azure_ad.managed_identity_client_id
+            - name: cloud_auth.azure_ad.mode_managed_identity.client_id
               description: Optional client ID of a user-assigned managed identity (`managed_identity` mode).
               default_value: ""
               required: false
@@ -289,9 +288,10 @@ modules:
                           provider: azure_ad
                           azure_ad:
                             mode: service_principal
-                            tenant_id: "00000000-0000-0000-0000-000000000000"
-                            client_id: "11111111-1111-1111-1111-111111111111"
-                            client_secret: "super-secret-value"
+                            mode_service_principal:
+                              tenant_id: "00000000-0000-0000-0000-000000000000"
+                              client_id: "11111111-1111-1111-1111-111111111111"
+                              client_secret: "super-secret-value"
             - name: Azure SQL with managed identity
               description: Use managed identity authentication (system-assigned by default).
               config: |

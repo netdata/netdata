@@ -42,6 +42,61 @@ func newMaterializedState() materializedState {
 	}
 }
 
+func (s materializedState) clone() materializedState {
+	if len(s.charts) == 0 {
+		return newMaterializedState()
+	}
+
+	out := materializedState{
+		charts: make(map[string]*materializedChartState, len(s.charts)),
+	}
+	for chartID, chart := range s.charts {
+		if chart == nil {
+			continue
+		}
+		out.charts[chartID] = chart.clone()
+	}
+	return out
+}
+
+func (c *materializedChartState) clone() *materializedChartState {
+	if c == nil {
+		return nil
+	}
+
+	out := &materializedChartState{
+		templateID:         c.templateID,
+		meta:               c.meta,
+		lifecycle:          c.lifecycle,
+		lastSeenSuccessSeq: c.lastSeenSuccessSeq,
+		orderedDims:        append([]string(nil), c.orderedDims...),
+		orderedDimsDirty:   c.orderedDimsDirty,
+	}
+	if len(c.dimensions) > 0 {
+		out.dimensions = make(map[string]*materializedDimensionState, len(c.dimensions))
+		for name, dim := range c.dimensions {
+			if dim == nil {
+				continue
+			}
+			cloned := *dim
+			out.dimensions[name] = &cloned
+		}
+	} else {
+		out.dimensions = make(map[string]*materializedDimensionState)
+	}
+	if len(c.scratchEntries) > 0 {
+		out.scratchEntries = make(map[string]*dimBuildEntry, len(c.scratchEntries))
+		for name, entry := range c.scratchEntries {
+			if entry == nil {
+				continue
+			}
+			cloned := *entry
+			out.scratchEntries[name] = &cloned
+		}
+	}
+	return out
+}
+
 func (s *materializedState) ensureChart(
 	chartID string,
 	templateID string,

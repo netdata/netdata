@@ -151,6 +151,11 @@
 - Go.d/powerstore: add Dell PowerStore storage array collector (V2 framework) ([#21929](https://github.com/netdata/netdata/issues/21929))
 - Go.d/powervault: add Dell PowerVault ME4/ME5 storage array collector ([#21936](https://github.com/netdata/netdata/issues/21936))
 - Regenerate integrations docs ([#21970](https://github.com/netdata/netdata/issues/21970))
+- Fix netdatacli ping command ([#21965](https://github.com/netdata/netdata/issues/21965))
+- Add basic testing of Windows installs in CI. ([#21869](https://github.com/netdata/netdata/issues/21869))
+- Fix Coverity issues (Timezone) ([#21971](https://github.com/netdata/netdata/issues/21971))
+- Fix(go/framweork): restore v2 host-scoped chart emission across host switches ([#21979](https://github.com/netdata/netdata/issues/21979))
+- Fix uninitialized vnode stale timeout field in pluginsd parser ([#21983](https://github.com/netdata/netdata/issues/21983))
 
 ## [2.9.0] - 2026-02-16
 

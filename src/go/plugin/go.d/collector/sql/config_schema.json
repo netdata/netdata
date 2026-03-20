@@ -89,29 +89,81 @@
                           "default"
                         ],
                         "default": "default"
-                      },
-                      "tenant_id": {
-                        "title": "Tenant ID",
-                        "description": "Azure tenant ID. Required for service_principal mode.",
-                        "type": "string"
-                      },
-                      "client_id": {
-                        "title": "Client ID",
-                        "description": "Service principal client ID for service_principal mode.",
-                        "type": "string"
-                      },
-                      "client_secret": {
-                        "title": "Client Secret",
-                        "description": "Service principal client secret for service_principal mode.",
-                        "type": "string",
-                        "sensitive": true
-                      },
-                      "managed_identity_client_id": {
-                        "title": "Managed Identity Client ID",
-                        "description": "Optional client ID of a user-assigned managed identity.",
-                        "type": "string"
                       }
-                    }
+                    },
+                    "dependencies": {
+                      "mode": {
+                        "oneOf": [
+                          {
+                            "properties": {
+                              "mode": {
+                                "const": "service_principal"
+                              },
+                              "mode_service_principal": {
+                                "title": "Service Principal",
+                                "description": "Service principal settings used when mode is `service_principal`.",
+                                "type": "object",
+                                "properties": {
+                                  "tenant_id": {
+                                    "title": "Tenant ID",
+                                    "description": "Azure tenant ID.",
+                                    "type": "string"
+                                  },
+                                  "client_id": {
+                                    "title": "Client ID",
+                                    "description": "Service principal client ID.",
+                                    "type": "string"
+                                  },
+                                  "client_secret": {
+                                    "title": "Client Secret",
+                                    "description": "Service principal client secret.",
+                                    "type": "string",
+                                    "sensitive": true
+                                  }
+                                },
+                                "required": [
+                                  "tenant_id",
+                                  "client_id",
+                                  "client_secret"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "mode_service_principal"
+                            ]
+                          },
+                          {
+                            "properties": {
+                              "mode": {
+                                "const": "managed_identity"
+                              },
+                              "mode_managed_identity": {
+                                "title": "Managed Identity",
+                                "description": "Managed identity settings used when mode is `managed_identity`.",
+                                "type": "object",
+                                "properties": {
+                                  "client_id": {
+                                    "title": "Client ID",
+                                    "description": "Optional client ID of a user-assigned managed identity.",
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "properties": {
+                              "mode": {
+                                "const": "default"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "mode"
+                    ]
                   }
                 },
                 "required": [
@@ -554,10 +606,16 @@
       },
       "azure_ad": {
         "mode": {
-          "ui:help": "Use `service_principal`, `managed_identity`, or `default` credential chain."
+          "ui:widget": "radio",
+          "ui:options": {
+            "inline": true
+          },
+          "ui:help": "Choose how Netdata gets Azure credentials.\n\n- `service_principal`: Use an Azure app / service principal. Requires `tenant_id`, `client_id`, and `client_secret` in `mode_service_principal`.\n- `managed_identity`: Use the managed identity attached to the Azure resource running Netdata. Set `mode_managed_identity.client_id` only for a user-assigned identity.\n- `default`: Use the Azure SDK `DefaultAzureCredential` chain. This automatically tries available Azure credential sources, such as environment-based credentials, managed identity, and local developer credentials.\n\nUse `service_principal` for explicit app credentials. Use `managed_identity` when Netdata runs on an Azure resource with an attached identity. Use `default` when you want Azure SDK auto-discovery or local development convenience."
         },
-        "client_secret": {
-          "ui:widget": "password"
+        "mode_service_principal": {
+          "client_secret": {
+            "ui:widget": "password"
+          }
         }
       }
     },

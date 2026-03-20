@@ -563,6 +563,56 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
     buffer_json_object_close(wb); // this node
 }
 
+static bool rrdhost_alert_status_snapshot_read(RRDHOST *host, struct health_alert_status_counts *snapshot) {
+    for(size_t retries = 0; retries < 3; retries++) {
+        uint64_t g1 = __atomic_load_n(&host->health.alert_status_snapshot.generation, __ATOMIC_ACQUIRE);
+        if(unlikely(g1 & 1))
+            continue;
+
+        snapshot->clear = __atomic_load_n(&host->health.alert_status_snapshot.counts.clear, __ATOMIC_RELAXED);
+        snapshot->warning = __atomic_load_n(&host->health.alert_status_snapshot.counts.warning, __ATOMIC_RELAXED);
+        snapshot->critical = __atomic_load_n(&host->health.alert_status_snapshot.counts.critical, __ATOMIC_RELAXED);
+        snapshot->undefined = __atomic_load_n(&host->health.alert_status_snapshot.counts.undefined, __ATOMIC_RELAXED);
+        snapshot->uninitialized = __atomic_load_n(&host->health.alert_status_snapshot.counts.uninitialized, __ATOMIC_RELAXED);
+
+        uint8_t valid = __atomic_load_n(&host->health.alert_status_snapshot.valid, __ATOMIC_ACQUIRE);
+        uint64_t g2 = __atomic_load_n(&host->health.alert_status_snapshot.generation, __ATOMIC_ACQUIRE);
+        if(likely(g1 == g2 && !(g2 & 1)))
+            return valid;
+    }
+
+    return false;
+}
+
+static inline bool rrdhost_alert_status_snapshot_matches_filter(
+    CONTEXTS_ALERT_STATUS filter,
+    const struct health_alert_status_counts *snapshot) {
+
+    if(!(filter & CONTEXTS_ALERT_STATUSES))
+        return true;
+
+    if((filter & CONTEXT_ALERT_UNINITIALIZED) && snapshot->uninitialized)
+        return true;
+
+    if((filter & CONTEXT_ALERT_UNDEFINED) && snapshot->undefined)
+        return true;
+
+    if((filter & CONTEXT_ALERT_CLEAR) && snapshot->clear)
+        return true;
+
+    if((filter & CONTEXT_ALERT_WARNING) && snapshot->warning)
+        return true;
+
+    if((filter & CONTEXT_ALERT_CRITICAL) && snapshot->critical)
+        return true;
+
+    if((filter & CONTEXT_ALERT_RAISED) &&
+       (snapshot->warning || snapshot->critical))
+        return true;
+
+    return false;
+}
+
 static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool queryable_host) {
     if(!queryable_host || !host->rrdctx.contexts)
         // the host matches the 'scope_host' but does not match the 'host' patterns
@@ -583,8 +633,20 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         // interrupted
         return -1; // stop the query
 
-    bool host_matched = (ctl->mode & (CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS | CONTEXTS_V2_ALERTS)) && !ctl->contexts.pattern && !ctl->contexts.scope_pattern && !ctl->window.enabled;
+    bool host_may_have_matching_alerts = true;
+    if((ctl->mode & CONTEXTS_V2_ALERTS) && (ctl->request->alerts.status & CONTEXTS_ALERT_STATUSES)) {
+        struct health_alert_status_counts snapshot = { 0 };
+        if(rrdhost_alert_status_snapshot_read(host, &snapshot) &&
+           !rrdhost_alert_status_snapshot_matches_filter(ctl->request->alerts.status, &snapshot))
+            host_may_have_matching_alerts = false;
+    }
+
+    CONTEXTS_V2_MODE host_matched_modes = CONTEXTS_V2_NODES | CONTEXTS_V2_FUNCTIONS |
+        (host_may_have_matching_alerts ? CONTEXTS_V2_ALERTS : 0);
+    bool host_matched = (ctl->mode & host_matched_modes) && !ctl->contexts.pattern && !ctl->contexts.scope_pattern && !ctl->window.enabled;
     bool do_contexts = (ctl->mode & (CONTEXTS_V2_CONTEXTS | CONTEXTS_V2_SEARCH | CONTEXTS_V2_ALERTS)) || ctl->contexts.pattern || ctl->contexts.scope_pattern;
+    if((ctl->mode & CONTEXTS_V2_ALERTS) && !host_may_have_matching_alerts)
+        do_contexts = false;
 
     if(do_contexts) {
         ssize_t added = query_scope_foreach_context(
