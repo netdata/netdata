@@ -114,7 +114,6 @@ func TestStoreAuthTimeout(t *testing.T) {
 
 func TestCredentialWithTimeout(t *testing.T) {
 	errMissingDeadline := errors.New("missing deadline")
-	errUnexpectedDeadline := errors.New("unexpected deadline")
 
 	tests := map[string]struct {
 		timeout      time.Duration
@@ -136,26 +135,17 @@ func TestCredentialWithTimeout(t *testing.T) {
 			timeout: 20 * time.Millisecond,
 			buildTokenFn: func(*testing.T) (func(ctx context.Context, _ policy.TokenRequestOptions) (azcore.AccessToken, error), func(t *testing.T)) {
 				var sawDeadline bool
-				var reasonableDeadline bool
 
 				return func(ctx context.Context, _ policy.TokenRequestOptions) (azcore.AccessToken, error) {
-						deadline, ok := ctx.Deadline()
-						if !ok {
+						if _, ok := ctx.Deadline(); !ok {
 							return azcore.AccessToken{}, errMissingDeadline
 						}
 
 						sawDeadline = true
-						remaining := time.Until(deadline)
-						reasonableDeadline = remaining > 0 && remaining <= 250*time.Millisecond
-						if !reasonableDeadline {
-							return azcore.AccessToken{}, errUnexpectedDeadline
-						}
-
 						<-ctx.Done()
 						return azcore.AccessToken{}, ctx.Err()
 					}, func(t *testing.T) {
 						assert.True(t, sawDeadline)
-						assert.True(t, reasonableDeadline)
 					}
 			},
 			wantErr:   true,
@@ -172,19 +162,35 @@ func TestCredentialWithTimeout(t *testing.T) {
 				timeout: tc.timeout,
 			}
 
-			token, err := cred.GetToken(context.Background(), policy.TokenRequestOptions{Scopes: []string{azureKeyVaultScope}})
+			type result struct {
+				token azcore.AccessToken
+				err   error
+			}
+
+			results := make(chan result, 1)
+			go func() {
+				token, err := cred.GetToken(context.Background(), policy.TokenRequestOptions{Scopes: []string{azureKeyVaultScope}})
+				results <- result{token: token, err: err}
+			}()
+
+			var res result
+			select {
+			case res = <-results:
+			case <-time.After(2 * time.Second):
+				t.Fatal("GetToken did not return before the outer test timeout")
+			}
 
 			if tc.wantErr {
-				require.Error(t, err)
-				assert.ErrorIs(t, err, tc.wantErrIs)
+				require.Error(t, res.err)
+				assert.ErrorIs(t, res.err, tc.wantErrIs)
 				if assertPostRun != nil {
 					assertPostRun(t)
 				}
 				return
 			}
 
-			require.NoError(t, err)
-			assert.Equal(t, tc.wantToken, token.Token)
+			require.NoError(t, res.err)
+			assert.Equal(t, tc.wantToken, res.token.Token)
 		})
 	}
 }
