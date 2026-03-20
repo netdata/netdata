@@ -5,57 +5,166 @@ package azure
 import (
 	"context"
 	"fmt"
-	"strings"
+	"net"
+	"net/http"
+	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 )
 
-func (s *store) init(_ context.Context) error {
-	published := &publishedStore{provider: s.provider}
+const azureKeyVaultScope = "https://vault.azure.net/.default"
 
-	switch strings.TrimSpace(s.Config.Mode) {
-	case "client":
-		if s.Config.ModeClient == nil {
-			return fmt.Errorf("mode_client is required when mode is 'client'")
-		}
-		tenantID := strings.TrimSpace(s.Config.ModeClient.TenantID)
-		if tenantID == "" {
-			return fmt.Errorf("mode_client.tenant_id is required")
-		}
-		clientID := strings.TrimSpace(s.Config.ModeClient.ClientID)
-		if clientID == "" {
-			return fmt.Errorf("mode_client.client_id is required")
-		}
-		clientSecret := strings.TrimSpace(s.Config.ModeClient.ClientSecret)
-		if clientSecret == "" {
-			return fmt.Errorf("mode_client.client_secret is required")
-		}
-		s.Config.Mode = "client"
-		s.Config.ModeClient.TenantID = tenantID
-		s.Config.ModeClient.ClientID = clientID
-		s.Config.ModeClient.ClientSecret = clientSecret
-		s.Config.ModeManagedIdentity = nil
-		published.mode = s.Config.Mode
-		published.clientTenantID = tenantID
-		published.clientID = clientID
-		published.clientSecret = clientSecret
-	case "managed_identity":
-		s.Config.Mode = "managed_identity"
-		s.Config.ModeClient = nil
-		published.mode = s.Config.Mode
-		if s.Config.ModeManagedIdentity != nil {
-			clientID := strings.TrimSpace(s.Config.ModeManagedIdentity.ClientID)
-			if clientID != "" {
-				s.Config.ModeManagedIdentity.ClientID = clientID
-				published.managedIdentityClientID = clientID
-			} else {
-				s.Config.ModeManagedIdentity = nil
-			}
-		}
-	default:
-		return fmt.Errorf("mode '%s' is invalid for kind '%s'", s.Config.Mode, secretstore.KindAzureKV)
+func (s *store) init(_ context.Context) error {
+	if err := s.Config.ValidateWithPath(""); err != nil {
+		return err
 	}
 
-	s.published = published
+	cred, err := s.Config.NewCredentialWithOptions(s.credentialOptions())
+	if err != nil {
+		return fmt.Errorf("creating azure credential for kind %q: %w", secretstore.KindAzureKV, err)
+	}
+	cred = credentialWithTimeout{
+		cred:    cred,
+		timeout: s.authTimeout(),
+	}
+
+	tokenProvider, err := cloudauth.NewTokenProvider(
+		cred,
+		[]string{azureKeyVaultScope},
+		cloudauth.DefaultTokenRefreshMargin,
+	)
+	if err != nil {
+		return fmt.Errorf("creating azure token provider for kind %q: %w", secretstore.KindAzureKV, err)
+	}
+
+	s.published = &publishedStore{
+		provider:      s.provider,
+		tokenProvider: tokenProvider,
+	}
 	return nil
+}
+
+func (s *store) authTimeout() time.Duration {
+	switch s.Config.NormalizedMode() {
+	case cloudauth.AzureADAuthModeServicePrincipal:
+		if s.provider.apiClient != nil {
+			return s.provider.apiClient.Timeout
+		}
+	case cloudauth.AzureADAuthModeManagedIdentity:
+		if s.provider.imdsClient != nil {
+			return s.provider.imdsClient.Timeout
+		}
+	case cloudauth.AzureADAuthModeDefault:
+		if s.provider.apiClient != nil && s.provider.apiClient.Timeout > 0 {
+			return s.provider.apiClient.Timeout
+		}
+		if s.provider.imdsClient != nil {
+			return s.provider.imdsClient.Timeout
+		}
+	}
+
+	return 0
+}
+
+func (s *store) credentialOptions() *cloudauth.AzureADCredentialOptions {
+	opts := &cloudauth.AzureADCredentialOptions{}
+
+	switch s.Config.NormalizedMode() {
+	case cloudauth.AzureADAuthModeServicePrincipal:
+		if s.provider.apiClient != nil && s.provider.apiClient.Transport != nil {
+			opts.ClientOptions.Transport = transportAdapter{s.provider.apiClient.Transport}
+		}
+	case cloudauth.AzureADAuthModeManagedIdentity:
+		if s.provider.imdsClient != nil && s.provider.imdsClient.Transport != nil {
+			opts.ClientOptions.Transport = transportAdapter{s.provider.imdsClient.Transport}
+		}
+	case cloudauth.AzureADAuthModeDefault:
+		opts.ClientOptions.Transport = routingTransportAdapter{
+			defaultRoundTripper: roundTripperForClient(s.provider.apiClient),
+			noProxyRoundTripper: roundTripperForClient(s.provider.imdsClient),
+		}
+	}
+
+	return opts
+}
+
+type transportAdapter struct {
+	roundTripper httpRoundTripper
+}
+
+type httpRoundTripper interface {
+	RoundTrip(*http.Request) (*http.Response, error)
+}
+
+func (t transportAdapter) Do(req *http.Request) (*http.Response, error) {
+	return t.roundTripper.RoundTrip(req)
+}
+
+type routingTransportAdapter struct {
+	defaultRoundTripper httpRoundTripper
+	noProxyRoundTripper httpRoundTripper
+}
+
+func (t routingTransportAdapter) Do(req *http.Request) (*http.Response, error) {
+	switch {
+	case shouldUseNoProxyTransport(req) && t.noProxyRoundTripper != nil:
+		return t.noProxyRoundTripper.RoundTrip(req)
+	case t.defaultRoundTripper != nil:
+		return t.defaultRoundTripper.RoundTrip(req)
+	case t.noProxyRoundTripper != nil:
+		return t.noProxyRoundTripper.RoundTrip(req)
+	default:
+		return http.DefaultTransport.RoundTrip(req)
+	}
+}
+
+func roundTripperForClient(client *http.Client) httpRoundTripper {
+	if client != nil && client.Transport != nil {
+		return client.Transport
+	}
+	if rt, ok := http.DefaultTransport.(httpRoundTripper); ok {
+		return rt
+	}
+	return nil
+}
+
+// Managed identity endpoints are local or link-local and must bypass proxies.
+func shouldUseNoProxyTransport(req *http.Request) bool {
+	if req == nil || req.URL == nil {
+		return false
+	}
+
+	host := req.URL.Hostname()
+	if host == "" {
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+
+	return ip.IsLoopback() || ip.IsLinkLocalUnicast()
+}
+
+type credentialWithTimeout struct {
+	cred    azcore.TokenCredential
+	timeout time.Duration
+}
+
+func (c credentialWithTimeout) GetToken(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error) {
+	if c.timeout <= 0 {
+		return c.cred.GetToken(ctx, opts)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	return c.cred.GetToken(ctx, opts)
 }

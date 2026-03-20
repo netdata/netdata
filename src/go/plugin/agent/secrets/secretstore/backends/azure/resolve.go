@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -74,99 +73,13 @@ func splitOperand(operand string) (string, string, bool) {
 }
 
 func (s *publishedStore) accessToken(ctx context.Context) (string, error) {
-	switch s.mode {
-	case "client":
-		if s.clientTenantID == "" {
-			return "", fmt.Errorf("mode_client.tenant_id is required")
-		}
-		if s.clientID == "" {
-			return "", fmt.Errorf("mode_client.client_id is required")
-		}
-		if s.clientSecret == "" {
-			return "", fmt.Errorf("mode_client.client_secret is required")
-		}
-		return s.clientCredentialsToken(ctx, s.clientTenantID, s.clientID, s.clientSecret)
-	case "managed_identity":
-		var clientID string
-		if s.managedIdentityClientID != "" {
-			clientID = s.managedIdentityClientID
-		}
-		return s.managedIdentityToken(ctx, clientID)
-	default:
-		return "", fmt.Errorf("mode '%s' is invalid for azure-kv", s.mode)
+	if s.tokenProvider == nil {
+		return "", fmt.Errorf("azure token provider is not initialized")
 	}
-}
 
-func (s *publishedStore) clientCredentialsToken(ctx context.Context, tenantID, clientID, clientSecret string) (string, error) {
-	tokenURL := s.provider.loginEndpointURL
-	if tokenURL == "" {
-		tokenURL = fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", tenantID)
-	}
-	form := url.Values{
-		"client_id":     {clientID},
-		"client_secret": {clientSecret},
-		"scope":         {"https://vault.azure.net/.default"},
-		"grant_type":    {"client_credentials"},
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(form.Encode()))
+	token, _, err := s.tokenProvider.Token(ctx)
 	if err != nil {
-		return "", fmt.Errorf("creating client credentials token request: %w", err)
+		return "", fmt.Errorf("acquiring Azure Key Vault access token: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := s.provider.apiClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("client credentials token request failed: %w", err)
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if err != nil {
-		return "", fmt.Errorf("reading client credentials token response: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("client credentials token request returned HTTP %d: %s", resp.StatusCode, httpx.TruncateBody(body))
-	}
-	var result struct {
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("parsing client credentials token response: %w", err)
-	}
-	if result.AccessToken == "" {
-		return "", fmt.Errorf("client credentials token response missing access_token")
-	}
-	return result.AccessToken, nil
-}
-
-func (s *publishedStore) managedIdentityToken(ctx context.Context, clientID string) (string, error) {
-	reqURL := "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://vault.azure.net"
-	if clientID != "" {
-		reqURL += "&client_id=" + url.QueryEscape(clientID)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
-	if err != nil {
-		return "", fmt.Errorf("creating managed identity token request: %w", err)
-	}
-	req.Header.Set("Metadata", "true")
-	resp, err := s.provider.imdsClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("managed identity token request failed: %w", err)
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if err != nil {
-		return "", fmt.Errorf("reading managed identity token response: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("managed identity token request returned HTTP %d: %s", resp.StatusCode, httpx.TruncateBody(body))
-	}
-	var result struct {
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("parsing managed identity token response: %w", err)
-	}
-	if result.AccessToken == "" {
-		return "", fmt.Errorf("managed identity token response missing access_token")
-	}
-	return result.AccessToken, nil
+	return token, nil
 }
