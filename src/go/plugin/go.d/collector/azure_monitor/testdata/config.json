@@ -5,6 +5,7 @@
   "cloud": "public",
   "discovery_every": 300,
   "query_offset": 180,
+  "timeout": 30,
   "max_concurrency": 4,
   "max_batch_resources": 50,
   "max_metrics_per_query": 20,

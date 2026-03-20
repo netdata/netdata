@@ -14,6 +14,7 @@ import (
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
@@ -56,6 +57,17 @@ func TestCollector_Init(t *testing.T) {
 		"success on valid config": {
 			cfg:      testConfig(),
 			wantFail: false,
+		},
+		"fails on negative timeout": {
+			cfg: Config{
+				SubscriptionID: "sub-1",
+				Timeout:        confopt.Duration(-time.Second),
+				Profiles:       []string{"postgres_flexible"},
+				Auth: cloudauth.AzureADAuthConfig{
+					Mode: cloudauth.AzureADAuthModeDefault,
+				},
+			},
+			wantFail: true,
 		},
 	}
 
@@ -120,6 +132,116 @@ func TestCollector_InitAuthValidation(t *testing.T) {
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tc.wantErrContain)
 			assert.NotContains(t, err.Error(), "cloud_auth.azure_ad")
+		})
+	}
+}
+
+func TestCollector_UsesConfiguredTimeout(t *testing.T) {
+	const timeout = 7 * time.Second
+
+	now := time.Date(2026, 3, 7, 12, 0, 0, 0, time.UTC)
+
+	tests := map[string]struct {
+		setup    func(*Collector, *mockResourceGraph, *mockMetricsClient)
+		act      func(context.Context, *Collector) error
+		deadline func(*mockResourceGraph, *mockMetricsClient) (time.Duration, bool)
+	}{
+		"init auto-discovery": {
+			setup: func(c *Collector, rg *mockResourceGraph, mx *mockMetricsClient) {
+				c.Config = testConfig()
+				c.Config.Timeout = confopt.Duration(timeout)
+				c.Config.Profiles = []string{"auto"}
+				rg.resources = []map[string]any{
+					{"type": "microsoft.dbforpostgresql/flexibleservers", "count_": int64(1)},
+				}
+			},
+			act: func(ctx context.Context, c *Collector) error {
+				return c.Init(ctx)
+			},
+			deadline: func(rg *mockResourceGraph, _ *mockMetricsClient) (time.Duration, bool) {
+				return rg.lastTimeout()
+			},
+		},
+		"resource discovery refresh": {
+			setup: func(c *Collector, rg *mockResourceGraph, mx *mockMetricsClient) {
+				c.Config = testConfig()
+				c.Config.Timeout = confopt.Duration(timeout)
+				rg.resources = []map[string]any{
+					{
+						"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+						"name":          "pg-a",
+						"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+						"resourceGroup": "rg-a",
+						"location":      "eastus",
+					},
+				}
+			},
+			act: func(ctx context.Context, c *Collector) error {
+				if err := c.Init(ctx); err != nil {
+					return err
+				}
+				_, err := c.refreshDiscovery(ctx, true)
+				return err
+			},
+			deadline: func(rg *mockResourceGraph, _ *mockMetricsClient) (time.Duration, bool) {
+				return rg.lastTimeout()
+			},
+		},
+		"metrics query": {
+			setup: func(c *Collector, rg *mockResourceGraph, mx *mockMetricsClient) {
+				c.Config = testConfig()
+				c.Config.Timeout = confopt.Duration(timeout)
+				c.now = func() time.Time { return now }
+				rg.resources = []map[string]any{
+					{
+						"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+						"name":          "pg-a",
+						"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+						"resourceGroup": "rg-a",
+						"location":      "eastus",
+					},
+				}
+				mx.queryResponse = azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
+					{
+						ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
+						Values: []azmetrics.Metric{
+							metricWithAvg("cpu_percent", now, 21.5),
+						},
+					},
+				}}}
+			},
+			act: func(ctx context.Context, c *Collector) error {
+				if err := c.Init(ctx); err != nil {
+					return err
+				}
+				_, err := collecttest.CollectScalarSeries(c, metrix.ReadRaw())
+				return err
+			},
+			deadline: func(_ *mockResourceGraph, mx *mockMetricsClient) (time.Duration, bool) {
+				return mx.lastTimeout()
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			rg := &mockResourceGraph{}
+			mx := &mockMetricsClient{}
+
+			c := New()
+			tc.setup(c, rg, mx)
+			c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
+				return rg, nil
+			}
+			c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
+				return mx, nil
+			}
+
+			require.NoError(t, tc.act(context.Background(), c))
+
+			got, ok := tc.deadline(rg, mx)
+			require.True(t, ok)
+			assertTimeoutClose(t, got, timeout)
 		})
 	}
 }
@@ -204,7 +326,7 @@ func TestCollector_Collect(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.GreaterOrEqual(t, len(series), 4)
-	assert.GreaterOrEqual(t, rg.calls, 1)
+	assert.GreaterOrEqual(t, rg.calls(), 1)
 	assert.GreaterOrEqual(t, mx.calls(), 1)
 }
 
@@ -518,6 +640,7 @@ func testConfig() Config {
 		Cloud:              "public",
 		DiscoveryEvery:     300,
 		QueryOffset:        180,
+		Timeout:            defaultTimeout,
 		MaxConcurrency:     4,
 		MaxBatchResources:  50,
 		MaxMetricsPerQuery: 20,
@@ -544,12 +667,26 @@ func mustLoadStockCatalog(t *testing.T, files map[string]string) azureprofiles.C
 }
 
 type mockResourceGraph struct {
+	mu        sync.Mutex
 	resources []map[string]any
-	calls     int
+	count     int
+	timeout   time.Duration
+	hasDL     bool
 }
 
-func (m *mockResourceGraph) Resources(_ context.Context, _ armresourcegraph.QueryRequest, _ *armresourcegraph.ClientResourcesOptions) (armresourcegraph.ClientResourcesResponse, error) {
-	m.calls++
+func (m *mockResourceGraph) Resources(ctx context.Context, _ armresourcegraph.QueryRequest, _ *armresourcegraph.ClientResourcesOptions) (armresourcegraph.ClientResourcesResponse, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.count++
+	deadline, ok := ctx.Deadline()
+	m.hasDL = ok
+	if ok {
+		m.timeout = time.Until(deadline)
+	} else {
+		m.timeout = 0
+	}
+
 	rows := make([]any, 0, len(m.resources))
 	for _, r := range m.resources {
 		rows = append(rows, r)
@@ -557,17 +694,38 @@ func (m *mockResourceGraph) Resources(_ context.Context, _ armresourcegraph.Quer
 	return armresourcegraph.ClientResourcesResponse{QueryResponse: armresourcegraph.QueryResponse{Data: rows}}, nil
 }
 
+func (m *mockResourceGraph) calls() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.count
+}
+
+func (m *mockResourceGraph) lastTimeout() (time.Duration, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.timeout, m.hasDL
+}
+
 type mockMetricsClient struct {
 	mu            sync.Mutex
 	queryResponse azmetrics.QueryResourcesResponse
 	queryErr      error
 	count         int
+	timeout       time.Duration
+	hasDL         bool
 }
 
-func (m *mockMetricsClient) QueryResources(_ context.Context, _ string, _ string, _ []string, _ azmetrics.ResourceIDList, _ *azmetrics.QueryResourcesOptions) (azmetrics.QueryResourcesResponse, error) {
+func (m *mockMetricsClient) QueryResources(ctx context.Context, _ string, _ string, _ []string, _ azmetrics.ResourceIDList, _ *azmetrics.QueryResourcesOptions) (azmetrics.QueryResourcesResponse, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.count++
+	deadline, ok := ctx.Deadline()
+	m.hasDL = ok
+	if ok {
+		m.timeout = time.Until(deadline)
+	} else {
+		m.timeout = 0
+	}
 	if m.queryErr != nil {
 		return azmetrics.QueryResourcesResponse{}, m.queryErr
 	}
@@ -580,6 +738,12 @@ func (m *mockMetricsClient) calls() int {
 	return m.count
 }
 
+func (m *mockMetricsClient) lastTimeout() (time.Duration, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.timeout, m.hasDL
+}
+
 func metricWithAvg(name string, ts time.Time, value float64) azmetrics.Metric {
 	return azmetrics.Metric{
 		Name: &azmetrics.LocalizableString{Value: ptrString(name)},
@@ -590,3 +754,8 @@ func metricWithAvg(name string, ts time.Time, value float64) azmetrics.Metric {
 }
 
 func ptrString(v string) *string { return &v }
+
+func assertTimeoutClose(t *testing.T, got, want time.Duration) {
+	t.Helper()
+	assert.InDelta(t, want.Seconds(), got.Seconds(), 1.0)
+}

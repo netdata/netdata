@@ -49,6 +49,13 @@
         "minimum": 60,
         "default": 180
       },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds.",
+        "type": "number",
+        "minimum": 0,
+        "default": 30
+      },
       "max_concurrency": {
         "title": "Max concurrency",
         "description": "Maximum concurrent Azure Monitor batch requests.",
@@ -94,7 +101,9 @@
         "items": {
           "type": "string"
         },
-        "default": ["auto"]
+        "default": [
+          "auto"
+        ]
       },
       "auth": {
         "title": "Authentication",
@@ -210,6 +219,9 @@
     "profiles": {
       "ui:listFlavour": "list"
     },
+    "timeout": {
+      "ui:help": "Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
+    },
     "auth": {
       "mode": {
         "ui:widget": "radio",
@@ -236,6 +248,7 @@
             "cloud",
             "discovery_every",
             "query_offset",
+            "timeout",
             "max_concurrency",
             "max_batch_resources",
             "max_metrics_per_query",

@@ -40,6 +40,7 @@ func New() *Collector {
 			Cloud:              defaultCloud,
 			DiscoveryEvery:     defaultDiscoveryEvery,
 			QueryOffset:        defaultQueryOffset,
+			Timeout:            defaultTimeout,
 			MaxConcurrency:     defaultMaxConcurrency,
 			MaxBatchResources:  defaultMaxBatchResource,
 			MaxMetricsPerQuery: defaultMaxMetricsQuery,

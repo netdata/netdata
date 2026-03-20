@@ -19,6 +19,7 @@ import (
 type queryExecutor struct {
 	subscriptionID string
 	maxConcurrency int
+	timeout        time.Duration
 	cloudCfg       azcloud.Configuration
 	credential     azcore.TokenCredential
 	newClient      func(endpoint string, cred azcore.TokenCredential, cloud azcloud.Configuration) (metricsQueryClient, error)
@@ -27,10 +28,11 @@ type queryExecutor struct {
 	clients   map[string]metricsQueryClient
 }
 
-func newQueryExecutor(subscriptionID string, maxConcurrency int, credential azcore.TokenCredential, cloudCfg azcloud.Configuration, newClient func(endpoint string, cred azcore.TokenCredential, cloud azcloud.Configuration) (metricsQueryClient, error)) *queryExecutor {
+func newQueryExecutor(subscriptionID string, maxConcurrency int, timeout time.Duration, credential azcore.TokenCredential, cloudCfg azcloud.Configuration, newClient func(endpoint string, cred azcore.TokenCredential, cloud azcloud.Configuration) (metricsQueryClient, error)) *queryExecutor {
 	return &queryExecutor{
 		subscriptionID: subscriptionID,
 		maxConcurrency: maxConcurrency,
+		timeout:        timeout,
 		cloudCfg:       cloudCfg,
 		credential:     credential,
 		newClient:      newClient,
@@ -89,7 +91,7 @@ func (e *queryExecutor) executeQueryBatch(ctx context.Context, batch queryBatch,
 	resourceIDs, resourceByID := queryBatchResourceIndex(batch.Resources)
 	startTime, endTime, interval, aggregation := queryBatchWindow(batch, queryEnd)
 
-	reqCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	reqCtx, cancel := withOptionalTimeout(ctx, e.timeout)
 	defer cancel()
 
 	resp, err := client.QueryResources(

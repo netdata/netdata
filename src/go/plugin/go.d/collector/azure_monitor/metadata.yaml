@@ -122,6 +122,11 @@ modules:
               default_value: 180
               required: false
               group: Collection
+            - name: timeout
+              description: Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds.
+              default_value: 30
+              required: false
+              group: Collection
             - name: max_concurrency
               description: Maximum concurrent batch queries to Azure Monitor.
               default_value: 4

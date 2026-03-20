@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
@@ -67,7 +68,7 @@ func (c *Collector) prepareInitResult(ctx context.Context) (*initResult, error) 
 	}
 
 	if autoDiscover {
-		profiles, err := resolveAutoProfiles(ctx, cfg.SubscriptionID, resourceGraph, catalog, cfg.Profiles)
+		profiles, err := resolveAutoProfiles(ctx, cfg.SubscriptionID, cfg.Timeout.Duration(), resourceGraph, catalog, cfg.Profiles)
 		if err != nil {
 			return nil, fmt.Errorf("auto-discover resource types: %w", err)
 		}
@@ -130,11 +131,11 @@ func (c *Collector) prepareInitClients(cfg Config) (resourceGraphClient, *queryE
 		return nil, nil, fmt.Errorf("create resource graph client: %w", err)
 	}
 
-	return resourceGraph, newQueryExecutor(cfg.SubscriptionID, cfg.MaxConcurrency, credential, cloudCfg, c.newMetricsClient), nil
+	return resourceGraph, newQueryExecutor(cfg.SubscriptionID, cfg.MaxConcurrency, cfg.Timeout.Duration(), credential, cloudCfg, c.newMetricsClient), nil
 }
 
-func resolveAutoProfiles(ctx context.Context, subscriptionID string, resourceGraph resourceGraphClient, catalog azureprofiles.Catalog, explicitProfiles []string) ([]string, error) {
-	types, err := discoverResourceTypes(ctx, subscriptionID, resourceGraph)
+func resolveAutoProfiles(ctx context.Context, subscriptionID string, timeout time.Duration, resourceGraph resourceGraphClient, catalog azureprofiles.Catalog, explicitProfiles []string) ([]string, error) {
+	types, err := discoverResourceTypes(ctx, subscriptionID, timeout, resourceGraph)
 	if err != nil {
 		return nil, err
 	}

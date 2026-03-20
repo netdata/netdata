@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
@@ -35,14 +36,16 @@ func (c *Collector) refreshDiscovery(ctx context.Context, force bool) ([]resourc
 
 // discoverResourceTypes queries Azure Resource Graph to find all resource types
 // present in the subscription. Used by auto-discovery to determine which profiles to activate.
-func discoverResourceTypes(ctx context.Context, subscriptionID string, resourceGraph resourceGraphClient) (map[string]struct{}, error) {
+func discoverResourceTypes(ctx context.Context, subscriptionID string, timeout time.Duration, resourceGraph resourceGraphClient) (map[string]struct{}, error) {
 	query := "resources | summarize count() by type"
 	types := make(map[string]struct{})
 
 	var skipToken *string
 	for {
 		req := armResourceGraphQuery(subscriptionID, query, skipToken)
-		resp, err := resourceGraph.Resources(ctx, req, nil)
+		reqCtx, cancel := withOptionalTimeout(ctx, timeout)
+		resp, err := resourceGraph.Resources(reqCtx, req, nil)
+		cancel()
 		if err != nil {
 			return nil, fmt.Errorf("resource graph query: %w", err)
 		}
@@ -109,7 +112,9 @@ func (c *Collector) discoverResources(ctx context.Context) ([]resourceInfo, map[
 	var skipToken *string
 	for {
 		req := armResourceGraphQuery(c.SubscriptionID, query, skipToken)
-		resp, err := c.resourceGraph.Resources(ctx, req, nil)
+		reqCtx, cancel := withOptionalTimeout(ctx, c.Timeout.Duration())
+		resp, err := c.resourceGraph.Resources(reqCtx, req, nil)
+		cancel()
 		if err != nil {
 			return nil, nil, err
 		}

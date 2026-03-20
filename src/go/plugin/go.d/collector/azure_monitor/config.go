@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 )
 
@@ -16,6 +18,7 @@ const (
 	defaultCloud            = cloudPublic
 	defaultDiscoveryEvery   = 300
 	defaultQueryOffset      = 180
+	defaultTimeout          = confopt.Duration(30 * time.Second)
 	defaultMaxConcurrency   = 4
 	defaultMaxBatchResource = 50
 	defaultMaxMetricsQuery  = 20
@@ -37,6 +40,7 @@ type Config struct {
 	Cloud              string                      `yaml:"cloud,omitempty" json:"cloud"`
 	DiscoveryEvery     int                         `yaml:"discovery_every,omitempty" json:"discovery_every"`
 	QueryOffset        int                         `yaml:"query_offset,omitempty" json:"query_offset"`
+	Timeout            confopt.Duration            `yaml:"timeout,omitempty" json:"timeout"`
 	MaxConcurrency     int                         `yaml:"max_concurrency,omitempty" json:"max_concurrency"`
 	MaxBatchResources  int                         `yaml:"max_batch_resources,omitempty" json:"max_batch_resources"`
 	MaxMetricsPerQuery int                         `yaml:"max_metrics_per_query,omitempty" json:"max_metrics_per_query"`
@@ -60,6 +64,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.QueryOffset <= 0 {
 		c.QueryOffset = defaultQueryOffset
+	}
+	if c.Timeout.Duration() == 0 {
+		c.Timeout = defaultTimeout
 	}
 	if c.MaxConcurrency <= 0 {
 		c.MaxConcurrency = defaultMaxConcurrency
@@ -89,6 +96,9 @@ func (c Config) validate() error {
 	}
 	if c.QueryOffset < 60 {
 		errs = append(errs, errors.New("'query_offset' must be >= 60 seconds"))
+	}
+	if c.Timeout.Duration() < 0 {
+		errs = append(errs, errors.New("'timeout' cannot be negative"))
 	}
 	if c.MaxConcurrency < 1 || c.MaxConcurrency > 64 {
 		errs = append(errs, errors.New("'max_concurrency' must be between 1 and 64"))
