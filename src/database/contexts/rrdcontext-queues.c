@@ -76,12 +76,12 @@ static void rrdcontext_prune_hub_queue(RRDHOST *host, usec_t now_ut, bool force_
         if(unlikely(!service_running(SERVICE_CONTEXT)))
             break;
 
+        spinlock_unlock(&host->rrdctx.hub_queue.spinlock);
+
         const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdctx.contexts, string2str(rc->id));
         bool context_matches = item && (dictionary_acquired_item_value(item) == rc);
         bool stale = !item || !context_matches;
         bool do_it = context_matches;
-
-        spinlock_unlock(&host->rrdctx.hub_queue.spinlock);
 
         if(context_matches) {
             bool drop = force_drop_all;
@@ -281,10 +281,10 @@ void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
         if(unlikely(messages_added >= MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST))
             break;
 
+        spinlock_unlock(&host->rrdctx.hub_queue.spinlock);
+
         const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdctx.contexts, string2str(rc->id));
         bool do_it = dictionary_acquired_item_value(item) == rc;
-
-        spinlock_unlock(&host->rrdctx.hub_queue.spinlock);
 
         if(item) {
             if (do_it) {
@@ -343,11 +343,16 @@ void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
 
             dictionary_acquired_item_release(host->rrdctx.contexts, item);
         }
+
         spinlock_lock(&host->rrdctx.hub_queue.spinlock);
+        if(unlikely(!service_running(SERVICE_CONTEXT)))
+            break;
 
         if(do_it) {
             worker_is_busy(WORKER_JOB_DEQUEUE);
-            rrdcontext_del_from_hub_queue(rc, true);
+            RRDCONTEXT *rc_at_idx = RRDCONTEXT_QUEUE_GET(&host->rrdctx.hub_queue, idx);
+            if(rc_at_idx == rc)
+                rrdcontext_del_from_hub_queue(rc, true);
         }
     }
     spinlock_unlock(&host->rrdctx.hub_queue.spinlock);
