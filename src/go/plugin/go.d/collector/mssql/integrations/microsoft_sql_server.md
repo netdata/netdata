@@ -717,7 +717,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | dsn | SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). When `cloud_auth.provider` is `azure_ad`, use URL format with `sqlserver://` scheme. | sqlserver://localhost:1433 | yes |
 | **Cloud Auth** | cloud_auth.provider | Cloud auth provider (`none` or `azure_ad`). | none | no |
-| **Cloud Auth/Azure** | cloud_auth.azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). Required when `cloud_auth.provider` is `azure_ad`. | default | yes |
+| **Cloud Auth/Azure** | cloud_auth.azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). Required when `cloud_auth.provider` is `azure_ad`. |  | yes |
 |  | cloud_auth.azure_ad.mode_service_principal.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
 |  | cloud_auth.azure_ad.mode_service_principal.client_id | Azure client ID. Required for `service_principal` mode. |  | no |
 |  | cloud_auth.azure_ad.mode_service_principal.client_secret | Azure client secret for `service_principal` mode. |  | no |
@@ -1004,4 +1004,3 @@ Ensure SQL Server is configured for mixed mode authentication if using SQL login
 
 The monitoring user needs VIEW SERVER STATE permission.
 Grant it with: `GRANT VIEW SERVER STATE TO netdata_user;`
-

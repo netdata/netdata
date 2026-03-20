@@ -314,7 +314,7 @@ functions:
 | **Target** | driver | SQL driver to use. Supported values: `mysql`, `pgx`, `oracle`, `sqlserver`, `azuresql`. | mysql | yes |
 |  | dsn | Database connection string (DSN). The format depends on the selected driver ( [MySQL](https://github.com/go-sql-driver/mysql#dsn-data-source-name), [PostgreSQL](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS), [MS SQL Server](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn)). |  | yes |
 | **Cloud Auth** | cloud_auth.provider | Cloud auth provider (`none` or `azure_ad`). Supported for `pgx`, `sqlserver`, and `azuresql`. | none | no |
-| **Cloud Auth/Azure** | cloud_auth.azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). Required when `cloud_auth.provider` is `azure_ad`. | default | yes |
+| **Cloud Auth/Azure** | cloud_auth.azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). Required when `cloud_auth.provider` is `azure_ad`. |  | yes |
 |  | cloud_auth.azure_ad.mode_service_principal.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
 |  | cloud_auth.azure_ad.mode_service_principal.client_id | Azure client ID. Required for `service_principal` mode. |  | no |
 |  | cloud_auth.azure_ad.mode_service_principal.client_secret | Azure client secret for `service_principal` mode. |  | no |
