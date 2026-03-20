@@ -66,6 +66,17 @@ func TestProviderSchemaAndValidationParity(t *testing.T) {
 				assert.Equal(t, "password", clientSecret["ui:widget"])
 			},
 		},
+		"azure default requires mode": {
+			kind: secretstore.KindAzureKV,
+			valid: map[string]any{
+				"name": "azure_default",
+				"mode": "default",
+			},
+			invalid: map[string]any{
+				"name": "azure_default",
+			},
+			wantErrContains: "mode is required",
+		},
 		"gcp": {
 			kind: secretstore.KindGCPSM,
 			valid: map[string]any{

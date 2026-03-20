@@ -141,7 +141,10 @@
                           }
                         ]
                       }
-                    }
+                    },
+                    "required": [
+                      "mode"
+                    ]
                   }
                 },
                 "required": [

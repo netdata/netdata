@@ -17,8 +17,9 @@ func TestAzureADAuthConfigValidate(t *testing.T) {
 		"default mode": {
 			cfg: AzureADAuthConfig{Mode: AzureADAuthModeDefault},
 		},
-		"empty mode defaults to default": {
-			cfg: AzureADAuthConfig{},
+		"empty mode": {
+			cfg:     AzureADAuthConfig{},
+			wantErr: true,
 		},
 		"managed identity mode": {
 			cfg: AzureADAuthConfig{Mode: AzureADAuthModeManagedIdentity},
@@ -88,6 +89,11 @@ func TestAzureADAuthConfigValidateWithPath(t *testing.T) {
 			},
 			validatePath:  "",
 			wantErrString: "mode_service_principal.client_secret is required",
+		},
+		"missing mode": {
+			cfg:           AzureADAuthConfig{},
+			validatePath:  azureADAuthConfigPath,
+			wantErrString: "cloud_auth.azure_ad.mode is required",
 		},
 	}
 

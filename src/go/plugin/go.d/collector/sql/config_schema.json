@@ -160,7 +160,10 @@
                           }
                         ]
                       }
-                    }
+                    },
+                    "required": [
+                      "mode"
+                    ]
                   }
                 },
                 "required": [

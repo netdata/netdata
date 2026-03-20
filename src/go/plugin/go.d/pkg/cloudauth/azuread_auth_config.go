@@ -40,11 +40,7 @@ type AzureADCredentialOptions struct {
 }
 
 func (c AzureADAuthConfig) NormalizedMode() string {
-	mode := strings.TrimSpace(c.Mode)
-	if mode == "" {
-		return AzureADAuthModeDefault
-	}
-	return strings.ToLower(mode)
+	return strings.ToLower(strings.TrimSpace(c.Mode))
 }
 
 func (c AzureADAuthConfig) Validate() error {
@@ -53,8 +49,13 @@ func (c AzureADAuthConfig) Validate() error {
 
 func (c AzureADAuthConfig) ValidateWithPath(path string) error {
 	modeField := fieldPath(path, "mode")
+	mode := c.NormalizedMode()
 
-	switch c.NormalizedMode() {
+	if mode == "" {
+		return errors.New(modeField + " is required")
+	}
+
+	switch mode {
 	case AzureADAuthModeServicePrincipal:
 		var errs []error
 		if c.ModeServicePrincipal == nil {

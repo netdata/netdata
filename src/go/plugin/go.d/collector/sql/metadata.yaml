@@ -280,9 +280,9 @@ modules:
               required: false
               group: Cloud Auth
             - name: cloud_auth.azure_ad.mode
-              description: Azure AD credential mode (`service_principal`, `managed_identity`, or `default`).
+              description: Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). Required when `cloud_auth.provider` is `azure_ad`.
               default_value: default
-              required: false
+              required: true
               group: Cloud Auth/Azure
             - name: cloud_auth.azure_ad.mode_service_principal.tenant_id
               description: Azure tenant ID. Required for `service_principal` mode.

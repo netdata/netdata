@@ -30,6 +30,11 @@ func TestStoreInit(t *testing.T) {
 				},
 			},
 		},
+		"default": {
+			cfg: Config{
+				Mode: cloudauth.AzureADAuthModeDefault,
+			},
+		},
 		"service principal validation": {
 			cfg: Config{
 				Mode: cloudauth.AzureADAuthModeServicePrincipal,
@@ -154,6 +159,60 @@ func TestCredentialWithTimeout(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tc.wantToken, token.Token)
+		})
+	}
+}
+
+func TestDefaultCredentialTransportRouting(t *testing.T) {
+	tests := map[string]struct {
+		url              string
+		wantDefaultCalls int
+		wantNoProxyCalls int
+	}{
+		"aad host uses default transport": {
+			url:              "https://login.microsoftonline.com/tenant/oauth2/v2.0/token",
+			wantDefaultCalls: 1,
+		},
+		"imds uses no proxy transport": {
+			url:              "http://169.254.169.254/metadata/identity/oauth2/token",
+			wantNoProxyCalls: 1,
+		},
+		"localhost managed identity endpoint uses no proxy transport": {
+			url:              "http://localhost/msi/token",
+			wantNoProxyCalls: 1,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var defaultCalls int
+			var noProxyCalls int
+
+			s := &store{
+				Config: Config{Mode: cloudauth.AzureADAuthModeDefault},
+				provider: &provider{
+					apiClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+						defaultCalls++
+						return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Header: make(http.Header)}, nil
+					})},
+					imdsClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+						noProxyCalls++
+						return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Header: make(http.Header)}, nil
+					})},
+				},
+			}
+
+			transport, ok := s.credentialOptions().ClientOptions.Transport.(routingTransportAdapter)
+			require.True(t, ok)
+
+			req, err := http.NewRequest(http.MethodGet, tc.url, nil)
+			require.NoError(t, err)
+
+			_, err = transport.Do(req)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.wantDefaultCalls, defaultCalls)
+			assert.Equal(t, tc.wantNoProxyCalls, noProxyCalls)
 		})
 	}
 }

@@ -46,6 +46,12 @@ func TestConfigValidate(t *testing.T) {
 				},
 			},
 		},
+		"provider azure_ad missing block": {
+			cfg: Config{
+				Provider: ProviderAzureAD,
+			},
+			wantErr: true,
+		},
 		"provider azure_ad invalid": {
 			cfg: Config{
 				Provider: ProviderAzureAD,

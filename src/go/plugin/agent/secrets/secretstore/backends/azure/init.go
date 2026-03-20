@@ -5,6 +5,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -80,6 +81,11 @@ func (s *store) credentialOptions() *cloudauth.AzureADCredentialOptions {
 		if s.provider.imdsClient != nil && s.provider.imdsClient.Transport != nil {
 			opts.ClientOptions.Transport = transportAdapter{s.provider.imdsClient.Transport}
 		}
+	case cloudauth.AzureADAuthModeDefault:
+		opts.ClientOptions.Transport = routingTransportAdapter{
+			defaultRoundTripper: roundTripperForClient(s.provider.apiClient),
+			noProxyRoundTripper: roundTripperForClient(s.provider.imdsClient),
+		}
 	}
 
 	return opts
@@ -95,6 +101,56 @@ type httpRoundTripper interface {
 
 func (t transportAdapter) Do(req *http.Request) (*http.Response, error) {
 	return t.roundTripper.RoundTrip(req)
+}
+
+type routingTransportAdapter struct {
+	defaultRoundTripper httpRoundTripper
+	noProxyRoundTripper httpRoundTripper
+}
+
+func (t routingTransportAdapter) Do(req *http.Request) (*http.Response, error) {
+	switch {
+	case shouldUseNoProxyTransport(req) && t.noProxyRoundTripper != nil:
+		return t.noProxyRoundTripper.RoundTrip(req)
+	case t.defaultRoundTripper != nil:
+		return t.defaultRoundTripper.RoundTrip(req)
+	case t.noProxyRoundTripper != nil:
+		return t.noProxyRoundTripper.RoundTrip(req)
+	default:
+		return http.DefaultTransport.RoundTrip(req)
+	}
+}
+
+func roundTripperForClient(client *http.Client) httpRoundTripper {
+	if client != nil && client.Transport != nil {
+		return client.Transport
+	}
+	if rt, ok := http.DefaultTransport.(httpRoundTripper); ok {
+		return rt
+	}
+	return nil
+}
+
+// Managed identity endpoints are local or link-local and must bypass proxies.
+func shouldUseNoProxyTransport(req *http.Request) bool {
+	if req == nil || req.URL == nil {
+		return false
+	}
+
+	host := req.URL.Hostname()
+	if host == "" {
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+
+	return ip.IsLoopback() || ip.IsLinkLocalUnicast()
 }
 
 type credentialWithTimeout struct {
