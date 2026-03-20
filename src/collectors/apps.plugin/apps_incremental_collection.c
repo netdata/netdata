@@ -132,21 +132,6 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     }
 
     // --------------------------------------------------------------------
-    // skip expensive /proc reads for idle processes (no CPU or fault activity)
-
-    if(enable_skip_idle
-        && !is_kernel_thread
-        && p->last_stat_collected_usec != 0
-        && p->values[PDF_UTIME] == 0
-        && p->values[PDF_STIME] == 0
-        && p->values[PDF_MINFLT] == 0) {
-        // Process is idle (no CPU, no faults) and this is not its first collection.
-        // Restore absolute values from the backup and skip io/status/fd/limits reads.
-        pid_collection_idle_cached(p);
-        return 1;
-    }
-
-    // --------------------------------------------------------------------
     // /proc/<pid>/io
 
     if(likely(!is_kernel_thread))

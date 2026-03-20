@@ -175,7 +175,6 @@ extern bool enable_groups_charts;
 extern bool include_exited_childs;
 extern bool enable_function_cmdline;
 extern bool proc_pid_cmdline_is_needed;
-extern bool enable_skip_idle;
 extern int enable_file_charts;
 extern bool obsolete_file_charts;
 
@@ -691,7 +690,6 @@ bool collect_data_for_all_pids(void);
 void pid_collection_started(struct pid_stat *p);
 void pid_collection_failed(struct pid_stat *p);
 void pid_collection_completed(struct pid_stat *p);
-void pid_collection_idle_cached(struct pid_stat *p);
 
 #if (INCREMENTAL_DATA_COLLECTION == 1)
 bool collect_parents_before_children(void);
