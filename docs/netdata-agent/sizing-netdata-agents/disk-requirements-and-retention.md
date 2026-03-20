@@ -29,9 +29,13 @@ gantt
 
 |  Tier   |                                          Resolution                                          | Uncompressed Sample Size | Usually On Disk |
 |:-------:|:--------------------------------------------------------------------------------------------:|:------------------------:|:---------------:|
-| `tier0` |            native resolution (metrics collected per-second as stored per-second)             |         4 bytes          |    0.6 bytes    |
-| `tier1` | 60 iterations of `tier0`, so when metrics are collected per-second, this tier is per-minute. |         16 bytes         |     6 bytes     |
-| `tier2` |  60 iterations of `tier1`, so when metrics are collected per second, this tier is per-hour.  |         16 bytes         |    18 bytes     |
+| `tier0` |            native resolution (metrics collected per-second as stored per-second)             |         4 bytes          |    1 byte       |
+| `tier1` | 60 iterations of `tier0`, so when metrics are collected per-second, this tier is per-minute. |         16 bytes         |     4 bytes     |
+| `tier2` |  60 iterations of `tier1`, so when metrics are collected per second, this tier is per-hour.  |         16 bytes         |     4 bytes     |
+
+:::note
+Actual disk usage varies based on data compression efficiency. For planning purposes, estimate approximately 1 byte per sample for `tier0` (after Gorilla and LZ4 compression), 4 bytes for `tier1`, and 4 bytes for `tier2`. Real-world compression ratios depend on the characteristics of your metrics data.
+:::
 
 ### Default Disk Footprint
 
@@ -45,7 +49,7 @@ Netdata Agent metrics storage is limited to 3 GiB by default (configurable), usi
 
 Data is deleted when it reaches **either** the size limit or the time limit, whichever comes first. The number of metrics collected determines how far back in time retention extends within the size limit.
 
-In practice, with default settings and an ingestion rate of about 4,000 metrics per second, Netdata provides about 14 days of high resolution (per-second) data, 3 months of medium resolution (per-minute) data, and more than 1 year of low resolution (per-hour) data.
+In practice, with default settings and an ingestion rate of about 4,000 metrics per second, the 1 GiB per tier size limit provides approximately 3 days of high resolution (per-second) data, 1-2 months of medium resolution (per-minute) data, and several years of low resolution (per-hour) data. The actual retention depends on how well your metrics data compresses.
 
 These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
