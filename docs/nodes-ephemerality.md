@@ -44,6 +44,105 @@ Netdata v2.3.0 introduces two alerts specific to permanent nodes:
 | `streaming_never_connected` | A permanent node has never connected to a Parent.       |
 | `streaming_disconnected`    | A previously connected permanent node has disconnected. |
 
+### Enable Webhook Notifications for Streaming Alerts
+
+By default, streaming alerts are configured with `to: silent`, meaning they appear in the dashboard but do not send notifications. To receive webhook notifications when permanent child nodes disconnect or never connect, follow these steps:
+
+#### Step 1: Enable the Streaming Alerts
+
+Create a custom override of the streaming alerts configuration:
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config health.d/streaming.conf
+```
+
+Change `to: silent` to `to: sysadmin` (or another role like `dba`, `webmaster`) for both alerts:
+
+```yaml
+template: streaming_never_connected
+      on: netdata.streaming_inbound
+# ... other settings ...
+    to: sysadmin    # Changed from: silent
+
+template: streaming_disconnected
+      on: netdata.streaming_inbound
+# ... other settings ...
+    to: sysadmin    # Changed from: silent
+```
+
+#### Step 2: Configure Webhook Endpoint
+
+Edit the notification configuration file:
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config health_alarm_notify.conf
+```
+
+Add the custom webhook configuration:
+
+```bash
+SEND_CUSTOM="YES"
+DEFAULT_RECIPIENT_CUSTOM="webhook"
+
+custom_sender() {
+    local payload=$(cat <<EOF
+{
+  "host": "${host}",
+  "alert": "${name}",
+  "status": "${status}",
+  "severity": "${severity}",
+  "message": "${host} ${status_message}: ${alarm} ${raised_for}",
+  "chart": "${chart}",
+  "value": "${value}",
+  "timestamp": "${when}",
+  "url": "${goto_url}"
+}
+EOF
+)
+
+    to="${1}"
+    for endpoint in ${to}; do
+        httpcode=$(docurl -X POST \
+            -H "Content-Type: application/json" \
+            -d "${payload}" \
+            "https://your-webhook-endpoint.com/notify")
+
+        if [ "${httpcode}" = "200" ]; then
+            info "sent custom webhook notification to ${endpoint}"
+            sent=$((sent + 1))
+        else
+            error "failed to send webhook notification to ${endpoint} with HTTP code ${httpcode}"
+        fi
+    done
+}
+```
+
+Replace `https://your-webhook-endpoint.com/notify` with your actual webhook URL.
+
+#### Step 3: Test and Apply
+
+Test the notification configuration:
+
+```bash
+sudo /usr/libexec/netdata/plugins.d/alarm-notify.sh test
+```
+
+Reload the health configuration to apply changes:
+
+```bash
+sudo netdatacli reload-health
+```
+
+:::tip
+
+You can use pre-built webhook integrations for popular services by setting variables like `SLACK_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL`, or `MSTEAMS_WEBHOOK_URL` in `health_alarm_notify.conf` instead of configuring a custom sender.
+
+:::
+
+For more details on custom notifications and available variables, see the [Custom Notifications documentation](/src/health/notifications/custom/README.md).
+
 ## Automatic Node Instance Cleanup in Netdata Cloud
 
 Netdata Cloud automatically removes inactive nodes to keep your dashboards clean and organized.
