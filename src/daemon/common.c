@@ -9,6 +9,7 @@ const char *netdata_configured_log_dir             = LOG_DIR;
 const char *netdata_configured_primary_plugins_dir = PLUGINS_DIR;
 const char *netdata_configured_web_dir             = WEB_DIR;
 const char *netdata_configured_cache_dir           = CACHE_DIR;
+const char *netdata_configured_run_dir             = RUN_DIR;
 const char *netdata_configured_varlib_dir          = VARLIB_DIR;
 const char *netdata_configured_cloud_dir           = VARLIB_DIR "/cloud.d";
 const char *netdata_configured_home_dir            = VARLIB_DIR;

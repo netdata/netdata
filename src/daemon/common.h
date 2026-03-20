@@ -78,6 +78,7 @@ extern const char *netdata_configured_log_dir;
 extern const char *netdata_configured_primary_plugins_dir;
 extern const char *netdata_configured_web_dir;
 extern const char *netdata_configured_cache_dir;
+extern const char *netdata_configured_run_dir;
 extern const char *netdata_configured_varlib_dir;
 extern const char *netdata_configured_cloud_dir;
 extern const char *netdata_configured_home_dir;

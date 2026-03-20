@@ -179,6 +179,7 @@
 #cmakedefine LIBCONFIG_DIR "@LIBCONFIG_DIR@"
 #cmakedefine LOG_DIR "@LOG_DIR@"
 #cmakedefine PLUGINS_DIR "@PLUGINS_DIR@"
+#cmakedefine RUN_DIR "@RUN_DIR@"
 #cmakedefine WEB_DIR "@WEB_DIR@"
 #cmakedefine VARLIB_DIR "@VARLIB_DIR@"
 
