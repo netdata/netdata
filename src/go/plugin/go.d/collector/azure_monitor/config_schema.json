@@ -1,0 +1,288 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Azure Monitor collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 60,
+        "default": 60
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds.",
+        "type": "number",
+        "minimum": 0,
+        "default": 30
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "subscription_id": {
+        "title": "Subscription ID",
+        "description": "Azure subscription ID.",
+        "type": "string",
+        "default": ""
+      },
+      "cloud": {
+        "title": "Azure cloud",
+        "description": "Azure cloud environment.",
+        "type": "string",
+        "enum": [
+          "public",
+          "government",
+          "china"
+        ],
+        "default": "public"
+      },
+      "discovery_every": {
+        "title": "Discovery every",
+        "description": "Resource discovery refresh interval, in seconds.",
+        "type": "integer",
+        "minimum": 60,
+        "default": 300
+      },
+      "query_offset": {
+        "title": "Query offset",
+        "description": "How many seconds to shift queries into the past to avoid partial Azure Monitor windows.",
+        "type": "integer",
+        "minimum": 60,
+        "default": 180
+      },
+      "max_concurrency": {
+        "title": "Max concurrency",
+        "description": "Maximum concurrent Azure Monitor batch requests.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 64,
+        "default": 4
+      },
+      "max_batch_resources": {
+        "title": "Max resources per batch",
+        "description": "Maximum resource IDs per batch API call.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50,
+        "default": 50
+      },
+      "max_metrics_per_query": {
+        "title": "Max metrics per query",
+        "description": "Maximum metric names per batch API call.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20,
+        "default": 20
+      },
+      "resource_groups": {
+        "title": "Resource groups",
+        "description": "Optional list of Azure resource groups to include.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "profiles": {
+        "title": "Profiles",
+        "description": "Profile ids to enable. Use 'auto' for automatic discovery based on resource types in the subscription. Combine with explicit ids: ['auto', 'custom_profile']. Empty list disables collection.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "default": [
+          "auto"
+        ]
+      },
+      "auth": {
+        "title": "Authentication",
+        "description": "Azure authentication mode and credentials.",
+        "type": "object",
+        "properties": {
+          "mode": {
+            "title": "Mode",
+            "description": "Azure AD credential mode.",
+            "type": "string",
+            "enum": [
+              "service_principal",
+              "managed_identity",
+              "default"
+            ],
+            "default": "default"
+          }
+        },
+        "dependencies": {
+          "mode": {
+            "oneOf": [
+              {
+                "properties": {
+                  "mode": {
+                    "const": "service_principal"
+                  },
+                  "mode_service_principal": {
+                    "title": "Service Principal",
+                    "description": "Service principal settings used when mode is `service_principal`.",
+                    "type": "object",
+                    "properties": {
+                      "tenant_id": {
+                        "title": "Tenant ID",
+                        "description": "Azure tenant ID.",
+                        "type": "string"
+                      },
+                      "client_id": {
+                        "title": "Client ID",
+                        "description": "Service principal client ID.",
+                        "type": "string"
+                      },
+                      "client_secret": {
+                        "title": "Client Secret",
+                        "description": "Service principal client secret.",
+                        "type": "string",
+                        "sensitive": true
+                      }
+                    },
+                    "required": [
+                      "tenant_id",
+                      "client_id",
+                      "client_secret"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_service_principal"
+                ]
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "managed_identity"
+                  },
+                  "mode_managed_identity": {
+                    "title": "Managed Identity",
+                    "description": "Managed identity settings used when mode is `managed_identity`.",
+                    "type": "object",
+                    "properties": {
+                      "client_id": {
+                        "title": "Client ID",
+                        "description": "Optional client ID of a user-assigned managed identity.",
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "default"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "vnode": {
+        "title": "Virtual Node",
+        "description": "Associates this data collection job with a Virtual Node.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "subscription_id",
+      "auth"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "resource_groups": {
+      "ui:listFlavour": "list"
+    },
+    "profiles": {
+      "ui:listFlavour": "list"
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
+    },
+    "cloud": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
+    },
+    "auth": {
+      "mode": {
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        },
+        "ui:help": "Choose how Netdata gets Azure credentials.\n\n- `service_principal`: Use an Azure app / service principal. Requires `tenant_id`, `client_id`, and `client_secret` in `mode_service_principal`.\n- `managed_identity`: Use the managed identity attached to the Azure resource running Netdata. Set `mode_managed_identity.client_id` only for a user-assigned identity.\n- `default`: Use the Azure SDK `DefaultAzureCredential` chain. This automatically tries available Azure credential sources, such as environment-based credentials, managed identity, and local developer credentials.\n\nUse `service_principal` for explicit app credentials. Use `managed_identity` when Netdata runs on an Azure resource with an attached identity. Use `default` when you want Azure SDK auto-discovery or local development convenience."
+      },
+      "mode_service_principal": {
+        "client_secret": {
+          "ui:widget": "password"
+        }
+      }
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Target",
+          "fields": [
+            "subscription_id",
+            "cloud",
+            "vnode"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "timeout",
+            "autodetection_retry",
+            "discovery_every",
+            "query_offset"
+          ]
+        },
+        {
+          "title": "Auth",
+          "fields": [
+            "auth"
+          ]
+        },
+        {
+          "title": "Profiles",
+          "fields": [
+            "profiles",
+            "resource_groups"
+          ]
+        },
+        {
+          "title": "Limits",
+          "fields": [
+            "max_concurrency",
+            "max_batch_resources",
+            "max_metrics_per_query"
+          ]
+        }
+      ]
+    }
+  }
+}
