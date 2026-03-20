@@ -11,6 +11,13 @@
         "minimum": 60,
         "default": 60
       },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds.",
+        "type": "number",
+        "minimum": 0,
+        "default": 30
+      },
       "autodetection_retry": {
         "title": "Detection retry",
         "description": "Recheck interval in seconds. Zero disables retries.",
@@ -48,13 +55,6 @@
         "type": "integer",
         "minimum": 60,
         "default": 180
-      },
-      "timeout": {
-        "title": "Timeout",
-        "description": "Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds.",
-        "type": "number",
-        "minimum": 0,
-        "default": 30
       },
       "max_concurrency": {
         "title": "Max concurrency",
@@ -194,8 +194,7 @@
         },
         "required": [
           "mode"
-        ],
-        "additionalProperties": false
+        ]
       },
       "vnode": {
         "title": "Virtual Node",
@@ -206,8 +205,7 @@
     "required": [
       "subscription_id",
       "auth"
-    ],
-    "additionalProperties": false
+    ]
   },
   "uiSchema": {
     "uiOptions": {
@@ -221,6 +219,12 @@
     },
     "timeout": {
       "ui:help": "Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
+    },
+    "cloud": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
     },
     "auth": {
       "mode": {
@@ -240,27 +244,42 @@
     "ui:options": {
       "tabs": [
         {
-          "title": "Base",
+          "title": "Target",
           "fields": [
-            "update_every",
-            "autodetection_retry",
             "subscription_id",
             "cloud",
-            "discovery_every",
-            "query_offset",
-            "timeout",
-            "max_concurrency",
-            "max_batch_resources",
-            "max_metrics_per_query",
-            "resource_groups",
-            "profiles",
             "vnode"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "timeout",
+            "autodetection_retry",
+            "discovery_every",
+            "query_offset"
           ]
         },
         {
           "title": "Auth",
           "fields": [
             "auth"
+          ]
+        },
+        {
+          "title": "Profiles",
+          "fields": [
+            "profiles",
+            "resource_groups"
+          ]
+        },
+        {
+          "title": "Limits",
+          "fields": [
+            "max_concurrency",
+            "max_batch_resources",
+            "max_metrics_per_query"
           ]
         }
       ]
