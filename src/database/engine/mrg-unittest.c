@@ -106,6 +106,13 @@ int mrg_unittest(void) {
     if(m3_t1 != m1_t1)
         fatal("DBENGINE METRIC: cannot find the metric added (section %zu)", (size_t)entry.section);
 
+    // add the same metric again in section 1
+    m4_t1 = mrg_metric_add_and_acquire(mrg, entry, &ret);
+    if(m4_t1 != m1_t1)
+        fatal("DBENGINE METRIC: adding the same metric twice (section %zu), does not return the same pointer", (size_t)entry.section);
+    if(ret)
+        fatal("DBENGINE METRIC: managed to add the same metric twice in (section %zu)", (size_t)entry.section);
+
     // Release all references to these initial test metrics
     mrg_metric_release(mrg, m2_t0);
     mrg_metric_release(mrg, m3_t0);
