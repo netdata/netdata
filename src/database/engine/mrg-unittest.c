@@ -210,3 +210,330 @@ int mrg_unittest(void) {
 
     return 0;
 }
+
+// ============================================================================
+// MRG Retention Benchmark
+// ============================================================================
+
+#define MRG_BENCH_MAX_THREADS 64
+#define MRG_BENCH_TEST_DURATION_SEC 1
+#define MRG_BENCH_STOP_SIGNAL UINT64_MAX
+#define MRG_BENCH_MAX_CONFIGS 12
+
+typedef struct {
+    uint64_t operations;
+    uint64_t violations;        // consistency check failures
+    usec_t test_time;
+    volatile int ready;
+} mrg_bench_thread_stats_t;
+
+typedef struct {
+    netdata_cond_t cond;
+    netdata_mutex_t cond_mutex;
+    uint64_t run_flag;
+} mrg_bench_thread_control_t;
+
+typedef enum {
+    MRG_BENCH_READER,
+    MRG_BENCH_WRITER
+} mrg_bench_thread_type_t;
+
+typedef struct {
+    int thread_id;
+    mrg_bench_thread_type_t type;
+    MRG *mrg;
+    METRIC *metric;
+    mrg_bench_thread_stats_t *stats;
+    mrg_bench_thread_control_t *control;
+    ND_THREAD *thread;
+} mrg_bench_thread_context_t;
+
+typedef struct {
+    double reader_ops_per_sec[MRG_BENCH_MAX_CONFIGS];
+    double writer_ops_per_sec[MRG_BENCH_MAX_CONFIGS];
+    uint64_t total_violations[MRG_BENCH_MAX_CONFIGS];
+    int readers[MRG_BENCH_MAX_CONFIGS];
+    int writers[MRG_BENCH_MAX_CONFIGS];
+    int config_count;
+} mrg_bench_summary_stats_t;
+
+static void mrg_bench_wait_for_start(netdata_cond_t *cond, netdata_mutex_t *mutex, uint64_t *flag) {
+    netdata_mutex_lock(mutex);
+    while (*flag == 0)
+        netdata_cond_wait(cond, mutex);
+    netdata_mutex_unlock(mutex);
+}
+
+static void mrg_bench_thread(void *arg) {
+    mrg_bench_thread_context_t *ctx = (mrg_bench_thread_context_t *)arg;
+    mrg_bench_thread_control_t *tc = ctx->control;
+    MRG *mrg = ctx->mrg;
+    METRIC *metric = ctx->metric;
+
+    while(1) {
+        mrg_bench_wait_for_start(&tc->cond, &tc->cond_mutex, &tc->run_flag);
+
+        if(tc->run_flag == MRG_BENCH_STOP_SIGNAL)
+            break;
+
+        usec_t start = now_monotonic_high_precision_usec();
+        uint64_t operations = 0;
+        uint64_t violations = 0;
+
+        if(ctx->type == MRG_BENCH_WRITER) {
+            // Writer: expand retention with incrementing timestamps
+            time_t seq = 1000;
+            while(tc->run_flag) {
+                seq++;
+                // Expand retention with incrementing first and last time
+                mrg_metric_expand_retention(mrg, metric, seq - 100, seq, 10);
+                operations++;
+            }
+        }
+        else {
+            // Reader: read retention and check consistency invariant
+            while(tc->run_flag) {
+                time_t first_time_s, last_time_s;
+                uint32_t update_every_s;
+                mrg_metric_get_retention(mrg, metric, &first_time_s, &last_time_s, &update_every_s);
+
+                // Consistency check: first_time_s <= last_time_s
+                if(unlikely(first_time_s > 0 && last_time_s > 0 && first_time_s > last_time_s))
+                    violations++;
+
+                operations++;
+            }
+        }
+
+        usec_t test_time = now_monotonic_high_precision_usec() - start;
+        __atomic_store_n(&ctx->stats[ctx->thread_id].test_time, test_time, __ATOMIC_RELEASE);
+        __atomic_store_n(&ctx->stats[ctx->thread_id].operations, operations, __ATOMIC_RELEASE);
+        __atomic_store_n(&ctx->stats[ctx->thread_id].violations, violations, __ATOMIC_RELEASE);
+        __atomic_store_n(&ctx->stats[ctx->thread_id].ready, 1, __ATOMIC_RELEASE);
+    }
+}
+
+static void mrg_bench_print_thread_stats(const char *test_name, int readers, int writers,
+                                          mrg_bench_thread_context_t *contexts,
+                                          mrg_bench_thread_stats_t *stats,
+                                          mrg_bench_summary_stats_t *summary, int config_idx) {
+    fprintf(stderr, "\n%-20s (readers: %d, writers: %d)\n", test_name, readers, writers);
+    fprintf(stderr, "%4s %8s %12s %12s %12s %12s\n",
+            "THR", "TYPE", "OPS", "OPS/SEC", "VIOLATIONS", "TIME (ms)");
+
+    double reader_ops_per_sec = 0;
+    double writer_ops_per_sec = 0;
+    uint64_t total_violations = 0;
+
+    for(int i = 0; i < readers + writers; i++) {
+        uint64_t ops = __atomic_load_n(&stats[i].operations, __ATOMIC_RELAXED);
+        uint64_t viol = __atomic_load_n(&stats[i].violations, __ATOMIC_RELAXED);
+        usec_t time = __atomic_load_n(&stats[i].test_time, __ATOMIC_RELAXED);
+        double ops_per_sec = (double)ops * USEC_PER_SEC / time;
+
+        fprintf(stderr, "%4d %8s %12"PRIu64" %12.0f %12"PRIu64" %12.2f\n",
+                i,
+                contexts[i].type == MRG_BENCH_READER ? "READER" : "WRITER",
+                ops, ops_per_sec, viol, (double)time / 1000.0);
+
+        total_violations += viol;
+
+        if(contexts[i].type == MRG_BENCH_READER)
+            reader_ops_per_sec += ops_per_sec;
+        else
+            writer_ops_per_sec += ops_per_sec;
+    }
+
+    if(total_violations > 0) {
+        fprintf(stderr, "\nFATAL ERROR: Detected %"PRIu64" consistency violations (torn reads)!\n",
+                total_violations);
+        fflush(stderr);
+        _exit(1);
+    }
+
+    summary->reader_ops_per_sec[config_idx] = reader_ops_per_sec;
+    summary->writer_ops_per_sec[config_idx] = writer_ops_per_sec;
+    summary->total_violations[config_idx] = total_violations;
+    summary->readers[config_idx] = readers;
+    summary->writers[config_idx] = writers;
+}
+
+static void mrg_bench_run_test(const char *name, int readers, int writers,
+                                mrg_bench_thread_context_t *contexts,
+                                mrg_bench_thread_stats_t *stats,
+                                mrg_bench_thread_control_t *controls,
+                                mrg_bench_summary_stats_t *summary, int config_idx) {
+    int total_threads = readers + writers;
+
+    fprintf(stderr, "\nRunning test: %s with %d readers and %d writers...\n",
+            name, readers, writers);
+
+    // Reset
+    memset(stats, 0, total_threads * sizeof(mrg_bench_thread_stats_t));
+
+    // Signal threads to start
+    for(int i = 0; i < total_threads; i++) {
+        netdata_mutex_lock(&controls[i].cond_mutex);
+        controls[i].run_flag = 1;
+        netdata_cond_signal(&controls[i].cond);
+        netdata_mutex_unlock(&controls[i].cond_mutex);
+    }
+
+    sleep_usec(MRG_BENCH_TEST_DURATION_SEC * USEC_PER_SEC);
+
+    // Signal stop
+    for(int i = 0; i < total_threads; i++)
+        __atomic_store_n(&controls[i].run_flag, 0, __ATOMIC_RELEASE);
+
+    // Wait for results
+    for(int i = 0; i < total_threads; i++) {
+        while(!__atomic_load_n(&stats[i].ready, __ATOMIC_ACQUIRE))
+            sleep_usec(10);
+    }
+
+    mrg_bench_print_thread_stats(name, readers, writers, contexts, stats, summary, config_idx);
+}
+
+static void mrg_bench_print_summary(const mrg_bench_summary_stats_t *summary) {
+    fprintf(stderr, "\n=== MRG Retention Benchmark Summary (Million ops/sec) ===\n\n");
+    fprintf(stderr, "%-8s %-8s %16s %16s\n",
+            "Readers", "Writers", "Reader Ops/s", "Writer Ops/s");
+    fprintf(stderr, "----------------------------------------------------------------------\n");
+
+    for(int config = 0; config < summary->config_count; config++) {
+        double reader_ops = summary->reader_ops_per_sec[config];
+        double writer_ops = summary->writer_ops_per_sec[config];
+
+        fprintf(stderr, "%-8d %-8d %16.2f %16.2f\n",
+                summary->readers[config],
+                summary->writers[config],
+                reader_ops / 1000000.0,
+                writer_ops / 1000000.0);
+    }
+    fprintf(stderr, "\n");
+}
+
+int mrg_retention_benchmark(void) {
+    mrg_bench_summary_stats_t summary = {0};
+
+    // Use mrg_create_for_unittest() to avoid loading from database
+    MRG *mrg = mrg_create_for_unittest();
+    nd_uuid_t test_uuid;
+    uuid_generate(test_uuid);
+
+    MRG_ENTRY entry = {
+        .uuid = &test_uuid,
+        .section = (Word_t)&test_ctx_0,
+        .first_time_s = 1000,
+        .last_time_s = 2000,
+        .latest_update_every_s = 10,
+    };
+    bool added;
+    METRIC *metric = mrg_metric_add_and_acquire(mrg, entry, &added);
+
+    if(!added) {
+        fatal("DBENGINE METRIC: failed to add metric for benchmark");
+    }
+
+    mrg_bench_thread_stats_t stats[MRG_BENCH_MAX_THREADS];
+    mrg_bench_thread_control_t controls[MRG_BENCH_MAX_THREADS];
+    mrg_bench_thread_context_t contexts[MRG_BENCH_MAX_THREADS];
+
+    fprintf(stderr, "\nStarting MRG retention benchmark...\n");
+    fprintf(stderr, "Creating threads...\n");
+
+    // Initialize per-thread controls
+    for(int i = 0; i < MRG_BENCH_MAX_THREADS; i++) {
+        netdata_cond_init(&controls[i].cond);
+        netdata_mutex_init(&controls[i].cond_mutex);
+        controls[i].run_flag = 0;
+    }
+
+    // Create threads
+    for(int i = 0; i < MRG_BENCH_MAX_THREADS; i++) {
+        char thr_name[32];
+        snprintf(thr_name, sizeof(thr_name), "mrgbench%d", i);
+
+        contexts[i] = (mrg_bench_thread_context_t){
+            .thread_id = i,
+            .type = MRG_BENCH_READER,
+            .mrg = mrg,
+            .metric = metric,
+            .stats = stats,
+            .control = &controls[i],
+        };
+        contexts[i].thread =
+            nd_thread_create(thr_name, NETDATA_THREAD_OPTION_DONT_LOG, mrg_bench_thread, &contexts[i]);
+    }
+
+    // Test configurations: [readers, writers]
+    int configs[][2] = {
+        {1, 0},   // Single reader (no contention baseline)
+        {0, 1},   // Single writer (write throughput baseline)
+        {1, 1},   // 1 reader + 1 writer
+        {2, 1},   // 2 readers + 1 writer (typical seqlock sweet spot)
+        {4, 1},   // 4 readers + 1 writer
+        {8, 1},   // 8 readers + 1 writer (high read contention)
+        {16, 1},  // 16 readers + 1 writer
+    };
+
+    const int num_configs = sizeof(configs) / sizeof(configs[0]);
+    summary.config_count = num_configs;
+
+    // Warm up
+    sleep_usec(100000);
+
+    for(int i = 0; i < num_configs; i++) {
+        int readers = configs[i][0];
+        int writers = configs[i][1];
+        int total = readers + writers;
+
+        // Assign reader/writer roles
+        int thread_idx = 0;
+        for(int r = 0; r < readers; r++) {
+            contexts[thread_idx].type = MRG_BENCH_READER;
+            thread_idx++;
+        }
+        for(int w = 0; w < writers; w++) {
+            contexts[thread_idx].type = MRG_BENCH_WRITER;
+            thread_idx++;
+        }
+
+        // Reset roles for unused threads
+        for(int j = total; j < MRG_BENCH_MAX_THREADS; j++) {
+            contexts[j].type = MRG_BENCH_READER;
+        }
+
+        char test_name[64];
+        snprintf(test_name, sizeof(test_name), "mrg_retention %dR/%dW", readers, writers);
+        mrg_bench_run_test(test_name, readers, writers, contexts, stats, controls, &summary, i);
+    }
+
+    mrg_bench_print_summary(&summary);
+
+    // Stop all threads
+    fprintf(stderr, "Stopping threads...\n");
+    for(int i = 0; i < MRG_BENCH_MAX_THREADS; i++) {
+        netdata_mutex_lock(&controls[i].cond_mutex);
+        controls[i].run_flag = MRG_BENCH_STOP_SIGNAL;
+        netdata_cond_signal(&controls[i].cond);
+        netdata_mutex_unlock(&controls[i].cond_mutex);
+    }
+
+    fprintf(stderr, "Waiting for threads to exit...\n");
+    for(int i = 0; i < MRG_BENCH_MAX_THREADS; i++) {
+        nd_thread_join(contexts[i].thread);
+    }
+
+    // Cleanup
+    for(int i = 0; i < MRG_BENCH_MAX_THREADS; i++) {
+        netdata_cond_destroy(&controls[i].cond);
+        netdata_mutex_destroy(&controls[i].cond_mutex);
+    }
+
+    mrg_metric_release(mrg, metric);
+    mrg_destroy(mrg);
+
+    fprintf(stderr, "All benchmark tests passed.\n");
+    return 0;
+}

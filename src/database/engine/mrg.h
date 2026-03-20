@@ -99,4 +99,6 @@ bool mrg_save(MRG *mrg);
 bool mrg_load(MRG *mrg);
 void mrg_metric_prepopulate_cleanup(MRG *mrg);
 
+int mrg_retention_benchmark(void);
+
 #endif // DBENGINE_METRIC_H
