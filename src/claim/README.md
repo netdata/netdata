@@ -203,10 +203,10 @@ When an Agent is claimed to Netdata Cloud, the `cloud.d/` directory (located in 
 
 | File | Description |
 |------|-------------|
-| `cloud.conf` | Cloud configuration file containing the `claimed_id` |
+| `cloud.conf` | Primary Cloud configuration file, including the canonical `claimed_id` and other ACLK settings |
 | `private.pem` | RSA private key for ACLK authentication |
 | `public.pem` | RSA public key for ACLK authentication |
-| `claimed_id` | File storing the claimed ID (a UUID identifying the ACLK connection) |
+| `claimed_id` | Legacy file duplicating the `claimed_id` from `cloud.conf`, kept mainly for backwards compatibility and fallback |
 
 In addition to these, depending on your configuration and features in use, you may also see the following optional files:
 
