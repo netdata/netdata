@@ -76,9 +76,10 @@ static void rrdcontext_prune_hub_queue(RRDHOST *host, usec_t now_ut, bool force_
         if(unlikely(!service_running(SERVICE_CONTEXT)))
             break;
 
+        STRING *id = string_dup(rc->id);
         spinlock_unlock(&host->rrdctx.hub_queue.spinlock);
 
-        const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdctx.contexts, string2str(rc->id));
+        const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdctx.contexts, string2str(id));
         bool context_matches = item && (dictionary_acquired_item_value(item) == rc);
         bool stale = !item || !context_matches;
         bool do_it = context_matches;
@@ -97,6 +98,7 @@ static void rrdcontext_prune_hub_queue(RRDHOST *host, usec_t now_ut, bool force_
 
         if(item)
             dictionary_acquired_item_release(host->rrdctx.contexts, item);
+        string_freez(id);
 
         spinlock_lock(&host->rrdctx.hub_queue.spinlock);
         if(unlikely(!service_running(SERVICE_CONTEXT)))
@@ -226,9 +228,10 @@ void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
          rc = RRDCONTEXT_QUEUE_NEXT(&host->rrdctx.pp_queue, &idx)) {
         if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
+        STRING *id = string_dup(rc->id);
         spinlock_unlock(&host->rrdctx.pp_queue.spinlock);
 
-        const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdctx.contexts, string2str(rc->id));
+        const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdctx.contexts, string2str(id));
         bool do_it = dictionary_acquired_item_value(item) == rc;
         bool process_it = false;
 
@@ -237,7 +240,8 @@ void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
             spinlock_unlock(&host->rrdctx.pp_queue.spinlock);
             if(item)
                 dictionary_acquired_item_release(host->rrdctx.contexts, item);
-            break;
+            string_freez(id);
+            return;
         }
 
         if(do_it) {
@@ -257,6 +261,7 @@ void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
                 rrdcontext_post_process_updates(rc, false, RRD_FLAG_NONE, true);
             dictionary_acquired_item_release(host->rrdctx.contexts, item);
         }
+        string_freez(id);
 
         spinlock_lock(&host->rrdctx.pp_queue.spinlock);
     }
@@ -298,9 +303,10 @@ void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
         if(unlikely(messages_added >= MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST))
             break;
 
+        STRING *id = string_dup(rc->id);
         spinlock_unlock(&host->rrdctx.hub_queue.spinlock);
 
-        const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdctx.contexts, string2str(rc->id));
+        const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdctx.contexts, string2str(id));
         bool do_it = dictionary_acquired_item_value(item) == rc;
 
         if(item) {
@@ -360,6 +366,7 @@ void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
 
             dictionary_acquired_item_release(host->rrdctx.contexts, item);
         }
+        string_freez(id);
 
         spinlock_lock(&host->rrdctx.hub_queue.spinlock);
         if(unlikely(!service_running(SERVICE_CONTEXT)))
