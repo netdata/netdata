@@ -322,14 +322,16 @@ procfile *procfile_readall(procfile *ff) {
         }
     }
 
-    // This function reads /proc and /sys pseudo-files. These kernel-backed files
-    // deliver their content atomically from kernel memory, so:
-    //  - buffer sizes stay small (bytes to low KB), well within ssize_t range
-    //  - ssize_t is the correct type here: it matches read()'s return type and
-    //    allows the loop condition (r > 0) to naturally handle both EOF (r == 0)
-    //    and errors (r == -1)
-    //  - a short read (r < remaining) genuinely means EOF for these files, unlike
-    //    regular files or sockets where short reads can be caused by signals
+    // Although named "procfile", this is also used for regular files (e.g.
+    // /etc/passwd, /etc/group, .environment). The read loop must handle all
+    // file types correctly:
+    //  - ssize_t is used because it matches read()'s return type and allows
+    //    the loop condition (r > 0) to naturally handle EOF (r == 0) and
+    //    errors (r == -1)
+    //  - buffer sizes are small (bytes to low KB), well within ssize_t range
+    //  - we loop until read() returns 0 (true EOF), not on short reads,
+    //    because POSIX allows partial reads on regular files (e.g. due to
+    //    signal interruption after some bytes were read)
 
     ff->len = 0;    // zero the used size
     ssize_t r = 1;  // read at least once
@@ -351,8 +353,7 @@ procfile *procfile_readall(procfile *ff) {
 
         // netdata_log_info("Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
         ff->stats.reads++;
-        ssize_t remaining = (ssize_t)ff->size - s;
-        r = read(ff->fd, &ff->data[s], (size_t)remaining);
+        r = read(ff->fd, &ff->data[s], (size_t)((ssize_t)ff->size - s));
         if(unlikely(r == -1)) {
             if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
             else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
@@ -365,12 +366,6 @@ procfile *procfile_readall(procfile *ff) {
             ff->stats.max_read_size = r;
 
         ff->len += (size_t)r;
-
-        // For /proc and /sys pseudo-files, the kernel delivers content atomically,
-        // so a short read means EOF — no risk of signal-interrupted partial reads.
-        // The while(r > 0) condition handles the r == 0 (true EOF) case naturally.
-        if(likely(r < remaining))
-            break;
     }
     
     // mark that this fd needs a seek before the next read
