@@ -233,8 +233,12 @@ void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
         bool process_it = false;
 
         spinlock_lock(&host->rrdctx.pp_queue.spinlock);
-        if(unlikely(!service_running(SERVICE_CONTEXT)))
+        if(unlikely(!service_running(SERVICE_CONTEXT))) {
+            spinlock_unlock(&host->rrdctx.pp_queue.spinlock);
+            if(item)
+                dictionary_acquired_item_release(host->rrdctx.contexts, item);
             break;
+        }
 
         if(do_it) {
             RRDCONTEXT *rc_at_idx = RRDCONTEXT_QUEUE_GET(&host->rrdctx.pp_queue, idx);
