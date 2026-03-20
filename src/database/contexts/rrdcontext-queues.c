@@ -226,13 +226,10 @@ void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
          rc = RRDCONTEXT_QUEUE_NEXT(&host->rrdctx.pp_queue, &idx)) {
         if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
+        spinlock_unlock(&host->rrdctx.pp_queue.spinlock);
+
         const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdctx.contexts, string2str(rc->id));
         bool do_it = dictionary_acquired_item_value(item) == rc;
-
-        if(do_it)
-            rrdcontext_del_from_pp_queue(rc, true);
-
-        spinlock_unlock(&host->rrdctx.pp_queue.spinlock);
 
         if(item) {
             if (do_it)
@@ -242,6 +239,14 @@ void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
         }
 
         spinlock_lock(&host->rrdctx.pp_queue.spinlock);
+        if(unlikely(!service_running(SERVICE_CONTEXT)))
+            break;
+
+        if(do_it) {
+            RRDCONTEXT *rc_at_idx = RRDCONTEXT_QUEUE_GET(&host->rrdctx.pp_queue, idx);
+            if(rc_at_idx == rc)
+                rrdcontext_del_from_pp_queue(rc, true);
+        }
     }
 
     spinlock_unlock(&host->rrdctx.pp_queue.spinlock);
