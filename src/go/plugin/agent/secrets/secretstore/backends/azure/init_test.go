@@ -4,6 +4,7 @@ package azure
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -112,48 +113,73 @@ func TestStoreAuthTimeout(t *testing.T) {
 }
 
 func TestCredentialWithTimeout(t *testing.T) {
+	errMissingDeadline := errors.New("missing deadline")
+	errUnexpectedDeadline := errors.New("unexpected deadline")
+
 	tests := map[string]struct {
-		timeout        time.Duration
-		getToken       func(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error)
-		wantErr        bool
-		wantErrIs      error
-		wantToken      string
-		wantMaxElapsed time.Duration
+		timeout      time.Duration
+		buildTokenFn func(t *testing.T) (func(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error), func(t *testing.T))
+		wantErr      bool
+		wantErrIs    error
+		wantToken    string
 	}{
 		"zero timeout passes through": {
 			timeout: 0,
-			getToken: func(context.Context, policy.TokenRequestOptions) (azcore.AccessToken, error) {
-				return azcore.AccessToken{Token: "ok"}, nil
+			buildTokenFn: func(*testing.T) (func(context.Context, policy.TokenRequestOptions) (azcore.AccessToken, error), func(t *testing.T)) {
+				return func(context.Context, policy.TokenRequestOptions) (azcore.AccessToken, error) {
+					return azcore.AccessToken{Token: "ok"}, nil
+				}, nil
 			},
 			wantToken: "ok",
 		},
 		"timeout cancels token request": {
 			timeout: 20 * time.Millisecond,
-			getToken: func(ctx context.Context, _ policy.TokenRequestOptions) (azcore.AccessToken, error) {
-				<-ctx.Done()
-				return azcore.AccessToken{}, ctx.Err()
+			buildTokenFn: func(*testing.T) (func(ctx context.Context, _ policy.TokenRequestOptions) (azcore.AccessToken, error), func(t *testing.T)) {
+				var sawDeadline bool
+				var reasonableDeadline bool
+
+				return func(ctx context.Context, _ policy.TokenRequestOptions) (azcore.AccessToken, error) {
+						deadline, ok := ctx.Deadline()
+						if !ok {
+							return azcore.AccessToken{}, errMissingDeadline
+						}
+
+						sawDeadline = true
+						remaining := time.Until(deadline)
+						reasonableDeadline = remaining > 0 && remaining <= 250*time.Millisecond
+						if !reasonableDeadline {
+							return azcore.AccessToken{}, errUnexpectedDeadline
+						}
+
+						<-ctx.Done()
+						return azcore.AccessToken{}, ctx.Err()
+					}, func(t *testing.T) {
+						assert.True(t, sawDeadline)
+						assert.True(t, reasonableDeadline)
+					}
 			},
-			wantErr:        true,
-			wantErrIs:      context.DeadlineExceeded,
-			wantMaxElapsed: 250 * time.Millisecond,
+			wantErr:   true,
+			wantErrIs: context.DeadlineExceeded,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			getToken, assertPostRun := tc.buildTokenFn(t)
+
 			cred := credentialWithTimeout{
-				cred:    fakeTokenCredential{getToken: tc.getToken},
+				cred:    fakeTokenCredential{getToken: getToken},
 				timeout: tc.timeout,
 			}
 
-			start := time.Now()
 			token, err := cred.GetToken(context.Background(), policy.TokenRequestOptions{Scopes: []string{azureKeyVaultScope}})
-			elapsed := time.Since(start)
 
 			if tc.wantErr {
 				require.Error(t, err)
 				assert.ErrorIs(t, err, tc.wantErrIs)
-				assert.Less(t, elapsed, tc.wantMaxElapsed)
+				if assertPostRun != nil {
+					assertPostRun(t)
+				}
 				return
 			}
 

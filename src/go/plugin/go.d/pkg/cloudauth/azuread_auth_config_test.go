@@ -105,3 +105,43 @@ func TestAzureADAuthConfigValidateWithPath(t *testing.T) {
 		})
 	}
 }
+
+func TestAzureADAuthConfigNewCredentialWithOptions(t *testing.T) {
+	tests := map[string]struct {
+		cfg           AzureADAuthConfig
+		wantErr       bool
+		wantErrString string
+	}{
+		"valid default": {
+			cfg: AzureADAuthConfig{
+				Mode: AzureADAuthModeDefault,
+			},
+		},
+		"invalid service principal": {
+			cfg: AzureADAuthConfig{
+				Mode: AzureADAuthModeServicePrincipal,
+				ModeServicePrincipal: &AzureADModeServicePrincipalConfig{
+					TenantID: "tenant",
+					ClientID: "client",
+				},
+			},
+			wantErr:       true,
+			wantErrString: "cloud_auth.azure_ad.mode_service_principal.client_secret is required",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cred, err := tc.cfg.NewCredentialWithOptions(nil)
+			if tc.wantErr {
+				require.Error(t, err)
+				assert.Nil(t, cred)
+				assert.ErrorContains(t, err, tc.wantErrString)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, cred)
+		})
+	}
+}

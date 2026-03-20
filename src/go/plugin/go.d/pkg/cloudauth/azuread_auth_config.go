@@ -89,6 +89,10 @@ func (c AzureADAuthConfig) NewCredential() (azcore.TokenCredential, error) {
 }
 
 func (c AzureADAuthConfig) NewCredentialWithOptions(opts *AzureADCredentialOptions) (azcore.TokenCredential, error) {
+	if err := c.Validate(); err != nil {
+		return nil, err
+	}
+
 	return c.newCredential(opts)
 }
 
