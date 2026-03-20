@@ -41,6 +41,7 @@ struct mrg_statistics {
 };
 
 MRG *mrg_create(void);
+MRG *mrg_create_for_unittest(void);
 
 // returns the number of metrics that were freed, but were still referenced
 size_t mrg_destroy(MRG *mrg);
