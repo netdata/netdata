@@ -199,7 +199,7 @@ To remove a node from your Space and connect it to another, follow these steps:
 
 ### `cloud.d` Directory Contents
 
-When an Agent is claimed to Netdata Cloud, the `cloud.d/` directory (located in your Netdata library directory, typically `/var/lib/netdata/cloud.d/`) stores the credentials and identity information for the Agent-Cloud Link (ACLK).
+When an Agent is claimed to Netdata Cloud, the `cloud.d/` directory (located in your Netdata library directory, typically `/var/lib/netdata/cloud.d/`) stores the credentials and identity information for the Agent-Cloud Link (ACLK). The directory typically includes the following core files:
 
 | File | Description |
 |------|-------------|
@@ -207,6 +207,11 @@ When an Agent is claimed to Netdata Cloud, the `cloud.d/` directory (located in 
 | `private.pem` | RSA private key for ACLK authentication |
 | `public.pem` | RSA public key for ACLK authentication |
 | `claimed_id` | File storing the claimed ID (a UUID identifying the ACLK connection) |
+
+In addition to these, depending on your configuration and features in use, you may also see the following optional files:
+
+- `token` / `rooms`: Used for split-file auto-claiming workflows.
+- `trusted.pem` / `cloud_fullchain.pem`: Optional custom CA bundle files used to validate the TLS connection to Netdata Cloud.
 
 :::note
 
