@@ -120,14 +120,14 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
         p->ppid = 0;
 
     // --------------------------------------------------------------------
-    // detect kernel threads and the kernel aggregator itself (e.g. kthreadd
-    // on Linux, kernel on FreeBSD). These have no meaningful I/O, file
-    // descriptors, or limits — skip those expensive reads.
+    // detect kernel threads and kernel aggregators (e.g. kthreadd on Linux,
+    // kernel on FreeBSD). These have no meaningful I/O, file descriptors,
+    // or limits — skip those expensive reads.
     // This mirrors the classification in get_tree_target():
-    //  - aggregator itself: ppid == 0 && pid != INIT_PID
-    //  - kernel threads:    parent is an aggregator
+    //  - kernel aggregator: ppid == 0 && pid != INIT_PID (structural check)
+    //  - kernel threads:    parent is an aggregator (name-based check)
 
-    bool is_kernel_thread = p->is_aggregator;
+    bool is_kernel_thread = (p->ppid == 0 && p->pid != INIT_PID);
     if(!is_kernel_thread && p->ppid) {
         struct pid_stat *pp = find_pid_entry(p->ppid);
         if(pp && pp->is_aggregator)
