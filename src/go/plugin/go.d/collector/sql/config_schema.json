@@ -89,27 +89,76 @@
                           "default"
                         ],
                         "default": "default"
-                      },
-                      "tenant_id": {
-                        "title": "Tenant ID",
-                        "description": "Azure tenant ID. Required for service_principal mode.",
-                        "type": "string"
-                      },
-                      "client_id": {
-                        "title": "Client ID",
-                        "description": "Service principal client ID for service_principal mode.",
-                        "type": "string"
-                      },
-                      "client_secret": {
-                        "title": "Client Secret",
-                        "description": "Service principal client secret for service_principal mode.",
-                        "type": "string",
-                        "sensitive": true
-                      },
-                      "managed_identity_client_id": {
-                        "title": "Managed Identity Client ID",
-                        "description": "Optional client ID of a user-assigned managed identity.",
-                        "type": "string"
+                      }
+                    },
+                    "dependencies": {
+                      "mode": {
+                        "oneOf": [
+                          {
+                            "properties": {
+                              "mode": {
+                                "const": "service_principal"
+                              },
+                              "mode_service_principal": {
+                                "title": "Service Principal",
+                                "description": "Service principal settings used when mode is `service_principal`.",
+                                "type": "object",
+                                "properties": {
+                                  "tenant_id": {
+                                    "title": "Tenant ID",
+                                    "description": "Azure tenant ID.",
+                                    "type": "string"
+                                  },
+                                  "client_id": {
+                                    "title": "Client ID",
+                                    "description": "Service principal client ID.",
+                                    "type": "string"
+                                  },
+                                  "client_secret": {
+                                    "title": "Client Secret",
+                                    "description": "Service principal client secret.",
+                                    "type": "string",
+                                    "sensitive": true
+                                  }
+                                },
+                                "required": [
+                                  "tenant_id",
+                                  "client_id",
+                                  "client_secret"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "mode_service_principal"
+                            ]
+                          },
+                          {
+                            "properties": {
+                              "mode": {
+                                "const": "managed_identity"
+                              },
+                              "mode_managed_identity": {
+                                "title": "Managed Identity",
+                                "description": "Managed identity settings used when mode is `managed_identity`.",
+                                "type": "object",
+                                "properties": {
+                                  "client_id": {
+                                    "title": "Client ID",
+                                    "description": "Optional client ID of a user-assigned managed identity.",
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "properties": {
+                              "mode": {
+                                "const": "default"
+                              }
+                            }
+                          }
+                        ]
                       }
                     }
                   }
@@ -556,8 +605,10 @@
         "mode": {
           "ui:help": "Use `service_principal`, `managed_identity`, or `default` credential chain."
         },
-        "client_secret": {
-          "ui:widget": "password"
+        "mode_service_principal": {
+          "client_secret": {
+            "ui:widget": "password"
+          }
         }
       }
     },

@@ -5,6 +5,7 @@ package cloudauth
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,17 +25,21 @@ func TestAzureADAuthConfigValidate(t *testing.T) {
 		},
 		"service principal mode": {
 			cfg: AzureADAuthConfig{
-				Mode:         AzureADAuthModeServicePrincipal,
-				TenantID:     "tenant",
-				ClientID:     "client",
-				ClientSecret: "secret",
+				Mode: AzureADAuthModeServicePrincipal,
+				ModeServicePrincipal: &AzureADModeServicePrincipalConfig{
+					TenantID:     "tenant",
+					ClientID:     "client",
+					ClientSecret: "secret",
+				},
 			},
 		},
 		"service principal missing secret": {
 			cfg: AzureADAuthConfig{
-				Mode:     AzureADAuthModeServicePrincipal,
-				TenantID: "tenant",
-				ClientID: "client",
+				Mode: AzureADAuthModeServicePrincipal,
+				ModeServicePrincipal: &AzureADModeServicePrincipalConfig{
+					TenantID: "tenant",
+					ClientID: "client",
+				},
 			},
 			wantErr: true,
 		},
@@ -52,6 +57,45 @@ func TestAzureADAuthConfigValidate(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestAzureADAuthConfigValidateWithPath(t *testing.T) {
+	tests := map[string]struct {
+		cfg           AzureADAuthConfig
+		validatePath  string
+		wantErrString string
+	}{
+		"cloud auth path": {
+			cfg: AzureADAuthConfig{
+				Mode: AzureADAuthModeServicePrincipal,
+				ModeServicePrincipal: &AzureADModeServicePrincipalConfig{
+					TenantID: "tenant",
+					ClientID: "client",
+				},
+			},
+			validatePath:  azureADAuthConfigPath,
+			wantErrString: "cloud_auth.azure_ad.mode_service_principal.client_secret is required",
+		},
+		"root path": {
+			cfg: AzureADAuthConfig{
+				Mode: AzureADAuthModeServicePrincipal,
+				ModeServicePrincipal: &AzureADModeServicePrincipalConfig{
+					TenantID: "tenant",
+					ClientID: "client",
+				},
+			},
+			validatePath:  "",
+			wantErrString: "mode_service_principal.client_secret is required",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := tc.cfg.ValidateWithPath(tc.validatePath)
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.wantErrString)
 		})
 	}
 }

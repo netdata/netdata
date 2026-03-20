@@ -49,20 +49,20 @@ func TestProviderSchemaAndValidationParity(t *testing.T) {
 			},
 			invalid: map[string]any{
 				"name": "azure_prod",
-				"mode": "client",
-				"mode_client": map[string]any{
+				"mode": "service_principal",
+				"mode_service_principal": map[string]any{
 					"client_id": "client-id",
 				},
 			},
-			wantErrContains: "mode_client.tenant_id is required",
+			wantErrContains: "mode_service_principal.tenant_id is required",
 			assertSchemaShape: func(t *testing.T, schema map[string]any) {
 				jsonSchema := schema["jsonSchema"].(map[string]any)
 				uiSchema := schema["uiSchema"].(map[string]any)
 				assert.Contains(t, jsonSchema["required"], "mode")
 				deps := jsonSchema["dependencies"].(map[string]any)
 				assert.Contains(t, deps, "mode")
-				modeClient := uiSchema["mode_client"].(map[string]any)
-				clientSecret := modeClient["client_secret"].(map[string]any)
+				modeServicePrincipal := uiSchema["mode_service_principal"].(map[string]any)
+				clientSecret := modeServicePrincipal["client_secret"].(map[string]any)
 				assert.Equal(t, "password", clientSecret["ui:widget"])
 			},
 		},

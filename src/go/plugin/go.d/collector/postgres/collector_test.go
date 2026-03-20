@@ -121,10 +121,12 @@ func TestCollector_Init(t *testing.T) {
 				CloudAuth: cloudauth.Config{
 					Provider: cloudauth.ProviderAzureAD,
 					AzureAD: &cloudauth.AzureADAuthConfig{
-						Mode:     "service_principal",
-						TenantID: "tenant-id",
-						ClientID: "client-id",
-						// Missing client_secret.
+						Mode: "service_principal",
+						ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
+							TenantID: "tenant-id",
+							ClientID: "client-id",
+							// Missing client_secret.
+						},
 					},
 				},
 			},
@@ -150,10 +152,12 @@ func TestCollector_Init_AzureADInitializesTokenProvider(t *testing.T) {
 	c.CloudAuth = cloudauth.Config{
 		Provider: cloudauth.ProviderAzureAD,
 		AzureAD: &cloudauth.AzureADAuthConfig{
-			Mode:         cloudauth.AzureADAuthModeServicePrincipal,
-			TenantID:     "tenant-id",
-			ClientID:     "client-id",
-			ClientSecret: "client-secret",
+			Mode: cloudauth.AzureADAuthModeServicePrincipal,
+			ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
+				TenantID:     "tenant-id",
+				ClientID:     "client-id",
+				ClientSecret: "client-secret",
+			},
 		},
 	}
 

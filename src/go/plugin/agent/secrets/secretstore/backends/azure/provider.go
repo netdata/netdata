@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 )
 
 var (
@@ -19,26 +20,11 @@ var (
 	reAzureSafeName = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
 )
 
-type Config struct {
-	Mode                string                     `json:"mode" yaml:"mode"`
-	ModeClient          *ModeClientConfig          `json:"mode_client,omitempty" yaml:"mode_client,omitempty"`
-	ModeManagedIdentity *ModeManagedIdentityConfig `json:"mode_managed_identity,omitempty" yaml:"mode_managed_identity,omitempty"`
-}
-
-type ModeClientConfig struct {
-	TenantID     string `json:"tenant_id" yaml:"tenant_id"`
-	ClientID     string `json:"client_id" yaml:"client_id"`
-	ClientSecret string `json:"client_secret" yaml:"client_secret"`
-}
-
-type ModeManagedIdentityConfig struct {
-	ClientID string `json:"client_id,omitempty" yaml:"client_id,omitempty"`
-}
+type Config = cloudauth.AzureADAuthConfig
 
 type provider struct {
-	apiClient        *http.Client
-	imdsClient       *http.Client
-	loginEndpointURL string
+	apiClient  *http.Client
+	imdsClient *http.Client
 }
 
 type store struct {
@@ -48,12 +34,8 @@ type store struct {
 }
 
 type publishedStore struct {
-	provider                *provider
-	mode                    string
-	clientTenantID          string
-	clientID                string
-	clientSecret            string
-	managedIdentityClientID string
+	provider      *provider
+	tokenProvider *cloudauth.TokenProvider
 }
 
 func New() secretstore.Creator {

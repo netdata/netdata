@@ -29,7 +29,7 @@ func TestConfigValidate(t *testing.T) {
 			cfg: Config{
 				Provider: ProviderNone,
 				AzureAD: &AzureADAuthConfig{
-					Mode: "service_principal",
+					Mode: AzureADAuthModeServicePrincipal,
 				},
 			},
 		},
@@ -37,10 +37,12 @@ func TestConfigValidate(t *testing.T) {
 			cfg: Config{
 				Provider: ProviderAzureAD,
 				AzureAD: &AzureADAuthConfig{
-					Mode:         AzureADAuthModeServicePrincipal,
-					TenantID:     "tenant",
-					ClientID:     "client",
-					ClientSecret: "secret",
+					Mode: AzureADAuthModeServicePrincipal,
+					ModeServicePrincipal: &AzureADModeServicePrincipalConfig{
+						TenantID:     "tenant",
+						ClientID:     "client",
+						ClientSecret: "secret",
+					},
 				},
 			},
 		},
@@ -48,9 +50,11 @@ func TestConfigValidate(t *testing.T) {
 			cfg: Config{
 				Provider: ProviderAzureAD,
 				AzureAD: &AzureADAuthConfig{
-					Mode:     AzureADAuthModeServicePrincipal,
-					TenantID: "tenant",
-					ClientID: "client",
+					Mode: AzureADAuthModeServicePrincipal,
+					ModeServicePrincipal: &AzureADModeServicePrincipalConfig{
+						TenantID: "tenant",
+						ClientID: "client",
+					},
 				},
 			},
 			wantErr: true,

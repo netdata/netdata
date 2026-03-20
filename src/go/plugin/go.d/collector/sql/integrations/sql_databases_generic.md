@@ -201,10 +201,12 @@ cloud_auth:                                  # OPTIONAL. Cloud auth for pgx/sqls
   provider: <none|azure_ad>                 # OPTIONAL. Default: none.
   azure_ad:
     mode: <service_principal|managed_identity|default>
-    tenant_id: "<tenant-id>"                # REQUIRED for service_principal
-    client_id: "<client-id>"                # REQUIRED for service_principal
-    client_secret: "<client-secret>"        # REQUIRED for service_principal
-    managed_identity_client_id: "<client-id>" # Optional for user-assigned MI
+    mode_service_principal:                  # REQUIRED for service_principal
+      tenant_id: "<tenant-id>"
+      client_id: "<client-id>"
+      client_secret: "<client-secret>"
+    mode_managed_identity:                   # OPTIONAL for managed_identity
+      client_id: "<client-id>"               # Optional for user-assigned MI
 
 # Optional static labels applied to all charts
 static_labels:
@@ -313,10 +315,10 @@ functions:
 |  | dsn | Database connection string (DSN). The format depends on the selected driver ( [MySQL](https://github.com/go-sql-driver/mysql#dsn-data-source-name), [PostgreSQL](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS), [MS SQL Server](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn)). |  | yes |
 | **Cloud Auth** | cloud_auth.provider | Cloud auth provider (`none` or `azure_ad`). Supported for `pgx`, `sqlserver`, and `azuresql`. | none | no |
 | **Cloud Auth/Azure** | cloud_auth.azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). | default | no |
-|  | cloud_auth.azure_ad.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
-|  | cloud_auth.azure_ad.client_id | Azure client ID. Required for `service_principal`; optional for user-assigned managed identity. |  | no |
-|  | cloud_auth.azure_ad.client_secret | Azure client secret for `service_principal` mode. |  | no |
-|  | cloud_auth.azure_ad.managed_identity_client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
+|  | cloud_auth.azure_ad.mode_service_principal.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.mode_service_principal.client_id | Azure client ID. Required for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.mode_service_principal.client_secret | Azure client secret for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.mode_managed_identity.client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
 | **Connection** | timeout | Query and connection check timeout (seconds). | 5 | no |
 | **Labels** | static_labels | A map of static labels added to every chart created by this job. Useful for tagging charts with environment, region, or role. | {} | no |
 | **Queries & Metrics** | queries | A list of reusable queries. Metric blocks can reference these via `query_ref` to avoid repeating SQL. See [Configuration Structure](#configuration) for details. | [] | no |
@@ -392,9 +394,10 @@ jobs:
       provider: azure_ad
       azure_ad:
         mode: service_principal
-        tenant_id: "00000000-0000-0000-0000-000000000000"
-        client_id: "11111111-1111-1111-1111-111111111111"
-        client_secret: "super-secret-value"
+        mode_service_principal:
+          tenant_id: "00000000-0000-0000-0000-000000000000"
+          client_id: "11111111-1111-1111-1111-111111111111"
+          client_secret: "super-secret-value"
     metrics:
       - id: user_connections
         mode: columns
@@ -894,5 +897,4 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 ```bash
 docker logs netdata 2>&1 | grep sql
 ```
-
 
