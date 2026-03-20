@@ -607,7 +607,7 @@
           "ui:options": {
             "inline": true
           },
-          "ui:help": "Use `service_principal`, `managed_identity`, or `default` credential chain."
+          "ui:help": "Choose how Netdata gets Azure credentials.\n\n- `service_principal`: Use an Azure app / service principal. Requires `tenant_id`, `client_id`, and `client_secret` in `mode_service_principal`.\n- `managed_identity`: Use the managed identity attached to the Azure resource running Netdata. Set `mode_managed_identity.client_id` only for a user-assigned identity.\n- `default`: Use the Azure SDK `DefaultAzureCredential` chain. This automatically tries available Azure credential sources, such as environment-based credentials, managed identity, and local developer credentials.\n\nUse `service_principal` for explicit app credentials. Use `managed_identity` when Netdata runs on an Azure resource with an attached identity. Use `default` when you want Azure SDK auto-discovery or local development convenience."
         },
         "mode_service_principal": {
           "client_secret": {
