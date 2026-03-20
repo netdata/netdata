@@ -9,10 +9,10 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 )
 
 type initResult struct {
@@ -142,25 +142,14 @@ func resolveAutoProfiles(ctx context.Context, subscriptionID string, resourceGra
 	return mergeProfileIDs(explicitProfiles, matched), nil
 }
 
-func createCredential(auth AuthConfig, cloudCfg azcloud.Configuration) (azcore.TokenCredential, error) {
-	coreOpts := azcore.ClientOptions{Cloud: cloudCfg}
-
-	switch stringsLowerTrim(auth.Mode) {
-	case authModeServicePrincipal:
-		opts := &azidentity.ClientSecretCredentialOptions{ClientOptions: coreOpts}
-		return azidentity.NewClientSecretCredential(auth.TenantID, auth.ClientID, auth.ClientSecret, opts)
-	case authModeManagedIdentity:
-		miOpts := &azidentity.ManagedIdentityCredentialOptions{ClientOptions: coreOpts}
-		if stringsTrim(auth.ManagedIdentityClientID) != "" {
-			miOpts.ID = azidentity.ClientID(stringsTrim(auth.ManagedIdentityClientID))
-		}
-		return azidentity.NewManagedIdentityCredential(miOpts)
-	case authModeDefault, "":
-		opts := &azidentity.DefaultAzureCredentialOptions{ClientOptions: coreOpts}
-		return azidentity.NewDefaultAzureCredential(opts)
-	default:
-		return nil, fmt.Errorf("unsupported auth.mode: %q", auth.Mode)
+func createCredential(auth cloudauth.AzureADAuthConfig, cloudCfg azcloud.Configuration) (azcore.TokenCredential, error) {
+	if err := auth.ValidateWithPath("auth"); err != nil {
+		return nil, err
 	}
+
+	return auth.NewCredentialWithOptions(&cloudauth.AzureADCredentialOptions{
+		ClientOptions: azcore.ClientOptions{Cloud: cloudCfg},
+	})
 }
 
 func extractAutoKeyword(profiles []string) (bool, []string) {

@@ -149,25 +149,24 @@ modules:
               group: Filters
             - name: auth.mode
               description: "Authentication mode: `service_principal`, `managed_identity`, or `default`."
-              default_value: default
               required: true
               group: Authentication
-            - name: auth.tenant_id
+            - name: auth.mode_service_principal.tenant_id
               description: Entra ID tenant ID (required for `service_principal` mode).
               default_value: ""
               required: false
               group: Authentication
-            - name: auth.client_id
+            - name: auth.mode_service_principal.client_id
               description: Entra ID application (client) ID (required for `service_principal` mode).
               default_value: ""
               required: false
               group: Authentication
-            - name: auth.client_secret
+            - name: auth.mode_service_principal.client_secret
               description: Entra ID client secret (required for `service_principal` mode).
               default_value: ""
               required: false
               group: Authentication
-            - name: auth.managed_identity_client_id
+            - name: auth.mode_managed_identity.client_id
               description: Client ID for user-assigned managed identity. Leave empty for system-assigned.
               default_value: ""
               required: false
@@ -192,9 +191,10 @@ modules:
                     subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                     auth:
                       mode: service_principal
-                      tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                      client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                      client_secret: "your-client-secret"
+                      mode_service_principal:
+                        tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        client_secret: "your-client-secret"
             - name: Managed identity (Azure VM/VMSS/AKS)
               description: Use the managed identity of the Azure VM, VMSS, or AKS node where Netdata is running.
               config: |
@@ -215,9 +215,10 @@ modules:
                       - redis_cache
                     auth:
                       mode: service_principal
-                      tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                      client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                      client_secret: "your-client-secret"
+                      mode_service_principal:
+                        tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        client_secret: "your-client-secret"
             - name: Filter by resource group
               description: Only monitor resources in specific resource groups.
               config: |
@@ -238,9 +239,10 @@ modules:
                     cloud: government
                     auth:
                       mode: service_principal
-                      tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                      client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                      client_secret: "your-client-secret"
+                      mode_service_principal:
+                        tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        client_secret: "your-client-secret"
     troubleshooting: &troubleshooting
       problems:
         list:

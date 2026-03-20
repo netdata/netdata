@@ -43,9 +43,6 @@ func New() *Collector {
 			MaxConcurrency:     defaultMaxConcurrency,
 			MaxBatchResources:  defaultMaxBatchResource,
 			MaxMetricsPerQuery: defaultMaxMetricsQuery,
-			Auth: AuthConfig{
-				Mode: authModeDefault,
-			},
 		},
 		store:              store,
 		now:                time.Now,

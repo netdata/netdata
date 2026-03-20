@@ -18,6 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -78,6 +79,47 @@ func TestCollector_Init(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestCollector_InitAuthValidation(t *testing.T) {
+	tests := map[string]struct {
+		auth           cloudauth.AzureADAuthConfig
+		wantErrContain string
+	}{
+		"missing mode": {
+			auth:           cloudauth.AzureADAuthConfig{},
+			wantErrContain: "auth.mode is required",
+		},
+		"missing service principal secret": {
+			auth: cloudauth.AzureADAuthConfig{
+				Mode: cloudauth.AzureADAuthModeServicePrincipal,
+				ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
+					TenantID: "tenant",
+					ClientID: "client",
+				},
+			},
+			wantErrContain: "auth.mode_service_principal.client_secret is required",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := New()
+			c.Config = testConfig()
+			c.Config.Auth = tc.auth
+			c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
+				return &mockResourceGraph{}, nil
+			}
+			c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
+				return &mockMetricsClient{}, nil
+			}
+
+			err := c.Init(context.Background())
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.wantErrContain)
+			assert.NotContains(t, err.Error(), "cloud_auth.azure_ad")
 		})
 	}
 }
@@ -480,7 +522,9 @@ func testConfig() Config {
 		MaxBatchResources:  50,
 		MaxMetricsPerQuery: 20,
 		Profiles:           []string{"postgres_flexible"},
-		Auth:               AuthConfig{Mode: "default"},
+		Auth: cloudauth.AzureADAuthConfig{
+			Mode: cloudauth.AzureADAuthModeDefault,
+		},
 	}
 }
 

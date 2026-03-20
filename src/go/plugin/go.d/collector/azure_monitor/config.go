@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 )
 
 const (
@@ -19,12 +21,6 @@ const (
 	defaultMaxMetricsQuery  = 20
 )
 
-const (
-	authModeServicePrincipal = "service_principal"
-	authModeManagedIdentity  = "managed_identity"
-	authModeDefault          = "default"
-)
-
 const profileAutoKeyword = "auto"
 
 const (
@@ -34,27 +30,19 @@ const (
 )
 
 type Config struct {
-	Vnode              string     `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int        `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int        `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	SubscriptionID     string     `yaml:"subscription_id" json:"subscription_id"`
-	Cloud              string     `yaml:"cloud,omitempty" json:"cloud"`
-	DiscoveryEvery     int        `yaml:"discovery_every,omitempty" json:"discovery_every"`
-	QueryOffset        int        `yaml:"query_offset,omitempty" json:"query_offset"`
-	MaxConcurrency     int        `yaml:"max_concurrency,omitempty" json:"max_concurrency"`
-	MaxBatchResources  int        `yaml:"max_batch_resources,omitempty" json:"max_batch_resources"`
-	MaxMetricsPerQuery int        `yaml:"max_metrics_per_query,omitempty" json:"max_metrics_per_query"`
-	ResourceGroups     []string   `yaml:"resource_groups,omitempty" json:"resource_groups"`
-	Profiles           []string   `yaml:"profiles,omitempty" json:"profiles"`
-	Auth               AuthConfig `yaml:"auth" json:"auth"`
-}
-
-type AuthConfig struct {
-	Mode                    string `yaml:"mode,omitempty" json:"mode,omitempty"`
-	TenantID                string `yaml:"tenant_id,omitempty" json:"tenant_id,omitempty"`
-	ClientID                string `yaml:"client_id,omitempty" json:"client_id,omitempty"`
-	ClientSecret            string `yaml:"client_secret,omitempty" json:"client_secret,omitempty"`
-	ManagedIdentityClientID string `yaml:"managed_identity_client_id,omitempty" json:"managed_identity_client_id,omitempty"`
+	Vnode              string                      `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery        int                         `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int                         `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	SubscriptionID     string                      `yaml:"subscription_id" json:"subscription_id"`
+	Cloud              string                      `yaml:"cloud,omitempty" json:"cloud"`
+	DiscoveryEvery     int                         `yaml:"discovery_every,omitempty" json:"discovery_every"`
+	QueryOffset        int                         `yaml:"query_offset,omitempty" json:"query_offset"`
+	MaxConcurrency     int                         `yaml:"max_concurrency,omitempty" json:"max_concurrency"`
+	MaxBatchResources  int                         `yaml:"max_batch_resources,omitempty" json:"max_batch_resources"`
+	MaxMetricsPerQuery int                         `yaml:"max_metrics_per_query,omitempty" json:"max_metrics_per_query"`
+	ResourceGroups     []string                    `yaml:"resource_groups,omitempty" json:"resource_groups"`
+	Profiles           []string                    `yaml:"profiles,omitempty" json:"profiles"`
+	Auth               cloudauth.AzureADAuthConfig `yaml:"auth" json:"auth"`
 }
 
 func (c *Config) applyDefaults() {
@@ -84,9 +72,6 @@ func (c *Config) applyDefaults() {
 	}
 	if len(c.Profiles) == 0 {
 		c.Profiles = []string{"auto"}
-	}
-	if strings.TrimSpace(c.Auth.Mode) == "" {
-		c.Auth.Mode = authModeDefault
 	}
 }
 
@@ -121,7 +106,7 @@ func (c Config) validate() error {
 		errs = append(errs, fmt.Errorf("'cloud' must be one of: %s, %s, %s", cloudPublic, cloudGovernment, cloudChina))
 	}
 
-	if err := c.Auth.validate(); err != nil {
+	if err := c.Auth.ValidateWithPath("auth"); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -140,30 +125,4 @@ func (c Config) validate() error {
 	}
 
 	return errors.Join(errs...)
-}
-
-func (a AuthConfig) validate() error {
-	mode := strings.ToLower(strings.TrimSpace(a.Mode))
-	if mode == "" {
-		mode = authModeDefault
-	}
-
-	switch mode {
-	case authModeServicePrincipal:
-		var errs []error
-		if strings.TrimSpace(a.TenantID) == "" {
-			errs = append(errs, errors.New("'auth.tenant_id' is required for service_principal mode"))
-		}
-		if strings.TrimSpace(a.ClientID) == "" {
-			errs = append(errs, errors.New("'auth.client_id' is required for service_principal mode"))
-		}
-		if strings.TrimSpace(a.ClientSecret) == "" {
-			errs = append(errs, errors.New("'auth.client_secret' is required for service_principal mode"))
-		}
-		return errors.Join(errs...)
-	case authModeManagedIdentity, authModeDefault:
-		return nil
-	default:
-		return fmt.Errorf("'auth.mode' must be one of: %s, %s, %s", authModeServicePrincipal, authModeManagedIdentity, authModeDefault)
-	}
 }
