@@ -213,7 +213,7 @@ bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         }
 
         ended_ut = now_monotonic_usec();
-    } while(running && ended_ut - started_ut < timeout_ut);
+    } while(running && ((ended_ut - started_ut) < timeout_ut));
 
     if(running) {
         buffer_flush(service_list);
