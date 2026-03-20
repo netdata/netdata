@@ -329,7 +329,7 @@ static void mrg_bench_print_thread_stats(const char *test_name, int readers, int
         uint64_t ops = __atomic_load_n(&stats[i].operations, __ATOMIC_RELAXED);
         uint64_t viol = __atomic_load_n(&stats[i].violations, __ATOMIC_RELAXED);
         usec_t time = __atomic_load_n(&stats[i].test_time, __ATOMIC_RELAXED);
-        double ops_per_sec = (double)ops * USEC_PER_SEC / time;
+        double ops_per_sec = time > 0 ? (double)ops * USEC_PER_SEC / time : 0.0;
 
         fprintf(stderr, "%4d %8s %12"PRIu64" %12.0f %12"PRIu64" %12.2f\n",
                 i,
