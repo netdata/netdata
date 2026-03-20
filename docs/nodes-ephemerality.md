@@ -44,6 +44,73 @@ Netdata v2.3.0 introduces two alerts specific to permanent nodes:
 | `streaming_never_connected` | A permanent node has never connected to a Parent.       |
 | `streaming_disconnected`    | A previously connected permanent node has disconnected. |
 
+## Configuring Notifications for Streaming Alerts
+
+By default, both `streaming_never_connected` and `streaming_disconnected` alerts are configured with `to: silent`, meaning no notifications are sent. To receive notifications when permanent child nodes disconnect or fail to connect:
+
+1. Copy the stock streaming alerts configuration to your local config:
+
+   ```bash
+   cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+   sudo ./edit-config health.d/streaming.conf
+   ```
+
+2. Change the recipient from `silent` to a role (e.g., `sysadmin`):
+
+   ```ini
+   # Before (default)
+      to: silent
+
+   # After (enabled)
+      to: sysadmin
+   ```
+
+3. Restart the Netdata Agent:
+
+   ```bash
+   sudo systemctl restart netdata
+   ```
+
+### Setting Up Webhook Notifications
+
+For webhook-based notifications without Netdata Cloud, use the Agent's custom notification system:
+
+1. Edit the notification configuration:
+
+   ```bash
+   sudo ./edit-config health_alarm_notify.conf
+   ```
+
+2. Enable custom notifications and define a `custom_sender()` function to send HTTP POST requests:
+
+   ```ini
+   SEND_CUSTOM="YES"
+   DEFAULT_RECIPIENT_CUSTOM="https://your-webhook-endpoint.com/alerts"
+
+   custom_sender() {
+       local msg="${host} ${status_message}: ${alarm} ${raised_for}"
+       local webhook_url="${1}"
+
+       httpcode=$(docurl -X POST \
+           -H "Content-Type: application/json" \
+           -d "{\"text\": \"${msg}\", \"host\": \"${host}\", \"alarm\": \"${name}\", \"status\": \"${status}\"}" \
+           "${webhook_url}")
+
+       if [ "${httpcode}" = "200" ]; then
+           info "sent custom notification to ${webhook_url}"
+           sent=$((sent + 1))
+       else
+           error "failed to send custom notification: HTTP ${httpcode}"
+       fi
+   }
+   ```
+
+:::tip
+
+For comprehensive webhook configuration options and available variables, see the [Custom Notifications documentation](/src/health/notifications/custom/README.md). Built-in webhook integrations (Slack, Discord, Microsoft Teams, etc.) are also available in `health_alarm_notify.conf`.
+
+:::
+
 ## Automatic Node Instance Cleanup in Netdata Cloud
 
 Netdata Cloud automatically removes inactive nodes to keep your dashboards clean and organized.
