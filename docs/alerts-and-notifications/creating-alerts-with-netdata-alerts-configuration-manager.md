@@ -104,6 +104,21 @@ You control how and when alerts are triggered, escalated, or resolved:
 | **Description** | What the alert does, in one or two sentences        |
 | **Summary**     | Optional: a short summary for display in dashboards |
 
+## Troubleshooting
+
+:::note
+
+**Receiving HTTP 412 (Precondition Failed) when editing alerts?**
+
+This error indicates that the Agent has bearer token protection enabled and you're not authenticated. To resolve this:
+
+1. Ensure you're logged into Netdata Cloud and accessing the Agent through your Space
+2. If accessing the Agent directly, verify that a valid bearer token is configured
+
+For more details on bearer token authentication, see [Secure Your Netdata Agent with Bearer Token](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
+
+:::
+
 ## Final Notes
 
 - You can apply alert definitions to **Parent Agents** or **Standalone Child Agents**
