@@ -283,7 +283,7 @@ static void mrg_bench_thread(void *arg) {
         if(ctx->type == MRG_BENCH_WRITER) {
             // Writer: expand retention with incrementing timestamps
             time_t seq = 1000;
-            while(tc->run_flag) {
+            while(__atomic_load_n(&tc->run_flag, __ATOMIC_RELAXED)) {
                 seq++;
                 // Expand retention with incrementing first and last time
                 mrg_metric_expand_retention(mrg, metric, seq - 100, seq, 10);
@@ -292,7 +292,7 @@ static void mrg_bench_thread(void *arg) {
         }
         else {
             // Reader: read retention and check consistency invariant
-            while(tc->run_flag) {
+            while(__atomic_load_n(&tc->run_flag, __ATOMIC_RELAXED)) {
                 time_t first_time_s, last_time_s;
                 uint32_t update_every_s;
                 mrg_metric_get_retention(mrg, metric, &first_time_s, &last_time_s, &update_every_s);
