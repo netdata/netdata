@@ -322,11 +322,20 @@ procfile *procfile_readall(procfile *ff) {
         }
     }
 
+    // This function reads /proc and /sys pseudo-files. These kernel-backed files
+    // deliver their content atomically from kernel memory, so:
+    //  - buffer sizes stay small (bytes to low KB), well within ssize_t range
+    //  - ssize_t is the correct type here: it matches read()'s return type and
+    //    allows the loop condition (r > 0) to naturally handle both EOF (r == 0)
+    //    and errors (r == -1)
+    //  - a short read (r < remaining) genuinely means EOF for these files, unlike
+    //    regular files or sockets where short reads can be caused by signals
+
     ff->len = 0;    // zero the used size
     ssize_t r = 1;  // read at least once
     while(r > 0) {
-        ssize_t s = ff->len;
-        ssize_t x = ff->size - s;
+        ssize_t s = (ssize_t)ff->len;
+        ssize_t x = (ssize_t)ff->size - s;
 
         if(unlikely(!x)) {
             size_t minimum = PROCFILE_INCREMENT_BUFFER;
@@ -342,8 +351,8 @@ procfile *procfile_readall(procfile *ff) {
 
         // netdata_log_info("Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
         ff->stats.reads++;
-        ssize_t remaining = ff->size - s;
-        r = read(ff->fd, &ff->data[s], remaining);
+        ssize_t remaining = (ssize_t)ff->size - s;
+        r = read(ff->fd, &ff->data[s], (size_t)remaining);
         if(unlikely(r == -1)) {
             if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
             else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
@@ -355,10 +364,11 @@ procfile *procfile_readall(procfile *ff) {
         if((ssize_t)ff->stats.max_read_size < r)
             ff->stats.max_read_size = r;
 
-        ff->len += r;
+        ff->len += (size_t)r;
 
-        // if we read less than the buffer had available,
-        // we reached EOF - no need for another read() syscall
+        // For /proc and /sys pseudo-files, the kernel delivers content atomically,
+        // so a short read means EOF — no risk of signal-interrupted partial reads.
+        // The while(r > 0) condition handles the r == 0 (true EOF) case naturally.
         if(likely(r < remaining))
             break;
     }

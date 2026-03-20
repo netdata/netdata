@@ -416,7 +416,7 @@ struct target {
 #if (PROCESSES_HAVE_FDS == 1)
     struct openfds openfds;
     NETDATA_DOUBLE max_open_files_percent;
-    int *target_fds;
+    uint32_t *target_fds;
     uint32_t target_fds_size;
 #endif
 
