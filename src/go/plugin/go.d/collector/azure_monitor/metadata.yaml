@@ -154,6 +154,7 @@ modules:
               group: Filters
             - name: auth.mode
               description: "Authentication mode: `service_principal`, `managed_identity`, or `default`."
+              default_value: ""
               required: true
               group: Authentication
             - name: auth.mode_service_principal.tenant_id
