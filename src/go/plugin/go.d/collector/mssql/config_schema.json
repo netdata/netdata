@@ -286,6 +286,10 @@
       },
       "azure_ad": {
         "mode": {
+          "ui:widget": "radio",
+          "ui:options": {
+            "inline": true
+          },
           "ui:help": "Use `service_principal`, `managed_identity`, or `default` credential chain."
         },
         "mode_service_principal": {
