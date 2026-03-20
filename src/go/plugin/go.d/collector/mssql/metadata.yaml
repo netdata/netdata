@@ -156,6 +156,7 @@ modules:
               group: Cloud Auth
             - name: cloud_auth.azure_ad.mode
               description: Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). Required when `cloud_auth.provider` is `azure_ad`.
+              default_value: ""
               required: true
               group: Cloud Auth/Azure
             - name: cloud_auth.azure_ad.mode_service_principal.tenant_id
@@ -281,27 +282,27 @@ modules:
             - name: Azure SQL with service principal
               description: Use Microsoft Entra service principal authentication for Azure SQL.
               config: |
-                    jobs:
-                      - name: azure_sql_sp
-                        dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
-                        cloud_auth:
-                          provider: azure_ad
-                          azure_ad:
-                            mode: service_principal
-                            mode_service_principal:
-                              tenant_id: "00000000-0000-0000-0000-000000000000"
-                              client_id: "11111111-1111-1111-1111-111111111111"
-                              client_secret: "super-secret-value"
+                jobs:
+                  - name: azure_sql_sp
+                    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
+                    cloud_auth:
+                      provider: azure_ad
+                      azure_ad:
+                        mode: service_principal
+                        mode_service_principal:
+                          tenant_id: "00000000-0000-0000-0000-000000000000"
+                          client_id: "11111111-1111-1111-1111-111111111111"
+                          client_secret: "super-secret-value"
             - name: Azure SQL with managed identity
               description: Use managed identity authentication (system-assigned by default).
               config: |
-                    jobs:
-                      - name: azure_sql_mi
-                        dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
-                        cloud_auth:
-                          provider: azure_ad
-                          azure_ad:
-                            mode: managed_identity
+                jobs:
+                  - name: azure_sql_mi
+                    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
+                    cloud_auth:
+                      provider: azure_ad
+                      azure_ad:
+                        mode: managed_identity
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
