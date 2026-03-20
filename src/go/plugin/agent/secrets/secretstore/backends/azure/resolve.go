@@ -79,7 +79,7 @@ func (s *publishedStore) accessToken(ctx context.Context) (string, error) {
 
 	token, _, err := s.tokenProvider.Token(ctx)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("acquiring Azure Key Vault access token: %w", err)
 	}
 	return token, nil
 }

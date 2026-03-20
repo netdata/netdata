@@ -4,6 +4,7 @@ package azure
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -33,10 +34,15 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func TestPublishedStoreResolve(t *testing.T) {
+	errTokenFailure := errors.New("token failure")
+
 	tests := map[string]struct {
-		operand   string
-		transport roundTripFunc
-		wantValue string
+		operand         string
+		transport       roundTripFunc
+		getToken        func(context.Context, policy.TokenRequestOptions) (azcore.AccessToken, error)
+		wantValue       string
+		wantErrContains string
+		wantErrIs       error
 	}{
 		"key vault secret": {
 			operand: "my-vault/my-secret",
@@ -52,7 +58,21 @@ func TestPublishedStoreResolve(t *testing.T) {
 					Header:     make(http.Header),
 				}, nil
 			},
+			getToken: func(context.Context, policy.TokenRequestOptions) (azcore.AccessToken, error) {
+				return azcore.AccessToken{
+					Token:     "test-token",
+					ExpiresOn: time.Now().Add(30 * time.Minute),
+				}, nil
+			},
 			wantValue: "secret-value",
+		},
+		"token acquisition failure": {
+			operand: "my-vault/my-secret",
+			getToken: func(context.Context, policy.TokenRequestOptions) (azcore.AccessToken, error) {
+				return azcore.AccessToken{}, errTokenFailure
+			},
+			wantErrContains: "acquiring Azure Key Vault access token",
+			wantErrIs:       errTokenFailure,
 		},
 	}
 
@@ -60,12 +80,7 @@ func TestPublishedStoreResolve(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tokenProvider, err := cloudauth.NewTokenProvider(
 				fakeTokenCredential{
-					getToken: func(context.Context, policy.TokenRequestOptions) (azcore.AccessToken, error) {
-						return azcore.AccessToken{
-							Token:     "test-token",
-							ExpiresOn: time.Now().Add(30 * time.Minute),
-						}, nil
-					},
+					getToken: tc.getToken,
 				},
 				[]string{azureKeyVaultScope},
 				time.Minute,
@@ -84,6 +99,14 @@ func TestPublishedStoreResolve(t *testing.T) {
 				Operand:  tc.operand,
 				Original: "${store:azure-kv:azure_prod:my-vault/my-secret}",
 			})
+			if tc.wantErrContains != "" {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tc.wantErrContains)
+				assert.ErrorIs(t, err, tc.wantErrIs)
+				assert.Empty(t, value)
+				return
+			}
+
 			require.NoError(t, err)
 			assert.Equal(t, tc.wantValue, value)
 		})
