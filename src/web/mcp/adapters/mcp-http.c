@@ -94,15 +94,6 @@ static void mcp_http_session_create(MCP_CLIENT *mcpc, char *session_id_out) {
     spinlock_lock(&mcp_http_sessions_lock);
     mcp_http_sessions_init_nolock();
 
-    // Extremely unlikely UUID collision: clean up old STRING pointers before overwriting.
-    MCP_HTTP_SESSION *existing = (MCP_HTTP_SESSION *)dictionary_get(mcp_http_sessions, session_id_out);
-    if (unlikely(existing)) {
-        string_freez(existing->client_name);
-        string_freez(existing->client_version);
-        existing->client_name = NULL;
-        existing->client_version = NULL;
-    }
-
     dictionary_set(mcp_http_sessions, session_id_out, &s, sizeof(s));
     mcp_http_sessions_cleanup_expired_nolock();
 
@@ -157,11 +148,11 @@ static void mcp_http_session_update(const char *session_id, MCP_CLIENT *mcpc) {
         s->logging_level    = mcpc->logging_level;
         s->last_accessed    = now_realtime_sec();
 
-        if (string_strcmp(s->client_name, string2str(mcpc->client_name)) != 0) {
+        if (string_cmp(s->client_name, mcpc->client_name) != 0) {
             string_freez(s->client_name);
             s->client_name = string_dup(mcpc->client_name);
         }
-        if (string_strcmp(s->client_version, string2str(mcpc->client_version)) != 0) {
+        if (string_cmp(s->client_version, mcpc->client_version) != 0) {
             string_freez(s->client_version);
             s->client_version = string_dup(mcpc->client_version);
         }
@@ -303,12 +294,16 @@ int mcp_http_handle_request(struct rrdhost *host __maybe_unused, struct web_clie
     }
 
     // Detect the top-level method so we can apply session logic correctly.
-    // For batch requests we read the method from the first item in the array;
-    // individual session validation is per-item but batch sessions are rare.
+    // For batch requests, read the method from the first item in the array.
     const char *method = NULL;
     struct json_object *method_obj = NULL;
     if (json_object_is_type(root, json_type_object)) {
         if (json_object_object_get_ex(root, "method", &method_obj))
+            method = json_object_get_string(method_obj);
+    } else if (json_object_is_type(root, json_type_array) && json_object_array_length(root) > 0) {
+        struct json_object *first = json_object_array_get_idx(root, 0);
+        if (first && json_object_is_type(first, json_type_object) &&
+            json_object_object_get_ex(first, "method", &method_obj))
             method = json_object_get_string(method_obj);
     }
 
