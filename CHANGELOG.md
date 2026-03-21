@@ -156,6 +156,12 @@
 - Fix Coverity issues (Timezone) ([#21971](https://github.com/netdata/netdata/issues/21971))
 - Fix(go/framweork): restore v2 host-scoped chart emission across host switches ([#21979](https://github.com/netdata/netdata/issues/21979))
 - Fix uninitialized vnode stale timeout field in pluginsd parser ([#21983](https://github.com/netdata/netdata/issues/21983))
+- Speed up alerts API filtering with host status snapshots ([#21984](https://github.com/netdata/netdata/issues/21984))
+- Improve streaming ([#21992](https://github.com/netdata/netdata/issues/21992))
+- Refactor(go/cloudauth): adopt shared Azure auth schema for collectors and secretstore ([#21995](https://github.com/netdata/netdata/issues/21995))
+- Feat(go.d): add azure_monitor collector ([#21993](https://github.com/netdata/netdata/issues/21993))
+- Regenerate integrations docs ([#21998](https://github.com/netdata/netdata/issues/21998))
+- Packaging: add go.d secretstore and azure mon stock files ([#21997](https://github.com/netdata/netdata/issues/21997))
 
 ## [2.9.0] - 2026-02-16
 

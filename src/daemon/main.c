@@ -541,6 +541,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return mrg_unittest();
                         }
+                        else if(strcmp(optarg, "mrgretentionbench") == 0) {
+                            unittest_running = true;
+                            return mrg_retention_benchmark();
+                        }
                         else if(strcmp(optarg, "parsertest") == 0) {
                             unittest_running = true;
                             return pluginsd_parser_unittest();

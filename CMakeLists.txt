@@ -3962,6 +3962,14 @@ if(ENABLE_PLUGIN_GO)
 
     install(DIRECTORY
             COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/ss)
+    file(GLOB GO_SS_CONF_FILES src/go/plugin/go.d/config/go.d/ss/*.conf)
+    install(FILES ${GO_SS_CONF_FILES}
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/ss)
+
+    install(DIRECTORY
+            COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles)
     install(DIRECTORY
             COMPONENT plugin-go
@@ -3978,6 +3986,17 @@ if(ENABLE_PLUGIN_GO)
     install(FILES ${GO_SNMP_META_FILES}
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata)
+
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles)
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default)
+    file(GLOB GO_AZURE_MON_PROFILE_FILES src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default/*.yaml)
+    install(FILES ${GO_AZURE_MON_PROFILE_FILES}
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default)
 
     if(BUILD_FOR_PACKAGING)
         install(FILES
