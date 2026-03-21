@@ -351,7 +351,7 @@ void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
                         rrdcontext_unlock(rc);
 
                         // delete it from the master dictionary
-                        if(!dictionary_del(host->rrdctx.contexts, string2str(rc->id)))
+                        if(!dictionary_del(host->rrdctx.contexts, string2str(delete_id)))
                             netdata_log_error("RRDCONTEXT: '%s' of host '%s' failed to be deleted from rrdcontext dictionary.",
                                               string2str(delete_id), rrdhost_hostname(host));
 
