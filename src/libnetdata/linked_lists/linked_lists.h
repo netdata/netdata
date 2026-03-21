@@ -67,6 +67,76 @@
         (item)->prev = NULL;                                                                   \
     } while (0)
 
+// RCU-safe prepend: publishes the new item to concurrent RCU readers via
+// atomic release stores on the pointers they follow (head and prev->next).
+// All other pointer setup uses plain stores (not visible to readers).
+#define DOUBLE_LINKED_LIST_PREPEND_ITEM_RCU_SAFE(head, item, prev, next)                       \
+    do {                                                                                       \
+        (item)->next = (head);                                                                 \
+                                                                                               \
+        if(likely(head)) {                                                                     \
+            (item)->prev = (head)->prev;                                                       \
+            (head)->prev = (item);                                                             \
+        }                                                                                      \
+        else                                                                                   \
+            (item)->prev = (item);                                                             \
+                                                                                               \
+        /* Publish: readers load head with acquire, so store with release */                   \
+        __atomic_store_n(&(head), (item), __ATOMIC_RELEASE);                                   \
+    } while (0)
+
+// RCU-safe append: publishes the new item to concurrent RCU readers via
+// atomic release stores on the pointers they follow (prev->next or head).
+#define DOUBLE_LINKED_LIST_APPEND_ITEM_RCU_SAFE(head, item, prev, next)                        \
+    do {                                                                                       \
+        (item)->next = NULL;                                                                   \
+                                                                                               \
+        if(likely(head)) {                                                                     \
+            (item)->prev = (head)->prev;                                                       \
+            /* Publish via tail->next: readers follow next with acquire */                     \
+            __atomic_store_n(&(head)->prev->next, (item), __ATOMIC_RELEASE);                   \
+            (head)->prev = (item);                                                             \
+        }                                                                                      \
+        else {                                                                                 \
+            (item)->prev = (item);                                                             \
+            __atomic_store_n(&(head), (item), __ATOMIC_RELEASE);                               \
+        }                                                                                      \
+    } while (0)
+
+// RCU-safe variant: unlinks the item but does NOT clear item->next.
+// This allows concurrent RCU readers at this item to continue forward
+// traversal. The item must NOT be freed until after rcu_synchronize().
+// Uses atomic release stores on pointers that RCU readers follow
+// (head and prev->next) to ensure correct ordering under C11.
+#define DOUBLE_LINKED_LIST_REMOVE_ITEM_RCU_SAFE(head, item, prev, next)                        \
+    do {                                                                                       \
+        fatal_assert((head) != NULL);                                                          \
+        fatal_assert((item)->prev != NULL);                                                    \
+                                                                                               \
+        if((item)->prev == (item))                                                             \
+            /* it is the only item in the list */                                              \
+            __atomic_store_n(&(head), NULL, __ATOMIC_RELEASE);                                 \
+                                                                                               \
+        else if((item) == (head)) {                                                            \
+            /* it is the first item */                                                         \
+            fatal_assert((item)->next != NULL);                                                \
+            (item)->next->prev = (item)->prev;                                                 \
+            __atomic_store_n(&(head), (item)->next, __ATOMIC_RELEASE);                         \
+        }                                                                                      \
+        else {                                                                                 \
+            /* it is any other item */                                                         \
+            __atomic_store_n(&(item)->prev->next, (item)->next, __ATOMIC_RELEASE);             \
+                                                                                               \
+            if ((item)->next)                                                                  \
+                (item)->next->prev = (item)->prev;                                             \
+            else                                                                               \
+                (head)->prev = (item)->prev;                                                   \
+        }                                                                                      \
+                                                                                               \
+        /* item->next intentionally NOT cleared: RCU readers may follow it */                  \
+        (item)->prev = NULL;                                                                   \
+    } while (0)
+
 #define DOUBLE_LINKED_LIST_INSERT_ITEM_BEFORE_UNSAFE(head, existing, item, prev, next)         \
     do {                                                                                       \
         if (existing) {                                                                        \

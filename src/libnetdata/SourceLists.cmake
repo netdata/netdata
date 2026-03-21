@@ -343,6 +343,8 @@ set(LIBNETDATA_FILES
         locks/rw-spinlock.c
         locks/rw-spinlock.h
         locks/rw-spinlock-unittest.c
+        locks/rcu.c
+        locks/rcu.h
         atomics/atomic_flags.h
         atomics/atomics.h
         atomics/single_writer.h
@@ -358,6 +360,8 @@ set(LIBNETDATA_FILES
         locks/benchmark.h
         locks/benchmark-rw.c
         locks/benchmark-rw.h
+        locks/benchmark-rcu.c
+        locks/benchmark-rcu.h
         memory/nd-mallocz.c
         memory/nd-mallocz.h
         memory/nd-mmap.c

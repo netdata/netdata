@@ -206,7 +206,10 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
     //    callback, which may delete or garbage collect this same dictionary (the items lock is
     //    recursive, so nothing stops it) and free the item item_next points to.
     //
-    // So victims are only DETACHED here - unlinked, unindexed (views, inside
+    // With RCU, victims are unlinked RCU-safely and queued for a deferred free after a grace
+    // period (dict_rcu_pending_free_drain() below), so the traversal stays callback-free too.
+    //
+    // Without RCU, victims are only DETACHED here - unlinked, unindexed (views, inside
     // item_check_and_acquire_advanced()), pending-mark cleared and exclusively owned through the
     // refcount claim - and chained FIFO. Their frees, and therefore every delete callback, run
     // after the traversal is over, where there is no cursor left to invalidate. A callback that
@@ -218,6 +221,7 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
     // re-enters the view through anything taking that lock would deadlock on it. That is a pre-existing limitation of running
     // callbacks under the locks at all, which this ordering fix does not change.
     DICTIONARY_ITEM *detached = NULL, *detached_last = NULL;
+    bool needs_rcu = !is_dictionary_single_threaded(dict);
 
     size_t deleted = 0, pending = 0, examined = 0;
     DICTIONARY_ITEM *item = dict->items.list, *item_next;
@@ -232,17 +236,27 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
             // we didn't get a reference
 
             if(item_is_not_referenced_and_can_be_removed(dict, item)) {
-                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
-                long int remaining = item_pending_deletion_clear(dict, item);
+                long int remaining;
+                if(needs_rcu) {
+                    // RCU-safe removal preserves item->next for concurrent readers.
+                    // The actual free is deferred until after a grace period.
+                    DOUBLE_LINKED_LIST_REMOVE_ITEM_RCU_SAFE(dict->items.list, item, prev, next);
+                    remaining = item_pending_deletion_clear(dict, item);
+                    dict_rcu_pending_free_queue(dict, item);
+                }
+                else {
+                    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
+                    remaining = item_pending_deletion_clear(dict, item);
 
-                // chain the detached victim, in traversal order;
-                // prev/next are dead after the list removal, so ->next is free to reuse
-                item->next = NULL;
-                if(detached_last)
-                    detached_last->next = item;
-                else
-                    detached = item;
-                detached_last = item;
+                    // chain the detached victim, in traversal order;
+                    // prev/next are dead after the list removal, so ->next is free to reuse
+                    item->next = NULL;
+                    if(detached_last)
+                        detached_last->next = item;
+                    else
+                        detached = item;
+                    detached_last = item;
+                }
 
                 deleted++;
 
@@ -284,6 +298,9 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
         dictionary_index_wrlock_unlock(dict);
 
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+
+    if(needs_rcu)
+        dict_rcu_pending_free_drain(dict);
 
     // after delivery: the callbacks above may have changed it
     pending = (size_t)DICTIONARY_PENDING_DELETES_GET(dict);
@@ -419,6 +436,14 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     if(!force && (dictionary_referenced_items(dict) || dictionary_inflight(dict)))
         return false;
 
+    if(!is_dictionary_single_threaded(dict)) {
+        // Readers no longer acquire item references in RCU traversal mode,
+        // so whole-dictionary teardown must wait for a grace period before
+        // freeing items, values, hooks, or the dictionary object itself.
+        if(rcu_thread_in_read_cs() || !rcu_synchronize())
+            return false;
+    }
+
     size_t dict_size = 0, counted_items = 0, item_size = 0, index_size = 0;
     (void)counted_items;
 
@@ -428,13 +453,21 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     long int pending_deletion_items = dict->pending_deletion_items;
 #endif
 
-    // destroy the index
+    // Detach the item list under the write lock.
+    ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
+    DICTIONARY_ITEM *item = dict->items.list;
+    dict->items.list = NULL;
+    ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+
+    // We already waited for a grace period above, so no pre-destroy RCU reader
+    // can still observe this dictionary, its items, or the payloads hanging off
+    // those items.
+
+    // Destroy the index.
     dictionary_index_lock_wrlock(dict);
     index_size += hashtable_destroy_unsafe(dict);
     dictionary_index_wrlock_unlock(dict);
 
-    ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
-    DICTIONARY_ITEM *item = dict->items.list;
     while (item) {
         // cache item->next
         // because we are going to free item
@@ -448,8 +481,8 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
 
         counted_items++;
     }
-    dict->items.list = NULL;
-    ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+
+    item_size += dict_rcu_pending_free_free_list(dict, dict_rcu_pending_free_detach(dict));
 
     dict_size += dictionary_locks_destroy(dict);
     dict_size += reference_counter_free(dict);
@@ -919,7 +952,10 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
     size_t freed;
-    dictionary_free_all_resources(dict, &freed, true);
+    if(!dictionary_free_all_resources(dict, &freed, true)) {
+        dictionary_queue_for_destruction(dict);
+        return 0;
+    }
 
     return freed;
 }
