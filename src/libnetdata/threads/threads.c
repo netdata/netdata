@@ -330,6 +330,7 @@ static void nd_thread_exit(ND_THREAD *nti) {
     thread_cache_destroy();
     service_exits();
     worker_unregister();
+    rcu_unregister_thread();
 
     nd_thread_status_set(nti, NETDATA_THREAD_STATUS_FINISHED);
 

@@ -78,6 +78,7 @@ extern const char *netdata_configured_host_prefix;
 #include "locks/locks.h"
 #include "locks/spinlock.h"
 #include "locks/rw-spinlock.h"
+#include "locks/rcu.h"
 #include "completion/completion.h"
 #include "libnetdata/locks/waitq.h"
 #include "clocks/clocks.h"

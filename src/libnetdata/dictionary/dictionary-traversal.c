@@ -2,6 +2,26 @@
 
 #include "dictionary-internals.h"
 
+// ----------------------------------------------------------------------------
+// RCU-safe pointer helpers for dictionary traversal.
+// Under RCU mode, readers load list/next pointers concurrently with writers
+// (who hold the write lock but NOT the RCU read-side CS). We must use atomic
+// acquire loads so the C11 memory model is satisfied. On x86 these compile
+// to plain loads (TSO guarantees), so there is no runtime cost.
+
+static inline DICTIONARY_ITEM *dict_item_list_head(DICTIONARY *dict, bool rcu_mode) {
+    if(rcu_mode)
+        return __atomic_load_n(&dict->items.list, __ATOMIC_ACQUIRE);
+    else
+        return dict->items.list;
+}
+
+static inline DICTIONARY_ITEM *dict_item_next(DICTIONARY_ITEM *item, bool rcu_mode) {
+    if(rcu_mode)
+        return __atomic_load_n(&item->next, __ATOMIC_ACQUIRE);
+    else
+        return item->next;
+}
 
 // ----------------------------------------------------------------------------
 // traversal with loop
@@ -21,6 +41,11 @@ void *dictionary_foreach_start_rw(DICTFE *dfe) {
         return NULL;
     }
 
+    // Determine if we should use RCU mode for this traversal.
+    // RCU mode: no per-item refcount acquisition during traversal.
+    // Only for pure READ mode on multi-threaded dictionaries.
+    dfe->rcu_mode = ll_lock_is_rcu_mode(dfe->dict, dfe->rw);
+
     dfe->counter = 0;
     dfe->locked = true;
     ll_recursive_lock(dfe->dict, dfe->rw);
@@ -39,11 +64,18 @@ void *dictionary_foreach_start_rw(DICTFE *dfe) {
     }
 
     // get the first item from the list
-    DICTIONARY_ITEM *item = dfe->dict->items.list;
+    DICTIONARY_ITEM *item = dict_item_list_head(dfe->dict, dfe->rcu_mode);
 
-    // skip all the deleted items
-    while(item && !item_check_and_acquire(dfe->dict, item))
-        item = item->next;
+    if(dfe->rcu_mode) {
+        // RCU mode: skip deleted items without acquiring refcount
+        while(item && !item_is_available_for_rcu_traversal(item))
+            item = dict_item_next(item, true);
+    }
+    else {
+        // Legacy mode: skip deleted items with CAS refcount acquisition
+        while(item && !item_check_and_acquire(dfe->dict, item))
+            item = item->next;
+    }
 
     if(likely(item)) {
         dfe->item = item;
@@ -91,15 +123,23 @@ ALWAYS_INLINE void *dictionary_foreach_next(DICTFE *dfe) {
     DICTIONARY_ITEM *item = dfe->item;
 
     // get the next item from the list
-    DICTIONARY_ITEM *item_next = (item) ? item->next : NULL;
+    DICTIONARY_ITEM *item_next = (item) ? dict_item_next(item, dfe->rcu_mode) : NULL;
 
-    // skip all the deleted items until one that can be acquired is found
-    while(item_next && !item_check_and_acquire(dfe->dict, item_next))
-        item_next = item_next->next;
+    if(dfe->rcu_mode) {
+        // RCU mode: skip deleted items without acquiring refcount
+        while(item_next && !item_is_available_for_rcu_traversal(item_next))
+            item_next = dict_item_next(item_next, true);
 
-    if(likely(item)) {
-        dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dfe->dict, item, dfe->rw);
-        // item_release(dfe->dict, item);
+        // No need to release the previous item — we never acquired it
+    }
+    else {
+        // Legacy mode: skip deleted items with CAS refcount acquisition
+        while(item_next && !item_check_and_acquire(dfe->dict, item_next))
+            item_next = item_next->next;
+
+        if(likely(item)) {
+            dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dfe->dict, item, dfe->rw);
+        }
     }
 
     item = item_next;
@@ -138,8 +178,10 @@ void dictionary_foreach_done(DICTFE *dfe) {
 
     // release it, so that it can possibly be deleted
     if(likely(item)) {
-        dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dfe->dict, item, dfe->rw);
-        // item_release(dfe->dict, item);
+        if(!dfe->rcu_mode) {
+            dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dfe->dict, item, dfe->rw);
+        }
+        // In RCU mode: no release needed — we never acquired a refcount
     }
 
     if(likely(dfe->rw != DICTIONARY_LOCK_REENTRANT) && dfe->locked) {
@@ -167,6 +209,8 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callba
         return 0;
     }
 
+    bool rcu_mode = ll_lock_is_rcu_mode(dict, rw);
+
     ll_recursive_lock(dict, rw);
 
     if(unlikely(is_dictionary_destroyed(dict))) {
@@ -179,13 +223,22 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callba
     // written in such a way, that the callback can delete the active element
 
     int ret = 0;
-    DICTIONARY_ITEM *item = dict->items.list, *item_next;
+    DICTIONARY_ITEM *item = dict_item_list_head(dict, rcu_mode), *item_next;
     while(item) {
 
-        // skip the deleted items
-        if(unlikely(!item_check_and_acquire(dict, item))) {
-            item = item->next;
-            continue;
+        if(rcu_mode) {
+            // RCU mode: skip deleted/unavailable items without refcount
+            if(unlikely(!item_is_available_for_rcu_traversal(item))) {
+                item = dict_item_next(item, true);
+                continue;
+            }
+        }
+        else {
+            // Legacy mode: skip deleted items with CAS refcount acquisition
+            if(unlikely(!item_check_and_acquire(dict, item))) {
+                item = item->next;
+                continue;
+            }
         }
 
         if(unlikely(rw == DICTIONARY_LOCK_REENTRANT))
@@ -198,10 +251,11 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callba
 
         // since we have a reference counter, this item cannot be deleted
         // until we release the reference counter, so the pointers are there
-        item_next = item->next;
+        item_next = dict_item_next(item, rcu_mode);
 
-        dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dict, item, rw);
-        // item_release(dict, item);
+        if(!rcu_mode) {
+            dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dict, item, rw);
+        }
 
         if(unlikely(r < 0)) {
             ret = r;
@@ -235,15 +289,20 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough
         return 0;
     }
 
-    ll_recursive_lock(dict, rw);
+    // Sorted walkthrough releases the lock before calling callbacks,
+    // so items must be kept alive via refcounts. Force non-RCU lock mode
+    // ('R') to ensure the rw_spinlock is used instead of RCU — RCU would
+    // only protect items during the CS, but we need them after unlock.
+    char lock_mode = (rw == DICTIONARY_LOCK_READ) ? 'R' : rw;
+
+    ll_recursive_lock(dict, lock_mode);
 
     if(unlikely(is_dictionary_destroyed(dict))) {
-        ll_recursive_unlock(dict, rw);
+        ll_recursive_unlock(dict, lock_mode);
         return 0;
     }
 
     DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
-
     size_t entries = __atomic_load_n(&dict->entries, __ATOMIC_RELAXED);
     DICTIONARY_ITEM **array = mallocz(sizeof(DICTIONARY_ITEM *) * entries);
 
@@ -253,7 +312,7 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough
         if(likely(item_check_and_acquire(dict, item)))
             array[i++] = item;
     }
-    ll_recursive_unlock(dict, rw);
+    ll_recursive_unlock(dict, lock_mode);
 
     if(unlikely(i != entries))
         entries = i;
@@ -271,7 +330,7 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough
         if(callit)
             r = walkthrough_callback(item, item->shared->value, data);
 
-        dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dict, item, rw);
+        dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dict, item, lock_mode);
         // item_release(dict, item);
 
         if(r < 0) {
@@ -290,4 +349,3 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough
 
     return ret;
 }
-

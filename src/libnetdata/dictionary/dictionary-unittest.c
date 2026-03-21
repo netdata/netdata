@@ -1745,6 +1745,154 @@ int dictionary_unittest_benchmark(void) {
     return 0;
 }
 
+// ============================================================================
+// Read-traversal benchmark: measures dfe_start_read throughput under contention
+// ============================================================================
+
+struct read_bench_thread {
+    int id;
+    volatile int *join;
+    DICTIONARY *dict;
+    uint64_t traversals;
+    uint64_t items_seen;
+    bool is_writer;
+    ND_THREAD *thread;
+};
+
+static void read_bench_reader_thread(void *arg) {
+    struct read_bench_thread *ctx = arg;
+
+    while(!__atomic_load_n(ctx->join, __ATOMIC_RELAXED)) {
+        void *v;
+        dfe_start_read(ctx->dict, v) {
+            (void)v;
+            ctx->items_seen++;
+        }
+        dfe_done(v);
+        ctx->traversals++;
+    }
+}
+
+static void read_bench_writer_thread(void *arg) {
+    struct read_bench_thread *ctx = arg;
+    uint64_t counter = 0;
+    char buf[64];
+
+    while(!__atomic_load_n(ctx->join, __ATOMIC_RELAXED)) {
+        snprintfz(buf, sizeof(buf), "writer-key-%"PRIu64, counter);
+        dictionary_set(ctx->dict, buf, NULL, 0);
+        dictionary_del(ctx->dict, buf);
+        counter++;
+        ctx->traversals = counter;
+    }
+}
+
+static void dictionary_unittest_read_traversal_benchmark(void) {
+    int thread_configs[] = {1, 2, 4, 8};
+    int num_configs = (int)(sizeof(thread_configs) / sizeof(thread_configs[0]));
+    time_t seconds_to_run = 3;
+    size_t dict_entries = 1000;
+
+    fprintf(stderr, "\n=== Dictionary Read-Traversal Benchmark (%zu items, %lld sec per config) ===\n",
+            dict_entries, (long long)seconds_to_run);
+
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    char name[64];
+    for(size_t i = 0; i < dict_entries; i++) {
+        snprintfz(name, sizeof(name), "bench-item-%zu", i);
+        dictionary_set(dict, name, NULL, 0);
+    }
+
+    fprintf(stderr, "\n%-10s %10s %16s %16s\n",
+            "Readers", "Writers", "Traversals/sec", "Items/sec");
+    fprintf(stderr, "------------------------------------------------------------\n");
+
+    for(int c = 0; c < num_configs; c++) {
+        int nreaders = thread_configs[c];
+        volatile int join = 0;
+
+        struct read_bench_thread readers[nreaders];
+        memset(readers, 0, sizeof(readers));
+
+        for(int i = 0; i < nreaders; i++) {
+            readers[i] = (struct read_bench_thread){
+                .id = i, .join = &join, .dict = dict,
+                .traversals = 0, .items_seen = 0, .is_writer = false,
+            };
+            char tname[32];
+            snprintfz(tname, sizeof(tname), "rdbench%d", i);
+            readers[i].thread = nd_thread_create(tname, NETDATA_THREAD_OPTION_DONT_LOG,
+                                                  read_bench_reader_thread, &readers[i]);
+        }
+
+        sleep_usec(seconds_to_run * USEC_PER_SEC);
+        __atomic_store_n(&join, 1, __ATOMIC_RELAXED);
+
+        uint64_t total_traversals = 0, total_items = 0;
+        for(int i = 0; i < nreaders; i++) {
+            nd_thread_join(readers[i].thread);
+            total_traversals += readers[i].traversals;
+            total_items += readers[i].items_seen;
+        }
+
+        fprintf(stderr, "%-10d %10d %16.0f %16.0f\n",
+                nreaders, 0,
+                (double)total_traversals / seconds_to_run,
+                (double)total_items / seconds_to_run);
+    }
+
+    fprintf(stderr, "------------------------------------------------------------\n");
+
+    for(int c = 0; c < num_configs; c++) {
+        int nreaders = thread_configs[c];
+        int total = nreaders + 1;
+        volatile int join = 0;
+
+        struct read_bench_thread threads[total];
+        memset(threads, 0, sizeof(threads));
+
+        for(int i = 0; i < nreaders; i++) {
+            threads[i] = (struct read_bench_thread){
+                .id = i, .join = &join, .dict = dict,
+                .traversals = 0, .items_seen = 0, .is_writer = false,
+            };
+            char tname[32];
+            snprintfz(tname, sizeof(tname), "rdbench%d", i);
+            threads[i].thread = nd_thread_create(tname, NETDATA_THREAD_OPTION_DONT_LOG,
+                                                  read_bench_reader_thread, &threads[i]);
+        }
+        threads[nreaders] = (struct read_bench_thread){
+            .id = nreaders, .join = &join, .dict = dict,
+            .traversals = 0, .items_seen = 0, .is_writer = true,
+        };
+        threads[nreaders].thread = nd_thread_create("wrbench", NETDATA_THREAD_OPTION_DONT_LOG,
+                                                     read_bench_writer_thread, &threads[nreaders]);
+
+        sleep_usec(seconds_to_run * USEC_PER_SEC);
+        __atomic_store_n(&join, 1, __ATOMIC_RELAXED);
+
+        uint64_t total_traversals = 0, total_items = 0, write_ops = 0;
+        for(int i = 0; i < total; i++) {
+            nd_thread_join(threads[i].thread);
+            if(threads[i].is_writer)
+                write_ops = threads[i].traversals;
+            else {
+                total_traversals += threads[i].traversals;
+                total_items += threads[i].items_seen;
+            }
+        }
+
+        fprintf(stderr, "%-10d %10d %16.0f %16.0f  (writes: %.0f/sec)\n",
+                nreaders, 1,
+                (double)total_traversals / seconds_to_run,
+                (double)total_items / seconds_to_run,
+                (double)write_ops / seconds_to_run);
+    }
+
+    fprintf(stderr, "\n");
+    dictionary_destroy(dict);
+}
+
 int dictionary_unittest(size_t entries) {
     if(entries < 10) entries = 10;
 
@@ -1829,15 +1977,17 @@ int dictionary_unittest(size_t entries) {
         errors += unittest_check_dictionary("", dict, 1, 1, 0, 1, 0);
         errors += unittest_check_item("ACQUIRED", dict, item, "test", "ITEM1", 1, ITEM_FLAG_NONE, true, true, true);
 
-        fprintf(stderr, "\nChecking that reference counters are increased:\n");
+        fprintf(stderr, "\nChecking refcounts during RCU read traversal (no per-item acquire):\n");
         void *t;
         dfe_start_read(dict, t) {
             errors += unittest_check_dictionary("", dict, 1, 1, 0, 1, 0);
-            errors += unittest_check_item("ACQUIRED TRAVERSAL", dict, item, "test", "ITEM1", 2, ITEM_FLAG_NONE, true, true, true);
+            // RCU traversal does not acquire a per-item refcount, so the
+            // refcount stays at 1 (from the dictionary_get_and_acquire_item above).
+            errors += unittest_check_item("ACQUIRED TRAVERSAL", dict, item, "test", "ITEM1", 1, ITEM_FLAG_NONE, true, true, true);
         }
         dfe_done(t);
 
-        fprintf(stderr, "\nChecking that reference counters are decreased:\n");
+        fprintf(stderr, "\nChecking that reference counters are unchanged after RCU traversal:\n");
         errors += unittest_check_dictionary("", dict, 1, 1, 0, 1, 0);
         errors += unittest_check_item("ACQUIRED TRAVERSAL 2", dict, item, "test", "ITEM1", 1, ITEM_FLAG_NONE, true, true, true);
 
@@ -1895,6 +2045,11 @@ int dictionary_unittest(size_t entries) {
     errors += dictionary_unittest_views();
     errors += dictionary_unittest_threads();
     errors += dictionary_unittest_view_threads();
+
+    // The read-traversal benchmark is available via dictionary_unittest_read_traversal_benchmark()
+    // but not run by default — it adds ~24 seconds of timed workloads.
+    // Uncomment the following line or call it from a dedicated benchmark harness:
+    // dictionary_unittest_read_traversal_benchmark();
 
     if(!dictionary_traverse_or_destroy_unittest()) {
         fprintf(stderr, "Destroy on traversal test failed\n");

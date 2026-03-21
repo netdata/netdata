@@ -259,10 +259,20 @@ static inline size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM
 static inline void item_linked_list_add(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
-    if(dict->options & DICT_OPTION_ADD_IN_FRONT)
-        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(dict->items.list, item, prev, next);
-    else
-        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(dict->items.list, item, prev, next);
+    if(is_dictionary_single_threaded(dict)) {
+        if(dict->options & DICT_OPTION_ADD_IN_FRONT)
+            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(dict->items.list, item, prev, next);
+        else
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(dict->items.list, item, prev, next);
+    }
+    else {
+        // RCU-safe insertion: uses atomic release stores on the publication
+        // pointers (head, prev->next) that RCU readers load with acquire.
+        if(dict->options & DICT_OPTION_ADD_IN_FRONT)
+            DOUBLE_LINKED_LIST_PREPEND_ITEM_RCU_SAFE(dict->items.list, item, prev, next);
+        else
+            DOUBLE_LINKED_LIST_APPEND_ITEM_RCU_SAFE(dict->items.list, item, prev, next);
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     item->ll_adder_pid = gettid_cached();
@@ -279,7 +289,14 @@ static inline void item_linked_list_add(DICTIONARY *dict, DICTIONARY_ITEM *item)
 static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
-    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
+    if(is_dictionary_single_threaded(dict)) {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
+    }
+    else {
+        // RCU-safe removal: preserve item->next so concurrent RCU readers
+        // at this item can still follow the chain forward.
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_RCU_SAFE(dict->items.list, item, prev, next);
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     item->ll_remover_pid = gettid_cached();
@@ -287,6 +304,20 @@ static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *it
 
     garbage_collect_pending_deletes(dict);
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+}
+
+static inline void dict_item_retire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+    if(is_dictionary_single_threaded(dict))
+        dict_item_free_with_hooks(dict, item);
+    else
+        dict_rcu_pending_free_queue(dict, item);
+}
+
+static inline void dict_item_retire_and_try_drain(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+    dict_item_retire(dict, item);
+
+    if(!is_dictionary_single_threaded(dict))
+        dict_rcu_pending_free_drain(dict);
 }
 
 // ----------------------------------------------------------------------------
@@ -324,10 +355,10 @@ static inline void dict_item_free_or_mark_deleted(DICTIONARY *dict, DICTIONARY_I
     int rc = item_is_not_referenced_and_can_be_removed_advanced(dict, item);
     switch(rc) {
         case RC_ITEM_OK:
-            // the item is ours, refcount set to -100
+            // the item is ours, refcount set to REFCOUNT_DELETED
             dict_item_shared_set_deleted(dict, item);
             item_linked_list_remove(dict, item);
-            dict_item_free_with_hooks(dict, item);
+            dict_item_retire_and_try_drain(dict, item);
             break;
 
         case RC_ITEM_IS_REFERENCED:
@@ -365,7 +396,7 @@ static inline void dict_item_release_and_check_if_it_is_deleted_and_can_be_remov
             DICTIONARY_PENDING_DELETES_MINUS1(dict);
 
             item_linked_list_remove(dict, item);
-            dict_item_free_with_hooks(dict, item);
+            dict_item_retire_and_try_drain(dict, item);
         }
     }
     else {
