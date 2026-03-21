@@ -217,6 +217,11 @@ static void http_header_x_netdata_auth(struct web_client *w, const char *v, size
     }
 }
 
+static void http_header_mcp_session_id(struct web_client *w, const char *v, size_t len __maybe_unused) {
+    freez(w->mcp_session_id);
+    w->mcp_session_id = strdupz(v);
+}
+
 // Handle WebSocket-specific headers
 static void http_header_upgrade(struct web_client *w, const char *v, size_t len __maybe_unused) {
     if(strcasecmp(v, "websocket") == 0) {
@@ -364,6 +369,9 @@ struct {
     // for historical reasons.
     // there are a few nightly versions of netdata UI that incorrectly use this instead of X-Netdata-Auth
     { .hash = 0, .key = "Authorization",        .cb = http_header_x_netdata_auth },
+
+    // MCP HTTP transport session identifier
+    { .hash = 0, .key = "Mcp-Session-Id",       .cb = http_header_mcp_session_id },
 
     // terminator
     { .hash = 0, .key = NULL, .cb = NULL }
