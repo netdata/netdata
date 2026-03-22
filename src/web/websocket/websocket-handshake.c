@@ -6,9 +6,11 @@
 #include "websocket-echo.h"
 #include "../mcp/adapters/mcp-websocket.h"
 #include "web/api/mcp_auth.h"
+#include "web/api/http_auth.h"
 
 // Global array of WebSocket threads
 WEBSOCKET_THREAD websocket_threads[WEBSOCKET_MAX_THREADS];
+static _Atomic bool websocket_mcp_query_api_key_compat_notice_logged = false;
 
 // Initialize WebSocket thread system
 void websocket_threads_init(void) {
@@ -305,6 +307,17 @@ short int websocket_handle_handshake(struct web_client *w) {
 
     // Copy user authentication and authorization information
     wsc->user_auth = w->user_auth;
+    bool mcp_api_key_verified = false;
+
+#ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
+    if (web_client_has_mcp_preview_key(w)) {
+        wsc->user_auth.access = HTTP_ACCESS_ALL;
+        wsc->user_auth.method = USER_AUTH_METHOD_GOD;
+        wsc->user_auth.user_role = HTTP_USER_ROLE_ADMIN;
+        mcp_api_key_verified = true;
+        websocket_debug(wsc, "MCP developer preview API key verified via Authorization header - enabling full access");
+    }
+#endif
 
     // Check for max_frame_size parameter in the URL query string
     if (w->url_query_string_decoded && buffer_strlen(w->url_query_string_decoded) > 0) {
@@ -332,15 +345,18 @@ short int websocket_handle_handshake(struct web_client *w) {
         }
         
 #ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
-        if (web_client_has_mcp_preview_key(w)) {
-            wsc->user_auth.access = HTTP_ACCESS_ALL;
-            wsc->user_auth.method = USER_AUTH_METHOD_GOD;
-            wsc->user_auth.user_role = HTTP_USER_ROLE_ADMIN;
-            websocket_debug(wsc, "MCP developer preview API key verified via Authorization header - enabling full access");
-        } else {
-            // Check for api_key parameter for MCP developer preview
+        if (!mcp_api_key_verified) {
+            // Backward-compatibility fallback for older MCP websocket clients.
+            // Preferred path is Authorization: Bearer, but we intentionally keep
+            // ?api_key= support to avoid breaking existing client integrations.
             char *api_key_str = strstr(query, "api_key=");
             if (api_key_str) {
+                if (!websocket_mcp_query_api_key_compat_notice_logged) {
+                    websocket_mcp_query_api_key_compat_notice_logged = true;
+                    netdata_log_info("WEBSOCKET: MCP query-string API key is accepted for backward compatibility. "
+                                     "Prefer Authorization: Bearer for better credential hygiene.");
+                }
+
                 api_key_str += strlen("api_key=");
 
                 // Extract the API key value (until & or end of string)
@@ -358,6 +374,7 @@ short int websocket_handle_handshake(struct web_client *w) {
                     wsc->user_auth.access = HTTP_ACCESS_ALL;
                     wsc->user_auth.method = USER_AUTH_METHOD_GOD;
                     wsc->user_auth.user_role = HTTP_USER_ROLE_ADMIN;
+                    mcp_api_key_verified = true;
                     websocket_debug(wsc, "MCP developer preview API key verified - enabling full access");
                 } else {
                     websocket_debug(wsc, "Invalid MCP developer preview API key provided");
@@ -384,6 +401,31 @@ short int websocket_handle_handshake(struct web_client *w) {
         freez(accept_key);
         websocket_client_free(wsc);
         return HTTP_RESP_BAD_REQUEST;
+    }
+
+    if (wsc->protocol == WS_PROTOCOL_MCP) {
+        if (unlikely(!http_can_access_mcp(w))) {
+            freez(accept_key);
+            websocket_client_free(wsc);
+            return web_client_permission_denied_acl(w);
+        }
+
+        if (netdata_is_protected_by_bearer && !mcp_api_key_verified) {
+            w->response.data->content_type = CT_TEXT_PLAIN;
+            buffer_flush(w->response.data);
+            buffer_strcat(w->response.data,
+                          "MCP API key is required when bearer token protection is enabled");
+            w->response.code = HTTP_RESP_PRECOND_FAIL;
+
+            freez(accept_key);
+            websocket_client_free(wsc);
+            return HTTP_RESP_PRECOND_FAIL;
+        }
+    }
+    else if (unlikely(!http_can_access_dashboard(w))) {
+        freez(accept_key);
+        websocket_client_free(wsc);
+        return web_client_permission_denied_acl(w);
     }
 
     // Take over the connection immediately

@@ -78,11 +78,17 @@ void netdata_conf_section_web(void) {
                               NULL, SIMPLE_PATTERN_EXACT, true);
     web_allow_connections_dns  =
         make_dns_decision(CONFIG_SECTION_WEB, "allow connections by dns", "heuristic", web_allow_connections_from);
+    const char *allow_dashboard_default =
+        inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "allow dashboard from", "localhost *");
     web_allow_dashboard_from   =
-        simple_pattern_create(inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "allow dashboard from", "localhost *"),
-                              NULL, SIMPLE_PATTERN_EXACT, true);
+        simple_pattern_create(allow_dashboard_default, NULL, SIMPLE_PATTERN_EXACT, true);
     web_allow_dashboard_dns    =
         make_dns_decision(CONFIG_SECTION_WEB, "allow dashboard by dns", "heuristic", web_allow_dashboard_from);
+    web_allow_mcp_from         =
+        simple_pattern_create(inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "allow mcp from", allow_dashboard_default),
+                              NULL, SIMPLE_PATTERN_EXACT, true);
+    web_allow_mcp_dns          =
+        make_dns_decision(CONFIG_SECTION_WEB, "allow mcp by dns", "heuristic", web_allow_mcp_from);
     web_allow_badges_from      =
         simple_pattern_create(inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT,
                               true);
@@ -154,4 +160,3 @@ void netdata_conf_web_security_init(void) {
     tls_version    = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "tls version",  "1.3");
     tls_ciphers    = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "tls ciphers",  "none");
 }
-

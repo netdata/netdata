@@ -103,6 +103,7 @@ typedef enum __attribute__((packed)) {
     HTTP_ACL_MANAGEMENT             = (1 << 17),
     HTTP_ACL_STREAMING              = (1 << 18),
     HTTP_ACL_NETDATACONF            = (1 << 19),
+    HTTP_ACL_MCP                    = (1 << 20),
 
     // SSL related
     HTTP_ACL_SSL_OPTIONAL           = (1 << 28),
@@ -142,6 +143,7 @@ typedef enum __attribute__((packed)) {
     | HTTP_ACL_MANAGEMENT                                               \
     | HTTP_ACL_STREAMING                                                \
     | HTTP_ACL_NETDATACONF                                              \
+    | HTTP_ACL_MCP                                                      \
 )
 
 #define HTTP_ACL_ACLK_LICENSE_MANAGER (HTTP_ACL)(                       \
@@ -160,6 +162,7 @@ typedef enum __attribute__((packed)) {
 #define http_can_access_mgmt(w) (((w)->acl & HTTP_ACL_MANAGEMENT) == HTTP_ACL_MANAGEMENT)
 #define http_can_access_stream(w) (((w)->acl & HTTP_ACL_STREAMING) == HTTP_ACL_STREAMING)
 #define http_can_access_netdataconf(w) (((w)->acl & HTTP_ACL_NETDATACONF) == HTTP_ACL_NETDATACONF)
+#define http_can_access_mcp(w) (((w)->acl & HTTP_ACL_MCP) == HTTP_ACL_MCP)
 #define http_is_using_ssl_optional(w) (((w)->port_acl & HTTP_ACL_SSL_OPTIONAL) == HTTP_ACL_SSL_OPTIONAL)
 #define http_is_using_ssl_force(w) (((w)->port_acl & HTTP_ACL_SSL_FORCE) == HTTP_ACL_SSL_FORCE)
 #define http_is_using_ssl_default(w) (((w)->port_acl & HTTP_ACL_SSL_DEFAULT) == HTTP_ACL_SSL_DEFAULT)
