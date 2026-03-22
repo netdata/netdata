@@ -730,7 +730,7 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
             Cfg.diff_n, smoothing_window, Cfg.lag_n,
             worker->scratch_training_cns, training_response.total_values,
             worker->training_cns, training_response.total_values,
-            worker->training_samples
+            &worker->training_samples
         };
         
         // Calculate dynamic sampling ratio based on expected output size
@@ -772,6 +772,7 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     // Don't treat values that don't exist as anomalous
     if (!exists) {
         dim->cns.clear();
+        dim->cns_head = 0;
         spinlock_unlock(&dim->slock);
         return false;
     }
@@ -785,11 +786,10 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     }
 
     // Push the value and check if it's different from the last one
-    bool same_value = true;
-    std::rotate(std::begin(dim->cns), std::begin(dim->cns) + 1, std::end(dim->cns));
-    if (dim->cns[n - 1] != value)
-        same_value = false;
-    dim->cns[n - 1] = value;
+    size_t newest_idx = (dim->cns_head + n - 1) % n;
+    bool same_value = (dim->cns[newest_idx] == value);
+    dim->cns[dim->cns_head] = value;
+    dim->cns_head = (dim->cns_head + 1) % n;
 
     // Create the sample
     assert((n * (Cfg.lag_n + 1) <= 128) &&
@@ -798,16 +798,18 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     calculated_number_t src_cns[128];
     calculated_number_t dst_cns[128];
 
-    memset(src_cns, 0, n * (Cfg.lag_n + 1) * sizeof(calculated_number_t));
-    memcpy(src_cns, dim->cns.data(), n * sizeof(calculated_number_t));
-    memcpy(dst_cns, dim->cns.data(), n * sizeof(calculated_number_t));
+    size_t first_chunk = n - dim->cns_head;
+    memcpy(src_cns, dim->cns.data() + dim->cns_head, first_chunk * sizeof(calculated_number_t));
+    if (dim->cns_head)
+        memcpy(src_cns + first_chunk, dim->cns.data(), dim->cns_head * sizeof(calculated_number_t));
+    memcpy(dst_cns, src_cns, n * sizeof(calculated_number_t));
 
     ml_features_t features = {
         Cfg.diff_n, Cfg.max_samples_to_smooth, Cfg.lag_n,
         dst_cns, n, src_cns, n,
-        dim->feature
+        nullptr // prediction path: preprocessed_features not used
     };
-    ml_features_preprocess(&features, 1.0);
+    ml_features_preprocess_predict(&features, &dim->feature);
 
     // Mark the metric time as variable if we received different values
     if (!same_value)
@@ -831,7 +833,7 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     for (const auto &km_ctx : dim->km_contexts) {
         models_consulted++;
 
-        calculated_number_t anomaly_score = ml_kmeans_anomaly_score(&km_ctx, features.preprocessed_features[0]);
+        calculated_number_t anomaly_score = ml_kmeans_anomaly_score(&km_ctx, dim->feature);
         if (std::isnan(anomaly_score))
             continue;
 

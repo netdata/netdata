@@ -32,8 +32,8 @@ ml_kmeans_train(ml_kmeans_t *kmeans, const ml_features_t *features, unsigned max
 
     kmeans->cluster_centers.clear();
 
-    if (features->preprocessed_features.size() < 2) {
-        netdata_log_error("ml_kmeans_train: not enough features to train kmeans (size=%zu)", features->preprocessed_features.size());
+    if (features->preprocessed_features->size() < 2) {
+        netdata_log_error("ml_kmeans_train: not enough features to train kmeans (size=%zu)", features->preprocessed_features->size());
         return;
     }
 
@@ -43,10 +43,10 @@ ml_kmeans_train(ml_kmeans_t *kmeans, const ml_features_t *features, unsigned max
     // causing heap-use-after-free when multiple threads train models concurrently.
     kmeans->cluster_centers.reserve(2);
 
-    dlib::pick_initial_centers(2, kmeans->cluster_centers, features->preprocessed_features);
-    dlib::find_clusters_using_kmeans(features->preprocessed_features, kmeans->cluster_centers, max_iters);
+    dlib::pick_initial_centers(2, kmeans->cluster_centers, *features->preprocessed_features);
+    dlib::find_clusters_using_kmeans(*features->preprocessed_features, kmeans->cluster_centers, max_iters);
 
-    for (const auto &preprocessed_feature : features->preprocessed_features) {
+    for (const auto &preprocessed_feature : *features->preprocessed_features) {
         calculated_number_t mean_dist = 0.0;
 
         for (const auto &cluster_center : kmeans->cluster_centers) {

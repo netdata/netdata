@@ -18,9 +18,10 @@ typedef struct {
     calculated_number_t *src;
     size_t src_n;
 
-    std::vector<DSample> &preprocessed_features;
+    std::vector<DSample> *preprocessed_features;
 } ml_features_t;
 
 void ml_features_preprocess(ml_features_t *features, double sampling_ratio);
+void ml_features_preprocess_predict(ml_features_t *features, DSample *sample);
 
 #endif /* ML_FEATURES_H */
