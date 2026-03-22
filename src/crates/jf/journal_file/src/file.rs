@@ -643,32 +643,14 @@ impl<M: MemoryMap> JournalFile<M> {
         })
     }
 
-    /// Collects all DATA object offsets for a specific entry.
+    /// Appends all DATA object offsets for a specific entry to the provided buffer.
     pub fn entry_data_object_offsets(
         &self,
         entry_offset: NonZeroU64,
         data_offsets: &mut Vec<NonZeroU64>,
     ) -> Result<()> {
         let entry_guard = self.entry_ref(entry_offset)?;
-
-        match &entry_guard.items {
-            EntryItemsType::Regular(items) => {
-                for item in items.iter() {
-                    if let Some(offset) = NonZeroU64::new(item.object_offset) {
-                        data_offsets.push(offset);
-                    }
-                }
-            }
-            EntryItemsType::Compact(items) => {
-                for item in items.iter() {
-                    if let Some(offset) = NonZeroU64::new(item.object_offset as u64) {
-                        data_offsets.push(offset);
-                    }
-                }
-            }
-        }
-
-        Ok(())
+        entry_guard.collect_offsets(data_offsets)
     }
 
     /// Get hash table bucket utilization statistics
