@@ -39,12 +39,8 @@ func TestJobConfigValidate(t *testing.T) {
 			}(),
 			wantErr: true,
 		},
-		"negative jitter": {
-			cfg: JobConfig{
-				Name:             "sample",
-				Plugin:           "/bin/true",
-				InterCheckJitter: -1,
-			},
+		"relative plugin path": {
+			cfg:     JobConfig{Name: "sample", Plugin: "check_ping"},
 			wantErr: true,
 		},
 	}

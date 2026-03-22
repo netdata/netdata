@@ -20,7 +20,7 @@
       },
       "plugin": {
         "title": "Plugin path",
-        "description": "Absolute path to the Nagios-compatible check script or executable to run. The command should return exit code 0, 1, 2, or 3 and may print performance data after `|`.",
+        "description": "Absolute path to the Nagios-compatible check executable to run. If you need a script interpreter, point this to the interpreter executable and pass the script path in `args`. The command should return exit code 0, 1, 2, or 3 and may print performance data after `|`.",
         "type": "string"
       },
       "args": {
@@ -83,13 +83,6 @@
         "type": "integer",
         "minimum": 1,
         "default": 3
-      },
-      "inter_check_jitter": {
-        "title": "Inter-check jitter",
-        "description": "Random delay added to scheduled runs, in seconds.",
-        "type": "number",
-        "minimum": 0,
-        "default": 0
       },
       "check_period": {
         "title": "Check period",
@@ -277,9 +270,6 @@
     "retry_interval": {
       "ui:help": "Requested retry interval after non-OK results. Actual execution cannot be faster than `update_every`."
     },
-    "inter_check_jitter": {
-      "ui:help": "Adds up to this many seconds of random delay to each scheduled run."
-    },
     "check_period": {
       "ui:placeholder": "24x7"
     },
@@ -310,7 +300,6 @@
             "check_interval",
             "retry_interval",
             "max_check_attempts",
-            "inter_check_jitter",
             "check_period",
             "time_periods"
           ]

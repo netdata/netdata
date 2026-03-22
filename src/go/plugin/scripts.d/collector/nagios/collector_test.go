@@ -41,17 +41,17 @@ func TestCollector_ChartTemplateYAML(t *testing.T) {
 		wantFloat bool
 	}{
 		"execution duration dimension is float": {
-			context:   "execution_duration",
+			context:   "job_execution_duration",
 			selector:  "nagios.job.execution_duration",
 			wantFloat: true,
 		},
 		"execution cpu dimension is float": {
-			context:   "execution_cpu",
+			context:   "job_execution_cpu",
 			selector:  "nagios.job.execution_cpu_total",
 			wantFloat: true,
 		},
 		"execution memory dimension is integer": {
-			context:   "execution_memory",
+			context:   "job_execution_memory",
 			selector:  "nagios.job.execution_max_rss",
 			wantFloat: false,
 		},

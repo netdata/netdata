@@ -44,7 +44,7 @@ func (c *Collector) skipDisallowedPeriod(now time.Time) bool {
 		return false
 	}
 	c.state.recordPeriodBlocked()
-	c.state.scheduleNextAllowed(now, c.job.config.CheckInterval.Duration(), c.job.config.InterCheckJitter.Duration(), c.job.period)
+	c.state.scheduleNextAllowed(now, c.job.config.CheckInterval.Duration(), c.job.period)
 	return true
 }
 

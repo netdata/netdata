@@ -3,7 +3,6 @@
 package nagios
 
 import (
-	"math/rand"
 	"strings"
 	"time"
 )
@@ -20,18 +19,15 @@ type collectState struct {
 
 	lastPerfValues          []perfValueMeasureSet
 	lastPerfThresholdStates []perfThresholdStateSet
-
-	jitterRand *rand.Rand
 }
 
 func newCollectState(now time.Time, job JobConfig) collectState {
 	return collectState{
 		nextAnniversary: now,
-		nextDue:         applyJitter(now, job.InterCheckJitter.Duration(), rand.New(rand.NewSource(now.UnixNano()))),
+		nextDue:         now,
 		serviceState:    nagiosStateUnknown,
 		jobState:        nagiosStateUnknown,
 		maxAttempts:     max(job.MaxCheckAttempts, 1),
-		jitterRand:      rand.New(rand.NewSource(now.UnixNano() + 1)),
 	}
 }
 
@@ -123,10 +119,10 @@ func (s *collectState) completeRun(now time.Time, serviceState, jobState string,
 	s.recordResult(serviceState, jobState)
 	s.rememberPerf(perf)
 	if s.retrying {
-		s.scheduleRetry(now, job.RetryInterval.Duration(), job.InterCheckJitter.Duration())
+		s.scheduleRetry(now, job.RetryInterval.Duration())
 		return
 	}
-	s.scheduleRegular(now, s.nextAnniversary, job.CheckInterval.Duration(), job.InterCheckJitter.Duration())
+	s.scheduleRegular(now, s.nextAnniversary, job.CheckInterval.Duration())
 }
 
 func normalizeState(state string) string {

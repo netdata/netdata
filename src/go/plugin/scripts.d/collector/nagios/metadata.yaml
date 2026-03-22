@@ -155,7 +155,7 @@ modules:
               group: Collection
 
             - name: plugin
-              description: Absolute path to the Nagios-compatible script or executable to run. This can be a packaged Nagios plugin or your own script. The command should return exit code `0`, `1`, `2`, or `3` and may print performance data after `|`.
+              description: Absolute path to the Nagios-compatible executable to run. This can be a packaged Nagios plugin or your own executable. If you need a script interpreter, point `plugin` to that interpreter and pass the script path in `args`. The command should return exit code `0`, `1`, `2`, or `3` and may print performance data after `|`.
               default_value: ""
               required: true
               group: Target
@@ -193,11 +193,6 @@ modules:
             - name: max_check_attempts
               description: Number of attempts before a non-OK result becomes a hard state.
               default_value: 3
-              required: false
-              group: Scheduling
-            - name: inter_check_jitter
-              description: Random delay added before a scheduled run.
-              default_value: 0
               required: false
               group: Scheduling
             - name: check_period
@@ -306,6 +301,12 @@ modules:
           - name: The script works in a shell but fails under Netdata
             description: |
               Nagios checks run with a limited execution environment rather than inheriting the full Netdata process environment. If the script depends on extra variables, set them explicitly in `environment` instead of relying on ambient shell state.
+          - name: No built-in alerts are shipped yet
+            description: |
+              This preview collector does not currently install stock Netdata health alerts. Use the exposed `nagios.job.state` chart and the derived perfdata threshold-state charts to build alert rules that match your own checks.
+          - name: Windows checks need an executable entry point
+            description: |
+              The collector runs the command named in `plugin` directly. On Windows, point `plugin` to an executable or to an interpreter such as `powershell.exe` and pass the script path in `args`.
     alerts: []
     metrics:
       folding:

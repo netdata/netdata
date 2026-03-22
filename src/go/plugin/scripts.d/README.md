@@ -27,6 +27,9 @@ jobs:
     max_check_attempts: 3
 ```
 
+The `plugin` value must be an absolute path. If you need an interpreter, point
+`plugin` to the interpreter executable and pass the script path in `args`.
+
 ### Time Periods
 
 `check_period` is supported. Custom periods are defined with `time_periods` inside
@@ -90,7 +93,6 @@ exit 0
   - `check_interval`
   - `retry_interval`
   - `max_check_attempts`
-  - `inter_check_jitter`
   - `check_period`
 - If a check exceeds `timeout`, Netdata reports the job state as `timeout`.
 - If a check is due but the current time is outside `check_period`, Netdata does not execute it and reports the public job state as `paused`.
@@ -131,10 +133,22 @@ Perfdata is routed plugin-side and materialized via autogen (bounded lifecycle):
 - Counter perfdata currently does not emit a threshold-state chart.
 - Raw `min`, `max`, and raw threshold bounds are not charted.
 
+## Alerts
+
+- This preview collector does not currently ship built-in Netdata health alerts.
+- Use `nagios.job.state` and the derived non-counter perfdata threshold-state
+  charts as the inputs for your own alert rules.
+
 ## Logging
 
 Checks log through the collector/job logger path. There is no separate public runtime
 component or scheduler telemetry surface.
+
+## Windows Note
+
+- On Windows, the collector runs the command named in `plugin` directly.
+- Use an executable path, or point `plugin` to an interpreter such as
+  `powershell.exe` and pass the script path in `args`.
 
 ## Tests
 

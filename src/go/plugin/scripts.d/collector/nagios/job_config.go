@@ -5,6 +5,7 @@ package nagios
 import (
 	"fmt"
 	"maps"
+	"path/filepath"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -31,7 +32,6 @@ type JobConfig struct {
 	CheckInterval    confopt.Duration  `yaml:"check_interval,omitempty" json:"check_interval"`
 	RetryInterval    confopt.Duration  `yaml:"retry_interval,omitempty" json:"retry_interval"`
 	MaxCheckAttempts int               `yaml:"max_check_attempts,omitempty" json:"max_check_attempts"`
-	InterCheckJitter confopt.Duration  `yaml:"inter_check_jitter,omitempty" json:"inter_check_jitter"`
 	WorkingDirectory string            `yaml:"working_directory,omitempty" json:"working_directory"`
 	CustomVars       map[string]string `yaml:"custom_vars,omitempty" json:"custom_vars"`
 	CheckPeriod      string            `yaml:"check_period,omitempty" json:"check_period"`
@@ -73,6 +73,9 @@ func (cfg JobConfig) validate() error {
 	if cfg.Plugin == "" {
 		return fmt.Errorf("job '%s': plugin path is required", cfg.Name)
 	}
+	if !filepath.IsAbs(cfg.Plugin) {
+		return fmt.Errorf("job '%s': plugin path must be absolute", cfg.Name)
+	}
 	if len(cfg.ArgValues) > maxArgMacros {
 		return fmt.Errorf("job '%s': arg_values supports up to %d entries", cfg.Name, maxArgMacros)
 	}
@@ -84,9 +87,6 @@ func (cfg JobConfig) validate() error {
 	}
 	if cfg.Timeout <= 0 {
 		return fmt.Errorf("job '%s': timeout must be > 0", cfg.Name)
-	}
-	if cfg.InterCheckJitter < 0 {
-		return fmt.Errorf("job '%s': inter_check_jitter must be >= 0", cfg.Name)
 	}
 	if cfg.MaxCheckAttempts < 1 {
 		return fmt.Errorf("job '%s': max_check_attempts must be >= 1", cfg.Name)
