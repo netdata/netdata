@@ -464,9 +464,12 @@ void sqlite_close_databases(void)
 
     spinlock_lock(&sqlite_spinlock);
 
-    // Finalize pending statements and report any thread that failed
-    // to do it properly
-    finalize_all_prepared_sql_statements();
+    // Each thread is responsible for finalizing its own statements via
+    // finalize_self_prepared_sql_statements() in their cleanup handlers.
+    // Forcefully finalizing statements from other threads can cause crashes
+    // if those threads are still using them during shutdown.
+    // SQLite will clean up any remaining statements when the database closes.
+    // finalize_all_prepared_sql_statements();
 
     sql_close_database(db_context_meta, "CONTEXT");
     sql_close_database(db_meta, "METADATA");
