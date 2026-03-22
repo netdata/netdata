@@ -1517,12 +1517,15 @@ journal:
     fn auto_detect_geoip_databases_uses_netdata_cache_dir_for_relative_journal_dir() {
         let dir = tempdir().expect("create tempdir");
         let cache_dir = dir.path();
+        let stock_data_dir = dir.path().join("share");
         let intel_dir = cache_dir.join(TOPOLOGY_IP_INTEL_DIR);
         fs::create_dir_all(&intel_dir).expect("create intel dir");
+        fs::create_dir_all(&stock_data_dir).expect("create stock data dir");
         fs::write(intel_dir.join(TOPOLOGY_IP_ASN_MMDB), b"asn").expect("write asn db");
 
         let mut cfg = PluginConfig::default();
         cfg._netdata_env.cache_dir = Some(cache_dir.to_path_buf());
+        cfg._netdata_env.stock_data_dir = Some(stock_data_dir);
         cfg.journal.journal_dir = "flows".to_string();
 
         cfg.auto_detect_geoip_databases();
