@@ -40,28 +40,31 @@ func TestPerfdataRouterRoutesAndCanonicalizesUnits(t *testing.T) {
 	values := valueSampleMap(got.values)
 	units := valueSampleUnits(got.values)
 	thresholds := thresholdStateMap(got.thresholdStates)
+	thresholdLabelValues := thresholdStateLabelValues(got.thresholdStates)
 
-	assertNear(t, values["check_memory.time_latency_value"], 0.12)
-	assertNear(t, values["check_memory.bytes_throughput_value"], 30_000)
-	assertNear(t, values["check_memory.bits_traffic_value"], 1_500_000)
-	assertNear(t, values["check_memory.percent_free_pct_value"], 40)
-	assertNear(t, values["check_memory.counter_checks_value"], 3)
-	assertNear(t, values["check_memory.generic_custom_value"], 7.25)
+	assertNear(t, values["perfdata.check_memory.time_latency_value"], 0.12)
+	assertNear(t, values["perfdata.check_memory.bytes_throughput_value"], 30_000)
+	assertNear(t, values["perfdata.check_memory.bits_traffic_value"], 1_500_000)
+	assertNear(t, values["perfdata.check_memory.percent_free_pct_value"], 40)
+	assertNear(t, values["perfdata.check_memory.counter_checks_value"], 3)
+	assertNear(t, values["perfdata.check_memory.generic_custom_value"], 7.25)
 
-	assertString(t, units["check_memory.time_latency_value"], "seconds")
-	assertString(t, units["check_memory.bytes_throughput_value"], "bytes")
-	assertString(t, units["check_memory.bits_traffic_value"], "bits")
-	assertString(t, units["check_memory.percent_free_pct_value"], "%")
-	assertString(t, units["check_memory.counter_checks_value"], "c")
-	assertString(t, units["check_memory.generic_custom_value"], "generic")
+	assertString(t, units["perfdata.check_memory.time_latency_value"], "seconds")
+	assertString(t, units["perfdata.check_memory.bytes_throughput_value"], "bytes")
+	assertString(t, units["perfdata.check_memory.bits_traffic_value"], "bits")
+	assertString(t, units["perfdata.check_memory.percent_free_pct_value"], "%")
+	assertString(t, units["perfdata.check_memory.counter_checks_value"], "c")
+	assertString(t, units["perfdata.check_memory.generic_custom_value"], "generic")
 
-	assertString(t, thresholds["check_memory.time_latency_threshold_state"], perfThresholdStateWarning)
-	assertString(t, thresholds["check_memory.bytes_throughput_threshold_state"], perfThresholdStateNone)
-	assertString(t, thresholds["check_memory.bits_traffic_threshold_state"], perfThresholdStateNone)
-	assertString(t, thresholds["check_memory.percent_free_pct_threshold_state"], perfThresholdStateNone)
-	assertString(t, thresholds["check_memory.generic_custom_threshold_state"], perfThresholdStateNone)
-	_, hasCounterThreshold := thresholds["check_memory.counter_checks_threshold_state"]
+	assertString(t, thresholds["perfdata.check_memory.time_latency_threshold_state"], perfThresholdStateWarning)
+	assertString(t, thresholds["perfdata.check_memory.bytes_throughput_threshold_state"], perfThresholdStateNone)
+	assertString(t, thresholds["perfdata.check_memory.bits_traffic_threshold_state"], perfThresholdStateNone)
+	assertString(t, thresholds["perfdata.check_memory.percent_free_pct_threshold_state"], perfThresholdStateNone)
+	assertString(t, thresholds["perfdata.check_memory.generic_custom_threshold_state"], perfThresholdStateNone)
+	_, hasCounterThreshold := thresholds["perfdata.check_memory.counter_checks_threshold_state"]
 	assert.False(t, hasCounterThreshold)
+	assertString(t, thresholdLabelValues["perfdata.check_memory.time_latency_threshold_state"], "time_latency")
+	assertString(t, thresholdLabelValues["perfdata.check_memory.bytes_throughput_threshold_state"], "bytes_throughput")
 }
 
 func TestPerfdataRouterPolicies(t *testing.T) {
@@ -80,7 +83,7 @@ func TestPerfdataRouterPolicies(t *testing.T) {
 			assert: func(t *testing.T, got perfRouteResult) {
 				t.Helper()
 				samples := valueSampleMap(got.values)
-				assertNear(t, samples["check_memory.bytes_used_kb_value"], 1_000)
+				assertNear(t, samples["perfdata.check_memory.bytes_used_kb_value"], 1_000)
 			},
 		},
 		"budget drops metrics beyond cap": {
@@ -93,9 +96,9 @@ func TestPerfdataRouterPolicies(t *testing.T) {
 			assert: func(t *testing.T, got perfRouteResult) {
 				t.Helper()
 				samples := valueSampleMap(got.values)
-				_, okA := samples["check_memory.counter_a_value"]
-				_, okB := samples["check_memory.counter_b_value"]
-				_, okC := samples["check_memory.counter_c_value"]
+				_, okA := samples["perfdata.check_memory.counter_a_value"]
+				_, okB := samples["perfdata.check_memory.counter_b_value"]
+				_, okC := samples["perfdata.check_memory.counter_c_value"]
 				assert.True(t, okA)
 				assert.True(t, okB)
 				assert.False(t, okC)
@@ -110,8 +113,8 @@ func TestPerfdataRouterPolicies(t *testing.T) {
 			assert: func(t *testing.T, got perfRouteResult) {
 				t.Helper()
 				samples := valueSampleMap(got.values)
-				assertNear(t, samples["check_memory.bytes_latency_value"], 1_000)
-				_, hasTime := samples["check_memory.time_latency_value"]
+				assertNear(t, samples["perfdata.check_memory.bytes_latency_value"], 1_000)
+				_, hasTime := samples["perfdata.check_memory.time_latency_value"]
 				assert.False(t, hasTime)
 			},
 		},
@@ -126,7 +129,7 @@ func TestPerfdataRouterPolicies(t *testing.T) {
 			assert: func(t *testing.T, got perfRouteResult) {
 				t.Helper()
 				samples := valueSampleMap(got.values)
-				assertNear(t, samples["check_memory.bytes_latency_value"], 10_000)
+				assertNear(t, samples["perfdata.check_memory.bytes_latency_value"], 10_000)
 			},
 		},
 		"invalid samples are ignored": {
@@ -210,6 +213,14 @@ func thresholdStateMap(sets []perfThresholdStateSet) map[string]string {
 	out := make(map[string]string, len(sets))
 	for _, set := range sets {
 		out[set.name] = set.state
+	}
+	return out
+}
+
+func thresholdStateLabelValues(sets []perfThresholdStateSet) map[string]string {
+	out := make(map[string]string, len(sets))
+	for _, set := range sets {
+		out[set.name] = set.perfdataValue
 	}
 	return out
 }
