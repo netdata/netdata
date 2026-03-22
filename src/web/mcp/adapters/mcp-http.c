@@ -161,18 +161,6 @@ static void mcp_http_session_update(const char *session_id, MCP_CLIENT *mcpc) {
     spinlock_unlock(&mcp_http_sessions_lock);
 }
 
-// Check whether a session ID exists (call with lock NOT held).
-static bool mcp_http_session_exists(const char *session_id) {
-    if (!session_id || !*session_id)
-        return false;
-
-    spinlock_lock(&mcp_http_sessions_lock);
-    mcp_http_sessions_init_nolock();
-    bool found = dictionary_get(mcp_http_sessions, session_id) != NULL;
-    spinlock_unlock(&mcp_http_sessions_lock);
-    return found;
-}
-
 // Delete a session by ID.  Returns true if found and deleted, false otherwise.
 static bool mcp_http_session_delete(const char *session_id) {
     if (!session_id || !*session_id)
@@ -345,17 +333,6 @@ int mcp_http_handle_request(struct rrdhost *host __maybe_unused, struct web_clie
             method = json_object_get_string(method_obj);
     }
 
-    // If the client provided a session ID for a non-initialize request, validate it.
-    // Unknown session IDs are rejected with HTTP 404 per the MCP Streamable HTTP spec.
-    if (has_incoming_session && method && strcmp(method, "initialize") != 0) {
-        if (!mcp_http_session_exists(incoming_session_id)) {
-            json_object_put(root);
-            BUFFER *payload = mcp_jsonrpc_build_error_payload(
-                NULL, -32001, "Session not found or expired", NULL, 0);
-            return mcp_http_prepare_error_response(w, payload, HTTP_RESP_NOT_FOUND);
-        }
-    }
-
     MCP_CLIENT *mcpc = mcp_create_client(MCP_TRANSPORT_HTTP, w);
     if (!mcpc) {
         json_object_put(root);
@@ -364,9 +341,17 @@ int mcp_http_handle_request(struct rrdhost *host __maybe_unused, struct web_clie
     }
     mcpc->user_auth = &w->user_auth;
 
-    // Restore session state for non-initialize requests that carry a session ID.
-    if (has_incoming_session && method && strcmp(method, "initialize") != 0)
-        mcp_http_session_restore(incoming_session_id, mcpc);
+    // Validate and restore session state atomically for non-initialize requests.
+    // Unknown session IDs are rejected with HTTP 404 per the MCP Streamable HTTP spec.
+    if (has_incoming_session && method && strcmp(method, "initialize") != 0) {
+        if (!mcp_http_session_restore(incoming_session_id, mcpc)) {
+            json_object_put(root);
+            mcp_free_client(mcpc);
+            BUFFER *payload = mcp_jsonrpc_build_error_payload(
+                NULL, -32001, "Session not found or expired", NULL, 0);
+            return mcp_http_prepare_error_response(w, payload, HTTP_RESP_NOT_FOUND);
+        }
+    }
 
     bool wants_sse = mcp_http_accepts_sse(w);
 
