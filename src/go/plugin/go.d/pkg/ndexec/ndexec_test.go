@@ -175,6 +175,69 @@ func TestRunDirect(t *testing.T) {
 	})
 }
 
+func TestRunDirectWithOptionsUsageContext(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses sh scripts")
+	}
+
+	tmp := t.TempDir()
+	workdir := filepath.Join(tmp, "subdir")
+	require.NoError(t, os.Mkdir(workdir, 0o755))
+
+	writeExe := func(path, body string) {
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o755))
+	}
+
+	script := filepath.Join(tmp, "envpwd.sh")
+	writeExe(script, "#!/bin/sh\nprintf 'PWD=%s\\nFOO=%s\\n' \"$PWD\" \"$FOO\"\n")
+
+	sleeper := filepath.Join(tmp, "sleep.sh")
+	writeExe(sleeper, "#!/bin/sh\nsleep 2\n")
+
+	tests := map[string]struct {
+		timeout time.Duration
+		opts    RunOptions
+		binPath string
+		args    []string
+		assert  func(*testing.T, []byte, string, ResourceUsage, error)
+	}{
+		"honors working directory and explicit environment": {
+			timeout: time.Second,
+			opts: RunOptions{
+				Dir: workdir,
+				Env: []string{"FOO=bar"},
+			},
+			binPath: script,
+			assert: func(t *testing.T, out []byte, cmd string, usage ResourceUsage, err error) {
+				t.Helper()
+				require.NoError(t, err)
+				assert.Contains(t, cmd, script)
+				assert.Contains(t, string(out), "\nFOO=bar\n")
+				assert.Contains(t, string(out), "PWD=")
+				assert.True(t, usage.User >= 0)
+				assert.True(t, usage.System >= 0)
+			},
+		},
+		"timeout is propagated through the direct helper": {
+			timeout: 100 * time.Millisecond,
+			opts:    RunOptions{},
+			binPath: sleeper,
+			assert: func(t *testing.T, _ []byte, _ string, _ ResourceUsage, err error) {
+				t.Helper()
+				require.Error(t, err)
+				assert.ErrorIs(t, err, context.DeadlineExceeded)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			out, cmd, usage, err := RunDirectWithOptionsUsageContext(context.Background(), nil, tc.timeout, tc.opts, tc.binPath, tc.args...)
+			tc.assert(t, out, cmd, usage, err)
+		})
+	}
+}
+
 func TestFindBinary(t *testing.T) {
 	tmp := t.TempDir()
 

@@ -30,9 +30,9 @@ COLLECTOR_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'python.d.plugin', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'guides', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'scripts.d' / 'collector', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules' / 'websphere', True),
-    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'scripts.d' / 'modules', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netdata-otel', True),
 ]
 
@@ -295,7 +295,9 @@ def load_categories():
     try:
         CATEGORY_VALIDATOR.validate(categories)
     except ValidationError as e:
-        warn(f'Failed to validate {CATEGORIES_FILE} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', CATEGORIES_FILE)
+        warn(
+            f'Failed to validate {CATEGORIES_FILE} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            CATEGORIES_FILE)
         sys.exit(1)
 
     return categories
@@ -316,7 +318,9 @@ def load_collectors():
         try:
             COLLECTOR_VALIDATOR.validate(data)
         except ValidationError as e:
-            warn(f'Failed to validate {path} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', path)
+            warn(
+                f'Failed to validate {path} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+                path)
             continue
 
         for idx, item in enumerate(data['modules']):
@@ -341,7 +345,9 @@ def _load_deploy_file(file, repo):
     try:
         DEPLOY_VALIDATOR.validate(data)
     except ValidationError as e:
-        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
         return []
 
     for idx, item in enumerate(data):
@@ -377,7 +383,9 @@ def _load_exporter_file(file, repo):
     try:
         EXPORTER_VALIDATOR.validate(data)
     except ValidationError as e:
-        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
         return []
 
     if 'id' in data:
@@ -423,7 +431,9 @@ def _load_agent_notification_file(file, repo):
     try:
         AGENT_NOTIFICATION_VALIDATOR.validate(data)
     except ValidationError as e:
-        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
         return []
 
     if 'id' in data:
@@ -469,7 +479,9 @@ def _load_cloud_notification_file(file, repo):
     try:
         CLOUD_NOTIFICATION_VALIDATOR.validate(data)
     except ValidationError as e:
-        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
         return []
 
     if 'id' in data:
@@ -515,7 +527,9 @@ def _load_logs_file(file, repo):
     try:
         LOGS_VALIDATOR.validate(data)
     except ValidationError as e:
-        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
         return []
 
     if 'id' in data:
@@ -561,7 +575,9 @@ def _load_authentication_file(file, repo):
     try:
         AUTHENTICATION_VALIDATOR.validate(data)
     except ValidationError as e:
-        warn(f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})', file)
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
         return []
 
     if 'id' in data:
@@ -660,8 +676,8 @@ def render_collectors(categories, collectors, ids):
     #   Level 2: plugin_name + module_name (all instances of that module)
     #   Level 3: plugin_name (all modules of that plugin)
     by_pm_instance = {}  # (plugin, module, instance) -> [items]
-    by_pm = {}           # (plugin, module) -> [items]
-    by_plugin = {}       # plugin -> [items]
+    by_pm = {}  # (plugin, module) -> [items]
+    by_plugin = {}  # plugin -> [items]
 
     for i in collectors:
         m = i['meta']
