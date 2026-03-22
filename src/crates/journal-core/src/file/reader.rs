@@ -2,7 +2,6 @@ use super::mmap::MemoryMap;
 use crate::error::Result;
 use crate::field_map::{FieldMap, REMAPPING_MARKER, extract_field_name};
 use crate::file::{
-    EntryItemsType,
     cursor::{JournalCursor, Location},
     file::{EntryDataIterator, FieldDataIterator, FieldIterator, JournalFile},
     filter::{JournalFilter, LogicalOp},
@@ -220,26 +219,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
         data_offsets: &mut Vec<NonZeroU64>,
     ) -> Result<()> {
         let entry_offset = self.cursor.position()?;
-        let entry_guard = journal_file.entry_ref(entry_offset)?;
-
-        match &entry_guard.items {
-            EntryItemsType::Regular(items) => {
-                for item in items.iter() {
-                    if let Some(offset) = NonZeroU64::new(item.object_offset) {
-                        data_offsets.push(offset);
-                    }
-                }
-            }
-            EntryItemsType::Compact(items) => {
-                for item in items.iter() {
-                    if let Some(offset) = NonZeroU64::new(item.object_offset as u64) {
-                        data_offsets.push(offset);
-                    }
-                }
-            }
-        }
-
-        Ok(())
+        journal_file.entry_data_object_offsets(entry_offset, data_offsets)
     }
 
     /// Loads field name remappings from the journal file.
