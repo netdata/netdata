@@ -806,8 +806,8 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
         if (proxy_type == MQTT_WSS_DIRECT)
             proxy_type = MQTT_WSS_PROXY_HTTP;
 
-        int proxy_timeout_ms = (request->timeout_s > 0 && request->timeout_s <= 2000000)
-                                    ? (int)request->timeout_s * 1000
+        int proxy_timeout_ms = (request->timeout_s > 0 && request->timeout_s <= (time_t)(INT_MAX / 1000))
+                                    ? (int)(request->timeout_s * 1000)
                                     : 30000;
 
         if (aclk_proxy_negotiation_connect(ctx->sock, proxy_type, request->proxy_username, request->proxy_password,
