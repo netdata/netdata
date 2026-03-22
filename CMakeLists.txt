@@ -104,6 +104,8 @@ set(CONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/etc/netdata")
 set(LIBCONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/conf.d")
 set(LOG_DIR "${NETDATA_RUNTIME_PREFIX}/var/log/netdata")
 set(PLUGINS_DIR "${NETDATA_RUNTIME_PREFIX}/usr/libexec/netdata/plugins.d")
+set(STOCK_DATA_DEST "usr/share/netdata")
+set(STOCK_DATA_DIR "${NETDATA_RUNTIME_PREFIX}/${STOCK_DATA_DEST}")
 set(VARLIB_DIR "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 set(NETDATA_BIN_DIR "${NETDATA_RUNTIME_PREFIX}/${BINDIR}")
 
@@ -3412,6 +3414,8 @@ if(ENABLE_PLUGIN_NETFLOW)
     install(FILES src/go/tools/topology-ip-intel-downloader/configs/topology-ip-intel.yaml
             COMPONENT plugin-netflow
             DESTINATION usr/lib/netdata/conf.d)
+    install(CODE "file(MAKE_DIRECTORY \"\${CMAKE_INSTALL_PREFIX}/${STOCK_DATA_DEST}/topology-ip-intel\")"
+            COMPONENT plugin-netflow)
 endif()
 
 #

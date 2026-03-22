@@ -5,6 +5,10 @@
 # - /usr/lib/netdata/conf.d/netflow.yaml (stock fallback)
 #
 # If listener/protocol/journal values are omitted here, they follow plugin defaults.
+#
+# If enrichment.geoip paths are omitted, netflow-plugin auto-detects MMDB files from:
+# - NETDATA_CACHE_DIR/topology-ip-intel
+# - NETDATA_STOCK_DATA_DIR/topology-ip-intel
 
 # Global plugin switch for netflow-plugin itself.
 enabled: true

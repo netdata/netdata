@@ -24,6 +24,12 @@ If `journal.journal_dir` is relative (default: `flows`), it is resolved against
 - `/var/cache/netdata/flows/5m`
 - `/var/cache/netdata/flows/1h`
 
+If `enrichment.geoip` does not define explicit MMDB paths, the plugin auto-detects
+packaged databases in this order:
+
+- `${NETDATA_CACHE_DIR}/topology-ip-intel`
+- `${NETDATA_STOCK_DATA_DIR}/topology-ip-intel`
+
 ### `protocols.decapsulation_mode`
 
 Controls packet decapsulation for datalink payload parsing:

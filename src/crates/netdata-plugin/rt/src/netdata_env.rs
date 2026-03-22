@@ -7,6 +7,7 @@ use std::path::PathBuf;
 pub struct NetdataEnv {
     pub user_config_dir: Option<PathBuf>,
     pub stock_config_dir: Option<PathBuf>,
+    pub stock_data_dir: Option<PathBuf>,
     pub plugins_dir: Option<PathBuf>,
     pub user_plugins_dirs: Option<Vec<PathBuf>>,
     pub web_dir: Option<PathBuf>,
@@ -81,6 +82,7 @@ impl NetdataEnv {
         Self {
             user_config_dir: env::var("NETDATA_USER_CONFIG_DIR").ok().map(PathBuf::from),
             stock_config_dir: env::var("NETDATA_STOCK_CONFIG_DIR").ok().map(PathBuf::from),
+            stock_data_dir: env::var("NETDATA_STOCK_DATA_DIR").ok().map(PathBuf::from),
             plugins_dir: env::var("NETDATA_PLUGINS_DIR").ok().map(PathBuf::from),
             user_plugins_dirs: env::var("NETDATA_USER_PLUGINS_DIRS")
                 .ok()

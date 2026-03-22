@@ -734,6 +734,7 @@ NETDATA_WEB_DIR="$(config_option "global" "web files directory" "${NETDATA_PREFI
 NETDATA_LOG_DIR="$(config_option "global" "log directory" "${NETDATA_PREFIX}/var/log/netdata")"
 NETDATA_USER_CONFIG_DIR="$(config_option "global" "config directory" "${NETDATA_PREFIX}/etc/netdata")"
 NETDATA_STOCK_CONFIG_DIR="$(config_option "global" "stock config directory" "${NETDATA_PREFIX}/usr/lib/netdata/conf.d")"
+NETDATA_STOCK_DATA_DIR="$(config_option "global" "stock data directory" "${NETDATA_PREFIX}/usr/share/netdata")"
 NETDATA_RUN_DIR="${NETDATA_PREFIX}/var/run"
 NETDATA_CLAIMING_DIR="${NETDATA_LIB_DIR}/cloud.d"
 
@@ -747,6 +748,7 @@ cat << OPTIONSEOF
     Directories
     - netdata user config dir  : ${NETDATA_USER_CONFIG_DIR}
     - netdata stock config dir : ${NETDATA_STOCK_CONFIG_DIR}
+    - netdata stock data dir   : ${NETDATA_STOCK_DATA_DIR}
     - netdata log dir          : ${NETDATA_LOG_DIR}
     - netdata run dir          : ${NETDATA_RUN_DIR}
     - netdata lib dir          : ${NETDATA_LIB_DIR}
@@ -771,6 +773,7 @@ fi
 # --- stock conf dir ----
 
 [ ! -d "${NETDATA_STOCK_CONFIG_DIR}" ] && mkdir -p "${NETDATA_STOCK_CONFIG_DIR}"
+[ ! -d "${NETDATA_STOCK_DATA_DIR}" ] && mkdir -p "${NETDATA_STOCK_DATA_DIR}"
 [ -L "${NETDATA_USER_CONFIG_DIR}/orig" ] && run rm -f "${NETDATA_USER_CONFIG_DIR}/orig"
 run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/orig"
 
