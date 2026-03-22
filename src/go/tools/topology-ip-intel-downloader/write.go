@@ -18,8 +18,12 @@ import (
 
 type generationMetadata struct {
 	GeneratedAt string `json:"generated_at"`
+	GeneratedBy string `json:"generated_by"`
 	Source      struct {
-		Provider string `json:"provider"`
+		Provider string                `json:"provider"`
+		Combined *generationDatasetRef `json:"combined,omitempty"`
+		Asn      *generationDatasetRef `json:"asn,omitempty"`
+		Country  *generationDatasetRef `json:"country,omitempty"`
 	} `json:"source"`
 	Counts struct {
 		AsnRanges     int `json:"asn_ranges"`
@@ -33,7 +37,15 @@ type generationMetadata struct {
 	Output struct {
 		AsnFile     string `json:"asn_file"`
 		CountryFile string `json:"country_file"`
+		MetadataFile string `json:"metadata_file"`
 	} `json:"output"`
+}
+
+type generationDatasetRef struct {
+	URL         string `json:"url,omitempty"`
+	Path        string `json:"path,omitempty"`
+	Format      string `json:"format,omitempty"`
+	Compression string `json:"compression,omitempty"`
 }
 
 func writeOutputs(cfg config, asnRanges []asnRange, countryRanges []countryRange) error {
@@ -59,7 +71,8 @@ func writeOutputs(cfg config, asnRanges []asnRange, countryRanges []countryRange
 
 	md := generationMetadata{}
 	md.GeneratedAt = time.Now().UTC().Format(time.RFC3339)
-	md.Source.Provider = cfg.source.provider
+	md.GeneratedBy = "topology-ip-intel-downloader"
+	md.Source = metadataSource(cfg.source)
 	md.Counts.AsnRanges = len(asnRanges)
 	md.Counts.CountryRanges = len(countryRanges)
 	md.Policy.LocalhostCIDRs = append([]string{}, cfg.policy.localhostCIDRs...)
@@ -67,6 +80,7 @@ func writeOutputs(cfg config, asnRanges []asnRange, countryRanges []countryRange
 	md.Policy.InterestingCIDRs = append([]string{}, cfg.policy.interestingCIDRs...)
 	md.Output.AsnFile = cfg.output.asnFile
 	md.Output.CountryFile = cfg.output.countryFile
+	md.Output.MetadataFile = cfg.output.metadataFile
 
 	blob, err := json.MarshalIndent(md, "", "  ")
 	if err != nil {
@@ -76,6 +90,58 @@ func writeOutputs(cfg config, asnRanges []asnRange, countryRanges []countryRange
 		return err
 	}
 	return nil
+}
+
+func metadataDatasetSpec(spec datasetSpec) *generationDatasetRef {
+	if spec.url == "" && spec.path == "" && spec.format == "" && spec.compression == "" {
+		return nil
+	}
+	return &generationDatasetRef{
+		URL:         spec.url,
+		Path:        spec.path,
+		Format:      spec.format,
+		Compression: spec.compression,
+	}
+}
+
+func metadataSource(src sourceConfig) struct {
+	Provider string                `json:"provider"`
+	Combined *generationDatasetRef `json:"combined,omitempty"`
+	Asn      *generationDatasetRef `json:"asn,omitempty"`
+	Country  *generationDatasetRef `json:"country,omitempty"`
+} {
+	md := struct {
+		Provider string                `json:"provider"`
+		Combined *generationDatasetRef `json:"combined,omitempty"`
+		Asn      *generationDatasetRef `json:"asn,omitempty"`
+		Country  *generationDatasetRef `json:"country,omitempty"`
+	}{
+		Provider: src.provider,
+	}
+
+	switch src.provider {
+	case providerIPToASN:
+		md.Combined = metadataDatasetSpec(src.combined)
+	case providerDBIP:
+		md.Asn = metadataDatasetSpec(src.asn)
+		md.Country = metadataDatasetSpec(src.country)
+	case providerCustom:
+		combinedConfigured := src.combined.url != "" || src.combined.path != ""
+		asnConfigured := src.asn.url != "" || src.asn.path != ""
+		countryConfigured := src.country.url != "" || src.country.path != ""
+
+		if combinedConfigured {
+			md.Combined = metadataDatasetSpec(src.combined)
+		}
+		if asnConfigured {
+			md.Asn = metadataDatasetSpec(src.asn)
+		}
+		if countryConfigured {
+			md.Country = metadataDatasetSpec(src.country)
+		}
+	}
+
+	return md
 }
 
 func writeAsnDatabase(path string, ranges []asnRange, classes []classification) error {

@@ -3414,8 +3414,13 @@ if(ENABLE_PLUGIN_NETFLOW)
     install(FILES src/go/tools/topology-ip-intel-downloader/configs/topology-ip-intel.yaml
             COMPONENT plugin-netflow
             DESTINATION usr/lib/netdata/conf.d)
-    install(CODE "file(MAKE_DIRECTORY \"\${CMAKE_INSTALL_PREFIX}/${STOCK_DATA_DEST}/topology-ip-intel\")"
-            COMPONENT plugin-netflow)
+    install(FILES
+            src/go/tools/topology-ip-intel-downloader/stock/README.md
+            src/go/tools/topology-ip-intel-downloader/stock/topology-ip-intel/topology-ip-asn.mmdb
+            src/go/tools/topology-ip-intel-downloader/stock/topology-ip-intel/topology-ip-country.mmdb
+            src/go/tools/topology-ip-intel-downloader/stock/topology-ip-intel/topology-ip-intel.json
+            COMPONENT plugin-netflow
+            DESTINATION ${STOCK_DATA_DEST}/topology-ip-intel)
 endif()
 
 #

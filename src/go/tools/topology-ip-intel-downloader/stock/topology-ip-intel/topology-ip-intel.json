@@ -1,0 +1,36 @@
+{
+  "generated_at": "2026-03-22T22:02:19Z",
+  "generated_by": "topology-ip-intel-downloader",
+  "source": {
+    "provider": "iptoasn",
+    "combined": {
+      "url": "https://iptoasn.com/data/ip2asn-combined.tsv.gz",
+      "format": "iptoasn_combined_tsv",
+      "compression": "auto"
+    }
+  },
+  "counts": {
+    "asn_ranges": 691946,
+    "country_ranges": 553280
+  },
+  "policy": {
+    "localhost_cidrs": [
+      "127.0.0.0/8",
+      "::1/128"
+    ],
+    "private_cidrs": [
+      "10.0.0.0/8",
+      "172.16.0.0/12",
+      "192.168.0.0/16",
+      "100.64.0.0/10",
+      "fc00::/7",
+      "fe80::/10"
+    ],
+    "interesting_cidrs": []
+  },
+  "output": {
+    "asn_file": "topology-ip-asn.mmdb",
+    "country_file": "topology-ip-country.mmdb",
+    "metadata_file": "topology-ip-intel.json"
+  }
+}

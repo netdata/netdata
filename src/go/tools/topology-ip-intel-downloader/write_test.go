@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net"
 	"net/netip"
 	"os"
@@ -67,8 +68,19 @@ func TestWriteOutputsAndClassifications(t *testing.T) {
 	require.Equal(t, "US", string(countryMap["iso_code"].(mmdbtype.String)))
 
 	metaPath := filepath.Join(cfg.output.directory, cfg.output.metadataFile)
-	_, err = os.Stat(metaPath)
+	metaBlob, err := os.ReadFile(metaPath)
 	require.NoError(t, err)
+
+	var meta generationMetadata
+	require.NoError(t, json.Unmarshal(metaBlob, &meta))
+	require.Equal(t, "topology-ip-intel-downloader", meta.GeneratedBy)
+	require.Equal(t, cfg.source.provider, meta.Source.Provider)
+	require.NotNil(t, meta.Source.Combined)
+	require.Nil(t, meta.Source.Asn)
+	require.Nil(t, meta.Source.Country)
+	require.Equal(t, cfg.source.combined.url, meta.Source.Combined.URL)
+	require.Equal(t, cfg.source.combined.format, meta.Source.Combined.Format)
+	require.Equal(t, cfg.output.metadataFile, meta.Output.MetadataFile)
 }
 
 func TestAtomicReplaceExistingFile(t *testing.T) {

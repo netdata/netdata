@@ -6,7 +6,7 @@ Outputs:
 
 - ASN database (`autonomous_system_number`, `autonomous_system_organization`)
 - Country database (`country.iso_code`)
-- Metadata JSON with generation details
+- Metadata JSON with generation details and source provenance
 
 Both MMDB outputs also include Netdata classification metadata under `netdata.*` for CIDRs that must be tracked individually.
 
@@ -31,6 +31,25 @@ When installed with Netdata, run it directly as:
 ```bash
 topology-ip-intel-downloader --config /etc/netdata/topology-ip-intel.yaml
 ```
+
+## Refresh stock payload for packaging
+
+Netdata ships a stock MMDB payload under:
+
+- `${NETDATA_STOCK_DATA_DIR}/topology-ip-intel/topology-ip-asn.mmdb`
+- `${NETDATA_STOCK_DATA_DIR}/topology-ip-intel/topology-ip-country.mmdb`
+
+To refresh the source-controlled stock payload used by packages and source installs:
+
+```bash
+./src/go/tools/topology-ip-intel-downloader/refresh-stock.sh
+```
+
+This regenerates:
+
+- `src/go/tools/topology-ip-intel-downloader/stock/topology-ip-intel/topology-ip-asn.mmdb`
+- `src/go/tools/topology-ip-intel-downloader/stock/topology-ip-intel/topology-ip-country.mmdb`
+- `src/go/tools/topology-ip-intel-downloader/stock/topology-ip-intel/topology-ip-intel.json`
 
 ## Supported sources
 
