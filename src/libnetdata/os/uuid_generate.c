@@ -6,19 +6,19 @@
 #undef uuid_generate_time
 
 #ifdef OS_WINDOWS
-void os_uuid_generate(void *out) {
-    RPC_STATUS status = UuidCreate(out);
+void os_uuid_generate(nd_uuid_t out) {
+    RPC_STATUS status = UuidCreate((UUID *)out);
     while (status != RPC_S_OK && status != RPC_S_UUID_LOCAL_ONLY) {
         tinysleep();
-        status = UuidCreate(out);
+        status = UuidCreate((UUID *)out);
     }
 }
 
-void os_uuid_generate_random(void *out) {
+void os_uuid_generate_random(nd_uuid_t out) {
     os_uuid_generate(out);
 }
 
-void os_uuid_generate_time(void *out) {
+void os_uuid_generate_time(nd_uuid_t out) {
     os_uuid_generate(out);
 }
 
@@ -30,17 +30,17 @@ void os_uuid_generate_time(void *out) {
 #include <uuid.h>
 #endif
 
-void os_uuid_generate(void *out) {
+void os_uuid_generate(nd_uuid_t out) {
     // IMPORTANT: this generates a UUIDv4, which is random
     // and falls back to uuid_generate_time() if high resolution random generated is not available
     uuid_generate(out);
 }
 
-void os_uuid_generate_random(void *out) {
+void os_uuid_generate_random(nd_uuid_t out) {
     uuid_generate_random(out);
 }
 
-void os_uuid_generate_time(void *out) {
+void os_uuid_generate_time(nd_uuid_t out) {
     // IMPORTANT: this generates a UUIDv1, which is not random and may suffer from collisions
     uuid_generate_time(out);
 }
