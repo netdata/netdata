@@ -58,6 +58,8 @@ func (m *mockRuntimeComponentService) RegisterProducer(_ string, _ func() error)
 	return nil
 }
 
+func (m *mockRuntimeComponentService) UnregisterProducer(_ string) {}
+
 func (m *mockModuleV2) Init(ctx context.Context) error {
 	if m.initFunc == nil {
 		return nil
@@ -368,6 +370,36 @@ END`)
 				assert.NotContains(t, cfg.JobLabels, "collector_module")
 				require.NotNil(t, cfg.Store)
 				assert.Equal(t, job.engine.RuntimeStore(), cfg.Store)
+			},
+		},
+		"module context carries runtime component service when available": {
+			run: func(t *testing.T) {
+				store := metrix.NewCollectorStore()
+				runtimeSvc := &mockRuntimeComponentService{}
+				mod := &mockModuleV2{
+					store:    store,
+					template: chartTemplateV2(),
+					initFunc: func(ctx context.Context) error {
+						got, ok := runtimecomp.ServiceFromContext(ctx)
+						require.True(t, ok)
+						require.NotNil(t, got)
+						assert.Same(t, runtimeSvc, got)
+						return nil
+					},
+				}
+
+				job := NewJobV2(JobV2Config{
+					PluginName:     pluginName,
+					Name:           jobName,
+					ModuleName:     modName,
+					FullName:       modName + "_" + jobName,
+					Module:         mod,
+					Out:            &bytes.Buffer{},
+					UpdateEvery:    1,
+					RuntimeService: runtimeSvc,
+				})
+
+				require.NoError(t, job.AutoDetection())
 			},
 		},
 		"runtime registration failure is non-fatal for autodetection": {

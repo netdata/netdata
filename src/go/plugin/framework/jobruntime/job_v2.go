@@ -535,7 +535,10 @@ func (j *JobV2) moduleContext() context.Context {
 	ctx := j.runCtx
 	j.ctxMu.RUnlock()
 	if ctx == nil {
-		return context.Background()
+		ctx = context.Background()
+	}
+	if j.runtimeService != nil {
+		return runtimecomp.ContextWithService(ctx, j.runtimeService)
 	}
 	return ctx
 }
