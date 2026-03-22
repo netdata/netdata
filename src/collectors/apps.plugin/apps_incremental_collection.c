@@ -120,9 +120,25 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
         p->ppid = 0;
 
     // --------------------------------------------------------------------
+    // detect kernel threads and kernel aggregators (e.g. kthreadd on Linux,
+    // kernel on FreeBSD). These have no meaningful I/O, file descriptors,
+    // or limits — skip those expensive reads.
+    // This mirrors the classification in get_tree_target():
+    //  - kernel aggregator: ppid == 0 && pid != INIT_PID (structural check)
+    //  - kernel threads:    parent is an aggregator (name-based check)
+
+    bool is_kernel_thread = (p->ppid == 0 && p->pid != INIT_PID);
+    if(!is_kernel_thread && p->ppid) {
+        struct pid_stat *pp = find_pid_entry(p->ppid);
+        if(pp && pp->is_aggregator)
+            is_kernel_thread = true;
+    }
+
+    // --------------------------------------------------------------------
     // /proc/<pid>/io
 
-    managed_log(p, PID_LOG_IO, incrementally_read_pid_io(p, ptr));
+    if(likely(!is_kernel_thread))
+        managed_log(p, PID_LOG_IO, incrementally_read_pid_io(p, ptr));
 
     // --------------------------------------------------------------------
     // /proc/<pid>/status
@@ -137,7 +153,7 @@ int incrementally_collect_data_for_pid_stat(struct pid_stat *p, void *ptr) {
     // /proc/<pid>/fd
 
 #if (PROCESSES_HAVE_FDS == 1)
-    if(enable_file_charts) {
+    if(likely(!is_kernel_thread) && enable_file_charts) {
         managed_log(p, PID_LOG_FDS, read_pid_file_descriptors(p, ptr));
 #if (PROCESSES_HAVE_PID_LIMITS == 1)
         managed_log(p, PID_LOG_LIMITS, OS_FUNCTION(apps_os_read_pid_limits)(p, ptr));
