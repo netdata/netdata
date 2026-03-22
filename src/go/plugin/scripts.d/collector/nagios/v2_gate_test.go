@@ -114,7 +114,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 		).StateSet(
 			jobPerfdataThresholdMetricName,
 			metrix.WithStateSetMode(metrix.ModeBitSet),
-			metrix.WithStateSetStates(perfThresholdStateNames...),
+			metrix.WithStateSetStates(perfThresholdAlertStateNames...),
 			metrix.WithUnit("state"),
 		).Enable(thresholdState.state)
 	}
@@ -140,6 +140,11 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 		perfdataValueLabelKey:                 "time_latency",
 		"nagios.job.perfdata.threshold_state": perfThresholdStateWarning,
 	}, 1)
+	assertMetricValue(t, reader, "nagios.job.perfdata.threshold_state", metrix.Labels{
+		"nagios_job":                          "gate_job",
+		perfdataValueLabelKey:                 "time_latency",
+		"nagios.job.perfdata.threshold_state": perfThresholdStateRetry,
+	}, 0)
 	assertSeriesKind(t, reader, "nagios.perfdata.check_gate.time_latency_value", metrix.Labels{
 		"nagios_job":                "gate_job",
 		metrix.MeasureSetFieldLabel: perfFieldValue,
@@ -395,33 +400,6 @@ func assertSeriesKind(t *testing.T, reader metrix.Reader, metricName string, lab
 	meta, ok := reader.SeriesMeta(metricName, labels)
 	require.True(t, ok, "missing series metadata for %q with labels %v", metricName, labels)
 	assert.Equal(t, want, meta.Kind)
-}
-
-func assertPlanHasUpdateAndRemoveForTargets(t *testing.T, plan chartengine.Plan, updateMetricPrefix, removeMetricPrefix string) {
-	t.Helper()
-
-	hasUpdate := false
-	hasRemove := false
-
-	for _, action := range plan.Actions {
-		switch a := action.(type) {
-		case chartengine.UpdateChartAction:
-			if strings.HasPrefix(a.ChartID, updateMetricPrefix) {
-				hasUpdate = true
-			}
-		case chartengine.RemoveDimensionAction:
-			if strings.HasPrefix(a.ChartID, removeMetricPrefix) {
-				hasRemove = true
-			}
-		case chartengine.RemoveChartAction:
-			if strings.HasPrefix(a.ChartID, removeMetricPrefix) {
-				hasRemove = true
-			}
-		}
-	}
-
-	assert.True(t, hasUpdate, "expected update action for %q", updateMetricPrefix)
-	assert.True(t, hasRemove, "expected remove action for %q", removeMetricPrefix)
 }
 
 func assertPlanHasUpdateForTarget(t *testing.T, plan chartengine.Plan, updateMetricPrefix string) {

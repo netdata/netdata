@@ -303,7 +303,7 @@ modules:
               Nagios checks run with a limited execution environment rather than inheriting the full Netdata process environment. If the script depends on extra variables, set them explicitly in `environment` instead of relying on ambient shell state.
           - name: Built-in alerts cover warning and critical states only
             description: |
-              This collector installs stock Netdata health alerts for the `warning` and `critical` states on `nagios.job.execution_state` and `nagios.job.perfdata_threshold_state`. The execution-state alerts suppress soft retry states by checking that `retry` is not active. If you also want alerts for `unknown`, `timeout`, `paused`, or more specific perfdata behavior, build your own rules on top of these contexts. The `job.perfdata.threshold_state` chart uses the `perfdata_value` label to identify which perfdata metric each threshold state belongs to.
+              This collector installs stock Netdata health alerts for the `warning` and `critical` states on `nagios.job.execution_state` and `nagios.job.perfdata_threshold_state`. Both stock alert families suppress soft retry states by checking that `retry` is not active. If you also want alerts for `unknown`, `timeout`, `paused`, or more specific perfdata behavior, build your own rules on top of these contexts. The `job.perfdata.threshold_state` chart uses the `perfdata_value` label to identify which perfdata metric each threshold state belongs to.
           - name: Windows checks need an executable entry point
             description: |
               The collector runs the command named in `plugin` directly. On Windows, point `plugin` to an executable or to an interpreter such as `powershell.exe` and pass the script path in `args`.
@@ -353,7 +353,7 @@ modules:
                 - name: paused
                 - name: retry
             - name: nagios.job.perfdata.threshold_state
-              description: Static alert-oriented duplicate of the non-counter perfdata threshold-state signal. Use the `perfdata_value` label to select the normalized perfdata identity, such as `bytes_used` or `time_latency`. Values are `no_threshold`, `ok`, `warning`, or `critical`.
+              description: Static alert-oriented duplicate of the non-counter perfdata threshold-state signal. Use the `perfdata_value` label to select the normalized perfdata identity, such as `bytes_used` or `time_latency`. Values are `no_threshold`, `ok`, `warning`, or `critical`. While the source check result is still retrying, this bitset chart also exposes `retry`.
               unit: state
               chart_type: line
               dimensions:
@@ -361,6 +361,7 @@ modules:
                 - name: ok
                 - name: warning
                 - name: critical
+                - name: retry
             - name: nagios.job.execution_duration
               description: Wall-clock duration recorded when the check runs. Non-due cycles report zero.
               unit: seconds

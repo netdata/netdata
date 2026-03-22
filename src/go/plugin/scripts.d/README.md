@@ -146,8 +146,11 @@ Perfdata is routed plugin-side and materialized via autogen:
 - `nagios.job.execution_state` is a bitset chart. It always exposes the current
   primary state and also exposes `retry=1` while a non-OK result is still
   retrying.
+- `nagios.job.perfdata_threshold_state` is also a bitset chart. It exposes the
+  current non-counter perfdata threshold state and also exposes `retry=1` while
+  that threshold result comes from a retrying soft run.
 - Stock alerts cover only the `warning` and `critical` states and suppress
-  retrying soft states.
+  retrying soft states on both built-in alert contexts.
 - If you want alerts for `unknown`, `timeout`, `paused`, or custom perfdata
   alerting rules, use these contexts as the base for your own rules.
 
