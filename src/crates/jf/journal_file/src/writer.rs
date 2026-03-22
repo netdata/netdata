@@ -697,4 +697,64 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_entry_data_offsets_reject_zero_offset_entries() -> Result<()> {
+        let temp_file = NamedTempFile::new().map_err(JournalError::Io)?;
+        let journal_path = temp_file.path();
+        let boot_id = [1; 16];
+
+        {
+            let options = JournalFileOptions::new(
+                generate_uuid(),
+                generate_uuid(),
+                generate_uuid(),
+                generate_uuid(),
+            );
+
+            let mut journal_file = JournalFile::create(journal_path, options)?;
+            let mut writer = JournalWriter::new(&mut journal_file)?;
+            let entry_data = vec![b"MESSAGE=Test message".as_slice(), b"PRIORITY=6".as_slice()];
+
+            writer.add_entry(&mut journal_file, &entry_data, 1_000_000, 500_000, boot_id)?;
+
+            let entry_offset = journal_file
+                .entry_list()
+                .unwrap()
+                .cursor_head()
+                .value(&journal_file)?
+                .expect("expected one entry");
+
+            let mut entry_guard = journal_file.entry_mut(entry_offset, None)?;
+            match &mut entry_guard.items {
+                crate::EntryItemsType::Regular(items) => items[0].object_offset = 0,
+                crate::EntryItemsType::Compact(items) => items[0].object_offset = 0,
+            }
+        }
+
+        let journal_file = JournalFile::<Mmap>::open(journal_path, 8 * 1024)?;
+        let entry_offset = journal_file
+            .entry_list()
+            .unwrap()
+            .cursor_head()
+            .value(&journal_file)?
+            .expect("expected one entry");
+
+        let mut offsets = Vec::new();
+        let err = journal_file
+            .entry_data_object_offsets(entry_offset, &mut offsets)
+            .expect_err("expected invalid entry item offset to fail");
+        assert!(matches!(err, JournalError::InvalidOffset));
+
+        let mut reader = JournalReader::default();
+        reader.set_location(Location::Head);
+        assert!(reader.step(&journal_file, Direction::Forward)?);
+
+        let err = reader
+            .entry_data_enumerate(&journal_file)
+            .expect_err("expected reader path to surface invalid offsets");
+        assert!(matches!(err, JournalError::InvalidOffset));
+
+        Ok(())
+    }
 }
