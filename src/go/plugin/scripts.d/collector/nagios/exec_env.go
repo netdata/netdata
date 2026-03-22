@@ -10,8 +10,8 @@ import (
 	"sort"
 )
 
-func buildRunEnv(jobEnv map[string]string, macroEnv map[string]string) []string {
-	merged := buildExecutionBaselineEnv()
+func buildRunEnv(workingDir string, jobEnv map[string]string, macroEnv map[string]string) []string {
+	merged := buildExecutionBaselineEnv(workingDir)
 	for k, v := range jobEnv {
 		merged[k] = replaceMacro(v, macroEnv)
 	}
@@ -32,19 +32,19 @@ func buildRunEnv(jobEnv map[string]string, macroEnv map[string]string) []string 
 	return out
 }
 
-func buildExecutionBaselineEnv() map[string]string {
+func buildExecutionBaselineEnv(workingDir string) map[string]string {
 	if runtime.GOOS == "windows" {
 		return buildWindowsExecutionBaselineEnv()
 	}
-	return buildUnixExecutionBaselineEnv()
+	return buildUnixExecutionBaselineEnv(workingDir)
 }
 
-func buildUnixExecutionBaselineEnv() map[string]string {
+func buildUnixExecutionBaselineEnv(workingDir string) map[string]string {
 	env := make(map[string]string)
 	setEnvFromProcess(env, "PATH", "PATH")
-	setEnvFromProcess(env, "PWD", "PWD")
 	setEnvFromProcess(env, "TZ", "TZ")
 	setEnvFromProcess(env, "TZDIR", "TZDIR")
+	setWorkingDirEnv(env, workingDir)
 
 	tmpdir := os.Getenv("TMPDIR")
 	if tmpdir == "" {
@@ -96,5 +96,15 @@ func buildWindowsExecutionBaselineEnv() map[string]string {
 func setEnvFromProcess(dst map[string]string, dstKey, srcKey string) {
 	if value := os.Getenv(srcKey); value != "" {
 		dst[dstKey] = value
+	}
+}
+
+func setWorkingDirEnv(dst map[string]string, workingDir string) {
+	if workingDir != "" {
+		dst["PWD"] = workingDir
+		return
+	}
+	if cwd, err := os.Getwd(); err == nil && cwd != "" {
+		dst["PWD"] = cwd
 	}
 }

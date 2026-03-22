@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -742,9 +743,10 @@ func TestBuildRunEnv(t *testing.T) {
 	t.Setenv("TZ", "UTC")
 
 	tests := map[string]struct {
-		jobEnv   map[string]string
-		macroEnv map[string]string
-		assert   func(*testing.T, map[string]string)
+		workingDir string
+		jobEnv     map[string]string
+		macroEnv   map[string]string
+		assert     func(*testing.T, map[string]string)
 	}{
 		"uses explicit baseline and does not leak ambient env": {
 			jobEnv:   map[string]string{},
@@ -758,6 +760,32 @@ func TestBuildRunEnv(t *testing.T) {
 					assert.Equal(t, "C", env["LC_ALL"])
 					assert.Equal(t, "/bin/sh", env["SHELL"])
 				}
+			},
+		},
+		"uses actual current directory instead of inherited parent PWD": {
+			jobEnv:   map[string]string{},
+			macroEnv: map[string]string{},
+			assert: func(t *testing.T, env map[string]string) {
+				t.Helper()
+				if runtime.GOOS == "windows" {
+					return
+				}
+				cwd, err := os.Getwd()
+				require.NoError(t, err)
+				assert.Equal(t, cwd, env["PWD"])
+				assert.NotEqual(t, "/parent/pwd", env["PWD"])
+			},
+		},
+		"working directory overrides PWD": {
+			workingDir: "/tmp/checks",
+			jobEnv:     map[string]string{},
+			macroEnv:   map[string]string{},
+			assert: func(t *testing.T, env map[string]string) {
+				t.Helper()
+				if runtime.GOOS == "windows" {
+					return
+				}
+				assert.Equal(t, "/tmp/checks", env["PWD"])
 			},
 		},
 		"job environment overrides baseline and macros override job environment": {
@@ -780,7 +808,10 @@ func TestBuildRunEnv(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			env := envSliceToMap(buildRunEnv(tc.jobEnv, tc.macroEnv))
+			if runtime.GOOS != "windows" {
+				t.Setenv("PWD", "/parent/pwd")
+			}
+			env := envSliceToMap(buildRunEnv(tc.workingDir, tc.jobEnv, tc.macroEnv))
 			tc.assert(t, env)
 		})
 	}

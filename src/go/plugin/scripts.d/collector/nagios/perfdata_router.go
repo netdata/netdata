@@ -43,7 +43,7 @@ func (r *perfdataRouter) route(pluginPath string, perf []output.PerfDatum) perfR
 		return perfRouteResult{}
 	}
 
-	sort.Slice(items, func(i, j int) bool {
+	sort.SliceStable(items, func(i, j int) bool {
 		if items[i].rawLabel == items[j].rawLabel {
 			return items[i].metricKey < items[j].metricKey
 		}
@@ -66,7 +66,7 @@ func (r *perfdataRouter) route(pluginPath string, perf []output.PerfDatum) perfR
 	}
 
 	// Budget policy: deterministic cap by metric-key lexical order.
-	sort.Slice(deduped, func(i, j int) bool {
+	sort.SliceStable(deduped, func(i, j int) bool {
 		return deduped[i].metricKey < deduped[j].metricKey
 	})
 	if len(deduped) > r.maxPerJob {

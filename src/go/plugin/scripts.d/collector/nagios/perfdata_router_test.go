@@ -101,6 +101,20 @@ func TestPerfdataRouterPolicies(t *testing.T) {
 				assert.False(t, okC)
 			},
 		},
+		"budget keeps stable order for equal metric keys": {
+			budget: 1,
+			input: []output.PerfDatum{
+				{Label: "latency", Unit: "KB", Value: 1},
+				{Label: "latency", Unit: "ms", Value: 1},
+			},
+			assert: func(t *testing.T, got perfRouteResult) {
+				t.Helper()
+				samples := valueSampleMap(got.values)
+				assertNear(t, samples["check_memory.bytes_latency_value"], 1_000)
+				_, hasTime := samples["check_memory.time_latency_value"]
+				assert.False(t, hasTime)
+			},
+		},
 		"class changes create a new metric identity": {
 			budget: 64,
 			prime: []output.PerfDatum{

@@ -42,7 +42,7 @@ func (systemCheckRunner) Run(ctx context.Context, req checkRunRequest) (checkRun
 	}
 
 	opts := ndexec.RunOptions{
-		Env: buildRunEnv(req.Job.Environment, macros.Env),
+		Env: buildRunEnv(req.Job.WorkingDirectory, req.Job.Environment, macros.Env),
 		Dir: req.Job.WorkingDirectory,
 	}
 	timeout := req.Job.Timeout.Duration()
