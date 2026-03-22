@@ -587,6 +587,10 @@
                     "require_cloud": {
                       "type": "boolean",
                       "description": "Whether the function requires cloud connection."
+                    },
+                    "keywords": {
+                      "$ref": "./shared.json#/$defs/keywords",
+                      "description": "Optional function-specific keywords. Falls back to collector keywords when omitted."
                     }
                   },
                   "required": [
