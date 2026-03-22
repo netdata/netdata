@@ -109,7 +109,11 @@ static bool mcp_http_session_restore(const char *session_id, MCP_CLIENT *mcpc) {
     mcp_http_sessions_init_nolock();
 
     MCP_HTTP_SESSION *s = (MCP_HTTP_SESSION *)dictionary_get(mcp_http_sessions, session_id);
-    if (!s) {
+    if (!s || (now_realtime_sec() - s->last_accessed > MCP_HTTP_SESSION_TTL_SECONDS)) {
+        if (s) {
+            dictionary_del(mcp_http_sessions, session_id);
+            dictionary_garbage_collect(mcp_http_sessions);
+        }
         spinlock_unlock(&mcp_http_sessions_lock);
         return false;
     }
