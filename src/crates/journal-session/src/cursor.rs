@@ -1,6 +1,8 @@
 use std::num::NonZeroU64;
 
-use journal_file::{Direction, JournalCursor, JournalFile, JournalReader, Location, Mmap};
+use journal_core::file::HashableObject;
+use journal_core::file::mmap::Mmap;
+use journal_core::{Direction, JournalCursor, JournalFile, JournalReader, Location};
 
 use crate::SessionError;
 
@@ -233,14 +235,14 @@ impl Cursor {
         }
 
         let registry_file = &self.files[self.file_index];
-        let journal_file = JournalFile::<Mmap>::open(registry_file.path(), self.window_size)?;
+        let journal_file = JournalFile::<Mmap>::open(registry_file, self.window_size)?;
 
         // Use a temporary reader for setup: remappings + match filter translation.
         // The reader is dropped before we store journal_file, so no lifetime issue.
         let mut reader = JournalReader::<Mmap>::default();
-        // The jf backend does not expose remappings yet. Netflow already
-        // uses load_remappings(false), so keep the flag only for API stability.
-        let _ = self.load_remappings;
+        if self.load_remappings {
+            reader.load_remappings(&journal_file)?;
+        }
 
         for op in &self.match_ops {
             match op {
@@ -520,7 +522,7 @@ impl Payloads<'_> {
             guard.decompress(self.buf)?;
         } else {
             self.buf.clear();
-            self.buf.extend_from_slice(guard.payload_bytes());
+            self.buf.extend_from_slice(guard.raw_payload());
         }
 
         Ok(Some(self.buf))

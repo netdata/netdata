@@ -1,9 +1,11 @@
 use super::{Direction, JournalSession};
-use journal_file::{JournalFile, JournalFileOptions, JournalWriter};
+use journal_core::{JournalFile, JournalFileOptions, JournalWriter};
 use journal_registry::repository::File as RegistryFile;
+use journal_registry::repository::file::Status;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
+use uuid::Uuid;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -14,8 +16,8 @@ struct TestEntry {
     fields: &'static [&'static str],
 }
 
-fn test_uuid(seed: u8) -> [u8; 16] {
-    [seed; 16]
+fn test_uuid(seed: u8) -> Uuid {
+    Uuid::from_bytes([seed; 16])
 }
 
 fn seqnum_id_hex(seed: u8) -> String {
@@ -42,17 +44,25 @@ fn write_archived_journal(
     path: &Path,
     option_seed: u8,
     entries: &[TestEntry],
-) -> Result<(), journal_file::JournalError> {
+) -> Result<(), journal_core::JournalError> {
+    let repo_file = RegistryFile::from_path(path).expect("test journal path should parse");
+    let head_seqnum = match repo_file.status() {
+        Status::Archived { head_seqnum, .. } => *head_seqnum,
+        _ => 1,
+    };
     let mut journal_file = JournalFile::create(
-        path,
+        &repo_file,
         JournalFileOptions::new(
             test_uuid(option_seed),
             test_uuid(option_seed.wrapping_add(1)),
             test_uuid(option_seed.wrapping_add(2)),
-            test_uuid(option_seed.wrapping_add(3)),
         ),
     )?;
-    let mut writer = JournalWriter::new(&mut journal_file)?;
+    let mut writer = JournalWriter::new(
+        &mut journal_file,
+        head_seqnum,
+        test_uuid(option_seed.wrapping_add(3)),
+    )?;
 
     for entry in entries {
         let payloads = entry
@@ -65,7 +75,6 @@ fn write_archived_journal(
             &payloads,
             entry.realtime,
             entry.monotonic,
-            test_uuid(option_seed.wrapping_add(4)),
         )?;
     }
 

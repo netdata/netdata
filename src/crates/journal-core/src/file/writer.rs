@@ -479,3 +479,92 @@ impl JournalWriter {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::JournalWriter;
+    use crate::error::{JournalError, Result};
+    use crate::file::{EntryItemsType, Mmap};
+    use crate::repository::File as RepositoryFile;
+    use crate::{Direction, JournalFile, JournalFileOptions, JournalReader, Location};
+    use tempfile::TempDir;
+    use uuid::Uuid;
+
+    fn test_uuid(seed: u8) -> Uuid {
+        Uuid::from_bytes([seed; 16])
+    }
+
+    fn active_journal_file(dir: &TempDir) -> RepositoryFile {
+        let journal_dir = dir
+            .path()
+            .join("11111111-1111-1111-1111-111111111111");
+        std::fs::create_dir_all(&journal_dir).expect("create test journal directory");
+        let path = journal_dir.join("system.journal");
+        RepositoryFile::from_path(&path).expect("test journal path should parse")
+    }
+
+    #[test]
+    fn test_entry_data_offsets_reject_zero_offset_entries() -> Result<()> {
+        let dir = TempDir::new().map_err(JournalError::Io)?;
+        let repo_file = active_journal_file(&dir);
+        let boot_id = test_uuid(4);
+
+        {
+            let options = JournalFileOptions::new(test_uuid(1), test_uuid(2), test_uuid(3));
+            let mut journal_file = JournalFile::create(&repo_file, options)?;
+            let mut writer = JournalWriter::new(&mut journal_file, 1, boot_id)?;
+            let entry_data = vec![b"MESSAGE=Test message".as_slice(), b"PRIORITY=6".as_slice()];
+
+            writer.add_entry(&mut journal_file, &entry_data, 1_000_000, 500_000)?;
+
+            let entry_offset = journal_file
+                .entry_list()
+                .unwrap()
+                .cursor_head()
+                .value(&journal_file)?
+                .expect("expected one entry");
+
+            let mut entry_guard = journal_file.entry_mut(entry_offset, None)?;
+            match &mut entry_guard.items {
+                EntryItemsType::Regular(items) => items[0].object_offset = 0,
+                EntryItemsType::Compact(items) => items[0].object_offset = 0,
+            }
+        }
+
+        let journal_file = JournalFile::<Mmap>::open(&repo_file, 8 * 1024)?;
+        let entry_offset = journal_file
+            .entry_list()
+            .unwrap()
+            .cursor_head()
+            .value(&journal_file)?
+            .expect("expected one entry");
+
+        let mut offsets = Vec::new();
+        let err = journal_file
+            .entry_data_object_offsets(entry_offset, &mut offsets)
+            .expect_err("expected invalid entry item offset to fail");
+        assert!(matches!(err, JournalError::InvalidOffset));
+
+        match journal_file.entry_data_objects(entry_offset) {
+            Err(JournalError::InvalidOffset) => {}
+            Err(err) => panic!("expected InvalidOffset from cached iterator creation, got {err:?}"),
+            Ok(_) => panic!("expected cached iterator creation to fail on invalid offsets"),
+        }
+
+        let mut reader = JournalReader::default();
+        reader.set_location(Location::Head);
+        assert!(reader.step(&journal_file, Direction::Forward)?);
+
+        let err = reader
+            .entry_data_offsets(&journal_file, &mut Vec::new())
+            .expect_err("expected cached offsets helper to surface invalid offsets");
+        assert!(matches!(err, JournalError::InvalidOffset));
+
+        let err = reader
+            .entry_data_enumerate(&journal_file)
+            .expect_err("expected cached reader path to surface invalid offsets");
+        assert!(matches!(err, JournalError::InvalidOffset));
+
+        Ok(())
+    }
+}

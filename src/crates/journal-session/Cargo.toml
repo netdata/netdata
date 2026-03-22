@@ -7,9 +7,10 @@ edition.workspace = true
 workspace = true
 
 [dependencies]
-journal_file = { path = "../jf/journal_file" }
+journal-core = { workspace = true }
 journal-registry = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+uuid = { workspace = true }
