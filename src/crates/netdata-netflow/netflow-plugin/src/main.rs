@@ -1,0 +1,1405 @@
+//! netflow-plugin standalone binary
+
+mod decoder;
+mod enrichment;
+mod ingest;
+mod network_sources;
+mod plugin_config;
+mod presentation;
+mod query;
+#[cfg(test)]
+mod rollup;
+mod routing_bioris;
+mod routing_bmp;
+mod tiering;
+
+use async_trait::async_trait;
+use chrono::Utc;
+use netdata_plugin_error::{NetdataPluginError, Result};
+use netdata_plugin_protocol::{FunctionDeclaration, HttpAccess};
+use rt::{FunctionCallContext, FunctionHandler, PluginRuntime};
+use serde::Serialize;
+use serde_json::Value;
+use std::collections::HashMap;
+use std::io::{IsTerminal, Write};
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
+use tokio_util::sync::CancellationToken;
+
+const FLOWS_SCHEMA_VERSION: &str = "2.0";
+const FLOWS_FUNCTION_VERSION: u32 = 3;
+const FLOWS_UPDATE_EVERY_SECONDS: u32 = 60;
+
+#[derive(Debug, Serialize)]
+struct RequiredParamOption {
+    id: String,
+    name: String,
+    #[serde(rename = "defaultSelected")]
+    default_selected: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct RequiredParam {
+    id: String,
+    name: String,
+    #[serde(rename = "type")]
+    kind: String,
+    options: Vec<RequiredParamOption>,
+    help: String,
+}
+
+#[derive(Debug, Serialize)]
+struct FlowsData {
+    schema_version: String,
+    source: String,
+    layer: String,
+    agent_id: String,
+    collected_at: String,
+    view: String,
+    group_by: Vec<String>,
+    columns: Value,
+    flows: Vec<Value>,
+    stats: HashMap<String, u64>,
+    metrics: HashMap<String, u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    warnings: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    facets: Option<Value>,
+}
+
+#[derive(Debug, Serialize)]
+struct FlowMetricsData {
+    schema_version: String,
+    source: String,
+    layer: String,
+    agent_id: String,
+    collected_at: String,
+    view: String,
+    group_by: Vec<String>,
+    columns: Value,
+    metric: String,
+    chart: Value,
+    stats: HashMap<String, u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    warnings: Option<Value>,
+}
+
+#[derive(Debug, Serialize)]
+struct FlowsResponse {
+    status: u32,
+    #[serde(rename = "v")]
+    version: u32,
+    #[serde(rename = "type")]
+    response_type: String,
+    data: FlowsData,
+    has_history: bool,
+    update_every: u32,
+    accepted_params: Vec<String>,
+    required_params: Vec<RequiredParam>,
+    help: String,
+}
+
+#[derive(Debug, Serialize)]
+struct FlowMetricsResponse {
+    status: u32,
+    #[serde(rename = "v")]
+    version: u32,
+    #[serde(rename = "type")]
+    response_type: String,
+    data: FlowMetricsData,
+    has_history: bool,
+    update_every: u32,
+    accepted_params: Vec<String>,
+    required_params: Vec<RequiredParam>,
+    help: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+enum FlowsFunctionResponse {
+    Table(FlowsResponse),
+    Metrics(FlowMetricsResponse),
+}
+
+struct NetflowFlowsHandler {
+    metrics: Arc<ingest::IngestMetrics>,
+    query: Arc<query::FlowQueryService>,
+}
+
+impl NetflowFlowsHandler {
+    fn new(metrics: Arc<ingest::IngestMetrics>, query: Arc<query::FlowQueryService>) -> Self {
+        Self { metrics, query }
+    }
+
+    async fn handle_request(&self, request: query::FlowsRequest) -> Result<FlowsFunctionResponse> {
+        if request.is_timeseries_view() {
+            let query_output = self
+                .query
+                .query_flow_metrics(&request)
+                .await
+                .map_err(|err| NetdataPluginError::Other {
+                    message: format!("failed to query flow metrics: {err:#}"),
+                })?;
+            let view = request.normalized_view().to_string();
+            let mut stats = self.metrics.snapshot();
+            stats.extend(query_output.stats);
+
+            Ok(FlowsFunctionResponse::Metrics(FlowMetricsResponse {
+                status: 200,
+                version: FLOWS_FUNCTION_VERSION,
+                response_type: "flows".to_string(),
+                data: FlowMetricsData {
+                    schema_version: FLOWS_SCHEMA_VERSION.to_string(),
+                    source: "netflow".to_string(),
+                    layer: "3".to_string(),
+                    agent_id: query_output.agent_id,
+                    collected_at: Utc::now().to_rfc3339(),
+                    view,
+                    group_by: query_output.group_by,
+                    columns: query_output.columns,
+                    metric: query_output.metric,
+                    chart: query_output.chart,
+                    stats,
+                    warnings: query_output.warnings,
+                },
+                has_history: true,
+                update_every: FLOWS_UPDATE_EVERY_SECONDS,
+                accepted_params: flows_accepted_params(),
+                required_params: flows_required_params(
+                    request.normalized_view(),
+                    &request.normalized_group_by(),
+                    request.normalized_sort_by(),
+                    request.normalized_top_n(),
+                ),
+                help: "NetFlow/IPFIX/sFlow Top-N time-series for grouped flow tuples".to_string(),
+            }))
+        } else {
+            let query_output = self.query.query_flows(&request).await.map_err(|err| {
+                NetdataPluginError::Other {
+                    message: format!("failed to query flows: {err:#}"),
+                }
+            })?;
+            let view = request.normalized_view().to_string();
+            let mut stats = self.metrics.snapshot();
+            stats.extend(query_output.stats);
+
+            Ok(FlowsFunctionResponse::Table(FlowsResponse {
+                status: 200,
+                version: FLOWS_FUNCTION_VERSION,
+                response_type: "flows".to_string(),
+                data: FlowsData {
+                    schema_version: FLOWS_SCHEMA_VERSION.to_string(),
+                    source: "netflow".to_string(),
+                    layer: "3".to_string(),
+                    agent_id: query_output.agent_id,
+                    collected_at: Utc::now().to_rfc3339(),
+                    view,
+                    group_by: query_output.group_by,
+                    columns: query_output.columns,
+                    flows: query_output.flows,
+                    stats,
+                    metrics: query_output.metrics,
+                    warnings: query_output.warnings,
+                    facets: query_output.facets,
+                },
+                has_history: true,
+                update_every: FLOWS_UPDATE_EVERY_SECONDS,
+                accepted_params: flows_accepted_params(),
+                required_params: flows_required_params(
+                    request.normalized_view(),
+                    &request.normalized_group_by(),
+                    request.normalized_sort_by(),
+                    request.normalized_top_n(),
+                ),
+                help: "NetFlow/IPFIX/sFlow flow analysis data from journal-backed storage"
+                    .to_string(),
+            }))
+        }
+    }
+}
+
+fn flows_accepted_params() -> Vec<String> {
+    vec![
+        "view".to_string(),
+        "after".to_string(),
+        "before".to_string(),
+        "query".to_string(),
+        "selections".to_string(),
+        "group_by".to_string(),
+        "sort_by".to_string(),
+        "top_n".to_string(),
+    ]
+}
+
+fn flows_required_params(
+    view: &str,
+    group_by: &[String],
+    sort_by: query::SortBy,
+    top_n: usize,
+) -> Vec<RequiredParam> {
+    vec![
+        RequiredParam {
+            id: "view".to_string(),
+            name: "View".to_string(),
+            kind: "select".to_string(),
+            options: vec![
+                RequiredParamOption {
+                    id: "table-sankey".to_string(),
+                    name: "Table / Sankey".to_string(),
+                    default_selected: view == "table-sankey",
+                },
+                RequiredParamOption {
+                    id: "timeseries".to_string(),
+                    name: "Time-Series".to_string(),
+                    default_selected: view == "timeseries",
+                },
+                RequiredParamOption {
+                    id: "country-map".to_string(),
+                    name: "Country-Map".to_string(),
+                    default_selected: view == "country-map",
+                },
+            ],
+            help: "Select the flow view to render.".to_string(),
+        },
+        RequiredParam {
+            id: "group_by".to_string(),
+            name: "Group By".to_string(),
+            kind: "multiselect".to_string(),
+            options: query::supported_group_by_fields()
+                .iter()
+                .map(|field| RequiredParamOption {
+                    id: field.clone(),
+                    name: presentation::field_display_name(field),
+                    default_selected: group_by.iter().any(|selected| selected == field),
+                })
+                .collect(),
+            help: "Select up to 10 tuple fields used to group and rank flows.".to_string(),
+        },
+        RequiredParam {
+            id: "sort_by".to_string(),
+            name: "Sort By".to_string(),
+            kind: "select".to_string(),
+            options: vec![
+                RequiredParamOption {
+                    id: "bytes".to_string(),
+                    name: "Bytes".to_string(),
+                    default_selected: sort_by == query::SortBy::Bytes,
+                },
+                RequiredParamOption {
+                    id: "packets".to_string(),
+                    name: "Packets".to_string(),
+                    default_selected: sort_by == query::SortBy::Packets,
+                },
+            ],
+            help: "Choose the metric used to rank top groups and the other bucket.".to_string(),
+        },
+        RequiredParam {
+            id: "top_n".to_string(),
+            name: "Top N".to_string(),
+            kind: "select".to_string(),
+            options: vec![
+                RequiredParamOption {
+                    id: "25".to_string(),
+                    name: "25".to_string(),
+                    default_selected: top_n == 25,
+                },
+                RequiredParamOption {
+                    id: "50".to_string(),
+                    name: "50".to_string(),
+                    default_selected: top_n == 50,
+                },
+                RequiredParamOption {
+                    id: "100".to_string(),
+                    name: "100".to_string(),
+                    default_selected: top_n == 100,
+                },
+                RequiredParamOption {
+                    id: "200".to_string(),
+                    name: "200".to_string(),
+                    default_selected: top_n == 200,
+                },
+                RequiredParamOption {
+                    id: "500".to_string(),
+                    name: "500".to_string(),
+                    default_selected: top_n == 500,
+                },
+            ],
+            help: "Choose how many grouped tuples the backend returns.".to_string(),
+        },
+    ]
+}
+
+#[async_trait]
+impl FunctionHandler for NetflowFlowsHandler {
+    type Request = query::FlowsRequest;
+    type Response = FlowsFunctionResponse;
+
+    async fn on_call(
+        &self,
+        _ctx: FunctionCallContext,
+        request: Self::Request,
+    ) -> Result<Self::Response> {
+        self.handle_request(request).await
+    }
+
+    fn declaration(&self) -> FunctionDeclaration {
+        let mut func_decl =
+            FunctionDeclaration::new("flows:netflow", "NetFlow/IPFIX/sFlow flow analysis data");
+        func_decl.global = true;
+        func_decl.tags = Some("flows".to_string());
+        func_decl.access =
+            Some(HttpAccess::SIGNED_ID | HttpAccess::SAME_SPACE | HttpAccess::SENSITIVE_DATA);
+        func_decl.timeout = 30;
+        func_decl.version = Some(FLOWS_FUNCTION_VERSION);
+        func_decl
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    if let Err(err) = journal_core::install_sigbus_handler() {
+        eprintln!("failed to install SIGBUS handler: {}", err);
+        std::process::exit(1);
+    }
+
+    println!("TRUST_DURATIONS 1");
+    rt::init_tracing();
+
+    let config = match plugin_config::PluginConfig::new() {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            tracing::error!("failed to load configuration: {err:#}");
+            std::process::exit(1);
+        }
+    };
+
+    if !config.enabled {
+        tracing::info!("netflow plugin disabled by config (enabled=false)");
+        if !std::io::stdout().is_terminal() {
+            let mut stdout = std::io::stdout();
+            let _ = stdout.write_all(b"DISABLE\n");
+            let _ = stdout.flush();
+        }
+        return;
+    }
+
+    let shutdown = CancellationToken::new();
+    let metrics = Arc::new(ingest::IngestMetrics::default());
+    let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+    let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+    let (query_service, notify_rx) = match query::FlowQueryService::new(
+        &config,
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    )
+    .await
+    {
+        Ok(service) => service,
+        Err(err) => {
+            tracing::error!("failed to initialize query service: {err:#}");
+            std::process::exit(1);
+        }
+    };
+    let query_service = Arc::new(query_service);
+
+    let ingest_service = match ingest::IngestService::new(
+        config.clone(),
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        Arc::clone(&tier_flow_indexes),
+    ) {
+        Ok(service) => service,
+        Err(err) => {
+            tracing::error!("failed to initialize ingestion service: {err:#}");
+            std::process::exit(1);
+        }
+    };
+    let routing_runtime = ingest_service.routing_runtime();
+    let network_sources_runtime = ingest_service.network_sources_runtime();
+
+    let mut runtime = PluginRuntime::new("netflow-plugin");
+    runtime.register_handler(NetflowFlowsHandler::new(
+        Arc::clone(&metrics),
+        Arc::clone(&query_service),
+    ));
+
+    let query_service_for_events = Arc::clone(&query_service);
+    tokio::spawn(async move {
+        let mut notify_rx = notify_rx;
+        while let Some(event) = notify_rx.recv().await {
+            query_service_for_events.process_notify_event(event);
+        }
+        tracing::info!("netflow journal notify event task terminated");
+    });
+
+    let ingest_shutdown = shutdown.clone();
+    let ingest_task = tokio::spawn(async move { ingest_service.run(ingest_shutdown).await });
+    let mut bmp_task = None;
+    if config.enrichment.routing_dynamic.bmp.enabled {
+        if let Some(runtime_state) = routing_runtime.clone() {
+            let bmp_cfg = config.enrichment.routing_dynamic.bmp.clone();
+            let bmp_shutdown = shutdown.clone();
+            bmp_task = Some(tokio::spawn(async move {
+                if let Err(err) =
+                    routing_bmp::run_bmp_listener(bmp_cfg, runtime_state, bmp_shutdown).await
+                {
+                    tracing::error!("dynamic BMP routing listener failed: {err:#}");
+                }
+            }));
+        } else {
+            tracing::warn!(
+                "dynamic BMP routing is enabled but enrichment runtime is unavailable; listener not started"
+            );
+        }
+    }
+    let mut bioris_task = None;
+    if config.enrichment.routing_dynamic.bioris.enabled {
+        if let Some(runtime_state) = routing_runtime.clone() {
+            let bioris_cfg = config.enrichment.routing_dynamic.bioris.clone();
+            let bioris_metrics = Arc::clone(&metrics);
+            let bioris_shutdown = shutdown.clone();
+            bioris_task = Some(tokio::spawn(async move {
+                if let Err(err) = routing_bioris::run_bioris_listener(
+                    bioris_cfg,
+                    runtime_state,
+                    bioris_metrics,
+                    bioris_shutdown,
+                )
+                .await
+                {
+                    tracing::error!("dynamic BioRIS routing listener failed: {err:#}");
+                }
+            }));
+        } else {
+            tracing::warn!(
+                "dynamic BioRIS routing is enabled but enrichment runtime is unavailable; listener not started"
+            );
+        }
+    }
+    let mut network_sources_task = None;
+    if let Some(runtime_state) = network_sources_runtime {
+        let network_sources_cfg = config.enrichment.network_sources.clone();
+        if !network_sources_cfg.is_empty() {
+            let sources_shutdown = shutdown.clone();
+            network_sources_task = Some(tokio::spawn(async move {
+                if let Err(err) = network_sources::run_network_sources_refresher(
+                    network_sources_cfg,
+                    runtime_state,
+                    sources_shutdown,
+                )
+                .await
+                {
+                    tracing::error!("network-sources refresher failed: {err:#}");
+                }
+            }));
+        }
+    }
+
+    let mut exit_code = 0;
+    let keepalive_required = !std::io::stdout().is_terminal();
+    let mut ingest_task = ingest_task;
+    let mut ingest_task_finished = false;
+
+    tokio::select! {
+        result = async {
+            if keepalive_required {
+                let writer = runtime.writer();
+                let keepalive = async move {
+                    let mut interval = tokio::time::interval(Duration::from_secs(60));
+                    loop {
+                        interval.tick().await;
+                        if let Ok(mut w) = writer.try_lock() {
+                            let _ = w.write_raw(b"PLUGIN_KEEPALIVE\n").await;
+                        }
+                    }
+                };
+
+                tokio::select! {
+                    result = runtime.run() => result,
+                    _ = keepalive => Ok(()),
+                }
+            } else {
+                runtime.run().await
+            }
+        } => {
+            if let Err(err) = result {
+                tracing::error!("plugin runtime error: {err:#}");
+                exit_code = 1;
+            }
+        }
+        result = &mut ingest_task => {
+            ingest_task_finished = true;
+            match result {
+                Ok(Ok(())) => {
+                    tracing::error!("ingestion task exited unexpectedly");
+                    exit_code = 1;
+                }
+                Ok(Err(err)) => {
+                    tracing::error!("ingestion task error: {err:#}");
+                    exit_code = 1;
+                }
+                Err(err) if !err.is_cancelled() => {
+                    tracing::error!("ingestion task join error: {err}");
+                    exit_code = 1;
+                }
+                Err(_) => {}
+            }
+        }
+    }
+
+    shutdown.cancel();
+
+    if !ingest_task_finished {
+        match ingest_task.await {
+            Ok(Ok(())) => {}
+            Ok(Err(err)) => {
+                tracing::error!("ingestion task error: {err:#}");
+                exit_code = 1;
+            }
+            Err(err) if !err.is_cancelled() => {
+                tracing::error!("ingestion task join error: {err}");
+                exit_code = 1;
+            }
+            Err(_) => {}
+        }
+    }
+    if let Some(task) = bmp_task {
+        match task.await {
+            Ok(()) => {}
+            Err(err) if !err.is_cancelled() => {
+                tracing::error!("BMP listener task join error: {err}");
+                exit_code = 1;
+            }
+            Err(_) => {}
+        }
+    }
+    if let Some(task) = bioris_task {
+        match task.await {
+            Ok(()) => {}
+            Err(err) if !err.is_cancelled() => {
+                tracing::error!("BioRIS listener task join error: {err}");
+                exit_code = 1;
+            }
+            Err(_) => {}
+        }
+    }
+    if let Some(task) = network_sources_task {
+        match task.await {
+            Ok(()) => {}
+            Err(err) if !err.is_cancelled() => {
+                tracing::error!("network-sources task join error: {err}");
+                exit_code = 1;
+            }
+            Err(_) => {}
+        }
+    }
+
+    if exit_code != 0 {
+        std::process::exit(exit_code);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        FLOWS_FUNCTION_VERSION, FLOWS_UPDATE_EVERY_SECONDS, FlowsFunctionResponse,
+        NetflowFlowsHandler, ingest, plugin_config, query, tiering,
+    };
+    use chrono::Utc;
+    use etherparse::{SlicedPacket, TransportSlice};
+    use pcap_file::pcap::PcapReader;
+    use std::collections::HashMap;
+    use std::fs;
+    use std::net::UdpSocket as StdUdpSocket;
+    use std::path::{Path, PathBuf};
+    use std::sync::atomic::Ordering;
+    use std::sync::{Arc, RwLock};
+    use std::time::{Duration, Instant};
+    use tempfile::TempDir;
+    use tokio::net::UdpSocket;
+    use tokio_util::sync::CancellationToken;
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn e2e_ingest_writes_journals_and_query_reads_flows() {
+        let (cfg, metrics, open_tiers, tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
+
+        assert_tier_has_files(&cfg.journal.raw_tier_dir(), "raw");
+        assert_tier_dir_exists(&cfg.journal.minute_1_tier_dir(), "1m");
+        assert_tier_dir_exists(&cfg.journal.minute_5_tier_dir(), "5m");
+        assert_tier_dir_exists(&cfg.journal.hour_1_tier_dir(), "1h");
+
+        let (query_service, _notify_rx) = query::FlowQueryService::new(
+            &cfg,
+            Arc::clone(&open_tiers),
+            Arc::clone(&tier_flow_indexes),
+        )
+        .await
+        .expect("create query service");
+        let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+        let request = query::FlowsRequest {
+            view: query::ViewMode::TableSankey,
+            after: Some(1),
+            before: Some(before),
+            group_by: vec![
+                "SRC_ADDR".to_string(),
+                "DST_ADDR".to_string(),
+                "PROTOCOL".to_string(),
+            ],
+            top_n: query::TopN::N100,
+            ..Default::default()
+        };
+        let output = query_service
+            .query_flows(&request)
+            .await
+            .expect("query tuple flows");
+
+        assert!(
+            !output.flows.is_empty(),
+            "expected at least one flow from ingested fixture"
+        );
+        assert!(
+            output.metrics.get("bytes").copied().unwrap_or(0) > 0,
+            "expected bytes metric to be positive"
+        );
+        assert!(
+            output.facets.is_some(),
+            "expected facets in query output for UI filtering"
+        );
+        assert!(
+            !output.stats.is_empty(),
+            "expected stats to remain available for backend debugging"
+        );
+        assert!(
+            metrics.journal_entries_written.load(Ordering::Relaxed) > 0,
+            "expected raw journal entries written by ingest service"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn e2e_flows_function_returns_expected_response_sections() {
+        let (cfg, metrics, open_tiers, tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
+        let (query_service, _notify_rx) = query::FlowQueryService::new(
+            &cfg,
+            Arc::clone(&open_tiers),
+            Arc::clone(&tier_flow_indexes),
+        )
+        .await
+        .expect("create query service");
+        let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
+        let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+
+        let response = handler
+            .handle_request(query::FlowsRequest {
+                view: query::ViewMode::TableSankey,
+                after: Some(1),
+                before: Some(before),
+                group_by: vec![
+                    "SRC_ADDR".to_string(),
+                    "DST_ADDR".to_string(),
+                    "PROTOCOL".to_string(),
+                ],
+                top_n: query::TopN::N100,
+                ..Default::default()
+            })
+            .await
+            .expect("flows function call");
+        let response = match response {
+            FlowsFunctionResponse::Table(response) => response,
+            FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
+        };
+
+        assert_eq!(response.status, 200);
+        assert_eq!(response.version, FLOWS_FUNCTION_VERSION);
+        assert_eq!(response.update_every, FLOWS_UPDATE_EVERY_SECONDS);
+        assert_eq!(response.response_type, "flows");
+        assert_eq!(response.data.view, "table-sankey");
+        assert!(
+            !response.data.flows.is_empty(),
+            "expected non-empty flows data section"
+        );
+        assert!(
+            response.data.facets.is_some(),
+            "expected facets section in flows response"
+        );
+        assert!(
+            !response.data.metrics.is_empty(),
+            "expected top-level metrics to remain in table-family response"
+        );
+        assert!(
+            response
+                .required_params
+                .iter()
+                .any(|param| param.id == "view"),
+            "expected required 'view' parameter declaration"
+        );
+        assert!(
+            response
+                .required_params
+                .iter()
+                .any(|param| param.id == "group_by"),
+            "expected required 'group_by' parameter declaration"
+        );
+        let group_by_param = response
+            .required_params
+            .iter()
+            .find(|param| param.id == "group_by")
+            .expect("group_by required param");
+        assert_eq!(group_by_param.kind, "multiselect");
+        assert!(
+            group_by_param
+                .options
+                .iter()
+                .any(|option| option.id == "SRC_AS_NAME"),
+            "expected SRC_AS_NAME group_by option to be available"
+        );
+        assert!(
+            group_by_param
+                .options
+                .iter()
+                .any(|option| option.id == "SRC_ADDR" && option.default_selected),
+            "expected current request group_by selection to be reflected"
+        );
+        assert!(
+            response
+                .required_params
+                .iter()
+                .any(|param| param.id == "sort_by"),
+            "expected required 'sort_by' parameter declaration"
+        );
+        assert!(
+            response
+                .required_params
+                .iter()
+                .any(|param| param.id == "top_n"),
+            "expected required 'top_n' parameter declaration"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn e2e_flows_metrics_function_returns_top_n_chart() {
+        let (cfg, metrics, open_tiers, tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
+        let (query_service, _notify_rx) = query::FlowQueryService::new(
+            &cfg,
+            Arc::clone(&open_tiers),
+            Arc::clone(&tier_flow_indexes),
+        )
+        .await
+        .expect("create query service");
+        let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
+        let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+        let after = before.saturating_sub(3600);
+
+        let response = handler
+            .handle_request(query::FlowsRequest {
+                view: query::ViewMode::TimeSeries,
+                after: Some(after),
+                before: Some(before),
+                group_by: vec!["PROTOCOL".to_string()],
+                sort_by: query::SortBy::Bytes,
+                top_n: query::TopN::N50,
+                ..Default::default()
+            })
+            .await
+            .expect("flow metrics function call");
+        let response = match response {
+            FlowsFunctionResponse::Metrics(response) => response,
+            FlowsFunctionResponse::Table(_) => panic!("expected metrics response"),
+        };
+
+        assert_eq!(response.status, 200);
+        assert_eq!(response.version, FLOWS_FUNCTION_VERSION);
+        assert_eq!(response.update_every, FLOWS_UPDATE_EVERY_SECONDS);
+        assert_eq!(response.response_type, "flows");
+        assert_eq!(response.data.view, "timeseries");
+        assert_eq!(response.data.metric, "bytes");
+        assert_eq!(response.data.group_by, vec!["PROTOCOL".to_string()]);
+        assert_eq!(response.data.columns["PROTOCOL"]["name"], "Protocol");
+        assert_eq!(response.data.chart["view"]["units"], "bytes/s");
+        assert!(
+            response.data.stats.get("query_tier").copied().unwrap_or(0) > 0,
+            "expected timeseries query to use a materialized tier when raw-only fields are absent"
+        );
+        assert_eq!(
+            response.data.stats.get("query_bucket_seconds").copied(),
+            Some(60)
+        );
+        assert!(
+            response.data.chart["view"]["dimensions"]["ids"]
+                .as_array()
+                .map(|dims| !dims.is_empty() && dims.len() <= 50)
+                .unwrap_or(false),
+            "expected Top-N chart dimensions limited by request"
+        );
+        assert!(
+            response.data.chart["result"]["data"]
+                .as_array()
+                .map(|rows| !rows.is_empty())
+                .unwrap_or(false),
+            "expected chart datapoints in metrics response"
+        );
+        assert!(
+            response
+                .required_params
+                .iter()
+                .any(|param| param.id == "sort_by"),
+            "expected required 'sort_by' parameter declaration"
+        );
+        assert!(
+            response
+                .required_params
+                .iter()
+                .any(|param| param.id == "top_n"),
+            "expected required 'top_n' parameter declaration"
+        );
+        assert_eq!(
+            response
+                .required_params
+                .iter()
+                .find(|param| param.id == "group_by")
+                .and_then(|param| param.options.iter().find(|option| option.id == "PROTOCOL"))
+                .map(|option| option.name.as_str()),
+            Some("Protocol")
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn e2e_aggregated_safe_group_by_reads_from_materialized_rollup_tier() {
+        let (cfg, metrics, open_tiers, tier_flow_indexes, _tmp) =
+            ingest_fixture_with_timestamp_source(
+                "nfv5.pcap",
+                plugin_config::TimestampSource::Input,
+            )
+            .await;
+        assert!(
+            tier_file_count(&cfg.journal.hour_1_tier_dir()) > 0
+                || !open_tiers
+                    .read()
+                    .expect("read open tiers")
+                    .hour_1
+                    .is_empty(),
+            "expected hour_1 rollup data to exist for deterministic non-raw query"
+        );
+
+        let (query_service, _notify_rx) = query::FlowQueryService::new(
+            &cfg,
+            Arc::clone(&open_tiers),
+            Arc::clone(&tier_flow_indexes),
+        )
+        .await
+        .expect("create query service");
+        let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+        let request = query::FlowsRequest {
+            view: query::ViewMode::TableSankey,
+            after: Some(1),
+            before: Some(before),
+            group_by: vec![
+                "SRC_AS_NAME".to_string(),
+                "DST_AS_NAME".to_string(),
+                "PROTOCOL".to_string(),
+            ],
+            top_n: query::TopN::N100,
+            ..Default::default()
+        };
+        let output = query_service
+            .query_flows(&request)
+            .await
+            .expect("query aggregated-safe flows");
+        assert!(
+            !output.flows.is_empty(),
+            "expected non-empty aggregated-safe flows from materialized tier"
+        );
+        assert!(
+            output.stats.get("query_tier").copied().unwrap_or(0) > 0,
+            "expected aggregated-safe query to use non-raw tier"
+        );
+
+        let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
+        let response = handler
+            .handle_request(request)
+            .await
+            .expect("flows function call for aggregated-safe view");
+        let response = match response {
+            FlowsFunctionResponse::Table(response) => response,
+            FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
+        };
+        assert!(
+            !response.data.flows.is_empty(),
+            "expected non-empty function flows for aggregated-safe view"
+        );
+        assert_eq!(
+            response.data.group_by,
+            vec![
+                "SRC_AS_NAME".to_string(),
+                "DST_AS_NAME".to_string(),
+                "PROTOCOL".to_string()
+            ]
+        );
+        assert_eq!(
+            response.data.columns["SRC_AS_NAME"]["name"],
+            "Source AS Name"
+        );
+        assert_eq!(response.data.columns["PROTOCOL"]["name"], "Protocol");
+        assert!(
+            response.data.stats.get("query_tier").copied().unwrap_or(0) > 0,
+            "expected function response to report non-raw query tier"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn e2e_country_map_reuses_tuple_table_shape_with_country_keys() {
+        let (cfg, metrics, open_tiers, tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
+        let (query_service, _notify_rx) = query::FlowQueryService::new(
+            &cfg,
+            Arc::clone(&open_tiers),
+            Arc::clone(&tier_flow_indexes),
+        )
+        .await
+        .expect("create query service");
+        let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
+        let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+
+        let response = handler
+            .handle_request(query::FlowsRequest {
+                view: query::ViewMode::CountryMap,
+                after: Some(1),
+                before: Some(before),
+                group_by: vec!["SRC_ADDR".to_string(), "DST_ADDR".to_string()],
+                top_n: query::TopN::N25,
+                ..Default::default()
+            })
+            .await
+            .expect("country-map function call");
+        let response = match response {
+            FlowsFunctionResponse::Table(response) => response,
+            FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
+        };
+
+        assert_eq!(response.status, 200);
+        assert_eq!(response.response_type, "flows");
+        assert_eq!(response.data.view, "country-map");
+        assert_eq!(
+            response.data.group_by,
+            vec!["SRC_COUNTRY".to_string(), "DST_COUNTRY".to_string()]
+        );
+        assert!(
+            !response.data.flows.is_empty(),
+            "expected non-empty country-map tuple rows"
+        );
+
+        let first = response.data.flows.first().expect("first flow row");
+        assert!(
+            first["key"].get("SRC_COUNTRY").is_some(),
+            "expected country-map rows to expose SRC_COUNTRY"
+        );
+        assert!(
+            first["key"].get("DST_COUNTRY").is_some(),
+            "expected country-map rows to expose DST_COUNTRY"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn e2e_selection_filter_uses_streaming_reader_path() {
+        let (cfg, _metrics, open_tiers, tier_flow_indexes, _tmp) =
+            ingest_fixture("nfv5.pcap").await;
+        let (query_service, _notify_rx) = query::FlowQueryService::new(
+            &cfg,
+            Arc::clone(&open_tiers),
+            Arc::clone(&tier_flow_indexes),
+        )
+        .await
+        .expect("create query service");
+        let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+
+        let request_base = query::FlowsRequest {
+            view: query::ViewMode::TableSankey,
+            after: Some(1),
+            before: Some(before),
+            group_by: vec![
+                "SRC_ADDR".to_string(),
+                "DST_ADDR".to_string(),
+                "PROTOCOL".to_string(),
+            ],
+            top_n: query::TopN::N100,
+            ..Default::default()
+        };
+        let request_match = query::FlowsRequest {
+            selections: HashMap::from([("FLOW_VERSION".to_string(), vec!["v5".to_string()])]),
+            ..request_base
+        };
+        let matched = query_service
+            .query_flows(&request_match)
+            .await
+            .expect("query with matching FLOW_VERSION selection");
+        assert_eq!(
+            matched.stats.get("query_reader_path").copied().unwrap_or(0),
+            1,
+            "expected query to use journal-session reader path"
+        );
+        assert!(
+            matched
+                .stats
+                .get("query_matched_entries")
+                .copied()
+                .unwrap_or(0)
+                > 0,
+            "expected at least one matched entry for FLOW_VERSION=v5"
+        );
+
+        let request_multi = query::FlowsRequest {
+            selections: HashMap::from([(
+                "PROTOCOL".to_string(),
+                vec!["6".to_string(), "17".to_string()],
+            )]),
+            ..Default::default()
+        };
+        let request_multi = query::FlowsRequest {
+            view: query::ViewMode::TableSankey,
+            after: Some(1),
+            before: Some(before),
+            group_by: vec![
+                "SRC_ADDR".to_string(),
+                "DST_ADDR".to_string(),
+                "PROTOCOL".to_string(),
+            ],
+            top_n: query::TopN::N100,
+            ..request_multi
+        };
+        let multi = query_service
+            .query_flows(&request_multi)
+            .await
+            .expect("query with multi-value PROTOCOL selection");
+        assert_eq!(
+            multi.stats.get("query_reader_path").copied().unwrap_or(0),
+            1,
+            "expected multi-value selection query to use journal-session reader path"
+        );
+        assert!(
+            multi
+                .stats
+                .get("query_matched_entries")
+                .copied()
+                .unwrap_or(0)
+                > 0,
+            "expected at least one matched entry for PROTOCOL in [6,17]"
+        );
+        assert!(
+            multi.flows.iter().all(|row| {
+                row["key"]
+                    .get("PROTOCOL")
+                    .and_then(|value| value.as_str())
+                    .map(|value| value == "6" || value == "17")
+                    .unwrap_or(false)
+            }),
+            "expected every returned row to respect the multi-value protocol filter"
+        );
+
+        let request_miss = query::FlowsRequest {
+            selections: HashMap::from([("FLOW_VERSION".to_string(), vec!["999".to_string()])]),
+            view: query::ViewMode::TableSankey,
+            after: Some(1),
+            before: Some(before),
+            group_by: vec![
+                "SRC_ADDR".to_string(),
+                "DST_ADDR".to_string(),
+                "PROTOCOL".to_string(),
+            ],
+            top_n: query::TopN::N100,
+            ..Default::default()
+        };
+        let missed = query_service
+            .query_flows(&request_miss)
+            .await
+            .expect("query with non-matching FLOW_VERSION selection");
+        assert_eq!(
+            missed
+                .stats
+                .get("query_matched_entries")
+                .copied()
+                .unwrap_or(0),
+            0,
+            "expected no matched entries for FLOW_VERSION=999"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn e2e_post_style_nested_required_controls_still_filter_correctly() {
+        let (cfg, _metrics, open_tiers, tier_flow_indexes, _tmp) =
+            ingest_fixture("nfv5.pcap").await;
+        let (query_service, _notify_rx) = query::FlowQueryService::new(
+            &cfg,
+            Arc::clone(&open_tiers),
+            Arc::clone(&tier_flow_indexes),
+        )
+        .await
+        .expect("create query service");
+        let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+        let payload = format!(
+            r#"{{
+                "after":1,
+                "before":{before},
+                "query":"",
+                "selections":{{
+                    "view":"table-sankey",
+                    "group_by":["SRC_ADDR","DST_ADDR","PROTOCOL"],
+                    "sort_by":"bytes",
+                    "top_n":"100",
+                    "FLOW_VERSION":["v5"]
+                }},
+                "timeout":120000,
+                "last":200
+            }}"#
+        );
+        let request = serde_json::from_str::<query::FlowsRequest>(&payload)
+            .expect("request should deserialize");
+
+        let output = query_service
+            .query_flows(&request)
+            .await
+            .expect("query should honor nested required controls");
+
+        assert_eq!(
+            output.stats.get("query_reader_path").copied().unwrap_or(0),
+            1,
+            "expected query to use journal-session reader path"
+        );
+        assert!(
+            output
+                .stats
+                .get("query_matched_entries")
+                .copied()
+                .unwrap_or(0)
+                > 0,
+            "expected nested required controls not to suppress real filtering"
+        );
+        assert!(
+            !output.flows.is_empty(),
+            "expected rows after hoisting nested required controls out of selections"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore]
+    async fn profile_live_day_query_against_local_journals() {
+        let journal_dir = PathBuf::from("/var/cache/netdata/flows");
+        assert!(
+            journal_dir.exists(),
+            "expected live netflow journal directory at {}",
+            journal_dir.display()
+        );
+
+        let mut cfg = plugin_config::PluginConfig::default();
+        cfg.journal.journal_dir = journal_dir.to_string_lossy().to_string();
+
+        let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+        let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+        let (query_service, _notify_rx) = query::FlowQueryService::new(
+            &cfg,
+            Arc::clone(&open_tiers),
+            Arc::clone(&tier_flow_indexes),
+        )
+        .await
+        .expect("create query service for live journals");
+
+        let before = Utc::now().timestamp().max(1) as u32;
+        let after = before.saturating_sub(24 * 60 * 60);
+        let request = query::FlowsRequest {
+            view: query::ViewMode::TableSankey,
+            after: Some(after),
+            before: Some(before),
+            group_by: vec![
+                "PROTOCOL".to_string(),
+                "SRC_AS_NAME".to_string(),
+                "DST_AS_NAME".to_string(),
+            ],
+            top_n: query::TopN::N25,
+            ..Default::default()
+        };
+
+        let start = Instant::now();
+        let output = query_service
+            .query_flows(&request)
+            .await
+            .expect("query live journals");
+        let elapsed = start.elapsed();
+
+        eprintln!();
+        eprintln!("=== Live Day Query Profile Harness ===");
+        eprintln!("journal_dir:             {}", journal_dir.display());
+        eprintln!("after:                   {}", after);
+        eprintln!("before:                  {}", before);
+        eprintln!("group_by:                {:?}", request.group_by);
+        eprintln!(
+            "elapsed_ms:              {:.2}",
+            elapsed.as_secs_f64() * 1_000.0
+        );
+        eprintln!("flow_rows:               {}", output.flows.len());
+        eprintln!(
+            "metric_bytes:            {}",
+            output.metrics.get("bytes").copied().unwrap_or(0)
+        );
+        eprintln!(
+            "metric_packets:          {}",
+            output.metrics.get("packets").copied().unwrap_or(0)
+        );
+        eprintln!("stats:                   {:?}", output.stats);
+    }
+
+    async fn ingest_fixture(
+        fixture_name: &str,
+    ) -> (
+        plugin_config::PluginConfig,
+        Arc<ingest::IngestMetrics>,
+        Arc<RwLock<tiering::OpenTierState>>,
+        Arc<RwLock<tiering::TierFlowIndexStore>>,
+        TempDir,
+    ) {
+        ingest_fixture_with_timestamp_source(fixture_name, plugin_config::TimestampSource::Input)
+            .await
+    }
+
+    async fn ingest_fixture_with_timestamp_source(
+        fixture_name: &str,
+        timestamp_source: plugin_config::TimestampSource,
+    ) -> (
+        plugin_config::PluginConfig,
+        Arc<ingest::IngestMetrics>,
+        Arc<RwLock<tiering::OpenTierState>>,
+        Arc<RwLock<tiering::TierFlowIndexStore>>,
+        TempDir,
+    ) {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let listen = reserve_udp_listen_addr();
+        let mut cfg = plugin_config::PluginConfig::default();
+        cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
+        cfg.listener.listen = listen.clone();
+        cfg.listener.sync_interval = Duration::from_millis(50);
+        cfg.listener.sync_every_entries = 1;
+        cfg.protocols.timestamp_source = timestamp_source;
+
+        let metrics = Arc::new(ingest::IngestMetrics::default());
+        let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+        let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+        let service = ingest::IngestService::new(
+            cfg.clone(),
+            Arc::clone(&metrics),
+            Arc::clone(&open_tiers),
+            Arc::clone(&tier_flow_indexes),
+        )
+        .expect("create ingest service");
+
+        let shutdown = CancellationToken::new();
+        let run_shutdown = shutdown.clone();
+        let ingest_task = tokio::spawn(async move { service.run(run_shutdown).await });
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        replay_fixture_udp(&listen, fixture_name).await;
+
+        wait_for_ingest_progress(&metrics).await;
+        shutdown.cancel();
+
+        ingest_task
+            .await
+            .expect("join ingestion task")
+            .expect("ingestion run");
+
+        (cfg, metrics, open_tiers, tier_flow_indexes, tmp)
+    }
+
+    async fn wait_for_ingest_progress(metrics: &Arc<ingest::IngestMetrics>) {
+        tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                if metrics.journal_entries_written.load(Ordering::Relaxed) > 0 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(25)).await;
+            }
+        })
+        .await
+        .expect("ingest did not write raw entries in time");
+    }
+
+    async fn replay_fixture_udp(listen: &str, fixture_name: &str) {
+        let sender = UdpSocket::bind("127.0.0.1:0")
+            .await
+            .expect("bind udp sender");
+        let payloads = fixture_udp_payloads(fixture_name);
+        assert!(
+            !payloads.is_empty(),
+            "fixture {fixture_name} should contain udp payloads"
+        );
+
+        for payload in payloads {
+            sender
+                .send_to(&payload, listen)
+                .await
+                .expect("send fixture datagram");
+        }
+    }
+
+    fn fixture_udp_payloads(fixture_name: &str) -> Vec<Vec<u8>> {
+        let path = fixture_dir().join(fixture_name);
+        let file = fs::File::open(&path)
+            .unwrap_or_else(|err| panic!("open fixture {}: {}", path.display(), err));
+        let mut reader = PcapReader::new(file)
+            .unwrap_or_else(|err| panic!("open pcap {}: {}", path.display(), err));
+
+        let mut payloads = Vec::new();
+        while let Some(packet) = reader.next_packet() {
+            let packet =
+                packet.unwrap_or_else(|err| panic!("read packet {}: {}", path.display(), err));
+            if let Some(payload) = extract_udp_payload(packet.data.as_ref()) {
+                payloads.push(payload.to_vec());
+            }
+        }
+        payloads
+    }
+
+    fn extract_udp_payload(packet: &[u8]) -> Option<&[u8]> {
+        let sliced = SlicedPacket::from_ethernet(packet).ok()?;
+        match sliced.transport {
+            Some(TransportSlice::Udp(udp)) => Some(udp.payload()),
+            _ => None,
+        }
+    }
+
+    fn fixture_dir() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/flows")
+    }
+
+    fn reserve_udp_listen_addr() -> String {
+        let sock = StdUdpSocket::bind("127.0.0.1:0").expect("reserve udp listen socket");
+        let addr = sock.local_addr().expect("read local addr");
+        addr.to_string()
+    }
+
+    fn assert_tier_has_files(path: &Path, tier_name: &str) {
+        let count = tier_file_count(path);
+        assert!(
+            count > 0,
+            "expected journal files in {tier_name} tier directory {}, found {}",
+            path.display(),
+            count
+        );
+    }
+
+    fn assert_tier_dir_exists(path: &Path, tier_name: &str) {
+        assert!(
+            path.is_dir(),
+            "expected {tier_name} tier directory to exist at {}",
+            path.display()
+        );
+    }
+
+    fn tier_file_count(path: &Path) -> usize {
+        fs::read_dir(path)
+            .unwrap_or_else(|err| panic!("read tier dir {}: {}", path.display(), err))
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .file_type()
+                    .map(|file_type| file_type.is_file())
+                    .unwrap_or(false)
+            })
+            .count()
+    }
+}

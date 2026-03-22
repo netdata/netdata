@@ -1,0 +1,16 @@
+[package]
+name = "netdata-flow-index"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+hashbrown = { workspace = true }
+thiserror = { workspace = true }
+twox-hash = { workspace = true, features = ["xxhash64"] }
+
+[dev-dependencies]
+proptest = { workspace = true }

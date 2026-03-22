@@ -643,6 +643,34 @@ impl<M: MemoryMap> JournalFile<M> {
         })
     }
 
+    /// Collects all DATA object offsets for a specific entry.
+    pub fn entry_data_object_offsets(
+        &self,
+        entry_offset: NonZeroU64,
+        data_offsets: &mut Vec<NonZeroU64>,
+    ) -> Result<()> {
+        let entry_guard = self.entry_ref(entry_offset)?;
+
+        match &entry_guard.items {
+            EntryItemsType::Regular(items) => {
+                for item in items.iter() {
+                    if let Some(offset) = NonZeroU64::new(item.object_offset) {
+                        data_offsets.push(offset);
+                    }
+                }
+            }
+            EntryItemsType::Compact(items) => {
+                for item in items.iter() {
+                    if let Some(offset) = NonZeroU64::new(item.object_offset as u64) {
+                        data_offsets.push(offset);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Get hash table bucket utilization statistics
     pub fn bucket_utilization(&self) -> Option<BucketUtilization> {
         let data_hash_table = self.data_hash_table_ref()?;

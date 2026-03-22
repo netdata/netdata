@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "scenario_id": "nms7918_samasw01_bridge_fdb",
+  "description": "Enlinkd NMS-7918 bridge/FDB parity slice for SAMASW01 collection.",
+  "devices": [
+    {
+      "id": "samasw01",
+      "hostname": "sam.asw01"
+    }
+  ],
+  "adjacencies": null,
+  "expectations": {
+    "directional_adjacencies": 0,
+    "bidirectional_pairs": 0,
+    "devices": 1
+  }
+}

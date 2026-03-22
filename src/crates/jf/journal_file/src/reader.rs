@@ -1,7 +1,7 @@
 use crate::{
     cursor::{JournalCursor, Location},
-    file::{EntryDataIterator, FieldDataIterator, FieldIterator, JournalFile},
-    filter::{JournalFilter, LogicalOp},
+    file::{FieldDataIterator, FieldIterator, JournalFile},
+    filter::{FilterExpr, JournalFilter, LogicalOp},
     object::{DataObject, FieldObject},
     offset_array::Direction,
     value_guard::ValueGuard,
@@ -16,7 +16,9 @@ pub struct JournalReader<'a, M: MemoryMap> {
     filter: Option<JournalFilter>,
     field_iterator: Option<FieldIterator<'a, M>>,
     field_data_iterator: Option<FieldDataIterator<'a, M>>,
-    entry_data_iterator: Option<EntryDataIterator<'a, M>>,
+    entry_data_offsets: Vec<NonZeroU64>,
+    entry_data_index: usize,
+    entry_data_ready: bool,
 
     field_guard: Option<ValueGuard<'a, FieldObject<&'a [u8]>>>,
     data_guard: Option<ValueGuard<'a, DataObject<&'a [u8]>>>,
@@ -39,7 +41,9 @@ impl<M: MemoryMap> Default for JournalReader<'_, M> {
             filter: None,
             field_iterator: None,
             field_data_iterator: None,
-            entry_data_iterator: None,
+            entry_data_offsets: Vec::new(),
+            entry_data_index: 0,
+            entry_data_ready: false,
             field_guard: None,
             data_guard: None,
         }
@@ -69,6 +73,21 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
         }
 
         self.cursor.step(journal_file, direction)
+    }
+
+    /// Build the pending filter expression (if any) and return it.
+    ///
+    /// This consumes the unresolved filter state so callers that drive
+    /// [`JournalCursor`] directly can resolve per-file matches once and
+    /// reuse the resulting expression.
+    pub fn build_filter(&mut self, journal_file: &JournalFile<M>) -> Result<Option<FilterExpr>> {
+        if let Some(filter) = self.filter.as_mut() {
+            let expr = filter.build(journal_file)?;
+            self.filter = None;
+            Ok(Some(expr))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn add_match(&mut self, data: &[u8]) {
@@ -170,7 +189,9 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
 
     pub fn entry_data_restart(&mut self) {
         self.drop_guards();
-        self.entry_data_iterator = None;
+        self.entry_data_offsets.clear();
+        self.entry_data_index = 0;
+        self.entry_data_ready = false;
     }
 
     pub fn entry_data_enumerate(
@@ -179,16 +200,22 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     ) -> Result<Option<&ValueGuard<'_, DataObject<&'a [u8]>>>> {
         self.drop_guards();
 
-        if self.entry_data_iterator.is_none() {
+        if !self.entry_data_ready {
             let entry_offset = self.cursor.position()?;
-            self.entry_data_iterator = Some(journal_file.entry_data_objects(entry_offset)?);
+            self.entry_data_offsets.clear();
+            journal_file.entry_data_object_offsets(entry_offset, &mut self.entry_data_offsets)?;
+            self.entry_data_index = 0;
+            self.entry_data_ready = true;
         }
 
-        if let Some(iter) = &mut self.entry_data_iterator {
-            self.data_guard = iter.next().transpose()?;
-            Ok(self.data_guard.as_ref())
-        } else {
-            Ok(None)
+        if self.entry_data_index >= self.entry_data_offsets.len() {
+            return Ok(None);
         }
+
+        let data_offset = self.entry_data_offsets[self.entry_data_index];
+        self.entry_data_index += 1;
+
+        self.data_guard = Some(journal_file.data_ref(data_offset)?);
+        Ok(self.data_guard.as_ref())
     }
 }

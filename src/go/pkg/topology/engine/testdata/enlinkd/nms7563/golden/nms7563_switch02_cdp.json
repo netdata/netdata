@@ -1,0 +1,47 @@
+{
+  "version": "v1",
+  "scenario_id": "nms7563_switch02_cdp",
+  "description": "Enlinkd NMS-7563 Switch02 CDP parity scenario from OpenNMS integration test corpus.",
+  "devices": [
+    {
+      "id": "00 1f f2 07 99 4f",
+      "hostname": "00 1F F2 07 99 4F"
+    },
+    {
+      "id": "cisco01",
+      "hostname": "cisco01"
+    },
+    {
+      "id": "switch02",
+      "hostname": "switch02"
+    }
+  ],
+  "adjacencies": [
+    {
+      "protocol": "cdp",
+      "source_device": "switch02",
+      "source_port": "24",
+      "target_device": "cisco01",
+      "target_port": "Fa0/8"
+    },
+    {
+      "protocol": "cdp",
+      "source_device": "switch02",
+      "source_port": "24",
+      "target_device": "cisco01",
+      "target_port": "FastEthernet0/8"
+    },
+    {
+      "protocol": "cdp",
+      "source_device": "switch02",
+      "source_port": "7",
+      "target_device": "00 1f f2 07 99 4f",
+      "target_port": "00 1F F2 07 99 4F"
+    }
+  ],
+  "expectations": {
+    "directional_adjacencies": 3,
+    "bidirectional_pairs": 0,
+    "devices": 3
+  }
+}

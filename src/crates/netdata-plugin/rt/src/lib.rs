@@ -1022,6 +1022,33 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
                     function_call.payload = Some(payload);
                 }
             }
+
+            // convert GET key:value args to JSON payload for flows:netflow
+            if function_call.name.starts_with("flows:") && function_call.payload.is_none() {
+                if !function_call.args.is_empty() {
+                    let numeric_fields: &[&str] = &["after", "before", "last"];
+                    let mut map = serde_json::Map::new();
+                    for arg in &function_call.args {
+                        if let Some((key, value)) = arg.split_once(':') {
+                            let json_value =
+                                if numeric_fields.contains(&key) {
+                                    value.parse::<u64>().map_or_else(
+                                        |_| serde_json::json!(value),
+                                        |n| serde_json::json!(n),
+                                    )
+                                } else {
+                                    serde_json::json!(value)
+                                };
+                            map.insert(key.to_string(), json_value);
+                        }
+                    }
+                    if !map.is_empty() {
+                        let json = serde_json::Value::Object(map);
+                        function_call.payload =
+                            Some(serde_json::to_vec(&json).unwrap_or_default());
+                    }
+                }
+            }
         }
 
         // Get handler

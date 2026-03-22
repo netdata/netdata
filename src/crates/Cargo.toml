@@ -9,6 +9,7 @@ members = [
     "journal-log-writer",
     "journal-engine",
     "journal-registry",
+    "journal-session",
     "rdp",
 
     # Netdata plugin workspace members
@@ -27,6 +28,10 @@ members = [
     # Netdata OTEL workspace members
     "netdata-otel/otel-plugin",
     "netdata-otel/flatten_otel",
+
+    # Netdata NetFlow workspace members
+    "netdata-netflow/flow-index",
+    "netdata-netflow/netflow-plugin",
 ]
 
 [workspace.package]
@@ -56,6 +61,7 @@ lzma-rust2 = { version = "0.15", default-features = false, features = ["std", "x
 md5 = "0.7"
 
 roaring = { git = "https://github.com/netdata/roaring-rs.git", branch="allocative" }
+hashbrown = "0.15"
 serde = { version = "1.0" }
 rustc-hash = "2.1"
 bincode = { version = "1.3" }
@@ -77,6 +83,7 @@ async-trait = "0.1.89"
 serde_yaml = "0.9.34"
 serde_regex = "1.1.0"
 tokio = { version = "1.45", features = ["full"] }
+ipnet = "2.11.0"
 
 # Tracing
 tracing = { version = "0.1" }
@@ -134,7 +141,7 @@ journal-index = { path = "journal-index" }
 journal-log-writer = { path = "journal-log-writer" }
 journal-engine = { path = "journal-engine" }
 journal-registry = { path = "journal-registry" }
-journalctl = { path = "journalctl" }
+journal-session = { path = "journal-session" }
 rdp = { path = "rdp" }
 
 # Netdata plugin crates

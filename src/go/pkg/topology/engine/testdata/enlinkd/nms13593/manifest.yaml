@@ -1,0 +1,24 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd/nms13593
+scenarios:
+  - id: nms13593_lldp
+    description: >-
+      Enlinkd NMS-13593 LLDP parity scenario from OpenNMS integration test
+      corpus.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: ZHBGO1Zsr001
+        hostname: ZHBGO1Zsr001
+        walk_file: ../upstream/linkd/nms13593/srv001-walk.txt
+      - device_id: ZHBGO1Zsr002
+        hostname: ZHBGO1Zsr002
+        walk_file: ../upstream/linkd/nms13593/srv002-walk.txt
+    golden_yaml: golden/nms13593_lldp.yaml
+    golden_json: golden/nms13593_lldp.json
