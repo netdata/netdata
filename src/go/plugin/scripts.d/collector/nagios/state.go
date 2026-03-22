@@ -49,6 +49,10 @@ func (s *collectState) currentJobState() string {
 	return s.jobState
 }
 
+func (s *collectState) isRetrying() bool {
+	return s != nil && s.retrying
+}
+
 func (s *collectState) currentAttempt() int {
 	if s == nil {
 		return 1

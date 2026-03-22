@@ -217,6 +217,7 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 		"BuildPlanAutogenOptionKeepsTemplateSelector":                  {run: runTestBuildPlanAutogenOptionKeepsTemplateSelector},
 		"BuildPlanAutogenCreatesChartForUnmatchedScalar":               {run: runTestBuildPlanAutogenCreatesChartForUnmatchedScalar},
 		"BuildPlanAutogenUsesMetricMetadataForScalar":                  {run: runTestBuildPlanAutogenUsesMetricMetadataForScalar},
+		"BuildPlanAutogenUsesMetricPriorityMetadataForScalar":          {run: runTestBuildPlanAutogenUsesMetricPriorityMetadataForScalar},
 		"BuildPlanAutogenUsesMetricMetadataForHistogram":               {run: runTestBuildPlanAutogenUsesMetricMetadataForHistogram},
 		"BuildPlanAutogenUsesMetricFloatMetadataForScalar":             {run: runTestBuildPlanAutogenUsesMetricFloatMetadataForScalar},
 		"BuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles": {run: runTestBuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles},
@@ -1039,6 +1040,49 @@ groups:
 	assert.Equal(t, "HTTP traffic", create.Meta.Title)
 	assert.Equal(t, "Traffic", create.Meta.Family)
 	assert.Equal(t, "bytes/s", create.Meta.Units)
+	assert.Equal(t, Priority, create.Meta.Priority)
+}
+
+func runTestBuildPlanAutogenUsesMetricPriorityMetadataForScalar(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	unmatched := store.Write().SnapshotMeter("svc").Counter(
+		"bytes_total",
+		metrix.WithDescription("HTTP traffic"),
+		metrix.WithChartFamily("Traffic"),
+		metrix.WithChartPriority(Priority+321),
+		metrix.WithUnit("bytes"),
+	)
+
+	cc.BeginCycle()
+	unmatched.ObserveTotal(10)
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, Priority+321, create.Meta.Priority)
 }
 
 func runTestBuildPlanAutogenUsesMetricMetadataForHistogram(t *testing.T) {

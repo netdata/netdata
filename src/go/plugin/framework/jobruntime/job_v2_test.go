@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -218,16 +219,16 @@ func TestJobV2Scenarios(t *testing.T) {
 				job.runOnce()
 
 				wire := out.String()
-				assert.Contains(t, wire, `HOST ''
+				assert.Contains(t, wire, fmt.Sprintf(`HOST ''
 
-CHART 'module_job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_busy' 'line' '0' '1' '' 'plugin' 'module'
+CHART 'module_job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_busy' 'line' '%d' '1' '' 'plugin' 'module'
 CLABEL 'instance' 'localhost' '2'
 CLABEL '_collect_job' 'job' '1'
 CLABEL_COMMIT
 DIMENSION 'busy' 'busy' 'absolute' '1' '1' ''
 BEGIN 'module_job.workers_busy'
 SET 'busy' = 7
-END`)
+END`, chartengine.Priority))
 				assert.False(t, job.Panicked())
 			},
 		},
@@ -311,14 +312,14 @@ END`)
 				job.runOnce()
 
 				wire := out.String()
-				assert.Contains(t, wire, `CHART 'module_job.win_nic_traffic_eth0' '' 'NIC traffic' 'bytes/s' 'Net' 'nic_traffic' 'line' '0' '1' '' 'plugin' 'module'
+				assert.Contains(t, wire, fmt.Sprintf(`CHART 'module_job.win_nic_traffic_eth0' '' 'NIC traffic' 'bytes/s' 'Net' 'nic_traffic' 'line' '%d' '1' '' 'plugin' 'module'
 CLABEL 'instance' 'localhost' '2'
 CLABEL 'nic' 'eth0' '1'
 CLABEL '_collect_job' 'job' '1'
 CLABEL_COMMIT
 DIMENSION 'received' 'received' 'incremental' '1' '1' ''
 DIMENSION 'sent' 'sent' 'incremental' '1' '1' ''
-CHART 'module_job.win_nic_traffic_eth1' '' 'NIC traffic' 'bytes/s' 'Net' 'nic_traffic' 'line' '0' '1' '' 'plugin' 'module'
+CHART 'module_job.win_nic_traffic_eth1' '' 'NIC traffic' 'bytes/s' 'Net' 'nic_traffic' 'line' '%d' '1' '' 'plugin' 'module'
 CLABEL 'instance' 'localhost' '2'
 CLABEL 'nic' 'eth1' '1'
 CLABEL '_collect_job' 'job' '1'
@@ -333,7 +334,7 @@ END
 BEGIN 'module_job.win_nic_traffic_eth1'
 SET 'received' = 50
 SET 'sent' = 40
-END`)
+END`, chartengine.Priority, chartengine.Priority))
 			},
 		},
 		"runtime component registers on successful autodetection": {
@@ -1013,9 +1014,9 @@ func TestJobV2CleanupUsesLastSuccessfulHostAfterFailedHostSwitch(t *testing.T) {
 	job.Cleanup()
 
 	wire := out.String()
-	assert.Contains(t, wire, `HOST 'node-guid-a'
+	assert.Contains(t, wire, fmt.Sprintf(`HOST 'node-guid-a'
 
-CHART 'module_job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_busy' 'line' '0' '1' 'obsolete' 'plugin' 'module'`)
+CHART 'module_job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_busy' 'line' '%d' '1' 'obsolete' 'plugin' 'module'`, chartengine.Priority))
 	assert.NotContains(t, wire, "HOST 'node-guid-b'")
 	assert.Empty(t, job.hostState.cleanupCharts)
 	assert.False(t, job.hostState.cleanupOwner.isSet())
@@ -1104,9 +1105,9 @@ func TestJobV2CleanupDoesNotSuppressGlobalCleanupForDifferentStaleVnode(t *testi
 	job.Cleanup()
 
 	wire := out.String()
-	assert.Contains(t, wire, `HOST ''
+	assert.Contains(t, wire, fmt.Sprintf(`HOST ''
 
-CHART 'module_job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_busy' 'line' '0' '1' 'obsolete' 'plugin' 'module'`)
+CHART 'module_job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_busy' 'line' '%d' '1' 'obsolete' 'plugin' 'module'`, chartengine.Priority))
 	assert.NotContains(t, wire, "HOST 'node-guid-b'")
 }
 

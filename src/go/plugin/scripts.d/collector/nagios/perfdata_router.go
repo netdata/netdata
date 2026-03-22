@@ -79,6 +79,7 @@ func (r *perfdataRouter) route(pluginPath string, perf []output.PerfDatum) perfR
 	}
 	for _, item := range deduped {
 		base := perfMetricIdentity(source, item)
+		tail := perfMetricTail(item)
 		result.values = append(result.values, perfValueMeasureSet{
 			name:       base,
 			scriptName: source,
@@ -95,9 +96,10 @@ func (r *perfdataRouter) route(pluginPath string, perf []output.PerfDatum) perfR
 		}
 
 		result.thresholdStates = append(result.thresholdStates, perfThresholdStateSet{
-			name:       perfThresholdStateMetricName(base),
-			scriptName: source,
-			state:      thresholdStateForPerfDatum(item),
+			name:          perfThresholdStateMetricName(base),
+			scriptName:    source,
+			perfdataValue: tail,
+			state:         thresholdStateForPerfDatum(item),
 		})
 	}
 
@@ -105,7 +107,11 @@ func (r *perfdataRouter) route(pluginPath string, perf []output.PerfDatum) perfR
 }
 
 func perfMetricIdentity(source string, item perfPreparedDatum) string {
-	return fmt.Sprintf("%s.%s_%s", source, item.class, item.metricKey)
+	return fmt.Sprintf("perfdata.%s.%s", source, perfMetricTail(item))
+}
+
+func perfMetricTail(item perfPreparedDatum) string {
+	return fmt.Sprintf("%s_%s", item.class, item.metricKey)
 }
 
 func perfThresholdStateMetricName(base string) string {
