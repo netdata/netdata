@@ -3,56 +3,67 @@ context_namespace: nagios
 engine:
   autogen:
     enabled: true
-    max_type_id_len: 200
-    expire_after_success_cycles: 3
 groups:
-  - family: Job/Status
-    metrics:
-      - nagios.job.state
-    charts:
-      - id: job_state
-        title: Job State
-        context: job_state
-        units: state
-        instances:
-          by_labels: [nagios_job]
-        dimensions:
-          - selector: nagios.job.state
-
-  - family: Job/Execution
-    metrics:
-      - nagios.job.execution_duration
-      - nagios.job.execution_cpu_total
-      - nagios.job.execution_max_rss
-    charts:
-      - id: job_execution_duration
-        title: Execution Duration
-        context: job_execution_duration
-        units: seconds
-        instances:
-          by_labels: [nagios_job]
-        dimensions:
-          - selector: nagios.job.execution_duration
-            name: duration
-            options:
-              float: true
-      - id: job_execution_cpu
-        title: Execution CPU Time
-        context: job_execution_cpu
-        units: seconds
-        instances:
-          by_labels: [nagios_job]
-        dimensions:
-          - selector: nagios.job.execution_cpu_total
-            name: total
-            options:
-              float: true
-      - id: job_execution_memory
-        title: Execution Peak RSS
-        context: job_execution_memory
-        units: bytes
-        instances:
-          by_labels: [nagios_job]
-        dimensions:
-          - selector: nagios.job.execution_max_rss
-            name: rss
+  - family: Job
+    context_namespace: job
+    groups:
+      - family: Execution
+        metrics:
+          - nagios.job.execution_state
+          - nagios.job.perfdata.threshold_state
+          - nagios.job.execution_duration
+          - nagios.job.execution_cpu_total
+          - nagios.job.execution_max_rss
+        charts:
+          - id: job_execution_state
+            title: Job Execution State
+            context: execution_state
+            units: state
+            priority: 90000
+            instances:
+              by_labels: [nagios_job]
+            dimensions:
+              - selector: nagios.job.execution_state
+          - id: job_perfdata_threshold_state
+            title: Job Perfdata Threshold State
+            context: perfdata_threshold_state
+            units: state
+            priority: 90001
+            instances:
+              by_labels: [nagios_job, perfdata_value]
+            dimensions:
+              - selector: nagios.job.perfdata.threshold_state
+          - id: job_execution_duration
+            title: Execution Duration
+            context: job_execution_duration
+            units: seconds
+            priority: 90002
+            instances:
+              by_labels: [nagios_job]
+            dimensions:
+              - selector: nagios.job.execution_duration
+                name: duration
+                options:
+                  float: true
+          - id: job_execution_cpu
+            title: Execution CPU Time
+            context: job_execution_cpu
+            units: seconds
+            priority: 90003
+            instances:
+              by_labels: [nagios_job]
+            dimensions:
+              - selector: nagios.job.execution_cpu_total
+                name: total
+                options:
+                  float: true
+          - id: job_execution_memory
+            title: Execution Peak RSS
+            context: job_execution_memory
+            units: bytes
+            priority: 90004
+            instances:
+              by_labels: [nagios_job]
+            dimensions:
+              - selector: nagios.job.execution_max_rss
+                name: rss

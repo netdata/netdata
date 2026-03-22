@@ -25,9 +25,9 @@ modules:
       multi_instance: true
       data_collection:
         metrics_description: |
-          This collector runs Nagios-compatible checks, tracks the state of each configured job, measures how long each check takes to run, and automatically charts any performance data the check prints. For non-counter perfdata, Netdata also derives a threshold-state chart and reports `no_threshold` when the check does not provide warning or critical ranges.
+          This collector runs Nagios-compatible checks, tracks the execution state of each configured job, measures how long each check takes to run, and automatically charts any performance data the check prints. For non-counter perfdata, Netdata also derives a script-scoped threshold-state chart for visualization and a static `nagios.job.perfdata.threshold_state` duplicate for alerting. When the check does not provide warning or critical ranges, the threshold state is `no_threshold`.
         method_description: |
-          Netdata runs the configured Nagios-compatible command for each job, reads the process exit code to determine the check state, and parses the command output into a summary line, optional long output, and optional performance data. Any performance data found after the `|` separator is converted into charts automatically. The main perfdata value becomes a chart, and non-counter metrics also get a derived threshold-state chart. If the check does not provide warning or critical ranges, that derived state is `no_threshold`. You can use packaged Nagios plugins or your own scripts, and you can control how often checks run, how retries behave, and when checks are allowed to run by using the job configuration.
+          Netdata runs the configured Nagios-compatible command for each job, reads the process exit code to determine the check state, and parses the command output into a summary line, optional long output, and optional performance data. Any performance data found after the `|` separator is converted into charts automatically. The main perfdata value becomes a chart, and non-counter metrics also get derived threshold-state output in two forms: a script-scoped chart for visualization and a static `nagios.job.perfdata.threshold_state` chart labeled by `perfdata_value` for stock alerting. If the check does not provide warning or critical ranges, that threshold state is `no_threshold`. You can use packaged Nagios plugins or your own scripts, and you can control how often checks run, how retries behave, and when checks are allowed to run by using the job configuration.
       default_behavior:
         auto_detection:
           description: |
@@ -116,7 +116,7 @@ modules:
               - `OK - 85.5% free memory` is the summary line
               - `free_pct=85.5%;20;10;0;100` creates a percentage metric
               - `free_kb=13999088KB;;;0;16380000` creates a size metric
-              - the warning and critical ranges on non-counter metrics are also used to derive a threshold-state chart
+              - the warning and critical ranges on non-counter metrics are also used to derive threshold-state output for both visualization and alerting
 
               Good rules to follow:
 
@@ -301,19 +301,35 @@ modules:
           - name: The script works in a shell but fails under Netdata
             description: |
               Nagios checks run with a limited execution environment rather than inheriting the full Netdata process environment. If the script depends on extra variables, set them explicitly in `environment` instead of relying on ambient shell state.
-          - name: No built-in alerts are shipped yet
+          - name: Built-in alerts cover warning and critical states only
             description: |
-              This preview collector does not currently install stock Netdata health alerts. Use the exposed `nagios.job.state` chart and the derived perfdata threshold-state charts to build alert rules that match your own checks.
+              This collector installs stock Netdata health alerts for the `warning` and `critical` states on `nagios.job.execution_state` and `nagios.job.perfdata_threshold_state`. If you also want alerts for `unknown`, `timeout`, `paused`, or more specific perfdata behavior, build your own rules on top of these contexts. The `job.perfdata.threshold_state` chart uses the `perfdata_value` label to identify which perfdata metric each threshold state belongs to.
           - name: Windows checks need an executable entry point
             description: |
               The collector runs the command named in `plugin` directly. On Windows, point `plugin` to an executable or to an interpreter such as `powershell.exe` and pass the script path in `args`.
-    alerts: []
+    alerts:
+      - name: nagios_job_execution_state_warn
+        metric: nagios.job.execution_state
+        info: "Nagios job ${label:nagios_job} is in WARNING state"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf
+      - name: nagios_job_execution_state_crit
+        metric: nagios.job.execution_state
+        info: "Nagios job ${label:nagios_job} is in CRITICAL state"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf
+      - name: nagios_job_perfdata_threshold_state_warn
+        metric: nagios.job.perfdata_threshold_state
+        info: "Nagios job ${label:nagios_job} perfdata ${label:perfdata_value} is in WARNING threshold state"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf
+      - name: nagios_job_perfdata_threshold_state_crit
+        metric: nagios.job.perfdata_threshold_state
+        info: "Nagios job ${label:nagios_job} perfdata ${label:perfdata_value} is in CRITICAL threshold state"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf
     metrics:
       folding:
         title: Metrics
         enabled: false
       description: |
-        Each configured job exposes state and execution charts. If a check prints Nagios performance data, Netdata also creates additional value charts automatically from the values emitted by that check. For non-counter perfdata, Netdata also creates a derived threshold-state chart and uses `no_threshold` when the check does not define warning or critical ranges. Counter perfdata currently exposes only the value chart.
+        Each configured job exposes execution-state and execution-resource charts. Netdata also emits a script-scoped copy of the job state named `nagios.perfdata.<script>.job.execution_state` so the state appears under each script section in the UI. If a check prints Nagios performance data, Netdata also creates additional value charts automatically from the values emitted by that check. For non-counter perfdata, Netdata creates both a script-scoped threshold-state chart for visualization and a static `nagios.job.perfdata.threshold_state` duplicate labeled by `perfdata_value` for alerting. Counter perfdata currently exposes only the value chart.
       availability: []
       scopes:
         - name: job
@@ -321,9 +337,11 @@ modules:
           labels:
             - name: nagios_job
               description: Job name as defined in the configuration.
+            - name: perfdata_value
+              description: Normalized perfdata identity in the form `<class>_<metric_key>`, used by the static threshold-state duplicate.
           metrics:
-            - name: nagios.job.state
-              description: Current job state for the check. Normal plugin results use `ok`, `warning`, `critical`, or `unknown`; collector-detected check timeouts use `timeout`; jobs blocked by `check_period` use `paused`.
+            - name: nagios.job.execution_state
+              description: Current job execution state for the check. Normal plugin results use `ok`, `warning`, `critical`, or `unknown`; collector-detected check timeouts use `timeout`; jobs blocked by `check_period` use `paused`. Netdata also emits a script-scoped duplicate named `nagios.perfdata.<script>.job.execution_state` for UI grouping.
               unit: state
               chart_type: line
               dimensions:
@@ -333,6 +351,15 @@ modules:
                 - name: unknown
                 - name: timeout
                 - name: paused
+            - name: nagios.job.perfdata.threshold_state
+              description: Static alert-oriented duplicate of the non-counter perfdata threshold-state signal. Use the `perfdata_value` label to select the normalized perfdata identity, such as `bytes_used` or `time_latency`. Values are `no_threshold`, `ok`, `warning`, or `critical`.
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: no_threshold
+                - name: ok
+                - name: warning
+                - name: critical
             - name: nagios.job.execution_duration
               description: Wall-clock duration recorded when the check runs. Non-due cycles report zero.
               unit: seconds

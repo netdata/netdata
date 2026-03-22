@@ -9,7 +9,10 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 )
+
+var jobStateMetricNames = []string{"ok", "warning", "critical", "unknown", "timeout", "paused"}
 
 func (c *Collector) collect(ctx context.Context) error {
 	execMetrics, err := c.collectIfDue(ctx)
@@ -78,13 +81,24 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 
 	jobLbl := sm.LabelSet(metrix.Label{Key: "nagios_job", Value: jobName})
 	jobMeter := sm.WithLabelSet(jobLbl)
+	jobState := normalizeJobStateForMetric(c.state.currentJobState())
 
 	jobMeter.StateSet(
-		"job.state",
+		"job.execution_state",
 		metrix.WithStateSetMode(metrix.ModeEnum),
-		metrix.WithStateSetStates("ok", "warning", "critical", "unknown", "timeout", "paused"),
+		metrix.WithStateSetStates(jobStateMetricNames...),
 		metrix.WithUnit("state"),
-	).Enable(normalizeJobStateForMetric(c.state.currentJobState()))
+	).Enable(jobState)
+
+	scriptName := perfSourceFromPlugin(c.job.config.Plugin)
+	jobMeter.StateSet(
+		"perfdata."+scriptName+".job.execution_state",
+		metrix.WithStateSetMode(metrix.ModeEnum),
+		metrix.WithStateSetStates(jobStateMetricNames...),
+		metrix.WithChartFamily(perfdataFamily(scriptName)),
+		metrix.WithChartPriority(chartengine.Priority-10),
+		metrix.WithUnit("state"),
+	).Enable(jobState)
 
 	jobMeter.Gauge(
 		"job.execution_duration",
@@ -111,14 +125,14 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 			jobMeter.MeasureSetCounter(
 				measureSet.name,
 				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-				metrix.WithChartFamily(measureSet.scriptName),
+				metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
 				metrix.WithUnit(measureSet.unit),
 			).ObserveTotalFields(fields)
 		} else {
 			jobMeter.MeasureSetGauge(
 				measureSet.name,
 				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-				metrix.WithChartFamily(measureSet.scriptName),
+				metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
 				metrix.WithUnit(measureSet.unit),
 			).ObserveFields(fields)
 		}
@@ -129,13 +143,28 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 			thresholdState.name,
 			metrix.WithStateSetMode(metrix.ModeBitSet),
 			metrix.WithStateSetStates(perfThresholdStateNames...),
-			metrix.WithChartFamily(thresholdState.scriptName),
+			metrix.WithChartFamily(perfdataFamily(thresholdState.scriptName)),
 			metrix.WithUnit("state"),
 		)
 		if thresholdState.state == "" {
 			inst.ObserveStateSet(perfThresholdStatePoint(""))
 		} else {
 			inst.Enable(thresholdState.state)
+		}
+
+		pdThreshold := jobMeter.WithLabels(metrix.Label{
+			Key:   perfdataValueLabelKey,
+			Value: thresholdState.perfdataValue,
+		}).StateSet(
+			jobPerfdataThresholdMetricName,
+			metrix.WithStateSetMode(metrix.ModeBitSet),
+			metrix.WithStateSetStates(perfThresholdStateNames...),
+			metrix.WithUnit("state"),
+		)
+		if thresholdState.state == "" {
+			pdThreshold.ObserveStateSet(perfThresholdStatePoint(""))
+		} else {
+			pdThreshold.Enable(thresholdState.state)
 		}
 	}
 }
@@ -155,4 +184,8 @@ func normalizeJobStateForMetric(state string) string {
 	default:
 		return "unknown"
 	}
+}
+
+func perfdataFamily(scriptName string) string {
+	return "Perfdata/" + scriptName
 }

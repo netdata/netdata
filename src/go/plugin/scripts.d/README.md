@@ -113,19 +113,24 @@ Defaults:
 
 Static template charts:
 
-- `nagios.job.state`
+- `nagios.job.execution_state`
+- `nagios.job.perfdata.threshold_state`
 - `nagios.job.execution_duration`
 - `nagios.job.execution_cpu_total`
 - `nagios.job.execution_max_rss`
 
-Perfdata is routed plugin-side and materialized via autogen (bounded lifecycle):
+Perfdata is routed plugin-side and materialized via autogen:
 
 - Unit classes: `time`, `bytes`, `bits`, `percent`, `counter`, `generic`
 - Metric identity: sanitized perfdata key (from Nagios perfdata label)
 - Unit-class changes create a new metric identity
 - Collision policy: deterministic keep-first, drop conflicting label
+- Per-job metric count is capped by the collector budget before emission
 - Each perfdata metric creates one value chart.
-- Non-counter perfdata also creates one derived threshold-state chart with:
+- Non-counter perfdata also creates:
+  - one script-scoped derived threshold-state chart for visualization
+  - one static `nagios.job.perfdata.threshold_state` duplicate for alerting, labeled by `perfdata_value=<class>_<metricKey>`
+- Threshold-state values are:
   - `no_threshold`
   - `ok`
   - `warning`
@@ -135,9 +140,12 @@ Perfdata is routed plugin-side and materialized via autogen (bounded lifecycle):
 
 ## Alerts
 
-- This preview collector does not currently ship built-in Netdata health alerts.
-- Use `nagios.job.state` and the derived non-counter perfdata threshold-state
-  charts as the inputs for your own alert rules.
+- Built-in Netdata health alerts are shipped for:
+  - `nagios.job.execution_state`
+  - `nagios.job.perfdata_threshold_state`
+- Stock alerts cover only the `warning` and `critical` states.
+- If you want alerts for `unknown`, `timeout`, `paused`, or custom perfdata
+  alerting rules, use these contexts as the base for your own rules.
 
 ## Logging
 

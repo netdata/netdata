@@ -54,27 +54,27 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	byName := valueSampleMap(samples.values)
 	byUnit := valueSampleUnits(samples.values)
 	byThreshold := thresholdStateMap(samples.thresholdStates)
-	assertNear(t, byName["check_gate.time_latency_value"], 0.12)
-	assertNear(t, byName["check_gate.bytes_throughput_value"], 30000)
-	assertNear(t, byName["check_gate.bits_wire_rate_value"], 80000)
-	assertNear(t, byName["check_gate.percent_free_pct_value"], 40)
-	assertNear(t, byName["check_gate.counter_requests_value"], 42)
-	assertNear(t, byName["check_gate.generic_custom_value"], 3.14)
-	assertNear(t, byName["check_gate.generic_dup_one_value"], 11)
-	assertString(t, byThreshold["check_gate.time_latency_threshold_state"], perfThresholdStateWarning)
-	assertString(t, byThreshold["check_gate.bytes_throughput_threshold_state"], perfThresholdStateNone)
-	assertString(t, byThreshold["check_gate.bits_wire_rate_threshold_state"], perfThresholdStateNone)
-	assertString(t, byThreshold["check_gate.percent_free_pct_threshold_state"], perfThresholdStateNone)
-	assertString(t, byThreshold["check_gate.generic_custom_threshold_state"], perfThresholdStateNone)
-	_, hasCounterThreshold := byThreshold["check_gate.counter_requests_threshold_state"]
+	assertNear(t, byName["perfdata.check_gate.time_latency_value"], 0.12)
+	assertNear(t, byName["perfdata.check_gate.bytes_throughput_value"], 30000)
+	assertNear(t, byName["perfdata.check_gate.bits_wire_rate_value"], 80000)
+	assertNear(t, byName["perfdata.check_gate.percent_free_pct_value"], 40)
+	assertNear(t, byName["perfdata.check_gate.counter_requests_value"], 42)
+	assertNear(t, byName["perfdata.check_gate.generic_custom_value"], 3.14)
+	assertNear(t, byName["perfdata.check_gate.generic_dup_one_value"], 11)
+	assertString(t, byThreshold["perfdata.check_gate.time_latency_threshold_state"], perfThresholdStateWarning)
+	assertString(t, byThreshold["perfdata.check_gate.bytes_throughput_threshold_state"], perfThresholdStateNone)
+	assertString(t, byThreshold["perfdata.check_gate.bits_wire_rate_threshold_state"], perfThresholdStateNone)
+	assertString(t, byThreshold["perfdata.check_gate.percent_free_pct_threshold_state"], perfThresholdStateNone)
+	assertString(t, byThreshold["perfdata.check_gate.generic_custom_threshold_state"], perfThresholdStateNone)
+	_, hasCounterThreshold := byThreshold["perfdata.check_gate.counter_requests_threshold_state"]
 	assert.False(t, hasCounterThreshold)
 
-	assertString(t, byUnit["check_gate.time_latency_value"], "seconds")
-	assertString(t, byUnit["check_gate.bytes_throughput_value"], "bytes")
-	assertString(t, byUnit["check_gate.bits_wire_rate_value"], "bits")
-	assertString(t, byUnit["check_gate.percent_free_pct_value"], "%")
-	assertString(t, byUnit["check_gate.counter_requests_value"], "c")
-	assertString(t, byUnit["check_gate.generic_custom_value"], "generic")
+	assertString(t, byUnit["perfdata.check_gate.time_latency_value"], "seconds")
+	assertString(t, byUnit["perfdata.check_gate.bytes_throughput_value"], "bytes")
+	assertString(t, byUnit["perfdata.check_gate.bits_wire_rate_value"], "bits")
+	assertString(t, byUnit["perfdata.check_gate.percent_free_pct_value"], "%")
+	assertString(t, byUnit["perfdata.check_gate.counter_requests_value"], "c")
+	assertString(t, byUnit["perfdata.check_gate.generic_custom_value"], "generic")
 
 	store := metrix.NewCollectorStore()
 	cc := gateCycleController(t, store)
@@ -89,7 +89,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 			sm.MeasureSetCounter(
 				measureSet.name,
 				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-				metrix.WithChartFamily(measureSet.scriptName),
+				metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
 				metrix.WithUnit(measureSet.unit),
 			).ObserveTotalFields(fields, labels)
 			continue
@@ -97,7 +97,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 		sm.MeasureSetGauge(
 			measureSet.name,
 			metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-			metrix.WithChartFamily(measureSet.scriptName),
+			metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
 			metrix.WithUnit(measureSet.unit),
 		).ObserveFields(fields, labels)
 	}
@@ -106,31 +106,45 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 			thresholdState.name,
 			metrix.WithStateSetMode(metrix.ModeBitSet),
 			metrix.WithStateSetStates(perfThresholdStateNames...),
-			metrix.WithChartFamily(thresholdState.scriptName),
+			metrix.WithChartFamily(perfdataFamily(thresholdState.scriptName)),
+			metrix.WithUnit("state"),
+		).Enable(thresholdState.state)
+		sm.WithLabelSet(labels).WithLabels(
+			metrix.Label{Key: perfdataValueLabelKey, Value: thresholdState.perfdataValue},
+		).StateSet(
+			jobPerfdataThresholdMetricName,
+			metrix.WithStateSetMode(metrix.ModeBitSet),
+			metrix.WithStateSetStates(perfThresholdStateNames...),
 			metrix.WithUnit("state"),
 		).Enable(thresholdState.state)
 	}
 	cc.CommitCycleSuccess()
 
 	reader := store.Read(metrix.ReadFlatten())
-	assertMetricMeta(t, reader, "nagios.check_gate.time_latency_value", "seconds", true)
-	assertMetricMeta(t, reader, "nagios.check_gate.bytes_throughput_value", "bytes", true)
-	assertMetricMeta(t, reader, "nagios.check_gate.bits_wire_rate_value", "bits", true)
-	assertMetricMeta(t, reader, "nagios.check_gate.percent_free_pct_value", "%", true)
-	assertMetricMeta(t, reader, "nagios.check_gate.counter_requests_value", "c", true)
-	assertMetricMeta(t, reader, "nagios.check_gate.generic_custom_value", "generic", true)
-	assertMetricMeta(t, reader, "nagios.check_gate.time_latency_threshold_state", "state", false)
-	assertMetricChartFamily(t, reader, "nagios.check_gate.time_latency_value", "check_gate")
-	assertMetricChartFamily(t, reader, "nagios.check_gate.time_latency_threshold_state", "check_gate")
-	assertMetricValue(t, reader, "nagios.check_gate.time_latency_threshold_state", metrix.Labels{
+	assertMetricMeta(t, reader, "nagios.perfdata.check_gate.time_latency_value", "seconds", true)
+	assertMetricMeta(t, reader, "nagios.perfdata.check_gate.bytes_throughput_value", "bytes", true)
+	assertMetricMeta(t, reader, "nagios.perfdata.check_gate.bits_wire_rate_value", "bits", true)
+	assertMetricMeta(t, reader, "nagios.perfdata.check_gate.percent_free_pct_value", "%", true)
+	assertMetricMeta(t, reader, "nagios.perfdata.check_gate.counter_requests_value", "c", true)
+	assertMetricMeta(t, reader, "nagios.perfdata.check_gate.generic_custom_value", "generic", true)
+	assertMetricMeta(t, reader, "nagios.perfdata.check_gate.time_latency_threshold_state", "state", false)
+	assertMetricMeta(t, reader, "nagios.job.perfdata.threshold_state", "state", false)
+	assertMetricChartFamily(t, reader, "nagios.perfdata.check_gate.time_latency_value", "Perfdata/check_gate")
+	assertMetricChartFamily(t, reader, "nagios.perfdata.check_gate.time_latency_threshold_state", "Perfdata/check_gate")
+	assertMetricValue(t, reader, "nagios.perfdata.check_gate.time_latency_threshold_state", metrix.Labels{
 		"nagios_job": "gate_job",
-		"nagios.check_gate.time_latency_threshold_state": perfThresholdStateWarning,
+		"nagios.perfdata.check_gate.time_latency_threshold_state": perfThresholdStateWarning,
 	}, 1)
-	assertSeriesKind(t, reader, "nagios.check_gate.time_latency_value", metrix.Labels{
+	assertMetricValue(t, reader, "nagios.job.perfdata.threshold_state", metrix.Labels{
+		"nagios_job":                          "gate_job",
+		perfdataValueLabelKey:                 "time_latency",
+		"nagios.job.perfdata.threshold_state": perfThresholdStateWarning,
+	}, 1)
+	assertSeriesKind(t, reader, "nagios.perfdata.check_gate.time_latency_value", metrix.Labels{
 		"nagios_job":                "gate_job",
 		metrix.MeasureSetFieldLabel: perfFieldValue,
 	}, metrix.MetricKindGauge)
-	assertSeriesKind(t, reader, "nagios.check_gate.counter_requests_value", metrix.Labels{
+	assertSeriesKind(t, reader, "nagios.perfdata.check_gate.counter_requests_value", metrix.Labels{
 		"nagios_job":                "gate_job",
 		metrix.MeasureSetFieldLabel: perfFieldValue,
 	}, metrix.MetricKindCounter)
@@ -139,7 +153,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 		{Label: "latency", Unit: "%", Value: 1}, // same label, different class => new identity
 	})
 	changedSamples := valueSampleMap(changedClass.values)
-	assertNear(t, changedSamples["check_gate.percent_latency_value"], 1)
+	assertNear(t, changedSamples["perfdata.check_gate.percent_latency_value"], 1)
 }
 
 func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
@@ -160,18 +174,18 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 			aFields := defaultPerfMeasureSetValues()
 			aFields[perfFieldValue] = 1
 			sm.MeasureSetGauge(
-				"check_gate.bytes_a",
+				"perfdata.check_gate.bytes_a",
 				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-				metrix.WithChartFamily("check_gate"),
+				metrix.WithChartFamily(perfdataFamily("check_gate")),
 				metrix.WithUnit("bytes"),
 			).ObserveFields(aFields, ls)
 			if includeB {
 				bFields := defaultPerfMeasureSetValues()
 				bFields[perfFieldValue] = 2
 				sm.MeasureSetGauge(
-					"check_gate.bytes_b",
+					"perfdata.check_gate.bytes_b",
 					metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-					metrix.WithChartFamily("check_gate"),
+					metrix.WithChartFamily(perfdataFamily("check_gate")),
 					metrix.WithUnit("bytes"),
 				).ObserveFields(bFields, ls)
 			}
@@ -199,9 +213,9 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 		aFields := defaultPerfMeasureSetValues()
 		aFields[perfFieldValue] = 1
 		sm.MeasureSetGauge(
-			"check_gate.bytes_a",
+			"perfdata.check_gate.bytes_a",
 			metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-			metrix.WithChartFamily("check_gate"),
+			metrix.WithChartFamily(perfdataFamily("check_gate")),
 			metrix.WithUnit("bytes"),
 		).ObserveFields(aFields, ls)
 		cc.AbortCycle()
@@ -212,15 +226,15 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 		assert.Zero(t, removeActionsCount(planAbort.Actions))
 	})
 
-	t.Run("failed-attempt gap contributes to expiry aging", func(t *testing.T) {
+	t.Run("failed-attempt gap keeps charts until an explicit expiry policy exists", func(t *testing.T) {
 		_, store, emit := newHarness(t)
 
 		plan1 := emit(true)
 		assert.NotZero(t, countActions[chartengine.CreateChartAction](plan1.Actions))
 		plan2 := emit(false)
 		assert.Zero(t, removeActionsCount(plan2.Actions))
-		assertPlanHasUpdateForTarget(t, plan2, "nagios.check_gate.bytes_a")
-		assertPlanHasNoRemoveForTarget(t, plan2, "nagios.check_gate.bytes_b")
+		assertPlanHasUpdateForTarget(t, plan2, "nagios.perfdata.check_gate.bytes_a")
+		assertPlanHasNoRemoveForTarget(t, plan2, "nagios.perfdata.check_gate.bytes_b")
 
 		cc := gateCycleController(t, store)
 		cc.BeginCycle()
@@ -231,20 +245,18 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 		aFields := defaultPerfMeasureSetValues()
 		aFields[perfFieldValue] = 1
 		sm.MeasureSetGauge(
-			"check_gate.bytes_a",
+			"perfdata.check_gate.bytes_a",
 			metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-			metrix.WithChartFamily("check_gate"),
+			metrix.WithChartFamily(perfdataFamily("check_gate")),
 			metrix.WithUnit("bytes"),
 		).ObserveFields(aFields, ls)
 		cc.AbortCycle()
 		assert.Equal(t, metrix.CollectStatusFailed, store.Read(metrix.ReadRaw()).CollectMeta().LastAttemptStatus)
 
 		plan3 := emit(false)
-		assert.NotZero(t, removeActionsCount(plan3.Actions))
-		assertPlanHasUpdateAndRemoveForTargets(t, plan3,
-			"nagios.check_gate.bytes_a",
-			"nagios.check_gate.bytes_b",
-		)
+		assert.Zero(t, removeActionsCount(plan3.Actions))
+		assertPlanHasUpdateForTarget(t, plan3, "nagios.perfdata.check_gate.bytes_a")
+		assertPlanHasNoRemoveForTarget(t, plan3, "nagios.perfdata.check_gate.bytes_b")
 		plan4 := emit(false)
 		assert.Zero(t, removeActionsCount(plan4.Actions))
 	})
@@ -308,7 +320,7 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 					sm.MeasureSetCounter(
 						measureSet.name,
 						metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-						metrix.WithChartFamily(measureSet.scriptName),
+						metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
 						metrix.WithUnit(measureSet.unit),
 					).ObserveTotalFields(fields, sm.LabelSet())
 					continue
@@ -316,14 +328,14 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 				sm.MeasureSetGauge(
 					measureSet.name,
 					metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-					metrix.WithChartFamily(measureSet.scriptName),
+					metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
 					metrix.WithUnit(measureSet.unit),
 				).ObserveFields(fields, sm.LabelSet())
 			}
 			cc.CommitCycleSuccess()
 			flat := store.Read(metrix.ReadFlatten())
 			assertMetricMeta(t, flat, "nagios."+candidateKey, tc.expectedUnit, true)
-			assertMetricChartFamily(t, flat, "nagios."+candidateKey, "check_gate")
+			assertMetricChartFamily(t, flat, "nagios."+candidateKey, "Perfdata/check_gate")
 		})
 	}
 }

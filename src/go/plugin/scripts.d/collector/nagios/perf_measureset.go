@@ -5,17 +5,16 @@ package nagios
 import "github.com/netdata/netdata/go/plugins/pkg/metrix"
 
 const (
-	perfFieldValue             = "value"
-	perfThresholdStateNone     = "no_threshold"
-	perfThresholdStateOK       = "ok"
-	perfThresholdStateWarning  = "warning"
-	perfThresholdStateCritical = "critical"
+	perfFieldValue                 = "value"
+	perfThresholdStateNone         = "no_threshold"
+	perfThresholdStateOK           = "ok"
+	perfThresholdStateWarning      = "warning"
+	perfThresholdStateCritical     = "critical"
+	perfdataValueLabelKey          = "perfdata_value"
+	jobPerfdataThresholdMetricName = "job.perfdata.threshold_state"
 )
 
 var (
-	perfMeasureSetFieldOrder = []string{
-		perfFieldValue,
-	}
 	perfThresholdStateNames = []string{
 		perfThresholdStateNone,
 		perfThresholdStateOK,
@@ -33,9 +32,10 @@ type perfValueMeasureSet struct {
 }
 
 type perfThresholdStateSet struct {
-	name       string
-	scriptName string
-	state      string
+	name          string
+	scriptName    string
+	perfdataValue string
+	state         string
 }
 
 type perfRouteResult struct {
