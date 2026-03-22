@@ -173,6 +173,22 @@ static bool mcp_http_session_exists(const char *session_id) {
     return found;
 }
 
+// Delete a session by ID.  Returns true if found and deleted, false otherwise.
+static bool mcp_http_session_delete(const char *session_id) {
+    if (!session_id || !*session_id)
+        return false;
+
+    spinlock_lock(&mcp_http_sessions_lock);
+    mcp_http_sessions_init_nolock();
+
+    bool found = dictionary_del(mcp_http_sessions, session_id);
+    if (found)
+        dictionary_garbage_collect(mcp_http_sessions);
+
+    spinlock_unlock(&mcp_http_sessions_lock);
+    return found;
+}
+
 // ---------------------------------------------------------------------------
 
 #define IS_PARAM_SEPARATOR(c) ((c) == '&' || (c) == '\0')
@@ -259,7 +275,8 @@ int mcp_http_handle_request(struct rrdhost *host __maybe_unused, struct web_clie
     if (!w)
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
 
-    if (w->mode != HTTP_REQUEST_MODE_POST && w->mode != HTTP_REQUEST_MODE_GET) {
+    if (w->mode != HTTP_REQUEST_MODE_POST && w->mode != HTTP_REQUEST_MODE_GET &&
+        w->mode != HTTP_REQUEST_MODE_DELETE) {
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data, "Unsupported HTTP method for /mcp\n");
         w->response.data->content_type = CT_TEXT_PLAIN;
@@ -276,6 +293,27 @@ int mcp_http_handle_request(struct rrdhost *host __maybe_unused, struct web_clie
     // ------------------------------------------------------------------
     const char *incoming_session_id = w->mcp_session_id;  // parsed from Mcp-Session-Id header
     bool has_incoming_session = incoming_session_id && *incoming_session_id;
+
+    // ------------------------------------------------------------------
+    // DELETE: explicit session termination (MCP Streamable HTTP spec)
+    // ------------------------------------------------------------------
+    if (w->mode == HTTP_REQUEST_MODE_DELETE) {
+        if (!has_incoming_session) {
+            BUFFER *payload = mcp_jsonrpc_build_error_payload(
+                NULL, -32600, "Mcp-Session-Id header required for DELETE", NULL, 0);
+            return mcp_http_prepare_error_response(w, payload, HTTP_RESP_BAD_REQUEST);
+        }
+        if (mcp_http_session_delete(incoming_session_id)) {
+            buffer_flush(w->response.data);
+            w->response.data->content_type = CT_APPLICATION_JSON;
+            w->response.code = HTTP_RESP_OK;
+        } else {
+            BUFFER *payload = mcp_jsonrpc_build_error_payload(
+                NULL, -32001, "Session not found or expired", NULL, 0);
+            return mcp_http_prepare_error_response(w, payload, HTTP_RESP_NOT_FOUND);
+        }
+        return w->response.code;
+    }
 
     size_t body_len = 0;
     const char *body = mcp_http_body(w, &body_len);
@@ -411,6 +449,8 @@ int mcp_http_handle_request(struct rrdhost *host __maybe_unused, struct web_clie
                (result_code == HTTP_RESP_OK || result_code == HTTP_RESP_ACCEPTED)) {
         // Persist any state changes (e.g. ready flag set by notifications/initialized).
         mcp_http_session_update(incoming_session_id, mcpc);
+        // Echo the session ID in all responses (MCP Streamable HTTP spec SHOULD).
+        buffer_sprintf(w->response.header, "Mcp-Session-Id: %s\r\n", incoming_session_id);
     }
 
     json_object_put(root);
