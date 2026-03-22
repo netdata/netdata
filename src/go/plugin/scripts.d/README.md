@@ -114,10 +114,10 @@ Defaults:
 Static template charts:
 
 - `nagios.job.execution_state`
-- `nagios.job.perfdata.threshold_state`
+- `nagios.job.perfdata_threshold_state`
 - `nagios.job.execution_duration`
-- `nagios.job.execution_cpu_total`
-- `nagios.job.execution_max_rss`
+- `nagios.job.execution_cpu`
+- `nagios.job.execution_memory`
 
 Perfdata is routed plugin-side and materialized via autogen:
 
@@ -128,7 +128,7 @@ Perfdata is routed plugin-side and materialized via autogen:
 - Per-job metric count is capped by the collector budget before emission
 - Each perfdata metric creates one value chart.
 - Non-counter perfdata also creates:
-  - one script-scoped derived threshold-state chart for visualization
+  - one plugin-scoped derived threshold-state chart for visualization
   - one static `nagios.job.perfdata.threshold_state` duplicate for alerting, labeled by `perfdata_value=<class>_<metricKey>`
 - Threshold-state values are:
   - `no_threshold`
@@ -143,7 +143,11 @@ Perfdata is routed plugin-side and materialized via autogen:
 - Built-in Netdata health alerts are shipped for:
   - `nagios.job.execution_state`
   - `nagios.job.perfdata_threshold_state`
-- Stock alerts cover only the `warning` and `critical` states.
+- `nagios.job.execution_state` is a bitset chart. It always exposes the current
+  primary state and also exposes `retry=1` while a non-OK result is still
+  retrying.
+- Stock alerts cover only the `warning` and `critical` states and suppress
+  retrying soft states.
 - If you want alerts for `unknown`, `timeout`, `paused`, or custom perfdata
   alerting rules, use these contexts as the base for your own rules.
 

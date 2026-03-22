@@ -226,7 +226,7 @@ func TestV2Gate_G3_ChartLifecycleChurn(t *testing.T) {
 		assert.Zero(t, removeActionsCount(planAbort.Actions))
 	})
 
-	t.Run("failed-attempt gap keeps charts until an explicit expiry policy exists", func(t *testing.T) {
+	t.Run("failed-attempt gap does not count toward expiry", func(t *testing.T) {
 		_, store, emit := newHarness(t)
 
 		plan1 := emit(true)

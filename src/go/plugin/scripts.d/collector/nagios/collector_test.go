@@ -42,17 +42,17 @@ func TestCollector_ChartTemplateYAML(t *testing.T) {
 		wantFloat bool
 	}{
 		"execution duration dimension is float": {
-			context:   "job_execution_duration",
+			context:   "execution_duration",
 			selector:  "nagios.job.execution_duration",
 			wantFloat: true,
 		},
 		"execution cpu dimension is float": {
-			context:   "job_execution_cpu",
+			context:   "execution_cpu",
 			selector:  "nagios.job.execution_cpu_total",
 			wantFloat: true,
 		},
 		"execution memory dimension is integer": {
-			context:   "job_execution_memory",
+			context:   "execution_memory",
 			selector:  "nagios.job.execution_max_rss",
 			wantFloat: false,
 		},
@@ -529,6 +529,11 @@ func TestCollector_Collect(t *testing.T) {
 				runCollectCycle(t, coll)
 				assert.Equal(t, 1, runner.calls)
 				assert.Equal(t, 2, coll.state.currentAttempt())
+				flat := coll.MetricStore().Read(metrix.ReadFlatten())
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "retry_job", "nagios.job.execution_state": "warning"}, 1)
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "retry_job", "nagios.job.execution_state": "retry"}, 1)
+				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "retry_job", "nagios.perfdata.true.job.execution_state": "warning"}, 1)
+				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "retry_job", "nagios.perfdata.true.job.execution_state": "retry"}, 1)
 
 				*now = now.Add(9 * time.Second)
 				runCollectCycle(t, coll)
@@ -538,6 +543,9 @@ func TestCollector_Collect(t *testing.T) {
 				runCollectCycle(t, coll)
 				assert.Equal(t, 2, runner.calls)
 				assert.Equal(t, 1, coll.state.currentAttempt())
+				flat = coll.MetricStore().Read(metrix.ReadFlatten())
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "retry_job", "nagios.job.execution_state": "ok"}, 1)
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "retry_job", "nagios.job.execution_state": "retry"}, 0)
 			},
 		},
 		"timeout is exposed publicly but macros keep Nagios unknown": {
@@ -569,7 +577,9 @@ func TestCollector_Collect(t *testing.T) {
 
 				flat := coll.MetricStore().Read(metrix.ReadFlatten())
 				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "timeout_job", "nagios.job.execution_state": "timeout"}, 1)
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "timeout_job", "nagios.job.execution_state": "retry"}, 1)
 				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "timeout_job", "nagios.perfdata.true.job.execution_state": "timeout"}, 1)
+				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "timeout_job", "nagios.perfdata.true.job.execution_state": "retry"}, 1)
 
 				*now = now.Add(11 * time.Second)
 				runCollectCycle(t, coll)

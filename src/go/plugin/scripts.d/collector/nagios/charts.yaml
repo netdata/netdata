@@ -3,6 +3,7 @@ context_namespace: nagios
 engine:
   autogen:
     enabled: true
+    expire_after_success_cycles: 50
 groups:
   - family: Job
     context_namespace: job
@@ -35,7 +36,7 @@ groups:
               - selector: nagios.job.perfdata.threshold_state
           - id: job_execution_duration
             title: Execution Duration
-            context: job_execution_duration
+            context: execution_duration
             units: seconds
             priority: 90002
             instances:
@@ -47,7 +48,7 @@ groups:
                   float: true
           - id: job_execution_cpu
             title: Execution CPU Time
-            context: job_execution_cpu
+            context: execution_cpu
             units: seconds
             priority: 90003
             instances:
@@ -59,7 +60,7 @@ groups:
                   float: true
           - id: job_execution_memory
             title: Execution Peak RSS
-            context: job_execution_memory
+            context: execution_memory
             units: bytes
             priority: 90004
             instances:

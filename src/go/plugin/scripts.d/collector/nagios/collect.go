@@ -12,7 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 )
 
-var jobStateMetricNames = []string{"ok", "warning", "critical", "unknown", "timeout", "paused"}
+var jobExecutionStateNames = []string{"ok", "warning", "critical", "unknown", "timeout", "paused", "retry"}
 
 func (c *Collector) collect(ctx context.Context) error {
 	execMetrics, err := c.collectIfDue(ctx)
@@ -82,23 +82,24 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 	jobLbl := sm.LabelSet(metrix.Label{Key: "nagios_job", Value: jobName})
 	jobMeter := sm.WithLabelSet(jobLbl)
 	jobState := normalizeJobStateForMetric(c.state.currentJobState())
+	jobStateActives := jobExecutionStateActives(jobState, c.state.isRetrying())
 
 	jobMeter.StateSet(
 		"job.execution_state",
-		metrix.WithStateSetMode(metrix.ModeEnum),
-		metrix.WithStateSetStates(jobStateMetricNames...),
+		metrix.WithStateSetMode(metrix.ModeBitSet),
+		metrix.WithStateSetStates(jobExecutionStateNames...),
 		metrix.WithUnit("state"),
-	).Enable(jobState)
+	).Enable(jobStateActives...)
 
 	scriptName := perfSourceFromPlugin(c.job.config.Plugin)
 	jobMeter.StateSet(
 		"perfdata."+scriptName+".job.execution_state",
-		metrix.WithStateSetMode(metrix.ModeEnum),
-		metrix.WithStateSetStates(jobStateMetricNames...),
+		metrix.WithStateSetMode(metrix.ModeBitSet),
+		metrix.WithStateSetStates(jobExecutionStateNames...),
 		metrix.WithChartFamily(perfdataFamily(scriptName)),
 		metrix.WithChartPriority(chartengine.Priority-10),
 		metrix.WithUnit("state"),
-	).Enable(jobState)
+	).Enable(jobStateActives...)
 
 	jobMeter.Gauge(
 		"job.execution_duration",
@@ -184,6 +185,14 @@ func normalizeJobStateForMetric(state string) string {
 	default:
 		return "unknown"
 	}
+}
+
+func jobExecutionStateActives(state string, retrying bool) []string {
+	actives := []string{state}
+	if retrying {
+		actives = append(actives, "retry")
+	}
+	return actives
 }
 
 func perfdataFamily(scriptName string) string {
