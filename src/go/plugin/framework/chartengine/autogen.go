@@ -25,6 +25,7 @@ type autogenRoute struct {
 	units             string
 	chartType         program.ChartType
 	family            string
+	priority          int
 	contextName       string
 	staticDimension   bool
 	float             bool
@@ -88,6 +89,7 @@ func (e *Engine) resolveAutogenRoute(
 	if metricMeta, ok := autogenMetricMeta(reader, metricName, meta); ok {
 		route = applyAutogenMetricMeta(route, metricMeta, meta)
 	}
+	route.priority = effectiveChartPriority(route.priority)
 	title := route.title
 	if title == "" {
 		title = getAutogenChartTitle(route.chartName)
@@ -114,7 +116,7 @@ func (e *Engine) resolveAutogenRoute(
 				Units:     route.units,
 				Algorithm: route.algorithm,
 				Type:      route.chartType,
-				Priority:  0,
+				Priority:  route.priority,
 			},
 			Lifecycle: autogenLifecyclePolicy(policy),
 		},
@@ -189,6 +191,9 @@ func applyAutogenMetricMeta(route autogenRoute, meta metrix.MetricMeta, seriesMe
 	}
 	if family := strings.TrimSpace(meta.ChartFamily); family != "" {
 		route.family = family
+	}
+	if meta.ChartPriority > 0 {
+		route.priority = meta.ChartPriority
 	}
 	if unit := strings.TrimSpace(meta.Unit); unit != "" && allowAutogenUnitOverride(seriesMeta) {
 		route.units = normalizeAutogenUnitByAlgorithm(unit, route.algorithm)

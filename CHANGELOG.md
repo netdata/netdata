@@ -165,6 +165,8 @@
 - Fix mrg unittest ([#21986](https://github.com/netdata/netdata/issues/21986))
 - Build(deps): bump github.com/jackc/pgx/v5 from 5.8.0 to 5.9.0 in /src/go ([#22003](https://github.com/netdata/netdata/issues/22003))
 - Build(deps): bump nick-invision/retry from 3 to 4 ([#22004](https://github.com/netdata/netdata/issues/22004))
+- Refactor(go/scripts.d): switch to v2 framework and fixes ([#21908](https://github.com/netdata/netdata/issues/21908))
+- Feat(go/scripts.d): add Nagios V2 alerts and alertable state ([#22008](https://github.com/netdata/netdata/issues/22008))
 
 ## [2.9.0] - 2026-02-16
 

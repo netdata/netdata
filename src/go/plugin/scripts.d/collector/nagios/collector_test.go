@@ -42,17 +42,17 @@ func TestCollector_ChartTemplateYAML(t *testing.T) {
 		wantFloat bool
 	}{
 		"execution duration dimension is float": {
-			context:   "job_execution_duration",
+			context:   "execution_duration",
 			selector:  "nagios.job.execution_duration",
 			wantFloat: true,
 		},
 		"execution cpu dimension is float": {
-			context:   "job_execution_cpu",
+			context:   "execution_cpu",
 			selector:  "nagios.job.execution_cpu_total",
 			wantFloat: true,
 		},
 		"execution memory dimension is integer": {
-			context:   "job_execution_memory",
+			context:   "execution_memory",
 			selector:  "nagios.job.execution_max_rss",
 			wantFloat: false,
 		},
@@ -322,7 +322,9 @@ func TestCollector_Collect(t *testing.T) {
 
 				read := coll.MetricStore().Read(metrix.ReadRaw())
 				flat := coll.MetricStore().Read(metrix.ReadFlatten())
-				assertMetricValue(t, flat, "nagios.job.state", metrix.Labels{"nagios_job": "check_disk", "nagios.job.state": "ok"}, 1)
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "check_disk", "nagios.job.execution_state": "ok"}, 1)
+				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "check_disk", "nagios.perfdata.true.job.execution_state": "ok"}, 1)
+				assertMetricChartFamily(t, flat, "nagios.perfdata.true.job.execution_state", "Perfdata/true")
 				assertMetricValue(t, flat, "nagios.job.execution_duration", metrix.Labels{"nagios_job": "check_disk"}, 2.5)
 				assertMetricMeta(t, flat, "nagios.job.execution_duration", "seconds", true)
 				if runtime.GOOS != "windows" {
@@ -334,8 +336,8 @@ func TestCollector_Collect(t *testing.T) {
 					assertMetricMissing(t, flat, "nagios.job.execution_cpu_total", metrix.Labels{"nagios_job": "check_disk"})
 					assertMetricMissing(t, flat, "nagios.job.execution_max_rss", metrix.Labels{"nagios_job": "check_disk"})
 				}
-				assertMetricValue(t, flat, "nagios.true.bytes_used_value", metrix.Labels{"nagios_job": "check_disk", metrix.MeasureSetFieldLabel: "value"}, 30000)
-				point, ok := read.MeasureSet("nagios.true.bytes_used", metrix.Labels{"nagios_job": "check_disk"})
+				assertMetricValue(t, flat, "nagios.perfdata.true.bytes_used_value", metrix.Labels{"nagios_job": "check_disk", metrix.MeasureSetFieldLabel: "value"}, 30000)
+				point, ok := read.MeasureSet("nagios.perfdata.true.bytes_used", metrix.Labels{"nagios_job": "check_disk"})
 				require.True(t, ok)
 				assert.Equal(t, 30000.0, point.Values[0])
 
@@ -352,7 +354,7 @@ func TestCollector_Collect(t *testing.T) {
 					assertMetricMissing(t, flat, "nagios.job.execution_cpu_total", metrix.Labels{"nagios_job": "check_disk"})
 					assertMetricMissing(t, flat, "nagios.job.execution_max_rss", metrix.Labels{"nagios_job": "check_disk"})
 				}
-				assertMetricValue(t, flat, "nagios.true.bytes_used_value", metrix.Labels{"nagios_job": "check_disk", metrix.MeasureSetFieldLabel: "value"}, 30000)
+				assertMetricValue(t, flat, "nagios.perfdata.true.bytes_used_value", metrix.Labels{"nagios_job": "check_disk", metrix.MeasureSetFieldLabel: "value"}, 30000)
 			},
 		},
 		"check period blocked cycles pause job state and zero threshold states": {
@@ -426,27 +428,46 @@ func TestCollector_Collect(t *testing.T) {
 				assert.Equal(t, 1, runner.calls)
 
 				flat := coll.MetricStore().Read(metrix.ReadFlatten())
-				assertMetricValue(t, flat, "nagios.job.state", metrix.Labels{"nagios_job": "period_job", "nagios.job.state": "ok"}, 1)
-				assertMetricValue(t, flat, "nagios.true.bytes_used_value", metrix.Labels{"nagios_job": "period_job", metrix.MeasureSetFieldLabel: "value"}, 30000)
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "period_job", "nagios.job.execution_state": "ok"}, 1)
+				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "period_job", "nagios.perfdata.true.job.execution_state": "ok"}, 1)
+				assertMetricValue(t, flat, "nagios.perfdata.true.bytes_used_value", metrix.Labels{"nagios_job": "period_job", metrix.MeasureSetFieldLabel: "value"}, 30000)
+				assertMetricValue(t, flat, "nagios.job.perfdata.threshold_state", metrix.Labels{
+					"nagios_job":                          "period_job",
+					perfdataValueLabelKey:                 "bytes_used",
+					"nagios.job.perfdata.threshold_state": perfThresholdStateWarning,
+				}, 1)
 
 				raw := coll.MetricStore().Read()
-				thresholdMetric := "nagios.true.bytes_used_threshold_state"
+				thresholdMetric := "nagios.perfdata.true.bytes_used_threshold_state"
 				thresholdLabels := metrix.Labels{"nagios_job": "period_job"}
 				point, ok := raw.StateSet(thresholdMetric, thresholdLabels)
 				require.True(t, ok)
 				assert.True(t, point.States[perfThresholdStateWarning])
+				alertThresholdMetric := "nagios.job.perfdata.threshold_state"
+				alertThresholdLabels := metrix.Labels{"nagios_job": "period_job", perfdataValueLabelKey: "bytes_used"}
+				alertPoint, ok := raw.StateSet(alertThresholdMetric, alertThresholdLabels)
+				require.True(t, ok)
+				assert.True(t, alertPoint.States[perfThresholdStateWarning])
 
 				*now = time.Date(2026, 3, 23, 20, 0, 0, 0, time.UTC)
 				runCollectCycle(t, coll)
 				assert.Equal(t, 1, runner.calls)
 
 				flat = coll.MetricStore().Read(metrix.ReadFlatten())
-				assertMetricValue(t, flat, "nagios.job.state", metrix.Labels{"nagios_job": "period_job", "nagios.job.state": "paused"}, 1)
-				assertMetricValue(t, flat, "nagios.true.bytes_used_value", metrix.Labels{"nagios_job": "period_job", metrix.MeasureSetFieldLabel: "value"}, 30000)
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "period_job", "nagios.job.execution_state": "paused"}, 1)
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "period_job", "nagios.job.execution_state": "retry"}, 0)
+				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "period_job", "nagios.perfdata.true.job.execution_state": "paused"}, 1)
+				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "period_job", "nagios.perfdata.true.job.execution_state": "retry"}, 0)
+				assertMetricValue(t, flat, "nagios.perfdata.true.bytes_used_value", metrix.Labels{"nagios_job": "period_job", metrix.MeasureSetFieldLabel: "value"}, 30000)
 				assertMetricValue(t, flat, thresholdMetric, metrix.Labels{"nagios_job": "period_job", thresholdMetric: perfThresholdStateWarning}, 0)
 				assertMetricValue(t, flat, thresholdMetric, metrix.Labels{"nagios_job": "period_job", thresholdMetric: perfThresholdStateOK}, 0)
 				assertMetricValue(t, flat, thresholdMetric, metrix.Labels{"nagios_job": "period_job", thresholdMetric: perfThresholdStateCritical}, 0)
 				assertMetricValue(t, flat, thresholdMetric, metrix.Labels{"nagios_job": "period_job", thresholdMetric: perfThresholdStateNone}, 0)
+				assertMetricValue(t, flat, alertThresholdMetric, metrix.Labels{"nagios_job": "period_job", perfdataValueLabelKey: "bytes_used", alertThresholdMetric: perfThresholdStateWarning}, 0)
+				assertMetricValue(t, flat, alertThresholdMetric, metrix.Labels{"nagios_job": "period_job", perfdataValueLabelKey: "bytes_used", alertThresholdMetric: perfThresholdStateOK}, 0)
+				assertMetricValue(t, flat, alertThresholdMetric, metrix.Labels{"nagios_job": "period_job", perfdataValueLabelKey: "bytes_used", alertThresholdMetric: perfThresholdStateCritical}, 0)
+				assertMetricValue(t, flat, alertThresholdMetric, metrix.Labels{"nagios_job": "period_job", perfdataValueLabelKey: "bytes_used", alertThresholdMetric: perfThresholdStateNone}, 0)
+				assertMetricValue(t, flat, alertThresholdMetric, metrix.Labels{"nagios_job": "period_job", perfdataValueLabelKey: "bytes_used", alertThresholdMetric: perfThresholdStateRetry}, 0)
 
 				raw = coll.MetricStore().Read()
 				point, ok = raw.StateSet(thresholdMetric, thresholdLabels)
@@ -455,14 +476,22 @@ func TestCollector_Collect(t *testing.T) {
 				assert.False(t, point.States[perfThresholdStateOK])
 				assert.False(t, point.States[perfThresholdStateWarning])
 				assert.False(t, point.States[perfThresholdStateCritical])
+				alertPoint, ok = raw.StateSet(alertThresholdMetric, alertThresholdLabels)
+				require.True(t, ok)
+				assert.False(t, alertPoint.States[perfThresholdStateNone])
+				assert.False(t, alertPoint.States[perfThresholdStateOK])
+				assert.False(t, alertPoint.States[perfThresholdStateWarning])
+				assert.False(t, alertPoint.States[perfThresholdStateCritical])
+				assert.False(t, alertPoint.States[perfThresholdStateRetry])
 
 				*now = time.Date(2026, 3, 24, 9, 0, 0, 0, time.UTC)
 				runCollectCycle(t, coll)
 				assert.Equal(t, 2, runner.calls)
 
 				flat = coll.MetricStore().Read(metrix.ReadFlatten())
-				assertMetricValue(t, flat, "nagios.job.state", metrix.Labels{"nagios_job": "period_job", "nagios.job.state": "ok"}, 1)
-				assertMetricValue(t, flat, "nagios.true.bytes_used_value", metrix.Labels{"nagios_job": "period_job", metrix.MeasureSetFieldLabel: "value"}, 10000)
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "period_job", "nagios.job.execution_state": "ok"}, 1)
+				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "period_job", "nagios.perfdata.true.job.execution_state": "ok"}, 1)
+				assertMetricValue(t, flat, "nagios.perfdata.true.bytes_used_value", metrix.Labels{"nagios_job": "period_job", metrix.MeasureSetFieldLabel: "value"}, 10000)
 
 				raw = coll.MetricStore().Read()
 				point, ok = raw.StateSet(thresholdMetric, thresholdLabels)
@@ -471,16 +500,57 @@ func TestCollector_Collect(t *testing.T) {
 				assert.True(t, point.States[perfThresholdStateOK])
 				assert.False(t, point.States[perfThresholdStateWarning])
 				assert.False(t, point.States[perfThresholdStateCritical])
+				alertPoint, ok = raw.StateSet(alertThresholdMetric, alertThresholdLabels)
+				require.True(t, ok)
+				assert.False(t, alertPoint.States[perfThresholdStateNone])
+				assert.True(t, alertPoint.States[perfThresholdStateOK])
+				assert.False(t, alertPoint.States[perfThresholdStateWarning])
+				assert.False(t, alertPoint.States[perfThresholdStateCritical])
 			},
 		},
 		"uses retry interval for retry state": {
 			results: []fakeRun{
 				{
-					result: checkRunResult{ServiceState: "WARNING", JobState: "WARNING", ExitCode: 1},
-					err:    errors.New("plugin returned warning"),
+					result: checkRunResult{
+						ServiceState: "WARNING",
+						JobState:     "WARNING",
+						ExitCode:     1,
+						Parsed: output.ParsedOutput{
+							Perfdata: []output.PerfDatum{
+								func() output.PerfDatum {
+									low := 0.0
+									high := 20.0
+									return output.PerfDatum{
+										Label: "used",
+										Unit:  "KB",
+										Value: 30,
+										Warn:  &output.ThresholdRange{Low: &low, High: &high},
+									}
+								}(),
+							},
+						},
+					},
+					err: errors.New("plugin returned warning"),
 				},
 				{
-					result: checkRunResult{ServiceState: "OK", JobState: "OK"},
+					result: checkRunResult{
+						ServiceState: "OK",
+						JobState:     "OK",
+						Parsed: output.ParsedOutput{
+							Perfdata: []output.PerfDatum{
+								func() output.PerfDatum {
+									low := 0.0
+									high := 20.0
+									return output.PerfDatum{
+										Label: "used",
+										Unit:  "KB",
+										Value: 10,
+										Warn:  &output.ThresholdRange{Low: &low, High: &high},
+									}
+								}(),
+							},
+						},
+					},
 				},
 			},
 			config: Config{
@@ -498,6 +568,21 @@ func TestCollector_Collect(t *testing.T) {
 				runCollectCycle(t, coll)
 				assert.Equal(t, 1, runner.calls)
 				assert.Equal(t, 2, coll.state.currentAttempt())
+				flat := coll.MetricStore().Read(metrix.ReadFlatten())
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "retry_job", "nagios.job.execution_state": "warning"}, 1)
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "retry_job", "nagios.job.execution_state": "retry"}, 1)
+				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "retry_job", "nagios.perfdata.true.job.execution_state": "warning"}, 1)
+				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "retry_job", "nagios.perfdata.true.job.execution_state": "retry"}, 1)
+				assertMetricValue(t, flat, "nagios.job.perfdata.threshold_state", metrix.Labels{
+					"nagios_job":                          "retry_job",
+					perfdataValueLabelKey:                 "bytes_used",
+					"nagios.job.perfdata.threshold_state": perfThresholdStateWarning,
+				}, 1)
+				assertMetricValue(t, flat, "nagios.job.perfdata.threshold_state", metrix.Labels{
+					"nagios_job":                          "retry_job",
+					perfdataValueLabelKey:                 "bytes_used",
+					"nagios.job.perfdata.threshold_state": perfThresholdStateRetry,
+				}, 1)
 
 				*now = now.Add(9 * time.Second)
 				runCollectCycle(t, coll)
@@ -507,6 +592,114 @@ func TestCollector_Collect(t *testing.T) {
 				runCollectCycle(t, coll)
 				assert.Equal(t, 2, runner.calls)
 				assert.Equal(t, 1, coll.state.currentAttempt())
+				flat = coll.MetricStore().Read(metrix.ReadFlatten())
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "retry_job", "nagios.job.execution_state": "ok"}, 1)
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "retry_job", "nagios.job.execution_state": "retry"}, 0)
+				assertMetricValue(t, flat, "nagios.job.perfdata.threshold_state", metrix.Labels{
+					"nagios_job":                          "retry_job",
+					perfdataValueLabelKey:                 "bytes_used",
+					"nagios.job.perfdata.threshold_state": perfThresholdStateOK,
+				}, 1)
+				assertMetricValue(t, flat, "nagios.job.perfdata.threshold_state", metrix.Labels{
+					"nagios_job":                          "retry_job",
+					perfdataValueLabelKey:                 "bytes_used",
+					"nagios.job.perfdata.threshold_state": perfThresholdStateRetry,
+				}, 0)
+			},
+		},
+		"period block suppresses public retry state": {
+			results: []fakeRun{
+				{
+					result: checkRunResult{
+						ServiceState: "WARNING",
+						JobState:     "WARNING",
+						ExitCode:     1,
+						Parsed: output.ParsedOutput{
+							Perfdata: []output.PerfDatum{
+								func() output.PerfDatum {
+									low := 0.0
+									high := 20.0
+									return output.PerfDatum{
+										Label: "used",
+										Unit:  "KB",
+										Value: 30,
+										Warn:  &output.ThresholdRange{Low: &low, High: &high},
+									}
+								}(),
+							},
+						},
+					},
+					err: errors.New("plugin returned warning"),
+				},
+			},
+			config: Config{
+				UpdateEvery: 1,
+				JobConfig: JobConfig{
+					Name:             "paused_retry_job",
+					Plugin:           "/bin/true",
+					CheckInterval:    confDuration(1 * time.Hour),
+					RetryInterval:    confDuration(10 * time.Second),
+					MaxCheckAttempts: 3,
+					CheckPeriod:      "business",
+				},
+				TimePeriods: []timeperiod.Config{
+					{
+						Name: "business",
+						Rules: []timeperiod.RuleConfig{
+							{
+								Type:   "weekly",
+								Days:   []string{"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"},
+								Ranges: []string{"09:00-18:00"},
+							},
+						},
+					},
+				},
+			},
+			run: func(t *testing.T, coll *Collector, runner *fakeRunner, now *time.Time) {
+				t.Helper()
+				runCollectCycle(t, coll)
+				assert.Equal(t, 1, runner.calls)
+
+				flat := coll.MetricStore().Read(metrix.ReadFlatten())
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "paused_retry_job", "nagios.job.execution_state": "warning"}, 1)
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "paused_retry_job", "nagios.job.execution_state": "retry"}, 1)
+				assertMetricValue(t, flat, "nagios.job.perfdata.threshold_state", metrix.Labels{
+					"nagios_job":                          "paused_retry_job",
+					perfdataValueLabelKey:                 "bytes_used",
+					"nagios.job.perfdata.threshold_state": perfThresholdStateWarning,
+				}, 1)
+				assertMetricValue(t, flat, "nagios.job.perfdata.threshold_state", metrix.Labels{
+					"nagios_job":                          "paused_retry_job",
+					perfdataValueLabelKey:                 "bytes_used",
+					"nagios.job.perfdata.threshold_state": perfThresholdStateRetry,
+				}, 1)
+
+				*now = time.Date(2026, 3, 23, 20, 0, 0, 0, time.UTC)
+				runCollectCycle(t, coll)
+				assert.Equal(t, 1, runner.calls)
+
+				flat = coll.MetricStore().Read(metrix.ReadFlatten())
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "paused_retry_job", "nagios.job.execution_state": "paused"}, 1)
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "paused_retry_job", "nagios.job.execution_state": "retry"}, 0)
+				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "paused_retry_job", "nagios.perfdata.true.job.execution_state": "paused"}, 1)
+				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "paused_retry_job", "nagios.perfdata.true.job.execution_state": "retry"}, 0)
+				for _, state := range perfThresholdAlertStateNames {
+					assertMetricValue(t, flat, "nagios.job.perfdata.threshold_state", metrix.Labels{
+						"nagios_job":                          "paused_retry_job",
+						perfdataValueLabelKey:                 "bytes_used",
+						"nagios.job.perfdata.threshold_state": state,
+					}, 0)
+				}
+
+				raw := coll.MetricStore().Read()
+				alertPoint, ok := raw.StateSet("nagios.job.perfdata.threshold_state", metrix.Labels{
+					"nagios_job":          "paused_retry_job",
+					perfdataValueLabelKey: "bytes_used",
+				})
+				require.True(t, ok)
+				for _, state := range perfThresholdAlertStateNames {
+					assert.False(t, alertPoint.States[state])
+				}
 			},
 		},
 		"timeout is exposed publicly but macros keep Nagios unknown": {
@@ -537,7 +730,10 @@ func TestCollector_Collect(t *testing.T) {
 				assert.Equal(t, jobStateTimeout, coll.state.currentJobState())
 
 				flat := coll.MetricStore().Read(metrix.ReadFlatten())
-				assertMetricValue(t, flat, "nagios.job.state", metrix.Labels{"nagios_job": "timeout_job", "nagios.job.state": "timeout"}, 1)
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "timeout_job", "nagios.job.execution_state": "timeout"}, 1)
+				assertMetricValue(t, flat, "nagios.job.execution_state", metrix.Labels{"nagios_job": "timeout_job", "nagios.job.execution_state": "retry"}, 1)
+				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "timeout_job", "nagios.perfdata.true.job.execution_state": "timeout"}, 1)
+				assertMetricValue(t, flat, "nagios.perfdata.true.job.execution_state", metrix.Labels{"nagios_job": "timeout_job", "nagios.perfdata.true.job.execution_state": "retry"}, 1)
 
 				*now = now.Add(11 * time.Second)
 				runCollectCycle(t, coll)

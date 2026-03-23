@@ -5,10 +5,10 @@ package nagios
 import (
 	"context"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 )
 
 func (c *Collector) collect(ctx context.Context) error {
@@ -78,13 +78,24 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 
 	jobLbl := sm.LabelSet(metrix.Label{Key: "nagios_job", Value: jobName})
 	jobMeter := sm.WithLabelSet(jobLbl)
+	jobStatePoint := projectJobExecutionState(c.state.currentJobState(), c.state.isRetrying())
 
 	jobMeter.StateSet(
-		"job.state",
-		metrix.WithStateSetMode(metrix.ModeEnum),
-		metrix.WithStateSetStates("ok", "warning", "critical", "unknown", "timeout", "paused"),
+		"job.execution_state",
+		metrix.WithStateSetMode(metrix.ModeBitSet),
+		metrix.WithStateSetStates(jobExecutionStateNames...),
 		metrix.WithUnit("state"),
-	).Enable(normalizeJobStateForMetric(c.state.currentJobState()))
+	).ObserveStateSet(jobStatePoint)
+
+	scriptName := perfSourceFromPlugin(c.job.config.Plugin)
+	jobMeter.StateSet(
+		"perfdata."+scriptName+".job.execution_state",
+		metrix.WithStateSetMode(metrix.ModeBitSet),
+		metrix.WithStateSetStates(jobExecutionStateNames...),
+		metrix.WithChartFamily(perfdataFamily(scriptName)),
+		metrix.WithChartPriority(chartengine.Priority-10),
+		metrix.WithUnit("state"),
+	).ObserveStateSet(jobStatePoint)
 
 	jobMeter.Gauge(
 		"job.execution_duration",
@@ -111,14 +122,14 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 			jobMeter.MeasureSetCounter(
 				measureSet.name,
 				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-				metrix.WithChartFamily(measureSet.scriptName),
+				metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
 				metrix.WithUnit(measureSet.unit),
 			).ObserveTotalFields(fields)
 		} else {
 			jobMeter.MeasureSetGauge(
 				measureSet.name,
 				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-				metrix.WithChartFamily(measureSet.scriptName),
+				metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
 				metrix.WithUnit(measureSet.unit),
 			).ObserveFields(fields)
 		}
@@ -129,7 +140,7 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 			thresholdState.name,
 			metrix.WithStateSetMode(metrix.ModeBitSet),
 			metrix.WithStateSetStates(perfThresholdStateNames...),
-			metrix.WithChartFamily(thresholdState.scriptName),
+			metrix.WithChartFamily(perfdataFamily(thresholdState.scriptName)),
 			metrix.WithUnit("state"),
 		)
 		if thresholdState.state == "" {
@@ -137,22 +148,19 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 		} else {
 			inst.Enable(thresholdState.state)
 		}
+
+		jobMeter.WithLabels(metrix.Label{
+			Key:   perfdataValueLabelKey,
+			Value: thresholdState.perfdataValue,
+		}).StateSet(
+			jobPerfdataThresholdMetricName,
+			metrix.WithStateSetMode(metrix.ModeBitSet),
+			metrix.WithStateSetStates(perfThresholdAlertStateNames...),
+			metrix.WithUnit("state"),
+		).ObserveStateSet(projectPerfThresholdAlertState(thresholdState.state, c.state.isRetrying()))
 	}
 }
 
-func normalizeJobStateForMetric(state string) string {
-	switch strings.ToUpper(strings.TrimSpace(state)) {
-	case nagiosStateOK:
-		return "ok"
-	case nagiosStateWarning:
-		return "warning"
-	case nagiosStateCritical:
-		return "critical"
-	case jobStateTimeout:
-		return "timeout"
-	case jobStatePaused:
-		return "paused"
-	default:
-		return "unknown"
-	}
+func perfdataFamily(scriptName string) string {
+	return "Perfdata/" + scriptName
 }

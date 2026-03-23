@@ -5,22 +5,29 @@ package nagios
 import "github.com/netdata/netdata/go/plugins/pkg/metrix"
 
 const (
-	perfFieldValue             = "value"
-	perfThresholdStateNone     = "no_threshold"
-	perfThresholdStateOK       = "ok"
-	perfThresholdStateWarning  = "warning"
-	perfThresholdStateCritical = "critical"
+	perfFieldValue                 = "value"
+	perfThresholdStateNone         = "no_threshold"
+	perfThresholdStateOK           = "ok"
+	perfThresholdStateWarning      = "warning"
+	perfThresholdStateCritical     = "critical"
+	perfThresholdStateRetry        = "retry"
+	perfdataValueLabelKey          = "perfdata_value"
+	jobPerfdataThresholdMetricName = "job.perfdata.threshold_state"
 )
 
 var (
-	perfMeasureSetFieldOrder = []string{
-		perfFieldValue,
-	}
 	perfThresholdStateNames = []string{
 		perfThresholdStateNone,
 		perfThresholdStateOK,
 		perfThresholdStateWarning,
 		perfThresholdStateCritical,
+	}
+	perfThresholdAlertStateNames = []string{
+		perfThresholdStateNone,
+		perfThresholdStateOK,
+		perfThresholdStateWarning,
+		perfThresholdStateCritical,
+		perfThresholdStateRetry,
 	}
 )
 
@@ -33,9 +40,10 @@ type perfValueMeasureSet struct {
 }
 
 type perfThresholdStateSet struct {
-	name       string
-	scriptName string
-	state      string
+	name          string
+	scriptName    string
+	perfdataValue string
+	state         string
 }
 
 type perfRouteResult struct {
@@ -62,11 +70,22 @@ func perfMeasureSetValues(value metrix.SampleValue) map[string]metrix.SampleValu
 }
 
 func perfThresholdStatePoint(active string) metrix.StateSetPoint {
-	states := make(map[string]bool, len(perfThresholdStateNames))
-	for _, state := range perfThresholdStateNames {
+	return stateSetPoint(perfThresholdStateNames, active)
+}
+
+func perfThresholdAlertStatePoint(actives ...string) metrix.StateSetPoint {
+	return stateSetPoint(perfThresholdAlertStateNames, actives...)
+}
+
+func stateSetPoint(names []string, actives ...string) metrix.StateSetPoint {
+	states := make(map[string]bool, len(names))
+	for _, state := range names {
 		states[state] = false
 	}
-	if active != "" {
+	for _, active := range actives {
+		if active == "" {
+			continue
+		}
 		states[active] = true
 	}
 	return metrix.StateSetPoint{States: states}

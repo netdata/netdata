@@ -159,7 +159,7 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 			Units:     strings.TrimSpace(chart.Units),
 			Algorithm: algorithm,
 			Type:      chartType,
-			Priority:  chart.Priority,
+			Priority:  effectiveChartPriority(chart.Priority),
 		},
 		Identity: identity,
 		Labels: program.LabelPolicy{
@@ -535,4 +535,11 @@ func (v selectorLabelView) CloneMap() map[string]string {
 		return true
 	})
 	return out
+}
+
+func effectiveChartPriority(priority int) int {
+	if priority > 0 {
+		return priority
+	}
+	return Priority
 }
