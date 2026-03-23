@@ -471,7 +471,7 @@ modules:
             - name: nagios_job
               description: Job name as defined in the configuration.
             - name: perfdata_value
-              description: Identifies which performance data metric a threshold state belongs to. Format is `<unit_class>_<label>`, where `<unit_class>` is derived from the UOM (`time`, `bytes`, `bits`, `percent`, `counter`, or `generic`) and `<label>` is the sanitized metric label from the check output. For example, `repl_lag=5s` produces `time_repl_lag`.
+              description: Identifies which performance data metric a threshold state belongs to. Format is `<unit_class>_<label>`, where `<unit_class>` is derived from the UOM (`time`, `bytes`, `bits`, `percent`, or `generic`) and `<label>` is the sanitized metric label from the check output. For example, `repl_lag=5s` produces `time_repl_lag`.
           metrics:
             - name: nagios.job.execution_state
               description: Current state of the check job. Values are ok, warning, critical, unknown, timeout (check exceeded configured timeout), or paused (outside check_period). The retry dimension indicates the check is retrying before reaching hard state.
