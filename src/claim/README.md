@@ -40,6 +40,20 @@ Create `/INSTALL_PREFIX/etc/netdata/claim.conf`:
    insecure = no
 ```
 
+:::info 
+
+**File Permissions and Ownership:**
+
+The `claim.conf` file contains sensitive claiming tokens and must be properly secured:
+
+- **Required permissions:** `0640` (owner read/write, group read, no world access)
+- **Required ownership:** `root:netdata` (owner root, group netdata)
+
+The claiming script automatically sets these permissions when creating or updating `claim.conf`. If you create the file manually, ensure it follows these same security standards to prevent unauthorized access to your claiming tokens.
+
+:::
+
+
 **Configuration Options:**
 
 |  option  | description                                                                            | required |
@@ -54,45 +68,6 @@ Create `/INSTALL_PREFIX/etc/netdata/claim.conf`:
 
 If the Agent is already running, you can either run `netdatacli reload-claiming-state` or [restart the Agent](/docs/netdata-agent/start-stop-restart.md). Otherwise, the Agent connects when it starts.
 
-**File Permissions and Ownership:**
-
-The `claim.conf` file contains sensitive claiming tokens and must be properly secured:
-
-- **Required permissions:** `0640` (owner read/write, group read, no world access)
-- **Required ownership:** `root:netdata` (owner root, group netdata)
-
-:::important
-
-The claiming script automatically sets these permissions when creating or updating `claim.conf`. If you create the file manually, ensure it follows these same security standards to prevent unauthorized access to your claiming tokens.
-
-:::
-
-:::info
-
-**File Permissions and Ownership:**
-
-The `claim.conf` file contains sensitive claiming tokens and must be properly secured:
-
-- **Required permissions:** `0640` (owner read/write, group read, no world access)
-- **Required ownership:** `root:netdata` (owner root, group netdata)
-
-The claiming script automatically sets these permissions when creating or updating `claim.conf`. If you create the file manually, ensure it follows these same security standards to prevent unauthorized access to your claiming tokens.
-
-:::
-
-**Configuration Options:**
-
-|  option  | description                                                                            | required |
-|:--------:|:---------------------------------------------------------------------------------------|:--------:|
-|   url    | The Netdata Cloud base URL (defaults to `https://app.netdata.cloud`)                   |    no    |
-|  token   | The claiming token for your Netdata Cloud Space                                        |   yes    |
-|  rooms   | A comma-separated list of Rooms that the Agent will be added to                        |    no    |
-|  proxy   | See [proxy configuration](#proxy-configuration) below                                  |    no    |
-| insecure | A boolean (either `yes`, or `no`) and when set to `yes` it disables host verification. |    no    |
-
-**Applying the Configuration:**
-
-If the Agent is already running, you can either run `netdatacli reload-claiming-state` or [restart the Agent](/docs/netdata-agent/start-stop-restart.md). Otherwise, the Agent connects when it starts.
 ### Method 3: Via Environment Variables
 
 **Best for:** Container deployments, CI/CD pipelines
