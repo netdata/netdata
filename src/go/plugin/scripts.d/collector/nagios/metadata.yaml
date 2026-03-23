@@ -253,12 +253,12 @@ modules:
               required: false
               group: Scheduling
             - name: check_period
-              description: Name of the time period that controls when the job is allowed to run. Outside this period, the check does not execute and the public job state becomes `paused`.
+              description: Name of the [time period](/src/go/plugin/scripts.d/pkg/timeperiod/README.md) that controls when the job is allowed to run. The built-in `24x7` period (always allowed) is the default. Outside the active period, the check does not execute and the job state becomes `paused`.
               default_value: 24x7
               required: false
               group: Scheduling
             - name: time_periods
-              description: Custom named time periods defined inside the same job.
+              description: Custom named [time periods](/src/go/plugin/scripts.d/pkg/timeperiod/README.md) defined inside the same job. Supports `weekly`, `nth_weekday`, and `date` rule types.
               default_value: ""
               required: false
               group: Scheduling
