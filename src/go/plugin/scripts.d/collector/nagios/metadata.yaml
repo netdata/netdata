@@ -212,7 +212,7 @@ modules:
               group: Collection
 
             - name: plugin
-              description: Absolute path to the Nagios-compatible executable to run. This can be a packaged Nagios plugin or your own executable. If you need a script interpreter, point `plugin` to that interpreter and pass the script path in `args`. The command should return exit code `0`, `1`, `2`, or `3` and may print performance data after `|`.
+              description: Absolute path to the Nagios-compatible executable to run. This can be a packaged Nagios plugin or your own executable. If you need a script interpreter, point `plugin` to that interpreter and pass the script path in `args`. The command should return exit code `0`, `1`, `2`, or `3` and may print performance data after <code>&#124;</code>.
               default_value: ""
               required: true
               group: Target
