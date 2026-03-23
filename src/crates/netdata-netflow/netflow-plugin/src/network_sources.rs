@@ -255,6 +255,7 @@ fn decode_remote_records(
             tenant: remote.tenant,
             asn: decode_remote_asn(remote.asn),
             asn_name: String::new(),
+            ip_class: String::new(),
         };
         out.push(NetworkSourceRecord { prefix, attrs });
     }

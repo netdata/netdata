@@ -20,6 +20,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const GEOIP_RELOAD_CHECK_INTERVAL: Duration = Duration::from_secs(30);
+const PRIVATE_IP_ADDRESS_SPACE_LABEL: &str = "Private IP Address Space";
 
 #[derive(Debug)]
 pub(crate) struct FlowEnricher {
@@ -502,8 +503,8 @@ impl FlowEnricher {
             "NEXT_HOP",
             next_hop.map(|addr| addr.to_string()).unwrap_or_default(),
         );
-        write_network_attributes(fields, &SRC_KEYS, source_network.as_ref());
-        write_network_attributes(fields, &DST_KEYS, dest_network.as_ref());
+        write_network_attributes(fields, &SRC_KEYS, source_network.as_ref(), source_as);
+        write_network_attributes(fields, &DST_KEYS, dest_network.as_ref(), dest_as);
 
         if let Some(dest_routing) = dest_routing {
             append_u32_list_field(fields, "DST_AS_PATH", &dest_routing.as_path);
@@ -2760,6 +2761,7 @@ pub(crate) struct NetworkAttributes {
     pub(crate) tenant: String,
     pub(crate) asn: u32,
     pub(crate) asn_name: String,
+    pub(crate) ip_class: String,
 }
 
 impl NetworkAttributes {
@@ -2775,6 +2777,7 @@ impl NetworkAttributes {
             tenant: config.tenant.clone(),
             asn: config.asn,
             asn_name: String::new(),
+            ip_class: String::new(),
         }
     }
 
@@ -2789,6 +2792,7 @@ impl NetworkAttributes {
             && self.tenant.is_empty()
             && self.asn == 0
             && self.asn_name.is_empty()
+            && self.ip_class.is_empty()
     }
 
     fn merge_from(&mut self, overlay: &Self) {
@@ -2797,6 +2801,9 @@ impl NetworkAttributes {
         }
         if !overlay.asn_name.is_empty() {
             self.asn_name = overlay.asn_name.clone();
+        }
+        if !overlay.ip_class.is_empty() {
+            self.ip_class = overlay.ip_class.clone();
         }
         if !overlay.name.is_empty() {
             self.name = overlay.name.clone();
@@ -2876,6 +2883,14 @@ struct AsnLookupRecord {
     autonomous_system_organization: Option<String>,
     #[serde(default)]
     asn: Option<String>,
+    #[serde(default)]
+    netdata: NetdataLookupRecord,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct NetdataLookupRecord {
+    #[serde(default)]
+    ip_class: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -3003,6 +3018,9 @@ impl GeoIpResolver {
                 if let Some(asn_name) = decode_asn_name(&record) {
                     out.asn_name = asn_name;
                 }
+                if let Some(ip_class) = decode_ip_class(&record) {
+                    out.ip_class = ip_class;
+                }
             }
         }
 
@@ -3109,6 +3127,23 @@ fn decode_asn_name(record: &AsnLookupRecord) -> Option<String> {
         .map(str::trim)
         .filter(|name| !name.is_empty())
         .map(str::to_string)
+}
+
+fn decode_ip_class(record: &AsnLookupRecord) -> Option<String> {
+    let ip_class = record.netdata.ip_class.trim();
+    (!ip_class.is_empty()).then(|| ip_class.to_string())
+}
+
+fn effective_as_name(attrs: Option<&NetworkAttributes>, resolved_asn: u32) -> String {
+    let Some(attrs) = attrs else {
+        return String::new();
+    };
+
+    if resolved_asn == 0 && attrs.ip_class == "private" {
+        PRIVATE_IP_ADDRESS_SPACE_LABEL.to_string()
+    } else {
+        attrs.asn_name.clone()
+    }
 }
 
 fn parse_asn_text(value: &str) -> Option<u32> {
@@ -3445,9 +3480,10 @@ fn write_network_attributes(
     fields: &mut FlowFields,
     keys: &SideKeys,
     attrs: Option<&NetworkAttributes>,
+    resolved_asn: u32,
 ) {
     let attrs = attrs.cloned().unwrap_or_default();
-    fields.insert(keys.as_name, attrs.asn_name);
+    fields.insert(keys.as_name, effective_as_name(Some(&attrs), resolved_asn));
     fields.insert(keys.net_name, attrs.name);
     fields.insert(keys.net_role, attrs.role);
     fields.insert(keys.net_site, attrs.site);
@@ -3464,7 +3500,7 @@ fn write_network_attributes(
 
 fn write_network_attributes_record_src(rec: &mut FlowRecord, attrs: Option<&NetworkAttributes>) {
     let attrs = attrs.cloned().unwrap_or_default();
-    rec.src_as_name = attrs.asn_name;
+    rec.src_as_name = effective_as_name(Some(&attrs), rec.src_as);
     rec.src_net_name = attrs.name;
     rec.src_net_role = attrs.role;
     rec.src_net_site = attrs.site;
@@ -3477,7 +3513,7 @@ fn write_network_attributes_record_src(rec: &mut FlowRecord, attrs: Option<&Netw
 
 fn write_network_attributes_record_dst(rec: &mut FlowRecord, attrs: Option<&NetworkAttributes>) {
     let attrs = attrs.cloned().unwrap_or_default();
-    rec.dst_as_name = attrs.asn_name;
+    rec.dst_as_name = effective_as_name(Some(&attrs), rec.dst_as);
     rec.dst_net_name = attrs.name;
     rec.dst_net_role = attrs.role;
     rec.dst_net_site = attrs.site;
@@ -5318,9 +5354,55 @@ mod tests {
             autonomous_system_number: Some(64_512),
             autonomous_system_organization: Some("Example Transit".to_string()),
             asn: None,
+            netdata: NetdataLookupRecord::default(),
         };
 
         assert_eq!(decode_asn_name(&record).as_deref(), Some("Example Transit"));
+    }
+
+    #[test]
+    fn decode_ip_class_returns_non_empty_value() {
+        let record = AsnLookupRecord {
+            autonomous_system_number: None,
+            autonomous_system_organization: None,
+            asn: None,
+            netdata: NetdataLookupRecord {
+                ip_class: "private".to_string(),
+            },
+        };
+
+        assert_eq!(decode_ip_class(&record).as_deref(), Some("private"));
+    }
+
+    #[test]
+    fn effective_as_name_uses_private_space_label_only_for_private_zero_asn() {
+        let attrs = NetworkAttributes {
+            ip_class: "private".to_string(),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            effective_as_name(Some(&attrs), 0),
+            PRIVATE_IP_ADDRESS_SPACE_LABEL
+        );
+        assert_eq!(effective_as_name(Some(&attrs), 64_500), "");
+        assert_eq!(effective_as_name(None, 0), "");
+    }
+
+    #[test]
+    fn write_network_attributes_uses_private_space_label_for_zero_private_asn() {
+        let attrs = NetworkAttributes {
+            ip_class: "private".to_string(),
+            ..Default::default()
+        };
+        let mut fields = FlowFields::new();
+
+        write_network_attributes(&mut fields, &SRC_KEYS, Some(&attrs), 0);
+
+        assert_eq!(
+            fields.get("SRC_AS_NAME").map(String::as_str),
+            Some(PRIVATE_IP_ADDRESS_SPACE_LABEL)
+        );
     }
 
     #[test]
