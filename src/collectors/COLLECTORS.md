@@ -482,7 +482,6 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Minecraft](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/minecraft.md) | Track Minecraft server metrics for efficient game server management and performance. |
 | [MS Exchange](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/ms_exchange.md) | This collector monitors Microsoft Exchange. |
 | [mtail](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/mtail.md) | Monitor log data metrics using mtail log data extractor and parser. |
-| [Nagios](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/nagios.md) | Keep tabs on Nagios network monitoring metrics for efficient IT infrastructure management and performance. |
 | [NET Framework](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/net_framework.md) | This collector monitors application built with .NET |
 | [Nextcloud servers](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/nextcloud_servers.md) | Keep an eye on Nextcloud cloud storage metrics for efficient file hosting and management. |
 | [NRPE daemon](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/nrpe_daemon.md) | Monitor Nagios Remote Plugin Executor (NRPE) metrics for efficient system and network monitoring. |
