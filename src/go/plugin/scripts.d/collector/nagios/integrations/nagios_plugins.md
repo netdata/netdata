@@ -21,10 +21,130 @@ Module: nagios
 
 ## Overview
 
-This collector runs Nagios-compatible checks, tracks the execution state of each configured job, measures how long each check takes to run, and automatically charts any performance data the check prints. For non-counter perfdata, Netdata also derives a plugin-scoped threshold-state chart for visualization and a static `nagios.job.perfdata.threshold_state` duplicate for alerting. When the check does not provide warning or critical ranges, the threshold state is `no_threshold`.
+This collector runs [Nagios-compatible plugins](https://www.nagios-plugins.org/) and custom scripts. It provides:
+
+- **Check state monitoring** — tracks whether each check returns OK, WARNING, CRITICAL, or UNKNOWN
+- **Execution metrics** — measures run duration, CPU time, and memory usage of each check
+- **Automatic performance data charts** — any [Nagios performance data](https://nagios-plugins.org/doc/guidelines.html) in the check output is parsed and charted automatically
+- **Threshold-based alerting** — when performance data includes warning/critical thresholds, Netdata derives threshold state and creates built-in alerts
 
 
-Netdata runs the configured Nagios-compatible command for each job, reads the process exit code to determine the check state, and parses the command output into a summary line, optional long output, and optional performance data. Any performance data found after the `|` separator is converted into charts automatically. The main perfdata value becomes a chart, and non-counter metrics also get derived threshold-state output in two forms: a plugin-scoped chart for visualization and a static `nagios.job.perfdata.threshold_state` chart labeled by `perfdata_value` for stock alerting. If the check does not provide warning or critical ranges, that threshold state is `no_threshold`. You can use packaged Nagios plugins or your own scripts, and you can control how often checks run, how retries behave, and when checks are allowed to run by using the job configuration.
+Netdata executes each configured command on a schedule, reads the process exit code to determine the check state, and parses the standard output for a status message and optional [performance data](https://nagios-plugins.org/doc/guidelines.html). Any performance data is automatically converted into charts.
+
+:::tip
+
+You can use packaged [Nagios plugins](https://www.nagios-plugins.org/) or write your own scripts — any executable that follows the Nagios plugin output format will work.
+
+:::
+
+<details open><summary><strong>Nagios Plugin Output Format</strong></summary>
+
+A Nagios-compatible plugin communicates through two channels: the **process exit code** and **standard output**. For the full specification, see the [Nagios Plugin Development Guidelines](https://nagios-plugins.org/doc/guidelines.html).
+
+#### Exit Codes
+
+The exit code is the **only** thing that determines the check state — the output text is for display purposes only.
+
+| Exit Code | State | Meaning |
+|:---------:|:------|:--------|
+| 0 | **OK** | Check passed |
+| 1 | **WARNING** | Above warning threshold or degraded |
+| 2 | **CRITICAL** | Above critical threshold or service down |
+| 3 | **UNKNOWN** | Invalid arguments or internal error |
+
+#### Standard Output
+
+The output follows this structure:
+
+```text
+STATUS TEXT | perfdata1=val;warn;crit;min;max perfdata2=val
+LONG OUTPUT LINE 1
+LONG OUTPUT LINE 2 | more_perfdata=val
+```
+
+| Part | Description |
+|:-----|:------------|
+| **Status text** | Text before the pipe on the first line. Shown as the job's status message. |
+| **Performance data** | Text after the pipe on any line. Parsed into charts automatically. |
+| **Long output** | Lines 2+ before the pipe. Additional detail text. |
+
+> **Note:** The pipe separator is optional. Without it, the entire first line is the status text and no performance data charts are created.
+
+#### Performance Data Format
+
+Each performance data metric uses this format:
+
+```text
+'label'=value[UOM];[warn];[crit];[min];[max]
+```
+
+| Field | Required | Description |
+|:------|:--------:|:------------|
+| `label` | Yes | Metric name. Quote with single quotes if it contains spaces. |
+| `value` | Yes | Numeric value. |
+| `UOM` | No | Unit of measurement (see table below). |
+| `warn` | No | Warning threshold range. |
+| `crit` | No | Critical threshold range. |
+| `min` | No | Minimum possible value. |
+| `max` | No | Maximum possible value. |
+
+Separate multiple metrics with spaces.
+
+**Supported Units of Measurement (UOM):**
+
+| UOM | Meaning | How Netdata charts it |
+|:----|:--------|:----------------------|
+| *(none)* | Unitless number | Charted as-is |
+| `s` | Seconds (also `ms`, `us`, `ns`) | Normalized to seconds |
+| `%` | Percentage | Charted as percentage |
+| `B` | Bytes (also `KB`, `MB`, `GB`, `TB`) | Charted in bytes |
+| `b` | Bits (also `Kb`, `Mb`, `Gb`, `Tb`) | Charted in bits |
+| `c` | Continuous counter | Charted as incremental rate |
+
+#### Threshold Ranges
+
+Thresholds use the format `[@]start:end`, where a bare number like `10` is shorthand for `0:10` and `~` represents negative infinity (no lower bound). An alert triggers when the value falls **outside** the range (or **inside** with the `@` prefix):
+
+| Range | Alert when... |
+|:------|:--------------|
+| `10` | value < 0 or value > 10 |
+| `10:` | value < 10 |
+| `~:10` | value > 10 |
+| `10:20` | value < 10 or value > 20 |
+| `@10:20` | 10 ≤ value ≤ 20 |
+
+When `warn` and `crit` ranges are provided on non-counter metrics, Netdata automatically derives a threshold state (ok / warning / critical) and creates charts with built-in alerts.
+
+**Common threshold patterns:**
+
+| I want to alert when... | `warn` | `crit` |
+|:------------------------|:-------|:-------|
+| Value exceeds a limit (e.g., response time > 2s) | `~:2` | `~:5` |
+| Value drops below a floor (e.g., free space < 10%) | `10:` | `5:` |
+| Value is outside a band (e.g., temperature 20–80) | `20:80` | `10:90` |
+
+#### Example
+
+A minimal Nagios-compatible script:
+
+```bash
+#!/bin/sh
+echo "OK - 85% free memory | free_pct=85%;20:;10:;0;100 used_kb=2380912KB;;;0;16380000"
+exit 0
+```
+
+This produces:
+- **Check state**: OK (exit code 0)
+- **Status text**: `OK - 85% free memory`
+- **Charts**: `free_pct` (percentage with warning/critical thresholds) and `used_kb` (bytes)
+
+</details>
+
+:::info
+
+**Retry behavior:** When a check returns a non-OK state, Netdata does not alert immediately. The check enters a **soft state** and retries at the `retry_interval` rate. Only after `max_check_attempts` consecutive failures does it become a **hard state** and trigger alerts. If the check recovers during retries, it returns to OK without alerting. The `retry` dimension on state charts indicates a soft state is in progress.
+
+:::
 
 
 This collector is supported on all platforms.
@@ -57,7 +177,7 @@ Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
-Each configured job exposes execution-state and execution-resource charts. Netdata also emits a plugin-scoped copy of the job state named `nagios.perfdata.<plugin>.job.execution_state` so the state appears under each configured check section in the UI. If a check prints Nagios performance data, Netdata also creates additional value charts automatically from the values emitted by that check. For non-counter perfdata, Netdata creates both a plugin-scoped threshold-state chart for visualization and a static `nagios.job.perfdata.threshold_state` duplicate labeled by `perfdata_value` for alerting. Counter perfdata currently exposes only the value chart.
+Each configured job produces execution state and resource usage charts. When a check emits Nagios performance data, additional charts are created automatically for each metric. Non-counter perfdata with warning/critical thresholds also get threshold state charts for alerting.
 
 
 ### Per job
@@ -69,14 +189,14 @@ Labels:
 | Label      | Description     |
 |:-----------|:----------------|
 | nagios_job | Job name as defined in the configuration. |
-| perfdata_value | Normalized perfdata identity in the form `<class>_<metric_key>`, used by the static threshold-state duplicate. |
+| perfdata_value | Identifies which performance data metric a threshold state belongs to. Format is `<unit_class>_<label>`, where `<unit_class>` is derived from the UOM (`time`, `bytes`, `bits`, `percent`, or `generic`) and `<label>` is the sanitized metric label from the check output. For example, `repl_lag=5s` produces `time_repl_lag`. |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | nagios.job.execution_state | ok, warning, critical, unknown, timeout, paused, retry | state |
-| nagios.job.perfdata.threshold_state | no_threshold, ok, warning, critical, retry | state |
+| nagios.job.perfdata_threshold_state | no_threshold, ok, warning, critical, retry | state |
 | nagios.job.execution_duration | duration | seconds |
 | nagios.job.execution_cpu_total | total | seconds |
 | nagios.job.execution_max_rss | rss | bytes |
@@ -118,77 +238,15 @@ dnf install nagios-plugins-all
 Make sure the configured command path exists and is executable by the `netdata` user.
 
 
-#### Write Nagios-compatible checks
+#### Prepare custom check scripts
 
-A compatible check uses two things:
+If you are writing your own check scripts instead of using packaged Nagios plugins:
 
-- the **exit code** to tell Netdata whether the result is OK, WARNING, CRITICAL, or UNKNOWN
-- the **command output** to show a human-readable message and optional performance data
-
-Use these exit codes:
-
-- `0` = OK
-- `1` = WARNING
-- `2` = CRITICAL
-- `3` = UNKNOWN
-
-The first output line should follow this pattern:
-
-```text
-<summary text> | <perfdata>
-```
-
-The `|` separator is optional:
-
-- everything before `|` is the human-readable summary
-- everything after `|` is performance data used for automatic charts
-
-The summary should be short and useful because it is the main status text shown for the job. If the script prints multiple lines, Netdata uses the first line as the summary and keeps the remaining lines as long output.
-
-Each performance-data item follows this format:
-
-```text
-'label'=value[UOM];warn;crit;min;max
-```
-
-Only `label` and `value` are required. The threshold and range fields are optional. Separate multiple metrics with spaces.
-
-Common units include:
-
-- `%` for percentages
-- `s`, `ms`, `us` for durations
-- `B`, `KB`, `MB`, `GB` for sizes
-- `c` for counters
-
-Example output:
-
-```text
-OK - 85.5% free memory | free_pct=85.5%;20;10;0;100 free_kb=13999088KB;;;0;16380000
-```
-
-In that example:
-
-- the exit code decides the state
-- `OK - 85.5% free memory` is the summary line
-- `free_pct=85.5%;20;10;0;100` creates a percentage metric
-- `free_kb=13999088KB;;;0;16380000` creates a size metric
-- the warning and critical ranges on non-counter metrics are also used to derive threshold-state output for both visualization and alerting
-
-Good rules to follow:
-
-- return the correct exit code
-- keep the first line short and readable
-- put performance data after `|`
-- separate multiple metrics with spaces
-- quote labels if they contain spaces
-
-Minimal example:
-
-```bash
-#!/bin/sh
-echo "CPU OK - 20% used | cpu=20%;80;90"
-exit 0
-```
+- Place scripts anywhere accessible to the `netdata` user (e.g., `/usr/local/lib/netdata/checks/`)
+- Make scripts executable: `chmod +x /path/to/script.sh`
+- Test as the `netdata` user to verify permissions and environment: `sudo -u netdata /path/to/script.sh`
+- Verify the exit code: `echo $?` (must be 0, 1, 2, or 3)
+- Verify the output matches the Nagios plugin output format described in the Overview above
 
 
 
@@ -205,22 +263,52 @@ Add jobs under `jobs:`. Each job runs one Nagios-compatible check command.
 
 | Group | Option | Description | Default | Required |
 |:------|:-----|:------------|:--------|:---------:|
-| **Collection** | update_every | How often Netdata evaluates the job schedule, in seconds. | 10 | no |
-|  | autodetection_retry | How often Netdata retries failed auto-detection jobs, in seconds. Set `0` to keep auto-detection disabled. | 0 | no |
-| **Target** | plugin | Absolute path to the Nagios-compatible executable to run. This can be a packaged Nagios plugin or your own executable. If you need a script interpreter, point `plugin` to that interpreter and pass the script path in `args`. The command should return exit code `0`, `1`, `2`, or `3` and may print performance data after `/`. |  | yes |
+| **Collection** | update_every | How often the collector's internal scheduler ticks, in seconds. Controls chart granularity. In most cases you only need to set `check_interval`. | 10 | no |
+| **Target** | plugin | Absolute path to the Nagios-compatible executable to run. This can be a packaged Nagios plugin or your own executable. If you need a script interpreter, point `plugin` to that interpreter and pass the script path in `args`. The command should return exit code `0`, `1`, `2`, or `3` and may print performance data after <code>&#124;</code>. |  | yes |
 |  | args | Arguments passed to the command. |  | no |
-|  | arg_values | Values exposed to `$ARG1$` through `$ARG32$` for macro expansion. |  | no |
+|  | arg_values | Values exposed to `$ARG1$` through `$ARG32$` for macro expansion. The first value maps to `$ARG1$`, the second to `$ARG2$`, and so on. |  | no |
 |  | working_directory | Working directory used when running the command. |  | no |
 | **Scheduling** | timeout | Maximum time allowed for one command run. If the check exceeds this limit, the job state becomes `timeout`. | 5s | no |
 |  | check_interval | Interval between regular checks. | 5m | no |
 |  | retry_interval | Interval between retries while a check remains in a non-OK soft state. | 1m | no |
 |  | max_check_attempts | Number of attempts before a non-OK result becomes a hard state. | 3 | no |
-|  | check_period | Name of the time period that controls when the job is allowed to run. Outside this period, the check does not execute and the public job state becomes `paused`. | 24x7 | no |
-|  | time_periods | Custom named time periods defined inside the same job. |  | no |
-| **Environment** | environment | Extra environment variables added on top of the collector's limited execution baseline. The check does not inherit the full Netdata process environment. |  | no |
-|  | custom_vars | Custom service variables exposed to the check as Nagios-style macros. |  | no |
+|  | check_period | Name of the [time period](https://github.com/netdata/netdata/blob/master/src/go/plugin/scripts.d/pkg/timeperiod/README.md) that controls when the job is allowed to run. The built-in `24x7` period (always allowed) is the default. Outside the active period, the check does not execute and the job state becomes `paused`. | 24x7 | no |
+|  | time_periods | Custom named [time periods](https://github.com/netdata/netdata/blob/master/src/go/plugin/scripts.d/pkg/timeperiod/README.md) defined inside the same job. Supports `weekly`, `nth_weekday`, and `date` rule types. |  | no |
+| **Environment** | [environment](#option-environment-environment) | Extra environment variables added on top of the collector's limited execution baseline. The check does not inherit the full Netdata process environment. |  | no |
+|  | [custom_vars](#option-environment-custom-vars) | Custom service variables exposed to the check as Nagios-style macros. |  | no |
 | **Virtual Node** | vnode | Associate the job with a virtual node so the check can use host-specific labels and macros. |  | no |
 | **Misc** | notes | Optional notes for the job definition. |  | no |
+
+<a id="option-environment-environment"></a>
+##### environment
+
+A key-value map of environment variables injected into the check's process. Use this when your script depends on variables that are not part of the collector's default environment.
+
+```yaml
+jobs:
+  - name: oracle_check
+    plugin: /usr/local/bin/check_oracle.sh
+    environment:
+      ORACLE_HOME: /opt/oracle/product/19c
+      LD_LIBRARY_PATH: /opt/oracle/product/19c/lib
+```
+
+
+<a id="option-environment-custom-vars"></a>
+##### custom_vars
+
+A key-value map of custom service variables. Each entry is exposed as a `NAGIOS__SERVICE<UPPERCASE_KEY>` environment variable and can be referenced in `args` using the Nagios macro syntax `$_SERVICE<KEY>$`.
+
+```yaml
+jobs:
+  - name: check_db
+    plugin: /usr/lib/nagios/plugins/check_pgsql
+    args: ["-H", "$_SERVICEDBHOST$", "-d", "$_SERVICEDBNAME$"]
+    custom_vars:
+      DBHOST: db.example.com
+      DBNAME: production
+```
+
 
 
 </details>
@@ -261,9 +349,68 @@ jobs:
 ```
 </details>
 
-###### Custom script
+###### End-to-end custom script
 
-Run your own Nagios-compatible shell script.
+Write a custom check script, then configure Netdata to run it.
+
+**1. Create the script** (e.g., `/usr/local/lib/netdata/checks/check_api.sh`):
+
+```bash
+#!/bin/sh
+# Check HTTP endpoint health
+URL="http://localhost:8080/health"
+
+response=$(curl -s -o /dev/null -w "%{http_code} %{time_total}" --max-time 5 "$URL" 2>/dev/null)
+curl_exit=$?
+
+if [ "$curl_exit" -ne 0 ]; then
+    echo "UNKNOWN - Could not connect to $URL (curl exit code $curl_exit)"
+    exit 3
+fi
+
+http_code=$(echo "$response" | cut -d' ' -f1)
+response_time=$(echo "$response" | cut -d' ' -f2)
+
+if [ "$http_code" -ge 500 ]; then
+    echo "CRITICAL - $URL returned HTTP $http_code | response_time=${response_time}s;2;5;0;"
+    exit 2
+elif [ "$http_code" -ne 200 ]; then
+    echo "WARNING - $URL returned HTTP $http_code | response_time=${response_time}s;2;5;0;"
+    exit 1
+fi
+
+echo "OK - $URL returned HTTP $http_code | response_time=${response_time}s;2;5;0;"
+exit 0
+```
+
+**2. Make it executable and test it:**
+
+```bash
+chmod +x /usr/local/lib/netdata/checks/check_api.sh
+sudo -u netdata /usr/local/lib/netdata/checks/check_api.sh
+echo "Exit code: $?"
+```
+
+**3. Add the configuration below, then restart Netdata** (`sudo systemctl restart netdata`). After restarting, look for `nagios.job.execution_state` and related charts in the Netdata dashboard.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: api_health
+    plugin: /usr/local/lib/netdata/checks/check_api.sh
+    timeout: 10s
+    check_interval: 1m
+    retry_interval: 30s
+    max_check_attempts: 3
+
+```
+</details>
+
+###### Custom script (minimal)
+
+Run your own Nagios-compatible shell script with minimal configuration.
 
 <details open><summary>Config</summary>
 
@@ -359,7 +506,17 @@ Nagios checks run with a limited execution environment rather than inheriting th
 
 ### Built-in alerts cover warning and critical states only
 
-This collector installs stock Netdata health alerts for the `warning` and `critical` states on `nagios.job.execution_state` and `nagios.job.perfdata_threshold_state`. Both stock alert families suppress soft retry states by checking that `retry` is not active. If you also want alerts for `unknown`, `timeout`, `paused`, or more specific perfdata behavior, build your own rules on top of these contexts. The `job.perfdata.threshold_state` chart uses the `perfdata_value` label to identify which perfdata metric each threshold state belongs to.
+This collector installs stock Netdata health alerts for the `warning` and `critical` states on `nagios.job.execution_state` and `nagios.job.perfdata_threshold_state`. Both stock alert families suppress soft retry states by checking that `retry` is not active. If you also want alerts for `unknown`, `timeout`, `paused`, or more specific perfdata behavior, build your own rules on top of these contexts. The `nagios.job.perfdata_threshold_state` chart uses the `perfdata_value` label to identify which perfdata metric each threshold state belongs to.
+
+
+### Configuration changes are not picked up
+
+After editing `scripts.d/nagios.conf`, restart the Netdata Agent for changes to take effect: `sudo systemctl restart netdata`.
+
+
+### Script stderr output is not visible
+
+Netdata captures the check's standard output for status and performance data parsing. Standard error (stderr) is logged by the collector but not used for state or charts. If your script writes errors to stderr, check the Netdata error log for details.
 
 
 ### Windows checks need an executable entry point
