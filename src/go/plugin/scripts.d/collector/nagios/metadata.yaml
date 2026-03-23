@@ -40,7 +40,7 @@ modules:
 
           :::
 
-          <details><summary><strong>Nagios Plugin Output Format</strong></summary>
+          <details open><summary><strong>Nagios Plugin Output Format</strong></summary>
 
           A Nagios-compatible plugin communicates through two channels: the **process exit code** and **standard output**. For the full specification, see the [Nagios Plugin Development Guidelines](https://nagios-plugins.org/doc/guidelines.html).
 
@@ -105,7 +105,7 @@ modules:
 
           #### Threshold Ranges
 
-          Thresholds use the format `[@]start:end`. An alert triggers when the value falls **outside** the range (or **inside** with the `@` prefix):
+          Thresholds use the format `[@]start:end`, where a bare number like `10` is shorthand for `0:10` and `~` represents negative infinity (no lower bound). An alert triggers when the value falls **outside** the range (or **inside** with the `@` prefix):
 
           | Range | Alert when... |
           |:------|:--------------|
@@ -116,6 +116,14 @@ modules:
           | `@10:20` | 10 ≤ value ≤ 20 |
 
           When `warn` and `crit` ranges are provided on non-counter metrics, Netdata automatically derives a threshold state (ok / warning / critical) and creates charts with built-in alerts.
+
+          **Common threshold patterns:**
+
+          | I want to alert when... | `warn` | `crit` |
+          |:------------------------|:-------|:-------|
+          | Value exceeds a limit (e.g., response time > 2s) | `~:2` | `~:5` |
+          | Value drops below a floor (e.g., free space < 10%) | `10:` | `5:` |
+          | Value is outside a band (e.g., temperature 20–80) | `20:80` | `10:90` |
 
           #### Example
 
@@ -133,6 +141,12 @@ modules:
           - **Charts**: `free_pct` (percentage with warning/critical thresholds) and `used_kb` (bytes)
 
           </details>
+
+          :::info
+
+          **Retry behavior:** When a check returns a non-OK state, Netdata does not alert immediately. The check enters a **soft state** and retries at the `retry_interval` rate. Only after `max_check_attempts` consecutive failures does it become a **hard state** and trigger alerts. If the check recovers during retries, it returns to OK without alerting. The `retry` dimension on state charts indicates a soft state is in progress.
+
+          :::
       default_behavior:
         auto_detection:
           description: |
@@ -167,6 +181,15 @@ modules:
               ```
 
               Make sure the configured command path exists and is executable by the `netdata` user.
+          - title: Prepare custom check scripts
+            description: |
+              If you are writing your own check scripts instead of using packaged Nagios plugins:
+
+              - Place scripts anywhere accessible to the `netdata` user (e.g., `/usr/local/lib/netdata/checks/`)
+              - Make scripts executable: `chmod +x /path/to/script.sh`
+              - Test as the `netdata` user to verify permissions and environment: `sudo -u netdata /path/to/script.sh`
+              - Verify the exit code: `echo $?` (must be 0, 1, 2, or 3)
+              - Verify the output matches the Nagios plugin output format described in the Overview above
       configuration:
         file:
           name: scripts.d/nagios.conf
@@ -278,8 +301,58 @@ modules:
                     check_interval: 1m
                     retry_interval: 30s
                     max_check_attempts: 3
-            - name: Custom script
-              description: Run your own Nagios-compatible shell script.
+            - name: End-to-end custom script
+              description: |
+                Write a custom check script, then configure Netdata to run it.
+
+                **1. Create the script** (e.g., `/usr/local/lib/netdata/checks/check_api.sh`):
+
+                ```bash
+                #!/bin/sh
+                # Check HTTP endpoint health
+                URL="http://localhost:8080/health"
+
+                response=$(curl -s -o /dev/null -w "%{http_code} %{time_total}" --max-time 5 "$URL" 2>/dev/null)
+
+                if [ -z "$response" ]; then
+                    echo "UNKNOWN - Could not connect to $URL"
+                    exit 3
+                fi
+
+                http_code=$(echo "$response" | cut -d' ' -f1)
+                response_time=$(echo "$response" | cut -d' ' -f2)
+
+                if [ "$http_code" -ge 500 ]; then
+                    echo "CRITICAL - $URL returned HTTP $http_code | response_time=${response_time}s;2;5;0;"
+                    exit 2
+                elif [ "$http_code" -ne 200 ]; then
+                    echo "WARNING - $URL returned HTTP $http_code | response_time=${response_time}s;2;5;0;"
+                    exit 1
+                fi
+
+                echo "OK - $URL returned HTTP $http_code | response_time=${response_time}s;2;5;0;"
+                exit 0
+                ```
+
+                **2. Make it executable and test it:**
+
+                ```bash
+                chmod +x /usr/local/lib/netdata/checks/check_api.sh
+                sudo -u netdata /usr/local/lib/netdata/checks/check_api.sh
+                echo "Exit code: $?"
+                ```
+
+                **3. Add the configuration below, then restart Netdata** (`sudo systemctl restart netdata`).
+              config: |
+                jobs:
+                  - name: api_health
+                    plugin: /usr/local/lib/netdata/checks/check_api.sh
+                    timeout: 10s
+                    check_interval: 1m
+                    retry_interval: 30s
+                    max_check_attempts: 3
+            - name: Custom script (minimal)
+              description: Run your own Nagios-compatible shell script with minimal configuration.
               config: |
                 jobs:
                   - name: custom_memory_check
@@ -338,6 +411,12 @@ modules:
           - name: Built-in alerts cover warning and critical states only
             description: |
               This collector installs stock Netdata health alerts for the `warning` and `critical` states on `nagios.job.execution_state` and `nagios.job.perfdata_threshold_state`. Both stock alert families suppress soft retry states by checking that `retry` is not active. If you also want alerts for `unknown`, `timeout`, `paused`, or more specific perfdata behavior, build your own rules on top of these contexts. The `job.perfdata.threshold_state` chart uses the `perfdata_value` label to identify which perfdata metric each threshold state belongs to.
+          - name: Configuration changes are not picked up
+            description: |
+              After editing `scripts.d/nagios.conf`, restart the Netdata Agent for changes to take effect: `sudo systemctl restart netdata`.
+          - name: Script stderr output is not visible
+            description: |
+              Netdata captures the check's standard output for status and performance data parsing. Standard error (stderr) is logged by the collector but not used for state or charts. If your script writes errors to stderr, check the Netdata error log for details.
           - name: Windows checks need an executable entry point
             description: |
               The collector runs the command named in `plugin` directly. On Windows, point `plugin` to an executable or to an interpreter such as `powershell.exe` and pass the script path in `args`.
@@ -372,7 +451,7 @@ modules:
             - name: nagios_job
               description: Job name as defined in the configuration.
             - name: perfdata_value
-              description: Normalized perfdata identity in the form `<class>_<metric_key>`, used by the static threshold-state duplicate.
+              description: Identifies which performance data metric a threshold state belongs to. Format is `<unit_class>_<label>`, where `<unit_class>` is derived from the UOM (e.g., `seconds`, `bytes`, `percent`) and `<label>` is the sanitized metric label from the check output.
           metrics:
             - name: nagios.job.execution_state
               description: Current state of the check job. Values are ok, warning, critical, unknown, timeout (check exceeded configured timeout), or paused (outside check_period). The retry dimension indicates the check is retrying before reaching hard state.
