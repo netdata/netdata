@@ -122,10 +122,13 @@ static void rrdcontext_prune_hub_queue(RRDHOST *host, usec_t now_ut, bool force_
             }
         }
         else if(do_it) {
-            rrdcontext_del_from_hub_queue(rc, true);
-            dropped++;
-            if(queued > 0)
-                queued--;
+            RRDCONTEXT *rc_at_idx = RRDCONTEXT_QUEUE_GET(&host->rrdctx.hub_queue, idx);
+            if(rc_at_idx == rc) {
+                rrdcontext_del_from_hub_queue(rc, true);
+                dropped++;
+                if(queued > 0)
+                    queued--;
+            }
         }
     }
     spinlock_unlock(&host->rrdctx.hub_queue.spinlock);
