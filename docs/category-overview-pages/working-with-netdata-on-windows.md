@@ -36,8 +36,27 @@ Open Command Prompt and run:
 
 When `msys2.exe` starts, it opens a shell environment for working with the Netdata files installed on your Windows system.
 
+## Writing Windows paths in Netdata config files
+
+When a Netdata setting is consumed from the MSYS side of the Windows installation, write Windows paths in MSYS format instead of native Windows drive-letter format.
+
+For example:
+
+- Windows path: `C:\Program Files\Netdata`
+- MSYS-style path: `/c/Program Files/Netdata`
+
+Use this pattern:
+
+- Replace the drive letter `C:` with `/c`
+- Replace backslashes `\` with forward slashes `/`
+- Keep spaces as they are
+
+This means:
+
+- `C:\Program Files\Netdata\etc\netdata` becomes `/c/Program Files/Netdata/etc/netdata/`
+- `C:\Program Files\Netdata\usr\bin\netdata.exe` becomes `/c/Program Files/Netdata/usr/bin/netdata.exe`
+
 ## Related Windows documentation
 
 - [Install Netdata on Windows](/packaging/windows/WINDOWS_INSTALLER.md)
 - [Switching Netdata Install Types and Release Channels on Windows](/docs/install/windows-release-channels.md)
-
