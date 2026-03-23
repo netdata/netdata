@@ -29,9 +29,9 @@ gantt
 
 |  Tier   |                                          Resolution                                          | Uncompressed Sample Size | Usually On Disk |
 |:-------:|:--------------------------------------------------------------------------------------------:|:------------------------:|:---------------:|
-| `tier0` |            native resolution (metrics collected per-second as stored per-second)             |         4 bytes          |    0.6 bytes    |
-| `tier1` | 60 iterations of `tier0`, so when metrics are collected per-second, this tier is per-minute. |         16 bytes         |     6 bytes     |
-| `tier2` |  60 iterations of `tier1`, so when metrics are collected per second, this tier is per-hour.  |         16 bytes         |    18 bytes     |
+| `tier0` |            native resolution (metrics collected per-second as stored per-second)             |         4 bytes          |     1 byte      |
+| `tier1` | 60 iterations of `tier0`, so when metrics are collected per-second, this tier is per-minute. |         16 bytes         |     4 bytes     |
+| `tier2` |  60 iterations of `tier1`, so when metrics are collected per second, this tier is per-hour.  |         16 bytes         |     4 bytes     |
 
 ### Default Disk Footprint
 
@@ -45,7 +45,11 @@ Netdata Agent metrics storage is limited to 3 GiB by default (configurable), usi
 
 Data is deleted when it reaches **either** the size limit or the time limit, whichever comes first. The number of metrics collected determines how far back in time retention extends within the size limit.
 
-In practice, with default settings and an ingestion rate of about 4,000 metrics per second, Netdata provides about 14 days of high resolution (per-second) data, 3 months of medium resolution (per-minute) data, and more than 1 year of low resolution (per-hour) data.
+In practice, with default settings and an ingestion rate of about 4,000 metrics per second, Netdata provides approximately 3 days of high resolution (per-second) data, 3 months of medium resolution (per-minute) data, and 2 years of low resolution (per-hour) data.
+
+:::note
+Actual compression ratios vary based on data characteristics. The values shown (1, 4, 4 bytes) represent average compression with LZ4. Some data patterns may achieve better or worse compression.
+:::
 
 These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
