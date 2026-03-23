@@ -1,83 +1,83 @@
-# timeperiod
+# Time Periods
 
-`timeperiod` compiles scripts.d schedule definitions into runtime period predicates used by the Nagios collector.
+Time periods control **when** a Nagios check job is allowed to run. Each time period is a named schedule with one or more allow rules.
 
-## What are "Nagios-style scheduling periods"?
+- Outside the active time period, the check does not execute and its state becomes `paused`.
+- The built-in `24x7` period (always allowed) is the default `check_period`.
+- Set the `check_period` option in a job to reference a named time period.
+- Define custom time periods using the `time_periods` option within the same job.
 
-In this plugin, a time period is a named allow-window that says **when a check may run**.
+## Rule Types
 
-- A period has one or more allow rules (`weekly`, `nth_weekday`, `date`).
-- A period can exclude other named periods (`exclude`).
-- `Allows(t)` answers: "is this timestamp allowed?"
-- `NextAllowed(t)` finds the next allowed timestamp.
+| Type          | Description                            | Key Fields                 |
+|:--------------|:---------------------------------------|:---------------------------|
+| `weekly`      | Repeats on specific weekdays           | `days`, `ranges`           |
+| `nth_weekday` | Nth occurrence of a weekday in a month | `weekday`, `nth`, `ranges` |
+| `date`        | Specific calendar dates                | `dates`, `ranges`          |
 
-This is "Nagios-style" because checks are gated by named time periods and exclusions, instead of only a single fixed interval.
+### Fields
 
-## What this package does
+- **`days`** — List of weekday names: `monday`, `tuesday`, `wednesday`, `thursday`, `friday`, `saturday`, `sunday`
+- **`ranges`** — List of time ranges in `HH:MM-HH:MM` format (e.g., `"09:00-18:00"`). Use `"00:00-24:00"` for all day.
+- **`weekday`** — Single weekday name (for `nth_weekday` rules)
+- **`nth`** — Which occurrence of the weekday in the month (1 = first, 2 = second, etc.)
+- **`dates`** — List of calendar dates in `YYYY-MM-DD` format
+- **`exclude`** — List of other time period names to subtract from this period
 
-- Defines schedule config types (`Config`, `RuleConfig`) for YAML/JSON.
-- Compiles raw config into a resolved set of named periods (`Compile`, `Set.Resolve`).
-- Evaluates whether a timestamp is allowed (`Period.Allows`).
-- Finds the next allowed execution slot (`Period.NextAllowed`).
-- Ensures the builtin always-on period exists (`EnsureDefault`).
+## Examples
 
-## Supported rule types
-
-- `weekly`: weekdays + time ranges (`HH:MM-HH:MM`)
-- `nth_weekday`: Nth weekday in month (`weekday` + `nth`) + time ranges
-- `date`: explicit calendar dates (`YYYY-MM-DD`) + time ranges
-
-## Config examples
-
-### 1) Business-hours checks (Mon-Fri, 09:00-18:00)
+### Business hours (Mon–Fri, 09:00–18:00)
 
 ```yaml
-- name: business_hours
-  alias: Business Hours
-  rules:
-    - type: weekly
-      days: [monday, tuesday, wednesday, thursday, friday]
-      ranges: ["09:00-18:00"]
+time_periods:
+  - name: business_hours
+    alias: Business Hours
+    rules:
+      - type: weekly
+        days: [monday, tuesday, wednesday, thursday, friday]
+        ranges: ["09:00-18:00"]
 ```
 
-### 2) First Monday maintenance window each month
+### First Monday maintenance window each month
 
 ```yaml
-- name: first_monday_maintenance
-  alias: First Monday Maint
-  rules:
-    - type: nth_weekday
-      weekday: monday
-      nth: 1
-      ranges: ["02:00-04:00"]
+time_periods:
+  - name: first_monday_maintenance
+    alias: First Monday Maint
+    rules:
+      - type: nth_weekday
+        weekday: monday
+        nth: 1
+        ranges: ["02:00-04:00"]
 ```
 
-### 3) Holiday blackout by specific dates
+### Holiday blackout by specific dates
 
 ```yaml
-- name: holidays
-  alias: Holiday Blackout
-  rules:
-    - type: date
-      dates: ["2026-12-25", "2026-12-31"]
-      ranges: ["00:00-24:00"]
+time_periods:
+  - name: holidays
+    alias: Holiday Blackout
+    rules:
+      - type: date
+        dates: ["2026-12-25", "2026-12-31"]
+        ranges: ["00:00-24:00"]
 ```
 
-### 4) Allow always, except maintenance/holidays
+### Always allowed, except during maintenance and holidays
 
 ```yaml
-- name: run_checks
-  alias: Run Checks
-  rules:
-    - type: weekly
-      days: [sunday, monday, tuesday, wednesday, thursday, friday, saturday]
-      ranges: ["00:00-24:00"]
-  exclude: [first_monday_maintenance, holidays]
+time_periods:
+  - name: run_checks
+    alias: Run Checks
+    rules:
+      - type: weekly
+        days: [sunday, monday, tuesday, wednesday, thursday, friday, saturday]
+        ranges: ["00:00-24:00"]
+    exclude: [first_monday_maintenance, holidays]
 ```
 
 ## Notes
 
 - Date format is strict `YYYY-MM-DD`.
-- Range format is strict `HH:MM-HH:MM` (`24:00` is valid only as an end boundary).
-- The package is scheduler-facing infrastructure and should remain generic (no parser/output domain logic).
-- `DefaultPeriodName` / `DefaultPeriodConfig` define the implicit `24x7` fallback period.
+- Time range format is strict `HH:MM-HH:MM`. `24:00` is valid only as an end boundary.
+- The built-in `24x7` period is always available and is the default `check_period`.
