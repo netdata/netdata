@@ -312,12 +312,28 @@ void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
 
         const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdctx.contexts, string2str(lookup_id));
         bool do_it = item && (dictionary_acquired_item_value(item) == rc);
+        bool dispatch_ready = false;
 
         if(item) {
             if (do_it) {
-                worker_is_busy(WORKER_JOB_QUEUED);
-                usec_t dispatch_ut = rrdcontext_calculate_queued_dispatch_time_ut(rc, now_ut);
-                if(unlikely(now_ut >= dispatch_ut) && claim_id_is_set(claim_id)) {
+                spinlock_lock(&host->rrdctx.hub_queue.spinlock);
+
+                if(likely(service_running(SERVICE_CONTEXT))) {
+                    RRDCONTEXT *rc_at_idx = RRDCONTEXT_QUEUE_GET(&host->rrdctx.hub_queue, idx);
+                    if(rc_at_idx == rc) {
+                        worker_is_busy(WORKER_JOB_QUEUED);
+                        usec_t dispatch_ut = rrdcontext_calculate_queued_dispatch_time_ut(rc, now_ut);
+                        dispatch_ready = unlikely(now_ut >= dispatch_ut) && claim_id_is_set(claim_id);
+                    }
+                    else
+                        do_it = false;
+                }
+                else
+                    do_it = false;
+
+                spinlock_unlock(&host->rrdctx.hub_queue.spinlock);
+
+                if(dispatch_ready) {
                     worker_is_busy(WORKER_JOB_CHECK);
 
                     rrdcontext_lock(rc);
