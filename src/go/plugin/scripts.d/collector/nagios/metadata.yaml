@@ -101,6 +101,7 @@ modules:
           | `s` | Seconds (also `ms`, `us`, `ns`) | Normalized to seconds |
           | `%` | Percentage | Charted as percentage |
           | `B` | Bytes (also `KB`, `MB`, `GB`, `TB`) | Charted in bytes |
+          | `b` | Bits (also `Kb`, `Mb`, `Gb`, `Tb`) | Charted in bits |
           | `c` | Continuous counter | Charted as incremental rate |
 
           #### Threshold Ranges
@@ -201,13 +202,8 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: How often Netdata evaluates the job schedule, in seconds.
+              description: How often the collector's internal scheduler ticks, in seconds. Controls chart granularity. In most cases you only need to set `check_interval`.
               default_value: 10
-              required: false
-              group: Collection
-            - name: autodetection_retry
-              description: How often Netdata retries failed auto-detection jobs, in seconds. Set `0` to keep auto-detection disabled.
-              default_value: 0
               required: false
               group: Collection
 
@@ -222,7 +218,7 @@ modules:
               required: false
               group: Target
             - name: arg_values
-              description: Values exposed to `$ARG1$` through `$ARG32$` for macro expansion.
+              description: Values exposed to `$ARG1$` through `$ARG32$` for macro expansion. The first value maps to `$ARG1$`, the second to `$ARG2$`, and so on.
               default_value: ""
               required: false
               group: Target
@@ -268,11 +264,34 @@ modules:
               default_value: ""
               required: false
               group: Environment
+              detailed_description: |
+                A key-value map of environment variables injected into the check's process. Use this when your script depends on variables that are not part of the collector's default environment.
+
+                ```yaml
+                jobs:
+                  - name: oracle_check
+                    plugin: /usr/local/bin/check_oracle.sh
+                    environment:
+                      ORACLE_HOME: /opt/oracle/product/19c
+                      LD_LIBRARY_PATH: /opt/oracle/product/19c/lib
+                ```
             - name: custom_vars
               description: Custom service variables exposed to the check as Nagios-style macros.
               default_value: ""
               required: false
               group: Environment
+              detailed_description: |
+                A key-value map of custom service variables. Each entry is exposed as a `NAGIOS__SERVICE<UPPERCASE_KEY>` environment variable and can be referenced in `args` using the Nagios macro syntax `$_SERVICE<KEY>$`.
+
+                ```yaml
+                jobs:
+                  - name: check_db
+                    plugin: /usr/lib/nagios/plugins/check_pgsql
+                    args: ["-H", "$_SERVICEDBHOST$", "-d", "$_SERVICEDBNAME$"]
+                    custom_vars:
+                      DBHOST: db.example.com
+                      DBNAME: production
+                ```
 
             - name: vnode
               description: Associate the job with a virtual node so the check can use host-specific labels and macros.
@@ -313,9 +332,10 @@ modules:
                 URL="http://localhost:8080/health"
 
                 response=$(curl -s -o /dev/null -w "%{http_code} %{time_total}" --max-time 5 "$URL" 2>/dev/null)
+                curl_exit=$?
 
-                if [ -z "$response" ]; then
-                    echo "UNKNOWN - Could not connect to $URL"
+                if [ "$curl_exit" -ne 0 ]; then
+                    echo "UNKNOWN - Could not connect to $URL (curl exit code $curl_exit)"
                     exit 3
                 fi
 
@@ -342,7 +362,7 @@ modules:
                 echo "Exit code: $?"
                 ```
 
-                **3. Add the configuration below, then restart Netdata** (`sudo systemctl restart netdata`).
+                **3. Add the configuration below, then restart Netdata** (`sudo systemctl restart netdata`). After restarting, look for `nagios.job.execution_state` and related charts in the Netdata dashboard.
               config: |
                 jobs:
                   - name: api_health
@@ -410,7 +430,7 @@ modules:
               Nagios checks run with a limited execution environment rather than inheriting the full Netdata process environment. If the script depends on extra variables, set them explicitly in `environment` instead of relying on ambient shell state.
           - name: Built-in alerts cover warning and critical states only
             description: |
-              This collector installs stock Netdata health alerts for the `warning` and `critical` states on `nagios.job.execution_state` and `nagios.job.perfdata_threshold_state`. Both stock alert families suppress soft retry states by checking that `retry` is not active. If you also want alerts for `unknown`, `timeout`, `paused`, or more specific perfdata behavior, build your own rules on top of these contexts. The `job.perfdata.threshold_state` chart uses the `perfdata_value` label to identify which perfdata metric each threshold state belongs to.
+              This collector installs stock Netdata health alerts for the `warning` and `critical` states on `nagios.job.execution_state` and `nagios.job.perfdata_threshold_state`. Both stock alert families suppress soft retry states by checking that `retry` is not active. If you also want alerts for `unknown`, `timeout`, `paused`, or more specific perfdata behavior, build your own rules on top of these contexts. The `nagios.job.perfdata_threshold_state` chart uses the `perfdata_value` label to identify which perfdata metric each threshold state belongs to.
           - name: Configuration changes are not picked up
             description: |
               After editing `scripts.d/nagios.conf`, restart the Netdata Agent for changes to take effect: `sudo systemctl restart netdata`.
@@ -451,7 +471,7 @@ modules:
             - name: nagios_job
               description: Job name as defined in the configuration.
             - name: perfdata_value
-              description: Identifies which performance data metric a threshold state belongs to. Format is `<unit_class>_<label>`, where `<unit_class>` is derived from the UOM (e.g., `seconds`, `bytes`, `percent`) and `<label>` is the sanitized metric label from the check output.
+              description: Identifies which performance data metric a threshold state belongs to. Format is `<unit_class>_<label>`, where `<unit_class>` is derived from the UOM (`time`, `bytes`, `bits`, `percent`, `counter`, or `generic`) and `<label>` is the sanitized metric label from the check output. For example, `repl_lag=5s` produces `time_repl_lag`.
           metrics:
             - name: nagios.job.execution_state
               description: Current state of the check job. Values are ok, warning, critical, unknown, timeout (check exceeded configured timeout), or paused (outside check_period). The retry dimension indicates the check is retrying before reaching hard state.
@@ -465,7 +485,7 @@ modules:
                 - name: timeout
                 - name: paused
                 - name: retry
-            - name: nagios.job.perfdata.threshold_state
+            - name: nagios.job.perfdata_threshold_state
               description: Threshold state derived from performance data warning/critical ranges. Use the `perfdata_value` label to identify the specific metric. Values are no_threshold (check provides no ranges), ok, warning, or critical. The retry dimension indicates the check is retrying.
               unit: state
               chart_type: line
