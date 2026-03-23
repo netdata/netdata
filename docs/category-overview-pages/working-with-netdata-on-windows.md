@@ -77,7 +77,7 @@ When `edit-config` opens the file on Windows, it uses the `nano` editor.
 - Search: press `Ctrl + W`, type the text you want to find, then press `Enter`.
 - Save: press `Ctrl + O`, press `Enter` to confirm the filename, then wait for nano to write the file.
 - Exit: press `Ctrl + X`.
-- Exit without losing changes: if nano asks whether to save modified content, press `Y` to save or `N` to leave without saving.
+- Exit after editing: press `Ctrl + X`. If nano asks whether to save modified content, press `Y` to save your changes or `N` to discard them.
 
 ## Related Windows documentation
 
