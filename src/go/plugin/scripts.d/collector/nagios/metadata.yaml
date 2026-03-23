@@ -25,7 +25,7 @@ modules:
       multi_instance: true
       data_collection:
         metrics_description: |
-          This collector runs [Nagios-compatible plugins](https://www.nagios-plugins.org/) and custom scripts, providing:
+          This collector runs [Nagios-compatible plugins](https://www.nagios-plugins.org/) and custom scripts. It provides:
 
           - **Check state monitoring** — tracks whether each check returns OK, WARNING, CRITICAL, or UNKNOWN
           - **Execution metrics** — measures run duration, CPU time, and memory usage of each check
