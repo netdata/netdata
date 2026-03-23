@@ -29,13 +29,17 @@ gantt
 
 |  Tier   |                                          Resolution                                          | Uncompressed Sample Size | Usually On Disk |
 |:-------:|:--------------------------------------------------------------------------------------------:|:------------------------:|:---------------:|
-| `tier0` |            native resolution (metrics collected per-second as stored per-second)             |         4 bytes          |    0.6 bytes    |
-| `tier1` | 60 iterations of `tier0`, so when metrics are collected per-second, this tier is per-minute. |         16 bytes         |     6 bytes     |
-| `tier2` |  60 iterations of `tier1`, so when metrics are collected per second, this tier is per-hour.  |         16 bytes         |    18 bytes     |
+| `tier0` |            native resolution (metrics collected per-second as stored per-second)             |         4 bytes          | 0.6-1.0 bytes¹  |
+| `tier1` | 60 iterations of `tier0`, so when metrics are collected per-second, this tier is per-minute. |         16 bytes         |     4 bytes     |
+| `tier2` |  60 iterations of `tier1`, so when metrics are collected per second, this tier is per-hour.  |         16 bytes         |     4 bytes     |
+
+:::note
+¹ Compression ratios vary based on the algorithm and data characteristics. The 0.6 bytes per sample value is achievable with optimal ZSTD compression, while 1.0 byte per sample is typical with LZ4 compression. Higher tiers (tier1, tier2) use 4 bytes per sample on average with LZ4 compression.
+:::
 
 ### Default Disk Footprint
 
-Netdata Agent metrics storage is limited to 3 GiB by default (configurable), using 1 GiB per tier × 3 tiers. In total, with SQLite databases, alert transitions, and other metadata, expect about 4 GiB of disk usage under normal conditions. The default retention limits are:
+Netdata Agent metrics storage defaults to 1 GiB per tier across 3 tiers (3 GiB total). Actual retention depends on metrics volume: at 4,000 metrics per second, the default 1 GiB per tier provides approximately 5 days of tier0 (high-resolution) retention. In total, with SQLite databases, alert transitions, and other metadata, expect about 4 GiB of disk usage under normal conditions. The default retention limits are:
 
 | Tier    | Resolution | Size Limit | Time Limit |
 |:-------:|:----------:|:----------:|:----------:|
@@ -45,7 +49,14 @@ Netdata Agent metrics storage is limited to 3 GiB by default (configurable), usi
 
 Data is deleted when it reaches **either** the size limit or the time limit, whichever comes first. The number of metrics collected determines how far back in time retention extends within the size limit.
 
-In practice, with default settings and an ingestion rate of about 4,000 metrics per second, Netdata provides about 14 days of high resolution (per-second) data, 3 months of medium resolution (per-minute) data, and more than 1 year of low resolution (per-hour) data.
+In practice, with default settings and an ingestion rate of about 4,000 metrics per second, Netdata provides approximately 5 days of high resolution (per-second) data, 3 months of medium resolution (per-minute) data, and more than 1 year of low resolution (per-hour) data.
+
+**Example calculation**: At 4,000 metrics per second for 14 days of tier0 retention, you need approximately 2.9 GiB of storage:
+- 14 days × 24 hours × 60 minutes × 60 seconds = 1,209,600 seconds
+- 4,000 metrics/s × 1,209,600 seconds = 4,838,400,000 samples
+- 4,838,400,000 samples × 0.6 bytes/sample ≈ 2.9 GiB
+
+With the default 1 GiB per tier, tier0 fills in approximately 5 days at this ingestion rate (5 days × 86,400 seconds × 4,000 metrics × 0.6 bytes ≈ 1 GiB).
 
 These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
