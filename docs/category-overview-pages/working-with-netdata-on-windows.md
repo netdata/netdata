@@ -56,6 +56,19 @@ This means:
 - `C:\Program Files\Netdata\etc\netdata` becomes `/c/Program Files/Netdata/etc/netdata/`
 - `C:\Program Files\Netdata\usr\bin\netdata.exe` becomes `/c/Program Files/Netdata/usr/bin/netdata.exe`
 
+## Editing config files with `edit-config`
+
+Inside the Netdata MSYS environment, use the `edit-config` helper script from `/etc/netdata/edit-config` when you want to edit Netdata configuration files.
+
+For example:
+
+```bash
+cd /etc/netdata
+./edit-config netdata.conf
+```
+
+For the complete `edit-config` workflow and the broader explanation of Netdata config directories, see [Netdata Agent Configuration](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
+
 ## Related Windows documentation
 
 - [Install Netdata on Windows](/packaging/windows/WINDOWS_INSTALLER.md)
