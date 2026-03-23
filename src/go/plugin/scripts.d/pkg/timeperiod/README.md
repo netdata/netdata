@@ -9,11 +9,11 @@ Time periods control **when** a Nagios check job is allowed to run. Each time pe
 
 ## Rule Types
 
-| Type | Description | Key Fields |
-|:-----|:------------|:-----------|
-| `weekly` | Repeats on specific weekdays | `days`, `ranges` |
+| Type          | Description                            | Key Fields                 |
+|:--------------|:---------------------------------------|:---------------------------|
+| `weekly`      | Repeats on specific weekdays           | `days`, `ranges`           |
 | `nth_weekday` | Nth occurrence of a weekday in a month | `weekday`, `nth`, `ranges` |
-| `date` | Specific calendar dates | `dates`, `ranges` |
+| `date`        | Specific calendar dates                | `dates`, `ranges`          |
 
 ### Fields
 
