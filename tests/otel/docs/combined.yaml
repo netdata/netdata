@@ -1,0 +1,29 @@
+receivers:
+  hostmetrics:
+    collection_interval: 10s
+    scrapers:
+      cpu:
+      memory:
+      disk:
+      network:
+      load:
+
+  redis:
+    endpoint: "localhost:6379"
+    collection_interval: 10s
+
+  nginx:
+    endpoint: "http://localhost:80/status"
+    collection_interval: 10s
+
+exporters:
+  otlp:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [hostmetrics, redis, nginx]
+      exporters: [otlp]
