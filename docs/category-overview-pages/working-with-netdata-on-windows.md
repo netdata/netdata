@@ -69,6 +69,16 @@ cd /etc/netdata
 
 For the complete `edit-config` workflow and the broader explanation of Netdata config directories, see [Netdata Agent Configuration](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
 
+When `edit-config` opens the file on Windows, it uses the `nano` editor.
+
+### Basic `nano` commands for Windows users
+
+- Edit text: just type, and use the arrow keys to move around the file.
+- Search: press `Ctrl + W`, type the text you want to find, then press `Enter`.
+- Save: press `Ctrl + O`, press `Enter` to confirm the filename, then wait for nano to write the file.
+- Exit: press `Ctrl + X`.
+- Exit without losing changes: if nano asks whether to save modified content, press `Y` to save or `N` to leave without saving.
+
 ## Related Windows documentation
 
 - [Install Netdata on Windows](/packaging/windows/WINDOWS_INSTALLER.md)
