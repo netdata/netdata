@@ -430,6 +430,43 @@ impl TierFlowIndexStore {
         materialize_rollup_fields(index, flow_ref.flow_id)
     }
 
+    pub(crate) fn field_value_string(&self, flow_ref: TierFlowRef, field: &str) -> Option<String> {
+        let normalized = field.to_ascii_uppercase();
+        let index = self.indexes.get(&flow_ref.hour_start_usec)?;
+        let field_ids = index.flow_field_ids(flow_ref.flow_id)?;
+
+        match normalized.as_str() {
+            "EXPORTER_IP" => {
+                let present = rollup_field_value(index, field_ids, INTERNAL_EXPORTER_IP_PRESENT)
+                    .is_some_and(|value| matches!(value, IndexFieldValue::U8(1)));
+                if !present {
+                    return Some(String::new());
+                }
+                rollup_field_value(index, field_ids, "EXPORTER_IP")
+                    .map(compact_index_value_to_string)
+            }
+            "NEXT_HOP" => {
+                let present = rollup_field_value(index, field_ids, INTERNAL_NEXT_HOP_PRESENT)
+                    .is_some_and(|value| matches!(value, IndexFieldValue::U8(1)));
+                if !present {
+                    return Some(String::new());
+                }
+                rollup_field_value(index, field_ids, "NEXT_HOP").map(compact_index_value_to_string)
+            }
+            "DIRECTION" => {
+                let value = rollup_field_value(index, field_ids, "DIRECTION")?;
+                match value {
+                    IndexFieldValue::U8(direction) => {
+                        Some(direction_from_u8(direction).as_str().to_string())
+                    }
+                    _ => None,
+                }
+            }
+            _ => rollup_field_value(index, field_ids, normalized.as_str())
+                .map(compact_index_value_to_string),
+        }
+    }
+
     pub(crate) fn prune_unused_hours(&mut self, active_hours: &BTreeSet<u64>) {
         let before = self.indexes.len();
         self.indexes
@@ -785,6 +822,26 @@ fn materialize_rollup_fields(index: &FlowIndex, flow_id: IndexedFlowId) -> Optio
     Some(fields)
 }
 
+pub(crate) fn rollup_field_supported(field: &str) -> bool {
+    rollup_field_index(field).is_some()
+}
+
+fn rollup_field_index(field: &str) -> Option<usize> {
+    ROLLUP_FIELD_DEFS
+        .iter()
+        .position(|def| def.name.eq_ignore_ascii_case(field))
+}
+
+fn rollup_field_value<'a>(
+    index: &'a FlowIndex,
+    field_ids: &[u32],
+    field: &str,
+) -> Option<IndexFieldValue<'a>> {
+    let field_index = rollup_field_index(field)?;
+    let field_id = *field_ids.get(field_index)?;
+    index.field_value(field_index, field_id)
+}
+
 fn compact_index_value_to_string(value: IndexFieldValue<'_>) -> String {
     match value {
         IndexFieldValue::Text(text) => text.to_string(),
@@ -932,6 +989,40 @@ mod tests {
         assert_eq!(fields.get("DST_COUNTRY").map(String::as_str), Some("DE"));
         assert_eq!(fields.get("DIRECTION").map(String::as_str), Some("ingress"));
         assert_eq!(fields.get("SAMPLING_RATE").map(String::as_str), Some("100"));
+    }
+
+    #[test]
+    fn indexed_field_lookup_matches_rollup_materialization_semantics() {
+        let mut store = TierFlowIndexStore::default();
+        let mut rec = FlowRecord::default();
+        rec.direction = FlowDirection::Ingress;
+        rec.protocol = 6;
+        rec.src_as_name = "Private IP Address Space".to_string();
+
+        let flow_ref = store
+            .get_or_insert_record_flow(120_000_000, &rec)
+            .expect("intern tier flow");
+
+        assert_eq!(
+            store.field_value_string(flow_ref, "DIRECTION").as_deref(),
+            Some("ingress")
+        );
+        assert_eq!(
+            store.field_value_string(flow_ref, "PROTOCOL").as_deref(),
+            Some("6")
+        );
+        assert_eq!(
+            store.field_value_string(flow_ref, "SRC_AS_NAME").as_deref(),
+            Some("Private IP Address Space")
+        );
+        assert_eq!(
+            store.field_value_string(flow_ref, "EXPORTER_IP").as_deref(),
+            Some("")
+        );
+        assert_eq!(
+            store.field_value_string(flow_ref, "NEXT_HOP").as_deref(),
+            Some("")
+        );
     }
 
     #[test]

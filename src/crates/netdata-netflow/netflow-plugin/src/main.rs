@@ -237,6 +237,7 @@ fn flows_required_params(
     sort_by: query::SortBy,
     top_n: usize,
 ) -> Vec<RequiredParam> {
+    let ordered_group_by_options = ordered_group_by_options(group_by);
     vec![
         RequiredParam {
             id: "view".to_string(),
@@ -265,7 +266,7 @@ fn flows_required_params(
             id: "group_by".to_string(),
             name: "Group By".to_string(),
             kind: "multiselect".to_string(),
-            options: query::supported_group_by_fields()
+            options: ordered_group_by_options
                 .iter()
                 .map(|field| RequiredParamOption {
                     id: field.clone(),
@@ -327,6 +328,28 @@ fn flows_required_params(
             help: "Choose how many grouped tuples the backend returns.".to_string(),
         },
     ]
+}
+
+fn ordered_group_by_options(group_by: &[String]) -> Vec<String> {
+    let mut ordered = Vec::with_capacity(query::supported_group_by_fields().len());
+
+    for selected in group_by {
+        if query::supported_group_by_fields()
+            .iter()
+            .any(|field| field == selected)
+            && !ordered.iter().any(|field| field == selected)
+        {
+            ordered.push(selected.clone());
+        }
+    }
+
+    for field in query::supported_group_by_fields() {
+        if !ordered.iter().any(|selected| selected == field) {
+            ordered.push(field.clone());
+        }
+    }
+
+    ordered
 }
 
 #[async_trait]
@@ -603,7 +626,7 @@ async fn main() {
 mod tests {
     use super::{
         FLOWS_FUNCTION_VERSION, FLOWS_UPDATE_EVERY_SECONDS, FlowsFunctionResponse,
-        NetflowFlowsHandler, ingest, plugin_config, query, tiering,
+        NetflowFlowsHandler, flows_required_params, ingest, plugin_config, query, tiering,
     };
     use chrono::Utc;
     use etherparse::{SlicedPacket, TransportSlice};
@@ -672,6 +695,34 @@ mod tests {
         assert!(
             metrics.journal_entries_written.load(Ordering::Relaxed) > 0,
             "expected raw journal entries written by ingest service"
+        );
+    }
+
+    #[test]
+    fn default_group_by_required_param_preserves_selected_field_order() {
+        let request = query::FlowsRequest::default();
+        let params = flows_required_params(
+            request.normalized_view(),
+            &request.normalized_group_by(),
+            request.normalized_sort_by(),
+            request.normalized_top_n(),
+        );
+
+        let group_by_param = params
+            .iter()
+            .find(|param| param.id == "group_by")
+            .expect("group_by required param");
+
+        let selected_fields: Vec<&str> = group_by_param
+            .options
+            .iter()
+            .filter(|option| option.default_selected)
+            .map(|option| option.id.as_str())
+            .collect();
+
+        assert_eq!(
+            selected_fields,
+            vec!["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME"]
         );
     }
 
