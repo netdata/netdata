@@ -77,6 +77,7 @@ static void rrdcontext_prune_hub_queue(RRDHOST *host, usec_t now_ut, bool force_
             break;
 
         STRING *lookup_id = string_dup(rc->id);
+        usec_t queued_ut = rc->queue.queued_ut;
         spinlock_unlock(&host->rrdctx.hub_queue.spinlock);
 
         const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdctx.contexts, string2str(lookup_id));
@@ -88,8 +89,8 @@ static void rrdcontext_prune_hub_queue(RRDHOST *host, usec_t now_ut, bool force_
             bool drop = force_drop_all;
             if(!drop && apply_bounds) {
                 bool queue_is_over_limit = queued > RRDCONTEXT_HUB_QUEUE_MAX_OFFLINE_ENTRIES;
-                bool queue_item_expired = (now_ut > rc->queue.queued_ut) &&
-                                          ((now_ut - rc->queue.queued_ut) > RRDCONTEXT_HUB_QUEUE_MAX_OFFLINE_AGE_UT);
+                bool queue_item_expired = (now_ut > queued_ut) &&
+                                          ((now_ut - queued_ut) > RRDCONTEXT_HUB_QUEUE_MAX_OFFLINE_AGE_UT);
                 drop = queue_is_over_limit || queue_item_expired;
             }
 
@@ -232,7 +233,7 @@ void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
         spinlock_unlock(&host->rrdctx.pp_queue.spinlock);
 
         const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdctx.contexts, string2str(lookup_id));
-        bool do_it = dictionary_acquired_item_value(item) == rc;
+        bool do_it = item && (dictionary_acquired_item_value(item) == rc);
         bool process_it = false;
 
         spinlock_lock(&host->rrdctx.pp_queue.spinlock);
@@ -307,7 +308,7 @@ void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now_ut) {
         spinlock_unlock(&host->rrdctx.hub_queue.spinlock);
 
         const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdctx.contexts, string2str(lookup_id));
-        bool do_it = dictionary_acquired_item_value(item) == rc;
+        bool do_it = item && (dictionary_acquired_item_value(item) == rc);
 
         if(item) {
             if (do_it) {
