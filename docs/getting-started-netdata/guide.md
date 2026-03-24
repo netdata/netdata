@@ -350,7 +350,7 @@ The foundation of Netdata's AI capabilities. Machine learning models run locally
 
 </details>
 
-### Join the Premium Experience
+### Go Live with Netdata
 
 :::tip
 
