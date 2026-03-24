@@ -171,51 +171,6 @@ Each job runs one configured command. Additional charts are created only when th
 Each job starts an external command. The impact depends mostly on how often the job runs and how expensive the check command itself is.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-Each configured job produces execution state and resource usage charts. When a check emits Nagios performance data, additional charts are created automatically for each metric. Non-counter perfdata with warning/critical thresholds also get threshold state charts for alerting.
-
-
-### Per job
-
-These metrics refer to each configured check job.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| nagios_job | Job name as defined in the configuration. |
-| perfdata_value | Identifies which performance data metric a threshold state belongs to. Format is `<unit_class>_<label>`, where `<unit_class>` is derived from the UOM (`time`, `bytes`, `bits`, `percent`, or `generic`) and `<label>` is the sanitized metric label from the check output. For example, `repl_lag=5s` produces `time_repl_lag`. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nagios.job.execution_state | ok, warning, critical, unknown, timeout, paused, retry | state |
-| nagios.job.perfdata_threshold_state | no_threshold, ok, warning, critical, retry | state |
-| nagios.job.execution_duration | duration | seconds |
-| nagios.job.execution_cpu_total | total | seconds |
-| nagios.job.execution_max_rss | rss | bytes |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ nagios_job_execution_state_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf) | nagios.job.execution_state | Nagios job ${label:nagios_job} is in WARNING state |
-| [ nagios_job_execution_state_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf) | nagios.job.execution_state | Nagios job ${label:nagios_job} is in CRITICAL state |
-| [ nagios_job_perfdata_threshold_state_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf) | nagios.job.perfdata_threshold_state | Nagios job ${label:nagios_job} perfdata ${label:perfdata_value} is in WARNING threshold state |
-| [ nagios_job_perfdata_threshold_state_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf) | nagios.job.perfdata_threshold_state | Nagios job ${label:nagios_job} perfdata ${label:perfdata_value} is in CRITICAL threshold state |
-
-
 ## Setup
 
 
@@ -464,6 +419,51 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ nagios_job_execution_state_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf) | nagios.job.execution_state | Nagios job ${label:nagios_job} is in WARNING state |
+| [ nagios_job_execution_state_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf) | nagios.job.execution_state | Nagios job ${label:nagios_job} is in CRITICAL state |
+| [ nagios_job_perfdata_threshold_state_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf) | nagios.job.perfdata_threshold_state | Nagios job ${label:nagios_job} perfdata ${label:perfdata_value} is in WARNING threshold state |
+| [ nagios_job_perfdata_threshold_state_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf) | nagios.job.perfdata_threshold_state | Nagios job ${label:nagios_job} perfdata ${label:perfdata_value} is in CRITICAL threshold state |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+Each configured job produces execution state and resource usage charts. When a check emits Nagios performance data, additional charts are created automatically for each metric. Non-counter perfdata with warning/critical thresholds also get threshold state charts for alerting.
+
+
+### Per job
+
+These metrics refer to each configured check job.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| nagios_job | Job name as defined in the configuration. |
+| perfdata_value | Identifies which performance data metric a threshold state belongs to. Format is `<unit_class>_<label>`, where `<unit_class>` is derived from the UOM (`time`, `bytes`, `bits`, `percent`, or `generic`) and `<label>` is the sanitized metric label from the check output. For example, `repl_lag=5s` produces `time_repl_lag`. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nagios.job.execution_state | ok, warning, critical, unknown, timeout, paused, retry | state |
+| nagios.job.perfdata_threshold_state | no_threshold, ok, warning, critical, retry | state |
+| nagios.job.execution_duration | duration | seconds |
+| nagios.job.execution_cpu_total | total | seconds |
+| nagios.job.execution_max_rss | rss | bytes |
 
 
 

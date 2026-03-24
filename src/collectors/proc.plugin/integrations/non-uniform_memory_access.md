@@ -56,37 +56,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per numa node
-
-
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| numa_node | TBD |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.numa_nodes | hit, miss, local, foreign, interleave, other | events/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -110,5 +79,36 @@ There is no configuration file.
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per numa node
+
+
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| numa_node | TBD |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| mem.numa_nodes | hit, miss, local, foreign, interleave, other | events/s |
 
 

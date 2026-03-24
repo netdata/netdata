@@ -50,48 +50,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Go-ethereum instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| geth.eth_db_chaindata_ancient_io_rate | reads, writes | bytes/s |
-| geth.eth_db_chaindata_ancient_io | reads, writes | bytes |
-| geth.eth_db_chaindata_disk_io | reads, writes | bytes |
-| geth.goroutines | goroutines | goroutines |
-| geth.eth_db_chaindata_disk_io_rate | reads, writes | bytes/s |
-| geth.chaindata_db_size | level_db, ancient_db | bytes |
-| geth.chainhead | block, receipt, header | block |
-| geth.tx_pool_pending | invalid, pending, local, discard, no_funds, ratelimit, replace | transactions |
-| geth.tx_pool_current | invalid, pending, local, pool | transactions |
-| geth.tx_pool_queued | discard, eviction, no_funds, ratelimit | transactions |
-| geth.p2p_bandwidth | ingress, egress | bytes/s |
-| geth.reorgs | executed | reorgs |
-| geth.reorgs_blocks | added, dropped | blocks |
-| geth.p2p_peers | peers | peers |
-| geth.p2p_peers_calls | dials, serves | calls/s |
-| geth.rpc_calls | failed, successful | calls/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -230,6 +188,48 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Go-ethereum instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| geth.eth_db_chaindata_ancient_io_rate | reads, writes | bytes/s |
+| geth.eth_db_chaindata_ancient_io | reads, writes | bytes |
+| geth.eth_db_chaindata_disk_io | reads, writes | bytes |
+| geth.goroutines | goroutines | goroutines |
+| geth.eth_db_chaindata_disk_io_rate | reads, writes | bytes/s |
+| geth.chaindata_db_size | level_db, ancient_db | bytes |
+| geth.chainhead | block, receipt, header | block |
+| geth.tx_pool_pending | invalid, pending, local, discard, no_funds, ratelimit, replace | transactions |
+| geth.tx_pool_current | invalid, pending, local, pool | transactions |
+| geth.tx_pool_queued | discard, eviction, no_funds, ratelimit | transactions |
+| geth.p2p_bandwidth | ingress, egress | bytes/s |
+| geth.reorgs | executed | reorgs |
+| geth.reorgs_blocks | added, dropped | blocks |
+| geth.p2p_peers | peers | peers |
+| geth.p2p_peers_calls | dials, serves | calls/s |
+| geth.rpc_calls | failed, successful | calls/s |
 
 
 

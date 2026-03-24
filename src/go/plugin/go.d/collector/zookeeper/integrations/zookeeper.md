@@ -55,49 +55,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per ZooKeeper server
-
-These metrics refer to ZooKeeper servers.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| zookeeper.requests | outstanding | requests |
-| zookeeper.requests_latency | min, avg, max | ms |
-| zookeeper.stale_requests | stale | requests/s |
-| zookeeper.stale_requests_dropped | dropped | requests/s |
-| zookeeper.connections | alive | connections |
-| zookeeper.connections_dropped | dropped | connections/s |
-| zookeeper.connections_rejected | rejected | connections/s |
-| zookeeper.auth_fails | auth | fails/s |
-| zookeeper.global_sessions | global | sessions |
-| zookeeper.server_state | leader, follower, observer, standalone | state |
-| zookeeper.throttled_ops | throttled | ops/s |
-| zookeeper.packets | received, sent | pps |
-| zookeeper.file_descriptor | open | file descriptors |
-| zookeeper.nodes | znode, ephemerals | nodes |
-| zookeeper.watches | watches | watches |
-| zookeeper.approximate_data_size | size | KiB |
-| zookeeper.uptime | uptime | seconds |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -237,6 +194,49 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per ZooKeeper server
+
+These metrics refer to ZooKeeper servers.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| zookeeper.requests | outstanding | requests |
+| zookeeper.requests_latency | min, avg, max | ms |
+| zookeeper.stale_requests | stale | requests/s |
+| zookeeper.stale_requests_dropped | dropped | requests/s |
+| zookeeper.connections | alive | connections |
+| zookeeper.connections_dropped | dropped | connections/s |
+| zookeeper.connections_rejected | rejected | connections/s |
+| zookeeper.auth_fails | auth | fails/s |
+| zookeeper.global_sessions | global | sessions |
+| zookeeper.server_state | leader, follower, observer, standalone | state |
+| zookeeper.throttled_ops | throttled | ops/s |
+| zookeeper.packets | received, sent | pps |
+| zookeeper.file_descriptor | open | file descriptors |
+| zookeeper.nodes | znode, ephemerals | nodes |
+| zookeeper.watches | watches | watches |
+| zookeeper.approximate_data_size | size | KiB |
+| zookeeper.uptime | uptime | seconds |
 
 
 

@@ -50,43 +50,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Dovecot instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| dovecot.session | active | sessions |
-| dovecot.logins | logins | logins |
-| dovecot.auth | ok, failed | attempts/s |
-| dovecot.commands | commands | commands |
-| dovecot.context_switches | voluntary, voluntary | switches/s |
-| dovecot.io | read, write | KiB/s |
-| dovecot.net | read, write | kilobits/s |
-| dovecot.syscalls | read, write | syscalls/s |
-| dovecot.lookup | path, attr | lookups/s |
-| dovecot.cache | hits | hits/s |
-| dovecot.auth_cache | hits, misses | requests/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -219,6 +182,43 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Dovecot instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| dovecot.session | active | sessions |
+| dovecot.logins | logins | logins |
+| dovecot.auth | ok, failed | attempts/s |
+| dovecot.commands | commands | commands |
+| dovecot.context_switches | voluntary, voluntary | switches/s |
+| dovecot.io | read, write | KiB/s |
+| dovecot.net | read, write | kilobits/s |
+| dovecot.syscalls | read, write | syscalls/s |
+| dovecot.lookup | path, attr | lookups/s |
+| dovecot.cache | hits | hits/s |
+| dovecot.auth_cache | hits, misses | requests/s |
 
 
 

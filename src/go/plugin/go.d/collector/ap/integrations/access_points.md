@@ -48,43 +48,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per wireless device
-
-These metrics refer to the entire monitored application.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| device | Wireless interface name |
-| ssid | SSID |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ap.clients | clients | clients |
-| ap.net | received, sent | kilobits/s |
-| ap.packets | received, sent | packets/s |
-| ap.issues | retries, failures | issues/s |
-| ap.signal | average signal | dBm |
-| ap.bitrate | receive, transmit | Mbps |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -177,6 +140,43 @@ jobs:
     binary_path: /usr/local/sbin/iw
 
 ```
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per wireless device
+
+These metrics refer to the entire monitored application.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| device | Wireless interface name |
+| ssid | SSID |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ap.clients | clients | clients |
+| ap.net | received, sent | kilobits/s |
+| ap.packets | received, sent | packets/s |
+| ap.issues | retries, failures | issues/s |
+| ap.signal | average signal | dBm |
+| ap.bitrate | receive, transmit | Mbps |
+
 
 
 ## Troubleshooting

@@ -45,95 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per vCenter Server Appliance instance
-
-These metrics refer to the entire monitored application.
-<details>
-<summary>See health statuses</summary>
-Overall System Health:
-
-| Status  | Description                                                                                                              |
-|:-------:|:-------------------------------------------------------------------------------------------------------------------------|
-|  green  | All components in the appliance are healthy.                                                                             |
-| yellow  | One or more components in the appliance might become overloaded soon.                                                    |
-| orange  | One or more components in the appliance might be degraded.                                                               |
-|   red   | One or more components in the appliance might be in an unusable status and the appliance might become unresponsive soon. |
-|  gray   | No health data is available.                                                                                             |
-| unknown | Collector failed to decode status.                                                                                       |
-
-Components Health:
-
-| Status  | Description                                                  |
-|:-------:|:-------------------------------------------------------------|
-|  green  | The component is healthy.                                    |
-| yellow  | The component is healthy, but may have some problems.        |
-| orange  | The component is degraded, and may have serious problems.    |
-|   red   | The component is unavailable, or will stop functioning soon. |
-|  gray   | No health data is available.                                 |
-| unknown | Collector failed to decode status.                           |
-
-Software Updates Health:
-
-| Status  | Description                                          |
-|:-------:|:-----------------------------------------------------|
-|  green  | No updates available.                                |
-| orange  | Non-security patches might be available.             |
-|   red   | Security patches might be available.                 |
-|  gray   | An error retrieving information on software updates. |
-| unknown | Collector failed to decode status.                   |
-
-</details>
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vcsa.system_health_status | green, red, yellow, orange, gray, unknown | status |
-| vcsa.applmgmt_health_status | green, red, yellow, orange, gray, unknown | status |
-| vcsa.load_health_status | green, red, yellow, orange, gray, unknown | status |
-| vcsa.mem_health_status | green, red, yellow, orange, gray, unknown | status |
-| vcsa.swap_health_status | green, red, yellow, orange, gray, unknown | status |
-| vcsa.database_storage_health_status | green, red, yellow, orange, gray, unknown | status |
-| vcsa.storage_health_status | green, red, yellow, orange, gray, unknown | status |
-| vcsa.software_packages_health_status | green, red, orange, gray, unknown | status |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ vcsa_system_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.system_health_status | VCSA overall system status is orange. One or more components are degraded. |
-| [ vcsa_system_health_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.system_health_status | VCSA overall system status is red. One or more components are unavailable or will stop functioning soon. |
-| [ vcsa_applmgmt_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.applmgmt_health_status | VCSA ApplMgmt component status is orange. It is degraded, and may have serious problems. |
-| [ vcsa_applmgmt_health_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.applmgmt_health_status | VCSA ApplMgmt component status is red. It is unavailable, or will stop functioning soon. |
-| [ vcsa_load_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.load_health_status | VCSA Load component status is orange. It is degraded, and may have serious problems. |
-| [ vcsa_load_health_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.load_health_status | VCSA Load component status is red. It is unavailable, or will stop functioning soon. |
-| [ vcsa_mem_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.mem_health_status | VCSA Memory component status is orange. It is degraded, and may have serious problems. |
-| [ vcsa_mem_health_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.mem_health_status | VCSA Memory component status is red. It is unavailable, or will stop functioning soon. |
-| [ vcsa_swap_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.swap_health_status | VCSA Swap component status is orange. It is degraded, and may have serious problems. |
-| [ vcsa_swap_health_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.swap_health_status | VCSA Swap component status is red. It is unavailable, or will stop functioning soon. |
-| [ vcsa_database_storage_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.database_storage_health_status | VCSA Database Storage component status is orange. It is degraded, and may have serious problems. |
-| [ vcsa_database_storage_health_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.database_storage_health_status | VCSA Database Storage component status is red. It is unavailable, or will stop functioning soon. |
-| [ vcsa_storage_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.storage_health_status | VCSA Storage component status is orange. It is degraded, and may have serious problems. |
-| [ vcsa_storage_health_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.storage_health_status | VCSA Storage component status is red. It is unavailable, or will stop functioning soon. |
-| [ vcsa_software_packages_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.software_packages_health_status | VCSA software packages security updates are available. |
-
-
 ## Setup
 
 
@@ -269,6 +180,95 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ vcsa_system_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.system_health_status | VCSA overall system status is orange. One or more components are degraded. |
+| [ vcsa_system_health_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.system_health_status | VCSA overall system status is red. One or more components are unavailable or will stop functioning soon. |
+| [ vcsa_applmgmt_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.applmgmt_health_status | VCSA ApplMgmt component status is orange. It is degraded, and may have serious problems. |
+| [ vcsa_applmgmt_health_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.applmgmt_health_status | VCSA ApplMgmt component status is red. It is unavailable, or will stop functioning soon. |
+| [ vcsa_load_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.load_health_status | VCSA Load component status is orange. It is degraded, and may have serious problems. |
+| [ vcsa_load_health_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.load_health_status | VCSA Load component status is red. It is unavailable, or will stop functioning soon. |
+| [ vcsa_mem_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.mem_health_status | VCSA Memory component status is orange. It is degraded, and may have serious problems. |
+| [ vcsa_mem_health_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.mem_health_status | VCSA Memory component status is red. It is unavailable, or will stop functioning soon. |
+| [ vcsa_swap_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.swap_health_status | VCSA Swap component status is orange. It is degraded, and may have serious problems. |
+| [ vcsa_swap_health_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.swap_health_status | VCSA Swap component status is red. It is unavailable, or will stop functioning soon. |
+| [ vcsa_database_storage_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.database_storage_health_status | VCSA Database Storage component status is orange. It is degraded, and may have serious problems. |
+| [ vcsa_database_storage_health_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.database_storage_health_status | VCSA Database Storage component status is red. It is unavailable, or will stop functioning soon. |
+| [ vcsa_storage_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.storage_health_status | VCSA Storage component status is orange. It is degraded, and may have serious problems. |
+| [ vcsa_storage_health_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.storage_health_status | VCSA Storage component status is red. It is unavailable, or will stop functioning soon. |
+| [ vcsa_software_packages_health_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf) | vcsa.software_packages_health_status | VCSA software packages security updates are available. |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per vCenter Server Appliance instance
+
+These metrics refer to the entire monitored application.
+<details>
+<summary>See health statuses</summary>
+Overall System Health:
+
+| Status  | Description                                                                                                              |
+|:-------:|:-------------------------------------------------------------------------------------------------------------------------|
+|  green  | All components in the appliance are healthy.                                                                             |
+| yellow  | One or more components in the appliance might become overloaded soon.                                                    |
+| orange  | One or more components in the appliance might be degraded.                                                               |
+|   red   | One or more components in the appliance might be in an unusable status and the appliance might become unresponsive soon. |
+|  gray   | No health data is available.                                                                                             |
+| unknown | Collector failed to decode status.                                                                                       |
+
+Components Health:
+
+| Status  | Description                                                  |
+|:-------:|:-------------------------------------------------------------|
+|  green  | The component is healthy.                                    |
+| yellow  | The component is healthy, but may have some problems.        |
+| orange  | The component is degraded, and may have serious problems.    |
+|   red   | The component is unavailable, or will stop functioning soon. |
+|  gray   | No health data is available.                                 |
+| unknown | Collector failed to decode status.                           |
+
+Software Updates Health:
+
+| Status  | Description                                          |
+|:-------:|:-----------------------------------------------------|
+|  green  | No updates available.                                |
+| orange  | Non-security patches might be available.             |
+|   red   | Security patches might be available.                 |
+|  gray   | An error retrieving information on software updates. |
+| unknown | Collector failed to decode status.                   |
+
+</details>
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vcsa.system_health_status | green, red, yellow, orange, gray, unknown | status |
+| vcsa.applmgmt_health_status | green, red, yellow, orange, gray, unknown | status |
+| vcsa.load_health_status | green, red, yellow, orange, gray, unknown | status |
+| vcsa.mem_health_status | green, red, yellow, orange, gray, unknown | status |
+| vcsa.swap_health_status | green, red, yellow, orange, gray, unknown | status |
+| vcsa.database_storage_health_status | green, red, yellow, orange, gray, unknown | status |
+| vcsa.storage_health_status | green, red, yellow, orange, gray, unknown | status |
+| vcsa.software_packages_health_status | green, red, orange, gray, unknown | status |
 
 
 

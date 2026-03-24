@@ -67,6 +67,43 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ 30min_ram_swapped_out ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.swapio | percentage of the system RAM swapped in the last 30 minutes |
+| [ oom_kill ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.oom_kill | number of out of memory kills in the last 30 minutes |
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -100,42 +137,5 @@ Metrics:
 | mem.thp_compact | success, fail, stall | events/s |
 | mem.oom_kill | kills | kills/s |
 | mem.numa | local, foreign, interleave, other, pte_updates, huge_pte_updates, hint_faults, hint_faults_local, pages_migrated | events/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ 30min_ram_swapped_out ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.swapio | percentage of the system RAM swapped in the last 30 minutes |
-| [ oom_kill ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.oom_kill | number of out of memory kills in the last 30 minutes |
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

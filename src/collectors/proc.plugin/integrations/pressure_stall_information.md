@@ -67,6 +67,37 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -97,36 +128,5 @@ Metrics:
 | system.io_some_pressure_stall_time | time | ms |
 | system.io_full_pressure | some10, some60, some300 | percentage |
 | system.io_full_pressure_stall_time | time | ms |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

@@ -52,72 +52,6 @@ The default configuration for this integration does not impose any limits on dat
 
 This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per apps
-
-These Metrics show grouped information per apps group.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| app_group | The name of the group defined in the configuration. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.ebpf_dc_ratio | ratio | % |
-| app.ebpf_dc_reference | files | files |
-| app.ebpf_dc_not_cache | files | files |
-| app.ebpf_dc_not_found | files | files |
-
-### Per filesystem
-
-These metrics show total number of calls to functions inside kernel.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| filesystem.dc_reference | reference, slow, miss | files |
-| filesystem.dc_hit_ratio | ratio | % |
-
-### Per cgroup
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.dc_ratio | ratio | % |
-| cgroup.dc_reference | reference | files |
-| cgroup.dc_not_cache | slow | files |
-| cgroup.dc_not_found | miss | files |
-| services.dc_ratio | a dimension per systemd service | % |
-| services.dc_reference | a dimension per systemd service | files |
-| services.dc_not_cache | a dimension per systemd service | files |
-| services.dc_not_found | a dimension per systemd service | files |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -193,5 +127,71 @@ sudo ./edit-config ebpf.d/dcstat.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per apps
+
+These Metrics show grouped information per apps group.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| app.ebpf_dc_ratio | ratio | % |
+| app.ebpf_dc_reference | files | files |
+| app.ebpf_dc_not_cache | files | files |
+| app.ebpf_dc_not_found | files | files |
+
+### Per filesystem
+
+These metrics show total number of calls to functions inside kernel.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| filesystem.dc_reference | reference, slow, miss | files |
+| filesystem.dc_hit_ratio | ratio | % |
+
+### Per cgroup
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cgroup.dc_ratio | ratio | % |
+| cgroup.dc_reference | reference | files |
+| cgroup.dc_not_cache | slow | files |
+| cgroup.dc_not_found | miss | files |
+| services.dc_ratio | a dimension per systemd service | % |
+| services.dc_reference | a dimension per systemd service | files |
+| services.dc_not_cache | a dimension per systemd service | files |
+| services.dc_not_found | a dimension per systemd service | files |
 
 

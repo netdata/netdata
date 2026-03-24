@@ -49,132 +49,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per RethinkDB instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rethinkdb.cluster_servers_stats_request | success, timeout | servers |
-| rethinkdb.cluster_client_connections | connections | connections |
-| rethinkdb.cluster_active_clients | active | clients |
-| rethinkdb.cluster_queries | queries | queries/s |
-| rethinkdb.cluster_documents | read, written | documents/s |
-
-### Per server
-
-These metrics refer to the server (cluster member).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| server_uuid | Server UUID. |
-| server_name | Server name. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rethinkdb.server_stats_request_status | success, timeout | status |
-| rethinkdb.server_client_connections | connections | connections |
-| rethinkdb.server_active_clients | active | clients |
-| rethinkdb.server_queries | queries | queries/s |
-| rethinkdb.server_documents | read, written | documents/s |
-
-
-
-## Functions
-
-This collector exposes real-time functions for interactive troubleshooting in the Live tab.
-
-
-### Running Queries
-
-Retrieves currently executing queries from the RethinkDB [rethinkdb.jobs](https://rethinkdb.com/docs/system-jobs/) system table.
-
-This function queries the `rethinkdb.jobs` system table which contains information about background tasks and queries currently running on the cluster. It provides query text, execution duration, client information, and involved servers.
-
-Use cases:
-- Identify long-running queries that may be blocking resources
-- Monitor active query load across the cluster
-- Investigate client connections generating heavy workloads
-
-Query text is truncated at 4096 characters for display purposes.
-
-
-| Aspect | Description |
-|:-------|:------------|
-| Name | `Rethinkdb:running-queries` |
-| Require Cloud | yes |
-| Performance | Queries the `rethinkdb.jobs` system table:<br/>• Minimal overhead as it reads from an in-memory system table<br/>• Default limit of 500 rows balances completeness with performance<br/>• Returns only currently active queries (no historical data) |
-| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Document field values in filter conditions<br/>• User-provided data in insert/update operations<br/>• Access should be restricted to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to RethinkDB<br/>• The user has admin access to `rethinkdb.jobs` table<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
-
-#### Prerequisites
-
-##### Grant admin access to `rethinkdb.jobs`
-
-The user must have admin privileges to query the `rethinkdb.jobs` system table.
-
-1. Connect with an admin user account that has access to system tables
-
-2. Verify access to `rethinkdb.jobs`:
-
-   ```javascript
-   r.db('rethinkdb').table('jobs').run(conn)
-   ```
-
-:::info
-
-- The `rethinkdb.jobs` table is only accessible to admin users
-- Non-admin users will receive a permission error when attempting to query this table
-- The collector's regular metrics do not require admin access
-
-:::
-
-
-
-#### Parameters
-
-| Parameter | Type | Description | Required | Default | Options |
-|:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column. Defaults to duration to focus on longest-running queries. | yes | durationMs |  |
-
-#### Returns
-
-Currently running queries from the `rethinkdb.jobs` system table. Each row represents a single active query with its execution context.
-
-| Column | Type | Unit | Visibility | Description |
-|:-------|:-----|:-----|:-----------|:------------|
-| Job ID | string |  | hidden | Unique identifier for the job entry. Can be used to track or kill specific queries. |
-| Query | string |  |  | The ReQL query text being executed. Truncated to 4096 characters. May contain literal values from application code. |
-| Duration | duration | milliseconds |  | Time elapsed since the query started executing. High values indicate long-running queries that may need investigation. |
-| Type | string |  |  | Job type (e.g., query, index_construction, disk_compaction). Useful for distinguishing user queries from background tasks. |
-| User | string |  |  | RethinkDB user account that initiated the query. Useful for identifying workload by user or application. |
-| Client Address | string |  | hidden | IP address of the client connection that submitted the query. |
-| Client Port | integer |  | hidden | Port number of the client connection. |
-| Servers | string |  | hidden | Comma-separated list of servers involved in executing this query. |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -310,6 +184,132 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per RethinkDB instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| rethinkdb.cluster_servers_stats_request | success, timeout | servers |
+| rethinkdb.cluster_client_connections | connections | connections |
+| rethinkdb.cluster_active_clients | active | clients |
+| rethinkdb.cluster_queries | queries | queries/s |
+| rethinkdb.cluster_documents | read, written | documents/s |
+
+### Per server
+
+These metrics refer to the server (cluster member).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| server_uuid | Server UUID. |
+| server_name | Server name. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| rethinkdb.server_stats_request_status | success, timeout | status |
+| rethinkdb.server_client_connections | connections | connections |
+| rethinkdb.server_active_clients | active | clients |
+| rethinkdb.server_queries | queries | queries/s |
+| rethinkdb.server_documents | read, written | documents/s |
+
+
+
+## Live Data
+
+This collector exposes real-time functions for interactive troubleshooting in the Live tab.
+
+
+### Running Queries
+
+Retrieves currently executing queries from the RethinkDB [rethinkdb.jobs](https://rethinkdb.com/docs/system-jobs/) system table.
+
+This function queries the `rethinkdb.jobs` system table which contains information about background tasks and queries currently running on the cluster. It provides query text, execution duration, client information, and involved servers.
+
+Use cases:
+- Identify long-running queries that may be blocking resources
+- Monitor active query load across the cluster
+- Investigate client connections generating heavy workloads
+
+Query text is truncated at 4096 characters for display purposes.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Rethinkdb:running-queries` |
+| Require Cloud | yes |
+| Performance | Queries the `rethinkdb.jobs` system table:<br/>• Minimal overhead as it reads from an in-memory system table<br/>• Default limit of 500 rows balances completeness with performance<br/>• Returns only currently active queries (no historical data) |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Document field values in filter conditions<br/>• User-provided data in insert/update operations<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to RethinkDB<br/>• The user has admin access to `rethinkdb.jobs` table<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+##### Grant admin access to `rethinkdb.jobs`
+
+The user must have admin privileges to query the `rethinkdb.jobs` system table.
+
+1. Connect with an admin user account that has access to system tables
+
+2. Verify access to `rethinkdb.jobs`:
+
+   ```javascript
+   r.db('rethinkdb').table('jobs').run(conn)
+   ```
+
+:::info
+
+- The `rethinkdb.jobs` table is only accessible to admin users
+- Non-admin users will receive a permission error when attempting to query this table
+- The collector's regular metrics do not require admin access
+
+:::
+
+
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column. Defaults to duration to focus on longest-running queries. | yes | durationMs |  |
+
+#### Returns
+
+Currently running queries from the `rethinkdb.jobs` system table. Each row represents a single active query with its execution context.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Job ID | string |  | hidden | Unique identifier for the job entry. Can be used to track or kill specific queries. |
+| Query | string |  |  | The ReQL query text being executed. Truncated to 4096 characters. May contain literal values from application code. |
+| Duration | duration | milliseconds |  | Time elapsed since the query started executing. High values indicate long-running queries that may need investigation. |
+| Type | string |  |  | Job type (e.g., query, index_construction, disk_compaction). Useful for distinguishing user queries from background tasks. |
+| User | string |  |  | RethinkDB user account that initiated the query. Useful for identifying workload by user or application. |
+| Client Address | string |  | hidden | IP address of the client connection that submitted the query. |
+| Client Port | integer |  | hidden | Port number of the client connection. |
+| Servers | string |  | hidden | Comma-separated list of servers involved in executing this query. |
 
 
 

@@ -57,70 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.logic_apps.run_lifecycle | started, completed, succeeded, failed, cancelled | runs/s |
-| azure_monitor.logic_apps.run_latency | all, success | seconds |
-| azure_monitor.logic_apps.run_failure_rate | failure_rate | percentage |
-| azure_monitor.logic_apps.run_throttling | during_run, at_start | events/s |
-| azure_monitor.logic_apps.action_lifecycle | started, completed, succeeded, failed, skipped | actions/s |
-| azure_monitor.logic_apps.action_latency | all, success | seconds |
-| azure_monitor.logic_apps.action_throttling | total | events/s |
-| azure_monitor.logic_apps.trigger_lifecycle | started, completed, succeeded, fired, failed, skipped | triggers/s |
-| azure_monitor.logic_apps.trigger_latency | all, fire, success | seconds |
-| azure_monitor.logic_apps.trigger_throttling | total | events/s |
-| azure_monitor.logic_apps.billable_executions | total, actions, triggers | executions/s |
-| azure_monitor.logic_apps.billing_by_type | native, standard_connector, storage | operations/s |
-| azure_monitor.logic_apps.agent | loop_executions, completion_overflow, prompt_overflow | events/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_logic_apps_run_failure_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_failure_rate | Logic Apps run failure rate on ${label:resource_name} |
-| [ am_logic_apps_runs_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_lifecycle | Logic Apps failed runs on ${label:resource_name} |
-| [ am_logic_apps_run_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_latency | Logic Apps run latency on ${label:resource_name} |
-| [ am_logic_apps_run_throttled ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_throttling | Logic Apps run throttling on ${label:resource_name} |
-| [ am_logic_apps_actions_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.action_lifecycle | Logic Apps failed actions on ${label:resource_name} |
-| [ am_logic_apps_action_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.action_latency | Logic Apps action latency on ${label:resource_name} |
-| [ am_logic_apps_action_throttled ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.action_throttling | Logic Apps action throttling on ${label:resource_name} |
-| [ am_logic_apps_triggers_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.trigger_lifecycle | Logic Apps failed triggers on ${label:resource_name} |
-| [ am_logic_apps_trigger_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.trigger_latency | Logic Apps trigger latency on ${label:resource_name} |
-| [ am_logic_apps_trigger_throttled ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.trigger_throttling | Logic Apps trigger throttling on ${label:resource_name} |
-| [ am_logic_apps_completion_token_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.agent | Logic Apps completion token overflow on ${label:resource_name} |
-| [ am_logic_apps_prompt_token_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.agent | Logic Apps prompt token overflow on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -339,6 +275,70 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_logic_apps_run_failure_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_failure_rate | Logic Apps run failure rate on ${label:resource_name} |
+| [ am_logic_apps_runs_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_lifecycle | Logic Apps failed runs on ${label:resource_name} |
+| [ am_logic_apps_run_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_latency | Logic Apps run latency on ${label:resource_name} |
+| [ am_logic_apps_run_throttled ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.run_throttling | Logic Apps run throttling on ${label:resource_name} |
+| [ am_logic_apps_actions_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.action_lifecycle | Logic Apps failed actions on ${label:resource_name} |
+| [ am_logic_apps_action_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.action_latency | Logic Apps action latency on ${label:resource_name} |
+| [ am_logic_apps_action_throttled ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.action_throttling | Logic Apps action throttling on ${label:resource_name} |
+| [ am_logic_apps_triggers_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.trigger_lifecycle | Logic Apps failed triggers on ${label:resource_name} |
+| [ am_logic_apps_trigger_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.trigger_latency | Logic Apps trigger latency on ${label:resource_name} |
+| [ am_logic_apps_trigger_throttled ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.trigger_throttling | Logic Apps trigger throttling on ${label:resource_name} |
+| [ am_logic_apps_completion_token_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.agent | Logic Apps completion token overflow on ${label:resource_name} |
+| [ am_logic_apps_prompt_token_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.agent | Logic Apps prompt token overflow on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.logic_apps.run_lifecycle | started, completed, succeeded, failed, cancelled | runs/s |
+| azure_monitor.logic_apps.run_latency | all, success | seconds |
+| azure_monitor.logic_apps.run_failure_rate | failure_rate | percentage |
+| azure_monitor.logic_apps.run_throttling | during_run, at_start | events/s |
+| azure_monitor.logic_apps.action_lifecycle | started, completed, succeeded, failed, skipped | actions/s |
+| azure_monitor.logic_apps.action_latency | all, success | seconds |
+| azure_monitor.logic_apps.action_throttling | total | events/s |
+| azure_monitor.logic_apps.trigger_lifecycle | started, completed, succeeded, fired, failed, skipped | triggers/s |
+| azure_monitor.logic_apps.trigger_latency | all, fire, success | seconds |
+| azure_monitor.logic_apps.trigger_throttling | total | events/s |
+| azure_monitor.logic_apps.billable_executions | total, actions, triggers | executions/s |
+| azure_monitor.logic_apps.billing_by_type | native, standard_connector, storage | operations/s |
+| azure_monitor.logic_apps.agent | loop_executions, completion_overflow, prompt_overflow | events/s |
 
 
 

@@ -86,177 +86,6 @@ API which returns pre-aggregated data, imposing minimal load on the array. Sessi
 CSRF tokens are cached across collection cycles.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Dell PowerStore instance
-
-These metrics refer to the entire monitored PowerStore cluster.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.cluster_space_usage | used, total | bytes |
-| powerstore.cluster_space_logical | provisioned, used, data_physical, shared | bytes |
-| powerstore.cluster_space_efficiency | efficiency, data_reduction, snapshot_savings, thin_savings | ratio |
-| powerstore.hardware_health_fan | ok, degraded, failed, unknown | fans |
-| powerstore.hardware_health_psu | ok, degraded, failed, unknown | PSUs |
-| powerstore.hardware_health_drive | ok, degraded, failed, unknown | drives |
-| powerstore.hardware_health_battery | ok, degraded, failed, unknown | batteries |
-| powerstore.hardware_health_node | ok, degraded, failed, unknown | nodes |
-| powerstore.alerts_active | critical, major, minor, info | alerts |
-| powerstore.nas_server_status | started, stopped, degraded, unknown | servers |
-| powerstore.copy_data | remaining, transferred | bytes |
-| powerstore.copy_transfer_rate | rate | bytes/s |
-
-### Per appliance
-
-These metrics refer to individual PowerStore appliances.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| appliance | Appliance name (e.g., `Appliance-WX-D8031`). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.appliance_iops | read, write | ops/s |
-| powerstore.appliance_bandwidth | read, write | bytes/s |
-| powerstore.appliance_latency | read, write, avg | microseconds |
-| powerstore.appliance_cpu | utilization | percentage |
-| powerstore.appliance_space | used, total | bytes |
-| powerstore.appliance_space_logical | provisioned, used, data_physical, shared | bytes |
-| powerstore.appliance_space_efficiency | efficiency, data_reduction, snapshot_savings, thin_savings | ratio |
-
-### Per volume
-
-These metrics refer to individual PowerStore volumes. Volumes can be filtered using the `volume_selector` configuration option.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| volume | Volume name (e.g., `prod-db-01`). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.volume_iops | read, write | ops/s |
-| powerstore.volume_bandwidth | read, write | bytes/s |
-| powerstore.volume_latency | read, write, avg | microseconds |
-| powerstore.volume_space | provisioned, used | bytes |
-| powerstore.volume_space_savings | thin_savings | ratio |
-
-### Per node
-
-These metrics refer to individual PowerStore nodes within an appliance.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| node | Node name (e.g., `Appliance-WX-D8031-node-A`). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.node_iops | read, write | ops/s |
-| powerstore.node_bandwidth | read, write | bytes/s |
-| powerstore.node_latency | read, write, avg | microseconds |
-| powerstore.node_logins | logins | logins |
-
-### Per fc port
-
-These metrics refer to individual Fibre Channel ports used for host connectivity.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| fc_port | FC port name (e.g., `Appliance-WX-D8031-node-A-Port-0`). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.fc_port_iops | read, write | ops/s |
-| powerstore.fc_port_bandwidth | read, write | bytes/s |
-| powerstore.fc_port_latency | read, write, avg | microseconds |
-| powerstore.fc_port_link_status | up | status |
-
-### Per ethernet port
-
-These metrics refer to individual Ethernet ports (management and iSCSI connectivity).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| eth_port | Ethernet port name (e.g., `Appliance-WX-D8031-node-A-Port-eth0`). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.eth_port_bytes | received, sent | bytes/s |
-| powerstore.eth_port_packets | received, sent | packets/s |
-| powerstore.eth_port_errors | rx_crc, rx_no_buffer, tx_error | errors/s |
-| powerstore.eth_port_link_status | up | status |
-
-### Per file system
-
-These metrics refer to individual file systems (NFS/SMB shares).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| filesystem | File system name (e.g., `nfs-share-01`). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.filesystem_iops | read, write | ops/s |
-| powerstore.filesystem_bandwidth | read, write | bytes/s |
-| powerstore.filesystem_latency | read, write, avg | microseconds |
-
-### Per drive
-
-These metrics refer to individual physical drives (SSDs).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| drive | Drive name (e.g., `Drive_0_0_25`). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerstore.drive_endurance | remaining | percentage |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -423,6 +252,177 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Dell PowerStore instance
+
+These metrics refer to the entire monitored PowerStore cluster.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powerstore.cluster_space_usage | used, total | bytes |
+| powerstore.cluster_space_logical | provisioned, used, data_physical, shared | bytes |
+| powerstore.cluster_space_efficiency | efficiency, data_reduction, snapshot_savings, thin_savings | ratio |
+| powerstore.hardware_health_fan | ok, degraded, failed, unknown | fans |
+| powerstore.hardware_health_psu | ok, degraded, failed, unknown | PSUs |
+| powerstore.hardware_health_drive | ok, degraded, failed, unknown | drives |
+| powerstore.hardware_health_battery | ok, degraded, failed, unknown | batteries |
+| powerstore.hardware_health_node | ok, degraded, failed, unknown | nodes |
+| powerstore.alerts_active | critical, major, minor, info | alerts |
+| powerstore.nas_server_status | started, stopped, degraded, unknown | servers |
+| powerstore.copy_data | remaining, transferred | bytes |
+| powerstore.copy_transfer_rate | rate | bytes/s |
+
+### Per appliance
+
+These metrics refer to individual PowerStore appliances.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| appliance | Appliance name (e.g., `Appliance-WX-D8031`). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powerstore.appliance_iops | read, write | ops/s |
+| powerstore.appliance_bandwidth | read, write | bytes/s |
+| powerstore.appliance_latency | read, write, avg | microseconds |
+| powerstore.appliance_cpu | utilization | percentage |
+| powerstore.appliance_space | used, total | bytes |
+| powerstore.appliance_space_logical | provisioned, used, data_physical, shared | bytes |
+| powerstore.appliance_space_efficiency | efficiency, data_reduction, snapshot_savings, thin_savings | ratio |
+
+### Per volume
+
+These metrics refer to individual PowerStore volumes. Volumes can be filtered using the `volume_selector` configuration option.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| volume | Volume name (e.g., `prod-db-01`). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powerstore.volume_iops | read, write | ops/s |
+| powerstore.volume_bandwidth | read, write | bytes/s |
+| powerstore.volume_latency | read, write, avg | microseconds |
+| powerstore.volume_space | provisioned, used | bytes |
+| powerstore.volume_space_savings | thin_savings | ratio |
+
+### Per node
+
+These metrics refer to individual PowerStore nodes within an appliance.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| node | Node name (e.g., `Appliance-WX-D8031-node-A`). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powerstore.node_iops | read, write | ops/s |
+| powerstore.node_bandwidth | read, write | bytes/s |
+| powerstore.node_latency | read, write, avg | microseconds |
+| powerstore.node_logins | logins | logins |
+
+### Per fc port
+
+These metrics refer to individual Fibre Channel ports used for host connectivity.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| fc_port | FC port name (e.g., `Appliance-WX-D8031-node-A-Port-0`). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powerstore.fc_port_iops | read, write | ops/s |
+| powerstore.fc_port_bandwidth | read, write | bytes/s |
+| powerstore.fc_port_latency | read, write, avg | microseconds |
+| powerstore.fc_port_link_status | up | status |
+
+### Per ethernet port
+
+These metrics refer to individual Ethernet ports (management and iSCSI connectivity).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| eth_port | Ethernet port name (e.g., `Appliance-WX-D8031-node-A-Port-eth0`). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powerstore.eth_port_bytes | received, sent | bytes/s |
+| powerstore.eth_port_packets | received, sent | packets/s |
+| powerstore.eth_port_errors | rx_crc, rx_no_buffer, tx_error | errors/s |
+| powerstore.eth_port_link_status | up | status |
+
+### Per file system
+
+These metrics refer to individual file systems (NFS/SMB shares).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| filesystem | File system name (e.g., `nfs-share-01`). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powerstore.filesystem_iops | read, write | ops/s |
+| powerstore.filesystem_bandwidth | read, write | bytes/s |
+| powerstore.filesystem_latency | read, write, avg | microseconds |
+
+### Per drive
+
+These metrics refer to individual physical drives (SSDs).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| drive | Drive name (e.g., `Drive_0_0_25`). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powerstore.drive_endurance | remaining | percentage |
 
 
 

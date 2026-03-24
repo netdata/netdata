@@ -43,40 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per kern.ipc.sem instance
-
-These metrics shows counters for semaphores on host.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.ipc_semaphores | semaphores | semaphores |
-| system.ipc_semaphore_arrays | arrays | arrays |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ semaphores_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphores | IPC semaphore utilization |
-| [ semaphore_arrays_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphore_arrays | IPC semaphore arrays utilization |
-
-
 ## Setup
 
 
@@ -128,5 +94,39 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ semaphores_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphores | IPC semaphore utilization |
+| [ semaphore_arrays_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphore_arrays | IPC semaphore arrays utilization |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per kern.ipc.sem instance
+
+These metrics shows counters for semaphores on host.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.ipc_semaphores | semaphores | semaphores |
+| system.ipc_semaphore_arrays | arrays | arrays |
 
 

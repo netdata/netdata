@@ -59,6 +59,196 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+You can configure the **yugabytedb** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **yugabytedb**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/yugabytedb.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 5 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | url | Target endpoint URL. | http://127.0.0.1:7000/prometheus-metrics | yes |
+|  | timeout | HTTP request timeout (seconds). | 1 | no |
+| **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
+|  | password | Password for Basic HTTP authentication. |  | no |
+|  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
+| **TLS** | tls_skip_verify | Skip TLS certificate and hostname verification (insecure). | no | no |
+|  | tls_ca | Path to CA bundle used to validate the server certificate. |  | no |
+|  | tls_cert | Path to client TLS certificate (for mTLS). |  | no |
+|  | tls_key | Path to client TLS private key (for mTLS). |  | no |
+| **Proxy** | proxy_url | HTTP proxy URL. |  | no |
+|  | proxy_username | Username for proxy Basic HTTP authentication. |  | no |
+|  | proxy_password | Password for proxy Basic HTTP authentication. |  | no |
+| **Request** | method | HTTP method to use. | GET | no |
+|  | body | Request body (e.g., for POST/PUT). |  | no |
+|  | headers | Additional HTTP headers (one per line as key: value). |  | no |
+|  | not_follow_redirects | Do not follow HTTP redirects. | no | no |
+|  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
+| **Functions** | functions.dsn | SQL DSN (required for query functions). |  | no |
+|  | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
+|  | functions.top_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.top_queries.limit | Maximum number of queries to return. | 500 | no |
+|  | functions.running_queries.disabled | Disable the [running-queries](#running-queries) function. | no | no |
+|  | functions.running_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.running_queries.limit | Maximum number of queries to return. | 500 | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+
+</details>
+
+
+#### via UI
+
+Configure the **yugabytedb** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the yugabytedb data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _yugabytedb_ (or scroll the list) to locate the **yugabytedb** collector.
+5. Click the **+** next to the **yugabytedb** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/yugabytedb.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name2
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/yugabytedb.conf
+```
+
+##### Examples
+
+###### Basic
+
+A basic example configuration.
+
+```yaml
+jobs:
+  - name: local
+    url: http://127.0.0.1:7000/prometheus-metrics     # Master
+    # url: http://127.0.0.1:9000/prometheus-metrics   # Tablet Server
+    # url: http://127.0.0.1:12000/prometheus-metrics  # YCQL
+    # url: http://127.0.0.1:13000/prometheus-metrics  # YSQL
+
+```
+###### Top queries
+
+Enable SQL query functions (YSQL).
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    url: http://127.0.0.1:7000/prometheus-metrics
+    functions:
+      dsn: postgres://yugabyte@127.0.0.1:5433/yugabyte?sslmode=disable
+
+```
+</details>
+
+###### HTTP authentication
+
+Basic HTTP authentication.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    url: http://127.0.0.1:7000/prometheus-metrics
+    username: username
+    password: password
+
+```
+</details>
+
+###### HTTPS with self-signed certificate
+
+NGINX with enabled HTTPS and self-signed certificate.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    url: https://127.0.0.1:7000/prometheus-metrics
+    tls_skip_verify: yes
+
+```
+</details>
+
+###### Multi-instance
+
+> **Note**: When you define multiple jobs, their names must be unique.
+
+Collecting metrics from local and remote instances.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    url: http://127.0.0.1:7000/prometheus-metrics
+
+  - name: remote
+    url: http://192.0.2.1:7000/prometheus-metrics
+
+```
+</details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -332,7 +522,7 @@ Metrics:
 
 
 
-## Functions
+## Live Data
 
 This collector exposes real-time functions for interactive troubleshooting in the Live tab.
 
@@ -476,196 +666,6 @@ Currently running SQL statements from `pg_stat_activity`. Each row represents an
 | Client Address | string |  | hidden | IP address of the client connection. |
 | Query Start | string |  | hidden | Timestamp when the current query began execution. |
 | Elapsed | duration | milliseconds |  | Time elapsed since the query started. High values indicate long-running queries that may need investigation. |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
-## Setup
-
-
-You can configure the **yugabytedb** collector in two ways:
-
-| Method                | Best for                                                                                 | How to                                                                                                                                 |
-|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **yugabytedb**, then click **+** to add a job. |
-| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/yugabytedb.conf` and add a job.                                                                        |
-
-:::important
-
-UI configuration requires paid Netdata Cloud plan.
-
-:::
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-The following options can be defined globally: update_every, autodetection_retry.
-
-
-<details open><summary>Config options</summary>
-
-
-
-| Group | Option | Description | Default | Required |
-|:------|:-----|:------------|:--------|:---------:|
-| **Collection** | update_every | Data collection interval (seconds). | 5 | no |
-|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| **Target** | url | Target endpoint URL. | http://127.0.0.1:7000/prometheus-metrics | yes |
-|  | timeout | HTTP request timeout (seconds). | 1 | no |
-| **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
-|  | password | Password for Basic HTTP authentication. |  | no |
-|  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
-| **TLS** | tls_skip_verify | Skip TLS certificate and hostname verification (insecure). | no | no |
-|  | tls_ca | Path to CA bundle used to validate the server certificate. |  | no |
-|  | tls_cert | Path to client TLS certificate (for mTLS). |  | no |
-|  | tls_key | Path to client TLS private key (for mTLS). |  | no |
-| **Proxy** | proxy_url | HTTP proxy URL. |  | no |
-|  | proxy_username | Username for proxy Basic HTTP authentication. |  | no |
-|  | proxy_password | Password for proxy Basic HTTP authentication. |  | no |
-| **Request** | method | HTTP method to use. | GET | no |
-|  | body | Request body (e.g., for POST/PUT). |  | no |
-|  | headers | Additional HTTP headers (one per line as key: value). |  | no |
-|  | not_follow_redirects | Do not follow HTTP redirects. | no | no |
-|  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
-| **Functions** | functions.dsn | SQL DSN (required for query functions). |  | no |
-|  | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
-|  | functions.top_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
-|  | functions.top_queries.limit | Maximum number of queries to return. | 500 | no |
-|  | functions.running_queries.disabled | Disable the [running-queries](#running-queries) function. | no | no |
-|  | functions.running_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
-|  | functions.running_queries.limit | Maximum number of queries to return. | 500 | no |
-| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
-
-
-</details>
-
-
-#### via UI
-
-Configure the **yugabytedb** collector from the Netdata web interface:
-
-1. Go to **Nodes**.
-2. Select the node **where you want the yugabytedb data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
-3. The **Collectors → Jobs** view opens by default.
-4. In the Search box, type _yugabytedb_ (or scroll the list) to locate the **yugabytedb** collector.
-5. Click the **+** next to the **yugabytedb** collector to add a new job.
-6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
-    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
-
-
-#### via File
-
-The configuration file name for this integration is `go.d/yugabytedb.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name2
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/yugabytedb.conf
-```
-
-##### Examples
-
-###### Basic
-
-A basic example configuration.
-
-```yaml
-jobs:
-  - name: local
-    url: http://127.0.0.1:7000/prometheus-metrics     # Master
-    # url: http://127.0.0.1:9000/prometheus-metrics   # Tablet Server
-    # url: http://127.0.0.1:12000/prometheus-metrics  # YCQL
-    # url: http://127.0.0.1:13000/prometheus-metrics  # YSQL
-
-```
-###### Top queries
-
-Enable SQL query functions (YSQL).
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: local
-    url: http://127.0.0.1:7000/prometheus-metrics
-    functions:
-      dsn: postgres://yugabyte@127.0.0.1:5433/yugabyte?sslmode=disable
-
-```
-</details>
-
-###### HTTP authentication
-
-Basic HTTP authentication.
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: local
-    url: http://127.0.0.1:7000/prometheus-metrics
-    username: username
-    password: password
-
-```
-</details>
-
-###### HTTPS with self-signed certificate
-
-NGINX with enabled HTTPS and self-signed certificate.
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: local
-    url: https://127.0.0.1:7000/prometheus-metrics
-    tls_skip_verify: yes
-
-```
-</details>
-
-###### Multi-instance
-
-> **Note**: When you define multiple jobs, their names must be unique.
-
-Collecting metrics from local and remote instances.
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: local
-    url: http://127.0.0.1:7000/prometheus-metrics
-
-  - name: remote
-    url: http://192.0.2.1:7000/prometheus-metrics
-
-```
-</details>
 
 
 

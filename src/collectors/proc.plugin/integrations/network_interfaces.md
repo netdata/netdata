@@ -44,6 +44,51 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | network interface ${label:device} current speed |
+| [ 1m_received_traffic_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | average inbound utilization for the network interface ${label:device} over the last minute |
+| [ 1m_sent_traffic_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | average outbound utilization for the network interface ${label:device} over the last minute |
+| [ inbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes |
+| [ outbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes |
+| [ wifi_inbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes |
+| [ wifi_outbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes |
+| [ 1m_received_packets_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | average number of packets received by the network interface ${label:device} over the last minute |
+| [ 10s_received_packets_storm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute |
+| [ 10min_fifo_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.fifo | number of FIFO errors for the network interface ${label:device} in the last 10 minutes |
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -91,50 +136,5 @@ Metrics:
 | net.fifo | receive, transmit | errors |
 | net.compressed | received, sent | packets/s |
 | net.events | frames, collisions, carrier | events/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | network interface ${label:device} current speed |
-| [ 1m_received_traffic_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | average inbound utilization for the network interface ${label:device} over the last minute |
-| [ 1m_sent_traffic_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | average outbound utilization for the network interface ${label:device} over the last minute |
-| [ inbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes |
-| [ outbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes |
-| [ wifi_inbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes |
-| [ wifi_outbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes |
-| [ 1m_received_packets_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | average number of packets received by the network interface ${label:device} over the last minute |
-| [ 10s_received_packets_storm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute |
-| [ 10min_fifo_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.fifo | number of FIFO errors for the network interface ${label:device} in the last 10 minutes |
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

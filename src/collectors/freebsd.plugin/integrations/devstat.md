@@ -43,57 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per devstat instance
-
-These metrics give a general vision about I/O events on disks.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.io | io, out | KiB/s |
-
-### Per disk
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| disk.io | reads, writes, frees | KiB/s |
-| disk.ops | reads, writes, other, frees | operations/s |
-| disk.qops | operations | operations |
-| disk.util | utilization | % of time working |
-| disk.iotime | reads, writes, other, frees | milliseconds/s |
-| disk.await | reads, writes, other, frees | milliseconds/operation |
-| disk.avgsz | reads, writes, frees | KiB/operation |
-| disk.svctm | svctm | milliseconds/operation |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | average percentage of time ${label:device} disk was busy over the last 10 minutes |
-
-
 ## Setup
 
 
@@ -156,5 +105,56 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | average percentage of time ${label:device} disk was busy over the last 10 minutes |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per devstat instance
+
+These metrics give a general vision about I/O events on disks.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.io | io, out | KiB/s |
+
+### Per disk
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| disk.io | reads, writes, frees | KiB/s |
+| disk.ops | reads, writes, other, frees | operations/s |
+| disk.qops | operations | operations |
+| disk.util | utilization | % of time working |
+| disk.iotime | reads, writes, other, frees | milliseconds/s |
+| disk.await | reads, writes, other, frees | milliseconds/operation |
+| disk.avgsz | reads, writes, frees | KiB/operation |
+| disk.svctm | svctm | milliseconds/operation |
 
 

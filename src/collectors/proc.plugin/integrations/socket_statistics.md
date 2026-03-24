@@ -44,6 +44,43 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ tcp_orphans ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_orphans.conf) | ipv4.sockstat_tcp_sockets | orphan IPv4 TCP sockets utilization |
+| [ tcp_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_mem.conf) | ipv4.sockstat_tcp_mem | TCP memory utilization |
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -71,42 +108,5 @@ Metrics:
 | ipv4.sockstat_raw_sockets | inuse | sockets |
 | ipv4.sockstat_frag_sockets | inuse | fragments |
 | ipv4.sockstat_frag_mem | mem | KiB |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ tcp_orphans ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_orphans.conf) | ipv4.sockstat_tcp_sockets | orphan IPv4 TCP sockets utilization |
-| [ tcp_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_mem.conf) | ipv4.sockstat_tcp_mem | TCP memory utilization |
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

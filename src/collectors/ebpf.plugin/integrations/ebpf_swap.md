@@ -52,65 +52,6 @@ The default configuration for this integration does not impose any limits on dat
 
 This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per cgroup
-
-These Metrics show grouped information per cgroup/service.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.swap_read | read | calls/s |
-| cgroup.swap_write | write | calls/s |
-| services.swap_read | a dimension per systemd service | calls/s |
-| services.swap_write | a dimension per systemd service | calls/s |
-
-### Per apps
-
-These Metrics show grouped information per apps group.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| app_group | The name of the group defined in the configuration. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.ebpf_call_swap_readpage | a dimension per app group | calls/s |
-| app.ebpf_call_swap_writepage | a dimension per app group | calls/s |
-
-### Per eBPF SWAP instance
-
-These metrics show total number of calls to functions inside kernel.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.swapcalls | write, read | calls/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -186,5 +127,64 @@ sudo ./edit-config ebpf.d/swap.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per cgroup
+
+These Metrics show grouped information per cgroup/service.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cgroup.swap_read | read | calls/s |
+| cgroup.swap_write | write | calls/s |
+| services.swap_read | a dimension per systemd service | calls/s |
+| services.swap_write | a dimension per systemd service | calls/s |
+
+### Per apps
+
+These Metrics show grouped information per apps group.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| app.ebpf_call_swap_readpage | a dimension per app group | calls/s |
+| app.ebpf_call_swap_writepage | a dimension per app group | calls/s |
+
+### Per eBPF SWAP instance
+
+These metrics show total number of calls to functions inside kernel.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| mem.swapcalls | write, read | calls/s |
 
 

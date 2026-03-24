@@ -53,84 +53,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per CoreDNS instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| coredns.dns_request_count_total | requests | requests/s |
-| coredns.dns_responses_count_total | responses | responses/s |
-| coredns.dns_request_count_total_per_status | processed, dropped | requests/s |
-| coredns.dns_no_matching_zone_dropped_total | dropped | requests/s |
-| coredns.dns_panic_count_total | panics | panics/s |
-| coredns.dns_requests_count_total_per_proto | udp, tcp | requests/s |
-| coredns.dns_requests_count_total_per_ip_family | v4, v6 | requests/s |
-| coredns.dns_requests_count_total_per_per_type | a, aaaa, mx, soa, cname, ptr, txt, ns, ds, dnskey, rrsig, nsec, nsec3, ixfr, any, other | requests/s |
-| coredns.dns_responses_count_total_per_rcode | noerror, formerr, servfail, nxdomain, notimp, refused, yxdomain, yxrrset, nxrrset, notauth, notzone, badsig, badkey, badtime, badmode, badname, badalg, badtrunc, badcookie, other | responses/s |
-
-### Per server
-
-These metrics refer to the DNS server.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| server_name | Server name. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| coredns.server_dns_request_count_total | requests | requests/s |
-| coredns.server_dns_responses_count_total | responses | responses/s |
-| coredns.server_request_count_total_per_status | processed, dropped | requests/s |
-| coredns.server_requests_count_total_per_proto | udp, tcp | requests/s |
-| coredns.server_requests_count_total_per_ip_family | v4, v6 | requests/s |
-| coredns.server_requests_count_total_per_per_type | a, aaaa, mx, soa, cname, ptr, txt, ns, ds, dnskey, rrsig, nsec, nsec3, ixfr, any, other | requests/s |
-| coredns.server_responses_count_total_per_rcode | noerror, formerr, servfail, nxdomain, notimp, refused, yxdomain, yxrrset, nxrrset, notauth, notzone, badsig, badkey, badtime, badmode, badname, badalg, badtrunc, badcookie, other | responses/s |
-
-### Per zone
-
-These metrics refer to the DNS zone.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| zone_name | Zone name. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| coredns.zone_dns_request_count_total | requests | requests/s |
-| coredns.zone_dns_responses_count_total | responses | responses/s |
-| coredns.zone_requests_count_total_per_proto | udp, tcp | requests/s |
-| coredns.zone_requests_count_total_per_ip_family | v4, v6 | requests/s |
-| coredns.zone_requests_count_total_per_per_type | a, aaaa, mx, soa, cname, ptr, txt, ns, ds, dnskey, rrsig, nsec, nsec3, ixfr, any, other | requests/s |
-| coredns.zone_responses_count_total_per_rcode | noerror, formerr, servfail, nxdomain, notimp, refused, yxdomain, yxrrset, nxrrset, notauth, notzone, badsig, badkey, badtime, badmode, badname, badalg, badtrunc, badcookie, other | responses/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -316,6 +238,84 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per CoreDNS instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| coredns.dns_request_count_total | requests | requests/s |
+| coredns.dns_responses_count_total | responses | responses/s |
+| coredns.dns_request_count_total_per_status | processed, dropped | requests/s |
+| coredns.dns_no_matching_zone_dropped_total | dropped | requests/s |
+| coredns.dns_panic_count_total | panics | panics/s |
+| coredns.dns_requests_count_total_per_proto | udp, tcp | requests/s |
+| coredns.dns_requests_count_total_per_ip_family | v4, v6 | requests/s |
+| coredns.dns_requests_count_total_per_per_type | a, aaaa, mx, soa, cname, ptr, txt, ns, ds, dnskey, rrsig, nsec, nsec3, ixfr, any, other | requests/s |
+| coredns.dns_responses_count_total_per_rcode | noerror, formerr, servfail, nxdomain, notimp, refused, yxdomain, yxrrset, nxrrset, notauth, notzone, badsig, badkey, badtime, badmode, badname, badalg, badtrunc, badcookie, other | responses/s |
+
+### Per server
+
+These metrics refer to the DNS server.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| server_name | Server name. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| coredns.server_dns_request_count_total | requests | requests/s |
+| coredns.server_dns_responses_count_total | responses | responses/s |
+| coredns.server_request_count_total_per_status | processed, dropped | requests/s |
+| coredns.server_requests_count_total_per_proto | udp, tcp | requests/s |
+| coredns.server_requests_count_total_per_ip_family | v4, v6 | requests/s |
+| coredns.server_requests_count_total_per_per_type | a, aaaa, mx, soa, cname, ptr, txt, ns, ds, dnskey, rrsig, nsec, nsec3, ixfr, any, other | requests/s |
+| coredns.server_responses_count_total_per_rcode | noerror, formerr, servfail, nxdomain, notimp, refused, yxdomain, yxrrset, nxrrset, notauth, notzone, badsig, badkey, badtime, badmode, badname, badalg, badtrunc, badcookie, other | responses/s |
+
+### Per zone
+
+These metrics refer to the DNS zone.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| zone_name | Zone name. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| coredns.zone_dns_request_count_total | requests | requests/s |
+| coredns.zone_dns_responses_count_total | responses | responses/s |
+| coredns.zone_requests_count_total_per_proto | udp, tcp | requests/s |
+| coredns.zone_requests_count_total_per_ip_family | v4, v6 | requests/s |
+| coredns.zone_requests_count_total_per_per_type | a, aaaa, mx, soa, cname, ptr, txt, ns, ds, dnskey, rrsig, nsec, nsec3, ixfr, any, other | requests/s |
+| coredns.zone_responses_count_total_per_rcode | noerror, formerr, servfail, nxdomain, notimp, refused, yxdomain, yxrrset, nxrrset, notauth, notzone, badsig, badkey, badtime, badmode, badname, badalg, badtrunc, badcookie, other | responses/s |
 
 
 

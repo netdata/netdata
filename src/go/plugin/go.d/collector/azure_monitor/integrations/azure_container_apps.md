@@ -57,78 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.container_apps.cpu_usage | average, maximum | nanocores |
-| azure_monitor.container_apps.cpu_percentage | average, maximum | percentage |
-| azure_monitor.container_apps.memory_working_set | average, maximum | bytes |
-| azure_monitor.container_apps.memory_percentage | average, maximum | percentage |
-| azure_monitor.container_apps.replicas | average | replicas |
-| azure_monitor.container_apps.reserved_cores | per_revision, total | cores |
-| azure_monitor.container_apps.restart_count | restarts | restarts/s |
-| azure_monitor.container_apps.requests | requests | requests/s |
-| azure_monitor.container_apps.response_time | average | milliseconds |
-| azure_monitor.container_apps.network | received, sent | bytes/s |
-| azure_monitor.container_apps.resiliency_timeouts | connection, request | timeouts/s |
-| azure_monitor.container_apps.resiliency_retries | retries | retries/s |
-| azure_monitor.container_apps.resiliency_pending_connections | pending | requests/s |
-| azure_monitor.container_apps.resiliency_ejections | ejected, aborted | ejections/s |
-| azure_monitor.container_apps.gpu_utilization | average, maximum | percentage |
-| azure_monitor.container_apps.jvm_buffer_count | average | buffers |
-| azure_monitor.container_apps.jvm_buffer_memory | used, limit | bytes |
-| azure_monitor.container_apps.jvm_gc_count | collections | collections/s |
-| azure_monitor.container_apps.jvm_gc_duration | duration | milliseconds/s |
-| azure_monitor.container_apps.jvm_memory_pool | used, committed, limit | bytes |
-| azure_monitor.container_apps.jvm_memory_total | used, committed, limit | bytes |
-| azure_monitor.container_apps.jvm_thread_count | average | threads |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_container_apps_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.cpu_percentage | Container Apps CPU on ${label:resource_name} |
-| [ am_container_apps_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.memory_percentage | Container Apps memory on ${label:resource_name} |
-| [ am_container_apps_restarts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.restart_count | Container Apps restarts on ${label:resource_name} |
-| [ am_container_apps_response_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.response_time | Container Apps response time on ${label:resource_name} |
-| [ am_container_apps_resiliency_timeouts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_timeouts | Container Apps resiliency timeouts on ${label:resource_name} |
-| [ am_container_apps_resiliency_retries ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_retries | Container Apps resiliency retries on ${label:resource_name} |
-| [ am_container_apps_pending_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_pending_connections | Container Apps pending connections on ${label:resource_name} |
-| [ am_container_apps_host_ejections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_ejections | Container Apps host ejections on ${label:resource_name} |
-| [ am_container_apps_replica_count ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.replicas | Container Apps replicas on ${label:resource_name} |
-| [ am_container_apps_gpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.gpu_utilization | Container Apps GPU on ${label:resource_name} |
-| [ am_container_apps_jvm_gc_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.jvm_gc_duration | Container Apps JVM GC duration on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -347,6 +275,78 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_container_apps_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.cpu_percentage | Container Apps CPU on ${label:resource_name} |
+| [ am_container_apps_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.memory_percentage | Container Apps memory on ${label:resource_name} |
+| [ am_container_apps_restarts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.restart_count | Container Apps restarts on ${label:resource_name} |
+| [ am_container_apps_response_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.response_time | Container Apps response time on ${label:resource_name} |
+| [ am_container_apps_resiliency_timeouts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_timeouts | Container Apps resiliency timeouts on ${label:resource_name} |
+| [ am_container_apps_resiliency_retries ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_retries | Container Apps resiliency retries on ${label:resource_name} |
+| [ am_container_apps_pending_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_pending_connections | Container Apps pending connections on ${label:resource_name} |
+| [ am_container_apps_host_ejections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.resiliency_ejections | Container Apps host ejections on ${label:resource_name} |
+| [ am_container_apps_replica_count ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.replicas | Container Apps replicas on ${label:resource_name} |
+| [ am_container_apps_gpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.gpu_utilization | Container Apps GPU on ${label:resource_name} |
+| [ am_container_apps_jvm_gc_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.jvm_gc_duration | Container Apps JVM GC duration on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.container_apps.cpu_usage | average, maximum | nanocores |
+| azure_monitor.container_apps.cpu_percentage | average, maximum | percentage |
+| azure_monitor.container_apps.memory_working_set | average, maximum | bytes |
+| azure_monitor.container_apps.memory_percentage | average, maximum | percentage |
+| azure_monitor.container_apps.replicas | average | replicas |
+| azure_monitor.container_apps.reserved_cores | per_revision, total | cores |
+| azure_monitor.container_apps.restart_count | restarts | restarts/s |
+| azure_monitor.container_apps.requests | requests | requests/s |
+| azure_monitor.container_apps.response_time | average | milliseconds |
+| azure_monitor.container_apps.network | received, sent | bytes/s |
+| azure_monitor.container_apps.resiliency_timeouts | connection, request | timeouts/s |
+| azure_monitor.container_apps.resiliency_retries | retries | retries/s |
+| azure_monitor.container_apps.resiliency_pending_connections | pending | requests/s |
+| azure_monitor.container_apps.resiliency_ejections | ejected, aborted | ejections/s |
+| azure_monitor.container_apps.gpu_utilization | average, maximum | percentage |
+| azure_monitor.container_apps.jvm_buffer_count | average | buffers |
+| azure_monitor.container_apps.jvm_buffer_memory | used, limit | bytes |
+| azure_monitor.container_apps.jvm_gc_count | collections | collections/s |
+| azure_monitor.container_apps.jvm_gc_duration | duration | milliseconds/s |
+| azure_monitor.container_apps.jvm_memory_pool | used, committed, limit | bytes |
+| azure_monitor.container_apps.jvm_memory_total | used, committed, limit | bytes |
+| azure_monitor.container_apps.jvm_thread_count | average | threads |
 
 
 

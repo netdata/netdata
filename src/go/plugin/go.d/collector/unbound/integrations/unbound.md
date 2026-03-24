@@ -45,81 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Unbound instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| unbound.queries | queries | queries |
-| unbound.queries_ip_ratelimited | ratelimited | queries |
-| unbound.dnscrypt_queries | crypted, cert, cleartext, malformed | queries |
-| unbound.cache | hits, miss | events |
-| unbound.cache_percentage | hits, miss | percentage |
-| unbound.prefetch | prefetches | prefetches |
-| unbound.expired | expired | replies |
-| unbound.zero_ttl_replies | zero_ttl | replies |
-| unbound.recursive_replies | recursive | replies |
-| unbound.recursion_time | avg, median | milliseconds |
-| unbound.request_list_usage | avg, max | queries |
-| unbound.current_request_list_usage | all, users | queries |
-| unbound.request_list_jostle_list | overwritten, dropped | queries |
-| unbound.tcpusage | usage | buffers |
-| unbound.uptime | time | seconds |
-| unbound.cache_memory | message, rrset, dnscrypt_nonce, dnscrypt_shared_secret | KB |
-| unbound.mod_memory | iterator, respip, validator, subnet, ipsec | KB |
-| unbound.mem_streamwait | streamwait | KB |
-| unbound.cache_count | infra, key, msg, rrset, dnscrypt_nonce, shared_secret | items |
-| unbound.type_queries | a dimension per query type | queries |
-| unbound.class_queries | a dimension per query class | queries |
-| unbound.opcode_queries | a dimension per query opcode | queries |
-| unbound.flag_queries | qr, aa, tc, rd, ra, z, ad, cd | queries |
-| unbound.rcode_answers | a dimension per reply rcode | replies |
-
-### Per thread
-
-These metrics refer to threads.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| unbound.thread_queries | queries | queries |
-| unbound.thread_queries_ip_ratelimited | ratelimited | queries |
-| unbound.thread_dnscrypt_queries | crypted, cert, cleartext, malformed | queries |
-| unbound.thread_cache | hits, miss | events |
-| unbound.thread_cache_percentage | hits, miss | percentage |
-| unbound.thread_prefetch | prefetches | prefetches |
-| unbound.thread_expired | expired | replies |
-| unbound.thread_zero_ttl_replies | zero_ttl | replies |
-| unbound.thread_recursive_replies | recursive | replies |
-| unbound.thread_recursion_time | avg, median | milliseconds |
-| unbound.thread_request_list_usage | avg, max | queries |
-| unbound.thread_current_request_list_usage | all, users | queries |
-| unbound.thread_request_list_jostle_list | overwritten, dropped | queries |
-| unbound.thread_tcpusage | usage | buffers |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -279,6 +204,81 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Unbound instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| unbound.queries | queries | queries |
+| unbound.queries_ip_ratelimited | ratelimited | queries |
+| unbound.dnscrypt_queries | crypted, cert, cleartext, malformed | queries |
+| unbound.cache | hits, miss | events |
+| unbound.cache_percentage | hits, miss | percentage |
+| unbound.prefetch | prefetches | prefetches |
+| unbound.expired | expired | replies |
+| unbound.zero_ttl_replies | zero_ttl | replies |
+| unbound.recursive_replies | recursive | replies |
+| unbound.recursion_time | avg, median | milliseconds |
+| unbound.request_list_usage | avg, max | queries |
+| unbound.current_request_list_usage | all, users | queries |
+| unbound.request_list_jostle_list | overwritten, dropped | queries |
+| unbound.tcpusage | usage | buffers |
+| unbound.uptime | time | seconds |
+| unbound.cache_memory | message, rrset, dnscrypt_nonce, dnscrypt_shared_secret | KB |
+| unbound.mod_memory | iterator, respip, validator, subnet, ipsec | KB |
+| unbound.mem_streamwait | streamwait | KB |
+| unbound.cache_count | infra, key, msg, rrset, dnscrypt_nonce, shared_secret | items |
+| unbound.type_queries | a dimension per query type | queries |
+| unbound.class_queries | a dimension per query class | queries |
+| unbound.opcode_queries | a dimension per query opcode | queries |
+| unbound.flag_queries | qr, aa, tc, rd, ra, z, ad, cd | queries |
+| unbound.rcode_answers | a dimension per reply rcode | replies |
+
+### Per thread
+
+These metrics refer to threads.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| unbound.thread_queries | queries | queries |
+| unbound.thread_queries_ip_ratelimited | ratelimited | queries |
+| unbound.thread_dnscrypt_queries | crypted, cert, cleartext, malformed | queries |
+| unbound.thread_cache | hits, miss | events |
+| unbound.thread_cache_percentage | hits, miss | percentage |
+| unbound.thread_prefetch | prefetches | prefetches |
+| unbound.thread_expired | expired | replies |
+| unbound.thread_zero_ttl_replies | zero_ttl | replies |
+| unbound.thread_recursive_replies | recursive | replies |
+| unbound.thread_recursion_time | avg, median | milliseconds |
+| unbound.thread_request_list_usage | avg, max | queries |
+| unbound.thread_current_request_list_usage | all, users | queries |
+| unbound.thread_request_list_jostle_list | overwritten, dropped | queries |
+| unbound.thread_tcpusage | usage | buffers |
 
 
 

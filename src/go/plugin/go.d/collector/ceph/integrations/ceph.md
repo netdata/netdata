@@ -61,102 +61,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per cluster
-
-These metrics refer to the entire Ceph cluster.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| fsid | A unique identifier of the cluster. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ceph.cluster_status | ok, err, warn | status |
-| ceph.cluster_hosts_count | hosts | hosts |
-| ceph.cluster_monitors_count | monitors | monitors |
-| ceph.cluster_osds_count | osds | osds |
-| ceph.cluster_osds_by_status_count | up, down, in, out | status |
-| ceph.cluster_managers_count | active, standby | managers |
-| ceph.cluster_object_gateways_count | object | gateways |
-| ceph.cluster_iscsi_gateways_count | iscsi | gateways |
-| ceph.cluster_iscsi_gateways_by_status_count | up, down | gateways |
-| ceph.cluster_physical_capacity_utilization | utilization | percent |
-| ceph.cluster_physical_capacity_usage | avail, used | bytes |
-| ceph.cluster_objects_count | objects | objects |
-| ceph.cluster_objects_by_status_distribution | healthy, misplaced, degraded, unfound | percent |
-| ceph.cluster_pools_count | pools | pools |
-| ceph.cluster_pgs_count | pgs | pgs |
-| ceph.cluster_pgs_by_status_count | clean, working, warning, unknown | pgs |
-| ceph.cluster_pgs_per_osd_count | per_osd | pgs |
-
-### Per osd
-
-These metrics refer to the Object Storage Daemon (OSD).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| fsid | A unique identifier of the cluster. |
-| osd_uuid | OSD UUID. |
-| osd_name | OSD name. |
-| device_class | OSD device class. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ceph.osd_status | up, down, in, out | status |
-| ceph.osd_space_usage | avail, used | bytes |
-| ceph.osd_io | read, written | bytes/s |
-| ceph.osd_iops | read, write | ops/s |
-| ceph.osd_latency | commit, apply | milliseconds |
-
-### Per pool
-
-These metrics refer to the Pool.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| fsid | A unique identifier of the cluster. |
-| pool_name | Pool name. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ceph.pool_space_utilization | utilization | percent |
-| ceph.pool_space_usage | avail, used | bytes |
-| ceph.pool_objects_count | object | objects |
-| ceph.pool_io | read, written | bytes/s |
-| ceph.pool_iops | read, write | ops/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ ceph_cluster_physical_capacity_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | ceph.cluster_physical_capacity_utilization | Ceph cluster ${label:fsid} disk space utilization |
-
-
 ## Setup
 
 
@@ -285,6 +189,102 @@ jobs:
     password: pass
 
 ```
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ ceph_cluster_physical_capacity_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | ceph.cluster_physical_capacity_utilization | Ceph cluster ${label:fsid} disk space utilization |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per cluster
+
+These metrics refer to the entire Ceph cluster.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| fsid | A unique identifier of the cluster. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ceph.cluster_status | ok, err, warn | status |
+| ceph.cluster_hosts_count | hosts | hosts |
+| ceph.cluster_monitors_count | monitors | monitors |
+| ceph.cluster_osds_count | osds | osds |
+| ceph.cluster_osds_by_status_count | up, down, in, out | status |
+| ceph.cluster_managers_count | active, standby | managers |
+| ceph.cluster_object_gateways_count | object | gateways |
+| ceph.cluster_iscsi_gateways_count | iscsi | gateways |
+| ceph.cluster_iscsi_gateways_by_status_count | up, down | gateways |
+| ceph.cluster_physical_capacity_utilization | utilization | percent |
+| ceph.cluster_physical_capacity_usage | avail, used | bytes |
+| ceph.cluster_objects_count | objects | objects |
+| ceph.cluster_objects_by_status_distribution | healthy, misplaced, degraded, unfound | percent |
+| ceph.cluster_pools_count | pools | pools |
+| ceph.cluster_pgs_count | pgs | pgs |
+| ceph.cluster_pgs_by_status_count | clean, working, warning, unknown | pgs |
+| ceph.cluster_pgs_per_osd_count | per_osd | pgs |
+
+### Per osd
+
+These metrics refer to the Object Storage Daemon (OSD).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| fsid | A unique identifier of the cluster. |
+| osd_uuid | OSD UUID. |
+| osd_name | OSD name. |
+| device_class | OSD device class. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ceph.osd_status | up, down, in, out | status |
+| ceph.osd_space_usage | avail, used | bytes |
+| ceph.osd_io | read, written | bytes/s |
+| ceph.osd_iops | read, write | ops/s |
+| ceph.osd_latency | commit, apply | milliseconds |
+
+### Per pool
+
+These metrics refer to the Pool.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| fsid | A unique identifier of the cluster. |
+| pool_name | Pool name. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ceph.pool_space_utilization | utilization | percent |
+| ceph.pool_space_usage | avail, used | bytes |
+| ceph.pool_objects_count | object | objects |
+| ceph.pool_io | read, written | bytes/s |
+| ceph.pool_iops | read, write | ops/s |
+
 
 
 ## Troubleshooting

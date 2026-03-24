@@ -54,143 +54,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per cluster
-
-These metrics refer to the RabbitMQ Cluster.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| cluster_id | Unique identifier for the cluster, automatically assigned by RabbitMQ. |
-| cluster_name | User-defined name of the cluster as set using `rabbitmqctl set_cluster_name`. If not set, it will be "unset". |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rabbitmq.messages_count | ready, unacknowledged | messages |
-| rabbitmq.messages_rate | ack, publish, publish_in, publish_out, confirm, deliver, deliver_no_ack, get, get_empty, get_no_ack, deliver_get, redeliver, return_unroutable | messages/s |
-| rabbitmq.objects_count | channels, consumers, connections, queues, exchanges | messages |
-| rabbitmq.connection_churn_rate | created, closed | operations/s |
-| rabbitmq.channel_churn_rate | created, closed | operations/s |
-| rabbitmq.queue_churn_rate | created, deleted, declared | operations/s |
-
-### Per node
-
-These metrics refer to the RabbitMQ node.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| cluster_id | Unique identifier for the cluster, automatically assigned by RabbitMQ. |
-| cluster_name | User-defined name of the cluster as set using `rabbitmqctl set_cluster_name <NAME>`. If not set, it will be "unset". |
-| node | Name of the node. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rabbitmq.node_avail_status | running, down | status |
-| rabbitmq.node_network_partition_status | clear, detected | status |
-| rabbitmq.node_mem_alarm_status | clear, triggered | status |
-| rabbitmq.node_disk_free_alarm_status | clear, triggered | status |
-| rabbitmq.node_file_descriptors_usage | used | fd |
-| rabbitmq.node_sockets_usage | used | sockets |
-| rabbitmq.node_erlang_processes_usage | used | processes |
-| rabbitmq.node_erlang_run_queue_processes_count | length | processes |
-| rabbitmq.node_memory_usage | used | bytes |
-| rabbitmq.node_disk_space_free_size | free | bytes |
-| rabbitmq.node_uptime | uptime | seconds |
-
-### Per cluster peer
-
-These metrics refer to the RabbiMQ cluster peer.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| cluster_id | Unique identifier for the cluster, automatically assigned by RabbitMQ. |
-| cluster_name | User-defined name of the cluster as set using `rabbitmqctl set_cluster_name <NAME>`. If not set, it will be "unset". |
-| node | Name of the node. |
-| peer | Name of the remote node in the cluster. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rabbitmq.node_peer_cluster_link_traffic | received, sent | bytes/s |
-
-### Per vhost
-
-These metrics refer to the virtual host.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| cluster_id | Unique identifier for the cluster, automatically assigned by RabbitMQ. |
-| cluster_name | User-defined name of the cluster as set using `rabbitmqctl set_cluster_name <NAME>`. If not set, it will be "unset". |
-| vhost | Name of the virtual host. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rabbitmq.vhost_status | running, stopped, partial | status |
-| rabbitmq.vhost_messages_count | ready, unacknowledged | messages |
-| rabbitmq.vhost_messages_rate | ack, publish, publish_in, publish_out, confirm, deliver, deliver_no_ack, get, get_no_ack, deliver_get, redeliver, return_unroutable | messages/s |
-
-### Per queue
-
-These metrics refer to the virtual host queue.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| cluster_id | Unique identifier for the cluster, automatically assigned by RabbitMQ. |
-| cluster_name | User-defined name of the cluster as set using `rabbitmqctl set_cluster_name <NAME>`. If not set, it will be "unset". |
-| node | Name of the node. |
-| vhost | Name of the virtual host. |
-| queue | Name of the queue. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rabbitmq.queue_status | running, down, idle, crashed, stopped, minority, terminated | status |
-| rabbitmq.queue_messages_count | ready, unacknowledged, paged_out, persistent | messages |
-| rabbitmq.queue_messages_rate | ack, publish, publish_in, publish_out, confirm, deliver, deliver_no_ack, get, get_no_ack, deliver_get, redeliver, return_unroutable | messages/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ rabbitmq_node_avail_status_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_avail_status | RabbitMQ node is down (node ${label:node} cluster ${label:cluster_id}) |
-| [ rabbitmq_node_network_partition_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_network_partition_status | RabbitMQ network partition detected (node ${label:node} cluster ${label:cluster_id}) |
-| [ rabbitmq_node_mem_alarm_status_triggered ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_mem_alarm_status | RabbitMQ mem alarm triggered (node ${label:node} cluster ${label:cluster_id}) |
-| [ rabbitmq.node_disk_free_alarm_status_triggered ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_disk_free_alarm_status | RabbitMQ disk free alarm triggered (node ${label:node} cluster ${label:cluster_id}) |
-| [ rabbitmq_vhost_status_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.vhost_status | RabbitMQ vhost is not healthy (vhost ${label:vhost} cluster ${label:cluster_id}) |
-| [ rabbitmq_queue_status_minority ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.queue_status | RabbitMQ queue insufficient online members (queue ${label:queue} node ${label:node} cluster ${label:cluster_id}) |
-| [ rabbitmq_queue_status_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.queue_status | RabbitMQ queue is unhealthy (queue ${label:queue} node ${label:node} cluster ${label:cluster_id}) |
-
-
 ## Setup
 
 
@@ -342,6 +205,143 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ rabbitmq_node_avail_status_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_avail_status | RabbitMQ node is down (node ${label:node} cluster ${label:cluster_id}) |
+| [ rabbitmq_node_network_partition_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_network_partition_status | RabbitMQ network partition detected (node ${label:node} cluster ${label:cluster_id}) |
+| [ rabbitmq_node_mem_alarm_status_triggered ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_mem_alarm_status | RabbitMQ mem alarm triggered (node ${label:node} cluster ${label:cluster_id}) |
+| [ rabbitmq.node_disk_free_alarm_status_triggered ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_disk_free_alarm_status | RabbitMQ disk free alarm triggered (node ${label:node} cluster ${label:cluster_id}) |
+| [ rabbitmq_vhost_status_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.vhost_status | RabbitMQ vhost is not healthy (vhost ${label:vhost} cluster ${label:cluster_id}) |
+| [ rabbitmq_queue_status_minority ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.queue_status | RabbitMQ queue insufficient online members (queue ${label:queue} node ${label:node} cluster ${label:cluster_id}) |
+| [ rabbitmq_queue_status_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.queue_status | RabbitMQ queue is unhealthy (queue ${label:queue} node ${label:node} cluster ${label:cluster_id}) |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per cluster
+
+These metrics refer to the RabbitMQ Cluster.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| cluster_id | Unique identifier for the cluster, automatically assigned by RabbitMQ. |
+| cluster_name | User-defined name of the cluster as set using `rabbitmqctl set_cluster_name`. If not set, it will be "unset". |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| rabbitmq.messages_count | ready, unacknowledged | messages |
+| rabbitmq.messages_rate | ack, publish, publish_in, publish_out, confirm, deliver, deliver_no_ack, get, get_empty, get_no_ack, deliver_get, redeliver, return_unroutable | messages/s |
+| rabbitmq.objects_count | channels, consumers, connections, queues, exchanges | messages |
+| rabbitmq.connection_churn_rate | created, closed | operations/s |
+| rabbitmq.channel_churn_rate | created, closed | operations/s |
+| rabbitmq.queue_churn_rate | created, deleted, declared | operations/s |
+
+### Per node
+
+These metrics refer to the RabbitMQ node.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| cluster_id | Unique identifier for the cluster, automatically assigned by RabbitMQ. |
+| cluster_name | User-defined name of the cluster as set using `rabbitmqctl set_cluster_name <NAME>`. If not set, it will be "unset". |
+| node | Name of the node. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| rabbitmq.node_avail_status | running, down | status |
+| rabbitmq.node_network_partition_status | clear, detected | status |
+| rabbitmq.node_mem_alarm_status | clear, triggered | status |
+| rabbitmq.node_disk_free_alarm_status | clear, triggered | status |
+| rabbitmq.node_file_descriptors_usage | used | fd |
+| rabbitmq.node_sockets_usage | used | sockets |
+| rabbitmq.node_erlang_processes_usage | used | processes |
+| rabbitmq.node_erlang_run_queue_processes_count | length | processes |
+| rabbitmq.node_memory_usage | used | bytes |
+| rabbitmq.node_disk_space_free_size | free | bytes |
+| rabbitmq.node_uptime | uptime | seconds |
+
+### Per cluster peer
+
+These metrics refer to the RabbiMQ cluster peer.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| cluster_id | Unique identifier for the cluster, automatically assigned by RabbitMQ. |
+| cluster_name | User-defined name of the cluster as set using `rabbitmqctl set_cluster_name <NAME>`. If not set, it will be "unset". |
+| node | Name of the node. |
+| peer | Name of the remote node in the cluster. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| rabbitmq.node_peer_cluster_link_traffic | received, sent | bytes/s |
+
+### Per vhost
+
+These metrics refer to the virtual host.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| cluster_id | Unique identifier for the cluster, automatically assigned by RabbitMQ. |
+| cluster_name | User-defined name of the cluster as set using `rabbitmqctl set_cluster_name <NAME>`. If not set, it will be "unset". |
+| vhost | Name of the virtual host. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| rabbitmq.vhost_status | running, stopped, partial | status |
+| rabbitmq.vhost_messages_count | ready, unacknowledged | messages |
+| rabbitmq.vhost_messages_rate | ack, publish, publish_in, publish_out, confirm, deliver, deliver_no_ack, get, get_no_ack, deliver_get, redeliver, return_unroutable | messages/s |
+
+### Per queue
+
+These metrics refer to the virtual host queue.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| cluster_id | Unique identifier for the cluster, automatically assigned by RabbitMQ. |
+| cluster_name | User-defined name of the cluster as set using `rabbitmqctl set_cluster_name <NAME>`. If not set, it will be "unset". |
+| node | Name of the node. |
+| vhost | Name of the virtual host. |
+| queue | Name of the queue. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| rabbitmq.queue_status | running, down, idle, crashed, stopped, minority, terminated | status |
+| rabbitmq.queue_messages_count | ready, unacknowledged, paged_out, persistent | messages |
+| rabbitmq.queue_messages_rate | ack, publish, publish_in, publish_out, confirm, deliver, deliver_no_ack, get, get_no_ack, deliver_get, redeliver, return_unroutable | messages/s |
 
 
 

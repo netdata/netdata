@@ -57,55 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.nat_gateway.datapath_availability | average | percentage |
-| azure_monitor.nat_gateway.byte_throughput | total | bytes/s |
-| azure_monitor.nat_gateway.packet_throughput | total | packets/s |
-| azure_monitor.nat_gateway.dropped_packets | total | packets/s |
-| azure_monitor.nat_gateway.snat_connections | total | connections/s |
-| azure_monitor.nat_gateway.total_connections | total | connections/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_nat_gateway_datapath_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.datapath_availability | NAT Gateway availability on ${label:resource_name} |
-| [ am_nat_gateway_dropped_packets ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.dropped_packets | NAT Gateway packet drops on ${label:resource_name} |
-| [ am_nat_gateway_snat_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.snat_connections | NAT Gateway SNAT connections on ${label:resource_name} |
-| [ am_nat_gateway_total_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.total_connections | NAT Gateway total connections on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -324,6 +275,55 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_nat_gateway_datapath_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.datapath_availability | NAT Gateway availability on ${label:resource_name} |
+| [ am_nat_gateway_dropped_packets ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.dropped_packets | NAT Gateway packet drops on ${label:resource_name} |
+| [ am_nat_gateway_snat_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.snat_connections | NAT Gateway SNAT connections on ${label:resource_name} |
+| [ am_nat_gateway_total_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.total_connections | NAT Gateway total connections on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.nat_gateway.datapath_availability | average | percentage |
+| azure_monitor.nat_gateway.byte_throughput | total | bytes/s |
+| azure_monitor.nat_gateway.packet_throughput | total | packets/s |
+| azure_monitor.nat_gateway.dropped_packets | total | packets/s |
+| azure_monitor.nat_gateway.snat_connections | total | connections/s |
+| azure_monitor.nat_gateway.total_connections | total | connections/s |
 
 
 

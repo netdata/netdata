@@ -54,49 +54,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Supervisor instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| supervisord.summary_processes | running, non-running | processes |
-
-### Per process group
-
-These metrics refer to the process group.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| supervisord.processes | running, non-running | processes |
-| supervisord.process_state_code | a dimension per process | code |
-| supervisord.process_exit_status | a dimension per process | exit status |
-| supervisord.process_uptime | a dimension per process | seconds |
-| supervisord.process_downtime | a dimension per process | seconds |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -224,6 +181,49 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Supervisor instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| supervisord.summary_processes | running, non-running | processes |
+
+### Per process group
+
+These metrics refer to the process group.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| supervisord.processes | running, non-running | processes |
+| supervisord.process_state_code | a dimension per process | code |
+| supervisord.process_exit_status | a dimension per process | exit status |
+| supervisord.process_uptime | a dimension per process | seconds |
+| supervisord.process_downtime | a dimension per process | seconds |
 
 
 

@@ -53,263 +53,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per CockroachDB instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cockroachdb.process_cpu_time_combined_percentage | used | percentage |
-| cockroachdb.process_cpu_time_percentage | user, sys | percentage |
-| cockroachdb.process_cpu_time | user, sys | ms |
-| cockroachdb.process_memory | rss | KiB |
-| cockroachdb.process_file_descriptors | open | fd |
-| cockroachdb.process_uptime | uptime | seconds |
-| cockroachdb.host_disk_bandwidth | read, write | KiB |
-| cockroachdb.host_disk_operations | reads, writes | operations |
-| cockroachdb.host_disk_iops_in_progress | in_progress | iops |
-| cockroachdb.host_network_bandwidth | received, sent | kilobits |
-| cockroachdb.host_network_packets | received, sent | packets |
-| cockroachdb.live_nodes | live_nodes | nodes |
-| cockroachdb.node_liveness_heartbeats | successful, failed | heartbeats |
-| cockroachdb.total_storage_capacity | total | KiB |
-| cockroachdb.storage_capacity_usability | usable, unusable | KiB |
-| cockroachdb.storage_usable_capacity | available, used | KiB |
-| cockroachdb.storage_used_capacity_percentage | total, usable | percentage |
-| cockroachdb.sql_connections | active | connections |
-| cockroachdb.sql_bandwidth | received, sent | KiB |
-| cockroachdb.sql_statements_total | started, executed | statements |
-| cockroachdb.sql_errors | statement, transaction | errors |
-| cockroachdb.sql_started_ddl_statements | ddl | statements |
-| cockroachdb.sql_executed_ddl_statements | ddl | statements |
-| cockroachdb.sql_started_dml_statements | select, update, delete, insert | statements |
-| cockroachdb.sql_executed_dml_statements | select, update, delete, insert | statements |
-| cockroachdb.sql_started_tcl_statements | begin, commit, rollback, savepoint, savepoint_cockroach_restart, release_savepoint_cockroach_restart, rollback_to_savepoint_cockroach_restart | statements |
-| cockroachdb.sql_executed_tcl_statements | begin, commit, rollback, savepoint, savepoint_cockroach_restart, release_savepoint_cockroach_restart, rollback_to_savepoint_cockroach_restart | statements |
-| cockroachdb.sql_active_distributed_queries | active | queries |
-| cockroachdb.sql_distributed_flows | active, queued | flows |
-| cockroachdb.live_bytes | applications, system | KiB |
-| cockroachdb.logical_data | keys, values | KiB |
-| cockroachdb.logical_data_count | keys, values | num |
-| cockroachdb.kv_transactions | committed, fast-path_committed, aborted | transactions |
-| cockroachdb.kv_transaction_restarts | write_too_old, write_too_old_multiple, forwarded_timestamp, possible_reply, async_consensus_failure, read_within_uncertainty_interval, aborted, push_failure, unknown | restarts |
-| cockroachdb.ranges | ranges | ranges |
-| cockroachdb.ranges_replication_problem | unavailable, under_replicated, over_replicated | ranges |
-| cockroachdb.range_events | split, add, remove, merge | events |
-| cockroachdb.range_snapshot_events | generated, applied_raft_initiated, applied_learner, applied_preemptive | events |
-| cockroachdb.rocksdb_read_amplification | reads | reads/query |
-| cockroachdb.rocksdb_table_operations | compactions, flushes | operations |
-| cockroachdb.rocksdb_cache_usage | used | KiB |
-| cockroachdb.rocksdb_cache_operations | hits, misses | operations |
-| cockroachdb.rocksdb_cache_hit_rate | hit_rate | percentage |
-| cockroachdb.rocksdb_sstables | sstables | sstables |
-| cockroachdb.replicas | replicas | replicas |
-| cockroachdb.replicas_quiescence | quiescent, active | replicas |
-| cockroachdb.replicas_leaders | leaders, not_leaseholders | replicas |
-| cockroachdb.replicas_leaseholders | leaseholders | leaseholders |
-| cockroachdb.queue_processing_failures | gc, replica_gc, replication, split, consistency, raft_log, raft_snapshot, time_series_maintenance | failures |
-| cockroachdb.rebalancing_queries | avg | queries/s |
-| cockroachdb.rebalancing_writes | avg | writes/s |
-| cockroachdb.timeseries_samples | written | samples |
-| cockroachdb.timeseries_write_errors | write | errors |
-| cockroachdb.timeseries_write_bytes | written | KiB |
-| cockroachdb.slow_requests | acquiring_latches, acquiring_lease, in_raft | requests |
-| cockroachdb.code_heap_memory_usage | go, cgo | KiB |
-| cockroachdb.goroutines | goroutines | goroutines |
-| cockroachdb.gc_count | gc | invokes |
-| cockroachdb.gc_pause | pause | us |
-| cockroachdb.cgo_calls | cgo | calls |
-
-
-
-## Functions
-
-This collector exposes real-time functions for interactive troubleshooting in the Live tab.
-
-
-### Top Queries
-
-Retrieves and aggregates SQL statement performance metrics from CockroachDB [crdb_internal.cluster_statement_statistics](https://www.cockroachlabs.com/docs/stable/crdb-internal#cluster_statement_statistics) table.
-
-This function queries cluster-wide statement statistics grouped by fingerprint (normalized query pattern). It provides aggregated metrics including execution counts, timing breakdowns, and row operation statistics.
-
-Use cases:
-- Identify slow queries consuming the most total execution time
-- Find frequently executed queries that may benefit from optimization
-- Analyze row read/write patterns to detect inefficient queries
-
-Query text is truncated at 4096 characters for display purposes.
-
-
-| Aspect | Description |
-|:-------|:------------|
-| Name | `Cockroachdb:top-queries` |
-| Require Cloud | yes |
-| Performance | Queries the `crdb_internal.cluster_statement_statistics` table which aggregates data across the cluster:<br/>• On busy clusters with high query throughput, this query may take longer<br/>• Default limit of 500 rows balances usefulness with performance |
-| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to CockroachDB<br/>• The SQL user has `VIEWACTIVITY` or `VIEWACTIVITYREDACTED` privileges<br/>• Returns HTTP 503 if the SQL connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
-
-#### Prerequisites
-
-##### Grant `VIEWACTIVITY` access to cluster statement stats
-
-The SQL user must have appropriate privileges to access statement statistics.
-
-1. Grant `VIEWACTIVITY` (shows full query text) or `VIEWACTIVITYREDACTED` (masks literals):
-
-   ```sql
-   GRANT SYSTEM VIEWACTIVITY TO netdata_user;
-   -- OR for privacy:
-   GRANT SYSTEM VIEWACTIVITYREDACTED TO netdata_user;
-   ```
-
-2. On newer CockroachDB versions, access to `crdb_internal` may require:
-
-   ```sql
-   SET allow_unsafe_internals = on;
-   ```
-
-:::info
-
-- The collector automatically sets `allow_unsafe_internals = on` for the session when querying `crdb_internal` tables (required on newer versions)
-- `VIEWACTIVITYREDACTED` replaces literal values with underscores for privacy
-- Statement statistics are collected by default but can be disabled via cluster settings
-
-:::
-
-
-
-#### Parameters
-
-| Parameter | Type | Description | Required | Default | Options |
-|:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column. Options include total time, executions, rows read, rows written, and more. Defaults to total time to focus on most resource-intensive queries. | yes | totalTime |  |
-
-#### Returns
-
-Aggregated SQL statement statistics grouped by fingerprint. Each row represents a unique query pattern with cumulative metrics across all executions.
-
-| Column | Type | Unit | Visibility | Description |
-|:-------|:-----|:-----|:-----------|:------------|
-| Fingerprint ID | string |  | hidden | Unique hash identifier for the normalized query pattern. Queries with identical structure but different literal values share the same fingerprint. |
-| Query | string |  |  | Normalized SQL statement text with literals replaced. Truncated to 4096 characters. |
-| Database | string |  |  | Database name where the query was executed. Empty for queries without database context. |
-| Application | string |  |  | Application name that executed the query. Useful for identifying query sources across services. |
-| Statement Type | string |  | hidden | Type of SQL statement (SELECT, INSERT, UPDATE, DELETE, etc.). |
-| Distributed | string |  | hidden | Whether the query used DistSQL execution (true/false). Distributed queries span multiple nodes. |
-| Full Scan | string |  | hidden | Whether the query performed a full table scan (true/false). Full scans may indicate missing indexes. |
-| Implicit Txn | string |  | hidden | Whether the statement ran in an implicit transaction (true/false). |
-| Vectorized | string |  | hidden | Whether the query used vectorized execution (true/false). Vectorized execution improves performance for analytical queries. |
-| Executions | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries. |
-| Total Time | duration | milliseconds |  | Cumulative service latency across all executions (mean time × executions). High values indicate queries consuming significant cluster resources. |
-| Mean Time | duration | milliseconds |  | Average service latency per execution. Use this to compare typical performance across query patterns. |
-| Run Time | duration | milliseconds | hidden | Average time spent executing the query after planning. Excludes parse and plan time. |
-| Plan Time | duration | milliseconds | hidden | Average time spent generating the query execution plan. High values may indicate complex queries or stale statistics. |
-| Parse Time | duration | milliseconds | hidden | Average time spent parsing the SQL statement. |
-| Rows Read | integer |  |  | Total rows read across all executions. High values relative to rows returned suggest missing indexes or inefficient scans. |
-| Rows Written | integer |  |  | Total rows written across all executions. Indicates write workload for INSERT, UPDATE, DELETE statements. |
-| Rows Returned | integer |  |  | Total rows returned to clients across all executions. Compare with rows read to assess query efficiency. |
-| Bytes Read | integer |  | hidden | Total bytes read from storage across all executions. Indicates I/O load for the query pattern. |
-| Max Retries | integer |  | hidden | Maximum number of automatic retries observed for this query pattern. High values indicate transaction contention. |
-
-### Running Queries
-
-Retrieves currently executing SQL statements across the CockroachDB cluster using [SHOW CLUSTER STATEMENTS](https://www.cockroachlabs.com/docs/stable/show-statements).
-
-This function provides a real-time snapshot of all active queries across all nodes in the cluster, including their execution phase, duration, and associated metadata.
-
-Use cases:
-- Identify long-running queries that may be blocking other operations
-- Monitor active workload distribution across the cluster
-- Debug stuck or slow queries in real-time
-
-Query text is truncated at 4096 characters for display purposes.
-
-
-| Aspect | Description |
-|:-------|:------------|
-| Name | `Cockroachdb:running-queries` |
-| Require Cloud | yes |
-| Performance | Executes the `SHOW CLUSTER STATEMENTS` command which queries all nodes in the cluster:<br/>• Lightweight operation with minimal overhead<br/>• Returns only currently active queries, typically a small result set |
-| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or VALUES<br/>• Session tokens or credentials<br/>• Access should be restricted to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to CockroachDB<br/>• The SQL user has `VIEWACTIVITY` or `VIEWACTIVITYREDACTED` privileges<br/>• Returns HTTP 503 if the SQL connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
-
-#### Prerequisites
-
-##### Grant `VIEWACTIVITY` access to system tables
-
-The SQL user must have appropriate privileges to view running statements.
-
-1. Grant `VIEWACTIVITY` (shows full query text) or `VIEWACTIVITYREDACTED` (masks literals):
-
-   ```sql
-   GRANT SYSTEM VIEWACTIVITY TO netdata_user;
-   -- OR for privacy:
-   GRANT SYSTEM VIEWACTIVITYREDACTED TO netdata_user;
-   ```
-
-   :::info
-
-   - `SHOW CLUSTER STATEMENTS` shows queries across all nodes, not just the connected node
-   - `VIEWACTIVITYREDACTED` replaces literal values with underscores for privacy
-   - Queries shown are point-in-time snapshots and may complete between retrieval and display
-
-   :::
-
-
-
-#### Parameters
-
-| Parameter | Type | Description | Required | Default | Options |
-|:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column. Defaults to elapsed time to show longest-running queries first. | yes | elapsedMs |  |
-
-#### Returns
-
-Real-time snapshot of currently executing SQL statements across all cluster nodes. Each row represents a single active query.
-
-| Column | Type | Unit | Visibility | Description |
-|:-------|:-----|:-----|:-----------|:------------|
-| Query ID | string |  | hidden | Unique identifier for this specific query execution. Can be used with CANCEL QUERY if needed. |
-| Query | string |  |  | The SQL statement currently being executed. Truncated to 4096 characters. |
-| User | string |  |  | Database user executing the query. Useful for identifying workload by user. |
-| Application | string |  |  | Application name from the client connection. Helps identify which service is running the query. |
-| Client Address | string |  | hidden | IP address of the client connection. Useful for identifying query sources. |
-| Node ID | string |  | hidden | CockroachDB node currently executing the query. Helps identify workload distribution. |
-| Session ID | string |  | hidden | Session identifier for the connection. Multiple queries may share a session. |
-| Phase | string |  |  | Current execution phase (executing, preparing, etc.). Indicates query progress. |
-| Distributed | string |  | hidden | Whether the query is using distributed execution across multiple nodes. |
-| Start Time | string |  | hidden | Timestamp when the query started executing. |
-| Elapsed | duration | milliseconds |  | Time elapsed since query started. High values indicate long-running queries that may need investigation. |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ cockroachdb_used_storage_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.storage_used_capacity_percentage | storage capacity utilization |
-| [ cockroachdb_used_usable_storage_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.storage_used_capacity_percentage | storage usable space utilization |
-| [ cockroachdb_unavailable_ranges ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.ranges_replication_problem | number of ranges with fewer live replicas than needed for quorum |
-| [ cockroachdb_underreplicated_ranges ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.ranges_replication_problem | number of ranges with fewer live replicas than the replication target |
-| [ cockroachdb_open_file_descriptors_limit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.process_file_descriptors | open file descriptors utilization (against softlimit) |
-
-
 ## Setup
 
 
@@ -493,6 +236,263 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ cockroachdb_used_storage_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.storage_used_capacity_percentage | storage capacity utilization |
+| [ cockroachdb_used_usable_storage_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.storage_used_capacity_percentage | storage usable space utilization |
+| [ cockroachdb_unavailable_ranges ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.ranges_replication_problem | number of ranges with fewer live replicas than needed for quorum |
+| [ cockroachdb_underreplicated_ranges ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.ranges_replication_problem | number of ranges with fewer live replicas than the replication target |
+| [ cockroachdb_open_file_descriptors_limit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.process_file_descriptors | open file descriptors utilization (against softlimit) |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per CockroachDB instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cockroachdb.process_cpu_time_combined_percentage | used | percentage |
+| cockroachdb.process_cpu_time_percentage | user, sys | percentage |
+| cockroachdb.process_cpu_time | user, sys | ms |
+| cockroachdb.process_memory | rss | KiB |
+| cockroachdb.process_file_descriptors | open | fd |
+| cockroachdb.process_uptime | uptime | seconds |
+| cockroachdb.host_disk_bandwidth | read, write | KiB |
+| cockroachdb.host_disk_operations | reads, writes | operations |
+| cockroachdb.host_disk_iops_in_progress | in_progress | iops |
+| cockroachdb.host_network_bandwidth | received, sent | kilobits |
+| cockroachdb.host_network_packets | received, sent | packets |
+| cockroachdb.live_nodes | live_nodes | nodes |
+| cockroachdb.node_liveness_heartbeats | successful, failed | heartbeats |
+| cockroachdb.total_storage_capacity | total | KiB |
+| cockroachdb.storage_capacity_usability | usable, unusable | KiB |
+| cockroachdb.storage_usable_capacity | available, used | KiB |
+| cockroachdb.storage_used_capacity_percentage | total, usable | percentage |
+| cockroachdb.sql_connections | active | connections |
+| cockroachdb.sql_bandwidth | received, sent | KiB |
+| cockroachdb.sql_statements_total | started, executed | statements |
+| cockroachdb.sql_errors | statement, transaction | errors |
+| cockroachdb.sql_started_ddl_statements | ddl | statements |
+| cockroachdb.sql_executed_ddl_statements | ddl | statements |
+| cockroachdb.sql_started_dml_statements | select, update, delete, insert | statements |
+| cockroachdb.sql_executed_dml_statements | select, update, delete, insert | statements |
+| cockroachdb.sql_started_tcl_statements | begin, commit, rollback, savepoint, savepoint_cockroach_restart, release_savepoint_cockroach_restart, rollback_to_savepoint_cockroach_restart | statements |
+| cockroachdb.sql_executed_tcl_statements | begin, commit, rollback, savepoint, savepoint_cockroach_restart, release_savepoint_cockroach_restart, rollback_to_savepoint_cockroach_restart | statements |
+| cockroachdb.sql_active_distributed_queries | active | queries |
+| cockroachdb.sql_distributed_flows | active, queued | flows |
+| cockroachdb.live_bytes | applications, system | KiB |
+| cockroachdb.logical_data | keys, values | KiB |
+| cockroachdb.logical_data_count | keys, values | num |
+| cockroachdb.kv_transactions | committed, fast-path_committed, aborted | transactions |
+| cockroachdb.kv_transaction_restarts | write_too_old, write_too_old_multiple, forwarded_timestamp, possible_reply, async_consensus_failure, read_within_uncertainty_interval, aborted, push_failure, unknown | restarts |
+| cockroachdb.ranges | ranges | ranges |
+| cockroachdb.ranges_replication_problem | unavailable, under_replicated, over_replicated | ranges |
+| cockroachdb.range_events | split, add, remove, merge | events |
+| cockroachdb.range_snapshot_events | generated, applied_raft_initiated, applied_learner, applied_preemptive | events |
+| cockroachdb.rocksdb_read_amplification | reads | reads/query |
+| cockroachdb.rocksdb_table_operations | compactions, flushes | operations |
+| cockroachdb.rocksdb_cache_usage | used | KiB |
+| cockroachdb.rocksdb_cache_operations | hits, misses | operations |
+| cockroachdb.rocksdb_cache_hit_rate | hit_rate | percentage |
+| cockroachdb.rocksdb_sstables | sstables | sstables |
+| cockroachdb.replicas | replicas | replicas |
+| cockroachdb.replicas_quiescence | quiescent, active | replicas |
+| cockroachdb.replicas_leaders | leaders, not_leaseholders | replicas |
+| cockroachdb.replicas_leaseholders | leaseholders | leaseholders |
+| cockroachdb.queue_processing_failures | gc, replica_gc, replication, split, consistency, raft_log, raft_snapshot, time_series_maintenance | failures |
+| cockroachdb.rebalancing_queries | avg | queries/s |
+| cockroachdb.rebalancing_writes | avg | writes/s |
+| cockroachdb.timeseries_samples | written | samples |
+| cockroachdb.timeseries_write_errors | write | errors |
+| cockroachdb.timeseries_write_bytes | written | KiB |
+| cockroachdb.slow_requests | acquiring_latches, acquiring_lease, in_raft | requests |
+| cockroachdb.code_heap_memory_usage | go, cgo | KiB |
+| cockroachdb.goroutines | goroutines | goroutines |
+| cockroachdb.gc_count | gc | invokes |
+| cockroachdb.gc_pause | pause | us |
+| cockroachdb.cgo_calls | cgo | calls |
+
+
+
+## Live Data
+
+This collector exposes real-time functions for interactive troubleshooting in the Live tab.
+
+
+### Top Queries
+
+Retrieves and aggregates SQL statement performance metrics from CockroachDB [crdb_internal.cluster_statement_statistics](https://www.cockroachlabs.com/docs/stable/crdb-internal#cluster_statement_statistics) table.
+
+This function queries cluster-wide statement statistics grouped by fingerprint (normalized query pattern). It provides aggregated metrics including execution counts, timing breakdowns, and row operation statistics.
+
+Use cases:
+- Identify slow queries consuming the most total execution time
+- Find frequently executed queries that may benefit from optimization
+- Analyze row read/write patterns to detect inefficient queries
+
+Query text is truncated at 4096 characters for display purposes.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Cockroachdb:top-queries` |
+| Require Cloud | yes |
+| Performance | Queries the `crdb_internal.cluster_statement_statistics` table which aggregates data across the cluster:<br/>• On busy clusters with high query throughput, this query may take longer<br/>• Default limit of 500 rows balances usefulness with performance |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to CockroachDB<br/>• The SQL user has `VIEWACTIVITY` or `VIEWACTIVITYREDACTED` privileges<br/>• Returns HTTP 503 if the SQL connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+##### Grant `VIEWACTIVITY` access to cluster statement stats
+
+The SQL user must have appropriate privileges to access statement statistics.
+
+1. Grant `VIEWACTIVITY` (shows full query text) or `VIEWACTIVITYREDACTED` (masks literals):
+
+   ```sql
+   GRANT SYSTEM VIEWACTIVITY TO netdata_user;
+   -- OR for privacy:
+   GRANT SYSTEM VIEWACTIVITYREDACTED TO netdata_user;
+   ```
+
+2. On newer CockroachDB versions, access to `crdb_internal` may require:
+
+   ```sql
+   SET allow_unsafe_internals = on;
+   ```
+
+:::info
+
+- The collector automatically sets `allow_unsafe_internals = on` for the session when querying `crdb_internal` tables (required on newer versions)
+- `VIEWACTIVITYREDACTED` replaces literal values with underscores for privacy
+- Statement statistics are collected by default but can be disabled via cluster settings
+
+:::
+
+
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column. Options include total time, executions, rows read, rows written, and more. Defaults to total time to focus on most resource-intensive queries. | yes | totalTime |  |
+
+#### Returns
+
+Aggregated SQL statement statistics grouped by fingerprint. Each row represents a unique query pattern with cumulative metrics across all executions.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Fingerprint ID | string |  | hidden | Unique hash identifier for the normalized query pattern. Queries with identical structure but different literal values share the same fingerprint. |
+| Query | string |  |  | Normalized SQL statement text with literals replaced. Truncated to 4096 characters. |
+| Database | string |  |  | Database name where the query was executed. Empty for queries without database context. |
+| Application | string |  |  | Application name that executed the query. Useful for identifying query sources across services. |
+| Statement Type | string |  | hidden | Type of SQL statement (SELECT, INSERT, UPDATE, DELETE, etc.). |
+| Distributed | string |  | hidden | Whether the query used DistSQL execution (true/false). Distributed queries span multiple nodes. |
+| Full Scan | string |  | hidden | Whether the query performed a full table scan (true/false). Full scans may indicate missing indexes. |
+| Implicit Txn | string |  | hidden | Whether the statement ran in an implicit transaction (true/false). |
+| Vectorized | string |  | hidden | Whether the query used vectorized execution (true/false). Vectorized execution improves performance for analytical queries. |
+| Executions | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries. |
+| Total Time | duration | milliseconds |  | Cumulative service latency across all executions (mean time × executions). High values indicate queries consuming significant cluster resources. |
+| Mean Time | duration | milliseconds |  | Average service latency per execution. Use this to compare typical performance across query patterns. |
+| Run Time | duration | milliseconds | hidden | Average time spent executing the query after planning. Excludes parse and plan time. |
+| Plan Time | duration | milliseconds | hidden | Average time spent generating the query execution plan. High values may indicate complex queries or stale statistics. |
+| Parse Time | duration | milliseconds | hidden | Average time spent parsing the SQL statement. |
+| Rows Read | integer |  |  | Total rows read across all executions. High values relative to rows returned suggest missing indexes or inefficient scans. |
+| Rows Written | integer |  |  | Total rows written across all executions. Indicates write workload for INSERT, UPDATE, DELETE statements. |
+| Rows Returned | integer |  |  | Total rows returned to clients across all executions. Compare with rows read to assess query efficiency. |
+| Bytes Read | integer |  | hidden | Total bytes read from storage across all executions. Indicates I/O load for the query pattern. |
+| Max Retries | integer |  | hidden | Maximum number of automatic retries observed for this query pattern. High values indicate transaction contention. |
+
+### Running Queries
+
+Retrieves currently executing SQL statements across the CockroachDB cluster using [SHOW CLUSTER STATEMENTS](https://www.cockroachlabs.com/docs/stable/show-statements).
+
+This function provides a real-time snapshot of all active queries across all nodes in the cluster, including their execution phase, duration, and associated metadata.
+
+Use cases:
+- Identify long-running queries that may be blocking other operations
+- Monitor active workload distribution across the cluster
+- Debug stuck or slow queries in real-time
+
+Query text is truncated at 4096 characters for display purposes.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Cockroachdb:running-queries` |
+| Require Cloud | yes |
+| Performance | Executes the `SHOW CLUSTER STATEMENTS` command which queries all nodes in the cluster:<br/>• Lightweight operation with minimal overhead<br/>• Returns only currently active queries, typically a small result set |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or VALUES<br/>• Session tokens or credentials<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to CockroachDB<br/>• The SQL user has `VIEWACTIVITY` or `VIEWACTIVITYREDACTED` privileges<br/>• Returns HTTP 503 if the SQL connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+##### Grant `VIEWACTIVITY` access to system tables
+
+The SQL user must have appropriate privileges to view running statements.
+
+1. Grant `VIEWACTIVITY` (shows full query text) or `VIEWACTIVITYREDACTED` (masks literals):
+
+   ```sql
+   GRANT SYSTEM VIEWACTIVITY TO netdata_user;
+   -- OR for privacy:
+   GRANT SYSTEM VIEWACTIVITYREDACTED TO netdata_user;
+   ```
+
+   :::info
+
+   - `SHOW CLUSTER STATEMENTS` shows queries across all nodes, not just the connected node
+   - `VIEWACTIVITYREDACTED` replaces literal values with underscores for privacy
+   - Queries shown are point-in-time snapshots and may complete between retrieval and display
+
+   :::
+
+
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column. Defaults to elapsed time to show longest-running queries first. | yes | elapsedMs |  |
+
+#### Returns
+
+Real-time snapshot of currently executing SQL statements across all cluster nodes. Each row represents a single active query.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Query ID | string |  | hidden | Unique identifier for this specific query execution. Can be used with CANCEL QUERY if needed. |
+| Query | string |  |  | The SQL statement currently being executed. Truncated to 4096 characters. |
+| User | string |  |  | Database user executing the query. Useful for identifying workload by user. |
+| Application | string |  |  | Application name from the client connection. Helps identify which service is running the query. |
+| Client Address | string |  | hidden | IP address of the client connection. Useful for identifying query sources. |
+| Node ID | string |  | hidden | CockroachDB node currently executing the query. Helps identify workload distribution. |
+| Session ID | string |  | hidden | Session identifier for the connection. Multiple queries may share a session. |
+| Phase | string |  |  | Current execution phase (executing, preparing, etc.). Indicates query progress. |
+| Distributed | string |  | hidden | Whether the query is using distributed execution across multiple nodes. |
+| Start Time | string |  | hidden | Timestamp when the query started executing. |
+| Elapsed | duration | milliseconds |  | Time elapsed since query started. High values indicate long-running queries that may need investigation. |
 
 
 

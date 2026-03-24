@@ -43,38 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per vm.swap_info instance
-
-This metric shows the SWAP usage.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.swap | free, used | MiB |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ used_swap ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.swap | swap memory utilization |
-
-
 ## Setup
 
 
@@ -126,5 +94,37 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ used_swap ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.swap | swap memory utilization |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per vm.swap_info instance
+
+This metric shows the SWAP usage.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| mem.swap | free, used | MiB |
 
 

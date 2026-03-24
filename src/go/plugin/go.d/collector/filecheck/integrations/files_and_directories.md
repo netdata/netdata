@@ -47,58 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per file
-
-These metrics refer to the File.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| file_path | File absolute path |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| filecheck.file_existence_status | exist, not_exist | status |
-| filecheck.file_modification_time_ago | mtime_ago | seconds |
-| filecheck.file_size_bytes | size | bytes |
-
-### Per directory
-
-These metrics refer to the Directory.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| dir_path | Directory absolute path |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| filecheck.dir_existence_status | exist, not_exist | status |
-| filecheck.dir_modification_time_ago | mtime_ago | seconds |
-| filecheck.dir_size_bytes | size | bytes |
-| filecheck.dir_files count | files | files |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -256,6 +204,58 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per file
+
+These metrics refer to the File.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| file_path | File absolute path |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| filecheck.file_existence_status | exist, not_exist | status |
+| filecheck.file_modification_time_ago | mtime_ago | seconds |
+| filecheck.file_size_bytes | size | bytes |
+
+### Per directory
+
+These metrics refer to the Directory.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| dir_path | Directory absolute path |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| filecheck.dir_existence_status | exist, not_exist | status |
+| filecheck.dir_modification_time_ago | mtime_ago | seconds |
+| filecheck.dir_size_bytes | size | bytes |
+| filecheck.dir_files count | files | files |
 
 
 

@@ -51,45 +51,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per NSD instance
-
-These metrics refer to the the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nsd.queries | queries | queries/s |
-| nsd.queries_by_type | A, NS, MD, MF, CNAME, SOA, MB, MG, MR, NULL, WKS, PTR, HINFO, MINFO, MX, TXT, RP, AFSDB, X25, ISDN, RT, NSAP, SIG, KEY, PX, AAAA, LOC, NXT, SRV, NAPTR, KX, CERT, DNAME, OPT, APL, DS, SSHFP, IPSECKEY, RRSIG, NSEC, DNSKEY, DHCID, NSEC3, NSEC3PARAM, TLSA, SMIMEA, CDS, CDNSKEY, OPENPGPKEY, CSYNC, ZONEMD, SVCB, HTTPS, SPF, NID, L32, L64, LP, EUI48, EUI64, URI, CAA, AVC, DLV, IXFR, AXFR, MAILB, MAILA, ANY | queries/s |
-| nsd.queries_by_opcode | QUERY, IQUERY, STATUS, NOTIFY, UPDATE, OTHER | queries/s |
-| nsd.queries_by_class | IN, CS, CH, HS | queries/s |
-| nsd.queries_by_protocol | udp, udp6, tcp, tcp6, tls, tls6 | queries/s |
-| nsd.answers_by_rcode | NOERROR, FORMERR, SERVFAIL, NXDOMAIN, NOTIMP, REFUSED, YXDOMAIN, YXRRSET, NXRRSET, NOTAUTH, NOTZONE, RCODE11, RCODE12, RCODE13, RCODE14, RCODE15, BADVERS | answers/s |
-| nsd.errors | query, answer | errors/s |
-| nsd.drops | query | drops/s |
-| nsd.zones | master, slave | zones |
-| nsd.zone_transfers_requests | AXFR, IXFR | requests/s |
-| nsd.zone_transfer_memory | used | bytes |
-| nsd.database_size | disk, mem | bytes |
-| nsd.uptime | uptime | seconds |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -181,6 +142,45 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per NSD instance
+
+These metrics refer to the the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nsd.queries | queries | queries/s |
+| nsd.queries_by_type | A, NS, MD, MF, CNAME, SOA, MB, MG, MR, NULL, WKS, PTR, HINFO, MINFO, MX, TXT, RP, AFSDB, X25, ISDN, RT, NSAP, SIG, KEY, PX, AAAA, LOC, NXT, SRV, NAPTR, KX, CERT, DNAME, OPT, APL, DS, SSHFP, IPSECKEY, RRSIG, NSEC, DNSKEY, DHCID, NSEC3, NSEC3PARAM, TLSA, SMIMEA, CDS, CDNSKEY, OPENPGPKEY, CSYNC, ZONEMD, SVCB, HTTPS, SPF, NID, L32, L64, LP, EUI48, EUI64, URI, CAA, AVC, DLV, IXFR, AXFR, MAILB, MAILA, ANY | queries/s |
+| nsd.queries_by_opcode | QUERY, IQUERY, STATUS, NOTIFY, UPDATE, OTHER | queries/s |
+| nsd.queries_by_class | IN, CS, CH, HS | queries/s |
+| nsd.queries_by_protocol | udp, udp6, tcp, tcp6, tls, tls6 | queries/s |
+| nsd.answers_by_rcode | NOERROR, FORMERR, SERVFAIL, NXDOMAIN, NOTIMP, REFUSED, YXDOMAIN, YXRRSET, NXRRSET, NOTAUTH, NOTZONE, RCODE11, RCODE12, RCODE13, RCODE14, RCODE15, BADVERS | answers/s |
+| nsd.errors | query, answer | errors/s |
+| nsd.drops | query | drops/s |
+| nsd.zones | master, slave | zones |
+| nsd.zone_transfers_requests | AXFR, IXFR | requests/s |
+| nsd.zone_transfer_memory | used | bytes |
+| nsd.database_size | disk, mem | bytes |
+| nsd.uptime | uptime | seconds |
 
 
 

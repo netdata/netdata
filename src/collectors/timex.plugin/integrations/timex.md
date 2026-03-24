@@ -43,40 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Timex instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.clock_sync_state | state | state |
-| system.clock_status | unsync, clockerr | status |
-| system.clock_sync_offset | offset | milliseconds |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ system_clock_sync_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/timex.conf) | system.clock_sync_state | when set to 0, the system kernel believes the system clock is not properly synchronized to a reliable server |
-
-
 ## Setup
 
 
@@ -144,5 +110,39 @@ A basic configuration example.
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ system_clock_sync_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/timex.conf) | system.clock_sync_state | when set to 0, the system kernel believes the system clock is not properly synchronized to a reliable server |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Timex instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.clock_sync_state | state | state |
+| system.clock_status | unsync, clockerr | status |
+| system.clock_sync_offset | offset | milliseconds |
 
 

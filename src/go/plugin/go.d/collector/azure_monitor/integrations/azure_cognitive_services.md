@@ -57,135 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.cognitive_services.availability | availability | percentage |
-| azure_monitor.cognitive_services.calls | total, successful, blocked, token | calls/s |
-| azure_monitor.cognitive_services.errors | total, client, server | errors/s |
-| azure_monitor.cognitive_services.latency | average | milliseconds |
-| azure_monitor.cognitive_services.data_transfer | in, out | bytes/s |
-| azure_monitor.cognitive_services.rate_limit | rate_limit | requests/s |
-| azure_monitor.cognitive_services.openai_availability | availability | percentage |
-| azure_monitor.cognitive_services.openai_requests | requests | requests/s |
-| azure_monitor.cognitive_services.openai_latency | time_to_response, time_to_first_token, time_between_tokens, time_to_last_byte | milliseconds |
-| azure_monitor.cognitive_services.openai_generation_speed | tokens_per_second | tokens/s |
-| azure_monitor.cognitive_services.openai_token_usage | total, prompt, generated, active | tokens/s |
-| azure_monitor.cognitive_services.openai_audio_tokens | prompt, completion | tokens/s |
-| azure_monitor.cognitive_services.openai_cache_match_rate | cache_match_rate | percentage |
-| azure_monitor.cognitive_services.openai_provisioned_utilization | utilization | percentage |
-| azure_monitor.cognitive_services.openai_finetuning | training_hours | hours/s |
-| azure_monitor.cognitive_services.openai_realtime_usage | seconds_used | seconds/s |
-| azure_monitor.cognitive_services.model_availability | availability | percentage |
-| azure_monitor.cognitive_services.model_requests | requests | requests/s |
-| azure_monitor.cognitive_services.model_latency | time_to_response, time_to_first_token, time_between_tokens, time_to_last_byte | milliseconds |
-| azure_monitor.cognitive_services.model_generation_speed | tokens_per_second | tokens/s |
-| azure_monitor.cognitive_services.model_token_usage | total, input, output | tokens/s |
-| azure_monitor.cognitive_services.model_audio_tokens | input, output | tokens/s |
-| azure_monitor.cognitive_services.model_cache_tokens | cache_read, cache_write_1h, cache_write_5m | tokens/s |
-| azure_monitor.cognitive_services.model_provisioned_utilization | utilization | percentage |
-| azure_monitor.cognitive_services.model_pages | total, annotated | pages/s |
-| azure_monitor.cognitive_services.model_generated_images | generated | images/s |
-| azure_monitor.cognitive_services.content_safety_requests | total, harmful, blocked | requests/s |
-| azure_monitor.cognitive_services.content_safety_abusive_users | abusive_users | users/s |
-| azure_monitor.cognitive_services.content_safety_system_events | events | events |
-| azure_monitor.cognitive_services.content_safety_moderation | text, image | requests/s |
-| azure_monitor.cognitive_services.job_duration | average | milliseconds |
-| azure_monitor.cognitive_services.personalizer_actions | occurrences | occurrences/s |
-| azure_monitor.cognitive_services.personalizer_actions_per_event | average | actions |
-| azure_monitor.cognitive_services.personalizer_feature_occurrences | action, context, slot | occurrences/s |
-| azure_monitor.cognitive_services.personalizer_feature_cardinality | action, context, slot | features |
-| azure_monitor.cognitive_services.personalizer_features_per_event | action, context, slot | features |
-| azure_monitor.cognitive_services.personalizer_namespaces_per_event | action, context, slot | namespaces |
-| azure_monitor.cognitive_services.personalizer_rewards | average, slot | reward |
-| azure_monitor.cognitive_services.personalizer_estimator_rewards | online, baseline, baseline_random | reward |
-| azure_monitor.cognitive_services.personalizer_estimator_slot_rewards | online, baseline, baseline_random | reward |
-| azure_monitor.cognitive_services.personalizer_slots | average | slots |
-| azure_monitor.cognitive_services.personalizer_slot_occurrences | occurrences | occurrences/s |
-| azure_monitor.cognitive_services.personalizer_event_counts | online, baseline_random, user_baseline | events/s |
-| azure_monitor.cognitive_services.personalizer_estimated_rewards | online, baseline_random, user_baseline | reward/s |
-| azure_monitor.cognitive_services.speech_transcription | realtime, batch, batch_whisper, fast, fast_whisper | seconds/s |
-| azure_monitor.cognitive_services.speech_translation | translated | seconds/s |
-| azure_monitor.cognitive_services.speech_synthesis | synthesized | characters/s |
-| azure_monitor.cognitive_services.speech_video_synthesis | synthesized | seconds/s |
-| azure_monitor.cognitive_services.speech_avatar | hosting, training | seconds/s |
-| azure_monitor.cognitive_services.speech_speaker_recognition | transactions | transactions/s |
-| azure_monitor.cognitive_services.speech_speaker_profiles | profiles | profiles/s |
-| azure_monitor.cognitive_services.speech_model_hosting | hosting | hours/s |
-| azure_monitor.cognitive_services.speech_voice_live_tokens | audio_input, audio_output, cached_audio_input, text_input, text_output, cached_text_input | tokens/s |
-| azure_monitor.cognitive_services.speech_voice_model | hosting | hours/s |
-| azure_monitor.cognitive_services.speech_voice_training | training | minutes/s |
-| azure_monitor.cognitive_services.translator_text | standard, custom, trained | characters/s |
-| azure_monitor.cognitive_services.translator_document | standard, custom | characters/s |
-| azure_monitor.cognitive_services.translator_document_sync | standard, custom | characters/s |
-| azure_monitor.cognitive_services.translator_pro_app | seconds | seconds/s |
-| azure_monitor.cognitive_services.vision_transactions | computer_vision, custom_vision | transactions/s |
-| azure_monitor.cognitive_services.vision_training | training_time | seconds/s |
-| azure_monitor.cognitive_services.vision_images_stored | stored | images/s |
-| azure_monitor.cognitive_services.face_transactions | transactions | transactions/s |
-| azure_monitor.cognitive_services.face_images_trained | trained | images/s |
-| azure_monitor.cognitive_services.faces_stored | stored | faces/s |
-| azure_monitor.cognitive_services.luis_requests | speech, text | requests/s |
-| azure_monitor.cognitive_services.text_processing | text, health_text, question_answering | records/s |
-| azure_monitor.cognitive_services.processed_characters | characters | characters/s |
-| azure_monitor.cognitive_services.processed_images | images | images/s |
-| azure_monitor.cognitive_services.processed_pages | pages | pages/s |
-| azure_monitor.cognitive_services.carnegie_inference | inferences | inferences/s |
-| azure_monitor.cognitive_services.personalizer_events | total, learned, non_activated | events/s |
-| azure_monitor.cognitive_services.personalizer_reward_tracking | matched, observed | rewards/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_cognitive_services_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.availability | Cognitive Services availability on ${label:resource_name} |
-| [ am_cognitive_services_server_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.errors | Cognitive Services server errors on ${label:resource_name} |
-| [ am_cognitive_services_client_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.errors | Cognitive Services client errors on ${label:resource_name} |
-| [ am_cognitive_services_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.latency | Cognitive Services latency on ${label:resource_name} |
-| [ am_cognitive_services_rate_limit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.rate_limit | Cognitive Services rate limiting on ${label:resource_name} |
-| [ am_cognitive_services_blocked_calls ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.calls | Cognitive Services blocked calls on ${label:resource_name} |
-| [ am_cognitive_services_openai_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_availability | Azure OpenAI availability on ${label:resource_name} |
-| [ am_cognitive_services_openai_time_to_response ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_latency | Azure OpenAI time to response on ${label:resource_name} |
-| [ am_cognitive_services_openai_time_to_first_token ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_latency | Azure OpenAI time to first token on ${label:resource_name} |
-| [ am_cognitive_services_openai_provisioned_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_provisioned_utilization | Azure OpenAI provisioned utilization on ${label:resource_name} |
-| [ am_cognitive_services_model_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_availability | Model availability on ${label:resource_name} |
-| [ am_cognitive_services_model_time_to_response ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_latency | Model time to response on ${label:resource_name} |
-| [ am_cognitive_services_model_time_to_first_token ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_latency | Model time to first token on ${label:resource_name} |
-| [ am_cognitive_services_model_provisioned_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_provisioned_utilization | Model provisioned utilization on ${label:resource_name} |
-| [ am_cognitive_services_harmful_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.content_safety_requests | Harmful content requests on ${label:resource_name} |
-| [ am_cognitive_services_blocked_content_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.content_safety_requests | Blocked content requests on ${label:resource_name} |
-| [ am_cognitive_services_abusive_users ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.content_safety_abusive_users | Abusive users detected on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -404,6 +275,135 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_cognitive_services_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.availability | Cognitive Services availability on ${label:resource_name} |
+| [ am_cognitive_services_server_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.errors | Cognitive Services server errors on ${label:resource_name} |
+| [ am_cognitive_services_client_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.errors | Cognitive Services client errors on ${label:resource_name} |
+| [ am_cognitive_services_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.latency | Cognitive Services latency on ${label:resource_name} |
+| [ am_cognitive_services_rate_limit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.rate_limit | Cognitive Services rate limiting on ${label:resource_name} |
+| [ am_cognitive_services_blocked_calls ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.calls | Cognitive Services blocked calls on ${label:resource_name} |
+| [ am_cognitive_services_openai_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_availability | Azure OpenAI availability on ${label:resource_name} |
+| [ am_cognitive_services_openai_time_to_response ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_latency | Azure OpenAI time to response on ${label:resource_name} |
+| [ am_cognitive_services_openai_time_to_first_token ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_latency | Azure OpenAI time to first token on ${label:resource_name} |
+| [ am_cognitive_services_openai_provisioned_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_provisioned_utilization | Azure OpenAI provisioned utilization on ${label:resource_name} |
+| [ am_cognitive_services_model_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_availability | Model availability on ${label:resource_name} |
+| [ am_cognitive_services_model_time_to_response ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_latency | Model time to response on ${label:resource_name} |
+| [ am_cognitive_services_model_time_to_first_token ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_latency | Model time to first token on ${label:resource_name} |
+| [ am_cognitive_services_model_provisioned_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_provisioned_utilization | Model provisioned utilization on ${label:resource_name} |
+| [ am_cognitive_services_harmful_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.content_safety_requests | Harmful content requests on ${label:resource_name} |
+| [ am_cognitive_services_blocked_content_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.content_safety_requests | Blocked content requests on ${label:resource_name} |
+| [ am_cognitive_services_abusive_users ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.content_safety_abusive_users | Abusive users detected on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.cognitive_services.availability | availability | percentage |
+| azure_monitor.cognitive_services.calls | total, successful, blocked, token | calls/s |
+| azure_monitor.cognitive_services.errors | total, client, server | errors/s |
+| azure_monitor.cognitive_services.latency | average | milliseconds |
+| azure_monitor.cognitive_services.data_transfer | in, out | bytes/s |
+| azure_monitor.cognitive_services.rate_limit | rate_limit | requests/s |
+| azure_monitor.cognitive_services.openai_availability | availability | percentage |
+| azure_monitor.cognitive_services.openai_requests | requests | requests/s |
+| azure_monitor.cognitive_services.openai_latency | time_to_response, time_to_first_token, time_between_tokens, time_to_last_byte | milliseconds |
+| azure_monitor.cognitive_services.openai_generation_speed | tokens_per_second | tokens/s |
+| azure_monitor.cognitive_services.openai_token_usage | total, prompt, generated, active | tokens/s |
+| azure_monitor.cognitive_services.openai_audio_tokens | prompt, completion | tokens/s |
+| azure_monitor.cognitive_services.openai_cache_match_rate | cache_match_rate | percentage |
+| azure_monitor.cognitive_services.openai_provisioned_utilization | utilization | percentage |
+| azure_monitor.cognitive_services.openai_finetuning | training_hours | hours/s |
+| azure_monitor.cognitive_services.openai_realtime_usage | seconds_used | seconds/s |
+| azure_monitor.cognitive_services.model_availability | availability | percentage |
+| azure_monitor.cognitive_services.model_requests | requests | requests/s |
+| azure_monitor.cognitive_services.model_latency | time_to_response, time_to_first_token, time_between_tokens, time_to_last_byte | milliseconds |
+| azure_monitor.cognitive_services.model_generation_speed | tokens_per_second | tokens/s |
+| azure_monitor.cognitive_services.model_token_usage | total, input, output | tokens/s |
+| azure_monitor.cognitive_services.model_audio_tokens | input, output | tokens/s |
+| azure_monitor.cognitive_services.model_cache_tokens | cache_read, cache_write_1h, cache_write_5m | tokens/s |
+| azure_monitor.cognitive_services.model_provisioned_utilization | utilization | percentage |
+| azure_monitor.cognitive_services.model_pages | total, annotated | pages/s |
+| azure_monitor.cognitive_services.model_generated_images | generated | images/s |
+| azure_monitor.cognitive_services.content_safety_requests | total, harmful, blocked | requests/s |
+| azure_monitor.cognitive_services.content_safety_abusive_users | abusive_users | users/s |
+| azure_monitor.cognitive_services.content_safety_system_events | events | events |
+| azure_monitor.cognitive_services.content_safety_moderation | text, image | requests/s |
+| azure_monitor.cognitive_services.job_duration | average | milliseconds |
+| azure_monitor.cognitive_services.personalizer_actions | occurrences | occurrences/s |
+| azure_monitor.cognitive_services.personalizer_actions_per_event | average | actions |
+| azure_monitor.cognitive_services.personalizer_feature_occurrences | action, context, slot | occurrences/s |
+| azure_monitor.cognitive_services.personalizer_feature_cardinality | action, context, slot | features |
+| azure_monitor.cognitive_services.personalizer_features_per_event | action, context, slot | features |
+| azure_monitor.cognitive_services.personalizer_namespaces_per_event | action, context, slot | namespaces |
+| azure_monitor.cognitive_services.personalizer_rewards | average, slot | reward |
+| azure_monitor.cognitive_services.personalizer_estimator_rewards | online, baseline, baseline_random | reward |
+| azure_monitor.cognitive_services.personalizer_estimator_slot_rewards | online, baseline, baseline_random | reward |
+| azure_monitor.cognitive_services.personalizer_slots | average | slots |
+| azure_monitor.cognitive_services.personalizer_slot_occurrences | occurrences | occurrences/s |
+| azure_monitor.cognitive_services.personalizer_event_counts | online, baseline_random, user_baseline | events/s |
+| azure_monitor.cognitive_services.personalizer_estimated_rewards | online, baseline_random, user_baseline | reward/s |
+| azure_monitor.cognitive_services.speech_transcription | realtime, batch, batch_whisper, fast, fast_whisper | seconds/s |
+| azure_monitor.cognitive_services.speech_translation | translated | seconds/s |
+| azure_monitor.cognitive_services.speech_synthesis | synthesized | characters/s |
+| azure_monitor.cognitive_services.speech_video_synthesis | synthesized | seconds/s |
+| azure_monitor.cognitive_services.speech_avatar | hosting, training | seconds/s |
+| azure_monitor.cognitive_services.speech_speaker_recognition | transactions | transactions/s |
+| azure_monitor.cognitive_services.speech_speaker_profiles | profiles | profiles/s |
+| azure_monitor.cognitive_services.speech_model_hosting | hosting | hours/s |
+| azure_monitor.cognitive_services.speech_voice_live_tokens | audio_input, audio_output, cached_audio_input, text_input, text_output, cached_text_input | tokens/s |
+| azure_monitor.cognitive_services.speech_voice_model | hosting | hours/s |
+| azure_monitor.cognitive_services.speech_voice_training | training | minutes/s |
+| azure_monitor.cognitive_services.translator_text | standard, custom, trained | characters/s |
+| azure_monitor.cognitive_services.translator_document | standard, custom | characters/s |
+| azure_monitor.cognitive_services.translator_document_sync | standard, custom | characters/s |
+| azure_monitor.cognitive_services.translator_pro_app | seconds | seconds/s |
+| azure_monitor.cognitive_services.vision_transactions | computer_vision, custom_vision | transactions/s |
+| azure_monitor.cognitive_services.vision_training | training_time | seconds/s |
+| azure_monitor.cognitive_services.vision_images_stored | stored | images/s |
+| azure_monitor.cognitive_services.face_transactions | transactions | transactions/s |
+| azure_monitor.cognitive_services.face_images_trained | trained | images/s |
+| azure_monitor.cognitive_services.faces_stored | stored | faces/s |
+| azure_monitor.cognitive_services.luis_requests | speech, text | requests/s |
+| azure_monitor.cognitive_services.text_processing | text, health_text, question_answering | records/s |
+| azure_monitor.cognitive_services.processed_characters | characters | characters/s |
+| azure_monitor.cognitive_services.processed_images | images | images/s |
+| azure_monitor.cognitive_services.processed_pages | pages | pages/s |
+| azure_monitor.cognitive_services.carnegie_inference | inferences | inferences/s |
+| azure_monitor.cognitive_services.personalizer_events | total, learned, non_activated | events/s |
+| azure_monitor.cognitive_services.personalizer_reward_tracking | matched, observed | rewards/s |
 
 
 

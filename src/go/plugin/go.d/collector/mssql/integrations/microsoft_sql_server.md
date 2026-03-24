@@ -85,558 +85,6 @@ The collector executes lightweight queries against system views.
 Most queries complete in milliseconds and have minimal impact on server performance.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Microsoft SQL Server instance
-
-These metrics refer to the entire SQL Server instance.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.user_connections | user | connections | • | • |
-| mssql.session_connections | user, internal | connections | • | • |
-| mssql.blocked_processes | blocked | processes | • | • |
-| mssql.batch_requests | batch | requests/s | • | • |
-| mssql.compilations | compilations | compilations/s | • | • |
-| mssql.recompilations | recompilations | recompilations/s | • | • |
-| mssql.auto_param_attempts | total, safe, failed | attempts/s | • | • |
-| mssql.sql_errors | errors | errors/s | • | • |
-| mssql.buffer_cache_hit_ratio | hit_ratio | percentage | • | • |
-| mssql.buffer_page_life_expectancy | life_expectancy | seconds | • | • |
-| mssql.buffer_page_iops | read, written | pages/s | • | • |
-| mssql.buffer_checkpoint_pages | flushed | pages/s | • | • |
-| mssql.buffer_page_lookups | lookups | lookups/s | • | • |
-| mssql.buffer_lazy_writes | lazy_writes | writes/s | • | • |
-| mssql.memory_total | memory | bytes | • | • |
-| mssql.memory_connection | memory | bytes | • | • |
-| mssql.memory_pending_grants | pending | processes | • | • |
-| mssql.memory_external_benefit | benefit | benefit | • | • |
-| mssql.page_splits | page | splits/s | • | • |
-| mssql.process_memory_resident | resident | bytes | • | • |
-| mssql.process_memory_virtual | virtual | bytes | • | • |
-| mssql.process_memory_utilization | utilization | percentage | • | • |
-| mssql.process_page_faults | page_faults | faults | • | • |
-| mssql.os_memory | used, available | bytes | • | • |
-| mssql.os_pagefile | used, available | bytes | • | • |
-
-### Per database
-
-These metrics refer to individual databases.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| database | Database name |
-
-Metrics:
-
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.database_active_transactions | active | transactions | • | • |
-| mssql.database_transactions | transactions | transactions/s | • | • |
-| mssql.database_write_transactions | write | transactions/s | • | • |
-| mssql.database_log_flushes | flushes | flushes/s | • | • |
-| mssql.database_log_flushed | flushed | bytes/s | • | • |
-| mssql.database_log_growths | growths | growths | • | • |
-| mssql.database_io_stall | read, write | ms | • | • |
-| mssql.database_data_file_size | size | bytes | • | • |
-| mssql.database_backup_restore_throughput | throughput | bytes/s | • | • |
-| mssql.database_state | online, restoring, recovering, pending, suspect, emergency, offline | state | • | • |
-| mssql.database_read_only | read_only, read_write | status | • | • |
-
-### Per lock stats
-
-These metrics refer to lock statistics by lock resource type (from performance counters).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource | Lock resource type (Database, File, Object, Page, Key, Extent, RID, HoBT, etc.) |
-
-Metrics:
-
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.lock_stats_deadlocks | deadlocks | deadlocks/s | • | • |
-| mssql.lock_stats_waits | waits | waits/s | • | • |
-| mssql.lock_stats_timeouts | timeouts | timeouts/s | • | • |
-| mssql.lock_stats_requests | requests | requests/s | • | • |
-
-### Per lock resource
-
-These metrics refer to lock resource types (from sys.dm_tran_locks).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource | Lock resource type (Database, File, Object, Page, Key, etc.) |
-
-Metrics:
-
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.locks_by_resource | locks | locks | • | • |
-
-### Per wait type
-
-These metrics refer to individual wait types (from sys.dm_os_wait_stats).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| wait_type | Wait type name |
-| wait_category | Wait category (CPU, Lock, Latch, Buffer IO, etc.) |
-
-Metrics:
-
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.wait_total_time | duration | ms | • | • |
-| mssql.wait_resource_time | duration | ms | • | • |
-| mssql.wait_signal_time | duration | ms | • | • |
-| mssql.wait_max_time | max_time | ms | • | • |
-| mssql.wait_count | waits | waits/s | • | • |
-
-### Per job
-
-These metrics refer to SQL Server Agent jobs.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| job_name | Job name |
-
-Metrics:
-
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.job_status | enabled, disabled | status | • | • |
-
-### Per replication
-
-These metrics refer to SQL Server replication publications.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| publisher_db | Publisher database name |
-| publication | Publication name |
-
-Metrics:
-
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.replication_status | started, succeeded, in_progress, idle, retrying, failed | status | • | • |
-| mssql.replication_warning | expiration, latency, merge_expiration, merge_slow_duration, merge_fast_duration, merge_fast_speed, merge_slow_speed | flags | • | • |
-| mssql.replication_latency | average, best, worst | seconds | • | • |
-| mssql.replication_subscriptions | total, agents_running | subscriptions | • | • |
-
-### Per availability group
-
-These metrics refer to Always On Availability Groups. Auto-detected when HADR is enabled.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| ag_name | Availability group name |
-
-Metrics:
-
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.ag_sync_health | not_healthy, partially_healthy, healthy | state | • | • |
-| mssql.ag_recovery_health | primary_online, primary_in_progress, secondary_online, secondary_in_progress | state | • | • |
-| mssql.ag_threads | capture, redo, parallel_redo | threads | • | • |
-
-### Per availability group replica
-
-These metrics refer to per-replica state within an Availability Group. Note: on secondary replicas, the replica states DMV returns only local information.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| ag_name | Availability group name |
-| replica_server | Replica server name |
-| availability_mode | Availability mode (synchronous_commit or asynchronous_commit) |
-| failover_mode | Failover mode (automatic or manual) |
-
-Metrics:
-
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.ag_replica_role | primary, secondary, resolving, unknown | state | • | • |
-| mssql.ag_replica_connected_state | connected, disconnected, unknown | state | • | • |
-| mssql.ag_replica_sync_health | not_healthy, partially_healthy, healthy | state | • | • |
-
-### Per availability group database replica
-
-These metrics refer to per-database synchronization within an Availability Group.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| ag_name | Availability group name |
-| replica_server | Replica server name |
-| database | Database name |
-
-Metrics:
-
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.ag_db_sync_state | not_synchronizing, synchronizing, synchronized, reverting, initializing | state | • | • |
-| mssql.ag_db_log_send_queue | queue_size | bytes | • | • |
-| mssql.ag_db_log_send_rate | send_rate | bytes/s | • | • |
-| mssql.ag_db_redo_queue | queue_size | bytes | • | • |
-| mssql.ag_db_redo_rate | redo_rate | bytes/s | • | • |
-| mssql.ag_db_filestream_send_rate | send_rate | bytes/s | • | • |
-| mssql.ag_db_secondary_lag | lag | seconds | • | • |
-| mssql.ag_db_suspended | active, suspended | state | • | • |
-| mssql.ag_db_failover_readiness | ready, not_ready | state | • | • |
-| mssql.ag_db_joined_state | joined, not_joined | state | • | • |
-
-### Per WSFC cluster
-
-These metrics refer to the Windows Server Failover Clustering quorum state.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.ag_cluster_quorum_state | normal, forced, unknown | state | • | • |
-
-### Per WSFC cluster member
-
-These metrics refer to individual WSFC cluster members.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| cluster_member | Cluster member name |
-
-Metrics:
-
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.ag_cluster_member_state | up, down | state | • | • |
-| mssql.ag_cluster_member_quorum_votes | votes | votes | • | • |
-
-### Per AG page repair
-
-These metrics refer to automatic page repair events per database in an Availability Group.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| database | Database name |
-
-Metrics:
-
-| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
-|:------|:----------|:----|:---:|:---:|
-| mssql.ag_page_repair | successful, failed | repairs | • | • |
-
-
-
-## Functions
-
-This collector exposes real-time functions for interactive troubleshooting in the Live tab.
-
-
-### Top Queries
-
-Retrieves aggregated SQL query performance metrics from Microsoft SQL Server [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store) runtime statistics.
-
-This function queries `sys.query_store_runtime_stats` and related views across all databases with Query Store enabled, aggregating execution statistics by query hash. It provides comprehensive timing, I/O, memory, and parallelism metrics.
-
-Use cases:
-- Identify slow or resource-intensive queries consuming excessive CPU time or memory
-- Analyze I/O patterns (logical reads, physical reads, writes) to detect bottlenecks
-- Monitor parallelism (DOP) and tempdb usage for capacity planning
-
-Query text is truncated at 4096 characters for display purposes. Columns are dynamically detected based on SQL Server version (some metrics only available in 2016+/2017+).
-
-
-| Aspect | Description |
-|:-------|:------------|
-| Name | `Mssql:top-queries` |
-| Require Cloud | yes |
-| Performance | Executes dynamic SQL to aggregate Query Store data across all enabled databases:<br/>• Execution time depends on Query Store workload and number of monitored databases<br/>• Default limit of 500 rows balances completeness with performance |
-| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• Query Store is enabled on at least one user database<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
-
-#### Prerequisites
-
-##### Enable Query Store
-
-Query Store must be enabled on each database you want to monitor.
-
-1. Verify Query Store is enabled on your databases:
-
-   ```sql
-   SELECT name, is_query_store_on
-   FROM sys.databases
-   WHERE name NOT IN ('master', 'tempdb', 'model', 'msdb');
-   ```
-
-2. Enable Query Store on databases where it is disabled:
-
-   ```sql
-   ALTER DATABASE [YourDatabaseName] SET QUERY_STORE = ON;
-   ```
-
-3. Enable the function in Netdata collector config:
-
-   ```yaml
-   jobs:
-     - name: local
-       dsn: "sqlserver://user:pass@localhost:1433"
-       query_store_function_enabled: true
-   ```
-
-:::info
-
-- Query Store is available in SQL Server 2016+ and Azure SQL Database
-- Requires ALTER DATABASE permission to enable Query Store
-- System databases (master, tempdb, model, msdb) are excluded from queries
-
-:::
-
-
-
-#### Parameters
-
-| Parameter | Type | Description | Required | Default | Options |
-|:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column. The available options depend on your SQL Server version and include metrics like total execution time, number of calls, CPU time, logical I/O, memory grants, and more. Default is Total Time to focus on most resource-intensive queries. | yes | totalTime |  |
-
-#### Returns
-
-Aggregated query execution statistics from Query Store runtime views, providing comprehensive performance analysis across all monitored databases. Each row represents a unique query pattern (normalized query hash) with cumulative metrics across all its executions.
-
-| Column | Type | Unit | Visibility | Description |
-|:-------|:-----|:-----|:-----------|:------------|
-| Query Hash | string |  | hidden | Unique hash identifier for the normalized query pattern. Queries with identical structure but different literal values share the same digest. |
-| Query | string |  |  | The SQL query text with literal values truncated at 4096 characters. Use this to identify the actual SQL being executed and spot parameterized queries or injection risks. |
-| Database | string |  |  | Database name where the query was executed. Essential for multi-database analysis to identify which database is experiencing query load. |
-| Calls | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries that may impact server performance significantly. |
-| Error Attribution | string |  |  | Status of error detail attribution for this query. Values: enabled, no_data, not_enabled, not_supported. |
-| Error Number | integer |  |  | Most recent error number observed for this query (when error attribution is enabled). |
-| Error State | integer |  | hidden | SQL Server error state for the most recent error (when error attribution is enabled). |
-| Error Message | string |  |  | Most recent error message for this query (when error attribution is enabled). |
-| Hash Match Joins | integer |  |  | Count of Hash Match join operators across all stored plans for this query. |
-| Merge Joins | integer |  |  | Count of Merge Join operators across all stored plans for this query. |
-| Nested Loops | integer |  |  | Count of Nested Loops operators across all stored plans for this query. |
-| Sorts | integer |  |  | Count of Sort operators across all stored plans for this query. |
-| Total Time | duration | milliseconds |  | Cumulative execution time across all query executions. This is a key metric for identifying the most resource-intensive queries in terms of total server time consumption. |
-| Avg Time | duration | milliseconds |  | Average execution time per query run, calculated as weighted average when execution count is greater than zero. Compare with Total Time to determine if individual executions or high frequency drives resource usage. |
-| Last Time | duration | milliseconds | hidden | Execution time of the most recent execution for this query pattern. Useful for identifying recent performance changes or individual outlier executions. |
-| Min Time | duration | milliseconds | hidden | Minimum execution time observed. Helps identify variability in query performance and spot potential optimization opportunities for outliers. |
-| Max Time | duration | milliseconds | hidden | Maximum execution time observed. Large gaps between Min Time and Max Time may indicate performance instability due to parameter sniffing, data skew, or lock contention. |
-| StdDev Time | duration | milliseconds | hidden | Standard deviation of execution time. High values indicate inconsistent query performance, making capacity planning difficult and suggesting need for query optimization or consistent indexing. |
-| Avg CPU | duration | milliseconds |  | Average CPU time consumed per query execution. High values indicate CPU-intensive operations that may include complex calculations, string manipulations, or excessive function calls. Available in SQL Server 2016+. |
-| Last CPU | duration | milliseconds | hidden | CPU time of the most recent execution. Useful for identifying recent changes in query patterns and resource usage. |
-| Min CPU | duration | milliseconds | hidden | Minimum CPU time observed. Helps identify variability in CPU consumption and spot efficient vs. inefficient query executions. |
-| Max CPU | duration | milliseconds | hidden | Maximum CPU time observed. Spikes may indicate complex queries, large result sets, or parallelism issues. |
-| StdDev CPU | duration | milliseconds | hidden | Standard deviation of CPU time. High variability suggests inconsistent performance due to varying data volumes, plan cache hit rates, or changing execution contexts. |
-| Avg Logical Reads | float |  |  | Average number of logical read operations (8KB pages) per execution. High values indicate queries scanning large amounts of data through indexes or table scans. Monitor for I/O subsystem impact. |
-| Last Logical Reads | integer |  | hidden | Logical reads from the most recent execution. Useful for identifying immediate query patterns and recent performance changes. |
-| Min Logical Reads | integer |  | hidden | Minimum logical reads observed. Helps identify data access patterns and spot outliers. |
-| Max Logical Reads | integer |  | hidden | Maximum logical reads observed. Very high values may indicate full table scans, missing indexes, or inefficient join operations requiring excessive data access. |
-| StdDev Logical Reads | float |  | hidden | Standard deviation of logical reads. High variability suggests inconsistent access patterns, potentially indicating performance issues with certain queries or data volumes. |
-| Avg Logical Writes | float |  |  | Average number of logical write operations per execution. High values indicate heavy write workloads that may benefit from batching or optimization. |
-| Last Logical Writes | integer |  | hidden | Logical writes from the most recent execution. Helps track recent write activity and identify immediate performance impact. |
-| Min Logical Writes | integer |  | hidden | Minimum logical writes observed. Helps identify read-heavy vs. write-heavy query patterns and data access characteristics. |
-| Max Logical Writes | integer |  | hidden | Maximum logical writes observed. Spikes may indicate bulk insert/update operations, large transactions, or data migration activities. |
-| StdDev Logical Writes | float |  | hidden | Standard deviation of logical writes. High values indicate write performance variability, potentially suggesting inconsistent transaction sizes or periodic bulk operations. |
-| Avg Physical Reads | float |  |  | Average number of physical read operations from storage per execution. High values indicate queries requiring substantial disk I/O for data retrieval, potentially due to full table scans or missing covering indexes. |
-| Last Physical Reads | integer |  | hidden | Physical reads from the most recent execution. Useful for identifying immediate I/O patterns and recent storage subsystem pressure. |
-| Min Physical Reads | integer |  | hidden | Minimum physical reads observed. Helps baseline I/O patterns and identify read-intensive query scenarios. |
-| Max Physical Reads | integer |  | hidden | Maximum physical reads observed. Extremely high values may indicate storage subsystem bottlenecks, full table scans without covering indexes, or queries processing very large data volumes. |
-| StdDev Physical Reads | float |  | hidden | Standard deviation of physical reads. High variability suggests inconsistent disk access patterns, potentially indicating intermittent I/O performance issues or storage contention. |
-| Avg CLR Time | duration | milliseconds |  | Average CLR (Common Language Runtime) time per execution. High values indicate managed code (stored procedures, functions, triggers) with heavy computations, garbage collection pressure, or inefficient memory allocations. Available in SQL Server 2016+. |
-| Last CLR Time | duration | milliseconds | hidden | CLR time of the most recent execution. Useful for identifying recent managed code performance changes and detecting inefficient code deployments. |
-| Min CLR Time | duration | milliseconds | hidden | Minimum CLR time observed. Helps identify efficient managed code executions and spot expensive CLR operations. |
-| Max CLR Time | duration | milliseconds | hidden | Maximum CLR time observed. Spikes may indicate complex managed code operations, large object allocations, or expensive .NET framework method calls. |
-| StdDev CLR Time | duration | milliseconds | hidden | Standard deviation of CLR time. High variability suggests inconsistent managed code execution patterns, potentially varying by execution parameters, data volumes, or different code paths being taken. |
-| Avg DOP | float |  |  | Average Degree of Parallelism (DOP) per query. Higher values indicate queries utilizing more CPU cores through parallelism, potentially consuming significant server resources. Values above 1 indicate intra-query parallelism; values of 1 indicate serial execution. |
-| Last DOP | integer |  | hidden | DOP of the most recent execution. Helps track recent parallelism patterns and identify changes in query execution behavior. |
-| Min DOP | integer |  | hidden | Minimum DOP observed. Values of 0 may indicate serial execution; values above 1 suggest parallel query execution within individual queries. |
-| Max DOP | integer |  | hidden | Maximum DOP observed. Very high values (>4) may indicate aggressive parallelism consuming excessive resources and potentially affecting concurrent workloads. Available in SQL Server 2016+. |
-| StdDev DOP | float |  | hidden | Standard deviation of DOP. High variability suggests inconsistent parallelism patterns across executions, potentially indicating performance variability based on data characteristics or query complexity. |
-| Avg Memory (8KB pages) | float |  |  | Average memory grant (in 8KB pages) per execution. High values indicate memory-intensive queries that may benefit from index optimization, reduced result sets, or query tuning to reduce working memory usage. |
-| Last Memory (8KB pages) | integer |  | hidden | Memory grant from the most recent execution. Useful for identifying recent memory pressure and tracking immediate impact of resource-intensive queries. |
-| Min Memory (8KB pages) | integer |  | hidden | Minimum memory grant observed. Helps identify memory-efficient queries and baseline memory requirements for common operations. |
-| Max Memory (8KB pages) | integer |  | hidden | Maximum memory grant observed. Spikes may indicate queries with large sort operations, hash joins, temporary table creation, or excessive parameter lengths consuming working memory. |
-| StdDev Memory | float |  | hidden | Standard deviation of memory grants. High variability suggests inconsistent memory usage patterns, potentially varying by execution parameters, result set sizes, or different code paths being executed. |
-| Avg Rows | float |  |  | Average number of rows processed per query execution. High values indicate queries returning large result sets that may consume significant network bandwidth, memory for result buffers, and client application resources. |
-| Last Rows | integer |  | hidden | Row count from the most recent execution. Helps identify recent query patterns and track immediate data processing requirements. |
-| Min Rows | integer |  | hidden | Minimum rows observed. Helps identify data access patterns and spot outliers in result set sizes. |
-| Max Rows | integer |  | hidden | Maximum rows observed. Extremely high values may indicate full table scans without WHERE clauses, missing or inefficient filters, or data export operations. |
-| StdDev Rows | float |  | hidden | Standard deviation of rows processed. High variability suggests inconsistent result set sizes, potentially due to varying query filters, parameterized inputs, or different data distributions across executions. |
-| Avg Log Bytes | float |  |  | Average transaction log bytes written per query execution (SQL Server 2017+). High values indicate write-intensive operations (INSERT/UPDATE/DELETE), large transactions, or bulk modifications. This measures WAL activity, not diagnostic logging. |
-| Last Log Bytes | integer |  | hidden | Transaction log bytes from the most recent execution. Useful for tracking recent write activity. |
-| Min Log Bytes | integer |  | hidden | Minimum transaction log bytes observed. Helps identify write-efficient queries and baseline requirements. |
-| Max Log Bytes | integer |  | hidden | Maximum transaction log bytes observed. Spikes may indicate bulk operations, large transactions, or queries affecting many rows. |
-| StdDev Log Bytes | float |  | hidden | Standard deviation of transaction log bytes. High variability suggests inconsistent write patterns, potentially varying by the number of rows affected or transaction sizes. |
-| Avg TempDB (8KB pages) | float |  |  | Average tempdb space usage (in 8KB pages) per execution. High values indicate queries that create or use large temporary objects, work tables, sort operations, or have heavy tempdb spillage from disk. High tempdb usage can lead to disk I/O contention and overall performance degradation. |
-| Last TempDB (8KB pages) | integer |  | hidden | Tempdb space from the most recent execution. Useful for identifying recent tempdb pressure and tracking immediate disk I/O impact of resource-intensive queries. |
-| Min TempDB (8KB pages) | integer |  | hidden | Minimum tempdb space observed. Helps identify tempdb-efficient queries and baseline temporary object requirements for common operations. |
-| Max TempDB (8KB pages) | integer |  | hidden | Maximum tempdb space observed. Spikes may indicate queries with large sort operations, hash joins, index spool usage, or temporary table creation consuming substantial tempdb space. Can lead to tempdb autogrow and disk space issues. |
-| StdDev TempDB | float |  | hidden | Standard deviation of tempdb space usage. High variability suggests inconsistent temporary object usage patterns, potentially varying by query complexity, parameter types, or different data access patterns affecting temporary object creation. |
-
-### Deadlock Info
-
-Retrieves the most recent deadlock event from SQL Server's `system_health` Extended Events session (`xml_deadlock_report`).
-
-The deadlock graph XML is parsed to attribute the deadlock to the participating processes and their query text, lock mode, lock status, and wait resource.
-
-Use cases:
-- Identify which process was chosen as the deadlock victim
-- Inspect the waiting resource and lock mode involved in the deadlock
-- Correlate deadlocks with recent application changes or deployments
-
-Query text and wait resource strings are truncated at 4096 characters for display purposes.
-
-
-| Aspect | Description |
-|:-------|:------------|
-| Name | `Mssql:deadlock-info` |
-| Require Cloud | yes |
-| Performance | Executes on-demand queries against the `system_health` ring buffer:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing |
-| Security | Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `deadlock_info_function_enabled` is true<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 561 when the deadlock graph cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled<br/>• Returns HTTP 504 if the query times out |
-
-#### Prerequisites
-
-No additional configuration is required.
-
-#### Parameters
-
-This function has no parameters.
-
-#### Returns
-
-Parsed deadlock participants from the latest detected deadlock event. Each row represents one process involved in the deadlock.
-
-| Column | Type | Unit | Visibility | Description |
-|:-------|:-----|:-----|:-----------|:------------|
-| Row ID | string |  | hidden | Unique row identifier composed of deadlock ID and process ID. |
-| Deadlock ID | string |  |  | Identifier for the deadlock event, derived from the deadlock timestamp to group participating processes. |
-| Timestamp | timestamp |  |  | Timestamp of the deadlock event from Extended Events when available; otherwise the function execution time. |
-| Process ID | string |  |  | Deadlock graph process identifier for the process involved in the deadlock. |
-| SPID | integer |  |  | SQL Server session ID (SPID) for the process when available. |
-| ECID | integer |  |  | Execution context ID (ECID) for parallel execution contexts when available. |
-| Victim | string |  |  | "true" when the process was chosen as the deadlock victim and rolled back; otherwise "false". |
-| Query | string |  |  | SQL query text for the process involved in the deadlock. Truncated to 4096 characters. |
-| Lock Mode | string |  |  | Lock mode reported for the process within the deadlock graph (for example X or S). |
-| Lock Status | string |  |  | Lock status for the process. WAITING indicates the process was waiting on a lock. |
-| Wait Resource | string |  |  | Lock resource identifier from the deadlock graph showing what the process was waiting on. |
-| Database | string |  |  | Database name mapped from the deadlock graph database ID when available. |
-
-### Error Info
-
-Retrieves recent SQL errors from a user-managed Extended Events session that captures `sqlserver.error_reported`
-with both the `sql_text` and `query_hash` actions.
-
-The session must be created by an administrator and include an `event_file` target. Netdata reads the event file
-and returns recent error events with error number, message, and SQL text. The `query_hash` action is required for
-reliable mapping into `top-queries` (query text fallback is best-effort).
-
-Use cases:
-- Identify recent query errors and their messages
-- Correlate errors to query text
-- Validate error rates seen in top-queries
-
-
-| Aspect | Description |
-|:-------|:------------|
-| Name | `Mssql:error-info` |
-| Require Cloud | yes |
-| Performance | Executes on-demand queries against the configured Extended Events event file:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time |
-| Security | Error messages and query text may include unmasked literal values including sensitive data (PII/secrets):<br/>• Restrict dashboard access to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `error_info_function_enabled` is true<br/>• The Extended Events session exists and has an event_file target<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the session is not enabled or the function is disabled<br/>• Returns HTTP 504 if the query times out |
-
-#### Prerequisites
-
-##### Create Extended Events session for error capture
-
-Create an Extended Events session that captures `sqlserver.error_reported` with `sql_text` and `query_hash` actions:
-
-```sql
--- Create the Extended Events session with event_file target
-CREATE EVENT SESSION [netdata_errors] ON SERVER
-ADD EVENT sqlserver.error_reported(
-  ACTION(sqlserver.sql_text, sqlserver.query_hash)
-)
-ADD TARGET package0.event_file(SET filename=N'netdata_errors');
-GO
-
--- Start the session
-ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;
-GO
-
--- Grant required permission
-GRANT VIEW SERVER STATE TO [netdata_user];
-```
-
-If you use a different session name, set it in the collector config:
-
-```yaml
-jobs:
-  - name: local
-    dsn: "sqlserver://user:pass@localhost:1433"
-    error_info_session_name: your_session_name
-```
-
-
-
-#### Parameters
-
-This function has no parameters.
-
-#### Returns
-
-Recent error events from the configured Extended Events session.
-
-| Column | Type | Unit | Visibility | Description |
-|:-------|:-----|:-----|:-----------|:------------|
-| Timestamp | timestamp |  |  | Timestamp of the error event. |
-| Error Number | integer |  |  | SQL Server error number. |
-| Error State | integer |  |  | SQL Server error state. |
-| Error Message | string |  |  | Error message text. |
-| Query | string |  |  | SQL text captured with the error event. |
-| Query Hash | string |  | hidden | Query hash captured with the error event (used for mapping into top-queries). |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -918,6 +366,558 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Microsoft SQL Server instance
+
+These metrics refer to the entire SQL Server instance.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.user_connections | user | connections | • | • |
+| mssql.session_connections | user, internal | connections | • | • |
+| mssql.blocked_processes | blocked | processes | • | • |
+| mssql.batch_requests | batch | requests/s | • | • |
+| mssql.compilations | compilations | compilations/s | • | • |
+| mssql.recompilations | recompilations | recompilations/s | • | • |
+| mssql.auto_param_attempts | total, safe, failed | attempts/s | • | • |
+| mssql.sql_errors | errors | errors/s | • | • |
+| mssql.buffer_cache_hit_ratio | hit_ratio | percentage | • | • |
+| mssql.buffer_page_life_expectancy | life_expectancy | seconds | • | • |
+| mssql.buffer_page_iops | read, written | pages/s | • | • |
+| mssql.buffer_checkpoint_pages | flushed | pages/s | • | • |
+| mssql.buffer_page_lookups | lookups | lookups/s | • | • |
+| mssql.buffer_lazy_writes | lazy_writes | writes/s | • | • |
+| mssql.memory_total | memory | bytes | • | • |
+| mssql.memory_connection | memory | bytes | • | • |
+| mssql.memory_pending_grants | pending | processes | • | • |
+| mssql.memory_external_benefit | benefit | benefit | • | • |
+| mssql.page_splits | page | splits/s | • | • |
+| mssql.process_memory_resident | resident | bytes | • | • |
+| mssql.process_memory_virtual | virtual | bytes | • | • |
+| mssql.process_memory_utilization | utilization | percentage | • | • |
+| mssql.process_page_faults | page_faults | faults | • | • |
+| mssql.os_memory | used, available | bytes | • | • |
+| mssql.os_pagefile | used, available | bytes | • | • |
+
+### Per database
+
+These metrics refer to individual databases.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| database | Database name |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.database_active_transactions | active | transactions | • | • |
+| mssql.database_transactions | transactions | transactions/s | • | • |
+| mssql.database_write_transactions | write | transactions/s | • | • |
+| mssql.database_log_flushes | flushes | flushes/s | • | • |
+| mssql.database_log_flushed | flushed | bytes/s | • | • |
+| mssql.database_log_growths | growths | growths | • | • |
+| mssql.database_io_stall | read, write | ms | • | • |
+| mssql.database_data_file_size | size | bytes | • | • |
+| mssql.database_backup_restore_throughput | throughput | bytes/s | • | • |
+| mssql.database_state | online, restoring, recovering, pending, suspect, emergency, offline | state | • | • |
+| mssql.database_read_only | read_only, read_write | status | • | • |
+
+### Per lock stats
+
+These metrics refer to lock statistics by lock resource type (from performance counters).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource | Lock resource type (Database, File, Object, Page, Key, Extent, RID, HoBT, etc.) |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.lock_stats_deadlocks | deadlocks | deadlocks/s | • | • |
+| mssql.lock_stats_waits | waits | waits/s | • | • |
+| mssql.lock_stats_timeouts | timeouts | timeouts/s | • | • |
+| mssql.lock_stats_requests | requests | requests/s | • | • |
+
+### Per lock resource
+
+These metrics refer to lock resource types (from sys.dm_tran_locks).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource | Lock resource type (Database, File, Object, Page, Key, etc.) |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.locks_by_resource | locks | locks | • | • |
+
+### Per wait type
+
+These metrics refer to individual wait types (from sys.dm_os_wait_stats).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| wait_type | Wait type name |
+| wait_category | Wait category (CPU, Lock, Latch, Buffer IO, etc.) |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.wait_total_time | duration | ms | • | • |
+| mssql.wait_resource_time | duration | ms | • | • |
+| mssql.wait_signal_time | duration | ms | • | • |
+| mssql.wait_max_time | max_time | ms | • | • |
+| mssql.wait_count | waits | waits/s | • | • |
+
+### Per job
+
+These metrics refer to SQL Server Agent jobs.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| job_name | Job name |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.job_status | enabled, disabled | status | • | • |
+
+### Per replication
+
+These metrics refer to SQL Server replication publications.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| publisher_db | Publisher database name |
+| publication | Publication name |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.replication_status | started, succeeded, in_progress, idle, retrying, failed | status | • | • |
+| mssql.replication_warning | expiration, latency, merge_expiration, merge_slow_duration, merge_fast_duration, merge_fast_speed, merge_slow_speed | flags | • | • |
+| mssql.replication_latency | average, best, worst | seconds | • | • |
+| mssql.replication_subscriptions | total, agents_running | subscriptions | • | • |
+
+### Per availability group
+
+These metrics refer to Always On Availability Groups. Auto-detected when HADR is enabled.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| ag_name | Availability group name |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.ag_sync_health | not_healthy, partially_healthy, healthy | state | • | • |
+| mssql.ag_recovery_health | primary_online, primary_in_progress, secondary_online, secondary_in_progress | state | • | • |
+| mssql.ag_threads | capture, redo, parallel_redo | threads | • | • |
+
+### Per availability group replica
+
+These metrics refer to per-replica state within an Availability Group. Note: on secondary replicas, the replica states DMV returns only local information.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| ag_name | Availability group name |
+| replica_server | Replica server name |
+| availability_mode | Availability mode (synchronous_commit or asynchronous_commit) |
+| failover_mode | Failover mode (automatic or manual) |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.ag_replica_role | primary, secondary, resolving, unknown | state | • | • |
+| mssql.ag_replica_connected_state | connected, disconnected, unknown | state | • | • |
+| mssql.ag_replica_sync_health | not_healthy, partially_healthy, healthy | state | • | • |
+
+### Per availability group database replica
+
+These metrics refer to per-database synchronization within an Availability Group.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| ag_name | Availability group name |
+| replica_server | Replica server name |
+| database | Database name |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.ag_db_sync_state | not_synchronizing, synchronizing, synchronized, reverting, initializing | state | • | • |
+| mssql.ag_db_log_send_queue | queue_size | bytes | • | • |
+| mssql.ag_db_log_send_rate | send_rate | bytes/s | • | • |
+| mssql.ag_db_redo_queue | queue_size | bytes | • | • |
+| mssql.ag_db_redo_rate | redo_rate | bytes/s | • | • |
+| mssql.ag_db_filestream_send_rate | send_rate | bytes/s | • | • |
+| mssql.ag_db_secondary_lag | lag | seconds | • | • |
+| mssql.ag_db_suspended | active, suspended | state | • | • |
+| mssql.ag_db_failover_readiness | ready, not_ready | state | • | • |
+| mssql.ag_db_joined_state | joined, not_joined | state | • | • |
+
+### Per WSFC cluster
+
+These metrics refer to the Windows Server Failover Clustering quorum state.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.ag_cluster_quorum_state | normal, forced, unknown | state | • | • |
+
+### Per WSFC cluster member
+
+These metrics refer to individual WSFC cluster members.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| cluster_member | Cluster member name |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.ag_cluster_member_state | up, down | state | • | • |
+| mssql.ag_cluster_member_quorum_votes | votes | votes | • | • |
+
+### Per AG page repair
+
+These metrics refer to automatic page repair events per database in an Availability Group.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| database | Database name |
+
+Metrics:
+
+| Metric | Dimensions | Unit | SQL Server 2016+ | Azure SQL Database |
+|:------|:----------|:----|:---:|:---:|
+| mssql.ag_page_repair | successful, failed | repairs | • | • |
+
+
+
+## Live Data
+
+This collector exposes real-time functions for interactive troubleshooting in the Live tab.
+
+
+### Top Queries
+
+Retrieves aggregated SQL query performance metrics from Microsoft SQL Server [Query Store](https://learn.microsoft.com/en-us/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store) runtime statistics.
+
+This function queries `sys.query_store_runtime_stats` and related views across all databases with Query Store enabled, aggregating execution statistics by query hash. It provides comprehensive timing, I/O, memory, and parallelism metrics.
+
+Use cases:
+- Identify slow or resource-intensive queries consuming excessive CPU time or memory
+- Analyze I/O patterns (logical reads, physical reads, writes) to detect bottlenecks
+- Monitor parallelism (DOP) and tempdb usage for capacity planning
+
+Query text is truncated at 4096 characters for display purposes. Columns are dynamically detected based on SQL Server version (some metrics only available in 2016+/2017+).
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mssql:top-queries` |
+| Require Cloud | yes |
+| Performance | Executes dynamic SQL to aggregate Query Store data across all enabled databases:<br/>• Execution time depends on Query Store workload and number of monitored databases<br/>• Default limit of 500 rows balances completeness with performance |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data and internal identifiers<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• Query Store is enabled on at least one user database<br/>• Returns HTTP 503 if collector is still initializing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+##### Enable Query Store
+
+Query Store must be enabled on each database you want to monitor.
+
+1. Verify Query Store is enabled on your databases:
+
+   ```sql
+   SELECT name, is_query_store_on
+   FROM sys.databases
+   WHERE name NOT IN ('master', 'tempdb', 'model', 'msdb');
+   ```
+
+2. Enable Query Store on databases where it is disabled:
+
+   ```sql
+   ALTER DATABASE [YourDatabaseName] SET QUERY_STORE = ON;
+   ```
+
+3. Enable the function in Netdata collector config:
+
+   ```yaml
+   jobs:
+     - name: local
+       dsn: "sqlserver://user:pass@localhost:1433"
+       query_store_function_enabled: true
+   ```
+
+:::info
+
+- Query Store is available in SQL Server 2016+ and Azure SQL Database
+- Requires ALTER DATABASE permission to enable Query Store
+- System databases (master, tempdb, model, msdb) are excluded from queries
+
+:::
+
+
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column. The available options depend on your SQL Server version and include metrics like total execution time, number of calls, CPU time, logical I/O, memory grants, and more. Default is Total Time to focus on most resource-intensive queries. | yes | totalTime |  |
+
+#### Returns
+
+Aggregated query execution statistics from Query Store runtime views, providing comprehensive performance analysis across all monitored databases. Each row represents a unique query pattern (normalized query hash) with cumulative metrics across all its executions.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Query Hash | string |  | hidden | Unique hash identifier for the normalized query pattern. Queries with identical structure but different literal values share the same digest. |
+| Query | string |  |  | The SQL query text with literal values truncated at 4096 characters. Use this to identify the actual SQL being executed and spot parameterized queries or injection risks. |
+| Database | string |  |  | Database name where the query was executed. Essential for multi-database analysis to identify which database is experiencing query load. |
+| Calls | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries that may impact server performance significantly. |
+| Error Attribution | string |  |  | Status of error detail attribution for this query. Values: enabled, no_data, not_enabled, not_supported. |
+| Error Number | integer |  |  | Most recent error number observed for this query (when error attribution is enabled). |
+| Error State | integer |  | hidden | SQL Server error state for the most recent error (when error attribution is enabled). |
+| Error Message | string |  |  | Most recent error message for this query (when error attribution is enabled). |
+| Hash Match Joins | integer |  |  | Count of Hash Match join operators across all stored plans for this query. |
+| Merge Joins | integer |  |  | Count of Merge Join operators across all stored plans for this query. |
+| Nested Loops | integer |  |  | Count of Nested Loops operators across all stored plans for this query. |
+| Sorts | integer |  |  | Count of Sort operators across all stored plans for this query. |
+| Total Time | duration | milliseconds |  | Cumulative execution time across all query executions. This is a key metric for identifying the most resource-intensive queries in terms of total server time consumption. |
+| Avg Time | duration | milliseconds |  | Average execution time per query run, calculated as weighted average when execution count is greater than zero. Compare with Total Time to determine if individual executions or high frequency drives resource usage. |
+| Last Time | duration | milliseconds | hidden | Execution time of the most recent execution for this query pattern. Useful for identifying recent performance changes or individual outlier executions. |
+| Min Time | duration | milliseconds | hidden | Minimum execution time observed. Helps identify variability in query performance and spot potential optimization opportunities for outliers. |
+| Max Time | duration | milliseconds | hidden | Maximum execution time observed. Large gaps between Min Time and Max Time may indicate performance instability due to parameter sniffing, data skew, or lock contention. |
+| StdDev Time | duration | milliseconds | hidden | Standard deviation of execution time. High values indicate inconsistent query performance, making capacity planning difficult and suggesting need for query optimization or consistent indexing. |
+| Avg CPU | duration | milliseconds |  | Average CPU time consumed per query execution. High values indicate CPU-intensive operations that may include complex calculations, string manipulations, or excessive function calls. Available in SQL Server 2016+. |
+| Last CPU | duration | milliseconds | hidden | CPU time of the most recent execution. Useful for identifying recent changes in query patterns and resource usage. |
+| Min CPU | duration | milliseconds | hidden | Minimum CPU time observed. Helps identify variability in CPU consumption and spot efficient vs. inefficient query executions. |
+| Max CPU | duration | milliseconds | hidden | Maximum CPU time observed. Spikes may indicate complex queries, large result sets, or parallelism issues. |
+| StdDev CPU | duration | milliseconds | hidden | Standard deviation of CPU time. High variability suggests inconsistent performance due to varying data volumes, plan cache hit rates, or changing execution contexts. |
+| Avg Logical Reads | float |  |  | Average number of logical read operations (8KB pages) per execution. High values indicate queries scanning large amounts of data through indexes or table scans. Monitor for I/O subsystem impact. |
+| Last Logical Reads | integer |  | hidden | Logical reads from the most recent execution. Useful for identifying immediate query patterns and recent performance changes. |
+| Min Logical Reads | integer |  | hidden | Minimum logical reads observed. Helps identify data access patterns and spot outliers. |
+| Max Logical Reads | integer |  | hidden | Maximum logical reads observed. Very high values may indicate full table scans, missing indexes, or inefficient join operations requiring excessive data access. |
+| StdDev Logical Reads | float |  | hidden | Standard deviation of logical reads. High variability suggests inconsistent access patterns, potentially indicating performance issues with certain queries or data volumes. |
+| Avg Logical Writes | float |  |  | Average number of logical write operations per execution. High values indicate heavy write workloads that may benefit from batching or optimization. |
+| Last Logical Writes | integer |  | hidden | Logical writes from the most recent execution. Helps track recent write activity and identify immediate performance impact. |
+| Min Logical Writes | integer |  | hidden | Minimum logical writes observed. Helps identify read-heavy vs. write-heavy query patterns and data access characteristics. |
+| Max Logical Writes | integer |  | hidden | Maximum logical writes observed. Spikes may indicate bulk insert/update operations, large transactions, or data migration activities. |
+| StdDev Logical Writes | float |  | hidden | Standard deviation of logical writes. High values indicate write performance variability, potentially suggesting inconsistent transaction sizes or periodic bulk operations. |
+| Avg Physical Reads | float |  |  | Average number of physical read operations from storage per execution. High values indicate queries requiring substantial disk I/O for data retrieval, potentially due to full table scans or missing covering indexes. |
+| Last Physical Reads | integer |  | hidden | Physical reads from the most recent execution. Useful for identifying immediate I/O patterns and recent storage subsystem pressure. |
+| Min Physical Reads | integer |  | hidden | Minimum physical reads observed. Helps baseline I/O patterns and identify read-intensive query scenarios. |
+| Max Physical Reads | integer |  | hidden | Maximum physical reads observed. Extremely high values may indicate storage subsystem bottlenecks, full table scans without covering indexes, or queries processing very large data volumes. |
+| StdDev Physical Reads | float |  | hidden | Standard deviation of physical reads. High variability suggests inconsistent disk access patterns, potentially indicating intermittent I/O performance issues or storage contention. |
+| Avg CLR Time | duration | milliseconds |  | Average CLR (Common Language Runtime) time per execution. High values indicate managed code (stored procedures, functions, triggers) with heavy computations, garbage collection pressure, or inefficient memory allocations. Available in SQL Server 2016+. |
+| Last CLR Time | duration | milliseconds | hidden | CLR time of the most recent execution. Useful for identifying recent managed code performance changes and detecting inefficient code deployments. |
+| Min CLR Time | duration | milliseconds | hidden | Minimum CLR time observed. Helps identify efficient managed code executions and spot expensive CLR operations. |
+| Max CLR Time | duration | milliseconds | hidden | Maximum CLR time observed. Spikes may indicate complex managed code operations, large object allocations, or expensive .NET framework method calls. |
+| StdDev CLR Time | duration | milliseconds | hidden | Standard deviation of CLR time. High variability suggests inconsistent managed code execution patterns, potentially varying by execution parameters, data volumes, or different code paths being taken. |
+| Avg DOP | float |  |  | Average Degree of Parallelism (DOP) per query. Higher values indicate queries utilizing more CPU cores through parallelism, potentially consuming significant server resources. Values above 1 indicate intra-query parallelism; values of 1 indicate serial execution. |
+| Last DOP | integer |  | hidden | DOP of the most recent execution. Helps track recent parallelism patterns and identify changes in query execution behavior. |
+| Min DOP | integer |  | hidden | Minimum DOP observed. Values of 0 may indicate serial execution; values above 1 suggest parallel query execution within individual queries. |
+| Max DOP | integer |  | hidden | Maximum DOP observed. Very high values (>4) may indicate aggressive parallelism consuming excessive resources and potentially affecting concurrent workloads. Available in SQL Server 2016+. |
+| StdDev DOP | float |  | hidden | Standard deviation of DOP. High variability suggests inconsistent parallelism patterns across executions, potentially indicating performance variability based on data characteristics or query complexity. |
+| Avg Memory (8KB pages) | float |  |  | Average memory grant (in 8KB pages) per execution. High values indicate memory-intensive queries that may benefit from index optimization, reduced result sets, or query tuning to reduce working memory usage. |
+| Last Memory (8KB pages) | integer |  | hidden | Memory grant from the most recent execution. Useful for identifying recent memory pressure and tracking immediate impact of resource-intensive queries. |
+| Min Memory (8KB pages) | integer |  | hidden | Minimum memory grant observed. Helps identify memory-efficient queries and baseline memory requirements for common operations. |
+| Max Memory (8KB pages) | integer |  | hidden | Maximum memory grant observed. Spikes may indicate queries with large sort operations, hash joins, temporary table creation, or excessive parameter lengths consuming working memory. |
+| StdDev Memory | float |  | hidden | Standard deviation of memory grants. High variability suggests inconsistent memory usage patterns, potentially varying by execution parameters, result set sizes, or different code paths being executed. |
+| Avg Rows | float |  |  | Average number of rows processed per query execution. High values indicate queries returning large result sets that may consume significant network bandwidth, memory for result buffers, and client application resources. |
+| Last Rows | integer |  | hidden | Row count from the most recent execution. Helps identify recent query patterns and track immediate data processing requirements. |
+| Min Rows | integer |  | hidden | Minimum rows observed. Helps identify data access patterns and spot outliers in result set sizes. |
+| Max Rows | integer |  | hidden | Maximum rows observed. Extremely high values may indicate full table scans without WHERE clauses, missing or inefficient filters, or data export operations. |
+| StdDev Rows | float |  | hidden | Standard deviation of rows processed. High variability suggests inconsistent result set sizes, potentially due to varying query filters, parameterized inputs, or different data distributions across executions. |
+| Avg Log Bytes | float |  |  | Average transaction log bytes written per query execution (SQL Server 2017+). High values indicate write-intensive operations (INSERT/UPDATE/DELETE), large transactions, or bulk modifications. This measures WAL activity, not diagnostic logging. |
+| Last Log Bytes | integer |  | hidden | Transaction log bytes from the most recent execution. Useful for tracking recent write activity. |
+| Min Log Bytes | integer |  | hidden | Minimum transaction log bytes observed. Helps identify write-efficient queries and baseline requirements. |
+| Max Log Bytes | integer |  | hidden | Maximum transaction log bytes observed. Spikes may indicate bulk operations, large transactions, or queries affecting many rows. |
+| StdDev Log Bytes | float |  | hidden | Standard deviation of transaction log bytes. High variability suggests inconsistent write patterns, potentially varying by the number of rows affected or transaction sizes. |
+| Avg TempDB (8KB pages) | float |  |  | Average tempdb space usage (in 8KB pages) per execution. High values indicate queries that create or use large temporary objects, work tables, sort operations, or have heavy tempdb spillage from disk. High tempdb usage can lead to disk I/O contention and overall performance degradation. |
+| Last TempDB (8KB pages) | integer |  | hidden | Tempdb space from the most recent execution. Useful for identifying recent tempdb pressure and tracking immediate disk I/O impact of resource-intensive queries. |
+| Min TempDB (8KB pages) | integer |  | hidden | Minimum tempdb space observed. Helps identify tempdb-efficient queries and baseline temporary object requirements for common operations. |
+| Max TempDB (8KB pages) | integer |  | hidden | Maximum tempdb space observed. Spikes may indicate queries with large sort operations, hash joins, index spool usage, or temporary table creation consuming substantial tempdb space. Can lead to tempdb autogrow and disk space issues. |
+| StdDev TempDB | float |  | hidden | Standard deviation of tempdb space usage. High variability suggests inconsistent temporary object usage patterns, potentially varying by query complexity, parameter types, or different data access patterns affecting temporary object creation. |
+
+### Deadlock Info
+
+Retrieves the most recent deadlock event from SQL Server's `system_health` Extended Events session (`xml_deadlock_report`).
+
+The deadlock graph XML is parsed to attribute the deadlock to the participating processes and their query text, lock mode, lock status, and wait resource.
+
+Use cases:
+- Identify which process was chosen as the deadlock victim
+- Inspect the waiting resource and lock mode involved in the deadlock
+- Correlate deadlocks with recent application changes or deployments
+
+Query text and wait resource strings are truncated at 4096 characters for display purposes.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mssql:deadlock-info` |
+| Require Cloud | yes |
+| Performance | Executes on-demand queries against the `system_health` ring buffer:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time and XML parsing |
+| Security | Query text and wait resource strings may include unmasked literal values including sensitive data (PII/secrets):<br/>• SQL literals such as emails, IDs, or tokens<br/>• Schema and table names that may be sensitive in some environments<br/>• Restrict dashboard access to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `deadlock_info_function_enabled` is true<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no deadlock is found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 561 when the deadlock graph cannot be parsed<br/>• Returns HTTP 503 if the collector is still initializing or the function is disabled<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+Parsed deadlock participants from the latest detected deadlock event. Each row represents one process involved in the deadlock.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Row ID | string |  | hidden | Unique row identifier composed of deadlock ID and process ID. |
+| Deadlock ID | string |  |  | Identifier for the deadlock event, derived from the deadlock timestamp to group participating processes. |
+| Timestamp | timestamp |  |  | Timestamp of the deadlock event from Extended Events when available; otherwise the function execution time. |
+| Process ID | string |  |  | Deadlock graph process identifier for the process involved in the deadlock. |
+| SPID | integer |  |  | SQL Server session ID (SPID) for the process when available. |
+| ECID | integer |  |  | Execution context ID (ECID) for parallel execution contexts when available. |
+| Victim | string |  |  | "true" when the process was chosen as the deadlock victim and rolled back; otherwise "false". |
+| Query | string |  |  | SQL query text for the process involved in the deadlock. Truncated to 4096 characters. |
+| Lock Mode | string |  |  | Lock mode reported for the process within the deadlock graph (for example X or S). |
+| Lock Status | string |  |  | Lock status for the process. WAITING indicates the process was waiting on a lock. |
+| Wait Resource | string |  |  | Lock resource identifier from the deadlock graph showing what the process was waiting on. |
+| Database | string |  |  | Database name mapped from the deadlock graph database ID when available. |
+
+### Error Info
+
+Retrieves recent SQL errors from a user-managed Extended Events session that captures `sqlserver.error_reported`
+with both the `sql_text` and `query_hash` actions.
+
+The session must be created by an administrator and include an `event_file` target. Netdata reads the event file
+and returns recent error events with error number, message, and SQL text. The `query_hash` action is required for
+reliable mapping into `top-queries` (query text fallback is best-effort).
+
+Use cases:
+- Identify recent query errors and their messages
+- Correlate errors to query text
+- Validate error rates seen in top-queries
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Mssql:error-info` |
+| Require Cloud | yes |
+| Performance | Executes on-demand queries against the configured Extended Events event file:<br/>• Not part of regular metric collection<br/>• Overhead is limited to function execution time |
+| Security | Error messages and query text may include unmasked literal values including sensitive data (PII/secrets):<br/>• Restrict dashboard access to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to SQL Server<br/>• `error_info_function_enabled` is true<br/>• The Extended Events session exists and has an event_file target<br/>• The account has `VIEW SERVER STATE` permission<br/>• Returns HTTP 200 with empty data when no errors are found<br/>• Returns HTTP 403 when permission is missing<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 503 if the session is not enabled or the function is disabled<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+##### Create Extended Events session for error capture
+
+Create an Extended Events session that captures `sqlserver.error_reported` with `sql_text` and `query_hash` actions:
+
+```sql
+-- Create the Extended Events session with event_file target
+CREATE EVENT SESSION [netdata_errors] ON SERVER
+ADD EVENT sqlserver.error_reported(
+  ACTION(sqlserver.sql_text, sqlserver.query_hash)
+)
+ADD TARGET package0.event_file(SET filename=N'netdata_errors');
+GO
+
+-- Start the session
+ALTER EVENT SESSION [netdata_errors] ON SERVER STATE = START;
+GO
+
+-- Grant required permission
+GRANT VIEW SERVER STATE TO [netdata_user];
+```
+
+If you use a different session name, set it in the collector config:
+
+```yaml
+jobs:
+  - name: local
+    dsn: "sqlserver://user:pass@localhost:1433"
+    error_info_session_name: your_session_name
+```
+
+
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+Recent error events from the configured Extended Events session.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Timestamp | timestamp |  |  | Timestamp of the error event. |
+| Error Number | integer |  |  | SQL Server error number. |
+| Error State | integer |  |  | SQL Server error state. |
+| Error Message | string |  |  | Error message text. |
+| Query | string |  |  | SQL text captured with the error event. |
+| Query Hash | string |  | hidden | Query hash captured with the error event (used for mapping into top-queries). |
 
 
 

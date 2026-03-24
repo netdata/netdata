@@ -57,55 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.firewall.health | average | percentage |
-| azure_monitor.firewall.latency | average | milliseconds |
-| azure_monitor.firewall.throughput | average | bits/s |
-| azure_monitor.firewall.data_processed | total | bytes/s |
-| azure_monitor.firewall.rule_hits | application, network | hits/s |
-| azure_monitor.firewall.snat_port_utilization | average | percentage |
-| azure_monitor.firewall.capacity | average | units |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_firewall_health ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.health | Firewall health on ${label:resource_name} |
-| [ am_firewall_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.latency | Firewall latency on ${label:resource_name} |
-| [ am_firewall_snat_port_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.snat_port_utilization | Firewall SNAT port utilization on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -324,6 +275,55 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_firewall_health ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.health | Firewall health on ${label:resource_name} |
+| [ am_firewall_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.latency | Firewall latency on ${label:resource_name} |
+| [ am_firewall_snat_port_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.snat_port_utilization | Firewall SNAT port utilization on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.firewall.health | average | percentage |
+| azure_monitor.firewall.latency | average | milliseconds |
+| azure_monitor.firewall.throughput | average | bits/s |
+| azure_monitor.firewall.data_processed | total | bytes/s |
+| azure_monitor.firewall.rule_hits | application, network | hits/s |
+| azure_monitor.firewall.snat_port_utilization | average | percentage |
+| azure_monitor.firewall.capacity | average | units |
 
 
 
