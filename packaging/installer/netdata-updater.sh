@@ -655,6 +655,45 @@ download() {
   fi
 }
 
+check_for_remote_file() {
+  url="${1}"
+  succeeded=0
+  checked=0
+
+  if echo "${url}" | grep -Eq "^file:///"; then
+    [ -e "${url#file://}" ] || return 1
+    return 0
+  elif [ -n "${NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT}" ]; then
+    return 0
+  fi
+
+  if [ -n "${curl}" ]; then
+    checked=1
+
+    if "${curl}" --output /dev/null --silent --head --fail "${url}"; then
+      succeeded=1
+    fi
+  fi
+
+  if [ "${checked}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK'; then
+        succeeded=1
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
+  else
+    return 255
+  fi
+}
+
 get_netdata_latest_tag() {
   url="${1}/latest"
 
@@ -1210,7 +1249,7 @@ update_binpkg() {
     info "Checking if native packages are still being published for this platform."
 
     set +e
-    _safe_download "${check_url}" /dev/null
+    check_for_remote_file "${check_url}"
     ret=$?
     set -e
 
