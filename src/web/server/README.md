@@ -234,6 +234,46 @@ openssl speed rsa2048 rsa4096
 
 :::
 
+### Obtaining TLS Certificates
+
+Self-signed certificates are suitable for testing and development environments. For production deployments, you should obtain certificates from a trusted Certificate Authority (CA) to ensure proper security and avoid browser warnings.
+
+#### Certificate Acquisition Options
+
+1. **Let's Encrypt (Recommended for public-facing instances)**
+   - Free, automated certificate authority
+   - Requires public DNS resolution and port 80/443 access
+   - Certificates auto-renew with proper configuration
+   - Install using [Certbot](https://certbot.eff.org/) or other ACME clients
+   - Certificates are issued in PEM format, compatible with Netdata
+
+2. **Commercial Certificate Authorities**
+   - Paid certificates from providers like DigiCert, Comodo, or GlobalSign
+   - Various validation levels (DV, OV, EV) available
+   - Suitable for organizations requiring extended validation
+   - Ensure certificates are provided in PEM format or convert them
+
+3. **Internal Certificate Authorities**
+   - For enterprise environments with private PKI infrastructure
+   - Allows complete control over certificate lifecycle
+   - See [Using custom CA certificates with Netdata](/docs/netdata-agent/configuration/using-custom-ca-certificates-with-netdata.md) for configuration details
+   - Requires clients to trust your internal CA
+
+#### Netdata Certificate Requirements
+
+Regardless of the source, ensure your certificates meet these requirements:
+
+- **Format**: PEM format (most common format, used by Let's Encrypt and compatible with OpenSSL)
+- **Location**: Place certificates in `/etc/netdata/ssl/` or another secure directory
+- **Permissions**: Certificate and key files must be readable by the `netdata` user
+- **Paths**: Configure the paths in `netdata.conf`:
+
+```text
+[web]
+    ssl key = /etc/netdata/ssl/key.pem
+    ssl certificate = /etc/netdata/ssl/cert.pem
+```
+
 </details>
 
 <details>
