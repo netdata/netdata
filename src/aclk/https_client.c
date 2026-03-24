@@ -184,6 +184,7 @@ void http_parse_ctx_create(http_parse_ctx *ctx, enum http_parse_state parse_stat
 #define POLL_TO_MS 100
 
 #define HTTP_LINE_TERM "\x0D\x0A"
+#define HTTP_LINE_TERM_LEN (sizeof(HTTP_LINE_TERM) - 1)
 #define RESP_PROTO "HTTP/1.1 "
 #define RESP_PROTO10 "HTTP/1.0 "
 #define HTTP_KEYVAL_SEPARATOR ": "
@@ -333,7 +334,7 @@ static int process_chunked_content(rbuf_t buf, http_parse_ctx *parse_ctx)
                 }
                 parse_ctx->chunk_got = 0;
                 chunked_response_buffer_grow_by(parse_ctx, parse_ctx->chunk_size);
-                rbuf_bump_tail(buf, strlen(HTTP_LINE_TERM));
+                rbuf_bump_tail(buf, HTTP_LINE_TERM_LEN);
                 parse_ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_DATA;
                 // fallthrough
             case CHUNKED_CONTENT_CHUNK_DATA:
@@ -350,11 +351,11 @@ static int process_chunked_content(rbuf_t buf, http_parse_ctx *parse_ctx)
                 // fallthrough
             case CHUNKED_CONTENT_FINAL_CRLF:
             case CHUNKED_CONTENT_CHUNK_END_CRLF:
-                if (rbuf_bytes_available(buf) < strlen(HTTP_LINE_TERM))
+                if (rbuf_bytes_available(buf) < HTTP_LINE_TERM_LEN)
                     return HTTP_PARSE_NEED_MORE_DATA;
-                char buf_crlf[strlen(HTTP_LINE_TERM)];
-                rbuf_pop(buf, buf_crlf, strlen(HTTP_LINE_TERM));
-                if (memcmp(buf_crlf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM))) {
+                char buf_crlf[HTTP_LINE_TERM_LEN];
+                rbuf_pop(buf, buf_crlf, HTTP_LINE_TERM_LEN);
+                if (memcmp(buf_crlf, HTTP_LINE_TERM, HTTP_LINE_TERM_LEN)) {
                     netdata_log_error("ACLK: CRLF expected");
                     return HTTP_PARSE_ERROR;
                 }
