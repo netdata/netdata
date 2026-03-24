@@ -22,12 +22,12 @@ Kind: vault
 
 Use Vault as a secretstore backend when you want Netdata collectors to read secrets from HashiCorp Vault at runtime instead of storing them in plain text in collector configuration files.
 
-This page covers Vault specific setup. For the generic secretstore workflow and lifecycle, see [Secrets Management](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/secrets-management.md).
+This page covers Vault specific setup. For the shared resolver workflow and syntax, see [Secrets Management](https://github.com/netdata/netdata/blob/master/src/collectors/SECRETS.md).
 
 
 ### Limitations
 
-Netdata reads existing secrets from Vault. It does not create or renew Vault tokens. For KV v2 secrets, Netdata does not add `/data/` to the path automatically.
+Netdata reads existing secrets from Vault. It does not create or renew Vault tokens. If the configured token expires or becomes invalid, secret resolution fails until Netdata can read a valid token again. For KV v2 secrets, Netdata does not add `/data/` to the path automatically.
 
 
 ## Setup
@@ -52,6 +52,8 @@ Choose one supported authentication mode and make sure Netdata can use it:
 
 - `token`: store the Vault token directly in the secretstore configuration.
 - `token_file`: store the Vault token in a local file on the Netdata host that is readable by the `netdata` user.
+
+Prefer `token_file` for production so the Vault token is not embedded directly in the secretstore configuration.
 
 
 #### Allow access to the referenced secret paths
@@ -78,7 +80,7 @@ The following options can be defined for this secretstore backend.
 |:------|:-----|:------------|:--------|:---------:|
 |  | [mode](#option-mode) | How Vault authentication is provided. | token | yes |
 |  | addr | Vault server address / base URL. |  | yes |
-|  | namespace | Optional Vault Enterprise namespace. |  | no |
+|  | namespace | Optional Vault Enterprise namespace. Leave it empty for open-source Vault or when your Vault deployment does not use namespaces. |  | no |
 |  | [tls_skip_verify](#option-tls-skip-verify) | Disable TLS certificate verification for Vault requests. | no | no |
 | **Token** | mode_token.token | Vault token value. Required when `mode` is `token`. |  | yes |
 | **Token File** | mode_token_file.path | Path to a file containing the Vault token. Required when `mode` is `token_file`. |  | yes |
@@ -90,6 +92,8 @@ Supported values:
 
 - `token`: store the Vault token directly in the secretstore configuration.
 - `token_file`: read the Vault token from a local file on the Netdata host.
+
+Prefer `token_file` for production so the token is stored separately from the secretstore configuration.
 
 
 <a id="option-tls-skip-verify"></a>
@@ -158,6 +162,7 @@ Reference Vault secrets from collector configs with the `vault` secretstore kind
 The operand is `path#key`.
 
 Netdata sends the path to Vault as `/v1/<path>` exactly as you provide it. For KV v2 secrets, include `/data/` in the path yourself.
+The `path` must not be empty and must not contain `..`, `?`, or `#`.
 
 
 ```text
@@ -197,9 +202,14 @@ jobs:
 
 ## Troubleshooting
 
-### Vault returns permission denied
+### Find the exact error
 
-Check the Vault token policy and, if you use Vault Enterprise namespaces, confirm that `namespace` is correct.
+Check the Netdata Agent logs when the collector starts or restarts. Vault resolver errors include messages such as `vault returned HTTP 403`, `vault path contains invalid characters`, `operand must be in format 'path#key'`, or `key 'password' not found in vault response`.
+
+
+### Vault returns permission denied or the token has expired
+
+Check the Vault token policy and, if you use Vault Enterprise namespaces, confirm that `namespace` is correct. If you use a short-lived token, make sure the token is renewed or replaced before it expires.
 
 
 ### Secret or key is not found

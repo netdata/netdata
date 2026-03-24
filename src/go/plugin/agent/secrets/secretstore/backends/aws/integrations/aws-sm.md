@@ -22,7 +22,7 @@ Kind: aws-sm
 
 Use AWS Secrets Manager as a secretstore backend when you want Netdata collectors to read secrets from AWS at runtime instead of storing them in plain text in collector configuration files.
 
-This page covers AWS Secrets Manager specific setup. For the generic secretstore workflow and lifecycle, see [Secrets Management](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/secrets-management.md).
+This page covers AWS Secrets Manager specific setup. For the shared resolver workflow and syntax, see [Secrets Management](https://github.com/netdata/netdata/blob/master/src/collectors/SECRETS.md).
 
 
 ### Limitations
@@ -48,6 +48,8 @@ Choose one supported authentication mode and make sure the Netdata Agent can obt
 - `env`: set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` for the Netdata service. Set `AWS_SESSION_TOKEN` too if you use temporary credentials.
 - `ecs`: run Netdata in ECS with a task role so `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` is available.
 - `imds`: run Netdata on EC2 with an instance profile and access to IMDSv2.
+
+For production on AWS, prefer `ecs` or `imds` over `env` so credentials are supplied by the platform instead of being stored in the Netdata service environment.
 
 
 #### Allow access to Secrets Manager
@@ -83,6 +85,8 @@ Supported values:
 - `env`: read credentials from the Netdata process environment.
 - `ecs`: read credentials from the ECS task credentials endpoint.
 - `imds`: read credentials from the EC2 Instance Metadata Service.
+
+For production on AWS, prefer `ecs` or `imds` when Netdata runs on ECS or EC2. Use `env` when you intentionally manage credentials in the Netdata service environment.
 
 
 
@@ -150,7 +154,9 @@ Reference AWS Secrets Manager secrets from collector configs with the `aws-sm` s
 The operand is `secret-name` or `secret-name#key`.
 
 - Use `secret-name` to return the whole `SecretString`.
-- Use `secret-name#key` to read one field from a JSON `SecretString`.
+- Use `secret-name#key` to read one top-level field from a JSON `SecretString`.
+- If you use `#key`, Netdata parses the secret value as JSON. Secret resolution fails if the value is not valid JSON or if the key does not exist.
+- Nested paths such as `parent.child` are not interpreted as nested JSON lookups.
 
 
 ```text
@@ -190,6 +196,11 @@ jobs:
 
 ## Troubleshooting
 
+### Find the exact error
+
+Check the Netdata Agent logs when the collector starts or restarts. AWS resolver errors include messages such as `AWS_ACCESS_KEY_ID is not set`, `parsing SecretString as JSON`, or `key 'password' not found in SecretString JSON`.
+
+
 ### AWS credentials are not found
 
 Check the selected `auth_mode`.
@@ -206,7 +217,7 @@ Confirm the configured `region` and make sure the AWS identity used by Netdata c
 
 ### JSON key lookup fails
 
-If you use `secret-name#key`, the secret must be stored as a JSON `SecretString`, and the requested key must exist in that JSON object.
+If you use `secret-name#key`, the secret must be stored as a JSON `SecretString`, and the requested key must exist as a top-level field in that JSON object.
 
 
 

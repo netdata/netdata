@@ -22,7 +22,7 @@ Kind: azure-kv
 
 Use Azure Key Vault as a secretstore backend when you want Netdata collectors to read secrets from Azure at runtime instead of storing them in plain text in collector configuration files.
 
-This page covers Azure Key Vault specific setup. For the generic secretstore workflow and lifecycle, see [Secrets Management](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/secrets-management.md).
+This page covers Azure Key Vault specific setup. For the shared resolver workflow and syntax, see [Secrets Management](https://github.com/netdata/netdata/blob/master/src/collectors/SECRETS.md).
 
 
 ### Limitations
@@ -47,7 +47,9 @@ Choose one supported authentication mode and make sure the Netdata Agent can use
 
 - `service_principal`: provide `tenant_id`, `client_id`, and `client_secret`.
 - `managed_identity`: run Netdata on an Azure resource with a managed identity.
-- `default`: use the Azure SDK `DefaultAzureCredential` chain.
+- `default`: use the Azure SDK `DefaultAzureCredential` chain, which automatically tries available Azure credential sources such as environment-based credentials, managed identity, and local developer credentials.
+
+Prefer `managed_identity` for production on Azure when Netdata runs on an Azure resource with an attached identity. Use `service_principal` for explicit application credentials. Use `default` for Azure SDK auto-discovery or local development convenience.
 
 
 #### Allow secret read access
@@ -76,7 +78,7 @@ The following options can be defined for this secretstore backend.
 | **Service Principal** | mode_service_principal.tenant_id | Azure tenant ID. Required when `mode` is `service_principal`. |  | yes |
 |  | mode_service_principal.client_id | Azure application / service principal client ID. Required when `mode` is `service_principal`. |  | yes |
 |  | mode_service_principal.client_secret | Azure application / service principal client secret. Required when `mode` is `service_principal`. |  | yes |
-| **Managed Identity** | mode_managed_identity.client_id | Optional client ID of a user-assigned managed identity when `mode` is `managed_identity`. |  | no |
+| **Managed Identity** | mode_managed_identity.client_id | Optional client ID of a user-assigned managed identity when `mode` is `managed_identity`. Leave it empty for the system-assigned identity. |  | no |
 
 <a id="option-mode"></a>
 ##### mode
@@ -85,7 +87,9 @@ Supported values:
 
 - `service_principal`: use an Azure app / service principal.
 - `managed_identity`: use the managed identity attached to the Azure resource running Netdata.
-- `default`: use the Azure SDK `DefaultAzureCredential` chain.
+- `default`: use the Azure SDK `DefaultAzureCredential` chain. It automatically tries available Azure credential sources such as environment-based credentials, managed identity, and local developer credentials.
+
+Prefer `managed_identity` for production on Azure. Use `service_principal` for explicit app credentials. Use `default` when you want Azure SDK auto-discovery or local development convenience.
 
 
 
@@ -156,6 +160,7 @@ Reference Azure Key Vault secrets from collector configs with the `azure-kv` sec
 The operand is `vault-name/secret-name`.
 
 Netdata requests the latest secret value from `https://<vault-name>.vault.azure.net/secrets/<secret-name>?api-version=7.4`.
+Both `vault-name` and `secret-name` must use only letters, numbers, and hyphens.
 
 
 ```text
@@ -187,6 +192,11 @@ jobs:
 
 
 ## Troubleshooting
+
+### Find the exact error
+
+Check the Netdata Agent logs when the collector starts or restarts. Azure resolver errors include messages such as `invalid vault name`, `invalid secret name`, or `Azure Key Vault returned HTTP 403`.
+
 
 ### Azure authentication fails
 

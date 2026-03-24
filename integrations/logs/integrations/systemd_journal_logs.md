@@ -50,4 +50,3 @@ You can start exploring `systemd` journal logs on the "Logs" tab of the Netdata 
 ## Configuration
 
 There is no configuration needed for this integration.
-

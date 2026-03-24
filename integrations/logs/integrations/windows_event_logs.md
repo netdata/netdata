@@ -50,4 +50,3 @@ You can start exploring Windows event logs on the "Logs" tab of the Netdata UI.
 ## Configuration
 
 There is no configuration needed for this integration.
-

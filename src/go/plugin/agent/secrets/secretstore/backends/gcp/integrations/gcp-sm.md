@@ -22,7 +22,7 @@ Kind: gcp-sm
 
 Use Google Secret Manager as a secretstore backend when you want Netdata collectors to read secrets from GCP at runtime instead of storing them in plain text in collector configuration files.
 
-This page covers Google Secret Manager specific setup. For the generic secretstore workflow and lifecycle, see [Secrets Management](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/secrets-management.md).
+This page covers Google Secret Manager specific setup. For the shared resolver workflow and syntax, see [Secrets Management](https://github.com/netdata/netdata/blob/master/src/collectors/SECRETS.md).
 
 
 ### Limitations
@@ -48,6 +48,13 @@ Choose one supported authentication mode and make sure the Netdata Agent can use
 - `metadata`: run Netdata in a Google Cloud environment where the metadata server is reachable.
 - `service_account_file`: provide a service account JSON file on the Netdata host.
 
+Prefer `metadata` for production when Netdata runs in a supported Google Cloud environment. Use `service_account_file` when Netdata runs outside Google Cloud or when you need explicit credentials.
+
+
+#### Protect the service account file
+
+If you use `service_account_file`, the JSON file contains a private key. Keep it on the Netdata host, make it readable by the `netdata` user, and restrict access as tightly as possible. A common setup is `chmod 0600` with ownership that allows the `netdata` user to read the file.
+
 
 #### Allow Secret Manager access
 
@@ -72,7 +79,7 @@ The following options can be defined for this secretstore backend.
 | Group | Option | Description | Default | Required |
 |:------|:-----|:------------|:--------|:---------:|
 |  | [mode](#option-mode) | GCP authentication mode. | metadata | yes |
-| **Service Account File** | mode_service_account_file.path | Path to a service account JSON file. Required when `mode` is `service_account_file`. |  | yes |
+| **Service Account File** | mode_service_account_file.path | Path to a service account JSON file. Required when `mode` is `service_account_file`. The file contains a private key and should be readable only by the `netdata` user or another tightly scoped owner. |  | yes |
 
 <a id="option-mode"></a>
 ##### mode
@@ -81,6 +88,8 @@ Supported values:
 
 - `metadata`: get an access token from the Google metadata server.
 - `service_account_file`: use a local service account JSON file.
+
+Prefer `metadata` for production when Netdata runs in a supported Google Cloud environment. Use `service_account_file` when you need explicit credentials or when the metadata server is not available.
 
 
 
@@ -137,6 +146,8 @@ Reference Google Secret Manager secrets from collector configs with the `gcp-sm`
 The operand is `project/secret` or `project/secret/version`.
 
 If you omit the version, Netdata uses `latest`.
+Project IDs may use letters, numbers, `.`, `_`, `:`, or `-`. Secret names and versions may use letters, numbers, `_`, or `-`.
+When you specify a version, use the version name accepted by Secret Manager, such as `3`.
 
 
 ```text
@@ -176,6 +187,11 @@ jobs:
 
 ## Troubleshooting
 
+### Find the exact error
+
+Check the Netdata Agent logs when the collector starts or restarts. GCP resolver errors include messages such as `metadata token request returned HTTP 404`, `invalid project ID`, `invalid version`, or `reading service account file`.
+
+
 ### Metadata mode does not work
 
 `mode: metadata` requires the Google metadata server. If Netdata is not running in a supported Google Cloud environment, switch to `service_account_file`.
@@ -183,7 +199,7 @@ jobs:
 
 ### Service account file cannot be read
 
-Check the file path, the JSON contents, and that the `netdata` user can read the file.
+Check the file path, the JSON contents, and that the `netdata` user can read the file. Because the file contains a private key, keep its permissions as tight as possible.
 
 
 ### Permission denied or secret not found

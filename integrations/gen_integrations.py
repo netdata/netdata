@@ -247,6 +247,18 @@ def anchorfy(value):
     return anchor
 
 
+def get_section_template_name(item, key):
+    if key != 'setup':
+        return f'{key}.md'
+
+    integration_type = item.get('integration_type')
+    if integration_type == 'secretstore':
+        return 'setup-secretstore.md'
+    if integration_type == 'logs':
+        return 'setup-logs.md'
+    return 'setup-generic.md'
+
+
 def get_category_sets(categories):
     default = set()
     valid = set()
@@ -837,7 +849,7 @@ def render_collectors(categories, collectors, ids):
 
         for key in COLLECTOR_RENDER_KEYS:
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{key}.md')
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
                 data = template.render(entry=item, related=related, clean=False)
                 clean_data = template.render(entry=item, related=related, clean=True)
 
@@ -931,7 +943,7 @@ def render_exporters(categories, exporters, ids):
 
         for key in EXPORTER_RENDER_KEYS:
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{key}.md')
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
                 data = template.render(entry=item, clean=False)
                 clean_data = template.render(entry=item, clean=True)
 
@@ -973,7 +985,7 @@ def render_agent_notifications(categories, notifications, ids):
 
         for key in AGENT_NOTIFICATION_RENDER_KEYS:
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{key}.md')
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
                 data = template.render(entry=item, clean=False)
 
                 clean_data = template.render(entry=item, clean=True)
@@ -1016,7 +1028,7 @@ def render_cloud_notifications(categories, notifications, ids):
 
         for key in CLOUD_NOTIFICATION_RENDER_KEYS:
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{key}.md')
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
                 data = template.render(entry=item, clean=False)
                 clean_data = template.render(entry=item, clean=True)
 
@@ -1058,7 +1070,7 @@ def render_logs(categories, logs, ids):
 
         for key in LOGS_RENDER_KEYS:
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{key}.md')
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
                 data = template.render(entry=item, clean=False)
                 clean_data = template.render(entry=item, clean=True)
 
@@ -1101,7 +1113,7 @@ def render_authentications(categories, authentications, ids):
         for key in AUTHENTICATION_RENDER_KEYS:
 
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{key}.md')
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
                 data = template.render(entry=item, clean=False)
                 clean_data = template.render(entry=item, clean=True)
 
@@ -1143,7 +1155,7 @@ def render_secretstores(categories, secretstores, ids):
 
         for key in SECRETSTORE_RENDER_KEYS:
             if key in item.keys():
-                template = get_jinja_env().get_template(f'{key}.md')
+                template = get_jinja_env().get_template(get_section_template_name(item, key))
                 data = template.render(entry=item, clean=False)
                 clean_data = template.render(entry=item, clean=True)
 
