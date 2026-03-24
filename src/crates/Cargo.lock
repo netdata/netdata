@@ -2303,6 +2303,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rt",
+ "schemars",
  "serde",
  "serde_json",
  "serde_yaml",

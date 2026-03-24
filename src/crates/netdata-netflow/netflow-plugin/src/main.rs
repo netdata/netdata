@@ -1,5 +1,6 @@
 //! netflow-plugin standalone binary
 
+mod charts;
 mod decoder;
 mod enrichment;
 mod ingest;
@@ -445,6 +446,11 @@ async fn main() {
         Arc::clone(&metrics),
         Arc::clone(&query_service),
     ));
+    let _charts_task = charts::NetflowCharts::new(&mut runtime).spawn_sampler(
+        Arc::clone(&metrics),
+        Arc::clone(&open_tiers),
+        shutdown.clone(),
+    );
 
     let query_service_for_events = Arc::clone(&query_service);
     tokio::spawn(async move {

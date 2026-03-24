@@ -50,6 +50,7 @@ tracing = { workspace = true }
 regex = { workspace = true }
 twox-hash = { workspace = true, features = ["xxhash64"] }
 reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"] }
+schemars = { workspace = true }
 socket2 = "0.5.8"
 tonic = { workspace = true, features = ["transport", "tls-native-roots"] }
 tonic-prost = "0.14"

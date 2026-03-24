@@ -50,11 +50,26 @@ pub(crate) struct IngestMetrics {
     pub(crate) ipfix_packets: AtomicU64,
     pub(crate) sflow_datagrams: AtomicU64,
     pub(crate) journal_entries_written: AtomicU64,
+    pub(crate) raw_journal_logical_bytes: AtomicU64,
     pub(crate) journal_write_errors: AtomicU64,
     pub(crate) journal_sync_errors: AtomicU64,
+    pub(crate) raw_journal_syncs: AtomicU64,
+    pub(crate) raw_journal_sync_errors: AtomicU64,
     pub(crate) tier_entries_written: AtomicU64,
+    pub(crate) minute_1_entries_written: AtomicU64,
+    pub(crate) minute_5_entries_written: AtomicU64,
+    pub(crate) hour_1_entries_written: AtomicU64,
+    pub(crate) minute_1_logical_bytes: AtomicU64,
+    pub(crate) minute_5_logical_bytes: AtomicU64,
+    pub(crate) hour_1_logical_bytes: AtomicU64,
     pub(crate) tier_write_errors: AtomicU64,
     pub(crate) tier_flushes: AtomicU64,
+    pub(crate) tier_journal_syncs: AtomicU64,
+    pub(crate) tier_journal_sync_errors: AtomicU64,
+    pub(crate) decoder_state_persist_calls: AtomicU64,
+    pub(crate) decoder_state_persist_bytes: AtomicU64,
+    pub(crate) decoder_state_write_errors: AtomicU64,
+    pub(crate) decoder_state_move_errors: AtomicU64,
     pub(crate) bioris_refresh_success: AtomicU64,
     pub(crate) bioris_refresh_errors: AtomicU64,
     pub(crate) bioris_dump_success: AtomicU64,
@@ -138,6 +153,10 @@ impl IngestMetrics {
             self.journal_entries_written.load(Ordering::Relaxed),
         );
         stats.insert(
+            "raw_journal_logical_bytes".to_string(),
+            self.raw_journal_logical_bytes.load(Ordering::Relaxed),
+        );
+        stats.insert(
             "journal_write_errors".to_string(),
             self.journal_write_errors.load(Ordering::Relaxed),
         );
@@ -146,8 +165,40 @@ impl IngestMetrics {
             self.journal_sync_errors.load(Ordering::Relaxed),
         );
         stats.insert(
+            "raw_journal_syncs".to_string(),
+            self.raw_journal_syncs.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "raw_journal_sync_errors".to_string(),
+            self.raw_journal_sync_errors.load(Ordering::Relaxed),
+        );
+        stats.insert(
             "tier_entries_written".to_string(),
             self.tier_entries_written.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "minute_1_entries_written".to_string(),
+            self.minute_1_entries_written.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "minute_5_entries_written".to_string(),
+            self.minute_5_entries_written.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "hour_1_entries_written".to_string(),
+            self.hour_1_entries_written.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "minute_1_logical_bytes".to_string(),
+            self.minute_1_logical_bytes.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "minute_5_logical_bytes".to_string(),
+            self.minute_5_logical_bytes.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "hour_1_logical_bytes".to_string(),
+            self.hour_1_logical_bytes.load(Ordering::Relaxed),
         );
         stats.insert(
             "tier_write_errors".to_string(),
@@ -156,6 +207,30 @@ impl IngestMetrics {
         stats.insert(
             "tier_flushes".to_string(),
             self.tier_flushes.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "tier_journal_syncs".to_string(),
+            self.tier_journal_syncs.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "tier_journal_sync_errors".to_string(),
+            self.tier_journal_sync_errors.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "decoder_state_persist_calls".to_string(),
+            self.decoder_state_persist_calls.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "decoder_state_persist_bytes".to_string(),
+            self.decoder_state_persist_bytes.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "decoder_state_write_errors".to_string(),
+            self.decoder_state_write_errors.load(Ordering::Relaxed),
+        );
+        stats.insert(
+            "decoder_state_move_errors".to_string(),
+            self.decoder_state_move_errors.load(Ordering::Relaxed),
         );
         stats.insert(
             "bioris_refresh_success".to_string(),
@@ -450,6 +525,9 @@ impl IngestService {
                         self.metrics
                             .journal_entries_written
                             .fetch_add(1, Ordering::Relaxed);
+                        self.metrics
+                            .raw_journal_logical_bytes
+                            .fetch_add(self.encode_buf.encoded_len(), Ordering::Relaxed);
                         entries_since_sync += 1;
 
                         self.observe_tiers_record(receive_time_usec, &flow.record);
@@ -735,7 +813,6 @@ impl IngestService {
                 continue;
             }
 
-            let writer = self.tier_writers.get_mut(tier);
             for row in rows {
                 let Some(mut fields) = tier_flow_indexes.materialize_fields(row.flow_ref) else {
                     tracing::warn!(
@@ -747,11 +824,16 @@ impl IngestService {
                 };
                 row.metrics.write_fields(&mut fields);
                 self.encode_buf.encode(&fields);
+                let logical_bytes = self.encode_buf.encoded_len();
                 let refs = self.encode_buf.field_slices();
                 let timestamps = EntryTimestamps::default()
                     .with_source_realtime_usec(row.timestamp_usec)
                     .with_entry_realtime_usec(row.timestamp_usec);
-                if let Err(err) = writer.write_entry_with_timestamps(&refs, timestamps) {
+                let write_result = {
+                    let writer = self.tier_writers.get_mut(tier);
+                    writer.write_entry_with_timestamps(&refs, timestamps)
+                };
+                if let Err(err) = write_result {
                     self.metrics
                         .tier_write_errors
                         .fetch_add(1, Ordering::Relaxed);
@@ -761,6 +843,7 @@ impl IngestService {
                 self.metrics
                     .tier_entries_written
                     .fetch_add(1, Ordering::Relaxed);
+                self.increment_materialized_tier_metrics(tier, logical_bytes);
             }
             self.metrics.tier_flushes.fetch_add(1, Ordering::Relaxed);
         }
@@ -806,9 +889,15 @@ impl IngestService {
             return 0;
         }
 
+        self.metrics
+            .raw_journal_syncs
+            .fetch_add(1, Ordering::Relaxed);
         if let Err(err) = self.raw_journal.sync() {
             self.metrics
                 .journal_sync_errors
+                .fetch_add(1, Ordering::Relaxed);
+            self.metrics
+                .raw_journal_sync_errors
                 .fetch_add(1, Ordering::Relaxed);
             tracing::warn!("journal sync failed: {}", err);
         }
@@ -817,9 +906,15 @@ impl IngestService {
     }
 
     fn sync_all_tiers(&mut self) -> usize {
+        self.metrics
+            .tier_journal_syncs
+            .fetch_add(1, Ordering::Relaxed);
         if let Err(err) = self.tier_writers.sync_all() {
             self.metrics
                 .journal_sync_errors
+                .fetch_add(1, Ordering::Relaxed);
+            self.metrics
+                .tier_journal_sync_errors
                 .fetch_add(1, Ordering::Relaxed);
             tracing::warn!("tier journal sync failed: {}", err);
             return 1;
@@ -846,8 +941,18 @@ impl IngestService {
             }
         };
 
+        self.metrics
+            .decoder_state_persist_calls
+            .fetch_add(1, Ordering::Relaxed);
+        self.metrics
+            .decoder_state_persist_bytes
+            .fetch_add(data.len() as u64, Ordering::Relaxed);
+
         let tmp_path = self.decoder_state_path.with_extension("json.tmp");
         if let Err(err) = fs::write(&tmp_path, data.as_bytes()) {
+            self.metrics
+                .decoder_state_write_errors
+                .fetch_add(1, Ordering::Relaxed);
             tracing::warn!(
                 "failed to write temporary netflow decoder state {}: {}",
                 tmp_path.display(),
@@ -857,6 +962,9 @@ impl IngestService {
         }
 
         if let Err(err) = fs::rename(&tmp_path, &self.decoder_state_path) {
+            self.metrics
+                .decoder_state_move_errors
+                .fetch_add(1, Ordering::Relaxed);
             tracing::warn!(
                 "failed to move netflow decoder state {} to {}: {}",
                 tmp_path.display(),
@@ -864,6 +972,36 @@ impl IngestService {
                 err
             );
             let _ = fs::remove_file(&tmp_path);
+        }
+    }
+
+    fn increment_materialized_tier_metrics(&self, tier: TierKind, logical_bytes: u64) {
+        match tier {
+            TierKind::Minute1 => {
+                self.metrics
+                    .minute_1_entries_written
+                    .fetch_add(1, Ordering::Relaxed);
+                self.metrics
+                    .minute_1_logical_bytes
+                    .fetch_add(logical_bytes, Ordering::Relaxed);
+            }
+            TierKind::Minute5 => {
+                self.metrics
+                    .minute_5_entries_written
+                    .fetch_add(1, Ordering::Relaxed);
+                self.metrics
+                    .minute_5_logical_bytes
+                    .fetch_add(logical_bytes, Ordering::Relaxed);
+            }
+            TierKind::Hour1 => {
+                self.metrics
+                    .hour_1_entries_written
+                    .fetch_add(1, Ordering::Relaxed);
+                self.metrics
+                    .hour_1_logical_bytes
+                    .fetch_add(logical_bytes, Ordering::Relaxed);
+            }
+            TierKind::Raw => {}
         }
     }
 }
@@ -918,6 +1056,10 @@ impl JournalEncodeBuffer {
 
     fn field_slices(&self) -> Vec<&[u8]> {
         self.refs.iter().map(|r| &self.data[r.clone()]).collect()
+    }
+
+    fn encoded_len(&self) -> u64 {
+        self.data.len() as u64
     }
 }
 
