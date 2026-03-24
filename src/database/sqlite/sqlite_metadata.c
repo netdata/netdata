@@ -3145,7 +3145,7 @@ static void *metadata_unittest_threads(void)
         threads_to_create,
         (long long)seconds_to_run);
 
-    ND_THREAD *threads[threads_to_create];
+    ND_THREAD **threads = callocz((size_t)threads_to_create, sizeof(*threads));
     tu.join = 0;
     for (int i = 0; i < threads_to_create; i++) {
         char buf[100 + 1];
@@ -3159,6 +3159,7 @@ static void *metadata_unittest_threads(void)
     for (int i = 0; i < threads_to_create; i++) {
         nd_thread_join(threads[i]);
     }
+    freez(threads);
     sleep_usec(5 * USEC_PER_SEC);
 
     fprintf(stderr, "Added %u elements, processed %u\n", tu.added, tu.processed);

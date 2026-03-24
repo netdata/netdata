@@ -1267,11 +1267,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             if(unlikely(pages_to_evict->link.next)) {
                 // we have many pages, let's minimize the index locks we are going to get
 
-                PGC_PAGE *pages_per_partition[cache->config.partitions];
-                memset(pages_per_partition, 0, sizeof(PGC_PAGE *) * cache->config.partitions);
-
-                bool partitions_done[cache->config.partitions];
-                memset(partitions_done, 0, sizeof(bool) * cache->config.partitions);
+                PGC_PAGE **pages_per_partition = callocz(cache->config.partitions, sizeof(*pages_per_partition));
+                bool *partitions_done = callocz(cache->config.partitions, sizeof(*partitions_done));
 
                 // sort them by partition
                 for (PGC_PAGE *page = pages_to_evict, *next = NULL; page; page = next) {
@@ -1337,6 +1334,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                     }
                 }
 
+                freez(partitions_done);
+                freez(pages_per_partition);
                 timing_dbengine_evict_report();
             }
             else {
@@ -1763,8 +1762,8 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
             break;
         }
 
-        PGC_ENTRY array[optimal_flush_size];
-        PGC_PAGE *pages[optimal_flush_size];
+        PGC_ENTRY *array = mallocz(optimal_flush_size * sizeof(*array));
+        PGC_PAGE **pages = mallocz(optimal_flush_size * sizeof(*pages));
 
         size_t pages_added = 0,
                pages_removed_dirty = 0,
@@ -1864,6 +1863,8 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
 
             // next time, continue to the next section (tier)
             first = false;
+            freez(pages);
+            freez(array);
             continue;
         }
 
@@ -1922,6 +1923,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
             pgc_queue_lock(cache, &cache->dirty, PGC_QUEUE_LOCK_PRIO_FLUSHERS);
             have_dirty_lock = true;
         }
+
+        freez(pages);
+        freez(array);
     }
 
     if(have_dirty_lock) {
@@ -2832,9 +2836,7 @@ void *unittest_stress_test_queries(void *ptr) {
             end_time_t = start_time_t + 1;
         size_t pages = (end_time_t - start_time_t) / pgc_uts.points_per_page + 1;
 
-        PGC_PAGE *array[pages];
-        for(size_t i = 0; i < pages ;i++)
-            array[i] = NULL;
+        PGC_PAGE **array = callocz(pages, sizeof(*array));
 
         // find the pages the cache has
         for(size_t i = 0; i < pages ;i++) {
@@ -2871,6 +2873,8 @@ void *unittest_stress_test_queries(void *ptr) {
             pgc_page_release(pgc_uts.cache, array[i]);
             array[i] = NULL;
         }
+
+        freez(array);
     }
 
     return ptr;

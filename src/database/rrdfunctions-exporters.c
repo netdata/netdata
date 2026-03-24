@@ -163,11 +163,13 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
         if(version)
             *version = t->version;
 
-        char key[UINT64_MAX_LENGTH + sizeof(RRDFUNCTIONS_VERSION_SEPARATOR) + strlen(t_dfe.name)];
-        snprintfz(key, sizeof(key), "%"PRIu32 RRDFUNCTIONS_VERSION_SEPARATOR "%s",
+        size_t key_size = UINT64_MAX_LENGTH + sizeof(RRDFUNCTIONS_VERSION_SEPARATOR) + strlen(t_dfe.name);
+        char *key = mallocz(key_size);
+        snprintfz(key, key_size, "%"PRIu32 RRDFUNCTIONS_VERSION_SEPARATOR "%s",
                   t->version, t_dfe.name);
 
         dictionary_set(dst, key, value, value_size);
+        freez(key);
     }
     dfe_done(t);
 }

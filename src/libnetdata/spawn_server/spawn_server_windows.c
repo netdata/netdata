@@ -61,8 +61,9 @@ static BUFFER *argv_to_windows(const char **argv) {
     BUFFER *wb = buffer_create(0, NULL);
 
     // argv[0] is the path
-    char b[strlen(argv[0]) * 2 + FILENAME_MAX];
-    cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], b, sizeof(b));
+    size_t b_size = strlen(argv[0]) * 2 + FILENAME_MAX;
+    char *b = mallocz(b_size);
+    cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], b, b_size);
 
     for(size_t i = 0; argv[i] ;i++) {
         const char *s = (i == 0) ? b : argv[i];
@@ -110,6 +111,7 @@ static BUFFER *argv_to_windows(const char **argv) {
             buffer_strcat(wb, "\"");
     }
 
+    freez(b);
     return wb;
 }
 

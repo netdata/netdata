@@ -76,7 +76,7 @@ void test_int_fds_plugin_kill_to_stop(SPAWN_SERVER *server, const char *argv0) {
 
     const char *msg = "Hello World!\n";
     ssize_t len = strlen(msg);
-    char buffer[len * 2];
+    char buffer[sizeof("Hello World!\n") * 2];
 
     for(size_t j = 0; j < 30 ;j++) {
         fprintf(stderr, "-");
@@ -131,7 +131,7 @@ void test_popen_plugin_kill_to_stop(const char *argv0) {
 
     const char *msg = "Hello World!\n";
     size_t len = strlen(msg);
-    char buffer[len * 2];
+    char buffer[sizeof("Hello World!\n") * 2];
 
     for(size_t j = 0; j < 30 ;j++) {
         fprintf(stderr, "-");
@@ -207,7 +207,7 @@ void test_int_fds_plugin_close_to_stop(SPAWN_SERVER *server, const char *argv0) 
 
     const char *msg = "Hello World!\n";
     ssize_t len = strlen(msg);
-    char buffer[len * 2];
+    char buffer[sizeof("Hello World!\n") * 2];
 
     for(size_t j = 0; j < 30 ;j++) {
         fprintf(stderr, "-");
@@ -262,7 +262,7 @@ void test_popen_plugin_close_to_stop(const char *argv0) {
 
     const char *msg = "Hello World!\n";
     size_t len = strlen(msg);
-    char buffer[len * 2];
+    char buffer[sizeof("Hello World!\n") * 2];
 
     for(size_t j = 0; j < 30 ;j++) {
         fprintf(stderr, "-");

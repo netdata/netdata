@@ -145,7 +145,8 @@ static void webrtc_config_ice_servers(void) {
     const char *servers = inicfg_get(&netdata_config, CONFIG_SECTION_WEBRTC, "ice servers", buffer_tostring(wb));
 
     webrtc_base.iceServersCount = 0;
-    char tmp[strlen(servers) + 1];
+    size_t tmp_size = strlen(servers) + 1;
+    char *tmp = mallocz(tmp_size);
     strcpy(tmp, servers);
     char *s = tmp, *e;
     while(*s) {
@@ -170,6 +171,7 @@ static void webrtc_config_ice_servers(void) {
             break;
     }
 
+    freez(tmp);
     buffer_free(wb);
 }
 

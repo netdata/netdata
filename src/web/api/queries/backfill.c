@@ -225,7 +225,7 @@ void backfill_thread(void *ptr) {
     size_t threads = netdata_conf_cpus() / 2;
     if(threads < 2) threads = 2;
     if(threads > 16) threads = 16;
-    ND_THREAD *th[threads - 1];
+    ND_THREAD **th = callocz(threads - 1, sizeof(*th));
 
     for(size_t t = 0; t < threads - 1 ;t++) {
         char tag[15];
@@ -240,6 +240,8 @@ void backfill_thread(void *ptr) {
         nd_thread_signal_cancel(th[t]);
         nd_thread_join(th[t]);
     }
+
+    freez(th);
 
     // cleanup
     spinlock_lock(&backfill_globals.spinlock);
@@ -258,4 +260,3 @@ void backfill_thread(void *ptr) {
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
-

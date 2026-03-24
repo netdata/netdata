@@ -282,16 +282,18 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                 }
 
                 uint32_t message_len = header.len - sizeof(opcode);
-                char message[message_len + 1];
+                char *message = mallocz((size_t)message_len + 1);
                 bytes = read_pipe_block(wth->cmd.pipe[PIPE_READ], message, message_len);
                 if(bytes != message_len) {
                     netdata_log_error("WEBSOCKET[%zu]: Failed to read broadcast message from pipe", wth->id);
+                    freez(message);
                     continue;
                 }
 
                 // Ensure we have the complete message
                 if(header.len != sizeof(WEBSOCKET_OPCODE) + message_len) {
                     netdata_log_error("WEBSOCKET[%zu]: Broadcast command size mismatch", wth->id);
+                    freez(message);
                     continue;
                 }
                 
@@ -307,6 +309,7 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                 }
                 
                 spinlock_unlock(&wth->clients_spinlock);
+                freez(message);
                 break;
             }
 

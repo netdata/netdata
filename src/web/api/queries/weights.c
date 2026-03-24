@@ -1410,21 +1410,29 @@ static double kstwo(
     uint32_t base_shifts) {
 
     // -1 in size, since the calculate_pairs_diffs() returns one less point
-    DIFFS_NUMBERS baseline_diffs[baseline_points - 1];
-    DIFFS_NUMBERS highlight_diffs[highlight_points - 1];
+    DIFFS_NUMBERS *baseline_diffs = mallocz((size_t)(baseline_points - 1) * sizeof(*baseline_diffs));
+    DIFFS_NUMBERS *highlight_diffs = mallocz((size_t)(highlight_points - 1) * sizeof(*highlight_diffs));
 
     int base_size = (int)calculate_pairs_diff(baseline_diffs, baseline, baseline_points);
     int high_size = (int)calculate_pairs_diff(highlight_diffs, highlight, highlight_points);
 
-    if(unlikely(!base_size || !high_size))
-        return NAN;
-
-    if(unlikely(base_size != baseline_points - 1 || high_size != highlight_points - 1)) {
-        netdata_log_error("Metric correlations: internal error - calculate_pairs_diff() returns the wrong number of entries");
+    if(unlikely(!base_size || !high_size)) {
+        freez(highlight_diffs);
+        freez(baseline_diffs);
         return NAN;
     }
 
-    return ks_2samp(baseline_diffs, base_size, highlight_diffs, high_size, base_shifts);
+    if(unlikely(base_size != baseline_points - 1 || high_size != highlight_points - 1)) {
+        netdata_log_error("Metric correlations: internal error - calculate_pairs_diff() returns the wrong number of entries");
+        freez(highlight_diffs);
+        freez(baseline_diffs);
+        return NAN;
+    }
+
+    double ret = ks_2samp(baseline_diffs, base_size, highlight_diffs, high_size, base_shifts);
+    freez(highlight_diffs);
+    freez(baseline_diffs);
+    return ret;
 }
 
 NETDATA_DOUBLE *rrd2rrdr_ks2(
@@ -1805,7 +1813,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
         stats->max_base_high_ratio = 1.0;
 
     // create an array of the right size and copy all the values in it
-    NETDATA_DOUBLE slots[dimensions];
+    NETDATA_DOUBLE *slots = mallocz(dimensions * sizeof(*slots));
     dimensions = 0;
     dfe_start_read(results, t) {
         if(t->flags & RESULT_IS_PERCENTAGE_OF_TIME)
@@ -1815,7 +1823,10 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     }
     dfe_done(t);
 
-    if(!dimensions) return 0;   // Coverity fix
+    if(!dimensions) {
+        freez(slots);
+        return 0;   // Coverity fix
+    }
 
     // sort the array with the values of all dimensions
     qsort(slots, dimensions, sizeof(NETDATA_DOUBLE), compare_netdata_doubles);
@@ -1844,6 +1855,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     }
     dfe_done(t);
 
+    freez(slots);
     return dimensions;
 }
 
@@ -2691,4 +2703,3 @@ int mc_unittest(void) {
 
     return errors;
 }
-

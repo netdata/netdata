@@ -149,11 +149,12 @@ BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_l
 
     POPEN_INSTANCE *pi = spawn_popen_run(command);
     if(pi) {
-        char buffer[max_line_length + 1];
+        char *buffer = mallocz((size_t)max_line_length + 1);
         while (fgets(buffer, max_line_length, spawn_popen_stdout(pi))) {
             buffer[max_line_length] = '\0';
             buffer_strcat(wb, buffer);
         }
+        freez(buffer);
         spawn_popen_kill(pi, 0);
     }
     else {
@@ -168,11 +169,12 @@ BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_l
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length) {
     POPEN_INSTANCE *pi = spawn_popen_run(command);
     if(pi) {
-        char buffer[max_line_length + 1];
+        char *buffer = mallocz((size_t)max_line_length + 1);
 
         while (fgets(buffer, max_line_length, spawn_popen_stdout(pi)))
             fprintf(stdout, "%s", buffer);
 
+        freez(buffer);
         spawn_popen_kill(pi, 0);
     }
     else {

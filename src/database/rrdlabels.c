@@ -799,7 +799,7 @@ static SIMPLE_PATTERN_RESULT simple_pattern_match_name_and_value_callback(const 
     if(simple_pattern_matches(t->pattern, name)) return -1;
 
     size_t len = RRDLABELS_MAX_NAME_LENGTH + RRDLABELS_MAX_VALUE_LENGTH + 2; // +1 for =, +1 for \0
-    char tmp[len], *dst = &tmp[0];
+    char *tmp = mallocz(len), *dst = tmp;
     const char *v = value;
 
     // copy the name
@@ -815,7 +815,9 @@ static SIMPLE_PATTERN_RESULT simple_pattern_match_name_and_value_callback(const 
     *dst = '\0';
 
     t->searches++;
-    return simple_pattern_matches_length_extract(t->pattern, tmp, dst - tmp, NULL, 0);
+    SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_length_extract(t->pattern, tmp, dst - tmp, NULL, 0);
+    freez(tmp);
+    return ret;
 }
 
 SIMPLE_PATTERN_RESULT rrdlabels_match_simple_pattern_parsed(RRDLABELS *labels, SIMPLE_PATTERN *pattern, char equal, size_t *searches) {
@@ -904,8 +906,8 @@ static int label_to_buffer_callback(const RRDLABEL *lb, void *value __maybe_unus
     size_t n_size = (t->name_sanitizer ) ? ( RRDLABELS_MAX_NAME_LENGTH  * 2 ) : 1;
     size_t v_size = (t->value_sanitizer) ? ( RRDLABELS_MAX_VALUE_LENGTH * 2 ) : 1;
 
-    char n[n_size];
-    char v[v_size];
+    char *n = mallocz(n_size);
+    char *v = mallocz(v_size);
 
     const char *name = string2str(lb->index.key);
 
@@ -923,9 +925,13 @@ static int label_to_buffer_callback(const RRDLABEL *lb, void *value __maybe_unus
 
     if(!t->filter_callback || t->filter_callback(name, string2str(lb->index.value), ls, t->filter_data)) {
         buffer_sprintf(t->wb, "%s%s%s%s%s%s%s%s%s", t->count++?t->between_them:"", t->before_each, t->quote, nn, t->quote, t->equal, t->quote, vv, t->quote);
+        freez(n);
+        freez(v);
         return 1;
     }
 
+    freez(n);
+    freez(v);
     return 0;
 }
 

@@ -216,9 +216,9 @@ static int unittest_stress(void) {
                 TEST_DURATION_SEC, with_sleep ? "with" : "without");
 
         // Prepare thread stats and args
-        THREAD_STATS stats[total_threads];
-        struct thread_args thread_args[total_threads];
-        ND_THREAD *threads[total_threads];
+        THREAD_STATS *stats = callocz(total_threads, sizeof(*stats));
+        struct thread_args *thread_args = callocz(total_threads, sizeof(*thread_args));
+        ND_THREAD **threads = callocz(total_threads, sizeof(*threads));
 
         fprintf(stderr, "Starting %zu threads for %ds test %s sleep...\n",
                 total_threads,
@@ -270,6 +270,10 @@ static int unittest_stress(void) {
 
         // Print stats
         print_thread_stats(stats, total_threads, TEST_DURATION_SEC * USEC_PER_SEC);
+
+        freez(threads);
+        freez(thread_args);
+        freez(stats);
     }
 
     waitq_destroy(&wq);

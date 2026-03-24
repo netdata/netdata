@@ -112,19 +112,24 @@ static void rrdhost_load_config_labels(void) {
 }
 
 static void rrdhost_load_kubernetes_labels(void) {
-    char label_script[sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2)];
-    sprintf(label_script, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
+    size_t label_script_size = strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2;
+    char *label_script = mallocz(label_script_size);
+    snprintfz(label_script, label_script_size, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
 
     if (unlikely(access(label_script, R_OK) != 0)) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "Kubernetes pod label fetching script %s not found.",
                label_script);
 
+        freez(label_script);
         return;
     }
 
     POPEN_INSTANCE *instance = spawn_popen_run(label_script);
-    if(!instance) return;
+    if(!instance) {
+        freez(label_script);
+        return;
+    }
 
     char buffer[1000 + 1];
     while (fgets(buffer, 1000, spawn_popen_stdout(instance)) != NULL)
@@ -137,6 +142,8 @@ static void rrdhost_load_kubernetes_labels(void) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "%s exited abnormally. Failed to get kubernetes labels.",
                label_script);
+
+    freez(label_script);
 }
 
 static void rrdhost_load_auto_labels(void) {

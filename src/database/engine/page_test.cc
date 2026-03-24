@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 #include <limits>
 #include <random>
+#include <vector>
 
 bool operator==(const STORAGE_POINT lhs, const STORAGE_POINT rhs) {
     if (lhs.min != rhs.min)
@@ -304,13 +305,13 @@ TEST(PGD, CopyToExtent) {
     EXPECT_EQ(size_in_bytes, 512);
 
     uint32_t size_in_words = size_in_bytes / sizeof(uint32_t);
-    alignas(sizeof(uintptr_t)) uint32_t disk_buffer[size_in_words];
+    std::vector<uint32_t> disk_buffer(size_in_words);
 
     for (size_t i = 0; i != size_in_words; i++) {
         disk_buffer[i] = std::numeric_limits<uint32_t>::max();
     }
 
-    pgd_copy_to_extent(pg_collector, (uint8_t *) &disk_buffer[0], size_in_bytes);
+    pgd_copy_to_extent(pg_collector, (uint8_t *)disk_buffer.data(), size_in_bytes);
 
     EXPECT_EQ(disk_buffer[0], NULL);
     EXPECT_EQ(disk_buffer[1], NULL);
@@ -336,13 +337,13 @@ TEST(PGD, Roundtrip) {
     uint32_t size_in_bytes = pgd_disk_footprint(pg_collector);
     uint32_t size_in_words = size_in_bytes / sizeof(uint32_t);
 
-    alignas(sizeof(uintptr_t)) uint32_t disk_buffer[size_in_words];
+    std::vector<uint32_t> disk_buffer(size_in_words);
     for (size_t i = 0; i != size_in_words; i++)
         disk_buffer[i] = std::numeric_limits<uint32_t>::max();
 
-    pgd_copy_to_extent(pg_collector, (uint8_t *) &disk_buffer[0], size_in_bytes);
+    pgd_copy_to_extent(pg_collector, (uint8_t *)disk_buffer.data(), size_in_bytes);
 
-    PGD *pg_disk = pgd_create_from_disk_data(page_type, &disk_buffer[0], size_in_bytes);
+    PGD *pg_disk = pgd_create_from_disk_data(page_type, disk_buffer.data(), size_in_bytes);
     EXPECT_EQ(pgd_slots_used(pg_disk), slots);
 
     // Expected memory footprint is equal to the disk footprint + a couple

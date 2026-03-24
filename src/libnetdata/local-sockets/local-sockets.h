@@ -1552,13 +1552,14 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
             local_sockets_log(ls, "failed to read cmdline length from pipe");
 
         if(len) {
-            char cmdline[len + 1];
+            char *cmdline = mallocz(len + 1);
             if(read(spawn_server_instance_read_fd(si), cmdline, len) != (ssize_t)len)
                 local_sockets_log(ls, "failed to read cmdline from pipe");
             else {
                 cmdline[len] = '\0';
                 buf.cmdline = string_strdupz(cmdline);
             }
+            freez(cmdline);
         }
         else
             buf.cmdline = NULL;
@@ -1635,10 +1636,8 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
     if(threads > 100) threads = 100;
 
     size_t last_thread = 0;
-    ND_THREAD *workers[threads];
-    struct local_sockets_namespace_worker workers_data[threads];
-    memset(workers, 0, sizeof(workers));
-    memset(workers_data, 0, sizeof(workers_data));
+    ND_THREAD **workers = callocz(threads, sizeof(*workers));
+    struct local_sockets_namespace_worker *workers_data = callocz(threads, sizeof(*workers_data));
 
     spinlock_lock(&ls->spinlock);
 
@@ -1683,6 +1682,9 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
         if(workers[i])
             nd_thread_join(workers[i]);
     }
+
+    freez(workers_data);
+    freez(workers);
 }
 
 #endif // LOCAL_SOCKETS_USE_SETNS

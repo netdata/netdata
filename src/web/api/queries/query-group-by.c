@@ -3,8 +3,9 @@
 #include "query-internal.h"
 
 RRDR_GROUP_BY group_by_parse(const char *group_by_txt) {
-    char src[strlen(group_by_txt) + 1];
-    strcatz(src, 0, group_by_txt, sizeof(src));
+    size_t src_size = strlen(group_by_txt) + 1;
+    char *src = mallocz(src_size);
+    strcatz(src, 0, group_by_txt, src_size);
     char *s = src;
 
     RRDR_GROUP_BY group_by = RRDR_GROUP_BY_NONE;
@@ -46,6 +47,7 @@ RRDR_GROUP_BY group_by_parse(const char *group_by_txt) {
     if(group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE)
         group_by = RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE; // remove all other groupings
 
+    freez(src);
     return group_by;
 }
 

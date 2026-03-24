@@ -274,7 +274,7 @@ static void log_forwarder_thread_func(void *arg) {
         // Count the number of fds
         size_t nfds = 1 + log_forwarder_remove_deleted_unsafe(lf);
 
-        struct pollfd pfds[nfds];
+        struct pollfd *pfds = mallocz(nfds * sizeof(*pfds));
 
         // First, the notification pipe
         pfds[0].fd = lf->pipe_fds[PIPE_READ];
@@ -320,6 +320,7 @@ static void log_forwarder_thread_func(void *arg) {
                         if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
                             // Handle read error if necessary
                             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: Failed to read from notification pipe");
+                            freez(pfds);
                             break;
                         }
                     }
@@ -368,11 +369,14 @@ static void log_forwarder_thread_func(void *arg) {
         }
         else if (ret == 0) {
             // Timeout, nothing to do
+            freez(pfds);
             continue;
 
         }
         else
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: poll() error");
+
+        freez(pfds);
     }
 
     spinlock_lock(&lf->spinlock);

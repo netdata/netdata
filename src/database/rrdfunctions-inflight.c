@@ -394,8 +394,9 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
     const DICTIONARY_ITEM *host_function_acquired = NULL;
 
-    char sanitized_source[(source ? strlen(source) : 0) + 1];
-    rrd_functions_sanitize(sanitized_source, source ? source : "", sizeof(sanitized_source));
+    size_t sanitized_source_size = (source ? strlen(source) : 0) + 1;
+    char *sanitized_source = mallocz(sanitized_source_size);
+    rrd_functions_sanitize(sanitized_source, source ? source : "", sanitized_source_size);
 
     // ------------------------------------------------------------------------
     // check for the host
@@ -529,6 +530,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         },
     };
     uuid_copy(t.transaction_uuid, uuid);
+    freez(sanitized_source);
 
     struct rrd_function_inflight *r = dictionary_set(rrd_functions_inflight_requests, transaction, &t, sizeof(t));
     if(!r) {

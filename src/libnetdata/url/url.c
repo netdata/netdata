@@ -272,11 +272,12 @@ url_is_request_complete_and_extract_payload(const char *begin, const char *end, 
                 while (*space && !isspace((uint8_t)*space) && *space != ';') space++;
                 size_t ct_len = space - ct;
 
-                char ct_copy[ct_len + 1];
+                char *ct_copy = mallocz(ct_len + 1);
                 memcpy(ct_copy, ct, ct_len);
                 ct_copy[ct_len] = '\0';
 
                 (*post_payload)->content_type = content_type_string2id(ct_copy);
+                freez(ct_copy);
             }
             else
                 (*post_payload)->content_type = CT_TEXT_PLAIN;
