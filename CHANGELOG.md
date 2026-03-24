@@ -167,6 +167,19 @@
 - Build(deps): bump nick-invision/retry from 3 to 4 ([#22004](https://github.com/netdata/netdata/issues/22004))
 - Refactor(go/scripts.d): switch to v2 framework and fixes ([#21908](https://github.com/netdata/netdata/issues/21908))
 - Feat(go/scripts.d): add Nagios V2 alerts and alertable state ([#22008](https://github.com/netdata/netdata/issues/22008))
+- Regenerate integrations docs ([#22006](https://github.com/netdata/netdata/issues/22006))
+- Build(deps): bump github.com/jackc/pgx/v5 from 5.9.0 to 5.9.1 in /src/go ([#22010](https://github.com/netdata/netdata/issues/22010))
+- Build(deps): bump go.opentelemetry.io/otel/sdk from 1.39.0 to 1.40.0 in /src/go ([#22011](https://github.com/netdata/netdata/issues/22011))
+- Feat(health): add azure monitor alerts ([#22007](https://github.com/netdata/netdata/issues/22007))
+- Docs: nagios metadata improvements ([#22014](https://github.com/netdata/netdata/issues/22014))
+- Docs: update Nagios overview for COLLECTORS.md ([#22016](https://github.com/netdata/netdata/issues/22016))
+- Regenerate integrations docs ([#22015](https://github.com/netdata/netdata/issues/22015))
+- Sync Repos (ebpf.plugin) ([#21982](https://github.com/netdata/netdata/issues/21982))
+- Create journal directory if missing before watching ([#22019](https://github.com/netdata/netdata/issues/22019))
+- Fix lock order during ctx processing to avoid deadlock ([#21996](https://github.com/netdata/netdata/issues/21996))
+- Docs: remove Nagios from Prometheus meta ([#22020](https://github.com/netdata/netdata/issues/22020))
+- Regenerate integrations docs ([#22022](https://github.com/netdata/netdata/issues/22022))
+- Fix clocks (ebpf.plugin and others) ([#22009](https://github.com/netdata/netdata/issues/22009))
 
 ## [2.9.0] - 2026-02-16
 
