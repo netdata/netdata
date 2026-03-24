@@ -43,6 +43,7 @@ const HISTOGRAM_TARGET_BUCKETS: u32 = 60;
 const MIN_TIMESERIES_BUCKET_SECONDS: u32 = 60;
 const OTHER_BUCKET_LABEL: &str = "__other__";
 const OVERFLOW_BUCKET_LABEL: &str = "__overflow__";
+const VIRTUAL_FLOW_FIELDS: &[&str] = &["ICMPV4", "ICMPV6"];
 
 pub(crate) const DEFAULT_GROUP_BY_FIELDS: &[&str] = &["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME"];
 const COUNTRY_MAP_GROUP_BY_FIELDS: &[&str] = &["SRC_COUNTRY", "DST_COUNTRY"];
@@ -54,6 +55,10 @@ fn default_group_by() -> Vec<String> {
         .iter()
         .map(|s| s.to_string())
         .collect()
+}
+
+fn supported_flow_field_names() -> impl Iterator<Item = &'static str> {
+    canonical_flow_field_names().chain(VIRTUAL_FLOW_FIELDS.iter().copied())
 }
 
 const FACET_EXCLUDED_FIELDS: &[&str] = &[
@@ -355,20 +360,20 @@ fn non_empty_selection(value: String) -> Option<String> {
 }
 
 static GROUP_BY_ALLOWED_FIELDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
-    canonical_flow_field_names()
+    supported_flow_field_names()
         .filter(|field| field_is_groupable(field))
         .collect()
 });
 
 static GROUP_BY_ALLOWED_OPTIONS: LazyLock<Vec<String>> = LazyLock::new(|| {
-    canonical_flow_field_names()
+    supported_flow_field_names()
         .filter(|field| field_is_groupable(field))
         .map(str::to_string)
         .collect()
 });
 
 static FACET_ALLOWED_OPTIONS: LazyLock<Vec<String>> = LazyLock::new(|| {
-    canonical_flow_field_names()
+    supported_flow_field_names()
         .filter(|field| facet_field_requested(field))
         .map(str::to_string)
         .collect()
@@ -709,13 +714,13 @@ impl FlowQueryService {
                 .filter_map(|row| {
                     let mut fields = tier_flow_indexes.materialize_fields(row.flow_ref)?;
                     row.metrics.write_fields(&mut fields);
-                    Some(FlowRecord {
-                        timestamp_usec: row.timestamp_usec,
-                        fields: fields
+                    Some(FlowRecord::new(
+                        row.timestamp_usec,
+                        fields
                             .into_iter()
                             .map(|(key, value)| (key.to_string(), value))
                             .collect(),
-                    })
+                    ))
                 })
                 .collect();
         }
@@ -950,10 +955,7 @@ impl FlowQueryService {
                     continue;
                 }
 
-                let record = FlowRecord {
-                    timestamp_usec,
-                    fields,
-                };
+                let record = FlowRecord::new(timestamp_usec, fields);
                 if !record_matches_selections(&record, &request.selections) {
                     continue;
                 }
@@ -1429,6 +1431,7 @@ impl FlowQueryService {
             .map(|field| field.to_ascii_uppercase())
             .collect::<HashSet<String>>();
         needed_fields.extend(requested_fields.iter().cloned());
+        expand_virtual_flow_field_dependencies(&mut needed_fields);
 
         let after_usec = (setup.after as u64).saturating_mul(1_000_000);
         let before_usec = (setup.before as u64).saturating_mul(1_000_000);
@@ -1522,10 +1525,7 @@ impl FlowQueryService {
                     continue;
                 }
 
-                let record = FlowRecord {
-                    timestamp_usec,
-                    fields,
-                };
+                let record = FlowRecord::new(timestamp_usec, fields);
                 accumulate_requested_distinct_facets(
                     &record,
                     &request.selections,
@@ -2094,10 +2094,7 @@ impl FlowQueryService {
 
                 let fields = fields_from_cursor_payloads(&mut cursor)
                     .context("failed to decode compact row payloads")?;
-                Ok(Some(FlowRecord {
-                    timestamp_usec,
-                    fields,
-                }))
+                Ok(Some(FlowRecord::new(timestamp_usec, fields)))
             }
             RecordHandle::OpenRowIndex(_) => Ok(None),
         }
@@ -2108,6 +2105,16 @@ impl FlowQueryService {
 struct FlowRecord {
     timestamp_usec: u64,
     fields: BTreeMap<String, String>,
+}
+
+impl FlowRecord {
+    fn new(timestamp_usec: u64, mut fields: BTreeMap<String, String>) -> Self {
+        populate_virtual_fields(&mut fields);
+        Self {
+            timestamp_usec,
+            fields,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -3397,6 +3404,13 @@ fn resolve_effective_group_by(request: &FlowsRequest) -> Vec<String> {
 
 fn grouped_query_can_use_projected_scan(request: &FlowsRequest) -> bool {
     request.query.is_empty()
+        && resolve_effective_group_by(request)
+            .iter()
+            .all(|field| journal_projected_group_field_supported(field))
+        && request
+            .selections
+            .keys()
+            .all(|field| journal_projected_selection_field_supported(field))
         && request
             .selections
             .values()
@@ -3496,7 +3510,7 @@ fn open_tier_index_path_supported(
 ) -> bool {
     requested_fields
         .iter()
-        .all(|field| rollup_field_supported(field))
+        .all(|field| open_tier_field_supported(field))
         && selections
             .keys()
             .all(|field| open_tier_selection_field_supported(field))
@@ -3506,17 +3520,23 @@ fn open_tier_projected_grouped_path_supported(
     group_by: &[String],
     selections: &HashMap<String, Vec<String>>,
 ) -> bool {
-    group_by.iter().all(|field| rollup_field_supported(field))
+    group_by
+        .iter()
+        .all(|field| open_tier_field_supported(field))
         && selections
             .keys()
             .all(|field| open_tier_selection_field_supported(field))
+}
+
+fn open_tier_field_supported(field: &str) -> bool {
+    is_virtual_flow_field(field) || rollup_field_supported(field)
 }
 
 fn open_tier_selection_field_supported(field: &str) -> bool {
     matches!(
         field.to_ascii_uppercase().as_str(),
         "BYTES" | "PACKETS" | "RAW_BYTES" | "RAW_PACKETS"
-    ) || rollup_field_supported(field)
+    ) || open_tier_field_supported(field)
 }
 
 fn accumulate_requested_distinct_open_tier_facets(
@@ -3583,6 +3603,30 @@ fn open_tier_row_field_value(
         "PACKETS" => Some(row.metrics.packets.to_string()),
         "RAW_BYTES" => Some(row.metrics.raw_bytes.to_string()),
         "RAW_PACKETS" => Some(row.metrics.raw_packets.to_string()),
+        "ICMPV4" => presentation::icmp_virtual_value(
+            "ICMPV4",
+            tier_flow_indexes
+                .field_value_string(row.flow_ref, "PROTOCOL")
+                .as_deref(),
+            tier_flow_indexes
+                .field_value_string(row.flow_ref, "ICMPV4_TYPE")
+                .as_deref(),
+            tier_flow_indexes
+                .field_value_string(row.flow_ref, "ICMPV4_CODE")
+                .as_deref(),
+        ),
+        "ICMPV6" => presentation::icmp_virtual_value(
+            "ICMPV6",
+            tier_flow_indexes
+                .field_value_string(row.flow_ref, "PROTOCOL")
+                .as_deref(),
+            tier_flow_indexes
+                .field_value_string(row.flow_ref, "ICMPV6_TYPE")
+                .as_deref(),
+            tier_flow_indexes
+                .field_value_string(row.flow_ref, "ICMPV6_CODE")
+                .as_deref(),
+        ),
         _ => tier_flow_indexes.field_value_string(row.flow_ref, field),
     }
 }
@@ -3597,7 +3641,9 @@ fn cursor_prefilter_pairs_excluding(
 ) -> Vec<(String, String)> {
     let mut pairs = selections
         .iter()
-        .filter(|(field, _)| !excluded_fields.contains(&field.to_ascii_uppercase()))
+        .filter(|(field, _)| {
+            !excluded_fields.contains(&field.to_ascii_uppercase()) && !is_virtual_flow_field(field)
+        })
         .flat_map(|(field, values)| {
             values
                 .iter()
@@ -3613,6 +3659,25 @@ fn requested_facet_fields(request: &FlowsRequest) -> Vec<String> {
     request
         .normalized_facets()
         .unwrap_or_else(|| FACET_ALLOWED_OPTIONS.clone())
+}
+
+fn virtual_flow_field_dependencies(field: &str) -> &'static [&'static str] {
+    match field.to_ascii_uppercase().as_str() {
+        "ICMPV4" => &["PROTOCOL", "ICMPV4_TYPE", "ICMPV4_CODE"],
+        "ICMPV6" => &["PROTOCOL", "ICMPV6_TYPE", "ICMPV6_CODE"],
+        _ => &[],
+    }
+}
+
+fn expand_virtual_flow_field_dependencies(fields: &mut HashSet<String>) {
+    let requested = fields.iter().cloned().collect::<Vec<_>>();
+    for field in requested {
+        fields.extend(
+            virtual_flow_field_dependencies(field.as_str())
+                .iter()
+                .map(|dependency| (*dependency).to_string()),
+        );
+    }
 }
 
 fn split_payload(payload: &[u8]) -> Option<(&str, &[u8])> {
@@ -3635,6 +3700,18 @@ fn field_is_raw_only(field: &str) -> bool {
         .any(|raw_only| field.eq_ignore_ascii_case(raw_only))
         || field.to_ascii_uppercase().starts_with("V9_")
         || field.to_ascii_uppercase().starts_with("IPFIX_")
+}
+
+fn is_virtual_flow_field(field: &str) -> bool {
+    matches!(field.to_ascii_uppercase().as_str(), "ICMPV4" | "ICMPV6")
+}
+
+fn journal_projected_group_field_supported(field: &str) -> bool {
+    !is_virtual_flow_field(field)
+}
+
+fn journal_projected_selection_field_supported(field: &str) -> bool {
+    !is_virtual_flow_field(field)
 }
 
 fn facet_field_requested(field: &str) -> bool {
@@ -4244,6 +4321,35 @@ fn parse_u64(value: Option<&String>) -> u64 {
     value.and_then(|v| v.parse::<u64>().ok()).unwrap_or(0)
 }
 
+fn populate_virtual_fields(fields: &mut BTreeMap<String, String>) {
+    for field in VIRTUAL_FLOW_FIELDS {
+        let value = match *field {
+            "ICMPV4" => presentation::icmp_virtual_value(
+                field,
+                fields.get("PROTOCOL").map(String::as_str),
+                fields.get("ICMPV4_TYPE").map(String::as_str),
+                fields.get("ICMPV4_CODE").map(String::as_str),
+            ),
+            "ICMPV6" => presentation::icmp_virtual_value(
+                field,
+                fields.get("PROTOCOL").map(String::as_str),
+                fields.get("ICMPV6_TYPE").map(String::as_str),
+                fields.get("ICMPV6_CODE").map(String::as_str),
+            ),
+            _ => None,
+        };
+
+        match value {
+            Some(value) => {
+                fields.insert((*field).to_string(), value);
+            }
+            None => {
+                fields.remove(*field);
+            }
+        }
+    }
+}
+
 fn fields_from_cursor_payloads(
     cursor: &mut journal_session::Cursor,
 ) -> Result<BTreeMap<String, String>> {
@@ -4284,7 +4390,7 @@ mod tests {
         resolve_effective_group_by,
     };
     use crate::rollup::build_rollup_key;
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::{BTreeMap, HashMap, HashSet};
     use std::time::Instant;
 
     #[test]
@@ -4448,6 +4554,8 @@ mod tests {
         assert!(fields.iter().any(|field| field == "SRC_AS_NAME"));
         assert!(fields.iter().any(|field| field == "DST_AS_NAME"));
         assert!(fields.iter().any(|field| field == "PROTOCOL"));
+        assert!(fields.iter().any(|field| field == "ICMPV4"));
+        assert!(fields.iter().any(|field| field == "ICMPV6"));
         assert!(!fields.iter().any(|field| field == "BYTES"));
         assert!(!fields.iter().any(|field| field == "PACKETS"));
         assert!(!fields.iter().any(|field| field == "RAW_BYTES"));
@@ -4694,6 +4802,85 @@ mod tests {
     }
 
     #[test]
+    fn cursor_prefilter_skips_virtual_flow_fields() {
+        let selections = HashMap::from([
+            ("ICMPV4".to_string(), vec!["Echo Request".to_string()]),
+            ("PROTOCOL".to_string(), vec!["1".to_string()]),
+        ]);
+
+        let pairs = super::cursor_prefilter_pairs(&selections);
+
+        assert_eq!(pairs, vec![("PROTOCOL".to_string(), "1".to_string())]);
+    }
+
+    #[test]
+    fn virtual_facet_dependencies_expand_to_stored_fields() {
+        let mut fields = HashSet::from([
+            "ICMPV4".to_string(),
+            "ICMPV6".to_string(),
+            "SRC_AS_NAME".to_string(),
+        ]);
+
+        super::expand_virtual_flow_field_dependencies(&mut fields);
+
+        assert!(fields.contains("ICMPV4"));
+        assert!(fields.contains("ICMPV6"));
+        assert!(fields.contains("SRC_AS_NAME"));
+        assert!(fields.contains("PROTOCOL"));
+        assert!(fields.contains("ICMPV4_TYPE"));
+        assert!(fields.contains("ICMPV4_CODE"));
+        assert!(fields.contains("ICMPV6_TYPE"));
+        assert!(fields.contains("ICMPV6_CODE"));
+    }
+
+    #[test]
+    fn grouped_projected_scan_falls_back_for_virtual_fields() {
+        let request = super::FlowsRequest {
+            group_by: vec!["ICMPV4".to_string()],
+            ..super::FlowsRequest::default()
+        };
+        assert!(!super::grouped_query_can_use_projected_scan(&request));
+
+        let request = super::FlowsRequest {
+            selections: HashMap::from([("ICMPV4".to_string(), vec!["Echo Request".to_string()])]),
+            ..super::FlowsRequest::default()
+        };
+        assert!(!super::grouped_query_can_use_projected_scan(&request));
+    }
+
+    #[test]
+    fn query_record_populates_virtual_icmp_fields() {
+        let record = super::FlowRecord::new(
+            42,
+            BTreeMap::from([
+                ("PROTOCOL".to_string(), "1".to_string()),
+                ("ICMPV4_TYPE".to_string(), "8".to_string()),
+                ("ICMPV4_CODE".to_string(), "0".to_string()),
+            ]),
+        );
+
+        assert_eq!(
+            record.fields.get("ICMPV4").map(String::as_str),
+            Some("Echo Request")
+        );
+        assert!(!record.fields.contains_key("ICMPV6"));
+
+        let record = super::FlowRecord::new(
+            42,
+            BTreeMap::from([
+                ("PROTOCOL".to_string(), "58".to_string()),
+                ("ICMPV6_TYPE".to_string(), "160".to_string()),
+                ("ICMPV6_CODE".to_string(), "1".to_string()),
+            ]),
+        );
+
+        assert_eq!(
+            record.fields.get("ICMPV6").map(String::as_str),
+            Some("160/1")
+        );
+    }
+
+    #[test]
     fn distinct_facets_ignore_self_selection_and_do_not_return_metrics() {
         let records = vec![
             super::FlowRecord {
@@ -4896,7 +5083,7 @@ mod tests {
         rec.exporter_ip = Some("192.0.2.10".parse().unwrap());
         rec.exporter_name = "edge-router".to_string();
         rec.exporter_port = 2055;
-        rec.sampling_rate = 100;
+        rec.set_sampling_rate(100);
         rec.bytes = 1000;
         rec.packets = 10;
 
@@ -4954,13 +5141,13 @@ mod tests {
         first.protocol = 6;
         first.bytes = 10;
         first.packets = 1;
-        first.sampling_rate = 100;
+        first.set_sampling_rate(100);
 
         let mut second = crate::decoder::FlowRecord::default();
         second.protocol = 17;
         second.bytes = 20;
         second.packets = 2;
-        second.sampling_rate = 1;
+        second.set_sampling_rate(1);
 
         let rows = vec![
             crate::tiering::OpenTierRow {
