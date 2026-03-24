@@ -714,7 +714,7 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs)
 
     size_t files_used = 0;
     size_t files_max = dictionary_entries(nd_journal_files_registry);
-    const DICTIONARY_ITEM *file_items[files_max];
+    const DICTIONARY_ITEM **file_items = files_max ? mallocz(sizeof(*file_items) * files_max) : NULL;
 
     // count the files
     bool files_are_newer = false;
@@ -737,6 +737,7 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs)
         for (size_t f = 0; f < files_used; f++)
             dictionary_acquired_item_release(nd_journal_files_registry, file_items[f]);
 
+        freez(file_items);
         return rrd_call_function_error(wb, "No new data since the previous call.", HTTP_RESP_NOT_MODIFIED);
     }
 
@@ -878,6 +879,7 @@ static int nd_sd_journal_query(BUFFER *wb, LOGS_QUERY_STATUS *lqs)
     // release the files
     for (size_t f = 0; f < files_used; f++)
         dictionary_acquired_item_release(nd_journal_files_registry, file_items[f]);
+    freez(file_items);
 
     switch (status) {
         case ND_SD_JOURNAL_OK:

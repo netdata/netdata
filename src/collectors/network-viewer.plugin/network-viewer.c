@@ -543,7 +543,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
         local_sockets_process(&ls);
 
         if(aggregated) {
-            LOCAL_SOCKET *array[ht.used];
+            LOCAL_SOCKET **array = ht.used ? mallocz(sizeof(*array) * ht.used) : NULL;
             size_t added = 0;
             uint64_t proc_self_net_ns_inode = ls.proc_self_net_ns_inode;
             for(SIMPLE_HASHTABLE_SLOT_AGGREGATED_SOCKETS *sl = simple_hashtable_first_read_only_AGGREGATED_SOCKETS(&ht);
@@ -563,6 +563,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                 freez(array[i]);
             }
 
+            freez(array);
             simple_hashtable_destroy_AGGREGATED_SOCKETS(&ht);
         }
 

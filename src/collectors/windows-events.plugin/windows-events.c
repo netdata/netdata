@@ -965,7 +965,7 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
 
     size_t files_used = 0;
     size_t files_max = dictionary_entries(wevt_sources);
-    const DICTIONARY_ITEM *file_items[files_max];
+    const DICTIONARY_ITEM **file_items = files_max ? mallocz(sizeof(*file_items) * files_max) : NULL;
 
     // count the files
     bool files_are_newer = false;
@@ -990,6 +990,7 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
         for(size_t f = 0; f < files_used ;f++)
             dictionary_acquired_item_release(wevt_sources, file_items[f]);
 
+        freez(file_items);
         return rrd_call_function_error(wb, "not modified", HTTP_RESP_NOT_MODIFIED);
     }
 
@@ -1015,6 +1016,7 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
         for(size_t f = 0; f < files_used ;f++)
             dictionary_acquired_item_release(wevt_sources, file_items[f]);
 
+        freez(file_items);
         netdata_log_error("WINDOWS EVENTS: cannot open windows event log");
         return rrd_call_function_error(wb, "cannot open windows events log", HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
@@ -1125,6 +1127,7 @@ static int wevt_master_query(BUFFER *wb __maybe_unused, LOGS_QUERY_STATUS *lqs _
     // release the files
     for(size_t f = 0; f < files_used ;f++)
         dictionary_acquired_item_release(wevt_sources, file_items[f]);
+    freez(file_items);
 
     switch (status) {
         case WEVT_OK:
