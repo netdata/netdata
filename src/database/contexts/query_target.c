@@ -269,18 +269,17 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
         time_t db_update_every_s;
     } tier_retention[nd_profile.storage_tiers];
 
+    RRDDIM *rd = rrdmetric_rrddim_get_and_lock(rm);
+
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         STORAGE_ENGINE *eng = qn->rrdhost->db[tier].eng;
         tier_retention[tier].eng = eng;
         tier_retention[tier].db_update_every_s = (time_t) (qn->rrdhost->db[tier].tier_grouping * ri->update_every_s);
 
-        RRDDIM *rd = rrdmetric_rrddim_get_and_lock(rm);
         if(rd && rd->tiers[tier].smh)
             tier_retention[tier].smh = eng->api.metric_dup(rd->tiers[tier].smh);
         else
             tier_retention[tier].smh = eng->api.metric_get_by_id(qn->rrdhost->db[tier].si, rm->uuid);
-
-        rrdmetric_rrddim_unlock(rd);
 
         if(tier_retention[tier].smh) {
             tier_retention[tier].db_first_time_s = storage_engine_oldest_time_s(tier_retention[tier].eng->seb, tier_retention[tier].smh);
@@ -309,6 +308,8 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
             tier_retention[tier].db_update_every_s = 0;
         }
     }
+
+    rrdmetric_rrddim_unlock(rd);
 
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         if(!qt->db.tiers[tier].update_every || (tier_retention[tier].db_update_every_s && tier_retention[tier].db_update_every_s < qt->db.tiers[tier].update_every))

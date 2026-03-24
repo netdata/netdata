@@ -347,11 +347,9 @@ static ALWAYS_INLINE void rrdmetric_set_collected(RRDMETRIC *rm) {
     if(!(old & RRD_FLAG_COLLECTED))
         __atomic_add_fetch(&rm->ri->rc->rrdhost->collected.metrics_count, 1, __ATOMIC_RELAXED);
 
-    RRDDIM *rd = rrdmetric_rrddim_get_and_lock(rm);
-    if(likely(rd)) {
+    RRDDIM *rd = rrdmetric_rrddim_atomic_load(rm);
+    if(likely(rd))
         rd->rrdcontexts.collected = true;
-        rrdmetric_rrddim_unlock(rd);
-    }
 }
 
 static ALWAYS_INLINE void rrdmetric_set_archived(RRDMETRIC *rm) {
