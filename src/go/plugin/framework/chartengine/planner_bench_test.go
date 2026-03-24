@@ -45,7 +45,7 @@ func BenchmarkBuildPlanBySeriesCardinality(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if _, err := engine.BuildPlan(reader); err != nil {
+				if _, err := buildPlan(engine, reader); err != nil {
 					b.Fatalf("build plan: %v", err)
 				}
 			}

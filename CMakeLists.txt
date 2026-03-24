@@ -531,6 +531,9 @@ check_function_exists(getrandom HAVE_GETRANDOM)
 check_function_exists(sysinfo HAVE_SYSINFO)
 
 check_function_exists(timegm HAVE_TIMEGM)
+check_function_exists(tzalloc HAVE_TZALLOC)
+check_function_exists(localtime_rz HAVE_LOCALTIME_RZ)
+check_function_exists(tzfree HAVE_TZFREE)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     # -fno-omit-frame-pointer = add frame pointers to all functions
@@ -2000,20 +2003,17 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetServicesStatus.c
         src/collectors/windows.plugin/GetSensors.c
         src/collectors/windows.plugin/GetHardwareInfo.c
-        src/collectors/windows.plugin/MonitorSQL.c
         src/collectors/windows.plugin/perflib-adcs.c
         src/collectors/windows.plugin/perflib-adfs.c
         src/collectors/windows.plugin/perflib-rrd.c
         src/collectors/windows.plugin/perflib-rrd.h
         src/collectors/windows.plugin/perflib-ad.c
-        src/collectors/windows.plugin/perflib-mssql-queries.h
         src/collectors/windows.plugin/perflib-storage.c
         src/collectors/windows.plugin/perflib-processor.c
         src/collectors/windows.plugin/perflib-thermalzone.c
         src/collectors/windows.plugin/perflib-objects.c
         src/collectors/windows.plugin/perflib-network.c
         src/collectors/windows.plugin/perflib-netframework.c
-        src/collectors/windows.plugin/perflib-mssql.c
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
         src/collectors/windows.plugin/perflib-web-service.c
@@ -2024,8 +2024,8 @@ set(WINDOWS_PLUGIN_FILES
 )
 
 set(WINDOWS_PLUGIN_DRIVER
-        src/collectors/windows.plugin/netdata_win_driver.c
-        src/collectors/windows.plugin/netdata_win_driver.h
+        src/collectors/windows.plugin/driver/netdata_driver.c
+        src/collectors/windows.plugin/driver/netdata_driver.h
 )
 
 set(PROC_PLUGIN_FILES
@@ -2912,9 +2912,11 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_unittest.h
             src/collectors/ebpf.plugin/ebpf_functions.c
             src/collectors/ebpf.plugin/ebpf_functions.h
-            src/collectors/ebpf.plugin/libbpf_api/ebpf.c
-            src/collectors/ebpf.plugin/libbpf_api/ebpf.h
-    )
+             src/collectors/ebpf.plugin/libbpf_api/ebpf.c
+             src/collectors/ebpf.plugin/libbpf_api/ebpf.h
+             src/collectors/ebpf.plugin/libbpf_api/ebpf_library.c
+             src/collectors/ebpf.plugin/libbpf_api/ebpf_library.h
+     )
 
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES} ${INTERCOMMUNICATION_COLLECTORS_FILES})
     target_link_libraries(ebpf.plugin libnetdata)
@@ -3072,6 +3074,7 @@ if(OS_WINDOWS)
         configure_file(packaging/windows/eula.rtf eula.rtf COPYONLY)
         configure_file(packaging/windows/Top.bmp Top.bmp COPYONLY)
         configure_file(packaging/windows/BackGround.bmp BackGround.bmp COPYONLY)
+        configure_file(src/collectors/windows.plugin/driver/netdata_driver.inf netdata_driver.inf COPYONLY)
 endif()
 
 add_executable(netdata
@@ -3092,12 +3095,13 @@ if(OS_WINDOWS)
         target_compile_options(NetdataClaim PUBLIC -mwindows)
 
         set(NETDATA_DRIVER_FILE "${CMAKE_BINARY_DIR}/netdata_driver.sys")
+        set(NETDATA_DRIVER_FILE_INF "${CMAKE_BINARY_DIR}/netdata_driver.inf")
 
         add_library(netdata_driver SHARED ${WINDOWS_PLUGIN_DRIVER})
         set_target_properties(netdata_driver PROPERTIES LIBRARY_OUTPUT_NAME "netdata_driver")
         set_target_properties(netdata_driver PROPERTIES PREFIX "")
         set_target_properties(netdata_driver PROPERTIES SUFFIX ".sys")
-        target_include_directories(netdata_driver PRIVATE BEFORE "/mingw64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin")
+        target_include_directories(netdata_driver PRIVATE BEFORE "/mingw64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
         target_compile_options(netdata_driver PRIVATE
                 -Wall
                 -Wextra
@@ -3117,7 +3121,11 @@ if(OS_WINDOWS)
         target_link_libraries(netdata_driver kernel32 ntoskrnl)
 
         install(FILES "${NETDATA_DRIVER_FILE}"
-                COMPONENT netdata_win_driver
+                COMPONENT netdata_driver
+                DESTINATION "${BINDIR}")
+
+        install(FILES "${NETDATA_DRIVER_FILE_INF}"
+                COMPONENT netdata_driver_inf
                 DESTINATION "${BINDIR}")
 endif()
 
@@ -3954,6 +3962,14 @@ if(ENABLE_PLUGIN_GO)
 
     install(DIRECTORY
             COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/ss)
+    file(GLOB GO_SS_CONF_FILES src/go/plugin/go.d/config/go.d/ss/*.conf)
+    install(FILES ${GO_SS_CONF_FILES}
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/ss)
+
+    install(DIRECTORY
+            COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles)
     install(DIRECTORY
             COMPONENT plugin-go
@@ -3970,6 +3986,17 @@ if(ENABLE_PLUGIN_GO)
     install(FILES ${GO_SNMP_META_FILES}
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata)
+
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles)
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default)
+    file(GLOB GO_AZURE_MON_PROFILE_FILES src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default/*.yaml)
+    install(FILES ${GO_AZURE_MON_PROFILE_FILES}
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default)
 
     if(BUILD_FOR_PACKAGING)
         install(FILES

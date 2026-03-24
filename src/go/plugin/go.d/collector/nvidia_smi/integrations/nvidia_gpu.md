@@ -50,73 +50,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per gpu
-
-These metrics refer to the GPU.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| uuid | GPU uuid (e.g. GPU-27b94a00-ed54-5c24-b1fd-1054085de32a) |
-| index | GPU index (nvidia_smi typically orders GPUs by PCI bus ID) |
-| product_name | GPU product name (e.g. NVIDIA A100-SXM4-40GB) |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nvidia_smi.gpu_pcie_bandwidth_usage | rx, tx | B/s |
-| nvidia_smi.gpu_pcie_bandwidth_utilization | rx, tx | % |
-| nvidia_smi.gpu_fan_speed_perc | fan_speed | % |
-| nvidia_smi.gpu_utilization | gpu | % |
-| nvidia_smi.gpu_memory_utilization | memory | % |
-| nvidia_smi.gpu_decoder_utilization | decoder | % |
-| nvidia_smi.gpu_encoder_utilization | encoder | % |
-| nvidia_smi.gpu_frame_buffer_memory_usage | free, used, reserved | B |
-| nvidia_smi.gpu_bar1_memory_usage | free, used | B |
-| nvidia_smi.gpu_temperature | temperature | Celsius |
-| nvidia_smi.gpu_voltage | voltage | V |
-| nvidia_smi.gpu_clock_freq | graphics, video, sm, mem | MHz |
-| nvidia_smi.gpu_power_draw | power_draw | Watts |
-| nvidia_smi.gpu_performance_state | P0-P15 | state |
-| nvidia_smi.gpu_mig_mode_current_status | enabled, disabled | status |
-| nvidia_smi.gpu_mig_devices_count | mig | devices |
-
-### Per mig
-
-These metrics refer to the Multi-Instance GPU (MIG).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| uuid | GPU uuid (e.g. GPU-27b94a00-ed54-5c24-b1fd-1054085de32a) |
-| product_name | GPU product name (e.g. NVIDIA A100-SXM4-40GB) |
-| gpu_instance_id | GPU instance id (e.g. 1) |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nvidia_smi.gpu_mig_frame_buffer_memory_usage | free, used, reserved | B |
-| nvidia_smi.gpu_mig_bar1_memory_usage | free, used | B |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -211,6 +144,73 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per gpu
+
+These metrics refer to the GPU.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| uuid | GPU uuid (e.g. GPU-27b94a00-ed54-5c24-b1fd-1054085de32a) |
+| index | GPU index (nvidia_smi typically orders GPUs by PCI bus ID) |
+| product_name | GPU product name (e.g. NVIDIA A100-SXM4-40GB) |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nvidia_smi.gpu_pcie_bandwidth_usage | rx, tx | B/s |
+| nvidia_smi.gpu_pcie_bandwidth_utilization | rx, tx | % |
+| nvidia_smi.gpu_fan_speed_perc | fan_speed | % |
+| nvidia_smi.gpu_utilization | gpu | % |
+| nvidia_smi.gpu_memory_utilization | memory | % |
+| nvidia_smi.gpu_decoder_utilization | decoder | % |
+| nvidia_smi.gpu_encoder_utilization | encoder | % |
+| nvidia_smi.gpu_frame_buffer_memory_usage | free, used, reserved | B |
+| nvidia_smi.gpu_bar1_memory_usage | free, used | B |
+| nvidia_smi.gpu_temperature | temperature | Celsius |
+| nvidia_smi.gpu_voltage | voltage | V |
+| nvidia_smi.gpu_clock_freq | graphics, video, sm, mem | MHz |
+| nvidia_smi.gpu_power_draw | power_draw | Watts |
+| nvidia_smi.gpu_performance_state | P0-P15 | state |
+| nvidia_smi.gpu_mig_mode_current_status | enabled, disabled | status |
+| nvidia_smi.gpu_mig_devices_count | mig | devices |
+
+### Per mig
+
+These metrics refer to the Multi-Instance GPU (MIG).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| uuid | GPU uuid (e.g. GPU-27b94a00-ed54-5c24-b1fd-1054085de32a) |
+| product_name | GPU product name (e.g. NVIDIA A100-SXM4-40GB) |
+| gpu_instance_id | GPU instance id (e.g. 1) |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nvidia_smi.gpu_mig_frame_buffer_memory_usage | free, used, reserved | B |
+| nvidia_smi.gpu_mig_bar1_memory_usage | free, used | B |
 
 
 

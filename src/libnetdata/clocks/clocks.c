@@ -331,10 +331,15 @@ static XXH64_hash_t heartbeat_hash(usec_t step, size_t statistics_id) {
 static usec_t heartbeat_randomness(XXH64_hash_t hash) {
     usec_t offset_ut = HEARTBEAT_MIN_OFFSET_UT + (hash % HEARTBEAT_RANDOM_OFFSET_UT);
 
-    // Calculate the scheduler tick interval in microseconds
-    usec_t scheduler_step_ut = USEC_PER_SEC / (usec_t)system_hz;
+    // A zero HZ value turns heartbeat initialization into SIGFPE.
+    usec_t hz = system_hz ? (usec_t)system_hz : 100;
+
+    // Calculate the scheduler tick interval in microseconds.
+    usec_t scheduler_step_ut = USEC_PER_SEC / hz;
     if(scheduler_step_ut > 10 * USEC_PER_MS)
         scheduler_step_ut = 10 * USEC_PER_MS;
+    else if(unlikely(!scheduler_step_ut))
+        scheduler_step_ut = 1;
 
     // if the offset is close to the scheduler tick, move it away from it
     if(offset_ut % scheduler_step_ut < scheduler_step_ut / 4)

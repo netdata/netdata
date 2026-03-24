@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -113,6 +114,23 @@ func TestCollector_Init(t *testing.T) {
 			wantFail: true,
 			config:   Config{DSN: ""},
 		},
+		"Fail on invalid Azure AD configuration": {
+			wantFail: true,
+			config: Config{
+				DSN: "postgresql://netdata@127.0.0.1:5432/postgres",
+				CloudAuth: cloudauth.Config{
+					Provider: cloudauth.ProviderAzureAD,
+					AzureAD: &cloudauth.AzureADAuthConfig{
+						Mode: "service_principal",
+						ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
+							TenantID: "tenant-id",
+							ClientID: "client-id",
+							// Missing client_secret.
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -127,6 +145,24 @@ func TestCollector_Init(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCollector_Init_AzureADInitializesTokenProvider(t *testing.T) {
+	c := New()
+	c.CloudAuth = cloudauth.Config{
+		Provider: cloudauth.ProviderAzureAD,
+		AzureAD: &cloudauth.AzureADAuthConfig{
+			Mode: cloudauth.AzureADAuthModeServicePrincipal,
+			ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
+				TenantID:     "tenant-id",
+				ClientID:     "client-id",
+				ClientSecret: "client-secret",
+			},
+		},
+	}
+
+	require.NoError(t, c.Init(context.Background()))
+	assert.NotNil(t, c.azureTokenProvider)
 }
 
 func TestCollector_Cleanup(t *testing.T) {

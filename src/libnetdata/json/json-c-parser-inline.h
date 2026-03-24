@@ -117,6 +117,8 @@
             buffer_sprintf(error, "cannot convert to string for '%s.%s'", path, member);                        \
             return false;                                                                                       \
         }                                                                                                       \
+        else                                                                                                    \
+            dst[0] = '\0';                                                                                      \
     }                                                                                                           \
     else {                                                                                                      \
         dst[0] = '\0';                                                                                          \

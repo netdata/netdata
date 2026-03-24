@@ -53,8 +53,11 @@ type SeriesMeta struct {
 type MetricMeta struct {
 	Description string
 	ChartFamily string
-	Unit        string
-	Float       bool
+	// ChartPriority is currently consumed only by chartengine autogen.
+	// TODO: Revisit whether chart-template charts should also honor metrix priority hints.
+	ChartPriority int
+	Unit          string
+	Float         bool
 }
 
 // MetricKind identifies the logical metric family type.
@@ -68,6 +71,7 @@ const (
 	MetricKindHistogram
 	MetricKindSummary
 	MetricKindStateSet
+	MetricKindMeasureSet
 )
 
 // FlattenRole describes synthetic scalar roles produced by Read(ReadFlatten()).
@@ -82,6 +86,7 @@ const (
 	FlattenRoleSummarySum
 	FlattenRoleSummaryQuantile
 	FlattenRoleStateSetState
+	FlattenRoleMeasureSetField
 )
 
 type CollectMeta struct {
@@ -114,6 +119,27 @@ type HistogramPoint struct {
 
 type StateSetPoint struct {
 	States map[string]bool
+}
+
+type MeasureFieldSpec struct {
+	Name  string
+	Float bool
+}
+
+type MeasureSetPoint struct {
+	Values []SampleValue
+}
+
+type MeasureSetSemantics int
+
+const (
+	MeasureSetSemanticsGauge MeasureSetSemantics = iota
+	MeasureSetSemanticsCounter
+)
+
+type MeasureSetSchema struct {
+	Semantics MeasureSetSemantics
+	Fields    []MeasureFieldSpec
 }
 
 type StateSetMode int

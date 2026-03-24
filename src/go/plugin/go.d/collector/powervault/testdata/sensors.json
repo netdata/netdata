@@ -1,0 +1,52 @@
+{
+  "sensors": [
+    {
+      "durable-id": "sensor_temp_ctrl_A.1",
+      "sensor-name": "Controller A CPU Temperature",
+      "sensor-type": "Temperature",
+      "value": "42 C",
+      "status": "OK",
+      "status-numeric": 1
+    },
+    {
+      "durable-id": "sensor_temp_ctrl_A.2",
+      "sensor-name": "Controller A Board Temperature",
+      "sensor-type": "Temperature",
+      "value": "35 C",
+      "status": "OK",
+      "status-numeric": 1
+    },
+    {
+      "durable-id": "sensor_volt_ctrl_A.1",
+      "sensor-name": "Controller A 3.3V",
+      "sensor-type": "Voltage",
+      "value": "3.30 V",
+      "status": "OK",
+      "status-numeric": 1
+    },
+    {
+      "durable-id": "sensor_curr_ctrl_A.1",
+      "sensor-name": "Controller A 12V Current",
+      "sensor-type": "Current Sensor",
+      "value": "1.25 A",
+      "status": "OK",
+      "status-numeric": 1
+    },
+    {
+      "durable-id": "sensor_chrg_ctrl_A.1",
+      "sensor-name": "Controller A Supercap",
+      "sensor-type": "Charge Capacity",
+      "value": "95%",
+      "status": "OK",
+      "status-numeric": 1
+    }
+  ],
+  "status": [
+    {
+      "response-type": "Success",
+      "response": "Command completed successfully.",
+      "return-code": 0,
+      "response-type-numeric": 0
+    }
+  ]
+}

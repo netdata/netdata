@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
@@ -158,7 +159,7 @@ func (c *compiler) compileChart(chart charttpl.Chart, scope compileScope, templa
 			Units:     strings.TrimSpace(chart.Units),
 			Algorithm: algorithm,
 			Type:      chartType,
-			Priority:  chart.Priority,
+			Priority:  effectiveChartPriority(chart.Priority),
 		},
 		Identity: identity,
 		Labels: program.LabelPolicy{
@@ -380,7 +381,7 @@ func metricKindsFromNames(names []string) []string {
 func supportsRuntimeInferredDimension(meta metrixselector.Meta) bool {
 	for _, key := range meta.ConstrainedLabelKeys {
 		switch key {
-		case histogramBucketLabel, summaryQuantileLabel:
+		case metrix.HistogramBucketLabel, metrix.SummaryQuantileLabel:
 			return true
 		}
 	}
@@ -534,4 +535,11 @@ func (v selectorLabelView) CloneMap() map[string]string {
 		return true
 	})
 	return out
+}
+
+func effectiveChartPriority(priority int) int {
+	if priority > 0 {
+		return priority
+	}
+	return Priority
 }

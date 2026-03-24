@@ -9,7 +9,7 @@ import (
 	"strconv"
 )
 
-const histogramBucketLabel = "le"
+const HistogramBucketLabel = "le"
 
 // snapshotHistogramInstrument writes sampled full histogram points.
 type snapshotHistogramInstrument struct {
@@ -87,7 +87,7 @@ func (c *storeCore) recordHistogramObservePoint(desc *instrumentDescriptor, poin
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, histogramBucketLabel) {
+	if labelsContainKey(labels, HistogramBucketLabel) {
 		panic(errHistogramLabelKey)
 	}
 
@@ -140,7 +140,7 @@ func (c *storeCore) recordHistogramObserve(desc *instrumentDescriptor, value Sam
 	if err != nil {
 		panic(err)
 	}
-	if labelsContainKey(labels, histogramBucketLabel) {
+	if labelsContainKey(labels, HistogramBucketLabel) {
 		panic(errHistogramLabelKey)
 	}
 

@@ -1069,8 +1069,12 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
         buffer_json_add_array_item_object(wb); // this node
 
         buffer_json_member_add_string_or_empty(wb, "hostname",             rrdhost_hostname(host));
-                  buffer_json_member_add_int64(wb, "utc_offset",           (int64_t)host->utc_offset);
-        buffer_json_member_add_string_or_empty(wb, "timezone",             rrdhost_abbrev_timezone(host));
+        {
+            RRDHOST_TZ host_tz = rrdhost_tz_get(host);
+            buffer_json_member_add_int64(wb, "utc_offset",           (int64_t)host_tz.utc_offset);
+            buffer_json_member_add_string_or_empty(wb, "timezone",   host_tz.abbrev_timezone);
+            rrdhost_tz_free(&host_tz);
+        }
                   buffer_json_member_add_int64(wb, "unique_id",            (int64_t) sqlite3_column_int64(stmt_query, 0));
                   buffer_json_member_add_int64(wb, "alarm_id",             (int64_t) sqlite3_column_int64(stmt_query, 1));
                   buffer_json_member_add_int64(wb, "alarm_event_id",       (int64_t) sqlite3_column_int64(stmt_query, 2));

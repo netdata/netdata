@@ -50,37 +50,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per PowerDNS Authoritative Server instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powerdns.questions_in | udp, tcp | questions/s |
-| powerdns.questions_out | udp, tcp | questions/s |
-| powerdns.cache_usage | query-cache-hit, query-cache-miss, packetcache-hit, packetcache-miss | events/s |
-| powerdns.cache_size | query-cache, packet-cache, key-cache, meta-cache | entries |
-| powerdns.latency | latency | microseconds |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -235,6 +204,37 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per PowerDNS Authoritative Server instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powerdns.questions_in | udp, tcp | questions/s |
+| powerdns.questions_out | udp, tcp | questions/s |
+| powerdns.cache_usage | query-cache-hit, query-cache-miss, packetcache-hit, packetcache-miss | events/s |
+| powerdns.cache_size | query-cache, packet-cache, key-cache, meta-cache | entries |
+| powerdns.latency | latency | microseconds |
 
 
 

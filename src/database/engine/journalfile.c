@@ -223,14 +223,17 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengin
             madvise_dontfork(journalfile->mmap.data, journalfile->mmap.size);
             madvise_dontdump(journalfile->mmap.data, journalfile->mmap.size);
             // madvise_dontneed(journalfile->mmap.data, journalfile->mmap.size);
-            madvise_random(journalfile->mmap.data, journalfile->mmap.size);
 
             journalfile->v2.flags |= JOURNALFILE_FLAG_IS_AVAILABLE | JOURNALFILE_FLAG_IS_MOUNTED;
             JOURNALFILE_FLAGS flags = journalfile->v2.flags;
 
             if(flags & JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION) {
-                // we need the entire metrics directory into memory to process it
+                // sequential access pattern during MRG population
+                madvise_sequential(journalfile->mmap.data, journalfile->v2.size_of_directory);
                 madvise_willneed(journalfile->mmap.data, journalfile->v2.size_of_directory);
+            }
+            else {
+                madvise_random(journalfile->mmap.data, journalfile->mmap.size);
             }
         }
     }
@@ -332,7 +335,9 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
     }
 }
 
-ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s) {
+ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire_with_hint(struct rrdengine_journalfile *journalfile,
+    size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s, JOURNALFILE_V2_ACCESS_HINT hint)
+{
     spinlock_lock(&journalfile->data_spinlock);
 
     bool has_data = (journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE);
@@ -343,15 +348,31 @@ ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire(struct rrden
         if (!wanted_first_time_s || !wanted_last_time_s ||
             is_page_in_time_range(journalfile->v2.first_time_s, journalfile->v2.last_time_s,
                                   wanted_first_time_s, wanted_last_time_s) == PAGE_IS_IN_RANGE) {
+            bool was_sequential = (journalfile->v2.flags & JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION);
 
             journalfile->v2.refcount++;
 
             do_we_need_it = true;
 
-            if (!wanted_first_time_s && !wanted_last_time_s && !is_mounted)
+            if(hint == JOURNALFILE_V2_ACCESS_AUTO)
+                hint = (!wanted_first_time_s && !wanted_last_time_s) ?
+                    JOURNALFILE_V2_ACCESS_SEQUENTIAL_DIRECTORY :
+                    JOURNALFILE_V2_ACCESS_RANDOM;
+
+            bool want_sequential = (hint == JOURNALFILE_V2_ACCESS_SEQUENTIAL_DIRECTORY);
+            if (want_sequential)
                 journalfile->v2.flags |= JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION;
             else
                 journalfile->v2.flags &= ~JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION;
+
+            if (is_mounted && journalfile->mmap.data) {
+                if (!was_sequential && want_sequential) {
+                    madvise_sequential(journalfile->mmap.data, journalfile->v2.size_of_directory);
+                    madvise_willneed(journalfile->mmap.data, journalfile->v2.size_of_directory);
+                }
+                else if (was_sequential && !want_sequential)
+                    madvise_random(journalfile->mmap.data, journalfile->mmap.size);
+            }
 
         }
     }
@@ -361,6 +382,10 @@ ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire(struct rrden
         return journalfile_v2_mounted_data_get(journalfile, data_size);
 
     return NULL;
+}
+
+ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s) {
+    return journalfile_v2_data_acquire_with_hint(journalfile, data_size, wanted_first_time_s, wanted_last_time_s, JOURNALFILE_V2_ACCESS_AUTO);
 }
 
 ALWAYS_INLINE void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile) {
@@ -993,7 +1018,8 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     usec_t started_ut = now_monotonic_usec();
 
     size_t data_size = 0;
-    struct journal_v2_header *j2_header = journalfile_v2_data_acquire(journalfile, &data_size, 0, 0);
+    struct journal_v2_header *j2_header = journalfile_v2_data_acquire_with_hint(
+        journalfile, &data_size, 0, 0, JOURNALFILE_V2_ACCESS_SEQUENTIAL_DIRECTORY);
     if(!j2_header)
         return;
 
@@ -1109,6 +1135,10 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         close(fd);
         return 1;
     }
+
+    // validation reads the file sequentially — hint the kernel to prefetch
+    madvise_sequential(data_start, journal_v2_file_size);
+    madvise_willneed(data_start, journal_v2_file_size);
 
     nd_log_daemon(NDLP_DEBUG, "DBENGINE: checking integrity of \"%s\"", path_v2);
 

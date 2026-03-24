@@ -45,40 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Tengine instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| tengine.bandwidth_total | in, out | B/s |
-| tengine.connections_total | accepted | connections/s |
-| tengine.requests_total | processed | requests/s |
-| tengine.requests_per_response_code_family_total | 2xx, 3xx, 4xx, 5xx, other | requests/s |
-| tengine.requests_per_response_code_detailed_total | 200, 206, 302, 304, 403, 404, 419, 499, 500, 502, 503, 504, 508, other | requests/s |
-| tengine.requests_upstream_total | requests | requests/s |
-| tengine.tries_upstream_total | calls | calls/s |
-| tengine.requests_upstream_per_response_code_family_total | 4xx, 5xx | requests/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -244,6 +210,40 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Tengine instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| tengine.bandwidth_total | in, out | B/s |
+| tengine.connections_total | accepted | connections/s |
+| tengine.requests_total | processed | requests/s |
+| tengine.requests_per_response_code_family_total | 2xx, 3xx, 4xx, 5xx, other | requests/s |
+| tengine.requests_per_response_code_detailed_total | 200, 206, 302, 304, 403, 404, 419, 499, 500, 502, 503, 504, 508, other | requests/s |
+| tengine.requests_upstream_total | requests | requests/s |
+| tengine.tries_upstream_total | calls | calls/s |
+| tengine.requests_upstream_per_response_code_family_total | 4xx, 5xx | requests/s |
 
 
 

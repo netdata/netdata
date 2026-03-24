@@ -50,35 +50,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-SLAB cache utilization metrics for the whole system.
-
-### Per Linux kernel SLAB allocator statistics instance
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.slabmemory | a dimension per cache | B |
-| mem.slabfilling | a dimension per cache | % |
-| mem.slabwaste | a dimension per cache | B |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -133,5 +104,34 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+SLAB cache utilization metrics for the whole system.
+
+### Per Linux kernel SLAB allocator statistics instance
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| mem.slabmemory | a dimension per cache | B |
+| mem.slabfilling | a dimension per cache | % |
+| mem.slabwaste | a dimension per cache | B |
 
 

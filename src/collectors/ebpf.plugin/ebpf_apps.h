@@ -40,8 +40,6 @@
 
 #define EBPF_CLEANUP_FACTOR 2
 
-extern int pids_fd[NETDATA_EBPF_PIDS_END_IDX];
-
 enum ebpf_main_index {
     EBPF_MODULE_PROCESS_IDX,
     EBPF_MODULE_SOCKET_IDX,
@@ -118,6 +116,10 @@ extern struct ebpf_target *users_root_target;
 extern struct ebpf_target *groups_root_target;
 extern uint64_t collect_pids;
 
+void ebpf_reset_pid_map_fds(void);
+void ebpf_set_pid_map_fd(int idx, int fd);
+int ebpf_get_pid_map_fd(int idx);
+
 // ebpf_pid_data
 typedef struct __attribute__((packed)) ebpf_pid_data {
     uint32_t pid;
@@ -140,7 +142,7 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
 
     netdata_publish_fd_stat_t *fd;
     netdata_publish_swap_t *swap;
-    netdata_publish_shm_t *shm; // this has a leak issue
+    netdata_publish_shm_t *shm;
     netdata_publish_dcstat_t *dc;
     netdata_publish_vfs_t *vfs;
     netdata_publish_cachestat_t *cachestat;
@@ -149,7 +151,6 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
 
 } ebpf_pid_data_t;
 
-//extern ebpf_pid_data_t *ebpf_pids;
 extern ebpf_pid_data_t *ebpf_pids_link_list;
 extern size_t ebpf_all_pids_count;
 extern size_t ebpf_hash_table_pids_count;
@@ -159,7 +160,6 @@ ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid);
 
 static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, uint32_t idx)
 {
-    //    ebpf_pid_data_t *ptr = &ebpf_pids[pid];
     ebpf_pid_data_t *ptr = ebpf_find_or_create_pid_data(pid);
     ptr->thread_collecting |= 1 << idx;
     // The caller is getting data to work.
@@ -208,7 +208,7 @@ static inline void ebpf_reset_specific_pid_data(ebpf_pid_data_t *ptr)
             continue;
         }
         // Check if we still have the map loaded
-        int fd = pids_fd[idx];
+        int fd = ebpf_get_pid_map_fd(idx);
         if (fd <= STDERR_FILENO)
             continue;
 
@@ -257,7 +257,6 @@ typedef struct ebpf_pid_stat {
 
     uint32_t log_thrown;
 
-    // char state;
     uint32_t ppid;
 
     int children_count;              // number of processes directly referencing this
@@ -378,7 +377,6 @@ void ebpf_parse_proc_files();
 
 // ARAL Section end
 
-// Threads integrated with apps
 // Threads integrated with apps
 
 #include "libnetdata/threads/threads.h"

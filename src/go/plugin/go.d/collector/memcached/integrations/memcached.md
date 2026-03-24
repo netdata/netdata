@@ -45,53 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Memcached instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| memcached.cache | available, used | MiB |
-| memcached.net | in, out | kilobits/s |
-| memcached.connections | current, rejected, total | connections/s |
-| memcached.items | current, total | items |
-| memcached.evicted_reclaimed | reclaimed, evicted | items |
-| memcached.get | hints, misses | requests |
-| memcached.get_rate | rate | requests/s |
-| memcached.set_rate | rate | requests/s |
-| memcached.delete | hits, misses | requests |
-| memcached.cas | hits, misses, bad value | requests |
-| memcached.increment | hits, misses | requests |
-| memcached.decrement | hits, misses | requests |
-| memcached.touch | hits, misses | requests |
-| memcached.touch_rate | rate | requests/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ memcached_cache_memory_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | cache memory utilization |
-| [ memcached_cache_fill_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | average rate the cache fills up (positive), or frees up (negative) space over the last hour |
-| [ memcached_out_of_cache_space_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | estimated time the cache will run out of space if the system continues to add data at the same rate as the past hour |
-
-
 ## Setup
 
 
@@ -219,6 +172,53 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ memcached_cache_memory_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | cache memory utilization |
+| [ memcached_cache_fill_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | average rate the cache fills up (positive), or frees up (negative) space over the last hour |
+| [ memcached_out_of_cache_space_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | estimated time the cache will run out of space if the system continues to add data at the same rate as the past hour |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Memcached instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| memcached.cache | available, used | MiB |
+| memcached.net | in, out | kilobits/s |
+| memcached.connections | current, rejected, total | connections/s |
+| memcached.items | current, total | items |
+| memcached.evicted_reclaimed | reclaimed, evicted | items |
+| memcached.get | hints, misses | requests |
+| memcached.get_rate | rate | requests/s |
+| memcached.set_rate | rate | requests/s |
+| memcached.delete | hits, misses | requests |
+| memcached.cas | hits, misses, bad value | requests |
+| memcached.increment | hits, misses | requests |
+| memcached.decrement | hits, misses | requests |
+| memcached.touch | hits, misses | requests |
+| memcached.touch_rate | rate | requests/s |
 
 
 

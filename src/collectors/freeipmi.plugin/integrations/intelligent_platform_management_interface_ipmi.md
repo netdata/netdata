@@ -47,64 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 Linux kernel module for IPMI can create big overhead.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-The plugin does a speed test when it starts, to find out the duration needed by the IPMI processor to respond. Depending on the speed of your IPMI processor, charts may need several seconds to show up on the dashboard.
-
-
-### Per Intelligent Platform Management Interface (IPMI) instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipmi.sel | events | events |
-
-### Per sensor
-
-
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| sensor | The sensor name |
-| type | One of 45 recognized sensor types (Battery, Voltage...) |
-| component | One of 25 recognized components (Processor, Peripheral). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipmi.sensor_state | nominal, critical, warning, unknown | state |
-| ipmi.sensor_temperature_c | temperature | Celsius |
-| ipmi.sensor_temperature_f | temperature | Fahrenheit |
-| ipmi.sensor_voltage | voltage | Volts |
-| ipmi.sensor_ampere | ampere | Amps |
-| ipmi.sensor_fan_speed | rotations | RPM |
-| ipmi.sensor_power | power | Watts |
-| ipmi.sensor_reading_percent | percentage | % |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ ipmi_sensor_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi.sensor_state | IPMI sensor ${label:sensor} (${label:component}) state |
-
-
 ## Setup
 
 
@@ -265,6 +207,64 @@ ID  | Name             | Type                     | State    | Reading    | Unit
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ ipmi_sensor_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi.sensor_state | IPMI sensor ${label:sensor} (${label:component}) state |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+The plugin does a speed test when it starts, to find out the duration needed by the IPMI processor to respond. Depending on the speed of your IPMI processor, charts may need several seconds to show up on the dashboard.
+
+
+### Per Intelligent Platform Management Interface (IPMI) instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ipmi.sel | events | events |
+
+### Per sensor
+
+
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| sensor | The sensor name |
+| type | One of 45 recognized sensor types (Battery, Voltage...) |
+| component | One of 25 recognized components (Processor, Peripheral). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ipmi.sensor_state | nominal, critical, warning, unknown | state |
+| ipmi.sensor_temperature_c | temperature | Celsius |
+| ipmi.sensor_temperature_f | temperature | Fahrenheit |
+| ipmi.sensor_voltage | voltage | Volts |
+| ipmi.sensor_ampere | ampere | Amps |
+| ipmi.sensor_fan_speed | rotations | RPM |
+| ipmi.sensor_power | power | Watts |
+| ipmi.sensor_reading_percent | percentage | % |
 
 
 

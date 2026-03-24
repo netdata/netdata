@@ -50,56 +50,6 @@ Doesn't work if Netdata or WireGuard is installed in the container.
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per device
-
-These metrics refer to the VPN network interface.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| device | VPN network interface |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| wireguard.device_network_io | receive, transmit | B/s |
-| wireguard.device_peers | peers | peers |
-
-### Per peer
-
-These metrics refer to the VPN peer.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| device | VPN network interface |
-| public_key | Public key of a peer |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| wireguard.peer_network_io | receive, transmit | B/s |
-| wireguard.peer_latest_handshake_ago | time | seconds |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -178,6 +128,56 @@ sudo ./edit-config go.d/wireguard.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per device
+
+These metrics refer to the VPN network interface.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| device | VPN network interface |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| wireguard.device_network_io | receive, transmit | B/s |
+| wireguard.device_peers | peers | peers |
+
+### Per peer
+
+These metrics refer to the VPN peer.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| device | VPN network interface |
+| public_key | Public key of a peer |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| wireguard.peer_network_io | receive, transmit | B/s |
+| wireguard.peer_latest_handshake_ago | time | seconds |
 
 
 

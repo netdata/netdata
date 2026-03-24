@@ -789,8 +789,11 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     if(get_daemon_status_fields_from_system_info(&session_status))
         product_name_vendor_type(&session_status);
 
-    if(netdata_configured_timezone)
-        safecpy(session_status.timezone, netdata_configured_timezone);
+    {
+        SYSTEM_TZ tz = system_tz_get();
+        safecpy(session_status.timezone, tz.timezone);
+        system_tz_free(&tz);
+    }
 
     session_status.exit_reason = exit_initiated_get();
     session_status.profile = nd_profile_detect_and_configure(false);

@@ -9,6 +9,7 @@
 #include "web/mcp/mcp.h"
 
 #include "database/engine/page_test.h"
+#include "database/rrdset-slots.h"
 #include <curl/curl.h>
 
 #ifdef OS_WINDOWS
@@ -154,6 +155,7 @@ int help(int exitcode) {
             "                           size of E MiB, an optional disk space limit\n"
             "                           of F MiB, G libuv workers (default 16) and exit.\n\n"
 #endif
+            "  -W prd-array-stress      Run PRD_ARRAY refcount stress test and exit.\n\n"
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W buildinfo             Print the version, the configure options,\n"
@@ -255,6 +257,7 @@ int netdata_main(int argc, char **argv) {
     libjudy_malloc_init();
     string_init();
     analytics_init();
+    nd_log_initialize_mutexes();
 
     netdata_start_time = now_realtime_sec();
     usec_t started_ut = now_monotonic_usec();
@@ -274,7 +277,7 @@ int netdata_main(int argc, char **argv) {
 
     static_threads = static_threads_get();
 
-    netdata_ready = false;
+    netdata_ready_store(false);
     // set the name for logging
     program_name = "netdata";
 
@@ -471,6 +474,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return rwlocks_stress_test();
                         }
+                        else if(strcmp(optarg, "prd-array-stress") == 0) {
+                            unittest_running = true;
+                            return prd_array_stress_test();
+                        }
                         else if(strcmp(optarg, "stringtest") == 0)  {
                             unittest_running = true;
                             return string_unittest(10000);
@@ -533,6 +540,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "mrgtest") == 0) {
                             unittest_running = true;
                             return mrg_unittest();
+                        }
+                        else if(strcmp(optarg, "mrgretentionbench") == 0) {
+                            unittest_running = true;
+                            return mrg_retention_benchmark();
                         }
                         else if(strcmp(optarg, "parsertest") == 0) {
                             unittest_running = true;
@@ -1149,7 +1160,7 @@ int netdata_main(int argc, char **argv) {
         (ready_ut - started_ut) / USEC_PER_MS, median_start_time / USEC_PER_MS);
 
     cleanup_agent_event_log();
-    netdata_ready = true;
+    netdata_ready_store(true);
 
     // ----------------------------------------------------------------------------------------------------------------
 

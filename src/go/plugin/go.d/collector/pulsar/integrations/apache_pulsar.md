@@ -51,93 +51,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-- topic_* metrics are available when `exposeTopicLevelMetricsInPrometheus` is set to true.
-- subscription_* and namespace_subscription metrics are available when `exposeTopicLevelMetricsInPrometheus` si set to true.
-- replication_* and namespace_replication_* metrics are available when replication is configured and `replicationMetricsEnabled` is set to true.
-
-
-### Per Apache Pulsar instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| pulsar.broker_components | namespaces, topics, subscriptions, producers, consumers | components |
-| pulsar.messages_rate | publish, dispatch | messages/s |
-| pulsar.throughput_rate | publish, dispatch | KiB/s |
-| pulsar.storage_size | used | KiB |
-| pulsar.storage_operations_rate | read, write | message batches/s |
-| pulsar.msg_backlog | backlog | messages |
-| pulsar.storage_write_latency | <=0.5ms, <=1ms, <=5ms, =10ms, <=20ms, <=50ms, <=100ms, <=200ms, <=1s, >1s | entries/s |
-| pulsar.entry_size | <=128B, <=512B, <=1KB, <=2KB, <=4KB, <=16KB, <=100KB, <=1MB, >1MB | entries/s |
-| pulsar.subscription_delayed | delayed | message batches |
-| pulsar.subscription_msg_rate_redeliver | redelivered | messages/s |
-| pulsar.subscription_blocked_on_unacked_messages | blocked | subscriptions |
-| pulsar.replication_rate | in, out | messages/s |
-| pulsar.replication_throughput_rate | in, out | KiB/s |
-| pulsar.replication_backlog | backlog | messages |
-
-### Per namespace
-
-TBD
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| pulsar.namespace_broker_components | topics, subscriptions, producers, consumers | components |
-| pulsar.namespace_messages_rate | publish, dispatch | messages/s |
-| pulsar.namespace_throughput_rate | publish, dispatch | KiB/s |
-| pulsar.namespace_storage_size | used | KiB |
-| pulsar.namespace_storage_operations_rate | read, write | message batches/s |
-| pulsar.namespace_msg_backlog | backlog | messages |
-| pulsar.namespace_storage_write_latency | <=0.5ms, <=1ms, <=5ms, =10ms, <=20ms, <=50ms, <=100ms, <=200ms, <=1s, >1s | entries/s |
-| pulsar.namespace_entry_size | <=128B, <=512B, <=1KB, <=2KB, <=4KB, <=16KB, <=100KB, <=1MB, >1MB | entries/s |
-| pulsar.namespace_subscription_delayed | delayed | message batches |
-| pulsar.namespace_subscription_msg_rate_redeliver | redelivered | messages/s |
-| pulsar.namespace_subscription_blocked_on_unacked_messages | blocked | subscriptions |
-| pulsar.namespace_replication_rate | in, out | messages/s |
-| pulsar.namespace_replication_throughput_rate | in, out | KiB/s |
-| pulsar.namespace_replication_backlog | backlog | messages |
-| pulsar.topic_producers | a dimension per topic | producers |
-| pulsar.topic_subscriptions | a dimension per topic | subscriptions |
-| pulsar.topic_consumers | a dimension per topic | consumers |
-| pulsar.topic_messages_rate_in | a dimension per topic | publishes/s |
-| pulsar.topic_messages_rate_out | a dimension per topic | dispatches/s |
-| pulsar.topic_throughput_rate_in | a dimension per topic | KiB/s |
-| pulsar.topic_throughput_rate_out | a dimension per topic | KiB/s |
-| pulsar.topic_storage_size | a dimension per topic | KiB |
-| pulsar.topic_storage_read_rate | a dimension per topic | message batches/s |
-| pulsar.topic_storage_write_rate | a dimension per topic | message batches/s |
-| pulsar.topic_msg_backlog | a dimension per topic | messages |
-| pulsar.topic_subscription_delayed | a dimension per topic | message batches |
-| pulsar.topic_subscription_msg_rate_redeliver | a dimension per topic | messages/s |
-| pulsar.topic_subscription_blocked_on_unacked_messages | a dimension per topic | blocked subscriptions |
-| pulsar.topic_replication_rate_in | a dimension per topic | messages/s |
-| pulsar.topic_replication_rate_out | a dimension per topic | messages/s |
-| pulsar.topic_replication_throughput_rate_in | a dimension per topic | messages/s |
-| pulsar.topic_replication_throughput_rate_out | a dimension per topic | messages/s |
-| pulsar.topic_replication_backlog | a dimension per topic | messages |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -295,6 +208,93 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+- topic_* metrics are available when `exposeTopicLevelMetricsInPrometheus` is set to true.
+- subscription_* and namespace_subscription metrics are available when `exposeTopicLevelMetricsInPrometheus` si set to true.
+- replication_* and namespace_replication_* metrics are available when replication is configured and `replicationMetricsEnabled` is set to true.
+
+
+### Per Apache Pulsar instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| pulsar.broker_components | namespaces, topics, subscriptions, producers, consumers | components |
+| pulsar.messages_rate | publish, dispatch | messages/s |
+| pulsar.throughput_rate | publish, dispatch | KiB/s |
+| pulsar.storage_size | used | KiB |
+| pulsar.storage_operations_rate | read, write | message batches/s |
+| pulsar.msg_backlog | backlog | messages |
+| pulsar.storage_write_latency | <=0.5ms, <=1ms, <=5ms, =10ms, <=20ms, <=50ms, <=100ms, <=200ms, <=1s, >1s | entries/s |
+| pulsar.entry_size | <=128B, <=512B, <=1KB, <=2KB, <=4KB, <=16KB, <=100KB, <=1MB, >1MB | entries/s |
+| pulsar.subscription_delayed | delayed | message batches |
+| pulsar.subscription_msg_rate_redeliver | redelivered | messages/s |
+| pulsar.subscription_blocked_on_unacked_messages | blocked | subscriptions |
+| pulsar.replication_rate | in, out | messages/s |
+| pulsar.replication_throughput_rate | in, out | KiB/s |
+| pulsar.replication_backlog | backlog | messages |
+
+### Per namespace
+
+TBD
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| pulsar.namespace_broker_components | topics, subscriptions, producers, consumers | components |
+| pulsar.namespace_messages_rate | publish, dispatch | messages/s |
+| pulsar.namespace_throughput_rate | publish, dispatch | KiB/s |
+| pulsar.namespace_storage_size | used | KiB |
+| pulsar.namespace_storage_operations_rate | read, write | message batches/s |
+| pulsar.namespace_msg_backlog | backlog | messages |
+| pulsar.namespace_storage_write_latency | <=0.5ms, <=1ms, <=5ms, =10ms, <=20ms, <=50ms, <=100ms, <=200ms, <=1s, >1s | entries/s |
+| pulsar.namespace_entry_size | <=128B, <=512B, <=1KB, <=2KB, <=4KB, <=16KB, <=100KB, <=1MB, >1MB | entries/s |
+| pulsar.namespace_subscription_delayed | delayed | message batches |
+| pulsar.namespace_subscription_msg_rate_redeliver | redelivered | messages/s |
+| pulsar.namespace_subscription_blocked_on_unacked_messages | blocked | subscriptions |
+| pulsar.namespace_replication_rate | in, out | messages/s |
+| pulsar.namespace_replication_throughput_rate | in, out | KiB/s |
+| pulsar.namespace_replication_backlog | backlog | messages |
+| pulsar.topic_producers | a dimension per topic | producers |
+| pulsar.topic_subscriptions | a dimension per topic | subscriptions |
+| pulsar.topic_consumers | a dimension per topic | consumers |
+| pulsar.topic_messages_rate_in | a dimension per topic | publishes/s |
+| pulsar.topic_messages_rate_out | a dimension per topic | dispatches/s |
+| pulsar.topic_throughput_rate_in | a dimension per topic | KiB/s |
+| pulsar.topic_throughput_rate_out | a dimension per topic | KiB/s |
+| pulsar.topic_storage_size | a dimension per topic | KiB |
+| pulsar.topic_storage_read_rate | a dimension per topic | message batches/s |
+| pulsar.topic_storage_write_rate | a dimension per topic | message batches/s |
+| pulsar.topic_msg_backlog | a dimension per topic | messages |
+| pulsar.topic_subscription_delayed | a dimension per topic | message batches |
+| pulsar.topic_subscription_msg_rate_redeliver | a dimension per topic | messages/s |
+| pulsar.topic_subscription_blocked_on_unacked_messages | a dimension per topic | blocked subscriptions |
+| pulsar.topic_replication_rate_in | a dimension per topic | messages/s |
+| pulsar.topic_replication_rate_out | a dimension per topic | messages/s |
+| pulsar.topic_replication_throughput_rate_in | a dimension per topic | messages/s |
+| pulsar.topic_replication_throughput_rate_out | a dimension per topic | messages/s |
+| pulsar.topic_replication_backlog | a dimension per topic | messages |
 
 
 

@@ -139,12 +139,12 @@ static void sanity_check(void)
     BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_OPCODE_MAX + 2));
 
     /* Magic numbers must fit in the super-blocks */
-    BUILD_BUG_ON(strlen(RRDENG_DF_MAGIC) > RRDENG_MAGIC_SZ);
-    BUILD_BUG_ON(strlen(RRDENG_JF_MAGIC) > RRDENG_MAGIC_SZ);
+    BUILD_BUG_ON(sizeof(RRDENG_DF_MAGIC) - 1 > RRDENG_MAGIC_SZ);
+    BUILD_BUG_ON(sizeof(RRDENG_JF_MAGIC) - 1 > RRDENG_MAGIC_SZ);
 
     /* Version strings must fit in the super-blocks */
-    BUILD_BUG_ON(strlen(RRDENG_DF_VER) > RRDENG_VER_SZ);
-    BUILD_BUG_ON(strlen(RRDENG_JF_VER) > RRDENG_VER_SZ);
+    BUILD_BUG_ON(sizeof(RRDENG_DF_VER) - 1 > RRDENG_VER_SZ);
+    BUILD_BUG_ON(sizeof(RRDENG_JF_VER) - 1 > RRDENG_VER_SZ);
 
     /* Data file super-block cannot be larger than RRDENG_BLOCK_SIZE */
     BUILD_BUG_ON(RRDENG_DF_SB_PADDING_SZ < 0);
@@ -1167,7 +1167,8 @@ static time_t find_uuid_first_time(
 
     bool agent_shutdown = false;
     while (datafile) {
-        struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL, 0, 0);
+        struct journal_v2_header *j2_header = journalfile_v2_data_acquire_with_hint(
+            datafile->journalfile, NULL, 0, 0, JOURNALFILE_V2_ACCESS_RANDOM);
         if (!j2_header) {
             datafile = datafile_release_and_acquire_next_for_retention(ctx, datafile);
             continue;
@@ -1342,7 +1343,8 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         worker_is_busy(UV_EVENT_DBENGINE_FIND_ROTATED_METRICS);
 
     struct rrdengine_journalfile *journalfile = datafile_to_delete->journalfile;
-    struct journal_v2_header *j2_header = journalfile_v2_data_acquire(journalfile, NULL, 0, 0);
+    struct journal_v2_header *j2_header = journalfile_v2_data_acquire_with_hint(
+        journalfile, NULL, 0, 0, JOURNALFILE_V2_ACCESS_SEQUENTIAL_DIRECTORY);
 
     if (unlikely(!j2_header)) {
         if (worker)
@@ -1692,14 +1694,16 @@ static void *populate_mrg_tp_worker(
     }
 
     size_t total = 0;
+    Word_t last_index = 0;
+    bool resume_scan = false;
     do {
         struct rrdengine_datafile *datafile = NULL;
 
         // find a datafile to work on
         netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
-        bool first_then_next = true;
-        Pvoid_t *Pvalue =  NULL;
-        Word_t Index = 0;
+        Pvoid_t *Pvalue = NULL;
+        Word_t Index = resume_scan ? last_index : 0;
+        bool first_then_next = !resume_scan;
         while((Pvalue = JudyLFirstThenNext(ctx->datafiles.JudyL, &Index, &first_then_next))) {
             datafile = *Pvalue;
             if(!spinlock_trylock(&datafile->populate_mrg.spinlock)) {
@@ -1719,6 +1723,10 @@ static void *populate_mrg_tp_worker(
         if(!datafile)
             break;
 
+        // resume next scan from current position
+        last_index = Index;
+        resume_scan = true;
+
         uv_sem_wait(mlt->sem);
         struct mrg_load_thread *local_mlt = callocz(1, sizeof(struct mrg_load_thread));
         local_mlt->datafile = datafile;
@@ -1727,18 +1735,25 @@ static void *populate_mrg_tp_worker(
         local_mlt->populated_datafiles = &populated_datafiles;
         __atomic_add_fetch(local_mlt->total, 1, __ATOMIC_RELAXED);
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_MRG_LOAD, local_mlt, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-        nd_log_limit_static_thread_var(erl, 10, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO, "DBENGINE: Tier %d MRG population completed: %.2f%% (%zu/%zu)", tier, (populated_datafiles * 100.0) / total_datafiles,
-                     populated_datafiles, total_datafiles);
+        {
+            nd_log_limit_static_thread_var(erl, 10, 0);
+            size_t completed = __atomic_load_n(&populated_datafiles, __ATOMIC_RELAXED);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
+                "DBENGINE: Tier %d MRG population completed: %.2f%% (%zu/%zu)",
+                tier, (completed * 100.0) / total_datafiles, completed, total_datafiles);
+        }
     } while(1);
 
-    // We've processed all datafiles. Now wait for all our threads to complete
+    // We've queued all datafiles. Now wait for all worker threads to complete.
     size_t pending;
     do {
         pending = __atomic_load_n(&total, __ATOMIC_ACQUIRE);
         if (pending) {
             nd_log_limit_static_thread_var(erl, 10, 0);
-            nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO, "DBENGINE: Tier %d Waiting for %zu threads", tier, total);
+            size_t completed = __atomic_load_n(&populated_datafiles, __ATOMIC_RELAXED);
+            nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
+                "DBENGINE: Tier %d MRG population completed: %.2f%% (%zu/%zu), waiting for %zu workers",
+                tier, (completed * 100.0) / total_datafiles, completed, total_datafiles, pending);
             sleep_usec(10 * USEC_PER_MS);
         }
     } while (pending > 0);

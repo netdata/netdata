@@ -46,6 +46,37 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -82,36 +113,5 @@ Metrics:
 | systemd.service.disk.queued_iops | read, write | operations/s |
 | systemd.service.disk.merged_iops | read, write | operations/s |
 | systemd.service.pids.current | pids | pids |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

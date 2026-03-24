@@ -97,6 +97,36 @@ modules:
               default_value: postgres://postgres:postgres@127.0.0.1:5432/postgres
               required: true
               group: Target
+            - name: cloud_auth.provider
+              description: Cloud auth provider (`none` or `azure_ad`).
+              default_value: none
+              required: false
+              group: Cloud Auth
+            - name: cloud_auth.azure_ad.mode
+              description: Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). Required when `cloud_auth.provider` is `azure_ad`.
+              default_value: ""
+              required: true
+              group: Cloud Auth/Azure
+            - name: cloud_auth.azure_ad.mode_service_principal.tenant_id
+              description: Azure tenant ID. Required for `service_principal` mode.
+              default_value: ""
+              required: false
+              group: Cloud Auth/Azure
+            - name: cloud_auth.azure_ad.mode_service_principal.client_id
+              description: Azure client ID. Required for `service_principal` mode.
+              default_value: ""
+              required: false
+              group: Cloud Auth/Azure
+            - name: cloud_auth.azure_ad.mode_service_principal.client_secret
+              description: Azure client secret for `service_principal` mode.
+              default_value: ""
+              required: false
+              group: Cloud Auth/Azure
+            - name: cloud_auth.azure_ad.mode_managed_identity.client_id
+              description: Optional client ID of a user-assigned managed identity (`managed_identity` mode).
+              default_value: ""
+              required: false
+              group: Cloud Auth/Azure
             - name: timeout
               description: Query timeout (seconds).
               default_value: 2
@@ -166,6 +196,30 @@ modules:
                 jobs:
                   - name: local
                     dsn: 'host=/var/run/postgresql port=5433 dbname=postgres user=netdata'
+            - name: Azure Database for PostgreSQL with service principal
+              description: Use Microsoft Entra service principal authentication.
+              config: |
+                jobs:
+                  - name: azure_postgres_sp
+                    dsn: 'postgresql://netdata@myserver.postgres.database.azure.com:5432/postgres?sslmode=require'
+                    cloud_auth:
+                      provider: azure_ad
+                      azure_ad:
+                        mode: service_principal
+                        mode_service_principal:
+                          tenant_id: "00000000-0000-0000-0000-000000000000"
+                          client_id: "11111111-1111-1111-1111-111111111111"
+                          client_secret: "super-secret-value"
+            - name: Azure Database for PostgreSQL with managed identity
+              description: Use managed identity authentication (system-assigned by default).
+              config: |
+                jobs:
+                  - name: azure_postgres_mi
+                    dsn: 'postgresql://netdata@myserver.postgres.database.azure.com:5432/postgres?sslmode=require'
+                    cloud_auth:
+                      provider: azure_ad
+                      azure_ad:
+                        mode: managed_identity
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.

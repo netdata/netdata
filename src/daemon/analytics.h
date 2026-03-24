@@ -88,6 +88,11 @@ void analytics_log_dashboard(void);
 void analytics_gather_mutable_meta_data(void);
 void analytics_report_oom_score(long long int score);
 void get_system_timezone(void);
+bool system_timezone_is_user_configured(void);
+bool system_timezone_is_tzdb_name(void);
+const char *detect_system_timezone_name(char *buffer, size_t buffer_size);
+bool timezone_name_is_safe_tzdb_path(const char *timezone);
+void refresh_system_timezone(const char *timezone, bool is_tzdb_name);
 void analytics_reset(void);
 void analytics_init(void);
 

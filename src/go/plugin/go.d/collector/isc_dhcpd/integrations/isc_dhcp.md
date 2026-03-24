@@ -48,50 +48,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per ISC DHCP instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| isc_dhcpd.active_leases_total | active | leases |
-
-### Per ISC DHCP instance
-
-These metrics refer to the DHCP pool.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| dhcp_pool_name | The DHCP pool name defined in the collector configuration. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| isc_dhcpd.dhcp_pool_utilization | utilization | percent |
-| isc_dhcpd.dhcp_pool_active_leases | active | leases |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -129,8 +85,9 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Collection** | update_every | Data collection interval (seconds). | 1 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | leases_path | Path to DHCP client lease database. | /var/lib/dhcp/dhcpd.leases | no |
-|  | pools | DHCP IP pools to monitor. |  | yes |
+|  | [pools](#option-target-pools) | DHCP IP pools to monitor. |  | yes |
 
+<a id="option-target-pools"></a>
 ##### pools
 
 List of IP pools to monitor.
@@ -205,6 +162,50 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per ISC DHCP instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| isc_dhcpd.active_leases_total | active | leases |
+
+### Per ISC DHCP instance
+
+These metrics refer to the DHCP pool.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| dhcp_pool_name | The DHCP pool name defined in the collector configuration. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| isc_dhcpd.dhcp_pool_utilization | utilization | percent |
+| isc_dhcpd.dhcp_pool_active_leases | active | leases |
 
 
 

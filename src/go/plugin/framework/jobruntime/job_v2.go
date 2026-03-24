@@ -117,6 +117,8 @@ type JobV2 struct {
 	vnode    vnodes.VirtualNode
 	updVnode chan *vnodes.VirtualNode
 
+	hostState jobV2HostState
+
 	ctxMu     sync.RWMutex
 	runCtx    context.Context
 	cancelRun context.CancelFunc
@@ -133,6 +135,12 @@ type JobV2 struct {
 	runtimeComponentRegistered bool
 
 	skipTracker tickstate.SkipTracker
+}
+
+type jobV2PreparedEmission struct {
+	attempt  chartengine.PlanAttempt
+	plan     chartengine.Plan
+	decision jobV2EmissionDecision
 }
 
 func (j *JobV2) FullName() string                 { return j.fullName }
@@ -171,10 +179,38 @@ func (j *JobV2) UpdateVnode(vnode *vnodes.VirtualNode) {
 	j.updVnode <- vnode
 }
 func (j *JobV2) Cleanup() {
+	j.buf.Reset()
+	snapshot := j.hostState.captureCleanupSnapshot(j.currentVnode())
 	j.unregisterRuntimeComponent()
 	if j.module != nil {
 		j.module.Cleanup(context.Background())
 	}
+	if !collectorapi.ShouldObsoleteCharts() {
+		return
+	}
+	if snapshot.staleVnodeSuppressed || len(snapshot.charts) == 0 {
+		return
+	}
+
+	env := chartemit.EmitEnv{
+		TypeID:      j.fullName,
+		UpdateEvery: j.updateEvery,
+		Plugin:      j.pluginName,
+		Module:      j.moduleName,
+		JobName:     j.name,
+		JobLabels:   j.labels,
+	}
+	if snapshot.host.isVnode() {
+		env.HostScope = &chartemit.HostScope{GUID: snapshot.host.guid}
+	}
+	if err := chartemit.ApplyPlan(j.api, buildJobV2CleanupPlan(snapshot.charts), env); err != nil {
+		j.Warningf("cleanup apply plan failed: %v", err)
+		j.buf.Reset()
+		return
+	}
+	_, _ = io.Copy(j.out, j.buf)
+	j.buf.Reset()
+	j.hostState.clearAfterCleanup()
 }
 
 func (j *JobV2) AutoDetection() (err error) {
@@ -334,17 +370,17 @@ func (j *JobV2) runOnce() {
 	sinceLastRun := calcSinceLastRun(curTime, j.prevRun)
 	j.prevRun = curTime
 
-	ok := j.collectAndEmit(sinceLastRun)
+	prepared, ok := j.collectAndEmit(sinceLastRun)
+	if ok && !j.panicked.Load() {
+		if err := j.finishPreparedEmission(prepared); err != nil {
+			j.Warningf("finalize emission failed: %v", err)
+			ok = false
+		}
+	}
 	if ok {
 		j.retries.Store(0)
 	} else {
 		j.retries.Add(1)
-	}
-
-	// Never flush buffered output from failed or panicked cycles:
-	// a panic can leave partial protocol lines in the buffer.
-	if ok && !j.panicked.Load() {
-		_, _ = io.Copy(j.out, j.buf)
 	}
 	j.buf.Reset()
 }
@@ -365,13 +401,16 @@ func (j *JobV2) applyPendingVnodeUpdate() {
 		j.vnodeMu.Lock()
 		j.vnode = *next
 		j.vnodeMu.Unlock()
+		j.hostState.invalidateDefine()
 	default:
 	}
 }
 
-func (j *JobV2) collectAndEmit(sinceLastRun int) bool {
+func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission, ok bool) {
 	j.panicked.Store(false)
 	cycleOpen := false
+	var attempt chartengine.PlanAttempt
+	attemptPending := false
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -381,6 +420,9 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) bool {
 					defer func() { _ = recover() }()
 					j.cycle.AbortCycle()
 				}()
+			}
+			if attemptPending {
+				attempt.Abort()
 			}
 			j.panicked.Store(true)
 			j.Errorf("PANIC: %v", r)
@@ -396,18 +438,56 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) bool {
 		j.cycle.AbortCycle()
 		cycleOpen = false
 		j.Warningf("collect failed: %v", err)
-		return false
+		return jobV2PreparedEmission{}, false
 	}
 	j.cycle.CommitCycleSuccess()
 	cycleOpen = false
 
-	plan, err := j.engine.BuildPlan(j.store.Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	vnode := j.currentVnode()
+	decision, err := j.hostState.prepareEmission(vnode)
+	if err != nil {
+		j.Warningf("prepare host state failed: %v", err)
+		return jobV2PreparedEmission{}, false
+	}
+	if decision.needEngineReload {
+		j.engine.ResetMaterialized()
+		j.hostState.onEngineReload(decision.targetHost)
+	}
+	attempt, err = j.engine.PreparePlan(j.store.Read(metrix.ReadRaw(), metrix.ReadFlatten()))
 	if err != nil {
 		j.Warningf("build plan failed: %v", err)
-		return false
+		return jobV2PreparedEmission{}, false
 	}
+	attemptPending = true
+	plan := attempt.Plan()
 
-	if err := chartemit.ApplyPlan(j.api, plan, chartemit.EmitEnv{
+	env := j.emitEnv(sinceLastRun, decision)
+	if err := chartemit.ApplyPlan(j.api, plan, env); err != nil {
+		attempt.Abort()
+		attemptPending = false
+		j.Warningf("apply plan failed: %v", err)
+		return jobV2PreparedEmission{}, false
+	}
+	return jobV2PreparedEmission{
+		attempt:  attempt,
+		plan:     plan,
+		decision: decision,
+	}, true
+}
+
+func (j *JobV2) finishPreparedEmission(prepared jobV2PreparedEmission) error {
+	if j.buf.Len() > 0 {
+		_, _ = io.Copy(j.out, j.buf)
+	}
+	if err := prepared.attempt.Commit(); err != nil {
+		return err
+	}
+	j.hostState.commitSuccessfulEmission(prepared.plan, prepared.decision)
+	return nil
+}
+
+func (j *JobV2) emitEnv(sinceLastRun int, decision jobV2EmissionDecision) chartemit.EmitEnv {
+	env := chartemit.EmitEnv{
 		TypeID:      j.fullName,
 		UpdateEvery: j.updateEvery,
 		Plugin:      j.pluginName,
@@ -415,11 +495,20 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) bool {
 		JobName:     j.name,
 		JobLabels:   j.labels,
 		MSSinceLast: sinceLastRun,
-	}); err != nil {
-		j.Warningf("apply plan failed: %v", err)
-		return false
 	}
-	return true
+	env.HostScope = decision.hostScope
+	return env
+}
+
+func (j *JobV2) currentVnode() vnodes.VirtualNode {
+	if j.module != nil {
+		if vnode := j.module.VirtualNode(); vnode != nil {
+			return *vnode.Copy()
+		}
+	}
+	j.vnodeMu.RLock()
+	defer j.vnodeMu.RUnlock()
+	return *j.vnode.Copy()
 }
 
 func (j *JobV2) penalty() int {
@@ -446,7 +535,10 @@ func (j *JobV2) moduleContext() context.Context {
 	ctx := j.runCtx
 	j.ctxMu.RUnlock()
 	if ctx == nil {
-		return context.Background()
+		ctx = context.Background()
+	}
+	if j.runtimeService != nil {
+		return runtimecomp.ContextWithService(ctx, j.runtimeService)
 	}
 	return ctx
 }

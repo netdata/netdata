@@ -74,18 +74,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics are dynamically created based on the OpenTelemetry data received.
-The specific metrics depend on the OTLP sources sending data to the plugin.
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -103,6 +91,12 @@ to the Netdata agent's gRPC endpoint.
 #### Options
 
 The plugin is configured via `otel.yaml` in the Netdata configuration directory.
+Only the fields you want to change need to be specified.
+
+Any option can also be overridden via environment variables with the `NETDATA_OTEL_`
+prefix (highest priority). The variable name is the config option in all caps with
+dots replaced by underscores — e.g. `endpoint.tls_cert_path` becomes
+`NETDATA_OTEL_ENDPOINT_TLS_CERT_PATH`.
 
 
 <details open><summary>Config options</summary>
@@ -115,11 +109,11 @@ The plugin is configured via `otel.yaml` in the Netdata configuration directory.
 | endpoint.tls_cert_path | Path to TLS certificate file. Enables TLS when provided. |  | no |
 | endpoint.tls_key_path | Path to TLS private key file. Required when TLS certificate is provided. |  | no |
 | endpoint.tls_ca_cert_path | Path to TLS CA certificate file for client authentication. |  | no |
-| metrics.chart_configs_dir | Directory containing YAML files that define how OTLP metrics are mapped to Netdata charts. Each file can match metrics by instrumentation scope and name, set the dimension attribute key, and override timing parameters. The plugin ships stock mappings; user files in this directory take priority. | /etc/netdata/otel.d/v1/metrics/ | no |
+| [metrics.chart_configs_dir](#option-metrics-chart-configs-dir) | Directory containing metric mapping YAML files. | /etc/netdata/otel.d/v1/metrics/ | no |
 | metrics.interval_secs | Collection interval in seconds (1–3600). Defines the Netdata chart update frequency. | 10 | no |
 | metrics.grace_period_secs | Grace period in seconds. After the last data point, the plugin waits this long before gap-filling. | 60 | no |
 | metrics.expiry_duration_secs | Expiry duration in seconds. Charts with no data for this long are removed. | 900 | no |
-| metrics.max_new_charts_per_request | Maximum number of new charts that can be created per gRPC request. Limits cardinality explosion from high-cardinality label combinations. | 100 | no |
+| [metrics.max_new_charts_per_request](#option-metrics-max-new-charts-per-request) | Maximum new charts created per gRPC request. | 100 | no |
 | logs.journal_dir | Directory to store journal files for ingested logs. |  | yes |
 | logs.size_of_journal_file | Maximum file size before rotating to a new journal file. | 100MB | no |
 | logs.entries_of_journal_file | Maximum log entries per journal file. | 50000 | no |
@@ -127,6 +121,28 @@ The plugin is configured via `otel.yaml` in the Netdata configuration directory.
 | logs.number_of_journal_files | Maximum number of journal files to keep. | 10 | no |
 | logs.size_of_journal_files | Maximum total size of all journal files. | 1GB | no |
 | logs.duration_of_journal_files | Maximum age of journal files. | 7 days | no |
+| [logs.store_otlp_json](#option-logs-store-otlp-json) | Store the complete OTLP JSON in each log entry. | no | no |
+
+<a id="option-metrics-chart-configs-dir"></a>
+##### metrics.chart_configs_dir
+
+Each file defines how OTLP metrics are mapped to Netdata charts.
+Files can match metrics by instrumentation scope and name, set the
+dimension attribute key, and override timing parameters. The plugin
+ships stock mappings; user files in this directory take priority.
+
+
+<a id="option-metrics-max-new-charts-per-request"></a>
+##### metrics.max_new_charts_per_request
+
+Limits cardinality explosion from high-cardinality label combinations.
+
+
+<a id="option-logs-store-otlp-json"></a>
+##### logs.store_otlp_json
+
+Useful for debugging and reprocessing, but increases storage usage.
+
 
 
 </details>
@@ -165,6 +181,25 @@ logs:
   journal_dir: /var/log/netdata/otel-journals
 
 ```
+###### Partial user override
+
+Override only specific fields in the user config. All other settings
+are inherited from the stock config. Unknown fields are ignored for
+forward compatibility.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+endpoint:
+  path: "0.0.0.0:4317"
+logs:
+  number_of_journal_files: 20
+  duration_of_journal_files: "14 days"
+
+```
+</details>
+
 ###### Metric mapping file
 
 Place YAML files like this in `/etc/netdata/otel.d/v1/metrics/` to control how
@@ -217,5 +252,17 @@ logs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics are dynamically created based on the OpenTelemetry data received.
+The specific metrics depend on the OTLP sources sending data to the plugin.
 
 

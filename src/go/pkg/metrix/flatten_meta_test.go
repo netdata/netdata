@@ -71,6 +71,35 @@ func TestFlattenSeriesMetaCarriesOriginType(t *testing.T) {
 				assert.Equal(t, FlattenRoleStateSetState, flatMeta.FlattenRole)
 			},
 		},
+		"measureset flatten series carry source kind and role": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+
+				ms := s.Write().SnapshotMeter("svc").MeasureSetGauge(
+					"latency",
+					WithMeasureSetFields(
+						MeasureFieldSpec{Name: "value"},
+						MeasureFieldSpec{Name: "limit"},
+					),
+				)
+				cc.BeginCycle()
+				ms.ObservePoint(MeasureSetPoint{Values: []SampleValue{1, 2}})
+				cc.CommitCycleSuccess()
+
+				rawMeta, ok := s.Read().SeriesMeta("svc.latency", nil)
+				require.True(t, ok)
+				assert.Equal(t, MetricKindMeasureSet, rawMeta.Kind)
+				assert.Equal(t, MetricKindMeasureSet, rawMeta.SourceKind)
+				assert.Equal(t, FlattenRoleNone, rawMeta.FlattenRole)
+
+				flatMeta, ok := s.Read(ReadFlatten()).SeriesMeta("svc.latency_value", measureSetFieldLabels("value"))
+				require.True(t, ok)
+				assert.Equal(t, MetricKindGauge, flatMeta.Kind)
+				assert.Equal(t, MetricKindMeasureSet, flatMeta.SourceKind)
+				assert.Equal(t, FlattenRoleMeasureSetField, flatMeta.FlattenRole)
+			},
+		},
 	}
 
 	for name, tc := range tests {

@@ -43,53 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per kern.cp_time instance
-
-These metrics show CPU usage statistics.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.cpu | nice, system, user, interrupt, idle | percentage |
-
-### Per core
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cpu.cpu | nice, system, user, interrupt, idle | percentage |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ 10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU utilization over the last 10 minutes (excluding iowait, nice and steal) |
-| [ 10min_cpu_iowait ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU iowait time over the last 10 minutes |
-| [ 20min_steal_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU steal time over the last 20 minutes |
-| [ 10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU utilization over the last 10 minutes (excluding nice) |
-
-
 ## Setup
 
 
@@ -140,5 +93,52 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ 10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU utilization over the last 10 minutes (excluding iowait, nice and steal) |
+| [ 10min_cpu_iowait ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU iowait time over the last 10 minutes |
+| [ 20min_steal_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU steal time over the last 20 minutes |
+| [ 10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU utilization over the last 10 minutes (excluding nice) |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per kern.cp_time instance
+
+These metrics show CPU usage statistics.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.cpu | nice, system, user, interrupt, idle | percentage |
+
+### Per core
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cpu.cpu | nice, system, user, interrupt, idle | percentage |
 
 

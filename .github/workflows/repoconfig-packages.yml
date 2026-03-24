@@ -82,7 +82,7 @@ jobs:
         # Unlike normally, we do not need a deep clone or submodules for this.
       - name: Fetch base image
         id: fetch-images
-        uses: nick-invision/retry@v3
+        uses: nick-invision/retry@v4
         with:
           max_attempts: 3
           retry_wait_seconds: 30
@@ -135,7 +135,7 @@ jobs:
       - name: Import GPG Keys
         id: import-keys
         if: matrix.format == 'deb' && github.event_name != 'pull_request'
-        uses: crazy-max/ghaction-import-gpg@v6
+        uses: crazy-max/ghaction-import-gpg@v7
         with:
           gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
       - name: Sign DEB Packages

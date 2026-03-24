@@ -43,63 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per getifaddrs instance
-
-General overview about network traffic.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.net | received, sent | kilobits/s |
-| system.packets | received, sent, multicast_received, multicast_sent | packets/s |
-| system.ipv4 | received, sent | kilobits/s |
-| system.ipv6 | received, sent | kilobits/s |
-
-### Per network device
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| net.net | received, sent | kilobits/s |
-| net.packets | received, sent, multicast_received, multicast_sent | packets/s |
-| net.errors | inbound, outbound | errors/s |
-| net.drops | inbound, outbound | drops/s |
-| net.events | collisions | events/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | network interface ${label:device} current speed |
-| [ inbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes |
-| [ outbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes |
-| [ 1m_received_packets_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | average number of packets received by the network interface ${label:device} over the last minute |
-| [ 10s_received_packets_storm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute |
-| [ interface_inbound_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.errors | number of inbound errors for the network interface ${label:device} in the last 10 minutes |
-| [ interface_outbound_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.errors | number of outbound errors for the network interface ${label:device} in the last 10 minutes |
-
-
 ## Setup
 
 
@@ -162,5 +105,62 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | network interface ${label:device} current speed |
+| [ inbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes |
+| [ outbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes |
+| [ 1m_received_packets_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | average number of packets received by the network interface ${label:device} over the last minute |
+| [ 10s_received_packets_storm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute |
+| [ interface_inbound_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.errors | number of inbound errors for the network interface ${label:device} in the last 10 minutes |
+| [ interface_outbound_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.errors | number of outbound errors for the network interface ${label:device} in the last 10 minutes |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per getifaddrs instance
+
+General overview about network traffic.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.net | received, sent | kilobits/s |
+| system.packets | received, sent, multicast_received, multicast_sent | packets/s |
+| system.ipv4 | received, sent | kilobits/s |
+| system.ipv6 | received, sent | kilobits/s |
+
+### Per network device
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| net.net | received, sent | kilobits/s |
+| net.packets | received, sent, multicast_received, multicast_sent | packets/s |
+| net.errors | inbound, outbound | errors/s |
+| net.drops | inbound, outbound | drops/s |
+| net.events | collisions | events/s |
 
 

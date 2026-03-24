@@ -44,6 +44,52 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ 1m_tcp_syn_queue_drops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_listen.conf) | ip.tcp_syn_queue | average number of SYN requests was dropped due to the full TCP SYN queue over the last minute (SYN cookies were not enabled) |
+| [ 1m_tcp_syn_queue_cookies ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_listen.conf) | ip.tcp_syn_queue | average number of sent SYN cookies due to the full TCP SYN queue over the last minute |
+| [ 1m_tcp_accept_queue_overflows ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_listen.conf) | ip.tcp_accept_queue | average number of overflows in the TCP accept queue over the last minute |
+| [ 1m_tcp_accept_queue_drops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_listen.conf) | ip.tcp_accept_queue | average number of dropped packets in the TCP accept queue over the last minute |
+| [ tcp_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_conn.conf) | ip.tcpsock | TCP connections utilization |
+| [ 1m_ip_tcp_resets_sent ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ip.tcphandshake | average number of sent TCP RESETS over the last minute |
+| [ 10s_ip_tcp_resets_sent ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ip.tcphandshake | average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has crashed. Netdata will not send a clear notification for this alarm. |
+| [ 1m_ip_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ip.tcphandshake | average number of received TCP RESETS over the last minute |
+| [ 10s_ip_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ip.tcphandshake | average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed. Netdata will not send a clear notification for this alarm. |
+| [ 1m_ipv4_udp_receive_buffer_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP receive buffer errors over the last minute |
+| [ 1m_ipv4_udp_send_buffer_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP send buffer errors over the last minute |
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -113,51 +159,5 @@ Metrics:
 | ipv6.ect | InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts | packets/s |
 | ipv6.fragsin | ok, failed, timeout, all | packets/s |
 | ipv6.fragsout | ok, failed, all | packets/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ 1m_tcp_syn_queue_drops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_listen.conf) | ip.tcp_syn_queue | average number of SYN requests was dropped due to the full TCP SYN queue over the last minute (SYN cookies were not enabled) |
-| [ 1m_tcp_syn_queue_cookies ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_listen.conf) | ip.tcp_syn_queue | average number of sent SYN cookies due to the full TCP SYN queue over the last minute |
-| [ 1m_tcp_accept_queue_overflows ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_listen.conf) | ip.tcp_accept_queue | average number of overflows in the TCP accept queue over the last minute |
-| [ 1m_tcp_accept_queue_drops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_listen.conf) | ip.tcp_accept_queue | average number of dropped packets in the TCP accept queue over the last minute |
-| [ tcp_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_conn.conf) | ip.tcpsock | TCP connections utilization |
-| [ 1m_ip_tcp_resets_sent ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ip.tcphandshake | average number of sent TCP RESETS over the last minute |
-| [ 10s_ip_tcp_resets_sent ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ip.tcphandshake | average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has crashed. Netdata will not send a clear notification for this alarm. |
-| [ 1m_ip_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ip.tcphandshake | average number of received TCP RESETS over the last minute |
-| [ 10s_ip_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ip.tcphandshake | average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed. Netdata will not send a clear notification for this alarm. |
-| [ 1m_ipv4_udp_receive_buffer_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP receive buffer errors over the last minute |
-| [ 1m_ipv4_udp_send_buffer_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP send buffer errors over the last minute |
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

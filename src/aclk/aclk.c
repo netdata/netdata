@@ -770,7 +770,8 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         freez((char*)mqtt_conn_params.will_msg);
         freez((char*)proxy_conf.host);
         freez((char*)proxy_conf.username);
-        freez((char*)proxy_conf.password);
+        char *proxy_password = (char *)proxy_conf.password;
+        aclk_sensitive_free(&proxy_password);
 
         if (!mqtt_rc) {
             last_conn_time_mqtt = now_realtime_sec();
@@ -841,14 +842,6 @@ void aclk_main(void *ptr)
     worker_register_job_name(WORKER_ACLK_WAITING_TO_CONNECT, "conn wait");
     worker_register_job_name(WORKER_ACLK_RECLAIM_MEMORY, "reclaim");
     worker_register_job_name(WORKER_ACLK_BUFFER_COMPACT, "compact");
-
-    ACLK_PROXY_TYPE proxy_type;
-    aclk_get_proxy(&proxy_type, false);
-    if (proxy_type == PROXY_TYPE_SOCKS5) {
-        netdata_log_error("ACLK: SOCKS5 proxy is not supported by ACLK-NG yet.");
-        static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return;
-    }
 
     aclk_init_rx_msg_handlers();
 
@@ -1354,6 +1347,9 @@ void add_aclk_host_labels(void) {
     switch(aclk_proxy) {
         case PROXY_TYPE_SOCKS5:
             proxy_str = "SOCKS5";
+            break;
+        case PROXY_TYPE_SOCKS5H:
+            proxy_str = "SOCKS5H";
             break;
         case PROXY_TYPE_HTTP:
             proxy_str = "HTTP";

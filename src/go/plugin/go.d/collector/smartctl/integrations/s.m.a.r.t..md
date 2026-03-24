@@ -55,49 +55,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per controller
-
-These metrics refer to the Storage Device.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| device_name | Device name |
-| device_type | Device type |
-| model_name | Model name |
-| serial_number | Serial number |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| smartctl.device_smart_status | passed, failed | status |
-| smartctl.device_ata_smart_error_log_count | error_log | logs |
-| smartctl.device_power_on_time | power_on_time | seconds |
-| smartctl.device_temperature | temperature | Celsius |
-| smartctl.device_power_cycles_count | power | cycles |
-| smartctl.device_read_errors_rate | corrected, uncorrected | errors/s |
-| smartctl.device_write_errors_rate | corrected, uncorrected | errors/s |
-| smartctl.device_verify_errors_rate | corrected, uncorrected | errors/s |
-| smartctl.device_smart_attr_{attribute_name} | {attribute_name} | {attribute_unit} |
-| smartctl.device_smart_attr_{attribute_name}_normalized | {attribute_name} | value |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -173,8 +130,9 @@ The following options can be defined globally: update_every.
 | **Target** | device_selector | Pattern to match the 'info name' of devices as reported by `smartctl --scan --json`. | * | no |
 |  | extra_devices | Manually specify devices not auto-detected by `smartctl --scan`. Each entry must include both a name and a type. | [] | no |
 | **Performance** | concurrent_scans | Number of devices to scan concurrently. Set 0 for sequential scanning (default). Helps performance when monitoring many devices. | 0 | no |
-|  | no_check_power_mode | Skip data collection when device is in low-power mode (avoids unnecessary spin-up). | standby | no |
+|  | [no_check_power_mode](#option-performance-no-check-power-mode) | Skip data collection when device is in low-power mode (avoids unnecessary spin-up). | standby | no |
 
+<a id="option-performance-no-check-power-mode"></a>
 ##### no_check_power_mode
 
 Valid arguments:
@@ -273,6 +231,49 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per controller
+
+These metrics refer to the Storage Device.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| device_name | Device name |
+| device_type | Device type |
+| model_name | Model name |
+| serial_number | Serial number |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| smartctl.device_smart_status | passed, failed | status |
+| smartctl.device_ata_smart_error_log_count | error_log | logs |
+| smartctl.device_power_on_time | power_on_time | seconds |
+| smartctl.device_temperature | temperature | Celsius |
+| smartctl.device_power_cycles_count | power | cycles |
+| smartctl.device_read_errors_rate | corrected, uncorrected | errors/s |
+| smartctl.device_write_errors_rate | corrected, uncorrected | errors/s |
+| smartctl.device_verify_errors_rate | corrected, uncorrected | errors/s |
+| smartctl.device_smart_attr_{attribute_name} | {attribute_name} | {attribute_unit} |
+| smartctl.device_smart_attr_{attribute_name}_normalized | {attribute_name} | value |
 
 
 

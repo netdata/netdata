@@ -1088,6 +1088,7 @@ done:
 static int store_host_metadata(RRDHOST *host)
 {
     sqlite3_stmt *res = NULL;
+    RRDHOST_TZ host_tz = { 0 };
 
     if (!PREPARE_STATEMENT(db_meta, SQL_STORE_HOST_INFO, &res))
         return false;
@@ -1098,12 +1099,13 @@ static int store_host_metadata(RRDHOST *host)
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_registry_hostname(host), 1));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->rrd_update_every));
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_os(host), 1));
-    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_timezone(host), 1));
+    host_tz = rrdhost_tz_get(host);
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, host_tz.timezone, 1));
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, "", 1));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, rrdhost_ingestion_hops(host)));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->rrd_memory_mode));
-    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_abbrev_timezone(host), 1));
-    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->utc_offset));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, host_tz.abbrev_timezone, 1));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host_tz.utc_offset));
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_program_name(host), 1));
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_program_version(host), 1));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int64(res, ++param, host->rrd_history_entries));
@@ -1116,12 +1118,14 @@ static int store_host_metadata(RRDHOST *host)
         error_report("Failed to store host %s, rc = %d", rrdhost_hostname(host), store_rc);
 
     SQLITE_FINALIZE(res);
+    rrdhost_tz_free(&host_tz);
 
     return store_rc != SQLITE_DONE;
 
 bind_fail:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+    rrdhost_tz_free(&host_tz);
     return 1;
 }
 

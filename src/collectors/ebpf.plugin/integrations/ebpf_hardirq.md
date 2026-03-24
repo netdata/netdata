@@ -47,33 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 This thread will add overhead every time that an internal kernel function monitored by this thread is called.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per eBPF Hardirq instance
-
-These metrics show latest timestamp for each hardIRQ available on host.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.hardirq_latency | hardirq names | milliseconds |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -115,7 +88,7 @@ All options are defined inside section `[global]`.
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
-| update every | Data collection frequency. | 5 | no |
+| update every | Data collection frequency. | 10 | no |
 | ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
 | lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
 
@@ -148,5 +121,32 @@ sudo ./edit-config ebpf.d/hardirq.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per eBPF Hardirq instance
+
+These metrics show latest timestamp for each hardIRQ available on host.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.hardirq_latency | hardirq names | milliseconds |
 
 

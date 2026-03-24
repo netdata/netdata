@@ -82,13 +82,32 @@ extern const char *netdata_configured_varlib_dir;
 extern const char *netdata_configured_cloud_dir;
 extern const char *netdata_configured_home_dir;
 extern const char *netdata_configured_host_prefix;
-extern const char *netdata_configured_timezone;
-extern const char *netdata_configured_abbrev_timezone;
-extern int32_t netdata_configured_utc_offset;
 extern bool netdata_anonymous_statistics_enabled;
+
+// Thread-safe system timezone access.
+// Use system_tz_get() to read; the returned struct owns strdup'd copies
+// that must be released with system_tz_free().
+// Use system_tz_set() to write (called by timezone detection and periodic refresh).
+typedef struct {
+    char *timezone;        // IANA timezone name, e.g. "America/New_York" (owned, strdup'd)
+    char *abbrev_timezone; // abbreviated timezone, e.g. "EDT" (owned, strdup'd)
+    int32_t utc_offset;    // offset from UTC in seconds
+} SYSTEM_TZ;
+
+SYSTEM_TZ system_tz_get(void);
+void system_tz_set(const char *timezone, const char *abbrev_timezone, int32_t utc_offset);
+void system_tz_free(SYSTEM_TZ *tz);
 
 extern bool netdata_ready;
 extern time_t netdata_start_time;
+
+static inline bool netdata_ready_load(void) {
+    return __atomic_load_n(&netdata_ready, __ATOMIC_ACQUIRE);
+}
+
+static inline void netdata_ready_store(bool ready) {
+    __atomic_store_n(&netdata_ready, ready, __ATOMIC_RELEASE);
+}
 
 void set_environment_for_plugins_and_scripts(void);
 

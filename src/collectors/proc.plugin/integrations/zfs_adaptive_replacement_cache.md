@@ -44,6 +44,42 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ zfs_memory_throttle ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfs.memory_ops | number of times ZFS had to limit the ARC growth in the last 10 minutes |
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -88,41 +124,5 @@ Metrics:
 | zfs.prefetch_data_hits_rate | hits, misses | events/s |
 | zfs.hash_elements | current, max | elements |
 | zfs.hash_chains | current, max | chains |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ zfs_memory_throttle ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfs.memory_ops | number of times ZFS had to limit the ARC growth in the last 10 minutes |
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

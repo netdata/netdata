@@ -45,44 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per DNSdist instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| dnsdist.queries | all, recursive, empty | queries/s |
-| dnsdist.queries_dropped | rule_drop, dynamic_blocked, no_policy, non_queries | queries/s |
-| dnsdist.packets_dropped | acl | packets/s |
-| dnsdist.answers | self_answered, nxdomain, refused, trunc_failures | answers/s |
-| dnsdist.backend_responses | responses | responses/s |
-| dnsdist.backend_commerrors | send_errors | errors/s |
-| dnsdist.backend_errors | timeouts, servfail, non_compliant | responses/s |
-| dnsdist.cache | hits, misses | answers/s |
-| dnsdist.servercpu | system_state, user_state | ms/s |
-| dnsdist.servermem | memory_usage | MiB |
-| dnsdist.query_latency | 1ms, 10ms, 50ms, 100ms, 1sec, slow | queries/s |
-| dnsdist.query_latency_avg | 100, 1k, 10k, 1000k | microseconds |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -222,6 +184,44 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per DNSdist instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| dnsdist.queries | all, recursive, empty | queries/s |
+| dnsdist.queries_dropped | rule_drop, dynamic_blocked, no_policy, non_queries | queries/s |
+| dnsdist.packets_dropped | acl | packets/s |
+| dnsdist.answers | self_answered, nxdomain, refused, trunc_failures | answers/s |
+| dnsdist.backend_responses | responses | responses/s |
+| dnsdist.backend_commerrors | send_errors | errors/s |
+| dnsdist.backend_errors | timeouts, servfail, non_compliant | responses/s |
+| dnsdist.cache | hits, misses | answers/s |
+| dnsdist.servercpu | system_state, user_state | ms/s |
+| dnsdist.servermem | memory_usage | MiB |
+| dnsdist.query_latency | 1ms, 10ms, 50ms, 100ms, 1sec, slow | queries/s |
+| dnsdist.query_latency_avg | 100, 1k, 10k, 1000k | microseconds |
 
 
 

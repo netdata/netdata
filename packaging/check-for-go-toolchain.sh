@@ -13,7 +13,7 @@
 
 GOLANG_MIN_MAJOR_VERSION='1'
 GOLANG_MIN_MINOR_VERSION='25'
-GOLANG_MIN_PATCH_VERSION='0'
+GOLANG_MIN_PATCH_VERSION='7'
 GOLANG_MIN_VERSION="${GOLANG_MIN_MAJOR_VERSION}.${GOLANG_MIN_MINOR_VERSION}.${GOLANG_MIN_PATCH_VERSION}"
 
 GOLANG_TEMP_PATH="${TMPDIR}/go-toolchain"
@@ -142,7 +142,7 @@ install_go_toolchain() {
     return 1
   fi
 
-  if ! tar -C /usr/local/ -xzf "${GOLANG_ARCHIVE_NAME}"; then
+  if ! tar -C /usr/local/ --no-same-owner -xzf "${GOLANG_ARCHIVE_NAME}"; then
     GOLANG_FAILURE_REASON="Failed to extract Go toolchain."
     return 1
   fi

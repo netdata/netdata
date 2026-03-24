@@ -29,13 +29,13 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				cc.BeginCycle()
 				c.ObserveTotal(10)
 				cc.CommitCycleSuccess()
-				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				cc.BeginCycle()
 				c.ObserveTotal(20)
 				cc.CommitCycleSuccess()
-				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				rs := e.RuntimeStore()
@@ -87,7 +87,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				cc.BeginCycle()
 				c.ObserveTotal(10)
 				cc.CommitCycleSuccess()
-				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				before := e.RuntimeStore().Read(metrix.ReadRaw())
@@ -97,7 +97,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 
 				cc.BeginCycle()
 				cc.AbortCycle()
-				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				after := e.RuntimeStore().Read(metrix.ReadRaw())
@@ -125,7 +125,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				cc.BeginCycle()
 				c.ObserveTotal(10)
 				cc.CommitCycleSuccess()
-				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				r := e.RuntimeStore().Read(metrix.ReadRaw())
@@ -149,13 +149,13 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				total.Observe(100)
 				modeMetric.Observe(1, modeOK)
 				cc.CommitCycleSuccess()
-				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				cc.BeginCycle()
 				total.Observe(101)
 				cc.CommitCycleSuccess()
-				_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				r := e.RuntimeStore().Read(metrix.ReadRaw())
@@ -186,7 +186,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, observer.LoadYAML([]byte(runtimeComponentTemplateYAML()), 1))
 
-				plan, err := observer.BuildPlan(rs.Read(metrix.ReadFlatten()))
+				plan, err := buildPlan(observer, rs.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 				assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
 
@@ -211,7 +211,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				cc.BeginCycle()
 				c.ObserveTotal(10)
 				cc.CommitCycleSuccess()
-				_, err = producer.BuildPlan(store.Read(metrix.ReadFlatten()))
+				_, err = buildPlan(producer, store.Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 
 				observer, err := New(
@@ -223,7 +223,7 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, observer.LoadYAML([]byte(runtimeDummyTemplateYAML()), 1))
 
-				plan, err := observer.BuildPlan(producer.RuntimeStore().Read(metrix.ReadFlatten()))
+				plan, err := buildPlan(observer, producer.RuntimeStore().Read(metrix.ReadFlatten()))
 				require.NoError(t, err)
 				create := findCreateChartByTitle(plan.Actions, "Successful BuildPlan calls")
 				require.NotNil(t, create)

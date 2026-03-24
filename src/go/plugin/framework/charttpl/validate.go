@@ -40,6 +40,9 @@ func validateGroup(group Group, path string, inheritedMetrics map[string]struct{
 	if strings.TrimSpace(group.Family) == "" {
 		return semErr(path+".family", "must not be empty")
 	}
+	if err := validateChartDefaults(group.ChartDefaults, path); err != nil {
+		return err
+	}
 
 	ownMetrics := make(map[string]struct{}, len(group.Metrics))
 	for i, name := range group.Metrics {
@@ -72,6 +75,13 @@ func validateGroup(group Group, path string, inheritedMetrics map[string]struct{
 		}
 	}
 	return nil
+}
+
+func validateChartDefaults(defaults *ChartDefaults, path string) error {
+	if defaults == nil {
+		return nil
+	}
+	return validateInstances(defaults.Instances, path+".chart_defaults")
 }
 
 func validateChart(chart Chart, path string, effectiveMetrics map[string]struct{}) error {

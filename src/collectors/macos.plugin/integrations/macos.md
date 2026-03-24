@@ -50,121 +50,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per macOS instance
-
-These metrics refer to hardware and network monitoring.
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.cpu | user, nice, system, idle | percentage |
-| system.ram | active, wired, throttled, compressor, inactive, purgeable, speculative, free | MiB |
-| mem.swapio | io, out | KiB/s |
-| mem.pgfaults | memory, cow, pagein, pageout, compress, decompress, zero_fill, reactivate, purge | faults/s |
-| system.load | load1, load5, load15 | load |
-| mem.swap | free, used | MiB |
-| system.ipv4 | received, sent | kilobits/s |
-| ipv4.tcppackets | received, sent | packets/s |
-| ipv4.tcperrors | InErrs, InCsumErrors, RetransSegs | packets/s |
-| ipv4.tcphandshake | EstabResets, ActiveOpens, PassiveOpens, AttemptFails | events/s |
-| ipv4.tcpconnaborts | baddata, userclosed, nomemory, timeout | connections/s |
-| ipv4.tcpofo | inqueue | packets/s |
-| ipv4.tcpsyncookies | received, sent, failed | packets/s |
-| ipv4.ecnpkts | CEP, NoECTP | packets/s |
-| ipv4.udppackets | received, sent | packets/s |
-| ipv4.udperrors | RcvbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | events/s |
-| ipv4.icmp | received, sent | packets/s |
-| ipv4.icmp_errors | InErrors, OutErrors, InCsumErrors | packets/s |
-| ipv4.icmpmsg | InEchoReps, OutEchoReps, InEchos, OutEchos | packets/s |
-| ipv4.packets | received, sent, forwarded, delivered | packets/s |
-| ipv4.fragsout | ok, failed, created | packets/s |
-| ipv4.fragsin | ok, failed, all | packets/s |
-| ipv4.errors | InDiscards, OutDiscards, InHdrErrors, OutNoRoutes, InAddrErrors, InUnknownProtos | packets/s |
-| ipv6.packets | received, sent, forwarded, delivers | packets/s |
-| ipv6.fragsout | ok, failed, all | packets/s |
-| ipv6.fragsin | ok, failed, timeout, all | packets/s |
-| ipv6.errors | InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes | packets/s |
-| ipv6.icmp | received, sent | messages/s |
-| ipv6.icmpredir | received, sent | redirects/s |
-| ipv6.icmperrors | InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutTimeExcds, OutParmProblems | errors/s |
-| ipv6.icmpechos | InEchos, OutEchos, InEchoReplies, OutEchoReplies | messages/s |
-| ipv6.icmprouter | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
-| ipv6.icmpneighbor | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
-| ipv6.icmptypes | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
-| system.uptime | uptime | seconds |
-| system.io | in, out | KiB/s |
-
-### Per disk
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| disk.io | read, writes | KiB/s |
-| disk.ops | read, writes | operations/s |
-| disk.util | utilization | % of time working |
-| disk.iotime | reads, writes | milliseconds/s |
-| disk.await | reads, writes | milliseconds/operation |
-| disk.avgsz | reads, writes | KiB/operation |
-| disk.svctm | svctm | milliseconds/operation |
-
-### Per mount point
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| disk.space | avail, used, reserved_for_root | GiB |
-| disk.inodes | avail, used, reserved_for_root | inodes |
-
-### Per network device
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| net.net | received, sent | kilobits/s |
-| net.packets | received, sent, multicast_received, multicast_sent | packets/s |
-| net.errors | inbound, outbound | errors/s |
-| net.drops | inbound | drops/s |
-| net.events | frames, collisions, carrier | events/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | network interface ${label:device} current speed |
-
-
 ## Setup
 
 
@@ -288,5 +173,120 @@ A basic example that discards swap monitoring
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | network interface ${label:device} current speed |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per macOS instance
+
+These metrics refer to hardware and network monitoring.
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.cpu | user, nice, system, idle | percentage |
+| system.ram | active, wired, throttled, compressor, inactive, purgeable, speculative, free | MiB |
+| mem.swapio | io, out | KiB/s |
+| mem.pgfaults | memory, cow, pagein, pageout, compress, decompress, zero_fill, reactivate, purge | faults/s |
+| system.load | load1, load5, load15 | load |
+| mem.swap | free, used | MiB |
+| system.ipv4 | received, sent | kilobits/s |
+| ipv4.tcppackets | received, sent | packets/s |
+| ipv4.tcperrors | InErrs, InCsumErrors, RetransSegs | packets/s |
+| ipv4.tcphandshake | EstabResets, ActiveOpens, PassiveOpens, AttemptFails | events/s |
+| ipv4.tcpconnaborts | baddata, userclosed, nomemory, timeout | connections/s |
+| ipv4.tcpofo | inqueue | packets/s |
+| ipv4.tcpsyncookies | received, sent, failed | packets/s |
+| ipv4.ecnpkts | CEP, NoECTP | packets/s |
+| ipv4.udppackets | received, sent | packets/s |
+| ipv4.udperrors | RcvbufErrors, InErrors, NoPorts, InCsumErrors, IgnoredMulti | events/s |
+| ipv4.icmp | received, sent | packets/s |
+| ipv4.icmp_errors | InErrors, OutErrors, InCsumErrors | packets/s |
+| ipv4.icmpmsg | InEchoReps, OutEchoReps, InEchos, OutEchos | packets/s |
+| ipv4.packets | received, sent, forwarded, delivered | packets/s |
+| ipv4.fragsout | ok, failed, created | packets/s |
+| ipv4.fragsin | ok, failed, all | packets/s |
+| ipv4.errors | InDiscards, OutDiscards, InHdrErrors, OutNoRoutes, InAddrErrors, InUnknownProtos | packets/s |
+| ipv6.packets | received, sent, forwarded, delivers | packets/s |
+| ipv6.fragsout | ok, failed, all | packets/s |
+| ipv6.fragsin | ok, failed, timeout, all | packets/s |
+| ipv6.errors | InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes | packets/s |
+| ipv6.icmp | received, sent | messages/s |
+| ipv6.icmpredir | received, sent | redirects/s |
+| ipv6.icmperrors | InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutTimeExcds, OutParmProblems | errors/s |
+| ipv6.icmpechos | InEchos, OutEchos, InEchoReplies, OutEchoReplies | messages/s |
+| ipv6.icmprouter | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
+| ipv6.icmpneighbor | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
+| ipv6.icmptypes | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
+| system.uptime | uptime | seconds |
+| system.io | in, out | KiB/s |
+
+### Per disk
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| disk.io | read, writes | KiB/s |
+| disk.ops | read, writes | operations/s |
+| disk.util | utilization | % of time working |
+| disk.iotime | reads, writes | milliseconds/s |
+| disk.await | reads, writes | milliseconds/operation |
+| disk.avgsz | reads, writes | KiB/operation |
+| disk.svctm | svctm | milliseconds/operation |
+
+### Per mount point
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| disk.space | avail, used, reserved_for_root | GiB |
+| disk.inodes | avail, used, reserved_for_root | inodes |
+
+### Per network device
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| net.net | received, sent | kilobits/s |
+| net.packets | received, sent, multicast_received, multicast_sent | packets/s |
+| net.errors | inbound, outbound | errors/s |
+| net.drops | inbound | drops/s |
+| net.events | frames, collisions, carrier | events/s |
 
 

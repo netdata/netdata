@@ -43,41 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per vm.loadavg instance
-
-Monitoring for number of threads running or waiting.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.load | load1, load5, load15 | load |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ load_cpu_number ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | number of active CPU cores in the system |
-| [ load_average_15 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system fifteen-minute load average |
-| [ load_average_5 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system five-minute load average |
-| [ load_average_1 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system one-minute load average |
-
-
 ## Setup
 
 
@@ -129,5 +94,40 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ load_cpu_number ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | number of active CPU cores in the system |
+| [ load_average_15 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system fifteen-minute load average |
+| [ load_average_5 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system five-minute load average |
+| [ load_average_1 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system one-minute load average |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per vm.loadavg instance
+
+Monitoring for number of threads running or waiting.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.load | load1, load5, load15 | load |
 
 

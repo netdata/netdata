@@ -77,6 +77,8 @@ func (e *Engine) Load(spec *charttpl.Spec, revision uint64) error {
 	// Template revision change resets routing/materialization internals.
 	e.state.routeCache = newRouteCache()
 	e.state.materialized = newMaterializedState()
+	e.state.engineEpoch++
+	e.state.outstanding = 0
 	e.mu.Unlock()
 	e.logInfof("chartengine program loaded revision=%d charts=%d metrics=%d", revision, len(compiled.Charts()), len(compiled.MetricNames()))
 	return nil
@@ -89,6 +91,20 @@ func (e *Engine) LoadYAML(data []byte, revision uint64) error {
 		return err
 	}
 	return e.Load(spec, revision)
+}
+
+// ResetMaterialized clears only materialized chart/dimension lifecycle state.
+//
+// It preserves the loaded program and other planner runtime state.
+func (e *Engine) ResetMaterialized() {
+	if e == nil {
+		return
+	}
+	e.mu.Lock()
+	e.state.materialized = newMaterializedState()
+	e.state.engineEpoch++
+	e.state.outstanding = 0
+	e.mu.Unlock()
 }
 
 // loadYAMLFile reads chart-template YAML from file, compiles and publishes it.

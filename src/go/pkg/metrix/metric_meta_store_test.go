@@ -21,6 +21,7 @@ func TestMetricMetaScenarios(t *testing.T) {
 					"workers_busy",
 					WithDescription("Busy workers"),
 					WithChartFamily("Workers"),
+					WithChartPriority(70000),
 					WithUnit("workers"),
 					WithFloat(true),
 				)
@@ -33,6 +34,7 @@ func TestMetricMetaScenarios(t *testing.T) {
 				require.True(t, ok)
 				assert.Equal(t, "Busy workers", meta.Description)
 				assert.Equal(t, "Workers", meta.ChartFamily)
+				assert.Equal(t, 70000, meta.ChartPriority)
 				assert.Equal(t, "workers", meta.Unit)
 				assert.True(t, meta.Float)
 			},
@@ -78,6 +80,7 @@ func TestMetricMetaScenarios(t *testing.T) {
 				require.True(t, ok, "expected flattened histogram bucket metric metadata")
 				assert.Equal(t, "Latency", meta.Description)
 				assert.Equal(t, "Service", meta.ChartFamily)
+				assert.Zero(t, meta.ChartPriority)
 				assert.Equal(t, "ms", meta.Unit)
 				assert.True(t, meta.Float)
 
@@ -85,6 +88,7 @@ func TestMetricMetaScenarios(t *testing.T) {
 				require.True(t, ok, "expected flattened histogram count metric metadata")
 				assert.Equal(t, "Latency", meta.Description)
 				assert.Equal(t, "Service", meta.ChartFamily)
+				assert.Zero(t, meta.ChartPriority)
 				assert.Equal(t, "ms", meta.Unit)
 				assert.True(t, meta.Float)
 
@@ -92,6 +96,7 @@ func TestMetricMetaScenarios(t *testing.T) {
 				require.True(t, ok, "expected flattened histogram sum metric metadata")
 				assert.Equal(t, "Latency", meta.Description)
 				assert.Equal(t, "Service", meta.ChartFamily)
+				assert.Zero(t, meta.ChartPriority)
 				assert.Equal(t, "ms", meta.Unit)
 				assert.True(t, meta.Float)
 			},
@@ -103,6 +108,16 @@ func TestMetricMetaScenarios(t *testing.T) {
 				_ = w.Gauge("workers_busy", WithDescription("Busy workers"))
 				expectPanic(t, func() {
 					_ = w.Gauge("workers_busy", WithDescription("Workers currently busy"))
+				})
+			},
+		},
+		"chart priority redeclaration conflict panics": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				w := s.Write().SnapshotMeter("apache")
+				_ = w.Gauge("workers_busy", WithChartPriority(70000))
+				expectPanic(t, func() {
+					_ = w.Gauge("workers_busy", WithChartPriority(70001))
 				})
 			},
 		},
@@ -124,6 +139,7 @@ func TestMetricMetaScenarios(t *testing.T) {
 					"workers_busy",
 					WithDescription("Busy workers"),
 					WithChartFamily("Workers"),
+					WithChartPriority(70000),
 					WithUnit("workers"),
 					WithFloat(true),
 				)
@@ -138,6 +154,7 @@ func TestMetricMetaScenarios(t *testing.T) {
 				require.True(t, ok)
 				assert.Equal(t, "Busy workers", meta.Description)
 				assert.Equal(t, "Workers", meta.ChartFamily)
+				assert.Equal(t, 70000, meta.ChartPriority)
 				assert.Equal(t, "workers", meta.Unit)
 				assert.True(t, meta.Float)
 			},

@@ -110,8 +110,8 @@ func (s *runSim) run(t *testing.T) {
 	expectedResults := strings.Count(s.wantDyncfg, "FUNCTION_RESULT_END")
 	require.Eventually(t, func() bool {
 		return countDiscovered(mgr) == len(s.wantDiscovered) &&
-			mgr.seen.Count() == len(s.wantSeen) &&
-			mgr.exposed.Count() == len(s.wantExposed) &&
+			mgr.collectorSeen.Count() == len(s.wantSeen) &&
+			mgr.collectorExposed.Count() == len(s.wantExposed) &&
 			runningSetMatches(mgr.runningJobs.snapshot(), s.wantRunning) &&
 			out.FuncResultCount() >= expectedResults
 	}, timeout, 10*time.Millisecond, "manager state did not settle before shutdown")
@@ -130,13 +130,21 @@ func (s *runSim) run(t *testing.T) {
 	}
 
 	var lines []string
+	skipNextEmpty := false
 	for _, s := range strings.Split(out.String(), "\n") {
 		if strings.HasPrefix(s, "CONFIG") && strings.Contains(s, " template ") {
+			skipNextEmpty = false
 			continue
 		}
 		if strings.HasPrefix(s, "FUNCTION GLOBAL") {
+			skipNextEmpty = true
 			continue
 		}
+		if skipNextEmpty && s == "" {
+			skipNextEmpty = false
+			continue
+		}
+		skipNextEmpty = false
 		if strings.HasPrefix(s, "FUNCTION_RESULT_BEGIN") {
 			parts := strings.Fields(s)
 			s = strings.Join(parts[:len(parts)-1], " ") // remove timestamp
@@ -164,19 +172,19 @@ func (s *runSim) run(t *testing.T) {
 		require.Truef(t, ok, "discoveredConfigs: source %s config %d is not found", cfg.Source(), cfg.Hash())
 	}
 
-	wantLen, gotLen = len(s.wantSeen), mgr.seen.Count()
+	wantLen, gotLen = len(s.wantSeen), mgr.collectorSeen.Count()
 	require.Equalf(t, wantLen, gotLen, "seen: different len (want %d got %d)", wantLen, gotLen)
 
 	for _, cfg := range s.wantSeen {
-		_, ok := mgr.seen.Lookup(cfg)
+		_, ok := mgr.collectorSeen.Lookup(cfg)
 		require.Truef(t, ok, "seen: config '%s' is not found", cfg.UID())
 	}
 
-	wantLen, gotLen = len(s.wantExposed), mgr.exposed.Count()
+	wantLen, gotLen = len(s.wantExposed), mgr.collectorExposed.Count()
 	require.Equalf(t, wantLen, gotLen, "exposed: different len (want %d got %d)", wantLen, gotLen)
 
 	for _, we := range s.wantExposed {
-		entry, ok := mgr.exposed.LookupByKey(we.cfg.ExposedKey())
+		entry, ok := mgr.collectorExposed.LookupByKey(we.cfg.ExposedKey())
 		require.Truef(t, ok && we.cfg.UID() == entry.Cfg.UID(), "exposed: config '%s' is not found", we.cfg.UID())
 		require.Truef(t, we.status == entry.Status, "exposed: wrong status for '%s', want %s got %s", we.cfg.UID(), we.status, entry.Status)
 	}
