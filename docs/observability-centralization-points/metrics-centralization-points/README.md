@@ -21,6 +21,24 @@ flowchart BT
     class P1 parent
 ```
 
+## Installation
+
+A **Netdata Parent** is a regular Netdata Agent configured to receive streaming metrics from Netdata Children.
+
+To install a Netdata Parent:
+
+1. Install Netdata using the kickstart script:
+
+   ```bash
+   wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
+   ```
+
+   For more installation options, see the [kickstart installation guide](/packaging/installer/methods/kickstart.md).
+
+2. After installation, configure `stream.conf` to enable reception from Children.
+
+   See [Configuring Metrics Centralization Points](/docs/observability-centralization-points/metrics-centralization-points/configuration.md) for detailed configuration instructions.
+
 ## Key Features
 
 :::important
