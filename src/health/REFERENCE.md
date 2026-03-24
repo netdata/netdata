@@ -808,6 +808,16 @@ This requires BOTH conditions to be true (AND logic).
 - If a specified label doesn't exist on the chart, the chart won't match
 - Multiple labels use AND logic
 
+:::important
+
+Alerts based on `chart labels` require the underlying chart to exist. For example, a `disk.space` chart is only created when a mount point is actively mounted. If a CIFS mount fails to mount after a system reboot, no `disk.space` chart will exist for that mount point, and the alert will not activate.
+
+To monitor mount failures (when a mount should exist but doesn't), consider:
+- **Systemd mount unit monitoring** - Use the systemd collector to track mount unit states
+- **Filecheck collector** - Monitor for the presence/absence of expected mount directories
+
+:::
+
 #### Alert Line `summary`
 
 **Purpose:** Brief title of the alert used in notifications and dashboard.
