@@ -89,8 +89,9 @@ bool dyncfg_unittest_parse_payload(BUFFER *payload, TEST *t, DYNCFG_CMDS cmd, co
         t->current.value.bln = value_boolean;
     }
     else if(cmd == DYNCFG_CMD_ADD) {
-        char buf[strlen(t->id) + strlen(add_name) + 20];
-        snprintfz(buf, sizeof(buf), "%s:%s", t->id, add_name);
+        size_t buf_size = strlen(t->id) + strlen(add_name) + 2;
+        char *buf = mallocz(buf_size);
+        snprintfz(buf, buf_size, "%s:%s", t->id, add_name);
         TEST tmp = {
             .id = strdupz(buf),
             .source = strdupz(source),
@@ -119,6 +120,7 @@ bool dyncfg_unittest_parse_payload(BUFFER *payload, TEST *t, DYNCFG_CMDS cmd, co
             .needs_save = true,
         };
         const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(dyncfg_unittest_data.nodes, buf, &tmp, sizeof(tmp));
+        freez(buf);
         TEST *t2 = dictionary_acquired_item_value(item);
         dictionary_acquired_item_release(dyncfg_unittest_data.nodes, item);
 
@@ -189,8 +191,7 @@ static int dyncfg_unittest_execute_cb(struct rrd_function_execute *rfe, void *da
 
     t->received = true;
 
-    char buf[strlen(rfe->function) + 1];
-    memcpy(buf, rfe->function, sizeof(buf));
+    char *buf = strdupz(rfe->function);
 
     char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, MAX_FUNCTION_PARAMETERS);
@@ -272,6 +273,7 @@ static int dyncfg_unittest_execute_cb(struct rrd_function_execute *rfe, void *da
     }
 
 cleanup:
+    freez(buf);
     if(run_the_callback) {
         __atomic_store_n(&t->finished, true, __ATOMIC_RELAXED);
 
@@ -420,8 +422,7 @@ void should_be_saved(TEST *t, DYNCFG_CMDS c) {
 static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload, const char *source) {
     dyncfg_unittest_reset();
 
-    char buf[strlen(cmd) + 1];
-    memcpy(buf, cmd, sizeof(buf));
+    char *buf = strdupz(cmd);
 
     char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, MAX_FUNCTION_PARAMETERS);
@@ -437,6 +438,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
     if(!t) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: cannot find id '%s' from cmd: %s", id, cmd);
         dyncfg_unittest_register_error(NULL, NULL);
+        freez(buf);
         return HTTP_RESP_NOT_FOUND;
     }
 
@@ -481,8 +483,9 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
 
     if(rc == HTTP_RESP_OK && t->type == DYNCFG_TYPE_TEMPLATE) {
         if(c == DYNCFG_CMD_ADD) {
-            char buf2[strlen(id) + strlen(add_name) + 2];
-            snprintfz(buf2, sizeof(buf2), "%s:%s", id, add_name);
+            size_t buf2_size = strlen(id) + strlen(add_name) + 2;
+            char *buf2 = mallocz(buf2_size);
+            snprintfz(buf2, buf2_size, "%s:%s", id, add_name);
             TEST *tt = dictionary_get(dyncfg_unittest_data.nodes, buf2);
             if (!tt) {
                 nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -491,6 +494,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
                 dyncfg_unittest_register_error(NULL, NULL);
             }
             dyncfg_unittest_check(tt, c, cmd, true);
+            freez(buf2);
         }
         else {
             STRING *template = string_strdupz(t->id);
@@ -517,6 +521,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
         }
     }
 
+    freez(buf);
     return rc;
 }
 

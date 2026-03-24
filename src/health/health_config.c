@@ -523,8 +523,9 @@ static void lookup_data_source_from_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
                                                                                                     \
     if(value) {                                                                                     \
         typeof(ax->member) _old = ax->member;                                                       \
-        char _buf[strlen(value) + string_strlen(_old) + (_label ? strlen(_label) : 0) + 3];         \
-        snprintfz(_buf, sizeof(_buf), "%s%s%s%s%s",                                                 \
+        size_t _buf_size = strlen(value) + string_strlen(_old) + (_label ? strlen(_label) : 0) + 3; \
+        char *_buf = mallocz(_buf_size);                                                            \
+        snprintfz(_buf, _buf_size, "%s%s%s%s%s",                                                    \
                       _label ? _label : "",                                                         \
                       _label ? "=" : "",                                                            \
                       value,                                                                        \
@@ -532,6 +533,7 @@ static void lookup_data_source_from_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
                       _old ? string2str(_old) : "");                                                \
         string_freez(_old);                                                                         \
         ax->member = string_strdupz(_buf);                                                          \
+        freez(_buf);                                                                                \
     }                                                                                               \
 } while(0)
 

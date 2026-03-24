@@ -89,7 +89,7 @@ static const char *curl_add_json_room(BUFFER *wb, const char *start, const char 
     size_t len = end - start;
 
     // copy the item to an new buffer and terminate it
-    char buf[len + 1];
+    char *buf = mallocz(len + 1);
     memcpy(buf, start, len);
     buf[len] = '\0';
 
@@ -97,6 +97,8 @@ static const char *curl_add_json_room(BUFFER *wb, const char *start, const char 
     const char *trimmed = trim(buf); // remove leading and trailing spaces
     if(trimmed)
         buffer_json_add_array_item_string(wb, trimmed);
+
+    freez(buf);
 
     if (last_item)
         return NULL;

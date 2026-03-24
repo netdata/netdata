@@ -380,9 +380,7 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
 
     // find the components of the variable
     {
-        char id[string_strlen(vbd.dim) + 1];
-        memcpy(id, string2str(vbd.dim), string_strlen(vbd.dim));
-        id[string_strlen(vbd.dim)] = '\0';
+        char *id = strdupz(string2str(vbd.dim));
 
         char *dot = strrchr(id, '.');
         while(dot) {
@@ -397,6 +395,8 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
             *dot = '.';
             dot = dot2;
         }
+
+        freez(id);
     }
 
 find_best_scored:

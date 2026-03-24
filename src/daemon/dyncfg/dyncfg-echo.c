@@ -87,8 +87,9 @@ void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe
     e->cmd = cmd;
     e->cmd_str = strdupz(cmd_str);
 
-    char buf[string_strlen(df->function) + strlen(e->cmd_str) + 20];
-    snprintfz(buf, sizeof(buf), "%s %s", string2str(df->function), e->cmd_str);
+    size_t buf_size = string_strlen(df->function) + strlen(e->cmd_str) + 2;
+    char *buf = mallocz(buf_size);
+    snprintfz(buf, buf_size, "%s %s", string2str(df->function), e->cmd_str);
 
     rrd_function_run(
         host, e->wb, 10,
@@ -97,6 +98,7 @@ void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe
         NULL, NULL,
         NULL, NULL,
         NULL, string2str(df->dyncfg.source), false);
+    freez(buf);
 }
 
 // ----------------------------------------------------------------------------
@@ -120,8 +122,9 @@ void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id)
     e->cmd = DYNCFG_CMD_UPDATE;
     e->cmd_str = strdupz("update");
 
-    char buf[string_strlen(df->function) + strlen(e->cmd_str) + 20];
-    snprintfz(buf, sizeof(buf), "%s %s", string2str(df->function), e->cmd_str);
+    size_t buf_size = string_strlen(df->function) + strlen(e->cmd_str) + 2;
+    char *buf = mallocz(buf_size);
+    snprintfz(buf, buf_size, "%s %s", string2str(df->function), e->cmd_str);
 
     rrd_function_run(
         host, e->wb, 10,
@@ -130,6 +133,7 @@ void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id)
         NULL, NULL,
         NULL, NULL,
         df->dyncfg.payload, string2str(df->dyncfg.source), false);
+    freez(buf);
 }
 
 // ----------------------------------------------------------------------------
@@ -155,8 +159,9 @@ static void dyncfg_echo_payload_add(const DICTIONARY_ITEM *item_template __maybe
     e->cmd = DYNCFG_CMD_ADD;
     e->cmd_str = strdupz(cmd);
 
-    char buf[string_strlen(df_template->function) + strlen(cmd) + 20];
-    snprintfz(buf, sizeof(buf), "%s %s", string2str(df_template->function), cmd);
+    size_t buf_size = string_strlen(df_template->function) + strlen(cmd) + 2;
+    char *buf = mallocz(buf_size);
+    snprintfz(buf, buf_size, "%s %s", string2str(df_template->function), cmd);
 
     rrd_function_run(
         host, e->wb, 10,
@@ -165,11 +170,13 @@ static void dyncfg_echo_payload_add(const DICTIONARY_ITEM *item_template __maybe
         NULL, NULL,
         NULL, NULL,
         df_job->dyncfg.payload, string2str(df_job->dyncfg.source), false);
+    freez(buf);
 }
 
 void dyncfg_echo_add(const DICTIONARY_ITEM *item_template, const DICTIONARY_ITEM *item_job, DYNCFG *df_template, DYNCFG *df_job, const char *template_id, const char *job_name) {
-    char buf[strlen(job_name) + 20];
-    snprintfz(buf, sizeof(buf), "add %s", job_name);
+    size_t buf_size = strlen(job_name) + strlen("add ") + 1;
+    char *buf = mallocz(buf_size);
+    snprintfz(buf, buf_size, "add %s", job_name);
     dyncfg_echo_payload_add(item_template, item_job, df_template, df_job, template_id, buf);
+    freez(buf);
 }
-

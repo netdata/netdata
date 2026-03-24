@@ -124,20 +124,28 @@ static void linux_get_dmi_field(const char *field, const char *alt, char *dst, s
     if (!filename[0])
         return;
 
-    char buf[MAX(256, dst_size)];
-    if (read_txt_file(filename, buf, sizeof(buf)) != 0)
+    size_t buf_size = MAX((size_t)256, dst_size);
+    char *buf = mallocz(buf_size);
+    if (read_txt_file(filename, buf, buf_size) != 0) {
+        freez(buf);
         return;
+    }
 
-    if (!buf[0])
+    if (!buf[0]) {
+        freez(buf);
         return;
+    }
 
-    dmi_clean_field(buf, sizeof(buf));
+    dmi_clean_field(buf, buf_size);
 
-    if (!buf[0])
+    if (!buf[0]) {
+        freez(buf);
         return;
+    }
 
     // copy it to its final location
     strcatz(dst, 0, buf, dst_size);
+    freez(buf);
 }
 
 void os_dmi_info_get(DMI_INFO *dmi) {

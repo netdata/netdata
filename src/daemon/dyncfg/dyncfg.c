@@ -60,9 +60,11 @@ static void dyncfg_insert_cb(const DICTIONARY_ITEM *item, void *value, void *dat
     dyncfg_normalize(df);
 
     const char *id = dictionary_acquired_item_name(item);
-    char buf[strlen(id) + 20];
-    snprintfz(buf, sizeof(buf), PLUGINSD_FUNCTION_CONFIG " %s", id);
+    size_t buf_size = strlen(PLUGINSD_FUNCTION_CONFIG " ") + strlen(id) + 1;
+    char *buf = mallocz(buf_size);
+    snprintfz(buf, buf_size, PLUGINSD_FUNCTION_CONFIG " %s", id);
     df->function = string_strdupz(buf);
+    freez(buf);
 
     if(df->type == DYNCFG_TYPE_JOB && !df->template) {
         const char *last_colon = strrchr(id, ':');
@@ -285,14 +287,16 @@ bool dyncfg_is_user_disabled(const char *id) {
 }
 
 bool dyncfg_job_has_registered_template(const char *id) {
-    char buf[strlen(id) + 1];
-    memcpy(buf, id, sizeof(buf));
+    char *buf = strdupz(id);
     char *colon = strrchr(buf, ':');
-    if(!colon)
+    if(!colon) {
+        freez(buf);
         return false;
+    }
 
     *colon = '\0';
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, buf);
+    freez(buf);
     if(!item)
         return false;
 
@@ -474,4 +478,3 @@ bool dyncfg_available_for_rrdhost(RRDHOST *host) {
 }
 
 // ----------------------------------------------------------------------------
-

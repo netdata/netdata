@@ -1113,7 +1113,7 @@ static void build_info_set_value(BUILD_INFO_SLOT slot, const char *value) {
 static void build_info_append_value(BUILD_INFO_SLOT slot, const char *value) {
     size_t size = BUILD_INFO[slot].value ? strlen(BUILD_INFO[slot].value) + 1 : 0;
     size += strlen(value);
-    char buf[size + 1];
+    char *buf = mallocz(size + 1);
 
     if(BUILD_INFO[slot].value) {
         strcpy(buf, BUILD_INFO[slot].value);
@@ -1126,6 +1126,7 @@ static void build_info_append_value(BUILD_INFO_SLOT slot, const char *value) {
     const char *old = BUILD_INFO[slot].value;
 
     BUILD_INFO[slot].value = strdupz(buf);
+    freez(buf);
 
     if(BUILD_INFO[slot].value_allocated)
         freez((void *)old);
@@ -1566,14 +1567,14 @@ static void print_build_info_category_to_console(BUILD_INFO_CATEGORY category, c
             int padding_length = 60 - strlen(k) - 1;
             if (padding_length < 0) padding_length = 0;
 
-            char padding[padding_length + 1];
-            memset(padding, '_', padding_length);
-            padding[padding_length] = '\0';
+            printf("    %s ", k);
+            for (int j = 0; j < padding_length; j++)
+                putchar('_');
 
             if(BUILD_INFO[i].type == BIT_STRING)
-                printf("    %s %s : %s\n", k, padding, d?d:"unknown");
+                printf(" : %s\n", d?d:"unknown");
             else
-                printf("    %s %s : %s%s%s%s\n", k, padding, v,
+                printf(" : %s%s%s%s\n", v,
                        d?" (":"", d?d:"", d?")":"");
         }
     }

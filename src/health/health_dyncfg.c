@@ -633,8 +633,9 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
 
     RRD_ALERT_PROTOTYPE *ap = dictionary_acquired_item_value(item);
 
-    char alert_name_dyncfg[strlen(DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX) + strlen(alert_name) + 10];
-    snprintfz(alert_name_dyncfg, sizeof(alert_name_dyncfg), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", alert_name);
+    size_t alert_name_dyncfg_size = strlen(DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX) + strlen(alert_name) + 2;
+    char *alert_name_dyncfg = mallocz(alert_name_dyncfg_size);
+    snprintfz(alert_name_dyncfg, alert_name_dyncfg_size, DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", alert_name);
 
     int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
@@ -695,7 +696,8 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
                     if(!added) {
                         health_prototype_free(nap);
                         if(!msg || !*msg) msg = "required attributes are missing";
-                        return dyncfg_default_response( result, HTTP_RESP_BAD_REQUEST, msg);
+                        code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
+                        break;
                     }
                     else
                         freez(nap);
@@ -738,6 +740,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
     }
 
     dictionary_acquired_item_release(health_globals.prototypes.dict, item);
+    freez(alert_name_dyncfg);
     return code;
 }
 
@@ -745,8 +748,7 @@ int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYN
                      BUFFER *payload, usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                      BUFFER *result, HTTP_ACCESS access __maybe_unused, const char *source, void *data __maybe_unused) {
 
-    char buf[strlen(id) + 1];
-    memcpy(buf, id, sizeof(buf));
+    char *buf = strdupz(id);
 
     char *words[100] = { NULL };
     size_t num_words = quoted_strings_splitter_dyncfg_id(buf, words, 100);
@@ -754,16 +756,22 @@ int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYN
     int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
     char *health_prefix = get_word(words, num_words, i++);
-    if(!health_prefix || !*health_prefix || strcmp(health_prefix, "health") != 0)
+    if(!health_prefix || !*health_prefix || strcmp(health_prefix, "health") != 0) {
+        freez(buf);
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "first component of id is not 'health'");
+    }
 
     char *alert_prefix = get_word(words, num_words, i++);
-    if(!alert_prefix || !*alert_prefix || strcmp(alert_prefix, "alert") != 0)
+    if(!alert_prefix || !*alert_prefix || strcmp(alert_prefix, "alert") != 0) {
+        freez(buf);
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "second component of id is not 'alert'");
+    }
 
     char *type_prefix = get_word(words, num_words, i++);
-    if(!type_prefix || !*type_prefix || strcmp(type_prefix, "prototype") != 0)
+    if(!type_prefix || !*type_prefix || strcmp(type_prefix, "prototype") != 0) {
+        freez(buf);
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "third component of id is not 'prototype'");
+    }
 
     char *alert_name = get_word(words, num_words, i++);
     if(!alert_name || !*alert_name) {
@@ -776,6 +784,7 @@ int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYN
 
         code = dyncfg_health_prototype_job_action(result, cmd, payload, source, alert_name);
     }
+    freez(buf);
     return code;
 }
 

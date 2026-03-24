@@ -110,8 +110,9 @@ static void dyncfg_log_user_action(DYNCFG *df, struct dyncfg_call *dc) {
 // we intercept the config function calls of the plugin
 
 static void dyncfg_function_intercept_job_successfully_added(DYNCFG *df_template, int code, struct dyncfg_call *dc) {
-    char id[strlen(dc->id) + 1 + strlen(dc->add_name) + 1];
-    snprintfz(id, sizeof(id), "%s:%s", dc->id, dc->add_name);
+    size_t id_size = strlen(dc->id) + strlen(dc->add_name) + 2;
+    char *id = mallocz(id_size);
+    snprintfz(id, id_size, "%s:%s", dc->id, dc->add_name);
 
     RRDHOST *host = dyncfg_rrdhost(df_template);
     if(!host) {
@@ -153,6 +154,8 @@ static void dyncfg_function_intercept_job_successfully_added(DYNCFG *df_template
 
         dictionary_acquired_item_release(dyncfg_globals.nodes, item);
     }
+
+    freez(id);
 }
 
 static void dyncfg_function_intercept_job_successfully_updated(DYNCFG *df, int code, struct dyncfg_call *dc) {
@@ -274,14 +277,17 @@ static int dyncfg_intercept_early_error(struct rrd_function_execute *rfe, int rc
 }
 
 const DICTIONARY_ITEM *dyncfg_get_template_of_new_job(const char *job_id) {
-    char id_copy[strlen(job_id) + 1];
-    memcpy(id_copy, job_id, sizeof(id_copy));
+    char *id_copy = strdupz(job_id);
 
     char *colon = strrchr(id_copy, ':');
-    if(!colon) return NULL;
+    if(!colon) {
+        freez(id_copy);
+        return NULL;
+    }
 
     *colon = '\0';
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id_copy);
+    freez(id_copy);
     if(!item) return NULL;
 
     DYNCFG *df = dictionary_acquired_item_value(item);
@@ -305,8 +311,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
     DYNCFG_CMDS cmd;
     const DICTIONARY_ITEM *item = NULL;
 
-    char buf[strlen(rfe->function) + 1];
-    memcpy(buf, rfe->function, sizeof(buf));
+    char *buf = strdupz(rfe->function);
 
     char *words[20];
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, 20);
@@ -317,16 +322,20 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
     char *cmd_str = get_word(words, num_words, i++);
     char *add_name = get_word(words, num_words, i++);
 
-    if(!config || !*config || strcmp(config, PLUGINSD_FUNCTION_CONFIG) != 0)
+    if(!config || !*config || strcmp(config, PLUGINSD_FUNCTION_CONFIG) != 0) {
+        freez(buf);
         return dyncfg_intercept_early_error(
             rfe, HTTP_RESP_BAD_REQUEST,
             "dyncfg functions intercept: this is not a dyncfg request");
+    }
 
     cmd = dyncfg_cmds2id(cmd_str);
-    if(cmd == DYNCFG_CMD_NONE)
+    if(cmd == DYNCFG_CMD_NONE) {
+        freez(buf);
         return dyncfg_intercept_early_error(
             rfe, HTTP_RESP_BAD_REQUEST,
             "dyncfg functions intercept: invalid command received");
+    }
 
     if(cmd == DYNCFG_CMD_ADD || cmd == DYNCFG_CMD_TEST || cmd == DYNCFG_CMD_USERCONFIG) {
         if(cmd == DYNCFG_CMD_TEST && (!add_name || !*add_name)) {
@@ -340,31 +349,43 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
                 add_name = "test";
         }
 
-        if(!add_name || !*add_name)
+        if(!add_name || !*add_name) {
+            freez(buf);
             return dyncfg_intercept_early_error(
                 rfe, HTTP_RESP_BAD_REQUEST,
                 "dyncfg functions intercept: this action requires a name");
+        }
 
         if(!called_from_dyncfg_echo) {
-            char nid[strlen(id) + strlen(add_name) + 2];
-            snprintfz(nid, sizeof(nid), "%s:%s", id, add_name);
+            size_t nid_size = strlen(id) + strlen(add_name) + 2;
+            char *nid = mallocz(nid_size);
+            snprintfz(nid, nid_size, "%s:%s", id, add_name);
 
-            if (cmd == DYNCFG_CMD_ADD && dictionary_get(dyncfg_globals.nodes, nid))
+            if (cmd == DYNCFG_CMD_ADD && dictionary_get(dyncfg_globals.nodes, nid)) {
+                freez(nid);
+                freez(buf);
                 return dyncfg_intercept_early_error(
                     rfe, HTTP_RESP_BAD_REQUEST,
                     "dyncfg functions intercept: a configuration with this name already exists");
+            }
+
+            freez(nid);
         }
     }
 
-    if((cmd == DYNCFG_CMD_ADD || cmd == DYNCFG_CMD_UPDATE || cmd == DYNCFG_CMD_TEST || cmd == DYNCFG_CMD_USERCONFIG) && !has_payload)
+    if((cmd == DYNCFG_CMD_ADD || cmd == DYNCFG_CMD_UPDATE || cmd == DYNCFG_CMD_TEST || cmd == DYNCFG_CMD_USERCONFIG) && !has_payload) {
+        freez(buf);
         return dyncfg_intercept_early_error(
             rfe, HTTP_RESP_BAD_REQUEST,
             "dyncfg functions intercept: this action requires a payload");
+    }
 
-    if((cmd != DYNCFG_CMD_ADD && cmd != DYNCFG_CMD_UPDATE && cmd != DYNCFG_CMD_TEST && cmd != DYNCFG_CMD_USERCONFIG) && has_payload)
+    if((cmd != DYNCFG_CMD_ADD && cmd != DYNCFG_CMD_UPDATE && cmd != DYNCFG_CMD_TEST && cmd != DYNCFG_CMD_USERCONFIG) && has_payload) {
+        freez(buf);
         return dyncfg_intercept_early_error(
             rfe, HTTP_RESP_BAD_REQUEST,
             "dyncfg functions intercept: this action does not require a payload");
+    }
 
     item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
     if(!item) {
@@ -373,10 +394,12 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
             item = dyncfg_get_template_of_new_job(id);
         }
 
-        if(!item)
+        if(!item) {
+            freez(buf);
             return dyncfg_intercept_early_error(
                 rfe, HTTP_RESP_NOT_FOUND,
                 "dyncfg functions intercept: id is not found");
+        }
     }
 
     DYNCFG *df = dictionary_acquired_item_value(item);
@@ -536,6 +559,6 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
         rfe->result.cb(rfe->result.wb, rc, rfe->result.data);
 
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
+    freez(buf);
     return rc;
 }
-

@@ -156,8 +156,7 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
     RRDHOST *host = data;
     int code;
 
-    char buf[strlen(rfe->function) + 1];
-    memcpy(buf, rfe->function, sizeof(buf));
+    char *buf = strdupz(rfe->function);
 
     char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, MAX_FUNCTION_PARAMETERS);
@@ -252,6 +251,7 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
                 item = NULL;
                 code = dyncfg_function_intercept_cb(rfe, data);
                 rfe->function = old_rfe_function;
+                freez(buf);
                 return code;
             }
 
@@ -271,6 +271,7 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
     }
 
 cleanup:
+    freez(buf);
     if(rfe->result.cb)
         rfe->result.cb(rfe->result.wb, code, rfe->result.data);
 

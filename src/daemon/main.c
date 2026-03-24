@@ -285,8 +285,12 @@ int netdata_main(int argc, char **argv) {
 
     // parse options
     {
-        int num_opts = sizeof(option_definitions) / sizeof(struct option_def);
-        char optstring[(num_opts * 2) + 1];
+        enum {
+            option_definitions_count = sizeof(option_definitions) / sizeof(option_definitions[0]),
+            option_string_size = (option_definitions_count * 2) + 1
+        };
+        int num_opts = option_definitions_count;
+        char optstring[option_string_size];
 
         int string_i = 0;
         for( i = 0; i < num_opts; i++ ) {
@@ -648,7 +652,7 @@ int netdata_main(int argc, char **argv) {
                             const char *haystack = argv[optind];
                             const char *needle = argv[optind + 1];
                             size_t len = strlen(needle) + 1;
-                            char wildcarded[len];
+                            char *wildcarded = mallocz(len);
 
                             SIMPLE_PATTERN *p = simple_pattern_create(haystack, NULL, SIMPLE_PATTERN_EXACT, true);
                             SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_extract(p, needle, wildcarded, len);
@@ -656,14 +660,17 @@ int netdata_main(int argc, char **argv) {
 
                             if(ret == SP_MATCHED_POSITIVE) {
                                 fprintf(stdout, "RESULT: POSITIVE MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
+                                freez(wildcarded);
                                 return 0;
                             }
                             else if(ret == SP_MATCHED_NEGATIVE) {
                                 fprintf(stdout, "RESULT: NEGATIVE MATCHED - pattern '%s' matches '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
+                                freez(wildcarded);
                                 return 0;
                             }
                             else {
                                 fprintf(stdout, "RESULT: NOT MATCHED - pattern '%s' does not match '%s', wildcarded '%s'\n", haystack, needle, wildcarded);
+                                freez(wildcarded);
                                 return 1;
                             }
                         }
