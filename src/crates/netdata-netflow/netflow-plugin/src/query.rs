@@ -7,7 +7,7 @@ use crate::tiering::{
     OpenTierRow, OpenTierState, TierFlowIndexStore, TierKind, rollup_field_supported,
 };
 use anyhow::{Context, Result};
-use chrono::{TimeZone, Utc};
+use chrono::Utc;
 use journal_common::{Seconds, load_machine_id};
 use journal_registry::{Monitor, Registry, repository::File as RegistryFile};
 use journal_session::{Direction as SessionDirection, JournalSession};
@@ -22,7 +22,6 @@ use serde::{Deserialize, Deserializer};
 use serde_json::{Map, Value, json};
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -1054,10 +1053,6 @@ impl FlowQueryService {
             let mut metrics = FlowMetrics::default();
             let mut src_hash = None;
             let mut dst_hash = None;
-            let mut exporter_ip_hash = None;
-            let mut exporter_name_hash = None;
-            let mut flow_version_hash = None;
-            let mut sampling_rate_hash = None;
 
             let mut payloads = cursor
                 .payloads()
@@ -1098,15 +1093,7 @@ impl FlowQueryService {
                 }
 
                 let group_slot = group_by_positions.get(key).copied();
-                let needs_identity = matches!(
-                    key,
-                    "SRC_ADDR"
-                        | "DST_ADDR"
-                        | "EXPORTER_IP"
-                        | "EXPORTER_NAME"
-                        | "FLOW_VERSION"
-                        | "SAMPLING_RATE"
-                );
+                let needs_identity = matches!(key, "SRC_ADDR" | "DST_ADDR");
                 if group_slot.is_none() && !needs_identity {
                     continue;
                 }
@@ -1136,10 +1123,6 @@ impl FlowQueryService {
                 match key {
                     "SRC_ADDR" => src_hash = Some(fingerprint_value(value_ref)),
                     "DST_ADDR" => dst_hash = Some(fingerprint_value(value_ref)),
-                    "EXPORTER_IP" => exporter_ip_hash = Some(fingerprint_value(value_ref)),
-                    "EXPORTER_NAME" => exporter_name_hash = Some(fingerprint_value(value_ref)),
-                    "FLOW_VERSION" => flow_version_hash = Some(fingerprint_value(value_ref)),
-                    "SAMPLING_RATE" => sampling_rate_hash = Some(fingerprint_value(value_ref)),
                     _ => {}
                 }
             }
@@ -1156,12 +1139,6 @@ impl FlowQueryService {
                 &mut empty_field_ids,
                 src_hash,
                 dst_hash,
-                combined_exporter_fingerprint(
-                    exporter_ip_hash,
-                    exporter_name_hash,
-                    flow_version_hash,
-                    sampling_rate_hash,
-                ),
                 None,
             )?;
             counts.matched_entries = counts.matched_entries.saturating_add(1);
@@ -2054,23 +2031,6 @@ impl FlowQueryService {
                 .flatten(),
             src_mixed: agg.src_mixed,
             dst_mixed: agg.dst_mixed,
-            exporter_ip: (!agg.exporter_mixed)
-                .then(|| aggregate_output_field(snapshot.as_ref(), record.as_ref(), "EXPORTER_IP"))
-                .flatten(),
-            exporter_name: (!agg.exporter_mixed)
-                .then(|| {
-                    aggregate_output_field(snapshot.as_ref(), record.as_ref(), "EXPORTER_NAME")
-                })
-                .flatten(),
-            flow_version: (!agg.exporter_mixed)
-                .then(|| aggregate_output_field(snapshot.as_ref(), record.as_ref(), "FLOW_VERSION"))
-                .flatten(),
-            sampling_rate: (!agg.exporter_mixed)
-                .then(|| {
-                    aggregate_output_field(snapshot.as_ref(), record.as_ref(), "SAMPLING_RATE")
-                })
-                .flatten(),
-            exporter_mixed: agg.exporter_mixed,
             folded_labels: None,
         })
     }
@@ -2165,10 +2125,6 @@ impl FlowMetrics {
 struct CompactRepresentativeFields {
     src_ip: Option<String>,
     dst_ip: Option<String>,
-    exporter_ip: Option<String>,
-    exporter_name: Option<String>,
-    flow_version: Option<String>,
-    sampling_rate: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2186,13 +2142,10 @@ struct CompactAggregatedFlow {
     metrics: FlowMetrics,
     src_hash: u64,
     dst_hash: u64,
-    exporter_hash: u64,
     has_src: bool,
     has_dst: bool,
-    has_exporter: bool,
     src_mixed: bool,
     dst_mixed: bool,
-    exporter_mixed: bool,
     open_representative: Option<CompactRepresentativeFields>,
     bucket_label: Option<&'static str>,
     folded_labels: Option<FoldedGroupedLabels>,
@@ -2213,13 +2166,10 @@ impl CompactAggregatedFlow {
             metrics: FlowMetrics::default(),
             src_hash: 0,
             dst_hash: 0,
-            exporter_hash: 0,
             has_src: false,
             has_dst: false,
-            has_exporter: false,
             src_mixed: false,
             dst_mixed: false,
-            exporter_mixed: false,
             open_representative: matches!(handle, RecordHandle::OpenRowIndex(_))
                 .then(|| compact_representative_from_record(record)),
             bucket_label: None,
@@ -2230,7 +2180,6 @@ impl CompactAggregatedFlow {
             metrics,
             record_src_fingerprint(record),
             record_dst_fingerprint(record),
-            exporter_identity_fingerprint(record),
         );
         entry
     }
@@ -2252,13 +2201,10 @@ impl CompactAggregatedFlow {
             metrics: FlowMetrics::default(),
             src_hash: 0,
             dst_hash: 0,
-            exporter_hash: 0,
             has_src: false,
             has_dst: false,
-            has_exporter: false,
             src_mixed: true,
             dst_mixed: true,
-            exporter_mixed: true,
             open_representative: None,
             bucket_label: Some(bucket_label),
             folded_labels: Some(FoldedGroupedLabels::default()),
@@ -2272,7 +2218,6 @@ impl CompactAggregatedFlow {
         metrics: FlowMetrics,
         src_hash: Option<u64>,
         dst_hash: Option<u64>,
-        exporter_hash: Option<u64>,
         open_representative: Option<CompactRepresentativeFields>,
     ) -> Self {
         let mut entry = Self {
@@ -2283,18 +2228,15 @@ impl CompactAggregatedFlow {
             metrics: FlowMetrics::default(),
             src_hash: 0,
             dst_hash: 0,
-            exporter_hash: 0,
             has_src: false,
             has_dst: false,
-            has_exporter: false,
             src_mixed: false,
             dst_mixed: false,
-            exporter_mixed: false,
             open_representative,
             bucket_label: None,
             folded_labels: None,
         };
-        entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash, exporter_hash);
+        entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash);
         entry
     }
 
@@ -2304,7 +2246,6 @@ impl CompactAggregatedFlow {
             metrics,
             record_src_fingerprint(record),
             record_dst_fingerprint(record),
-            exporter_identity_fingerprint(record),
         );
     }
 
@@ -2314,7 +2255,6 @@ impl CompactAggregatedFlow {
         metrics: FlowMetrics,
         src_hash: Option<u64>,
         dst_hash: Option<u64>,
-        exporter_hash: Option<u64>,
     ) {
         if self.first_ts == 0 || timestamp_usec < self.first_ts {
             self.first_ts = timestamp_usec;
@@ -2335,12 +2275,6 @@ impl CompactAggregatedFlow {
             &mut self.has_dst,
             &mut self.dst_mixed,
             dst_hash,
-        );
-        merge_prehashed_fingerprint(
-            &mut self.exporter_hash,
-            &mut self.has_exporter,
-            &mut self.exporter_mixed,
-            exporter_hash,
         );
     }
 }
@@ -2466,11 +2400,6 @@ struct AggregatedFlow {
     dst_ip: Option<String>,
     src_mixed: bool,
     dst_mixed: bool,
-    exporter_ip: Option<String>,
-    exporter_name: Option<String>,
-    flow_version: Option<String>,
-    sampling_rate: Option<String>,
-    exporter_mixed: bool,
     folded_labels: Option<FoldedGroupedLabels>,
 }
 
@@ -2751,7 +2680,6 @@ fn accumulate_projected_compact_grouped_record(
     empty_field_ids: &mut [Option<u32>],
     src_hash: Option<u64>,
     dst_hash: Option<u64>,
-    exporter_hash: Option<u64>,
     open_representative: Option<CompactRepresentativeFields>,
 ) -> Result<()> {
     anyhow::ensure!(
@@ -2802,7 +2730,7 @@ fn accumulate_projected_compact_grouped_record(
             .context("failed to resolve projected grouped tuple from compact query index")?
         {
             if let Some(entry) = aggregates.rows.get_mut(flow_id as usize) {
-                entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash, exporter_hash);
+                entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash);
                 return Ok(());
             }
             anyhow::bail!("compact query index returned missing flow row for flow id {flow_id}");
@@ -2822,7 +2750,7 @@ fn accumulate_projected_compact_grouped_record(
                 row_missing_values,
             )?;
             merge_compact_projected_labels(entry, &labels);
-            entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash, exporter_hash);
+            entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash);
             return Ok(());
         }
 
@@ -2844,7 +2772,6 @@ fn accumulate_projected_compact_grouped_record(
             metrics,
             src_hash,
             dst_hash,
-            exporter_hash,
             open_representative,
         ));
         return Ok(());
@@ -2863,7 +2790,7 @@ fn accumulate_projected_compact_grouped_record(
             row_missing_values,
         )?;
         merge_compact_projected_labels(entry, &labels);
-        entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash, exporter_hash);
+        entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash);
         return Ok(());
     }
 
@@ -2906,7 +2833,7 @@ fn accumulate_projected_compact_grouped_record(
         .context("failed to recheck projected grouped tuple from compact query index")?
     {
         if let Some(entry) = aggregates.rows.get_mut(flow_id as usize) {
-            entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash, exporter_hash);
+            entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash);
             return Ok(());
         }
         anyhow::bail!("compact query index returned missing flow row for flow id {flow_id}");
@@ -2931,7 +2858,6 @@ fn accumulate_projected_compact_grouped_record(
         metrics,
         src_hash,
         dst_hash,
-        exporter_hash,
         open_representative,
     ));
     Ok(())
@@ -2974,22 +2900,6 @@ fn accumulate_projected_open_tier_grouped_record(
         }
     }
 
-    let exporter_hash = combined_exporter_fingerprint(
-        representative.exporter_ip.as_deref().map(fingerprint_value),
-        representative
-            .exporter_name
-            .as_deref()
-            .map(fingerprint_value),
-        representative
-            .flow_version
-            .as_deref()
-            .map(fingerprint_value),
-        representative
-            .sampling_rate
-            .as_deref()
-            .map(fingerprint_value),
-    );
-
     accumulate_projected_compact_grouped_record(
         group_by,
         row.timestamp_usec,
@@ -3007,7 +2917,6 @@ fn accumulate_projected_open_tier_grouped_record(
         empty_field_ids,
         None,
         None,
-        exporter_hash,
         Some(representative),
     )
 }
@@ -3021,7 +2930,6 @@ fn new_bucket_aggregate(bucket_label: &'static str) -> AggregatedFlow {
         labels: synthetic_bucket_labels(bucket_label),
         src_mixed: true,
         dst_mixed: true,
-        exporter_mixed: true,
         folded_labels: Some(FoldedGroupedLabels::default()),
         ..AggregatedFlow::default()
     }
@@ -3049,26 +2957,6 @@ fn update_aggregate_entry(entry: &mut AggregatedFlow, record: &FlowRecord, metri
         &mut entry.dst_ip,
         &mut entry.dst_mixed,
         record.fields.get("DST_ADDR").map(String::as_str),
-    );
-    merge_single_value(
-        &mut entry.exporter_ip,
-        &mut entry.exporter_mixed,
-        record.fields.get("EXPORTER_IP").map(String::as_str),
-    );
-    merge_single_value(
-        &mut entry.exporter_name,
-        &mut entry.exporter_mixed,
-        record.fields.get("EXPORTER_NAME").map(String::as_str),
-    );
-    merge_single_value(
-        &mut entry.flow_version,
-        &mut entry.exporter_mixed,
-        record.fields.get("FLOW_VERSION").map(String::as_str),
-    );
-    merge_single_value(
-        &mut entry.sampling_rate,
-        &mut entry.exporter_mixed,
-        record.fields.get("SAMPLING_RATE").map(String::as_str),
     );
 }
 
@@ -3345,62 +3233,6 @@ fn accumulate_open_tier_timeseries_grouped_record(
     );
 }
 
-fn combined_exporter_fingerprint(
-    exporter_ip_hash: Option<u64>,
-    exporter_name_hash: Option<u64>,
-    flow_version_hash: Option<u64>,
-    sampling_rate_hash: Option<u64>,
-) -> Option<u64> {
-    if exporter_ip_hash.is_none()
-        && exporter_name_hash.is_none()
-        && flow_version_hash.is_none()
-        && sampling_rate_hash.is_none()
-    {
-        return None;
-    }
-
-    let mut hasher = DefaultHasher::default();
-    exporter_ip_hash.hash(&mut hasher);
-    exporter_name_hash.hash(&mut hasher);
-    flow_version_hash.hash(&mut hasher);
-    sampling_rate_hash.hash(&mut hasher);
-    Some(hasher.finish())
-}
-
-fn exporter_identity_fingerprint(record: &FlowRecord) -> Option<u64> {
-    let exporter_ip_hash = record
-        .fields
-        .get("EXPORTER_IP")
-        .map(String::as_str)
-        .filter(|value| !value.is_empty())
-        .map(fingerprint_value);
-    let exporter_name_hash = record
-        .fields
-        .get("EXPORTER_NAME")
-        .map(String::as_str)
-        .filter(|value| !value.is_empty())
-        .map(fingerprint_value);
-    let flow_version_hash = record
-        .fields
-        .get("FLOW_VERSION")
-        .map(String::as_str)
-        .filter(|value| !value.is_empty())
-        .map(fingerprint_value);
-    let sampling_rate_hash = record
-        .fields
-        .get("SAMPLING_RATE")
-        .map(String::as_str)
-        .filter(|value| !value.is_empty())
-        .map(fingerprint_value);
-
-    combined_exporter_fingerprint(
-        exporter_ip_hash,
-        exporter_name_hash,
-        flow_version_hash,
-        sampling_rate_hash,
-    )
-}
-
 fn fingerprint_value(value: &str) -> u64 {
     let mut hasher = XxHash64::default();
     value.hash(&mut hasher);
@@ -3510,30 +3342,12 @@ fn synthetic_aggregate_from_compact(agg: CompactAggregatedFlow) -> Result<Aggreg
         dst_ip: None,
         src_mixed: true,
         dst_mixed: true,
-        exporter_ip: None,
-        exporter_name: None,
-        flow_version: None,
-        sampling_rate: None,
-        exporter_mixed: true,
         folded_labels: agg.folded_labels,
     })
 }
 
 fn flow_value_from_aggregate(agg: AggregatedFlow) -> Value {
     let mut flow_obj = Map::new();
-    flow_obj.insert(
-        "timestamp".to_string(),
-        Value::String(format_timestamp_usec(agg.last_ts)),
-    );
-    if agg.last_ts >= agg.first_ts {
-        flow_obj.insert(
-            "duration_sec".to_string(),
-            json!((agg.last_ts.saturating_sub(agg.first_ts)) / 1_000_000),
-        );
-    }
-    if let Some(exporter) = exporter_value_from_aggregate(&agg) {
-        flow_obj.insert("exporter".to_string(), exporter);
-    }
     flow_obj.insert(
         "src".to_string(),
         aggregated_endpoint_value(agg.src_ip.as_deref(), agg.src_mixed),
@@ -3646,10 +3460,6 @@ fn compact_representative_from_record(record: &FlowRecord) -> CompactRepresentat
     CompactRepresentativeFields {
         src_ip: record.fields.get("SRC_ADDR").cloned(),
         dst_ip: record.fields.get("DST_ADDR").cloned(),
-        exporter_ip: record.fields.get("EXPORTER_IP").cloned(),
-        exporter_name: record.fields.get("EXPORTER_NAME").cloned(),
-        flow_version: record.fields.get("FLOW_VERSION").cloned(),
-        sampling_rate: record.fields.get("SAMPLING_RATE").cloned(),
     }
 }
 
@@ -3661,14 +3471,6 @@ fn compact_representative_from_open_tier_row(
         src_ip: open_tier_row_field_value(row, tier_flow_indexes, "SRC_ADDR")
             .filter(|value| !value.is_empty()),
         dst_ip: open_tier_row_field_value(row, tier_flow_indexes, "DST_ADDR")
-            .filter(|value| !value.is_empty()),
-        exporter_ip: open_tier_row_field_value(row, tier_flow_indexes, "EXPORTER_IP")
-            .filter(|value| !value.is_empty()),
-        exporter_name: open_tier_row_field_value(row, tier_flow_indexes, "EXPORTER_NAME")
-            .filter(|value| !value.is_empty()),
-        flow_version: open_tier_row_field_value(row, tier_flow_indexes, "FLOW_VERSION")
-            .filter(|value| !value.is_empty()),
-        sampling_rate: open_tier_row_field_value(row, tier_flow_indexes, "SAMPLING_RATE")
             .filter(|value| !value.is_empty()),
     }
 }
@@ -3682,10 +3484,6 @@ fn aggregate_output_field(
         .and_then(|snapshot| match field {
             "SRC_ADDR" => snapshot.src_ip.clone(),
             "DST_ADDR" => snapshot.dst_ip.clone(),
-            "EXPORTER_IP" => snapshot.exporter_ip.clone(),
-            "EXPORTER_NAME" => snapshot.exporter_name.clone(),
-            "FLOW_VERSION" => snapshot.flow_version.clone(),
-            "SAMPLING_RATE" => snapshot.sampling_rate.clone(),
             _ => None,
         })
         .or_else(|| record.and_then(|record| record.fields.get(field).cloned()))
@@ -4437,32 +4235,6 @@ fn dimensions_from_fields(fields: &crate::decoder::FlowFields) -> crate::decoder
     dimensions_for_rollup(fields)
 }
 
-fn exporter_value_from_aggregate(agg: &AggregatedFlow) -> Option<Value> {
-    if agg.exporter_mixed {
-        return None;
-    }
-
-    let ip = agg.exporter_ip.as_ref()?;
-    let mut obj = Map::new();
-    obj.insert("ip".to_string(), Value::String(ip.clone()));
-
-    if let Some(name) = &agg.exporter_name {
-        obj.insert("name".to_string(), Value::String(name.clone()));
-    }
-    if let Some(version) = &agg.flow_version {
-        obj.insert("flow_version".to_string(), Value::String(version.clone()));
-    }
-    if let Some(rate) = agg
-        .sampling_rate
-        .as_ref()
-        .and_then(|v| v.parse::<u64>().ok())
-    {
-        obj.insert("sampling_rate".to_string(), json!(rate));
-    }
-
-    Some(Value::Object(obj))
-}
-
 fn aggregated_endpoint_value(ip: Option<&str>, mixed: bool) -> Value {
     let mut endpoint = Map::new();
     let mut match_obj = Map::new();
@@ -4557,16 +4329,6 @@ fn fields_from_cursor_payloads(
         }
     }
     Ok(fields)
-}
-
-fn format_timestamp_usec(timestamp_usec: u64) -> String {
-    let seconds = (timestamp_usec / 1_000_000) as i64;
-    let nanos = ((timestamp_usec % 1_000_000) * 1_000) as u32;
-
-    Utc.timestamp_opt(seconds, nanos)
-        .single()
-        .unwrap_or_else(Utc::now)
-        .to_rfc3339()
 }
 
 #[cfg(test)]
@@ -5304,66 +5066,6 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["GOOGLE", "NETDATA"]
         );
-    }
-
-    #[test]
-    fn projected_open_tier_grouped_record_keeps_representative_exporter_fields() {
-        let mut store = crate::tiering::TierFlowIndexStore::default();
-        let timestamp_usec = 120_000_000;
-
-        let mut rec = crate::decoder::FlowRecord::default();
-        rec.protocol = 6;
-        rec.flow_version = "v9";
-        rec.exporter_ip = Some("192.0.2.10".parse().unwrap());
-        rec.exporter_name = "edge-router".to_string();
-        rec.exporter_port = 2055;
-        rec.set_sampling_rate(100);
-        rec.bytes = 1000;
-        rec.packets = 10;
-
-        let row = crate::tiering::OpenTierRow {
-            timestamp_usec,
-            flow_ref: store
-                .get_or_insert_record_flow(timestamp_usec, &rec)
-                .expect("intern open tier row"),
-            metrics: crate::tiering::FlowMetrics::from_record(&rec),
-        };
-
-        let group_by = vec!["PROTOCOL".to_string()];
-        let mut aggregates =
-            super::CompactGroupAccumulator::new(&group_by).expect("build compact accumulator");
-        let mut row_group_field_ids = vec![None; group_by.len()];
-        let mut row_missing_values = std::iter::repeat_with(|| None)
-            .take(group_by.len())
-            .collect::<Vec<Option<String>>>();
-        let mut empty_field_ids = vec![None; group_by.len()];
-
-        super::accumulate_projected_open_tier_grouped_record(
-            0,
-            &row,
-            &store,
-            &group_by,
-            &mut aggregates,
-            super::DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS,
-            &mut row_group_field_ids,
-            &mut row_missing_values,
-            &mut empty_field_ids,
-            super::compact_representative_from_open_tier_row(&row, &store),
-        )
-        .expect("accumulate open tier grouped row");
-
-        assert_eq!(aggregates.rows.len(), 1);
-        let row = &aggregates.rows[0];
-        assert_eq!(row.metrics.bytes, 1000);
-        assert_eq!(row.metrics.packets, 10);
-        let snapshot = row
-            .open_representative
-            .as_ref()
-            .expect("open row representative snapshot");
-        assert_eq!(snapshot.exporter_ip.as_deref(), Some("192.0.2.10"));
-        assert_eq!(snapshot.exporter_name.as_deref(), Some("edge-router"));
-        assert_eq!(snapshot.flow_version.as_deref(), Some("v9"));
-        assert_eq!(snapshot.sampling_rate.as_deref(), Some("100"));
     }
 
     #[test]

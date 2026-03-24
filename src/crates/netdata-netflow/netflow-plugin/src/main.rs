@@ -770,10 +770,30 @@ mod tests {
         assert_eq!(response.update_every, FLOWS_UPDATE_EVERY_SECONDS);
         assert_eq!(response.response_type, "flows");
         assert_eq!(response.data.view, "table-sankey");
+        assert_eq!(
+            response
+                .data
+                .columns
+                .as_object()
+                .map(|columns| columns.len())
+                .unwrap_or_default(),
+            5,
+            "expected grouped table columns to include only group_by fields plus bytes and packets"
+        );
+        assert!(response.data.columns.get("timestamp").is_none());
+        assert!(response.data.columns.get("durationSec").is_none());
+        assert!(response.data.columns.get("exporterIp").is_none());
+        assert!(response.data.columns.get("exporterName").is_none());
+        assert!(response.data.columns.get("flowVersion").is_none());
+        assert!(response.data.columns.get("samplingRate").is_none());
         assert!(
             !response.data.flows.is_empty(),
             "expected non-empty flows data section"
         );
+        let first = response.data.flows.first().expect("first grouped flow");
+        assert!(first.get("timestamp").is_none());
+        assert!(first.get("duration_sec").is_none());
+        assert!(first.get("exporter").is_none());
         assert!(
             response.data.facets.is_some(),
             "expected facets section in flows response"
@@ -1042,6 +1062,22 @@ mod tests {
             !response.data.flows.is_empty(),
             "expected non-empty country-map tuple rows"
         );
+        assert_eq!(
+            response
+                .data
+                .columns
+                .as_object()
+                .map(|columns| columns.len())
+                .unwrap_or_default(),
+            4,
+            "expected country-map columns to include only country keys plus bytes and packets"
+        );
+        assert!(response.data.columns.get("timestamp").is_none());
+        assert!(response.data.columns.get("durationSec").is_none());
+        assert!(response.data.columns.get("exporterIp").is_none());
+        assert!(response.data.columns.get("exporterName").is_none());
+        assert!(response.data.columns.get("flowVersion").is_none());
+        assert!(response.data.columns.get("samplingRate").is_none());
 
         let first = response.data.flows.first().expect("first flow row");
         assert!(
@@ -1052,6 +1088,9 @@ mod tests {
             first["key"].get("DST_COUNTRY").is_some(),
             "expected country-map rows to expose DST_COUNTRY"
         );
+        assert!(first.get("timestamp").is_none());
+        assert!(first.get("duration_sec").is_none());
+        assert!(first.get("exporter").is_none());
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
