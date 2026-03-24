@@ -20,7 +20,13 @@ as a VM or Docker container:
 - On Alpine: `apk add py3-jsonschema py3-referencing py3-jinja2 py3-ruamel.yaml`
 - On Fedora or RHEL (EPEL is required on RHEL systems): `dnf install python3-jsonschema python3-referencing python3-jinja2 python3-ruamel-yaml`
 
-Once the environment is set up, simply run
-`integrations/gen_integrations.py` from the Agent repo. Note that the
-script must be run _from this specific location_, as it uses it’s own
-path to figure out where all the files it needs are.
+Once the environment is set up, run the documentation generators from
+the Agent repo root:
+
+- `integrations/gen_integrations.py`
+- `integrations/gen_docs_integrations.py`
+- `integrations/gen_doc_collector_page.py`
+- `integrations/gen_doc_secrets_page.py`
+
+These scripts must be run _from this specific location_, as they use
+their own path to figure out where all the files they need are.
