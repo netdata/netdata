@@ -1,25 +1,36 @@
 use crate::enrichment::FlowEnricher;
+use bincode::Options;
+use bitflags::bitflags;
 use netflow_parser::NetflowPacket;
 use netflow_parser::scoped_parser::AutoScopedParser;
 use netflow_parser::static_versions::{v5::V5, v7::V7};
 use netflow_parser::variable_versions::data_number::{DataNumber, FieldValue};
 use netflow_parser::variable_versions::ipfix::{
-    FlowSetBody as IPFixFlowSetBody, IPFix, OptionsData as IPFixOptionsData,
+    FlowSet as NetflowIPFixFlowSet, FlowSetBody as IPFixFlowSetBody,
+    FlowSetHeader as NetflowIPFixFlowSetHeader, Header as NetflowIPFixHeader, IPFix,
+    OptionsData as IPFixOptionsData, OptionsTemplate as NetflowIPFixOptionsTemplate,
+    Template as NetflowIPFixTemplate, TemplateField as NetflowIPFixTemplateField,
 };
 use netflow_parser::variable_versions::ipfix_lookup::{
     IANAIPFixField, IPFixField, ReverseInformationElement,
 };
 use netflow_parser::variable_versions::v9::{
-    FlowSetBody as V9FlowSetBody, OptionsData as V9OptionsData, V9,
+    FlowSet as NetflowV9FlowSet, FlowSetBody as V9FlowSetBody,
+    FlowSetHeader as NetflowV9FlowSetHeader, Header as NetflowV9Header,
+    OptionsData as V9OptionsData, OptionsTemplate as NetflowV9OptionsTemplate,
+    OptionsTemplateScopeField as NetflowV9OptionsTemplateScopeField,
+    OptionsTemplates as NetflowV9OptionsTemplates, Template as NetflowV9Template,
+    TemplateField as NetflowV9TemplateField, Templates as NetflowV9Templates, V9,
 };
 use netflow_parser::variable_versions::v9_lookup::V9Field;
 use serde::{Deserialize, Serialize};
 use sflow_parser::models::{Address, FlowData, HeaderProtocol, SFlowDatagram, SampleData};
 use sflow_parser::parse_datagram;
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::time::{SystemTime, UNIX_EPOCH};
+use twox_hash::XxHash64;
 
 const ETYPE_IPV4: &str = "2048";
 const ETYPE_IPV6: &str = "34525";
@@ -58,7 +69,9 @@ const SFLOW_INTERFACE_LOCAL: u32 = 0x3fff_ffff;
 const SFLOW_INTERFACE_FORMAT_INDEX: u32 = 0;
 const SFLOW_INTERFACE_FORMAT_DISCARD: u32 = 1;
 const VXLAN_UDP_PORT: u16 = 4789;
-const DECODER_STATE_SCHEMA_VERSION: u32 = 1;
+const DECODER_STATE_SCHEMA_VERSION: u32 = 2;
+const DECODER_STATE_MAGIC: &[u8; 4] = b"NDFS";
+const DECODER_STATE_HEADER_LEN: usize = 4 + 4 + 8 + 8;
 
 const CANONICAL_FLOW_DEFAULTS: &[(&str, &str)] = &[
     ("FLOW_VERSION", ""),
@@ -154,6 +167,38 @@ pub(crate) fn canonical_flow_field_names() -> impl Iterator<Item = &'static str>
     CANONICAL_FLOW_DEFAULTS.iter().map(|&(name, _)| name)
 }
 
+fn field_tracks_presence(field: &str) -> bool {
+    matches!(
+        field,
+        "SAMPLING_RATE"
+            | "ETYPE"
+            | "DIRECTION"
+            | "FORWARDING_STATUS"
+            | "IN_IF_SPEED"
+            | "OUT_IF_SPEED"
+            | "IN_IF_BOUNDARY"
+            | "OUT_IF_BOUNDARY"
+            | "SRC_VLAN"
+            | "DST_VLAN"
+            | "IPTOS"
+            | "TCP_FLAGS"
+            | "ICMPV4_TYPE"
+            | "ICMPV4_CODE"
+            | "ICMPV6_TYPE"
+            | "ICMPV6_CODE"
+    )
+}
+
+fn field_present_in_map(fields: &FlowFields, field: &'static str) -> bool {
+    fields.get(field).is_some_and(|value| {
+        !value.is_empty() && !(field == "DIRECTION" && value == DIRECTION_UNDEFINED)
+    })
+}
+
+fn scalar_field_present_in_map(fields: &FlowFields, field: &'static str) -> bool {
+    fields.get(field).is_some_and(|value| !value.is_empty())
+}
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DecodeStats {
     pub(crate) parse_attempts: u64,
@@ -214,6 +259,28 @@ pub(crate) enum FlowDirection {
     Egress,
 }
 
+bitflags! {
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+    pub(crate) struct FlowPresence: u32 {
+        const SAMPLING_RATE = 1 << 0;
+        const ETYPE = 1 << 1;
+        const DIRECTION = 1 << 2;
+        const FORWARDING_STATUS = 1 << 3;
+        const IN_IF_SPEED = 1 << 4;
+        const OUT_IF_SPEED = 1 << 5;
+        const IN_IF_BOUNDARY = 1 << 6;
+        const OUT_IF_BOUNDARY = 1 << 7;
+        const SRC_VLAN = 1 << 8;
+        const DST_VLAN = 1 << 9;
+        const IPTOS = 1 << 10;
+        const TCP_FLAGS = 1 << 11;
+        const ICMPV4_TYPE = 1 << 12;
+        const ICMPV4_CODE = 1 << 13;
+        const ICMPV6_TYPE = 1 << 14;
+        const ICMPV6_CODE = 1 << 15;
+    }
+}
+
 impl FlowDirection {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
@@ -243,6 +310,7 @@ impl std::fmt::Display for FlowDirection {
 /// text fields remain as String (36 fields, most empty by default).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct FlowRecord {
+    pub(crate) presence: FlowPresence,
     // --- Protocol version / exporter identity ---
     pub(crate) flow_version: &'static str,
     pub(crate) exporter_ip: Option<IpAddr>,
@@ -363,6 +431,29 @@ pub(crate) struct FlowRecord {
     pub(crate) mpls_labels: String,
 }
 
+macro_rules! presence_field_methods {
+    ($(($has:ident, $set:ident, $clear:ident, $field:ident : $ty:ty, $flag:ident, $default:expr)),* $(,)?) => {
+        $(
+            #[allow(dead_code)]
+            pub(crate) fn $has(&self) -> bool {
+                self.presence.contains(FlowPresence::$flag)
+            }
+
+            #[allow(dead_code)]
+            pub(crate) fn $set(&mut self, value: $ty) {
+                self.$field = value;
+                self.presence.insert(FlowPresence::$flag);
+            }
+
+            #[allow(dead_code)]
+            pub(crate) fn $clear(&mut self) {
+                self.$field = $default;
+                self.presence.remove(FlowPresence::$flag);
+            }
+        )*
+    };
+}
+
 /// Format a MAC address as lowercase colon-separated hex.
 #[cfg(test)]
 fn format_mac(mac: &[u8; 6]) -> String {
@@ -385,6 +476,116 @@ fn parse_mac(s: &str) -> [u8; 6] {
 }
 
 impl FlowRecord {
+    fn swap_presence_flags(&mut self, left: FlowPresence, right: FlowPresence) {
+        let left_present = self.presence.contains(left);
+        let right_present = self.presence.contains(right);
+        self.presence.set(left, right_present);
+        self.presence.set(right, left_present);
+    }
+
+    presence_field_methods!(
+        (
+            has_sampling_rate,
+            set_sampling_rate,
+            clear_sampling_rate,
+            sampling_rate: u64,
+            SAMPLING_RATE,
+            0
+        ),
+        (has_etype, set_etype, clear_etype, etype: u16, ETYPE, 0),
+        (
+            has_direction,
+            set_direction,
+            clear_direction,
+            direction: FlowDirection,
+            DIRECTION,
+            FlowDirection::Undefined
+        ),
+        (
+            has_forwarding_status,
+            set_forwarding_status,
+            clear_forwarding_status,
+            forwarding_status: u8,
+            FORWARDING_STATUS,
+            0
+        ),
+        (
+            has_in_if_speed,
+            set_in_if_speed,
+            clear_in_if_speed,
+            in_if_speed: u64,
+            IN_IF_SPEED,
+            0
+        ),
+        (
+            has_out_if_speed,
+            set_out_if_speed,
+            clear_out_if_speed,
+            out_if_speed: u64,
+            OUT_IF_SPEED,
+            0
+        ),
+        (
+            has_in_if_boundary,
+            set_in_if_boundary,
+            clear_in_if_boundary,
+            in_if_boundary: u8,
+            IN_IF_BOUNDARY,
+            0
+        ),
+        (
+            has_out_if_boundary,
+            set_out_if_boundary,
+            clear_out_if_boundary,
+            out_if_boundary: u8,
+            OUT_IF_BOUNDARY,
+            0
+        ),
+        (has_src_vlan, set_src_vlan, clear_src_vlan, src_vlan: u16, SRC_VLAN, 0),
+        (has_dst_vlan, set_dst_vlan, clear_dst_vlan, dst_vlan: u16, DST_VLAN, 0),
+        (has_iptos, set_iptos, clear_iptos, iptos: u8, IPTOS, 0),
+        (
+            has_tcp_flags,
+            set_tcp_flags,
+            clear_tcp_flags,
+            tcp_flags: u8,
+            TCP_FLAGS,
+            0
+        ),
+        (
+            has_icmpv4_type,
+            set_icmpv4_type,
+            clear_icmpv4_type,
+            icmpv4_type: u8,
+            ICMPV4_TYPE,
+            0
+        ),
+        (
+            has_icmpv4_code,
+            set_icmpv4_code,
+            clear_icmpv4_code,
+            icmpv4_code: u8,
+            ICMPV4_CODE,
+            0
+        ),
+        (
+            has_icmpv6_type,
+            set_icmpv6_type,
+            clear_icmpv6_type,
+            icmpv6_type: u8,
+            ICMPV6_TYPE,
+            0
+        ),
+        (
+            has_icmpv6_code,
+            set_icmpv6_code,
+            clear_icmpv6_code,
+            icmpv6_code: u8,
+            ICMPV6_CODE,
+            0
+        ),
+    );
+
     /// Convert to FlowFields (BTreeMap) for backward compatibility.
     /// Used during the transition period while tiering/encode still expect FlowFields.
     #[cfg(test)]
@@ -401,9 +602,23 @@ impl FlowRecord {
         f.insert("EXPORTER_REGION", self.exporter_region.clone());
         f.insert("EXPORTER_TENANT", self.exporter_tenant.clone());
         // Sampling
-        f.insert("SAMPLING_RATE", self.sampling_rate.to_string());
+        f.insert(
+            "SAMPLING_RATE",
+            if self.has_sampling_rate() {
+                self.sampling_rate.to_string()
+            } else {
+                String::new()
+            },
+        );
         // L2/L3
-        f.insert("ETYPE", self.etype.to_string());
+        f.insert(
+            "ETYPE",
+            if self.has_etype() {
+                self.etype.to_string()
+            } else {
+                String::new()
+            },
+        );
         f.insert("PROTOCOL", self.protocol.to_string());
         // Counters
         f.insert("BYTES", self.bytes.to_string());
@@ -411,8 +626,22 @@ impl FlowRecord {
         f.insert("FLOWS", self.flows.to_string());
         f.insert("RAW_BYTES", self.raw_bytes.to_string());
         f.insert("RAW_PACKETS", self.raw_packets.to_string());
-        f.insert("FORWARDING_STATUS", self.forwarding_status.to_string());
-        f.insert("DIRECTION", self.direction.as_str().to_string());
+        f.insert(
+            "FORWARDING_STATUS",
+            if self.has_forwarding_status() {
+                self.forwarding_status.to_string()
+            } else {
+                String::new()
+            },
+        );
+        f.insert(
+            "DIRECTION",
+            if self.has_direction() {
+                self.direction.as_str().to_string()
+            } else {
+                String::new()
+            },
+        );
         // Endpoints
         f.insert("SRC_ADDR", opt_ip_to_string(self.src_addr));
         f.insert("DST_ADDR", opt_ip_to_string(self.dst_addr));
@@ -452,14 +681,42 @@ impl FlowRecord {
         f.insert("OUT_IF_NAME", self.out_if_name.clone());
         f.insert("IN_IF_DESCRIPTION", self.in_if_description.clone());
         f.insert("OUT_IF_DESCRIPTION", self.out_if_description.clone());
-        f.insert("IN_IF_SPEED", self.in_if_speed.to_string());
-        f.insert("OUT_IF_SPEED", self.out_if_speed.to_string());
+        f.insert(
+            "IN_IF_SPEED",
+            if self.has_in_if_speed() {
+                self.in_if_speed.to_string()
+            } else {
+                String::new()
+            },
+        );
+        f.insert(
+            "OUT_IF_SPEED",
+            if self.has_out_if_speed() {
+                self.out_if_speed.to_string()
+            } else {
+                String::new()
+            },
+        );
         f.insert("IN_IF_PROVIDER", self.in_if_provider.clone());
         f.insert("OUT_IF_PROVIDER", self.out_if_provider.clone());
         f.insert("IN_IF_CONNECTIVITY", self.in_if_connectivity.clone());
         f.insert("OUT_IF_CONNECTIVITY", self.out_if_connectivity.clone());
-        f.insert("IN_IF_BOUNDARY", self.in_if_boundary.to_string());
-        f.insert("OUT_IF_BOUNDARY", self.out_if_boundary.to_string());
+        f.insert(
+            "IN_IF_BOUNDARY",
+            if self.has_in_if_boundary() {
+                self.in_if_boundary.to_string()
+            } else {
+                String::new()
+            },
+        );
+        f.insert(
+            "OUT_IF_BOUNDARY",
+            if self.has_out_if_boundary() {
+                self.out_if_boundary.to_string()
+            } else {
+                String::new()
+            },
+        );
         // Next hop / ports
         f.insert("NEXT_HOP", opt_ip_to_string(self.next_hop));
         f.insert("SRC_PORT", self.src_port.to_string());
@@ -477,8 +734,22 @@ impl FlowRecord {
         f.insert("SRC_PORT_NAT", self.src_port_nat.to_string());
         f.insert("DST_PORT_NAT", self.dst_port_nat.to_string());
         // VLAN
-        f.insert("SRC_VLAN", self.src_vlan.to_string());
-        f.insert("DST_VLAN", self.dst_vlan.to_string());
+        f.insert(
+            "SRC_VLAN",
+            if self.has_src_vlan() {
+                self.src_vlan.to_string()
+            } else {
+                String::new()
+            },
+        );
+        f.insert(
+            "DST_VLAN",
+            if self.has_dst_vlan() {
+                self.dst_vlan.to_string()
+            } else {
+                String::new()
+            },
+        );
         // MAC
         f.insert(
             "SRC_MAC",
@@ -498,16 +769,58 @@ impl FlowRecord {
         );
         // IP header
         f.insert("IPTTL", self.ipttl.to_string());
-        f.insert("IPTOS", self.iptos.to_string());
+        f.insert(
+            "IPTOS",
+            if self.has_iptos() {
+                self.iptos.to_string()
+            } else {
+                String::new()
+            },
+        );
         f.insert("IPV6_FLOW_LABEL", self.ipv6_flow_label.to_string());
-        f.insert("TCP_FLAGS", self.tcp_flags.to_string());
+        f.insert(
+            "TCP_FLAGS",
+            if self.has_tcp_flags() {
+                self.tcp_flags.to_string()
+            } else {
+                String::new()
+            },
+        );
         f.insert("IP_FRAGMENT_ID", self.ip_fragment_id.to_string());
         f.insert("IP_FRAGMENT_OFFSET", self.ip_fragment_offset.to_string());
         // ICMP
-        f.insert("ICMPV4_TYPE", self.icmpv4_type.to_string());
-        f.insert("ICMPV4_CODE", self.icmpv4_code.to_string());
-        f.insert("ICMPV6_TYPE", self.icmpv6_type.to_string());
-        f.insert("ICMPV6_CODE", self.icmpv6_code.to_string());
+        f.insert(
+            "ICMPV4_TYPE",
+            if self.has_icmpv4_type() {
+                self.icmpv4_type.to_string()
+            } else {
+                String::new()
+            },
+        );
+        f.insert(
+            "ICMPV4_CODE",
+            if self.has_icmpv4_code() {
+                self.icmpv4_code.to_string()
+            } else {
+                String::new()
+            },
+        );
+        f.insert(
+            "ICMPV6_TYPE",
+            if self.has_icmpv6_type() {
+                self.icmpv6_type.to_string()
+            } else {
+                String::new()
+            },
+        );
+        f.insert(
+            "ICMPV6_CODE",
+            if self.has_icmpv6_code() {
+                self.icmpv6_code.to_string()
+            } else {
+                String::new()
+            },
+        );
         // MPLS
         f.insert("MPLS_LABELS", self.mpls_labels.clone());
         f
@@ -566,7 +879,8 @@ impl FlowRecord {
             })
         };
 
-        Self {
+        let mut record = Self {
+            presence: FlowPresence::empty(),
             flow_version: get_static("FLOW_VERSION"),
             exporter_ip: get_ip("EXPORTER_IP"),
             exporter_port: get_u16("EXPORTER_PORT"),
@@ -654,7 +968,58 @@ impl FlowRecord {
             icmpv6_type: get_u8("ICMPV6_TYPE"),
             icmpv6_code: get_u8("ICMPV6_CODE"),
             mpls_labels: get_string("MPLS_LABELS"),
+        };
+
+        if field_present_in_map(fields, "SAMPLING_RATE") {
+            record.presence.insert(FlowPresence::SAMPLING_RATE);
         }
+        if field_present_in_map(fields, "ETYPE") {
+            record.presence.insert(FlowPresence::ETYPE);
+        }
+        if field_present_in_map(fields, "DIRECTION") {
+            record.presence.insert(FlowPresence::DIRECTION);
+        }
+        if field_present_in_map(fields, "FORWARDING_STATUS") {
+            record.presence.insert(FlowPresence::FORWARDING_STATUS);
+        }
+        if field_present_in_map(fields, "IN_IF_SPEED") {
+            record.presence.insert(FlowPresence::IN_IF_SPEED);
+        }
+        if field_present_in_map(fields, "OUT_IF_SPEED") {
+            record.presence.insert(FlowPresence::OUT_IF_SPEED);
+        }
+        if field_present_in_map(fields, "IN_IF_BOUNDARY") {
+            record.presence.insert(FlowPresence::IN_IF_BOUNDARY);
+        }
+        if field_present_in_map(fields, "OUT_IF_BOUNDARY") {
+            record.presence.insert(FlowPresence::OUT_IF_BOUNDARY);
+        }
+        if field_present_in_map(fields, "SRC_VLAN") {
+            record.presence.insert(FlowPresence::SRC_VLAN);
+        }
+        if field_present_in_map(fields, "DST_VLAN") {
+            record.presence.insert(FlowPresence::DST_VLAN);
+        }
+        if field_present_in_map(fields, "IPTOS") {
+            record.presence.insert(FlowPresence::IPTOS);
+        }
+        if field_present_in_map(fields, "TCP_FLAGS") {
+            record.presence.insert(FlowPresence::TCP_FLAGS);
+        }
+        if field_present_in_map(fields, "ICMPV4_TYPE") {
+            record.presence.insert(FlowPresence::ICMPV4_TYPE);
+        }
+        if field_present_in_map(fields, "ICMPV4_CODE") {
+            record.presence.insert(FlowPresence::ICMPV4_CODE);
+        }
+        if field_present_in_map(fields, "ICMPV6_TYPE") {
+            record.presence.insert(FlowPresence::ICMPV6_TYPE);
+        }
+        if field_present_in_map(fields, "ICMPV6_CODE") {
+            record.presence.insert(FlowPresence::ICMPV6_CODE);
+        }
+
+        record
     }
 
     /// Encode non-default fields into a byte buffer for journal writing.
@@ -728,6 +1093,39 @@ impl FlowRecord {
                 }
             }};
         }
+        macro_rules! push_u8_when {
+            ($cond:expr, $name:expr, $val:expr) => {{
+                if $cond {
+                    let start = data.len();
+                    data.extend_from_slice($name.as_bytes());
+                    data.push(b'=');
+                    data.extend_from_slice(ibuf.format($val as u64).as_bytes());
+                    refs.push(start..data.len());
+                }
+            }};
+        }
+        macro_rules! push_u16_when {
+            ($cond:expr, $name:expr, $val:expr) => {{
+                if $cond {
+                    let start = data.len();
+                    data.extend_from_slice($name.as_bytes());
+                    data.push(b'=');
+                    data.extend_from_slice(ibuf.format($val as u64).as_bytes());
+                    refs.push(start..data.len());
+                }
+            }};
+        }
+        macro_rules! push_u64_when {
+            ($cond:expr, $name:expr, $val:expr) => {{
+                if $cond {
+                    let start = data.len();
+                    data.extend_from_slice($name.as_bytes());
+                    data.push(b'=');
+                    data.extend_from_slice(ibuf.format($val).as_bytes());
+                    refs.push(start..data.len());
+                }
+            }};
+        }
         macro_rules! push_opt_ip {
             ($name:expr, $val:expr) => {{
                 if let Some(ip) = $val {
@@ -767,19 +1165,23 @@ impl FlowRecord {
         push_str!("EXPORTER_SITE", &self.exporter_site);
         push_str!("EXPORTER_REGION", &self.exporter_region);
         push_str!("EXPORTER_TENANT", &self.exporter_tenant);
-        push_u64!("SAMPLING_RATE", self.sampling_rate);
-        push_u16!("ETYPE", self.etype);
+        push_u64_when!(self.has_sampling_rate(), "SAMPLING_RATE", self.sampling_rate);
+        push_u16_when!(self.has_etype(), "ETYPE", self.etype);
         push_u8!("PROTOCOL", self.protocol);
         push_u64!("BYTES", self.bytes);
         push_u64!("PACKETS", self.packets);
         push_u64!("FLOWS", self.flows);
         push_u64!("RAW_BYTES", self.raw_bytes);
         push_u64!("RAW_PACKETS", self.raw_packets);
-        push_u8!("FORWARDING_STATUS", self.forwarding_status);
-        // Direction: skip when "unknown" (from_fields defaults to Unknown).
+        push_u8_when!(
+            self.has_forwarding_status(),
+            "FORWARDING_STATUS",
+            self.forwarding_status
+        );
+        // Direction: skip the internal undefined sentinel so it never leaks into journals.
         {
             let dir_str = self.direction.as_str();
-            if dir_str != "unknown" {
+            if self.has_direction() && dir_str != DIRECTION_UNDEFINED {
                 let start = data.len();
                 data.extend_from_slice(b"DIRECTION=");
                 data.extend_from_slice(dir_str.as_bytes());
@@ -842,14 +1244,18 @@ impl FlowRecord {
         push_str!("OUT_IF_NAME", &self.out_if_name);
         push_str!("IN_IF_DESCRIPTION", &self.in_if_description);
         push_str!("OUT_IF_DESCRIPTION", &self.out_if_description);
-        push_u64!("IN_IF_SPEED", self.in_if_speed);
-        push_u64!("OUT_IF_SPEED", self.out_if_speed);
+        push_u64_when!(self.has_in_if_speed(), "IN_IF_SPEED", self.in_if_speed);
+        push_u64_when!(self.has_out_if_speed(), "OUT_IF_SPEED", self.out_if_speed);
         push_str!("IN_IF_PROVIDER", &self.in_if_provider);
         push_str!("OUT_IF_PROVIDER", &self.out_if_provider);
         push_str!("IN_IF_CONNECTIVITY", &self.in_if_connectivity);
         push_str!("OUT_IF_CONNECTIVITY", &self.out_if_connectivity);
-        push_u8!("IN_IF_BOUNDARY", self.in_if_boundary);
-        push_u8!("OUT_IF_BOUNDARY", self.out_if_boundary);
+        push_u8_when!(self.has_in_if_boundary(), "IN_IF_BOUNDARY", self.in_if_boundary);
+        push_u8_when!(
+            self.has_out_if_boundary(),
+            "OUT_IF_BOUNDARY",
+            self.out_if_boundary
+        );
         push_opt_ip!("NEXT_HOP", self.next_hop);
         push_u16!("SRC_PORT", self.src_port);
         push_u16!("DST_PORT", self.dst_port);
@@ -860,20 +1266,20 @@ impl FlowRecord {
         push_opt_ip!("DST_ADDR_NAT", self.dst_addr_nat);
         push_u16!("SRC_PORT_NAT", self.src_port_nat);
         push_u16!("DST_PORT_NAT", self.dst_port_nat);
-        push_u16!("SRC_VLAN", self.src_vlan);
-        push_u16!("DST_VLAN", self.dst_vlan);
+        push_u16_when!(self.has_src_vlan(), "SRC_VLAN", self.src_vlan);
+        push_u16_when!(self.has_dst_vlan(), "DST_VLAN", self.dst_vlan);
         push_mac!("SRC_MAC", self.src_mac);
         push_mac!("DST_MAC", self.dst_mac);
         push_u8!("IPTTL", self.ipttl);
-        push_u8!("IPTOS", self.iptos);
+        push_u8_when!(self.has_iptos(), "IPTOS", self.iptos);
         push_u32!("IPV6_FLOW_LABEL", self.ipv6_flow_label);
-        push_u8!("TCP_FLAGS", self.tcp_flags);
+        push_u8_when!(self.has_tcp_flags(), "TCP_FLAGS", self.tcp_flags);
         push_u32!("IP_FRAGMENT_ID", self.ip_fragment_id);
         push_u16!("IP_FRAGMENT_OFFSET", self.ip_fragment_offset);
-        push_u8!("ICMPV4_TYPE", self.icmpv4_type);
-        push_u8!("ICMPV4_CODE", self.icmpv4_code);
-        push_u8!("ICMPV6_TYPE", self.icmpv6_type);
-        push_u8!("ICMPV6_CODE", self.icmpv6_code);
+        push_u8_when!(self.has_icmpv4_type(), "ICMPV4_TYPE", self.icmpv4_type);
+        push_u8_when!(self.has_icmpv4_code(), "ICMPV4_CODE", self.icmpv4_code);
+        push_u8_when!(self.has_icmpv6_type(), "ICMPV6_TYPE", self.icmpv6_type);
+        push_u8_when!(self.has_icmpv6_code(), "ICMPV6_CODE", self.icmpv6_code);
         push_str!("MPLS_LABELS", &self.mpls_labels);
     }
 }
@@ -1022,86 +1428,221 @@ struct IPFixDataLinkTemplate {
     fields: Vec<IPFixTemplateField>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct PersistedSamplingRate {
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub(crate) struct DecoderStateNamespaceKey {
     exporter_ip: String,
-    version: u16,
     observation_domain_id: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct PersistedSamplingRate {
+    version: u16,
     sampler_id: u64,
     sampling_rate: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct PersistedV9TemplateField {
     field_type: u16,
-    field_length: usize,
+    field_length: u16,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct PersistedV9SamplingTemplate {
-    exporter_ip: String,
-    observation_domain_id: u32,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct PersistedV9Template {
+    template_id: u16,
+    fields: Vec<PersistedV9TemplateField>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct PersistedV9OptionsTemplate {
     template_id: u16,
     scope_fields: Vec<PersistedV9TemplateField>,
     option_fields: Vec<PersistedV9TemplateField>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct PersistedV9DatalinkTemplate {
-    exporter_ip: String,
-    observation_domain_id: u32,
-    template_id: u16,
-    fields: Vec<PersistedV9TemplateField>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct PersistedIPFixTemplateField {
     field_type: u16,
     field_length: u16,
     enterprise_number: Option<u32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct PersistedIPFixDatalinkTemplate {
-    exporter_ip: String,
-    observation_domain_id: u32,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct PersistedIPFixTemplate {
     template_id: u16,
     fields: Vec<PersistedIPFixTemplateField>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct PersistedTemplatePacket {
-    source: String,
-    payload_hex: String,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct PersistedIPFixOptionsTemplate {
+    template_id: u16,
+    scope_field_count: u16,
+    fields: Vec<PersistedIPFixTemplateField>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct PersistedDecoderState {
-    schema_version: u32,
-    saved_at_usec: u64,
-    sampling_rates: Vec<PersistedSamplingRate>,
-    v9_sampling_templates: Vec<PersistedV9SamplingTemplate>,
-    #[serde(default)]
-    v9_datalink_templates: Vec<PersistedV9DatalinkTemplate>,
-    ipfix_datalink_templates: Vec<PersistedIPFixDatalinkTemplate>,
-    template_packets: Vec<PersistedTemplatePacket>,
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+struct DecoderStateNamespace {
+    sampling_rates: BTreeMap<(u16, u64), PersistedSamplingRate>,
+    v9_templates: BTreeMap<u16, PersistedV9Template>,
+    v9_options_templates: BTreeMap<u16, PersistedV9OptionsTemplate>,
+    ipfix_templates: BTreeMap<u16, PersistedIPFixTemplate>,
+    ipfix_options_templates: BTreeMap<u16, PersistedIPFixOptionsTemplate>,
+    ipfix_v9_templates: BTreeMap<u16, PersistedV9Template>,
+    ipfix_v9_options_templates: BTreeMap<u16, PersistedV9OptionsTemplate>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct TemplatePacketKey {
-    source: SocketAddr,
-    version: u16,
-    scope_id: u32,
-    payload_hash: u64,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct PersistedDecoderNamespaceFile {
+    key: DecoderStateNamespaceKey,
+    namespace: DecoderStateNamespace,
 }
 
-#[derive(Debug, Clone)]
-struct TemplatePacketEntry {
-    source: SocketAddr,
-    payload: Vec<u8>,
+#[derive(Debug, Clone, Copy)]
+struct DecoderStateObservation {
+    namespace_state_changed: bool,
+    template_state_changed: bool,
+}
+
+impl DecoderStateNamespace {
+    fn is_empty(&self) -> bool {
+        self.sampling_rates.is_empty()
+            && self.v9_templates.is_empty()
+            && self.v9_options_templates.is_empty()
+            && self.ipfix_templates.is_empty()
+            && self.ipfix_options_templates.is_empty()
+            && self.ipfix_v9_templates.is_empty()
+            && self.ipfix_v9_options_templates.is_empty()
+    }
+
+    fn set_sampling_rate(&mut self, version: u16, sampler_id: u64, sampling_rate: u64) -> bool {
+        let row = PersistedSamplingRate {
+            version,
+            sampler_id,
+            sampling_rate,
+        };
+        self.sampling_rates
+            .insert((version, sampler_id), row)
+            .as_ref()
+            != Some(&PersistedSamplingRate {
+                version,
+                sampler_id,
+                sampling_rate,
+            })
+    }
+
+    fn set_v9_template(&mut self, template_id: u16, fields: Vec<PersistedV9TemplateField>) -> bool {
+        let template = PersistedV9Template {
+            template_id,
+            fields,
+        };
+        self.v9_templates.insert(template_id, template.clone()).as_ref() != Some(&template)
+    }
+
+    fn set_v9_options_template(
+        &mut self,
+        template_id: u16,
+        scope_fields: Vec<PersistedV9TemplateField>,
+        option_fields: Vec<PersistedV9TemplateField>,
+    ) -> bool {
+        let template = PersistedV9OptionsTemplate {
+            template_id,
+            scope_fields,
+            option_fields,
+        };
+        self.v9_options_templates
+            .insert(template_id, template.clone())
+            .as_ref()
+            != Some(&template)
+    }
+
+    fn set_ipfix_template(
+        &mut self,
+        template_id: u16,
+        fields: Vec<PersistedIPFixTemplateField>,
+    ) -> bool {
+        let template = PersistedIPFixTemplate {
+            template_id,
+            fields,
+        };
+        self.ipfix_templates
+            .insert(template_id, template.clone())
+            .as_ref()
+            != Some(&template)
+    }
+
+    fn set_ipfix_options_template(
+        &mut self,
+        template_id: u16,
+        scope_field_count: u16,
+        fields: Vec<PersistedIPFixTemplateField>,
+    ) -> bool {
+        let template = PersistedIPFixOptionsTemplate {
+            template_id,
+            scope_field_count,
+            fields,
+        };
+        self.ipfix_options_templates
+            .insert(template_id, template.clone())
+            .as_ref()
+            != Some(&template)
+    }
+
+    fn set_ipfix_v9_template(
+        &mut self,
+        template_id: u16,
+        fields: Vec<PersistedV9TemplateField>,
+    ) -> bool {
+        let template = PersistedV9Template {
+            template_id,
+            fields,
+        };
+        self.ipfix_v9_templates
+            .insert(template_id, template.clone())
+            .as_ref()
+            != Some(&template)
+    }
+
+    fn set_ipfix_v9_options_template(
+        &mut self,
+        template_id: u16,
+        scope_fields: Vec<PersistedV9TemplateField>,
+        option_fields: Vec<PersistedV9TemplateField>,
+    ) -> bool {
+        let template = PersistedV9OptionsTemplate {
+            template_id,
+            scope_fields,
+            option_fields,
+        };
+        self.ipfix_v9_options_templates
+            .insert(template_id, template.clone())
+            .as_ref()
+            != Some(&template)
+    }
 }
 
 impl SamplingState {
+    fn clear_namespace(&mut self, exporter_ip: &str, observation_domain_id: u32) {
+        if let Some(rates) = self.by_exporter.get_mut(exporter_ip) {
+            rates.retain(|key, _| key.observation_domain_id != observation_domain_id);
+            if rates.is_empty() {
+                self.by_exporter.remove(exporter_ip);
+            }
+        }
+
+        let v9_scope = V9TemplateScopeKey {
+            exporter_ip: exporter_ip.to_string(),
+            observation_domain_id,
+        };
+        let ipfix_scope = IPFixTemplateScopeKey {
+            exporter_ip: exporter_ip.to_string(),
+            observation_domain_id,
+        };
+
+        self.v9_sampling_templates.remove(&v9_scope);
+        self.v9_datalink_templates.remove(&v9_scope);
+        self.ipfix_datalink_templates.remove(&ipfix_scope);
+    }
+
     fn set(
         &mut self,
         exporter_ip: &str,
@@ -1286,154 +1827,64 @@ impl SamplingState {
             .any(|m| !m.is_empty())
     }
 
-    fn to_persisted(&self) -> PersistedDecoderState {
-        let mut sampling_rates = Vec::new();
-        for (exporter_ip, rates) in &self.by_exporter {
-            for (key, sampling_rate) in rates {
-                sampling_rates.push(PersistedSamplingRate {
-                    exporter_ip: exporter_ip.clone(),
-                    version: key.version,
-                    observation_domain_id: key.observation_domain_id,
-                    sampler_id: key.sampler_id,
-                    sampling_rate: *sampling_rate,
-                });
-            }
-        }
+    fn apply_decoder_state_namespace(
+        &mut self,
+        key: &DecoderStateNamespaceKey,
+        namespace: &DecoderStateNamespace,
+    ) {
+        self.clear_namespace(&key.exporter_ip, key.observation_domain_id);
 
-        let mut v9_sampling_templates = Vec::new();
-        for (scope, templates) in &self.v9_sampling_templates {
-            for (template_id, template) in templates {
-                v9_sampling_templates.push(PersistedV9SamplingTemplate {
-                    exporter_ip: scope.exporter_ip.clone(),
-                    observation_domain_id: scope.observation_domain_id,
-                    template_id: *template_id,
-                    scope_fields: template
-                        .scope_fields
-                        .iter()
-                        .map(|f| PersistedV9TemplateField {
-                            field_type: f.field_type,
-                            field_length: f.field_length,
-                        })
-                        .collect(),
-                    option_fields: template
-                        .option_fields
-                        .iter()
-                        .map(|f| PersistedV9TemplateField {
-                            field_type: f.field_type,
-                            field_length: f.field_length,
-                        })
-                        .collect(),
-                });
-            }
-        }
-
-        let mut v9_datalink_templates = Vec::new();
-        for (scope, templates) in &self.v9_datalink_templates {
-            for (template_id, template) in templates {
-                v9_datalink_templates.push(PersistedV9DatalinkTemplate {
-                    exporter_ip: scope.exporter_ip.clone(),
-                    observation_domain_id: scope.observation_domain_id,
-                    template_id: *template_id,
-                    fields: template
-                        .fields
-                        .iter()
-                        .map(|f| PersistedV9TemplateField {
-                            field_type: f.field_type,
-                            field_length: f.field_length,
-                        })
-                        .collect(),
-                });
-            }
-        }
-
-        let mut ipfix_datalink_templates = Vec::new();
-        for (scope, templates) in &self.ipfix_datalink_templates {
-            for (template_id, template) in templates {
-                ipfix_datalink_templates.push(PersistedIPFixDatalinkTemplate {
-                    exporter_ip: scope.exporter_ip.clone(),
-                    observation_domain_id: scope.observation_domain_id,
-                    template_id: *template_id,
-                    fields: template
-                        .fields
-                        .iter()
-                        .map(|f| PersistedIPFixTemplateField {
-                            field_type: f.field_type,
-                            field_length: f.field_length,
-                            enterprise_number: f.enterprise_number,
-                        })
-                        .collect(),
-                });
-            }
-        }
-
-        PersistedDecoderState {
-            schema_version: DECODER_STATE_SCHEMA_VERSION,
-            saved_at_usec: now_usec(),
-            sampling_rates,
-            v9_sampling_templates,
-            v9_datalink_templates,
-            ipfix_datalink_templates,
-            template_packets: Vec::new(),
-        }
-    }
-
-    fn load_persisted(&mut self, persisted: &PersistedDecoderState) {
-        self.by_exporter.clear();
-        self.v9_sampling_templates.clear();
-        self.v9_datalink_templates.clear();
-        self.ipfix_datalink_templates.clear();
-
-        for row in &persisted.sampling_rates {
+        for row in namespace.sampling_rates.values() {
             self.set(
-                &row.exporter_ip,
+                &key.exporter_ip,
                 row.version,
-                row.observation_domain_id,
+                key.observation_domain_id,
                 row.sampler_id,
                 row.sampling_rate,
             );
         }
 
-        for row in &persisted.v9_sampling_templates {
+        for row in namespace.v9_options_templates.values() {
             self.set_v9_sampling_template(
-                &row.exporter_ip,
-                row.observation_domain_id,
+                &key.exporter_ip,
+                key.observation_domain_id,
                 row.template_id,
                 row.scope_fields
                     .iter()
                     .map(|f| V9TemplateField {
                         field_type: f.field_type,
-                        field_length: f.field_length,
+                        field_length: usize::from(f.field_length),
                     })
                     .collect(),
                 row.option_fields
                     .iter()
                     .map(|f| V9TemplateField {
                         field_type: f.field_type,
-                        field_length: f.field_length,
+                        field_length: usize::from(f.field_length),
                     })
                     .collect(),
             );
         }
 
-        for row in &persisted.v9_datalink_templates {
+        for row in namespace.v9_templates.values() {
             self.set_v9_datalink_template(
-                &row.exporter_ip,
-                row.observation_domain_id,
+                &key.exporter_ip,
+                key.observation_domain_id,
                 row.template_id,
                 row.fields
                     .iter()
                     .map(|f| V9TemplateField {
                         field_type: f.field_type,
-                        field_length: f.field_length,
+                        field_length: usize::from(f.field_length),
                     })
                     .collect(),
             );
         }
 
-        for row in &persisted.ipfix_datalink_templates {
+        for row in namespace.ipfix_templates.values() {
             self.set_ipfix_datalink_template(
-                &row.exporter_ip,
-                row.observation_domain_id,
+                &key.exporter_ip,
+                key.observation_domain_id,
                 row.template_id,
                 row.fields
                     .iter()
@@ -1451,8 +1902,10 @@ impl SamplingState {
 pub(crate) struct FlowDecoders {
     netflow: AutoScopedParser,
     sampling: SamplingState,
-    template_packets: VecDeque<TemplatePacketEntry>,
-    template_packet_keys: HashSet<TemplatePacketKey>,
+    decoder_state_namespaces: HashMap<DecoderStateNamespaceKey, DecoderStateNamespace>,
+    loaded_decoder_namespaces: HashSet<DecoderStateNamespaceKey>,
+    dirty_decoder_namespaces: HashSet<DecoderStateNamespaceKey>,
+    hydrated_namespace_sources: HashMap<DecoderStateNamespaceKey, HashSet<SocketAddr>>,
     enricher: Option<FlowEnricher>,
     stats: DecodeStats,
     decapsulation_mode: DecapsulationMode,
@@ -1534,8 +1987,10 @@ impl FlowDecoders {
         Self {
             netflow: AutoScopedParser::new(),
             sampling: SamplingState::default(),
-            template_packets: VecDeque::new(),
-            template_packet_keys: HashSet::new(),
+            decoder_state_namespaces: HashMap::new(),
+            loaded_decoder_namespaces: HashSet::new(),
+            dirty_decoder_namespaces: HashSet::new(),
+            hydrated_namespace_sources: HashMap::new(),
             enricher: None,
             stats: DecodeStats::default(),
             decapsulation_mode,
@@ -1579,7 +2034,7 @@ impl FlowDecoders {
         payload: &[u8],
         input_realtime_usec: u64,
     ) -> DecodedBatch {
-        self.observe_template_payload(source, payload);
+        let template_state_changed = self.observe_decoder_state_from_payload(source, payload);
 
         let mut batch = if is_sflow_payload(payload) && self.enable_sflow {
             decode_sflow(
@@ -1615,82 +2070,539 @@ impl FlowDecoders {
                 .retain_mut(|flow| enricher.enrich_record(&mut flow.record));
         }
 
+        if let Some(key) = template_state_changed {
+            let hydrated = self.hydrated_namespace_sources.entry(key).or_default();
+            hydrated.clear();
+            hydrated.insert(source);
+        }
+
         self.stats.merge(&batch.stats);
         batch
     }
 
-    fn observe_template_payload(&mut self, source: SocketAddr, payload: &[u8]) {
-        let Some((version, scope_id)) = template_scope(payload) else {
-            return;
-        };
-        if !has_template_flowsets(payload) {
-            return;
-        }
-
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        payload.hash(&mut hasher);
-        let payload_hash = hasher.finish();
-        let key = TemplatePacketKey {
-            source,
-            version,
-            scope_id,
-            payload_hash,
-        };
-        if self.template_packet_keys.contains(&key) {
-            return;
-        }
-
-        self.template_packet_keys.insert(key);
-        self.template_packets.push_back(TemplatePacketEntry {
-            source,
-            payload: payload.to_vec(),
-        });
+    pub(crate) fn decoder_state_namespace_key(
+        source: SocketAddr,
+        payload: &[u8],
+    ) -> Option<DecoderStateNamespaceKey> {
+        let (_version, observation_domain_id) = template_scope(payload)?;
+        Some(DecoderStateNamespaceKey {
+            exporter_ip: source.ip().to_string(),
+            observation_domain_id,
+        })
     }
 
-    pub(crate) fn export_persistent_state_json(&self) -> Result<String, serde_json::Error> {
-        let mut state = self.sampling.to_persisted();
-        state.template_packets = self
-            .template_packets
-            .iter()
-            .map(|entry| PersistedTemplatePacket {
-                source: entry.source.to_string(),
-                payload_hex: bytes_to_hex(&entry.payload),
-            })
-            .collect();
-        serde_json::to_string(&state)
+    pub(crate) fn decoder_state_namespace_filename(key: &DecoderStateNamespaceKey) -> String {
+        format!(
+            "{}--{:08x}.bin",
+            key.exporter_ip
+                .chars()
+                .map(|ch| if ch == '.' || ch == ':' { '_' } else { ch })
+                .collect::<String>(),
+            key.observation_domain_id
+        )
     }
 
-    pub(crate) fn import_persistent_state_json(&mut self, data: &str) -> Result<(), String> {
-        let state: PersistedDecoderState =
-            serde_json::from_str(data).map_err(|e| format!("invalid decoder state json: {e}"))?;
-        if state.schema_version != DECODER_STATE_SCHEMA_VERSION {
+    pub(crate) fn is_decoder_state_namespace_loaded(
+        &self,
+        key: &DecoderStateNamespaceKey,
+    ) -> bool {
+        self.loaded_decoder_namespaces.contains(key)
+    }
+
+    pub(crate) fn decoder_state_source_needs_hydration(
+        &self,
+        key: &DecoderStateNamespaceKey,
+        source: SocketAddr,
+    ) -> bool {
+        !self
+            .hydrated_namespace_sources
+            .get(key)
+            .is_some_and(|sources| sources.contains(&source))
+    }
+
+    pub(crate) fn mark_decoder_state_namespace_absent(
+        &mut self,
+        key: DecoderStateNamespaceKey,
+        source: SocketAddr,
+    ) {
+        self.loaded_decoder_namespaces.insert(key.clone());
+        self.decoder_state_namespaces
+            .entry(key.clone())
+            .or_default();
+        self.hydrated_namespace_sources
+            .entry(key)
+            .or_default()
+            .insert(source);
+    }
+
+    pub(crate) fn hydrate_loaded_decoder_state_namespace(
+        &mut self,
+        key: &DecoderStateNamespaceKey,
+        source: SocketAddr,
+    ) -> Result<(), String> {
+        let Some(namespace) = self.decoder_state_namespaces.get(key).cloned() else {
+            self.hydrated_namespace_sources
+                .entry(key.clone())
+                .or_default()
+                .insert(source);
+            return Ok(());
+        };
+
+        self.sampling.apply_decoder_state_namespace(key, &namespace);
+        self.replay_namespace_packets(key, &namespace, source)?;
+        self.hydrated_namespace_sources
+            .entry(key.clone())
+            .or_default()
+            .insert(source);
+        Ok(())
+    }
+
+    pub(crate) fn import_decoder_state_namespace(
+        &mut self,
+        expected_key: DecoderStateNamespaceKey,
+        source: SocketAddr,
+        data: &[u8],
+    ) -> Result<(), String> {
+        let persisted = decode_persisted_namespace_file(data)?;
+        if persisted.key != expected_key {
             return Err(format!(
-                "unsupported decoder state schema version {} (expected {})",
-                state.schema_version, DECODER_STATE_SCHEMA_VERSION
+                "namespace key mismatch in persisted decoder state (got {} / {}, expected {} / {})",
+                persisted.key.exporter_ip,
+                persisted.key.observation_domain_id,
+                expected_key.exporter_ip,
+                expected_key.observation_domain_id
             ));
         }
 
-        self.netflow.clear_all_templates();
-        self.sampling.load_persisted(&state);
-        self.template_packets.clear();
-        self.template_packet_keys.clear();
+        self.loaded_decoder_namespaces.insert(expected_key.clone());
+        self.decoder_state_namespaces
+            .insert(expected_key.clone(), persisted.namespace.clone());
+        self.dirty_decoder_namespaces.remove(&expected_key);
+        self.hydrated_namespace_sources.remove(&expected_key);
+        self.hydrate_loaded_decoder_state_namespace(&expected_key, source)
+    }
 
-        for packet in &state.template_packets {
-            let source: SocketAddr = packet.source.parse().map_err(|e| {
-                format!("invalid persisted source address '{}': {e}", packet.source)
-            })?;
-            let payload = hex_to_bytes(&packet.payload_hex)
-                .ok_or_else(|| "invalid persisted template packet payload".to_string())?;
+    pub(crate) fn dirty_decoder_state_namespaces(&self) -> Vec<DecoderStateNamespaceKey> {
+        let mut keys: Vec<_> = self.dirty_decoder_namespaces.iter().cloned().collect();
+        keys.sort_by(|left, right| {
+            left.exporter_ip
+                .cmp(&right.exporter_ip)
+                .then(left.observation_domain_id.cmp(&right.observation_domain_id))
+        });
+        keys
+    }
 
-            self.observe_template_payload(source, &payload);
-            observe_v9_templates_from_raw_payload(source, &payload, &mut self.sampling);
-            observe_v9_sampling_from_raw_payload(source, &payload, &mut self.sampling);
-            observe_ipfix_templates_from_raw_payload(source, &payload, &mut self.sampling);
-            let _ = self.netflow.parse_from_source(source, &payload);
+    pub(crate) fn export_decoder_state_namespace(
+        &self,
+        key: &DecoderStateNamespaceKey,
+    ) -> Result<Option<Vec<u8>>, String> {
+        let Some(namespace) = self.decoder_state_namespaces.get(key) else {
+            return Ok(None);
+        };
+        if namespace.is_empty() {
+            return Ok(None);
         }
 
+        encode_persisted_namespace_file(&PersistedDecoderNamespaceFile {
+            key: key.clone(),
+            namespace: namespace.clone(),
+        })
+        .map(Some)
+    }
+
+    pub(crate) fn mark_decoder_state_namespace_persisted(&mut self, key: &DecoderStateNamespaceKey) {
+        self.dirty_decoder_namespaces.remove(key);
+    }
+
+    #[cfg(test)]
+    fn decoder_state_namespace_keys(&self) -> Vec<DecoderStateNamespaceKey> {
+        let mut keys: Vec<_> = self.decoder_state_namespaces.keys().cloned().collect();
+        keys.sort_by(|left, right| {
+            left.exporter_ip
+                .cmp(&right.exporter_ip)
+                .then(left.observation_domain_id.cmp(&right.observation_domain_id))
+        });
+        keys
+    }
+
+    fn observe_decoder_state_from_payload(
+        &mut self,
+        source: SocketAddr,
+        payload: &[u8],
+    ) -> Option<DecoderStateNamespaceKey> {
+        let Some(key) = Self::decoder_state_namespace_key(source, payload) else {
+            return None;
+        };
+        self.loaded_decoder_namespaces.insert(key.clone());
+        let namespace = self
+            .decoder_state_namespaces
+            .entry(key.clone())
+            .or_default();
+
+        let observation = match u16::from_be_bytes([payload[0], payload[1]]) {
+            9 => observe_v9_decoder_state_from_raw_payload(
+                source,
+                payload,
+                &mut self.sampling,
+                namespace,
+            ),
+            10 => observe_ipfix_decoder_state_from_raw_payload(
+                source,
+                payload,
+                &mut self.sampling,
+                namespace,
+            ),
+            _ => DecoderStateObservation {
+                namespace_state_changed: false,
+                template_state_changed: false,
+            },
+        };
+
+        if observation.namespace_state_changed {
+            self.dirty_decoder_namespaces.insert(key.clone());
+        }
+
+        observation.template_state_changed.then_some(key)
+    }
+
+    fn replay_namespace_packets(
+        &mut self,
+        key: &DecoderStateNamespaceKey,
+        namespace: &DecoderStateNamespace,
+        source: SocketAddr,
+    ) -> Result<(), String> {
+        for packet in build_namespace_restore_packets(key, namespace)? {
+            let _ = self.netflow.parse_from_source(source, &packet);
+        }
         Ok(())
     }
+}
+
+fn decoder_state_bincode_options() -> impl Options {
+    bincode::DefaultOptions::new()
+        .with_fixint_encoding()
+        .with_little_endian()
+}
+
+fn xxhash64(data: &[u8]) -> u64 {
+    let mut hasher = XxHash64::default();
+    hasher.write(data);
+    hasher.finish()
+}
+
+fn encode_persisted_namespace_file(
+    file: &PersistedDecoderNamespaceFile,
+) -> Result<Vec<u8>, String> {
+    let payload = decoder_state_bincode_options()
+        .serialize(file)
+        .map_err(|err| format!("failed to encode decoder namespace state: {err}"))?;
+    let payload_hash = xxhash64(&payload);
+    let payload_len = payload.len() as u64;
+
+    let mut out = Vec::with_capacity(DECODER_STATE_HEADER_LEN + payload.len());
+    out.extend_from_slice(DECODER_STATE_MAGIC);
+    out.extend_from_slice(&DECODER_STATE_SCHEMA_VERSION.to_le_bytes());
+    out.extend_from_slice(&payload_hash.to_le_bytes());
+    out.extend_from_slice(&payload_len.to_le_bytes());
+    out.extend_from_slice(&payload);
+    Ok(out)
+}
+
+fn decode_persisted_namespace_file(data: &[u8]) -> Result<PersistedDecoderNamespaceFile, String> {
+    if data.len() < DECODER_STATE_HEADER_LEN {
+        return Err("truncated decoder namespace state header".to_string());
+    }
+    if &data[..4] != DECODER_STATE_MAGIC {
+        return Err("invalid decoder namespace state magic".to_string());
+    }
+
+    let version = u32::from_le_bytes(data[4..8].try_into().unwrap());
+    if version != DECODER_STATE_SCHEMA_VERSION {
+        return Err(format!(
+            "unsupported decoder namespace schema version {} (expected {})",
+            version, DECODER_STATE_SCHEMA_VERSION
+        ));
+    }
+
+    let expected_hash = u64::from_le_bytes(data[8..16].try_into().unwrap());
+    let payload_len = u64::from_le_bytes(data[16..24].try_into().unwrap()) as usize;
+    let payload = &data[DECODER_STATE_HEADER_LEN..];
+    if payload.len() != payload_len {
+        return Err(format!(
+            "decoder namespace payload length mismatch (header {}, actual {})",
+            payload_len,
+            payload.len()
+        ));
+    }
+
+    let actual_hash = xxhash64(payload);
+    if actual_hash != expected_hash {
+        return Err(format!(
+            "decoder namespace payload hash mismatch (expected {}, got {})",
+            expected_hash, actual_hash
+        ));
+    }
+
+    decoder_state_bincode_options()
+        .deserialize(payload)
+        .map_err(|err| format!("failed to decode decoder namespace state: {err}"))
+}
+
+fn build_namespace_restore_packets(
+    key: &DecoderStateNamespaceKey,
+    namespace: &DecoderStateNamespace,
+) -> Result<Vec<Vec<u8>>, String> {
+    let mut packets = Vec::new();
+
+    if !namespace.v9_templates.is_empty() || !namespace.v9_options_templates.is_empty() {
+        let mut flowsets = Vec::new();
+        if !namespace.v9_templates.is_empty() {
+            flowsets.push(NetflowV9FlowSet {
+                header: NetflowV9FlowSetHeader {
+                    flowset_id: 0,
+                    length: 0,
+                },
+                body: V9FlowSetBody::Template(NetflowV9Templates {
+                    templates: namespace
+                        .v9_templates
+                        .values()
+                        .map(|template| NetflowV9Template {
+                            template_id: template.template_id,
+                            field_count: template.fields.len() as u16,
+                            fields: template
+                                .fields
+                                .iter()
+                                .map(|field| NetflowV9TemplateField {
+                                    field_type_number: field.field_type,
+                                    field_type: V9Field::from(field.field_type),
+                                    field_length: field.field_length,
+                                })
+                                .collect(),
+                        })
+                        .collect(),
+                    padding: Vec::new(),
+                }),
+            });
+        }
+        if !namespace.v9_options_templates.is_empty() {
+            flowsets.push(NetflowV9FlowSet {
+                header: NetflowV9FlowSetHeader {
+                    flowset_id: 1,
+                    length: 0,
+                },
+                body: V9FlowSetBody::OptionsTemplate(NetflowV9OptionsTemplates {
+                    templates: namespace
+                        .v9_options_templates
+                        .values()
+                        .map(|template| NetflowV9OptionsTemplate {
+                            template_id: template.template_id,
+                            options_scope_length: (template.scope_fields.len() * 4) as u16,
+                            options_length: (template.option_fields.len() * 4) as u16,
+                            scope_fields: template
+                                .scope_fields
+                                .iter()
+                                .map(|field| NetflowV9OptionsTemplateScopeField {
+                                    field_type_number: field.field_type,
+                                    field_type: netflow_parser::variable_versions::v9_lookup::ScopeFieldType::from(field.field_type),
+                                    field_length: field.field_length,
+                                })
+                                .collect(),
+                            option_fields: template
+                                .option_fields
+                                .iter()
+                                .map(|field| NetflowV9TemplateField {
+                                    field_type_number: field.field_type,
+                                    field_type: V9Field::from(field.field_type),
+                                    field_length: field.field_length,
+                                })
+                                .collect(),
+                        })
+                        .collect(),
+                    padding: Vec::new(),
+                }),
+            });
+        }
+
+        let packet = V9 {
+            header: NetflowV9Header {
+                version: 9,
+                count: 0,
+                sys_up_time: 0,
+                unix_secs: 0,
+                sequence_number: 0,
+                source_id: key.observation_domain_id,
+            },
+            flowsets,
+        };
+        packets.push(
+            packet
+                .to_be_bytes()
+                .map_err(|err| format!("failed to serialize v9 restore packet: {err}"))?,
+        );
+    }
+
+    if !namespace.ipfix_templates.is_empty()
+        || !namespace.ipfix_options_templates.is_empty()
+        || !namespace.ipfix_v9_templates.is_empty()
+        || !namespace.ipfix_v9_options_templates.is_empty()
+    {
+        let mut flowsets = Vec::new();
+        if !namespace.ipfix_templates.is_empty() {
+            flowsets.push(NetflowIPFixFlowSet {
+                header: NetflowIPFixFlowSetHeader {
+                    header_id: 2,
+                    length: 0,
+                },
+                body: IPFixFlowSetBody::Templates(
+                    namespace
+                        .ipfix_templates
+                        .values()
+                        .map(|template| NetflowIPFixTemplate {
+                            template_id: template.template_id,
+                            field_count: template.fields.len() as u16,
+                            fields: template
+                                .fields
+                                .iter()
+                                .map(|field| NetflowIPFixTemplateField {
+                                    field_type_number: field.field_type
+                                        | if field.enterprise_number.is_some() {
+                                            0x8000
+                                        } else {
+                                            0
+                                        },
+                                    field_length: field.field_length,
+                                    enterprise_number: field.enterprise_number,
+                                    field_type: IPFixField::new(
+                                        field.field_type,
+                                        field.enterprise_number,
+                                    ),
+                                })
+                                .collect(),
+                        })
+                        .collect(),
+                ),
+            });
+        }
+        if !namespace.ipfix_options_templates.is_empty() {
+            flowsets.push(NetflowIPFixFlowSet {
+                header: NetflowIPFixFlowSetHeader {
+                    header_id: 3,
+                    length: 0,
+                },
+                body: IPFixFlowSetBody::OptionsTemplates(
+                    namespace
+                        .ipfix_options_templates
+                        .values()
+                        .map(|template| NetflowIPFixOptionsTemplate {
+                            template_id: template.template_id,
+                            field_count: template.fields.len() as u16,
+                            scope_field_count: template.scope_field_count,
+                            fields: template
+                                .fields
+                                .iter()
+                                .map(|field| NetflowIPFixTemplateField {
+                                    field_type_number: field.field_type
+                                        | if field.enterprise_number.is_some() {
+                                            0x8000
+                                        } else {
+                                            0
+                                        },
+                                    field_length: field.field_length,
+                                    enterprise_number: field.enterprise_number,
+                                    field_type: IPFixField::new(
+                                        field.field_type,
+                                        field.enterprise_number,
+                                    ),
+                                })
+                                .collect(),
+                        })
+                        .collect(),
+                ),
+            });
+        }
+        if !namespace.ipfix_v9_templates.is_empty() {
+            flowsets.push(NetflowIPFixFlowSet {
+                header: NetflowIPFixFlowSetHeader {
+                    header_id: 0,
+                    length: 0,
+                },
+                body: IPFixFlowSetBody::V9Templates(
+                    namespace
+                        .ipfix_v9_templates
+                        .values()
+                        .map(|template| NetflowV9Template {
+                            template_id: template.template_id,
+                            field_count: template.fields.len() as u16,
+                            fields: template
+                                .fields
+                                .iter()
+                                .map(|field| NetflowV9TemplateField {
+                                    field_type_number: field.field_type,
+                                    field_type: V9Field::from(field.field_type),
+                                    field_length: field.field_length,
+                                })
+                                .collect(),
+                        })
+                        .collect(),
+                ),
+            });
+        }
+        if !namespace.ipfix_v9_options_templates.is_empty() {
+            flowsets.push(NetflowIPFixFlowSet {
+                header: NetflowIPFixFlowSetHeader {
+                    header_id: 1,
+                    length: 0,
+                },
+                body: IPFixFlowSetBody::V9OptionsTemplates(
+                    namespace
+                        .ipfix_v9_options_templates
+                        .values()
+                        .map(|template| NetflowV9OptionsTemplate {
+                            template_id: template.template_id,
+                            options_scope_length: (template.scope_fields.len() * 4) as u16,
+                            options_length: (template.option_fields.len() * 4) as u16,
+                            scope_fields: template
+                                .scope_fields
+                                .iter()
+                                .map(|field| NetflowV9OptionsTemplateScopeField {
+                                    field_type_number: field.field_type,
+                                    field_type: netflow_parser::variable_versions::v9_lookup::ScopeFieldType::from(field.field_type),
+                                    field_length: field.field_length,
+                                })
+                                .collect(),
+                            option_fields: template
+                                .option_fields
+                                .iter()
+                                .map(|field| NetflowV9TemplateField {
+                                    field_type_number: field.field_type,
+                                    field_type: V9Field::from(field.field_type),
+                                    field_length: field.field_length,
+                                })
+                                .collect(),
+                        })
+                        .collect(),
+                ),
+            });
+        }
+
+        let packet = IPFix {
+            header: NetflowIPFixHeader {
+                version: 10,
+                length: 0,
+                export_time: 0,
+                sequence_number: 0,
+                observation_domain_id: key.observation_domain_id,
+            },
+            flowsets,
+        };
+        packets.push(
+            packet
+                .to_be_bytes()
+                .map_err(|err| format!("failed to serialize ipfix restore packet: {err}"))?,
+        );
+    }
+
+    Ok(packets)
 }
 
 fn is_sflow_payload(payload: &[u8]) -> bool {
@@ -1755,10 +2667,6 @@ fn decode_netflow(
         },
         ..Default::default()
     };
-
-    observe_v9_templates_from_raw_payload(source, payload, sampling);
-    observe_v9_sampling_from_raw_payload(source, payload, sampling);
-    observe_ipfix_templates_from_raw_payload(source, payload, sampling);
 
     // Skip special datalink-frame decode paths when no datalink templates are registered.
     // These functions parse the raw payload looking for template-matched records — pointless
@@ -1987,6 +2895,14 @@ fn merge_enriched_records(existing: &mut DecodedFlow, incoming: &DecodedFlow) ->
             }
         };
     }
+    macro_rules! merge_present_copy {
+        ($has:ident, $set:ident, $field:ident) => {
+            if src.$has() && !dst.$has() {
+                dst.$set(src.$field);
+                changed = true;
+            }
+        };
+    }
 
     // Protocol version / exporter identity
     merge_copy!(flow_version);
@@ -2000,12 +2916,12 @@ fn merge_enriched_records(existing: &mut DecodedFlow, incoming: &DecodedFlow) ->
     merge_str!(exporter_tenant);
 
     // Sampling
-    merge_copy!(sampling_rate);
+    merge_present_copy!(has_sampling_rate, set_sampling_rate, sampling_rate);
 
     // L2/L3 identity
-    merge_copy!(etype);
+    merge_present_copy!(has_etype, set_etype, etype);
     merge_copy!(protocol);
-    merge_copy!(direction);
+    merge_present_copy!(has_direction, set_direction, direction);
 
     // Counters
     merge_copy!(bytes);
@@ -2013,7 +2929,7 @@ fn merge_enriched_records(existing: &mut DecodedFlow, incoming: &DecodedFlow) ->
     merge_copy!(flows);
     merge_copy!(raw_bytes);
     merge_copy!(raw_packets);
-    merge_copy!(forwarding_status);
+    merge_present_copy!(has_forwarding_status, set_forwarding_status, forwarding_status);
 
     // Endpoints
     merge_copy!(src_addr);
@@ -2055,14 +2971,14 @@ fn merge_enriched_records(existing: &mut DecodedFlow, incoming: &DecodedFlow) ->
     merge_str!(out_if_name);
     merge_str!(in_if_description);
     merge_str!(out_if_description);
-    merge_copy!(in_if_speed);
-    merge_copy!(out_if_speed);
+    merge_present_copy!(has_in_if_speed, set_in_if_speed, in_if_speed);
+    merge_present_copy!(has_out_if_speed, set_out_if_speed, out_if_speed);
     merge_str!(in_if_provider);
     merge_str!(out_if_provider);
     merge_str!(in_if_connectivity);
     merge_str!(out_if_connectivity);
-    merge_copy!(in_if_boundary);
-    merge_copy!(out_if_boundary);
+    merge_present_copy!(has_in_if_boundary, set_in_if_boundary, in_if_boundary);
+    merge_present_copy!(has_out_if_boundary, set_out_if_boundary, out_if_boundary);
 
     // Next hop / ports
     merge_copy!(next_hop);
@@ -2081,8 +2997,8 @@ fn merge_enriched_records(existing: &mut DecodedFlow, incoming: &DecodedFlow) ->
     merge_copy!(dst_port_nat);
 
     // VLAN
-    merge_copy!(src_vlan);
-    merge_copy!(dst_vlan);
+    merge_present_copy!(has_src_vlan, set_src_vlan, src_vlan);
+    merge_present_copy!(has_dst_vlan, set_dst_vlan, dst_vlan);
 
     // MAC addresses
     merge_copy!(src_mac);
@@ -2090,17 +3006,17 @@ fn merge_enriched_records(existing: &mut DecodedFlow, incoming: &DecodedFlow) ->
 
     // IP header fields
     merge_copy!(ipttl);
-    merge_copy!(iptos);
+    merge_present_copy!(has_iptos, set_iptos, iptos);
     merge_copy!(ipv6_flow_label);
-    merge_copy!(tcp_flags);
+    merge_present_copy!(has_tcp_flags, set_tcp_flags, tcp_flags);
     merge_copy!(ip_fragment_id);
     merge_copy!(ip_fragment_offset);
 
     // ICMP
-    merge_copy!(icmpv4_type);
-    merge_copy!(icmpv4_code);
-    merge_copy!(icmpv6_type);
-    merge_copy!(icmpv6_code);
+    merge_present_copy!(has_icmpv4_type, set_icmpv4_type, icmpv4_type);
+    merge_present_copy!(has_icmpv4_code, set_icmpv4_code, icmpv4_code);
+    merge_present_copy!(has_icmpv6_type, set_icmpv6_type, icmpv6_type);
+    merge_present_copy!(has_icmpv6_code, set_icmpv6_code, icmpv6_code);
 
     // MPLS
     merge_str!(mpls_labels);
@@ -2117,92 +3033,129 @@ fn is_ipfix_mpls_label_field(field_type: u16) -> bool {
     (IPFIX_FIELD_MPLS_LABEL_1..=IPFIX_FIELD_MPLS_LABEL_10).contains(&field_type)
 }
 
+fn observe_v9_decoder_state_from_raw_payload(
+    source: SocketAddr,
+    payload: &[u8],
+    sampling: &mut SamplingState,
+    namespace: &mut DecoderStateNamespace,
+) -> DecoderStateObservation {
+    let template_state_changed =
+        observe_v9_templates_from_raw_payload(source, payload, sampling, namespace);
+    let sampling_state_changed =
+        observe_v9_sampling_from_raw_payload(source, payload, sampling, namespace);
+    DecoderStateObservation {
+        namespace_state_changed: template_state_changed || sampling_state_changed,
+        template_state_changed,
+    }
+}
+
 fn observe_v9_sampling_from_raw_payload(
     source: SocketAddr,
     payload: &[u8],
     sampling: &mut SamplingState,
-) {
+    namespace: &mut DecoderStateNamespace,
+) -> bool {
     // netflow_parser currently decodes some options data flowsets as empty records
     // when they contain unsupported field widths (for example SAMPLER_NAME=32 bytes).
     // Parse v9 options templates/data minimally here to preserve Akvorado sampling parity.
     if payload.len() < 20 {
-        return;
+        return false;
     }
     if u16::from_be_bytes([payload[0], payload[1]]) != 9 {
-        return;
+        return false;
     }
 
     let exporter_ip = source.ip().to_string();
     let observation_domain_id =
         u32::from_be_bytes([payload[16], payload[17], payload[18], payload[19]]);
     let mut offset = 20_usize;
+    let mut changed = false;
 
     while offset.saturating_add(4) <= payload.len() {
         let flowset_id = u16::from_be_bytes([payload[offset], payload[offset + 1]]);
         let flowset_len = u16::from_be_bytes([payload[offset + 2], payload[offset + 3]]) as usize;
         if flowset_len < 4 {
-            return;
+            return changed;
         }
         let end = offset.saturating_add(flowset_len);
         if end > payload.len() {
-            return;
+            return changed;
         }
         let body = &payload[offset + 4..end];
 
         if flowset_id == 1 {
-            observe_v9_sampling_templates(&exporter_ip, observation_domain_id, body, sampling);
+            changed |= observe_v9_sampling_templates(
+                &exporter_ip,
+                observation_domain_id,
+                body,
+                sampling,
+                namespace,
+            );
         } else if flowset_id >= 256
             && let Some(template) =
                 sampling.get_v9_sampling_template(&exporter_ip, observation_domain_id, flowset_id)
         {
-            observe_v9_sampling_data(
+            changed |= observe_v9_sampling_data(
                 &exporter_ip,
                 observation_domain_id,
                 &template,
                 body,
                 sampling,
+                namespace,
             );
         }
 
         offset = end;
     }
+
+    changed
 }
 
 fn observe_v9_templates_from_raw_payload(
     source: SocketAddr,
     payload: &[u8],
     sampling: &mut SamplingState,
-) {
+    namespace: &mut DecoderStateNamespace,
+) -> bool {
     if payload.len() < 20 {
-        return;
+        return false;
     }
     if u16::from_be_bytes([payload[0], payload[1]]) != 9 {
-        return;
+        return false;
     }
 
     let exporter_ip = source.ip().to_string();
     let observation_domain_id =
         u32::from_be_bytes([payload[16], payload[17], payload[18], payload[19]]);
     let mut offset = 20_usize;
+    let mut changed = false;
 
     while offset.saturating_add(4) <= payload.len() {
         let flowset_id = u16::from_be_bytes([payload[offset], payload[offset + 1]]);
         let flowset_len = u16::from_be_bytes([payload[offset + 2], payload[offset + 3]]) as usize;
         if flowset_len < 4 {
-            return;
+            return changed;
         }
         let end = offset.saturating_add(flowset_len);
         if end > payload.len() {
-            return;
+            return changed;
         }
         let body = &payload[offset + 4..end];
 
         if flowset_id == 0 {
-            observe_v9_data_templates(&exporter_ip, observation_domain_id, body, sampling);
+            changed |= observe_v9_data_templates(
+                &exporter_ip,
+                observation_domain_id,
+                body,
+                sampling,
+                namespace,
+            );
         }
 
         offset = end;
     }
+
+    changed
 }
 
 fn observe_v9_data_templates(
@@ -2210,8 +3163,10 @@ fn observe_v9_data_templates(
     observation_domain_id: u32,
     body: &[u8],
     sampling: &mut SamplingState,
-) {
+    namespace: &mut DecoderStateNamespace,
+) -> bool {
     let mut cursor = body;
+    let mut changed = false;
     while cursor.len() >= 4 {
         let template_id = u16::from_be_bytes([cursor[0], cursor[1]]);
         let field_count = u16::from_be_bytes([cursor[2], cursor[3]]) as usize;
@@ -2222,15 +3177,20 @@ fn observe_v9_data_templates(
 
         let record_len = 4_usize.saturating_add(field_count.saturating_mul(4));
         if record_len > cursor.len() {
-            return;
+            return changed;
         }
 
         let mut fields = Vec::with_capacity(field_count);
+        let mut persisted_fields = Vec::with_capacity(field_count);
         let mut field_cursor = &cursor[4..record_len];
         for _ in 0..field_count {
             let field_type = u16::from_be_bytes([field_cursor[0], field_cursor[1]]);
-            let field_length = u16::from_be_bytes([field_cursor[2], field_cursor[3]]) as usize;
+            let field_length = u16::from_be_bytes([field_cursor[2], field_cursor[3]]);
             fields.push(V9TemplateField {
+                field_type,
+                field_length: usize::from(field_length),
+            });
+            persisted_fields.push(PersistedV9TemplateField {
                 field_type,
                 field_length,
             });
@@ -2238,7 +3198,24 @@ fn observe_v9_data_templates(
         }
 
         sampling.set_v9_datalink_template(exporter_ip, observation_domain_id, template_id, fields);
+        changed |= namespace.set_v9_template(template_id, persisted_fields);
         cursor = &cursor[record_len..];
+    }
+
+    changed
+}
+
+fn observe_ipfix_decoder_state_from_raw_payload(
+    source: SocketAddr,
+    payload: &[u8],
+    sampling: &mut SamplingState,
+    namespace: &mut DecoderStateNamespace,
+) -> DecoderStateObservation {
+    let template_state_changed =
+        observe_ipfix_templates_from_raw_payload(source, payload, sampling, namespace);
+    DecoderStateObservation {
+        namespace_state_changed: template_state_changed,
+        template_state_changed,
     }
 }
 
@@ -2246,12 +3223,13 @@ fn observe_ipfix_templates_from_raw_payload(
     source: SocketAddr,
     payload: &[u8],
     sampling: &mut SamplingState,
-) {
+    namespace: &mut DecoderStateNamespace,
+) -> bool {
     if payload.len() < 16 {
-        return;
+        return false;
     }
     if u16::from_be_bytes([payload[0], payload[1]]) != 10 {
-        return;
+        return false;
     }
 
     let exporter_ip = source.ip().to_string();
@@ -2260,25 +3238,40 @@ fn observe_ipfix_templates_from_raw_payload(
     let packet_length = u16::from_be_bytes([payload[2], payload[3]]) as usize;
     let end_limit = payload.len().min(packet_length);
     let mut offset = 16_usize;
+    let mut changed = false;
 
     while offset.saturating_add(4) <= end_limit {
         let flowset_id = u16::from_be_bytes([payload[offset], payload[offset + 1]]);
         let flowset_len = u16::from_be_bytes([payload[offset + 2], payload[offset + 3]]) as usize;
         if flowset_len < 4 {
-            return;
+            return changed;
         }
         let end = offset.saturating_add(flowset_len);
         if end > end_limit {
-            return;
+            return changed;
         }
         let body = &payload[offset + 4..end];
 
         if flowset_id == IPFIX_SET_ID_TEMPLATE {
-            observe_ipfix_data_templates(&exporter_ip, observation_domain_id, body, sampling);
+            changed |= observe_ipfix_data_templates(
+                &exporter_ip,
+                observation_domain_id,
+                body,
+                sampling,
+                namespace,
+            );
+        } else if flowset_id == 3 {
+            changed |= observe_ipfix_options_templates(body, namespace);
+        } else if flowset_id == 0 {
+            changed |= observe_ipfix_v9_templates(body, namespace);
+        } else if flowset_id == 1 {
+            changed |= observe_ipfix_v9_options_templates(body, namespace);
         }
 
         offset = end;
     }
+
+    changed
 }
 
 fn observe_ipfix_data_templates(
@@ -2286,17 +3279,20 @@ fn observe_ipfix_data_templates(
     observation_domain_id: u32,
     body: &[u8],
     sampling: &mut SamplingState,
-) {
+    namespace: &mut DecoderStateNamespace,
+) -> bool {
     let mut cursor = body;
+    let mut changed = false;
     while cursor.len() >= 4 {
         let template_id = u16::from_be_bytes([cursor[0], cursor[1]]);
         let field_count = u16::from_be_bytes([cursor[2], cursor[3]]) as usize;
         cursor = &cursor[4..];
 
         let mut fields = Vec::with_capacity(field_count);
+        let mut persisted_fields = Vec::with_capacity(field_count);
         for _ in 0..field_count {
             if cursor.len() < 4 {
-                return;
+                return changed;
             }
 
             let raw_type = u16::from_be_bytes([cursor[0], cursor[1]]);
@@ -2307,7 +3303,7 @@ fn observe_ipfix_data_templates(
             let field_type = raw_type & 0x7fff;
             let enterprise_number = if pen_provided {
                 if cursor.len() < 4 {
-                    return;
+                    return changed;
                 }
                 let pen = u32::from_be_bytes([cursor[0], cursor[1], cursor[2], cursor[3]]);
                 cursor = &cursor[4..];
@@ -2321,6 +3317,11 @@ fn observe_ipfix_data_templates(
                 field_length,
                 enterprise_number,
             });
+            persisted_fields.push(PersistedIPFixTemplateField {
+                field_type,
+                field_length,
+                enterprise_number,
+            });
         }
 
         sampling.set_ipfix_datalink_template(
@@ -2329,7 +3330,10 @@ fn observe_ipfix_data_templates(
             template_id,
             fields,
         );
+        changed |= namespace.set_ipfix_template(template_id, persisted_fields);
     }
+
+    changed
 }
 
 fn decode_ipfix_special_from_raw_payload(
@@ -2508,7 +3512,6 @@ fn decode_v9_special_record(
     decapsulation_mode: DecapsulationMode,
 ) -> Option<DecodedFlow> {
     let mut fields = base_fields("v9", source);
-    fields.insert("SRC_VLAN", "0".to_string());
     let mut has_datalink_section = false;
     let mut has_decoded_datalink = false;
     let mut flow_start_usec: Option<u64> = None;
@@ -2650,7 +3653,6 @@ fn decode_ipfix_special_record(
     decapsulation_mode: DecapsulationMode,
 ) -> Option<DecodedFlow> {
     let mut fields = base_fields("ipfix", source);
-    fields.insert("SRC_VLAN", "0".to_string());
     let mut has_datalink_section = false;
     let mut has_decoded_datalink = false;
     let mut has_mpls_labels = false;
@@ -2810,7 +3812,7 @@ fn parse_datalink_frame_section(
             return None;
         }
         let vlan = ((u16::from(cursor[0] & 0x0f)) << 8) | u16::from(cursor[1]);
-        if vlan > 0 && fields.get("SRC_VLAN").map(String::as_str) == Some("0") {
+        if vlan > 0 && !field_present_in_map(fields, "SRC_VLAN") {
             fields.insert("SRC_VLAN", vlan.to_string());
         }
         etype = u16::from_be_bytes([cursor[2], cursor[3]]);
@@ -3043,8 +4045,10 @@ fn observe_v9_sampling_templates(
     observation_domain_id: u32,
     body: &[u8],
     sampling: &mut SamplingState,
-) {
+    namespace: &mut DecoderStateNamespace,
+) -> bool {
     let mut cursor = body;
+    let mut changed = false;
     while cursor.len() >= 6 {
         let template_id = u16::from_be_bytes([cursor[0], cursor[1]]);
         let scope_length = u16::from_be_bytes([cursor[2], cursor[3]]) as usize;
@@ -3054,17 +4058,23 @@ fn observe_v9_sampling_templates(
         let fields_block_len = scope_count.saturating_add(option_count).saturating_mul(4);
         let record_len = 6_usize.saturating_add(fields_block_len);
         if record_len > cursor.len() {
-            return;
+            return changed;
         }
 
         let mut fields = &cursor[6..record_len];
         let mut scope_fields = Vec::with_capacity(scope_count);
         let mut option_fields = Vec::with_capacity(option_count);
+        let mut persisted_scope_fields = Vec::with_capacity(scope_count);
+        let mut persisted_option_fields = Vec::with_capacity(option_count);
 
         for _ in 0..scope_count {
             let field_type = u16::from_be_bytes([fields[0], fields[1]]);
-            let field_length = u16::from_be_bytes([fields[2], fields[3]]) as usize;
+            let field_length = u16::from_be_bytes([fields[2], fields[3]]);
             scope_fields.push(V9TemplateField {
+                field_type,
+                field_length: usize::from(field_length),
+            });
+            persisted_scope_fields.push(PersistedV9TemplateField {
                 field_type,
                 field_length,
             });
@@ -3072,8 +4082,12 @@ fn observe_v9_sampling_templates(
         }
         for _ in 0..option_count {
             let field_type = u16::from_be_bytes([fields[0], fields[1]]);
-            let field_length = u16::from_be_bytes([fields[2], fields[3]]) as usize;
+            let field_length = u16::from_be_bytes([fields[2], fields[3]]);
             option_fields.push(V9TemplateField {
+                field_type,
+                field_length: usize::from(field_length),
+            });
+            persisted_option_fields.push(PersistedV9TemplateField {
                 field_type,
                 field_length,
             });
@@ -3087,8 +4101,15 @@ fn observe_v9_sampling_templates(
             scope_fields,
             option_fields,
         );
+        changed |= namespace.set_v9_options_template(
+            template_id,
+            persisted_scope_fields,
+            persisted_option_fields,
+        );
         cursor = &cursor[record_len..];
     }
+
+    changed
 }
 
 fn observe_v9_sampling_data(
@@ -3097,12 +4118,14 @@ fn observe_v9_sampling_data(
     template: &V9SamplingTemplate,
     body: &[u8],
     sampling: &mut SamplingState,
-) {
+    namespace: &mut DecoderStateNamespace,
+) -> bool {
     if template.record_length == 0 {
-        return;
+        return false;
     }
 
     let mut cursor = body;
+    let mut changed = false;
     while cursor.len() >= template.record_length {
         let mut record = &cursor[..template.record_length];
         let mut sampler_id = 0_u64;
@@ -3114,7 +4137,7 @@ fn observe_v9_sampling_data(
             .chain(template.option_fields.iter())
         {
             if field.field_length > record.len() {
-                return;
+                return changed;
             }
             let raw = &record[..field.field_length];
             record = &record[field.field_length..];
@@ -3135,9 +4158,140 @@ fn observe_v9_sampling_data(
 
         if rate > 0 {
             sampling.set(exporter_ip, 9, observation_domain_id, sampler_id, rate);
+            changed |= namespace.set_sampling_rate(9, sampler_id, rate);
         }
         cursor = &cursor[template.record_length..];
     }
+
+    changed
+}
+
+fn observe_ipfix_options_templates(
+    body: &[u8],
+    namespace: &mut DecoderStateNamespace,
+) -> bool {
+    let mut cursor = body;
+    let mut changed = false;
+    while cursor.len() >= 6 {
+        let template_id = u16::from_be_bytes([cursor[0], cursor[1]]);
+        let field_count = u16::from_be_bytes([cursor[2], cursor[3]]) as usize;
+        let scope_field_count = u16::from_be_bytes([cursor[4], cursor[5]]);
+        cursor = &cursor[6..];
+
+        let mut fields = Vec::with_capacity(field_count);
+        for _ in 0..field_count {
+            if cursor.len() < 4 {
+                return changed;
+            }
+
+            let raw_type = u16::from_be_bytes([cursor[0], cursor[1]]);
+            let field_length = u16::from_be_bytes([cursor[2], cursor[3]]);
+            cursor = &cursor[4..];
+
+            let pen_provided = (raw_type & 0x8000) != 0;
+            let field_type = raw_type & 0x7fff;
+            let enterprise_number = if pen_provided {
+                if cursor.len() < 4 {
+                    return changed;
+                }
+                let pen = u32::from_be_bytes([cursor[0], cursor[1], cursor[2], cursor[3]]);
+                cursor = &cursor[4..];
+                Some(pen)
+            } else {
+                None
+            };
+
+            fields.push(PersistedIPFixTemplateField {
+                field_type,
+                field_length,
+                enterprise_number,
+            });
+        }
+
+        changed |= namespace.set_ipfix_options_template(template_id, scope_field_count, fields);
+    }
+
+    changed
+}
+
+fn observe_ipfix_v9_templates(body: &[u8], namespace: &mut DecoderStateNamespace) -> bool {
+    let mut cursor = body;
+    let mut changed = false;
+    while cursor.len() >= 4 {
+        let template_id = u16::from_be_bytes([cursor[0], cursor[1]]);
+        let field_count = u16::from_be_bytes([cursor[2], cursor[3]]) as usize;
+        if field_count == 0 {
+            cursor = &cursor[4..];
+            continue;
+        }
+
+        let record_len = 4_usize.saturating_add(field_count.saturating_mul(4));
+        if record_len > cursor.len() {
+            return changed;
+        }
+
+        let mut field_cursor = &cursor[4..record_len];
+        let mut fields = Vec::with_capacity(field_count);
+        for _ in 0..field_count {
+            let field_type = u16::from_be_bytes([field_cursor[0], field_cursor[1]]);
+            let field_length = u16::from_be_bytes([field_cursor[2], field_cursor[3]]);
+            fields.push(PersistedV9TemplateField {
+                field_type,
+                field_length,
+            });
+            field_cursor = &field_cursor[4..];
+        }
+
+        changed |= namespace.set_ipfix_v9_template(template_id, fields);
+        cursor = &cursor[record_len..];
+    }
+
+    changed
+}
+
+fn observe_ipfix_v9_options_templates(body: &[u8], namespace: &mut DecoderStateNamespace) -> bool {
+    let mut cursor = body;
+    let mut changed = false;
+    while cursor.len() >= 6 {
+        let template_id = u16::from_be_bytes([cursor[0], cursor[1]]);
+        let scope_length = u16::from_be_bytes([cursor[2], cursor[3]]) as usize;
+        let option_length = u16::from_be_bytes([cursor[4], cursor[5]]) as usize;
+        let scope_count = scope_length / 4;
+        let option_count = option_length / 4;
+        let fields_block_len = scope_count.saturating_add(option_count).saturating_mul(4);
+        let record_len = 6_usize.saturating_add(fields_block_len);
+        if record_len > cursor.len() {
+            return changed;
+        }
+
+        let mut fields = &cursor[6..record_len];
+        let mut scope_fields = Vec::with_capacity(scope_count);
+        let mut option_fields = Vec::with_capacity(option_count);
+
+        for _ in 0..scope_count {
+            scope_fields.push(PersistedV9TemplateField {
+                field_type: u16::from_be_bytes([fields[0], fields[1]]),
+                field_length: u16::from_be_bytes([fields[2], fields[3]]),
+            });
+            fields = &fields[4..];
+        }
+        for _ in 0..option_count {
+            option_fields.push(PersistedV9TemplateField {
+                field_type: u16::from_be_bytes([fields[0], fields[1]]),
+                field_length: u16::from_be_bytes([fields[2], fields[3]]),
+            });
+            fields = &fields[4..];
+        }
+
+        changed |= namespace.set_ipfix_v9_options_template(
+            template_id,
+            scope_fields,
+            option_fields,
+        );
+        cursor = &cursor[record_len..];
+    }
+
+    changed
 }
 
 fn decode_akvorado_unsigned(bytes: &[u8]) -> u64 {
@@ -3226,15 +4380,15 @@ fn append_v5_records(
         rec.in_if = flow.input as u32;
         rec.out_if = flow.output as u32;
         rec.next_hop = Some(IpAddr::V4(flow.next_hop));
-        rec.etype = 2048; // IPv4
-        rec.iptos = flow.tos;
-        rec.tcp_flags = flow.tcp_flags;
+        rec.set_etype(2048); // IPv4
+        rec.set_iptos(flow.tos);
+        rec.set_tcp_flags(flow.tcp_flags);
         rec.bytes = flow.d_octets as u64;
         rec.packets = flow.d_pkts as u64;
         rec.flows = 1;
         rec.raw_bytes = flow.d_octets as u64;
         rec.raw_packets = flow.d_pkts as u64;
-        rec.sampling_rate = sampling as u64;
+        rec.set_sampling_rate(sampling as u64);
         finalize_record(&mut rec);
 
         out.push(DecodedFlow {
@@ -3290,9 +4444,9 @@ fn append_v7_records(
         rec.in_if = flow.input as u32;
         rec.out_if = flow.output as u32;
         rec.next_hop = Some(IpAddr::V4(flow.next_hop));
-        rec.etype = 2048; // IPv4
-        rec.iptos = flow.tos;
-        rec.tcp_flags = flow.tcp_flags;
+        rec.set_etype(2048); // IPv4
+        rec.set_iptos(flow.tos);
+        rec.set_tcp_flags(flow.tcp_flags);
         rec.bytes = flow.d_octets as u64;
         rec.packets = flow.d_pkts as u64;
         rec.flows = 1;
@@ -3877,8 +5031,8 @@ fn build_sflow_flow(
     if let Some(ip) = exporter_ip_override {
         rec.exporter_ip = Some(ip);
     }
-    rec.sampling_rate = sampling_rate as u64;
-    rec.forwarding_status = forwarding_status as u8;
+    rec.set_sampling_rate(sampling_rate as u64);
+    rec.set_forwarding_status(forwarding_status as u8);
     if let Some(value) = in_if {
         rec.in_if = value;
     }
@@ -3937,8 +5091,8 @@ fn build_sflow_flow(
                 rec.src_port = sampled.src_port as u16;
                 rec.dst_port = sampled.dst_port as u16;
                 rec.protocol = sampled.protocol as u8;
-                rec.etype = 2048;
-                rec.iptos = sampled.tos as u8;
+                rec.set_etype(2048);
+                rec.set_iptos(sampled.tos as u8);
                 l3_length = sampled.length as u64;
             }
             FlowData::SampledIpv6(sampled) => {
@@ -3950,8 +5104,8 @@ fn build_sflow_flow(
                 rec.src_port = sampled.src_port as u16;
                 rec.dst_port = sampled.dst_port as u16;
                 rec.protocol = sampled.protocol as u8;
-                rec.etype = 34525;
-                rec.iptos = sampled.priority as u8;
+                rec.set_etype(34525);
+                rec.set_iptos(sampled.priority as u8);
                 l3_length = sampled.length as u64;
             }
             FlowData::SampledEthernet(sampled) => {
@@ -3969,10 +5123,10 @@ fn build_sflow_flow(
                     continue;
                 }
                 if record.src_vlan < 4096 {
-                    rec.src_vlan = record.src_vlan as u16;
+                    rec.set_src_vlan(record.src_vlan as u16);
                 }
                 if record.dst_vlan < 4096 {
-                    rec.dst_vlan = record.dst_vlan as u16;
+                    rec.set_dst_vlan(record.dst_vlan as u16);
                 }
             }
             FlowData::ExtendedRouter(record) => {
@@ -4070,6 +5224,9 @@ fn finalize_canonical_flow_fields(fields: &mut FlowFields) {
     }
 
     for &(name, default_value) in CANONICAL_FLOW_DEFAULTS {
+        if field_tracks_presence(name) {
+            continue;
+        }
         fields
             .entry(name)
             .or_insert_with(|| default_value.to_string());
@@ -4172,11 +5329,11 @@ fn finalize_record(rec: &mut FlowRecord) {
     apply_icmp_port_fallback_record(rec);
 
     // Infer ETYPE from endpoints if not set
-    if rec.etype == 0 {
+    if !rec.has_etype() {
         if let Some(src) = rec.src_addr {
-            rec.etype = if src.is_ipv4() { 2048 } else { 34525 };
+            rec.set_etype(if src.is_ipv4() { 2048 } else { 34525 });
         } else if let Some(dst) = rec.dst_addr {
-            rec.etype = if dst.is_ipv4() { 2048 } else { 34525 };
+            rec.set_etype(if dst.is_ipv4() { 2048 } else { 34525 });
         }
     }
 }
@@ -4194,19 +5351,19 @@ fn apply_icmp_port_fallback_record(rec: &mut FlowRecord) {
 
     match rec.protocol {
         1 => {
-            if rec.icmpv4_type == 0 {
-                rec.icmpv4_type = icmp_type;
+            if !rec.has_icmpv4_type() {
+                rec.set_icmpv4_type(icmp_type);
             }
-            if rec.icmpv4_code == 0 {
-                rec.icmpv4_code = icmp_code;
+            if !rec.has_icmpv4_code() {
+                rec.set_icmpv4_code(icmp_code);
             }
         }
         58 => {
-            if rec.icmpv6_type == 0 {
-                rec.icmpv6_type = icmp_type;
+            if !rec.has_icmpv6_type() {
+                rec.set_icmpv6_type(icmp_type);
             }
-            if rec.icmpv6_code == 0 {
-                rec.icmpv6_code = icmp_code;
+            if !rec.has_icmpv6_code() {
+                rec.set_icmpv6_code(icmp_code);
             }
         }
         _ => {}
@@ -4239,6 +5396,9 @@ fn swap_directional_record_fields(rec: &mut FlowRecord) {
     std::mem::swap(&mut rec.in_if_provider, &mut rec.out_if_provider);
     std::mem::swap(&mut rec.in_if_connectivity, &mut rec.out_if_connectivity);
     std::mem::swap(&mut rec.in_if_boundary, &mut rec.out_if_boundary);
+    rec.swap_presence_flags(FlowPresence::SRC_VLAN, FlowPresence::DST_VLAN);
+    rec.swap_presence_flags(FlowPresence::IN_IF_SPEED, FlowPresence::OUT_IF_SPEED);
+    rec.swap_presence_flags(FlowPresence::IN_IF_BOUNDARY, FlowPresence::OUT_IF_BOUNDARY);
 }
 
 /// Set a field on FlowRecord by canonical name (string dispatch).
@@ -4273,10 +5433,10 @@ fn set_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
             rec.exporter_tenant = value.to_string();
         }
         "SAMPLING_RATE" => {
-            rec.sampling_rate = value.parse().unwrap_or(0);
+            rec.set_sampling_rate(value.parse().unwrap_or(0));
         }
         "ETYPE" => {
-            rec.etype = value.parse().unwrap_or(0);
+            rec.set_etype(value.parse().unwrap_or(0));
         }
         "PROTOCOL" => {
             rec.protocol = value.parse().unwrap_or(0);
@@ -4297,10 +5457,15 @@ fn set_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
             rec.raw_packets = value.parse().unwrap_or(0);
         }
         "FORWARDING_STATUS" => {
-            rec.forwarding_status = value.parse().unwrap_or(0);
+            rec.set_forwarding_status(value.parse().unwrap_or(0));
         }
         "DIRECTION" => {
-            rec.direction = FlowDirection::from_str_value(value);
+            let normalized = FlowDirection::from_str_value(value);
+            if value == DIRECTION_UNDEFINED {
+                rec.clear_direction();
+            } else {
+                rec.set_direction(normalized);
+            }
         }
         "SRC_ADDR" => {
             if let Ok(ip) = value.parse::<IpAddr>() {
@@ -4418,10 +5583,10 @@ fn set_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
             rec.out_if_description = value.to_string();
         }
         "IN_IF_SPEED" => {
-            rec.in_if_speed = value.parse().unwrap_or(0);
+            rec.set_in_if_speed(value.parse().unwrap_or(0));
         }
         "OUT_IF_SPEED" => {
-            rec.out_if_speed = value.parse().unwrap_or(0);
+            rec.set_out_if_speed(value.parse().unwrap_or(0));
         }
         "IN_IF_PROVIDER" => {
             rec.in_if_provider = value.to_string();
@@ -4436,10 +5601,10 @@ fn set_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
             rec.out_if_connectivity = value.to_string();
         }
         "IN_IF_BOUNDARY" => {
-            rec.in_if_boundary = value.parse().unwrap_or(0);
+            rec.set_in_if_boundary(value.parse().unwrap_or(0));
         }
         "OUT_IF_BOUNDARY" => {
-            rec.out_if_boundary = value.parse().unwrap_or(0);
+            rec.set_out_if_boundary(value.parse().unwrap_or(0));
         }
         "NEXT_HOP" => {
             if let Ok(ip) = value.parse::<IpAddr>() {
@@ -4478,10 +5643,10 @@ fn set_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
             rec.dst_port_nat = value.parse().unwrap_or(0);
         }
         "SRC_VLAN" => {
-            rec.src_vlan = value.parse().unwrap_or(0);
+            rec.set_src_vlan(value.parse().unwrap_or(0));
         }
         "DST_VLAN" => {
-            rec.dst_vlan = value.parse().unwrap_or(0);
+            rec.set_dst_vlan(value.parse().unwrap_or(0));
         }
         "SRC_MAC" => {
             rec.src_mac = parse_mac(&value.to_ascii_lowercase());
@@ -4493,13 +5658,13 @@ fn set_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
             rec.ipttl = value.parse().unwrap_or(0);
         }
         "IPTOS" => {
-            rec.iptos = value.parse().unwrap_or(0);
+            rec.set_iptos(value.parse().unwrap_or(0));
         }
         "IPV6_FLOW_LABEL" => {
             rec.ipv6_flow_label = value.parse().unwrap_or(0);
         }
         "TCP_FLAGS" => {
-            rec.tcp_flags = value.parse().unwrap_or(0);
+            rec.set_tcp_flags(value.parse().unwrap_or(0));
         }
         "IP_FRAGMENT_ID" => {
             rec.ip_fragment_id = value.parse().unwrap_or(0);
@@ -4508,16 +5673,16 @@ fn set_record_field(rec: &mut FlowRecord, key: &str, value: &str) {
             rec.ip_fragment_offset = value.parse().unwrap_or(0);
         }
         "ICMPV4_TYPE" => {
-            rec.icmpv4_type = value.parse().unwrap_or(0);
+            rec.set_icmpv4_type(value.parse().unwrap_or(0));
         }
         "ICMPV4_CODE" => {
-            rec.icmpv4_code = value.parse().unwrap_or(0);
+            rec.set_icmpv4_code(value.parse().unwrap_or(0));
         }
         "ICMPV6_TYPE" => {
-            rec.icmpv6_type = value.parse().unwrap_or(0);
+            rec.set_icmpv6_type(value.parse().unwrap_or(0));
         }
         "ICMPV6_CODE" => {
-            rec.icmpv6_code = value.parse().unwrap_or(0);
+            rec.set_icmpv6_code(value.parse().unwrap_or(0));
         }
         "MPLS_LABELS" => {
             rec.mpls_labels = value.to_string();
@@ -4676,11 +5841,11 @@ fn parse_ipv4_packet_record(
     let dst = Ipv4Addr::new(data[16], data[17], data[18], data[19]);
 
     if decapsulation_mode.is_none() {
-        rec.etype = 2048;
+        rec.set_etype(2048);
         rec.src_addr = Some(IpAddr::V4(src));
         rec.dst_addr = Some(IpAddr::V4(dst));
         rec.protocol = proto;
-        rec.iptos = data[1];
+        rec.set_iptos(data[1]);
         rec.ipttl = data[8];
         rec.ip_fragment_id = fragment_id as u32;
         rec.ip_fragment_offset = fragment_offset;
@@ -4728,11 +5893,11 @@ fn parse_ipv6_packet_record(
         let traffic_class = ((u16::from_be_bytes([data[0], data[1]]) & 0x0ff0) >> 4) as u8;
         let flow_label = u32::from_be_bytes([data[0], data[1], data[2], data[3]]) & 0x000f_ffff;
 
-        rec.etype = 34525;
+        rec.set_etype(34525);
         rec.src_addr = Some(IpAddr::V6(src));
         rec.dst_addr = Some(IpAddr::V6(dst));
         rec.protocol = next_header;
-        rec.iptos = traffic_class;
+        rec.set_iptos(traffic_class);
         rec.ipttl = hop_limit;
         rec.ipv6_flow_label = flow_label;
     }
@@ -4777,19 +5942,19 @@ fn parse_transport_record(
                 rec.dst_port = u16::from_be_bytes([data[2], data[3]]);
             }
             if proto == 6 && data.len() >= 14 {
-                rec.tcp_flags = data[13];
+                rec.set_tcp_flags(data[13]);
             }
         }
         1 => {
             if data.len() >= 2 {
-                rec.icmpv4_type = data[0];
-                rec.icmpv4_code = data[1];
+                rec.set_icmpv4_type(data[0]);
+                rec.set_icmpv4_code(data[1]);
             }
         }
         58 => {
             if data.len() >= 2 {
-                rec.icmpv6_type = data[0];
-                rec.icmpv6_code = data[1];
+                rec.set_icmpv6_type(data[0]);
+                rec.set_icmpv6_code(data[1]);
             }
         }
         _ => {}
@@ -4826,51 +5991,55 @@ fn apply_v9_special_mappings_record(rec: &mut FlowRecord, field: V9Field, value:
     match field {
         V9Field::IpProtocolVersion => {
             if let Some(etype) = etype_u16_from_ip_version(value) {
-                rec.etype = etype;
+                rec.set_etype(etype);
             }
         }
         V9Field::IcmpType => {
             if let Some((icmp_type, icmp_code)) = decode_type_code_raw(value) {
-                if rec.icmpv4_type == 0 {
-                    rec.icmpv4_type = icmp_type;
+                if !rec.has_icmpv4_type() {
+                    rec.set_icmpv4_type(icmp_type);
                 }
-                if rec.icmpv4_code == 0 {
-                    rec.icmpv4_code = icmp_code;
+                if !rec.has_icmpv4_code() {
+                    rec.set_icmpv4_code(icmp_code);
                 }
-                if rec.icmpv6_type == 0 {
-                    rec.icmpv6_type = value
+                if !rec.has_icmpv6_type() {
+                    rec.set_icmpv6_type(
+                        value
                         .parse::<u64>()
                         .ok()
                         .map(|v| ((v >> 8) & 0xff) as u8)
-                        .unwrap_or(0);
+                        .unwrap_or(0),
+                    );
                 }
-                if rec.icmpv6_code == 0 {
-                    rec.icmpv6_code = value
+                if !rec.has_icmpv6_code() {
+                    rec.set_icmpv6_code(
+                        value
                         .parse::<u64>()
                         .ok()
                         .map(|v| (v & 0xff) as u8)
-                        .unwrap_or(0);
+                        .unwrap_or(0),
+                    );
                 }
             }
         }
         V9Field::IcmpTypeValue => {
-            if rec.icmpv4_type == 0 {
-                rec.icmpv4_type = value.parse().unwrap_or(0);
+            if !rec.has_icmpv4_type() {
+                rec.set_icmpv4_type(value.parse().unwrap_or(0));
             }
         }
         V9Field::IcmpCodeValue => {
-            if rec.icmpv4_code == 0 {
-                rec.icmpv4_code = value.parse().unwrap_or(0);
+            if !rec.has_icmpv4_code() {
+                rec.set_icmpv4_code(value.parse().unwrap_or(0));
             }
         }
         V9Field::IcmpIpv6TypeValue => {
-            if rec.icmpv6_type == 0 {
-                rec.icmpv6_type = value.parse().unwrap_or(0);
+            if !rec.has_icmpv6_type() {
+                rec.set_icmpv6_type(value.parse().unwrap_or(0));
             }
         }
         V9Field::ImpIpv6CodeValue => {
-            if rec.icmpv6_code == 0 {
-                rec.icmpv6_code = value.parse().unwrap_or(0);
+            if !rec.has_icmpv6_code() {
+                rec.set_icmpv6_code(value.parse().unwrap_or(0));
             }
         }
         V9Field::MplsLabel1
@@ -4893,26 +6062,26 @@ fn apply_ipfix_special_mappings_record(rec: &mut FlowRecord, field: &IPFixField,
     match field {
         IPFixField::IANA(IANAIPFixField::IpVersion) => {
             if let Some(etype) = etype_u16_from_ip_version(value) {
-                rec.etype = etype;
+                rec.set_etype(etype);
             }
         }
         IPFixField::IANA(IANAIPFixField::IcmpTypeCodeIpv4) => {
             if let Some((icmp_type, icmp_code)) = decode_type_code_raw(value) {
-                if rec.icmpv4_type == 0 {
-                    rec.icmpv4_type = icmp_type;
+                if !rec.has_icmpv4_type() {
+                    rec.set_icmpv4_type(icmp_type);
                 }
-                if rec.icmpv4_code == 0 {
-                    rec.icmpv4_code = icmp_code;
+                if !rec.has_icmpv4_code() {
+                    rec.set_icmpv4_code(icmp_code);
                 }
             }
         }
         IPFixField::IANA(IANAIPFixField::IcmpTypeCodeIpv6) => {
             if let Some((icmp_type, icmp_code)) = decode_type_code_raw(value) {
-                if rec.icmpv6_type == 0 {
-                    rec.icmpv6_type = icmp_type;
+                if !rec.has_icmpv6_type() {
+                    rec.set_icmpv6_type(icmp_type);
                 }
-                if rec.icmpv6_code == 0 {
-                    rec.icmpv6_code = icmp_code;
+                if !rec.has_icmpv6_code() {
+                    rec.set_icmpv6_code(icmp_code);
                 }
             }
         }
@@ -4943,20 +6112,20 @@ fn apply_sampling_state_record(
     sampling: &SamplingState,
 ) {
     if let Some(rate) = observed_sampling_rate.filter(|rate| *rate > 0) {
-        rec.sampling_rate = rate;
+        rec.set_sampling_rate(rate);
         return;
     }
 
-    if rec.sampling_rate == 0 {
+    if !rec.has_sampling_rate() {
         if let Some(id) = sampler_id
             && let Some(rate) = sampling.get(exporter_ip, version, observation_domain_id, id)
         {
-            rec.sampling_rate = rate;
+            rec.set_sampling_rate(rate);
             return;
         }
 
         if let Some(rate) = sampling.get(exporter_ip, version, observation_domain_id, 0) {
-            rec.sampling_rate = rate;
+            rec.set_sampling_rate(rate);
         }
     }
 }
@@ -4994,6 +6163,8 @@ fn apply_icmp_port_fallback(fields: &mut FlowFields) {
         .get("PROTOCOL")
         .and_then(|v| v.parse::<u64>().ok())
         .unwrap_or(0);
+    let src_port_present = scalar_field_present_in_map(fields, "SRC_PORT");
+    let dst_port_present = scalar_field_present_in_map(fields, "DST_PORT");
     let src_port = fields
         .get("SRC_PORT")
         .and_then(|v| v.parse::<u64>().ok())
@@ -5003,32 +6174,29 @@ fn apply_icmp_port_fallback(fields: &mut FlowFields) {
         .and_then(|v| v.parse::<u64>().ok())
         .unwrap_or(0);
 
-    if src_port != 0 || dst_port == 0 {
+    if (src_port_present && src_port != 0) || !dst_port_present {
         return;
     }
 
     let icmp_type = ((dst_port >> 8) & 0xff).to_string();
     let icmp_code = (dst_port & 0xff).to_string();
 
-    match protocol {
-        1 => {
-            set_if_missing_or_zero(fields, "ICMPV4_TYPE", &icmp_type);
-            set_if_missing_or_zero(fields, "ICMPV4_CODE", &icmp_code);
+        match protocol {
+            1 => {
+                set_if_missing_or_empty(fields, "ICMPV4_TYPE", &icmp_type);
+                set_if_missing_or_empty(fields, "ICMPV4_CODE", &icmp_code);
+            }
+            58 => {
+                set_if_missing_or_empty(fields, "ICMPV6_TYPE", &icmp_type);
+                set_if_missing_or_empty(fields, "ICMPV6_CODE", &icmp_code);
+            }
+            _ => {}
         }
-        58 => {
-            set_if_missing_or_zero(fields, "ICMPV6_TYPE", &icmp_type);
-            set_if_missing_or_zero(fields, "ICMPV6_CODE", &icmp_code);
-        }
-        _ => {}
-    }
 }
 
-fn set_if_missing_or_zero(fields: &mut FlowFields, key: &'static str, value: &str) {
-    let current = fields
-        .get(key)
-        .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(0);
-    if current == 0 {
+fn set_if_missing_or_empty(fields: &mut FlowFields, key: &'static str, value: &str) {
+    let current = fields.get(key).map(String::as_str).unwrap_or_default();
+    if current.is_empty() {
         fields.insert(key, value.to_string());
     }
 }
@@ -5662,20 +6830,6 @@ fn decode_sampling_interval(raw: u16) -> u32 {
     if interval == 0 { 1 } else { interval as u32 }
 }
 
-fn hex_to_bytes(hex: &str) -> Option<Vec<u8>> {
-    if hex.len() % 2 != 0 {
-        return None;
-    }
-    let mut out = Vec::with_capacity(hex.len() / 2);
-    let bytes = hex.as_bytes();
-    for i in (0..bytes.len()).step_by(2) {
-        let hi = char::from(bytes[i]).to_digit(16)? as u8;
-        let lo = char::from(bytes[i + 1]).to_digit(16)? as u8;
-        out.push((hi << 4) | lo);
-    }
-    Some(out)
-}
-
 fn template_scope(payload: &[u8]) -> Option<(u16, u32)> {
     if payload.len() < 2 {
         return None;
@@ -5699,64 +6853,6 @@ fn template_scope(payload: &[u8]) -> Option<(u16, u32)> {
             Some((version, observation_domain_id))
         }
         _ => None,
-    }
-}
-
-fn has_template_flowsets(payload: &[u8]) -> bool {
-    if payload.len() < 2 {
-        return false;
-    }
-    let version = u16::from_be_bytes([payload[0], payload[1]]);
-    match version {
-        9 => {
-            if payload.len() < 20 {
-                return false;
-            }
-            let mut offset = 20_usize;
-            while offset.saturating_add(4) <= payload.len() {
-                let flowset_id = u16::from_be_bytes([payload[offset], payload[offset + 1]]);
-                let flowset_len =
-                    u16::from_be_bytes([payload[offset + 2], payload[offset + 3]]) as usize;
-                if flowset_len < 4 {
-                    return false;
-                }
-                let end = offset.saturating_add(flowset_len);
-                if end > payload.len() {
-                    return false;
-                }
-                if flowset_id == 0 || flowset_id == 1 {
-                    return true;
-                }
-                offset = end;
-            }
-            false
-        }
-        10 => {
-            if payload.len() < 16 {
-                return false;
-            }
-            let packet_length = u16::from_be_bytes([payload[2], payload[3]]) as usize;
-            let end_limit = payload.len().min(packet_length);
-            let mut offset = 16_usize;
-            while offset.saturating_add(4) <= end_limit {
-                let set_id = u16::from_be_bytes([payload[offset], payload[offset + 1]]);
-                let set_len =
-                    u16::from_be_bytes([payload[offset + 2], payload[offset + 3]]) as usize;
-                if set_len < 4 {
-                    return false;
-                }
-                let end = offset.saturating_add(set_len);
-                if end > end_limit {
-                    return false;
-                }
-                if set_id == IPFIX_SET_ID_TEMPLATE || set_id == 3 {
-                    return true;
-                }
-                offset = end;
-            }
-            false
-        }
-        _ => false,
     }
 }
 
@@ -5813,12 +6909,14 @@ fn to_field_token(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        CANONICAL_FLOW_DEFAULTS, DIRECTION_EGRESS, DIRECTION_INGRESS, DecapsulationMode,
-        DecodeStats, DecodedFlow, ETYPE_IPV4, ETYPE_IPV6, FlowDecoders, FlowFields, FlowRecord,
-        PersistedDecoderState, SamplingState, TimestampSource, append_mpls_label,
-        append_unique_flows, apply_icmp_port_fallback, decode_v9_special_from_raw_payload,
-        default_exporter_name, finalize_canonical_flow_fields, normalize_direction_value,
-        observe_v9_templates_from_raw_payload, to_field_token,
+        CANONICAL_FLOW_DEFAULTS, DECODER_STATE_HEADER_LEN, DECODER_STATE_MAGIC,
+        DECODER_STATE_SCHEMA_VERSION, DIRECTION_EGRESS, DIRECTION_INGRESS, DecapsulationMode,
+        DecodeStats, DecodedFlow, DecoderStateNamespace, ETYPE_IPV4, ETYPE_IPV6, FlowDecoders,
+        FlowFields, FlowRecord, SamplingState, TimestampSource, append_mpls_label,
+        append_unique_flows, apply_icmp_port_fallback, decode_persisted_namespace_file,
+        decode_v9_special_from_raw_payload, default_exporter_name, field_tracks_presence,
+        finalize_canonical_flow_fields, normalize_direction_value,
+        observe_v9_templates_from_raw_payload, to_field_token, xxhash64,
     };
     use etherparse::{NetSlice, SlicedPacket, TransportSlice};
     use pcap_file::pcap::PcapReader;
@@ -6193,7 +7291,7 @@ mod tests {
                 ),
                 ("SRC_MASK", "32"),
                 ("DST_MASK", "22"),
-                ("SRC_VLAN", "0"),
+                ("SRC_VLAN", ""),
                 ("ETYPE", ETYPE_IPV4),
                 ("PROTOCOL", "6"),
                 ("SRC_PORT", "22"),
@@ -6410,6 +7508,7 @@ mod tests {
                     ("DST_PORT", "19624"),
                     ("SAMPLING_RATE", "30000"),
                     ("FORWARDING_STATUS", "64"),
+                    ("IPTOS", "0"),
                     ("DIRECTION", DIRECTION_INGRESS),
                     ("TCP_FLAGS", "16"),
                     ("FLOW_START_USEC", "1647285925050000"),
@@ -6436,6 +7535,7 @@ mod tests {
                     ("DST_PORT", "2444"),
                     ("SAMPLING_RATE", "30000"),
                     ("FORWARDING_STATUS", "64"),
+                    ("IPTOS", "0"),
                     ("DIRECTION", DIRECTION_INGRESS),
                     ("TCP_FLAGS", "16"),
                     ("FLOW_START_USEC", "1647285925050000"),
@@ -6462,6 +7562,7 @@ mod tests {
                     ("DST_PORT", "53697"),
                     ("SAMPLING_RATE", "30000"),
                     ("FORWARDING_STATUS", "64"),
+                    ("IPTOS", "0"),
                     ("DIRECTION", DIRECTION_INGRESS),
                     ("TCP_FLAGS", "16"),
                     ("FLOW_START_USEC", "1647285925051000"),
@@ -6488,6 +7589,7 @@ mod tests {
                     ("DST_PORT", "52300"),
                     ("SAMPLING_RATE", "30000"),
                     ("FORWARDING_STATUS", "64"),
+                    ("IPTOS", "0"),
                     ("DIRECTION", DIRECTION_INGRESS),
                     ("TCP_FLAGS", "16"),
                     ("FLOW_START_USEC", "1647285925052000"),
@@ -6562,7 +7664,8 @@ mod tests {
         let data = synthetic_v9_datalink_data_packet(256, 42, 582, 0, &frame);
 
         let mut sampling = SamplingState::default();
-        observe_v9_templates_from_raw_payload(source, &template, &mut sampling);
+        let mut namespace = DecoderStateNamespace::default();
+        observe_v9_templates_from_raw_payload(source, &template, &mut sampling, &mut namespace);
 
         let flows = decode_v9_special_from_raw_payload(
             source,
@@ -6613,7 +7716,8 @@ mod tests {
         let data = synthetic_v9_datalink_data_packet(256, 42, 582, 0, &frame);
 
         let mut sampling = SamplingState::default();
-        observe_v9_templates_from_raw_payload(source, &template, &mut sampling);
+        let mut namespace = DecoderStateNamespace::default();
+        observe_v9_templates_from_raw_payload(source, &template, &mut sampling, &mut namespace);
 
         let flows = decode_v9_special_from_raw_payload(
             source,
@@ -6845,6 +7949,9 @@ mod tests {
                 ("DIRECTION", DIRECTION_INGRESS),
                 ("IN_IF", "13"),
                 ("SRC_VLAN", "701"),
+                ("DST_VLAN", "0"),
+                ("IPTOS", "0"),
+                ("TCP_FLAGS", "0"),
                 ("FLOW_START_USEC", "1691746198012000"),
                 ("FLOW_END_USEC", "1691746198012000"),
             ],
@@ -7000,6 +8107,7 @@ mod tests {
                 ("IPTTL", "57"),
                 ("IPTOS", "40"),
                 ("IPV6_FLOW_LABEL", "570164"),
+                ("TCP_FLAGS", "0"),
                 ("DIRECTION", DIRECTION_INGRESS),
                 ("SRC_MASK", "36"),
                 ("DST_MASK", "48"),
@@ -7099,8 +8207,6 @@ mod tests {
                 ("BYTES", "84"),
                 ("PACKETS", "1"),
                 ("ETYPE", ETYPE_IPV4),
-                ("ICMPV4_TYPE", "0"),
-                ("ICMPV4_CODE", "0"),
                 ("DIRECTION", DIRECTION_INGRESS),
             ],
         );
@@ -7194,6 +8300,8 @@ mod tests {
                     ("DST_PORT", "32768"),
                     ("ICMPV6_TYPE", "128"),
                     ("ICMPV6_CODE", "0"),
+                    ("IPTOS", "0"),
+                    ("TCP_FLAGS", "0"),
                     ("DIRECTION", DIRECTION_INGRESS),
                 ],
             ),
@@ -7211,6 +8319,8 @@ mod tests {
                     ("DST_PORT", "33024"),
                     ("ICMPV6_TYPE", "129"),
                     ("ICMPV6_CODE", "0"),
+                    ("IPTOS", "0"),
+                    ("TCP_FLAGS", "0"),
                     ("DIRECTION", DIRECTION_INGRESS),
                 ],
             ),
@@ -7228,6 +8338,8 @@ mod tests {
                     ("DST_PORT", "2048"),
                     ("ICMPV4_TYPE", "8"),
                     ("ICMPV4_CODE", "0"),
+                    ("IPTOS", "0"),
+                    ("TCP_FLAGS", "0"),
                     ("DIRECTION", DIRECTION_INGRESS),
                 ],
             ),
@@ -7242,8 +8354,8 @@ mod tests {
                     ("BYTES", "84"),
                     ("PACKETS", "1"),
                     ("ETYPE", ETYPE_IPV4),
-                    ("ICMPV4_TYPE", "0"),
-                    ("ICMPV4_CODE", "0"),
+                    ("IPTOS", "0"),
+                    ("TCP_FLAGS", "0"),
                     ("DIRECTION", DIRECTION_INGRESS),
                 ],
             ),
@@ -7281,6 +8393,10 @@ mod tests {
                     ("ETYPE", ETYPE_IPV6),
                     ("PROTOCOL", "17"),
                     ("OUT_IF", "16"),
+                    ("IPTOS", "0"),
+                    ("TCP_FLAGS", "0"),
+                    ("ICMPV6_TYPE", "0"),
+                    ("ICMPV6_CODE", "0"),
                     ("IPTTL", "255"),
                     ("MPLS_LABELS", "20005,524250"),
                     ("FORWARDING_STATUS", "66"),
@@ -7304,6 +8420,10 @@ mod tests {
                     ("ETYPE", ETYPE_IPV6),
                     ("PROTOCOL", "17"),
                     ("OUT_IF", "17"),
+                    ("IPTOS", "0"),
+                    ("TCP_FLAGS", "0"),
+                    ("ICMPV6_TYPE", "0"),
+                    ("ICMPV6_CODE", "0"),
                     ("IPTTL", "255"),
                     ("MPLS_LABELS", "20006,524275"),
                     ("FORWARDING_STATUS", "66"),
@@ -7791,8 +8911,11 @@ mod tests {
                 ("BYTES", "64"),
                 ("PACKETS", "1"),
                 ("ETYPE", ETYPE_IPV4),
+                ("IPTOS", "0"),
                 ("IPTTL", "63"),
                 ("IP_FRAGMENT_ID", "51563"),
+                ("ICMPV4_TYPE", "0"),
+                ("ICMPV4_CODE", "0"),
                 ("DIRECTION", DIRECTION_INGRESS),
                 ("SRC_MAC", "2c:6b:f5:b0:54:c4"),
                 ("DST_MAC", "2c:6b:f5:d3:cd:c4"),
@@ -7854,6 +8977,7 @@ mod tests {
                 ("PACKETS", "1"),
                 ("ETYPE", ETYPE_IPV6),
                 ("DIRECTION", DIRECTION_INGRESS),
+                ("IPTOS", "0"),
                 ("IPTTL", "253"),
                 ("IPV6_FLOW_LABEL", "673728"),
                 ("SRC_MAC", "2c:6b:f5:b0:54:c4"),
@@ -8065,6 +9189,7 @@ mod tests {
                 ("FORWARDING_STATUS", "128"),
                 ("DIRECTION", DIRECTION_INGRESS),
                 ("IN_IF", "737"),
+                ("IPTOS", "0"),
                 ("IPTTL", "254"),
                 ("IPV6_FLOW_LABEL", "152740"),
                 ("SRC_MAC", "0c:00:c3:86:af:07"),
@@ -8086,14 +9211,17 @@ mod tests {
         let _ = decode_pcap(&base.join("options-data.pcap"), &mut warm);
         let _ = decode_pcap(&base.join("template.pcap"), &mut warm);
 
+        let key = single_decoder_state_namespace_key(&warm);
         let persisted = warm
-            .export_persistent_state_json()
-            .expect("failed to serialize decoder state");
+            .export_decoder_state_namespace(&key)
+            .expect("failed to serialize decoder namespace state")
+            .expect("expected populated decoder namespace state");
 
         let mut restored = FlowDecoders::new();
+        let source = first_udp_source(&base.join("data.pcap"));
         restored
-            .import_persistent_state_json(&persisted)
-            .expect("failed to restore decoder state");
+            .import_decoder_state_namespace(key, source, &persisted)
+            .expect("failed to restore decoder namespace state");
 
         let flows = decode_pcap_flows(&base.join("data.pcap"), &mut restored);
         assert_eq!(
@@ -8125,14 +9253,17 @@ mod tests {
         let mut warm = FlowDecoders::new();
         let _ = decode_pcap(&base.join("datalink-template.pcap"), &mut warm);
 
+        let key = single_decoder_state_namespace_key(&warm);
         let persisted = warm
-            .export_persistent_state_json()
-            .expect("failed to serialize decoder state");
+            .export_decoder_state_namespace(&key)
+            .expect("failed to serialize decoder namespace state")
+            .expect("expected populated decoder namespace state");
 
         let mut restored = FlowDecoders::new();
+        let source = first_udp_source(&base.join("datalink-data.pcap"));
         restored
-            .import_persistent_state_json(&persisted)
-            .expect("failed to restore decoder state");
+            .import_decoder_state_namespace(key, source, &persisted)
+            .expect("failed to restore decoder namespace state");
 
         let flows = decode_pcap_flows(&base.join("datalink-data.pcap"), &mut restored);
         assert_eq!(
@@ -8165,14 +9296,17 @@ mod tests {
         let mut warm = FlowDecoders::new();
         let _ = decode_pcap(&base.join("ipfixprobe-templates.pcap"), &mut warm);
 
+        let key = single_decoder_state_namespace_key(&warm);
         let persisted = warm
-            .export_persistent_state_json()
-            .expect("failed to serialize decoder state");
+            .export_decoder_state_namespace(&key)
+            .expect("failed to serialize decoder namespace state")
+            .expect("expected populated decoder namespace state");
 
         let mut restored = FlowDecoders::new();
+        let source = first_udp_source(&base.join("ipfixprobe-data.pcap"));
         restored
-            .import_persistent_state_json(&persisted)
-            .expect("failed to restore decoder state");
+            .import_decoder_state_namespace(key, source, &persisted)
+            .expect("failed to restore decoder namespace state");
 
         let flows = decode_pcap_flows(&base.join("ipfixprobe-data.pcap"), &mut restored);
         assert_eq!(
@@ -8198,46 +9332,137 @@ mod tests {
     }
 
     #[test]
-    fn persisted_decoder_state_does_not_evict_template_packets() {
+    fn persisted_decoder_state_keeps_latest_effective_template_only() {
         let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
         let mut decoders = FlowDecoders::new();
-        let template_count = 5000_usize;
+        let initial = synthetic_v9_datalink_template_packet(256, 42, 96);
+        let replacement = synthetic_v9_datalink_template_packet(256, 42, 128);
 
-        for template_id in 0..template_count {
-            let payload = synthetic_v9_datalink_template_packet(
-                256_u16.saturating_add(template_id as u16),
-                42,
-                96,
-            );
-            decoders.observe_template_payload(source, &payload);
-        }
+        let _ = decoders.decode_udp_payload(source, &initial);
+        let _ = decoders.decode_udp_payload(source, &replacement);
 
+        let key = FlowDecoders::decoder_state_namespace_key(source, &initial)
+            .expect("expected v9 template namespace key");
         let persisted = decoders
-            .export_persistent_state_json()
-            .expect("failed to serialize decoder state");
-        let state: PersistedDecoderState =
-            serde_json::from_str(&persisted).expect("failed to parse persisted decoder state");
+            .export_decoder_state_namespace(&key)
+            .expect("failed to serialize decoder namespace state")
+            .expect("expected populated decoder namespace state");
+        let state = decode_persisted_namespace_file(&persisted)
+            .expect("failed to parse persisted decoder namespace state");
 
+        assert_eq!(state.key, key);
         assert_eq!(
-            state.template_packets.len(),
-            template_count,
-            "all observed template packets must be retained in persisted state"
+            state.namespace.v9_templates.len(),
+            1,
+            "only the effective template definition should be retained"
         );
+        let template = state
+            .namespace
+            .v9_templates
+            .get(&256)
+            .expect("expected latest v9 template");
+        assert_eq!(template.fields.len(), 3);
+        assert_eq!(template.fields[2].field_type, 104);
+        assert_eq!(
+            template.fields[2].field_length, 128,
+            "latest template definition should replace the earlier one"
+        );
+    }
+
+    #[test]
+    fn persisted_decoder_state_rehydrates_loaded_namespace_for_new_source_socket() {
+        let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
+        let alternate_source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9999);
+        let template = synthetic_v9_datalink_template_packet(256, 42, 96);
+        let data = synthetic_v9_datalink_data_packet(
+            256,
+            42,
+            582,
+            0,
+            &synthetic_vlan_ipv4_udp_frame(),
+        );
+
+        let mut warm = FlowDecoders::new();
+        let _ = warm.decode_udp_payload(source, &template);
+        let key = FlowDecoders::decoder_state_namespace_key(source, &template)
+            .expect("expected v9 template namespace key");
+        let persisted = warm
+            .export_decoder_state_namespace(&key)
+            .expect("failed to serialize decoder namespace state")
+            .expect("expected populated decoder namespace state");
 
         let mut restored = FlowDecoders::new();
         restored
-            .import_persistent_state_json(&persisted)
-            .expect("failed to restore decoder state");
-        let restored_persisted = restored
-            .export_persistent_state_json()
-            .expect("failed to serialize restored decoder state");
-        let restored_state: PersistedDecoderState = serde_json::from_str(&restored_persisted)
-            .expect("failed to parse restored persisted decoder state");
+            .import_decoder_state_namespace(key.clone(), source, &persisted)
+            .expect("failed to restore decoder namespace state");
+        assert!(
+            restored.decoder_state_source_needs_hydration(&key, alternate_source),
+            "a new source socket should require template hydration"
+        );
 
-        assert_eq!(
-            restored_state.template_packets.len(),
-            template_count,
-            "restored decoder state must preserve all template packets without eviction"
+        restored
+            .hydrate_loaded_decoder_state_namespace(&key, alternate_source)
+            .expect("failed to hydrate decoder namespace for alternate source");
+        let decoded = restored.decode_udp_payload(alternate_source, &data);
+        assert_eq!(decoded.flows.len(), 1, "alternate source should decode after hydration");
+        let flow = decoded.flows[0].record.to_fields();
+        assert_eq!(flow.get("IN_IF").map(String::as_str), Some("582"));
+        assert_eq!(flow.get("SRC_VLAN").map(String::as_str), Some("231"));
+    }
+
+    #[test]
+    fn persisted_decoder_state_rejects_unsupported_schema_version() {
+        let (_key, mut persisted) = sample_persisted_namespace_bytes();
+        persisted[4..8].copy_from_slice(&999_u32.to_le_bytes());
+
+        let err = decode_persisted_namespace_file(&persisted)
+            .expect_err("expected schema version mismatch");
+        assert!(err.contains("unsupported decoder namespace schema version"));
+    }
+
+    #[test]
+    fn persisted_decoder_state_rejects_bad_hash() {
+        let (_key, mut persisted) = sample_persisted_namespace_bytes();
+        persisted[8..16].copy_from_slice(&0_u64.to_le_bytes());
+
+        let err = decode_persisted_namespace_file(&persisted).expect_err("expected hash mismatch");
+        assert!(err.contains("payload hash mismatch"));
+    }
+
+    #[test]
+    fn persisted_decoder_state_rejects_truncated_header() {
+        let (_key, persisted) = sample_persisted_namespace_bytes();
+        let truncated = persisted[..(DECODER_STATE_HEADER_LEN - 1)].to_vec();
+
+        let err = decode_persisted_namespace_file(&truncated)
+            .expect_err("expected truncated header failure");
+        assert!(err.contains("truncated decoder namespace state header"));
+    }
+
+    #[test]
+    fn persisted_decoder_state_rejects_corrupt_payload_with_valid_hash() {
+        let (key, _) = sample_persisted_namespace_bytes();
+        let payload = vec![0xff, 0x00, 0x7f, 0x55];
+        let payload_hash = xxhash64(&payload);
+
+        let mut corrupt = Vec::with_capacity(DECODER_STATE_HEADER_LEN + payload.len());
+        corrupt.extend_from_slice(DECODER_STATE_MAGIC);
+        corrupt.extend_from_slice(&DECODER_STATE_SCHEMA_VERSION.to_le_bytes());
+        corrupt.extend_from_slice(&payload_hash.to_le_bytes());
+        corrupt.extend_from_slice(&(payload.len() as u64).to_le_bytes());
+        corrupt.extend_from_slice(&payload);
+
+        let err =
+            decode_persisted_namespace_file(&corrupt).expect_err("expected payload decode failure");
+        assert!(err.contains("failed to decode decoder namespace state"));
+
+        let mut restored = FlowDecoders::new();
+        let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
+        assert!(
+            restored
+                .import_decoder_state_namespace(key, source, &corrupt)
+                .is_err(),
+            "corrupt payload should fail namespace import"
         );
     }
 
@@ -8315,7 +9540,16 @@ mod tests {
     ) -> FlowFields {
         let mut row: FlowFields = CANONICAL_FLOW_DEFAULTS
             .iter()
-            .map(|(k, v)| (*k, (*v).to_string()))
+            .map(|(k, v)| {
+                (
+                    *k,
+                    if field_tracks_presence(k) {
+                        String::new()
+                    } else {
+                        (*v).to_string()
+                    },
+                )
+            })
             .collect();
 
         row.insert("FLOW_VERSION", flow_version.to_string());
@@ -8518,6 +9752,45 @@ mod tests {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/flows")
     }
 
+    fn single_decoder_state_namespace_key(decoders: &FlowDecoders) -> super::DecoderStateNamespaceKey {
+        let keys = decoders.decoder_state_namespace_keys();
+        assert_eq!(
+            keys.len(),
+            1,
+            "expected exactly one decoder namespace key, got {keys:?}"
+        );
+        keys.into_iter().next().unwrap()
+    }
+
+    fn sample_persisted_namespace_bytes() -> (super::DecoderStateNamespaceKey, Vec<u8>) {
+        let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
+        let template = synthetic_v9_datalink_template_packet(256, 42, 96);
+        let mut decoders = FlowDecoders::new();
+        let _ = decoders.decode_udp_payload(source, &template);
+        let key = FlowDecoders::decoder_state_namespace_key(source, &template)
+            .expect("expected v9 template namespace key");
+        let persisted = decoders
+            .export_decoder_state_namespace(&key)
+            .expect("failed to serialize decoder namespace state")
+            .expect("expected populated decoder namespace state");
+        (key, persisted)
+    }
+
+    fn first_udp_source(path: &Path) -> SocketAddr {
+        let file = File::open(path).unwrap_or_else(|e| panic!("open {}: {e}", path.display()));
+        let mut reader =
+            PcapReader::new(file).unwrap_or_else(|e| panic!("pcap reader {}: {e}", path.display()));
+
+        while let Some(packet) = reader.next_packet() {
+            let packet = packet.unwrap_or_else(|e| panic!("read packet {}: {e}", path.display()));
+            if let Some((source, _payload)) = extract_udp_payload(packet.data.as_ref()) {
+                return source;
+            }
+        }
+
+        panic!("no UDP packets found in {}", path.display());
+    }
+
     fn decode_pcap(path: &Path, decoders: &mut FlowDecoders) -> (DecodeStats, usize) {
         let file = File::open(path).unwrap_or_else(|e| panic!("open {}: {e}", path.display()));
         let mut reader =
@@ -8577,11 +9850,27 @@ mod tests {
 
     #[test]
     fn flow_record_round_trip_all_fields() {
-        use super::{FlowDirection, FlowRecord};
+        use super::{FlowDirection, FlowPresence, FlowRecord};
         use std::net::Ipv6Addr;
 
         // Build a FlowRecord with non-default values in every field.
         let rec = FlowRecord {
+            presence: FlowPresence::SAMPLING_RATE
+                | FlowPresence::ETYPE
+                | FlowPresence::DIRECTION
+                | FlowPresence::FORWARDING_STATUS
+                | FlowPresence::IN_IF_SPEED
+                | FlowPresence::OUT_IF_SPEED
+                | FlowPresence::IN_IF_BOUNDARY
+                | FlowPresence::OUT_IF_BOUNDARY
+                | FlowPresence::SRC_VLAN
+                | FlowPresence::DST_VLAN
+                | FlowPresence::IPTOS
+                | FlowPresence::TCP_FLAGS
+                | FlowPresence::ICMPV4_TYPE
+                | FlowPresence::ICMPV4_CODE
+                | FlowPresence::ICMPV6_TYPE
+                | FlowPresence::ICMPV6_CODE,
             flow_version: "v9",
             exporter_ip: Some(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1))),
             exporter_port: 9995,
@@ -8772,7 +10061,7 @@ mod tests {
     fn flow_record_encode_journal_round_trip() {
         use super::{FlowDirection, FlowRecord};
 
-        let rec = FlowRecord {
+        let mut rec = FlowRecord {
             flow_version: "ipfix",
             exporter_ip: Some(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))),
             protocol: 17,
@@ -8781,9 +10070,9 @@ mod tests {
             bytes: 512,
             packets: 1,
             flows: 1,
-            direction: FlowDirection::Egress,
             ..Default::default()
         };
+        rec.set_direction(FlowDirection::Egress);
 
         // Encode to journal buffer
         let mut data = Vec::new();
@@ -8839,5 +10128,31 @@ mod tests {
         assert_eq!(decoded.dst_addr, None);
         assert!(decoded.exporter_name.is_empty());
         assert!(decoded.src_country.is_empty());
+    }
+
+    #[test]
+    fn flow_record_encode_journal_omits_undefined_direction() {
+        use super::{FlowDirection, FlowRecord};
+
+        let rec = FlowRecord {
+            flow_version: "ipfix",
+            protocol: 17,
+            bytes: 512,
+            packets: 1,
+            flows: 1,
+            direction: FlowDirection::Undefined,
+            ..Default::default()
+        };
+
+        let mut data = Vec::new();
+        let mut refs = Vec::new();
+        rec.encode_to_journal_buf(&mut data, &mut refs);
+
+        let encoded = refs
+            .iter()
+            .map(|r| std::str::from_utf8(&data[r.clone()]).expect("valid utf8"))
+            .collect::<Vec<_>>();
+
+        assert!(!encoded.iter().any(|entry| entry.starts_with("DIRECTION=")));
     }
 }

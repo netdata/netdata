@@ -411,8 +411,8 @@ impl JournalConfig {
             .unwrap_or_else(|| self.default_retention())
     }
 
-    pub(crate) fn decoder_state_path(&self) -> PathBuf {
-        self.base_dir().join("decoder-state.json")
+    pub(crate) fn decoder_state_dir(&self) -> PathBuf {
+        self.base_dir().join("decoder-state.d")
     }
 }
 

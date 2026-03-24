@@ -2268,6 +2268,8 @@ version = "0.1.3"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bincode",
+ "bitflags 2.10.0",
  "bytesize",
  "bytesize-serde",
  "chrono",

@@ -1,6 +1,6 @@
 use crate::decoder::{
-    DecapsulationMode as DecoderDecapsulationMode, DecodeStats, FlowDecoders,
-    TimestampSource as DecoderTimestampSource,
+    DecapsulationMode as DecoderDecapsulationMode, DecodeStats, DecoderStateNamespaceKey,
+    FlowDecoders, TimestampSource as DecoderTimestampSource,
 };
 use crate::enrichment::{DynamicRoutingRuntime, FlowEnricher, NetworkSourcesRuntime};
 use crate::plugin_config::{
@@ -297,7 +297,7 @@ pub(crate) struct IngestService {
     cfg: PluginConfig,
     metrics: Arc<IngestMetrics>,
     decoders: FlowDecoders,
-    decoder_state_path: PathBuf,
+    decoder_state_dir: PathBuf,
     last_decoder_state_persist_usec: u64,
     raw_journal: Log,
     tier_writers: MaterializedTierWriters,
@@ -407,33 +407,20 @@ impl IngestService {
             .as_ref()
             .and_then(FlowEnricher::network_sources_runtime);
         decoders.set_enricher(enricher);
-        let decoder_state_path = cfg.journal.decoder_state_path();
-        if decoder_state_path.is_file() {
-            match fs::read_to_string(&decoder_state_path) {
-                Ok(data) => {
-                    if let Err(err) = decoders.import_persistent_state_json(&data) {
-                        tracing::warn!(
-                            "failed to restore netflow decoder state from {}: {}",
-                            decoder_state_path.display(),
-                            err
-                        );
-                    }
-                }
-                Err(err) => {
-                    tracing::warn!(
-                        "failed to read netflow decoder state {}: {}",
-                        decoder_state_path.display(),
-                        err
-                    );
-                }
-            }
+        let decoder_state_dir = cfg.journal.decoder_state_dir();
+        if let Err(err) = fs::create_dir_all(&decoder_state_dir) {
+            tracing::warn!(
+                "failed to prepare netflow decoder state directory {}: {}",
+                decoder_state_dir.display(),
+                err
+            );
         }
 
         Ok(Self {
             cfg,
             metrics,
             decoders,
-            decoder_state_path,
+            decoder_state_dir,
             last_decoder_state_persist_usec: now_usec(),
             raw_journal,
             tier_writers,
@@ -501,6 +488,7 @@ impl IngestService {
                         .fetch_add(received as u64, Ordering::Relaxed);
 
                     let receive_time_usec = now_usec();
+                    self.prepare_decoder_state_namespace(source, &buffer[..received]);
                     let batch = self
                         .decoders
                         .decode_udp_payload_at(source, &buffer[..received], receive_time_usec);
@@ -933,45 +921,126 @@ impl IngestService {
     }
 
     fn persist_decoder_state(&mut self) {
-        let data = match self.decoders.export_persistent_state_json() {
-            Ok(data) => data,
-            Err(err) => {
-                tracing::warn!("failed to serialize netflow decoder state: {}", err);
-                return;
+        for key in self.decoders.dirty_decoder_state_namespaces() {
+            let path = self.decoder_state_namespace_path(&key);
+            let data = match self.decoders.export_decoder_state_namespace(&key) {
+                Ok(Some(data)) => data,
+                Ok(None) => {
+                    if path.is_file() && let Err(err) = fs::remove_file(&path) {
+                        self.metrics
+                            .decoder_state_write_errors
+                            .fetch_add(1, Ordering::Relaxed);
+                        tracing::warn!(
+                            "failed to remove stale netflow decoder state {}: {}",
+                            path.display(),
+                            err
+                        );
+                        continue;
+                    }
+                    self.decoders.mark_decoder_state_namespace_persisted(&key);
+                    continue;
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        "failed to serialize netflow decoder state namespace {}: {}",
+                        path.display(),
+                        err
+                    );
+                    continue;
+                }
+            };
+
+            self.metrics
+                .decoder_state_persist_calls
+                .fetch_add(1, Ordering::Relaxed);
+            self.metrics
+                .decoder_state_persist_bytes
+                .fetch_add(data.len() as u64, Ordering::Relaxed);
+
+            let tmp_path = path.with_extension("bin.tmp");
+            if let Err(err) = fs::write(&tmp_path, &data) {
+                self.metrics
+                    .decoder_state_write_errors
+                    .fetch_add(1, Ordering::Relaxed);
+                tracing::warn!(
+                    "failed to write temporary netflow decoder state {}: {}",
+                    tmp_path.display(),
+                    err
+                );
+                continue;
             }
+
+            if let Err(err) = fs::rename(&tmp_path, &path) {
+                self.metrics
+                    .decoder_state_move_errors
+                    .fetch_add(1, Ordering::Relaxed);
+                tracing::warn!(
+                    "failed to move netflow decoder state {} to {}: {}",
+                    tmp_path.display(),
+                    path.display(),
+                    err
+                );
+                let _ = fs::remove_file(&tmp_path);
+                continue;
+            }
+
+            self.decoders.mark_decoder_state_namespace_persisted(&key);
+        }
+    }
+
+    fn decoder_state_namespace_path(&self, key: &DecoderStateNamespaceKey) -> PathBuf {
+        self.decoder_state_dir
+            .join(FlowDecoders::decoder_state_namespace_filename(key))
+    }
+
+    fn prepare_decoder_state_namespace(&mut self, source: std::net::SocketAddr, payload: &[u8]) {
+        let Some(key) = FlowDecoders::decoder_state_namespace_key(source, payload) else {
+            return;
         };
 
-        self.metrics
-            .decoder_state_persist_calls
-            .fetch_add(1, Ordering::Relaxed);
-        self.metrics
-            .decoder_state_persist_bytes
-            .fetch_add(data.len() as u64, Ordering::Relaxed);
-
-        let tmp_path = self.decoder_state_path.with_extension("json.tmp");
-        if let Err(err) = fs::write(&tmp_path, data.as_bytes()) {
-            self.metrics
-                .decoder_state_write_errors
-                .fetch_add(1, Ordering::Relaxed);
-            tracing::warn!(
-                "failed to write temporary netflow decoder state {}: {}",
-                tmp_path.display(),
-                err
-            );
+        if !self.decoders.is_decoder_state_namespace_loaded(&key) {
+            let path = self.decoder_state_namespace_path(&key);
+            if path.is_file() {
+                match fs::read(&path) {
+                    Ok(data) => {
+                        if let Err(err) = self
+                            .decoders
+                            .import_decoder_state_namespace(key.clone(), source, &data)
+                        {
+                            tracing::warn!(
+                                "failed to restore netflow decoder state namespace from {}: {}",
+                                path.display(),
+                                err
+                            );
+                            self.decoders.mark_decoder_state_namespace_absent(key, source);
+                        }
+                    }
+                    Err(err) => {
+                        tracing::warn!(
+                            "failed to read netflow decoder state namespace {}: {}",
+                            path.display(),
+                            err
+                        );
+                        self.decoders.mark_decoder_state_namespace_absent(key, source);
+                    }
+                }
+            } else {
+                self.decoders.mark_decoder_state_namespace_absent(key, source);
+            }
             return;
         }
 
-        if let Err(err) = fs::rename(&tmp_path, &self.decoder_state_path) {
-            self.metrics
-                .decoder_state_move_errors
-                .fetch_add(1, Ordering::Relaxed);
+        if self.decoders.decoder_state_source_needs_hydration(&key, source)
+            && let Err(err) = self
+                .decoders
+                .hydrate_loaded_decoder_state_namespace(&key, source)
+        {
             tracing::warn!(
-                "failed to move netflow decoder state {} to {}: {}",
-                tmp_path.display(),
-                self.decoder_state_path.display(),
+                "failed to hydrate netflow decoder state namespace {} for {}: {}",
+                self.decoder_state_namespace_path(&key).display(),
+                source,
                 err
             );
-            let _ = fs::remove_file(&tmp_path);
         }
     }
 
@@ -1184,9 +1253,17 @@ mod tests {
         );
         first.persist_decoder_state();
         assert!(
-            first.decoder_state_path.is_file(),
-            "decoder state file was not persisted at {}",
-            first.decoder_state_path.display()
+            first.decoder_state_dir.is_dir(),
+            "decoder state directory was not prepared at {}",
+            first.decoder_state_dir.display()
+        );
+        let persisted_files = std::fs::read_dir(&first.decoder_state_dir)
+            .unwrap_or_else(|e| panic!("read decoder state dir {}: {e}", first.decoder_state_dir.display()))
+            .count();
+        assert!(
+            persisted_files >= 2,
+            "expected decoder namespace files in {}, got {persisted_files}",
+            first.decoder_state_dir.display()
         );
 
         let mut second = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
@@ -1236,6 +1313,70 @@ mod tests {
         assert_eq!(ipfix_flow.get("PACKETS").map(String::as_str), Some("1"));
     }
 
+    #[test]
+    fn ingest_service_persist_decoder_state_skips_clean_namespaces() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let mut service = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+
+        let _ = decode_fixture_sequence(&mut service, &["template.pcap"]);
+        service.persist_decoder_state();
+
+        let calls_after_first = service
+            .metrics
+            .decoder_state_persist_calls
+            .load(Ordering::Relaxed);
+        let bytes_after_first = service
+            .metrics
+            .decoder_state_persist_bytes
+            .load(Ordering::Relaxed);
+        let persisted_files_after_first = std::fs::read_dir(&service.decoder_state_dir)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "read decoder state dir {}: {e}",
+                    service.decoder_state_dir.display()
+                )
+            })
+            .count();
+
+        assert_eq!(calls_after_first, 1, "expected exactly one dirty namespace write");
+        assert!(bytes_after_first > 0, "expected persisted namespace bytes");
+        assert_eq!(
+            persisted_files_after_first, 1,
+            "expected one persisted namespace file"
+        );
+
+        service.persist_decoder_state();
+
+        assert_eq!(
+            service
+                .metrics
+                .decoder_state_persist_calls
+                .load(Ordering::Relaxed),
+            calls_after_first,
+            "clean namespaces should not be rewritten"
+        );
+        assert_eq!(
+            service
+                .metrics
+                .decoder_state_persist_bytes
+                .load(Ordering::Relaxed),
+            bytes_after_first,
+            "clean namespaces should not add persisted bytes"
+        );
+        let persisted_files_after_second = std::fs::read_dir(&service.decoder_state_dir)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "read decoder state dir {}: {e}",
+                    service.decoder_state_dir.display()
+                )
+            })
+            .count();
+        assert_eq!(
+            persisted_files_after_second, persisted_files_after_first,
+            "clean namespaces should not create extra files"
+        );
+    }
+
     fn new_test_ingest_service(
         decapsulation_mode: ConfigDecapsulationMode,
     ) -> (TempDir, IngestService) {
@@ -1277,18 +1418,12 @@ mod tests {
         let base = fixture_dir();
         let mut out = Vec::new();
         for fixture in fixtures {
-            out.extend(decode_pcap_flows(
-                &base.join(fixture),
-                &mut service.decoders,
-            ));
+            out.extend(decode_pcap_flows(&base.join(fixture), service));
         }
         out
     }
 
-    fn decode_pcap_flows(
-        path: &Path,
-        decoders: &mut FlowDecoders,
-    ) -> Vec<crate::decoder::FlowFields> {
+    fn decode_pcap_flows(path: &Path, service: &mut IngestService) -> Vec<crate::decoder::FlowFields> {
         let file = File::open(path).unwrap_or_else(|e| panic!("open {}: {e}", path.display()));
         let mut reader =
             PcapReader::new(file).unwrap_or_else(|e| panic!("pcap reader {}: {e}", path.display()));
@@ -1297,7 +1432,8 @@ mod tests {
         while let Some(packet) = reader.next_packet() {
             let packet = packet.unwrap_or_else(|e| panic!("read packet {}: {e}", path.display()));
             if let Some((source, payload)) = extract_udp_payload(packet.data.as_ref()) {
-                let decoded = decoders.decode_udp_payload(source, payload);
+                service.prepare_decoder_state_namespace(source, payload);
+                let decoded = service.decoders.decode_udp_payload(source, payload);
                 flows.extend(
                     decoded
                         .flows
