@@ -48,39 +48,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per disk
-
-These metrics refer to the Disk.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| disk_id | Disk identifier. It is derived from the device path (e.g. sda or ata-HUP722020APA330_BFJ0WS3F) |
-| model | Disk model |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| hddtemp.disk_temperature | temperature | Celsius |
-| hddtemp.disk_temperature_sensor_status | ok, err, na, unk, nos, slp | status |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -198,6 +165,39 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per disk
+
+These metrics refer to the Disk.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| disk_id | Disk identifier. It is derived from the device path (e.g. sda or ata-HUP722020APA330_BFJ0WS3F) |
+| model | Disk model |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| hddtemp.disk_temperature | temperature | Celsius |
+| hddtemp.disk_temperature_sensor_status | ok, err, na, unk, nos, slp | status |
 
 
 

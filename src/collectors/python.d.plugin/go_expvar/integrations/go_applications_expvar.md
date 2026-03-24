@@ -44,39 +44,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Go applications (EXPVAR) instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| expvar.memstats.heap | alloc, inuse | KiB |
-| expvar.memstats.stack | inuse | KiB |
-| expvar.memstats.mspan | inuse | KiB |
-| expvar.memstats.mcache | inuse | KiB |
-| expvar.memstats.live_objects | live | objects |
-| expvar.memstats.sys | sys | KiB |
-| expvar.memstats.gc_pauses | avg | ns |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -315,6 +282,39 @@ app1:
        - {expvar_key: 'counters.cnt2', expvar_type: float, id: counters_cnt2}
 
 ```
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Go applications (EXPVAR) instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| expvar.memstats.heap | alloc, inuse | KiB |
+| expvar.memstats.stack | inuse | KiB |
+| expvar.memstats.mspan | inuse | KiB |
+| expvar.memstats.mcache | inuse | KiB |
+| expvar.memstats.live_objects | live | objects |
+| expvar.memstats.sys | sys | KiB |
+| expvar.memstats.gc_pauses | avg | ns |
+
 
 
 ## Troubleshooting

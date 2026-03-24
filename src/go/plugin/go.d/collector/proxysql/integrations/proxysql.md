@@ -45,203 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per ProxySQL instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| proxysql.client_connections_count | connected, non_idle, hostgroup_locked | connections |
-| proxysql.client_connections_rate | created, aborted | connections/s |
-| proxysql.server_connections_count | connected | connections |
-| proxysql.server_connections_rate | created, aborted, delayed | connections/s |
-| proxysql.backends_traffic | recv, sent | B/s |
-| proxysql.clients_traffic | recv, sent | B/s |
-| proxysql.active_transactions_count | client | connections |
-| proxysql.questions_rate | questions | questions/s |
-| proxysql.slow_queries_rate | slow | queries/s |
-| proxysql.queries_rate | autocommit, autocommit_filtered, commit_filtered, rollback, rollback_filtered, backend_change_user, backend_init_db, backend_set_names, frontend_init_db, frontend_set_names, frontend_use_db | queries/s |
-| proxysql.backend_statements_count | total, unique | statements |
-| proxysql.backend_statements_rate | prepare, execute, close | statements/s |
-| proxysql.client_statements_count | total, unique | statements |
-| proxysql.client_statements_rate | prepare, execute, close | statements/s |
-| proxysql.cached_statements_count | cached | statements |
-| proxysql.query_cache_entries_count | entries | entries |
-| proxysql.query_cache_memory_used | used | B |
-| proxysql.query_cache_io | in, out | B/s |
-| proxysql.query_cache_requests_rate | read, write, read_success | requests/s |
-| proxysql.mysql_monitor_workers_count | workers, auxiliary | threads |
-| proxysql.mysql_monitor_workers_rate | started | workers/s |
-| proxysql.mysql_monitor_connect_checks_rate | succeed, failed | checks/s |
-| proxysql.mysql_monitor_ping_checks_rate | succeed, failed | checks/s |
-| proxysql.mysql_monitor_read_only_checks_rate | succeed, failed | checks/s |
-| proxysql.mysql_monitor_replication_lag_checks_rate | succeed, failed | checks/s |
-| proxysql.jemalloc_memory_used | active, allocated, mapped, metadata, resident, retained | B |
-| proxysql.memory_used | auth, sqlite3, query_digest, query_rules, firewall_users_table, firewall_users_config, firewall_rules_table, firewall_rules_config, mysql_threads, admin_threads, cluster_threads | B |
-| proxysql.uptime | uptime | seconds |
-
-### Per command
-
-These metrics refer to the SQL command.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| command | SQL command. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| proxysql.mysql_command_execution_rate | uptime | seconds |
-| proxysql.mysql_command_execution_time | time | microseconds |
-| proxysql.mysql_command_execution_duration | 100us, 500us, 1ms, 5ms, 10ms, 50ms, 100ms, 500ms, 1s, 5s, 10s, +Inf | microseconds |
-
-### Per user
-
-These metrics refer to the user.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| user | username from the mysql_users table |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| proxysql.mysql_user_connections_utilization | used | percentage |
-| proxysql.mysql_user_connections_count | used | connections |
-
-### Per hostgroup
-
-These metrics refer to the backends hostgroup.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| hostgroup | hostgroup identifier |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| proxysql.hostgroup_backends_status | online, shunned, offline_soft, offline_hard | backends |
-
-### Per backend
-
-These metrics refer to the backend server.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| hostgroup | backend server hostgroup |
-| host | backend server host |
-| port | backend server port |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| proxysql.backend_status | online, shunned, offline_soft, offline_hard | status |
-| proxysql.backend_connections_usage | free, used | connections |
-| proxysql.backend_connections_rate | succeed, failed | connections/s |
-| proxysql.backend_queries_rate | queries | queries/s |
-| proxysql.backend_traffic | recv, send | B/s |
-| proxysql.backend_latency | latency | microseconds |
-
-
-
-## Functions
-
-This collector exposes real-time functions for interactive troubleshooting in the Live tab.
-
-
-### Top Queries
-
-Retrieves aggregated query statistics from ProxySQL's [stats_mysql_query_digest](https://proxysql.com/documentation/stats-statistics/#stats_mysql_query_digest) table.
-
-This function queries the `stats_mysql_query_digest` table which stores runtime statistics for all queries proxied through ProxySQL, aggregated by query digest (normalized query pattern). It provides timing metrics, execution counts, and error statistics for each unique query pattern.
-
-Use cases:
-- Identify slow queries consuming excessive total execution time
-- Find high-frequency queries that may benefit from caching
-- Monitor query error rates across backends
-
-Query text is truncated at 4096 characters for display purposes.
-
-
-| Aspect | Description |
-|:-------|:------------|
-| Name | `Proxysql:top-queries` |
-| Require Cloud | yes |
-| Performance | Queries ProxySQL admin interface for digest statistics:<br/>• Reads from in-memory `stats_mysql_query_digest` table<br/>• Default limit of 500 rows balances completeness with performance<br/>• Data is aggregated in-memory by ProxySQL from active connections |
-| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data embedded in queries<br/>• Access should be restricted to authorized personnel only |
-| Availability | Available when:<br/>• The collector has successfully connected to ProxySQL admin interface<br/>• Returns HTTP 503 if the connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
-
-#### Prerequisites
-
-No additional configuration is required.
-
-#### Parameters
-
-| Parameter | Type | Description | Required | Default | Options |
-|:---------|:-----|:------------|:--------:|:--------|:--------|
-| Filter By | select | Select the primary sort column. Options include total execution time, number of calls, rows affected, rows sent, errors, and warnings. Defaults to total time to focus on most resource-intensive queries. | yes | totalTime |  |
-
-#### Returns
-
-Aggregated query digest statistics from ProxySQL, providing comprehensive performance analysis across all monitored MySQL backends. Each row represents a unique query pattern (normalized digest) with cumulative metrics across all its executions.
-
-| Column | Type | Unit | Visibility | Description |
-|:-------|:-----|:-----|:-----------|:------------|
-| Digest | string |  | hidden | Unique hash identifier for normalized query pattern. Queries with identical structure but different literal values share the same digest. |
-| Query | string |  |  | The SQL query text with literal values truncated at 4096 characters. Use this to identify the actual SQL being executed and spot parameterized queries or injection risks. |
-| Schema | string |  |  | Database name where the query was executed. Essential for multi-database analysis to identify which database or backend is experiencing query load. |
-| User | string |  | hidden | MySQL username used to execute the query. Useful for identifying application users or connection pool attribution. |
-| Hostgroup | integer |  | hidden | Backend hostgroup identifier from ProxySQL configuration. Allows grouping queries by backend server for multi-backend analysis. |
-| Calls | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries that may impact server performance significantly. |
-| Total Time | duration | milliseconds |  | Cumulative execution time across all query executions. This is a key metric for identifying the most resource-intensive queries in terms of total server time consumption. |
-| Avg Time | duration | milliseconds |  | Average execution time per query run. Compare with Total Time to determine if individual executions or high frequency drives resource usage. |
-| Min Time | duration | milliseconds | hidden | Minimum execution time observed. Helps identify variability in query performance and spot potential optimization opportunities for outliers. |
-| Max Time | duration | milliseconds | hidden | Maximum execution time observed. Large gaps between Min Time and Max Time may indicate performance instability due to parameter sniffing, data skew, or lock contention. |
-| Rows Affected | integer |  |  | Total number of rows modified by INSERT, UPDATE, DELETE, or REPLACE statements. Useful for tracking write workloads and data modification patterns. |
-| Rows Sent | integer |  |  | Total number of rows returned to the client by SELECT statements. High values may indicate queries returning large result sets that consume significant network bandwidth and client resources. |
-| Errors | integer |  |  | Total number of times this query pattern resulted in an error. Non-zero values require investigation into the underlying SQL syntax, permission issues, or constraint violations. |
-| Warnings | integer |  |  | Total number of times this query pattern generated a warning. Warnings may indicate data type conversions, NULL handling issues, or other non-critical SQL problems that should be reviewed. |
-| First Seen | string |  | hidden | Timestamp when this query pattern was first observed. Helps identify new queries that may have been introduced by application changes or code deployments. |
-| Last Seen | string |  | hidden | Timestamp when this query pattern was last executed. Can help identify stale queries that are no longer in use or to track recent query activity. |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ proxysql_hostgroup_no_online_backends ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.hostgroup_backends_status | ProxySQL hostgroup ${label:hostgroup} has no ONLINE backends |
-| [ proxysql_backend_shunned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend SHUNNED (${label:host}:${label:port} hostgroup ${label:hostgroup}) |
-| [ proxysql_backend_offline_hard ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend OFFLINE_HARD (${label:host}:${label:port} hostgroup ${label:hostgroup}) |
-
-
 ## Setup
 
 
@@ -373,6 +176,203 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ proxysql_hostgroup_no_online_backends ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.hostgroup_backends_status | ProxySQL hostgroup ${label:hostgroup} has no ONLINE backends |
+| [ proxysql_backend_shunned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend SHUNNED (${label:host}:${label:port} hostgroup ${label:hostgroup}) |
+| [ proxysql_backend_offline_hard ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend OFFLINE_HARD (${label:host}:${label:port} hostgroup ${label:hostgroup}) |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per ProxySQL instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| proxysql.client_connections_count | connected, non_idle, hostgroup_locked | connections |
+| proxysql.client_connections_rate | created, aborted | connections/s |
+| proxysql.server_connections_count | connected | connections |
+| proxysql.server_connections_rate | created, aborted, delayed | connections/s |
+| proxysql.backends_traffic | recv, sent | B/s |
+| proxysql.clients_traffic | recv, sent | B/s |
+| proxysql.active_transactions_count | client | connections |
+| proxysql.questions_rate | questions | questions/s |
+| proxysql.slow_queries_rate | slow | queries/s |
+| proxysql.queries_rate | autocommit, autocommit_filtered, commit_filtered, rollback, rollback_filtered, backend_change_user, backend_init_db, backend_set_names, frontend_init_db, frontend_set_names, frontend_use_db | queries/s |
+| proxysql.backend_statements_count | total, unique | statements |
+| proxysql.backend_statements_rate | prepare, execute, close | statements/s |
+| proxysql.client_statements_count | total, unique | statements |
+| proxysql.client_statements_rate | prepare, execute, close | statements/s |
+| proxysql.cached_statements_count | cached | statements |
+| proxysql.query_cache_entries_count | entries | entries |
+| proxysql.query_cache_memory_used | used | B |
+| proxysql.query_cache_io | in, out | B/s |
+| proxysql.query_cache_requests_rate | read, write, read_success | requests/s |
+| proxysql.mysql_monitor_workers_count | workers, auxiliary | threads |
+| proxysql.mysql_monitor_workers_rate | started | workers/s |
+| proxysql.mysql_monitor_connect_checks_rate | succeed, failed | checks/s |
+| proxysql.mysql_monitor_ping_checks_rate | succeed, failed | checks/s |
+| proxysql.mysql_monitor_read_only_checks_rate | succeed, failed | checks/s |
+| proxysql.mysql_monitor_replication_lag_checks_rate | succeed, failed | checks/s |
+| proxysql.jemalloc_memory_used | active, allocated, mapped, metadata, resident, retained | B |
+| proxysql.memory_used | auth, sqlite3, query_digest, query_rules, firewall_users_table, firewall_users_config, firewall_rules_table, firewall_rules_config, mysql_threads, admin_threads, cluster_threads | B |
+| proxysql.uptime | uptime | seconds |
+
+### Per command
+
+These metrics refer to the SQL command.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| command | SQL command. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| proxysql.mysql_command_execution_rate | uptime | seconds |
+| proxysql.mysql_command_execution_time | time | microseconds |
+| proxysql.mysql_command_execution_duration | 100us, 500us, 1ms, 5ms, 10ms, 50ms, 100ms, 500ms, 1s, 5s, 10s, +Inf | microseconds |
+
+### Per user
+
+These metrics refer to the user.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| user | username from the mysql_users table |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| proxysql.mysql_user_connections_utilization | used | percentage |
+| proxysql.mysql_user_connections_count | used | connections |
+
+### Per hostgroup
+
+These metrics refer to the backends hostgroup.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| hostgroup | hostgroup identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| proxysql.hostgroup_backends_status | online, shunned, offline_soft, offline_hard | backends |
+
+### Per backend
+
+These metrics refer to the backend server.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| hostgroup | backend server hostgroup |
+| host | backend server host |
+| port | backend server port |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| proxysql.backend_status | online, shunned, offline_soft, offline_hard | status |
+| proxysql.backend_connections_usage | free, used | connections |
+| proxysql.backend_connections_rate | succeed, failed | connections/s |
+| proxysql.backend_queries_rate | queries | queries/s |
+| proxysql.backend_traffic | recv, send | B/s |
+| proxysql.backend_latency | latency | microseconds |
+
+
+
+## Live Data
+
+This collector exposes real-time functions for interactive troubleshooting in the Live tab.
+
+
+### Top Queries
+
+Retrieves aggregated query statistics from ProxySQL's [stats_mysql_query_digest](https://proxysql.com/documentation/stats-statistics/#stats_mysql_query_digest) table.
+
+This function queries the `stats_mysql_query_digest` table which stores runtime statistics for all queries proxied through ProxySQL, aggregated by query digest (normalized query pattern). It provides timing metrics, execution counts, and error statistics for each unique query pattern.
+
+Use cases:
+- Identify slow queries consuming excessive total execution time
+- Find high-frequency queries that may benefit from caching
+- Monitor query error rates across backends
+
+Query text is truncated at 4096 characters for display purposes.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Proxysql:top-queries` |
+| Require Cloud | yes |
+| Performance | Queries ProxySQL admin interface for digest statistics:<br/>• Reads from in-memory `stats_mysql_query_digest` table<br/>• Default limit of 500 rows balances completeness with performance<br/>• Data is aggregated in-memory by ProxySQL from active connections |
+| Security | Query text may contain unmasked literal values including potentially sensitive data:<br/>• Personal information in WHERE clauses or INSERT values<br/>• Business data embedded in queries<br/>• Access should be restricted to authorized personnel only |
+| Availability | Available when:<br/>• The collector has successfully connected to ProxySQL admin interface<br/>• Returns HTTP 503 if the connection cannot be established<br/>• Returns HTTP 500 if the query fails<br/>• Returns HTTP 504 if the query times out |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Filter By | select | Select the primary sort column. Options include total execution time, number of calls, rows affected, rows sent, errors, and warnings. Defaults to total time to focus on most resource-intensive queries. | yes | totalTime |  |
+
+#### Returns
+
+Aggregated query digest statistics from ProxySQL, providing comprehensive performance analysis across all monitored MySQL backends. Each row represents a unique query pattern (normalized digest) with cumulative metrics across all its executions.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Digest | string |  | hidden | Unique hash identifier for normalized query pattern. Queries with identical structure but different literal values share the same digest. |
+| Query | string |  |  | The SQL query text with literal values truncated at 4096 characters. Use this to identify the actual SQL being executed and spot parameterized queries or injection risks. |
+| Schema | string |  |  | Database name where the query was executed. Essential for multi-database analysis to identify which database or backend is experiencing query load. |
+| User | string |  | hidden | MySQL username used to execute the query. Useful for identifying application users or connection pool attribution. |
+| Hostgroup | integer |  | hidden | Backend hostgroup identifier from ProxySQL configuration. Allows grouping queries by backend server for multi-backend analysis. |
+| Calls | integer |  |  | Total number of times this query pattern has been executed. High values indicate frequently run queries that may impact server performance significantly. |
+| Total Time | duration | milliseconds |  | Cumulative execution time across all query executions. This is a key metric for identifying the most resource-intensive queries in terms of total server time consumption. |
+| Avg Time | duration | milliseconds |  | Average execution time per query run. Compare with Total Time to determine if individual executions or high frequency drives resource usage. |
+| Min Time | duration | milliseconds | hidden | Minimum execution time observed. Helps identify variability in query performance and spot potential optimization opportunities for outliers. |
+| Max Time | duration | milliseconds | hidden | Maximum execution time observed. Large gaps between Min Time and Max Time may indicate performance instability due to parameter sniffing, data skew, or lock contention. |
+| Rows Affected | integer |  |  | Total number of rows modified by INSERT, UPDATE, DELETE, or REPLACE statements. Useful for tracking write workloads and data modification patterns. |
+| Rows Sent | integer |  |  | Total number of rows returned to the client by SELECT statements. High values may indicate queries returning large result sets that consume significant network bandwidth and client resources. |
+| Errors | integer |  |  | Total number of times this query pattern resulted in an error. Non-zero values require investigation into the underlying SQL syntax, permission issues, or constraint violations. |
+| Warnings | integer |  |  | Total number of times this query pattern generated a warning. Warnings may indicate data type conversions, NULL handling issues, or other non-critical SQL problems that should be reviewed. |
+| First Seen | string |  | hidden | Timestamp when this query pattern was first observed. Helps identify new queries that may have been introduced by application changes or code deployments. |
+| Last Seen | string |  | hidden | Timestamp when this query pattern was last executed. Can help identify stale queries that are no longer in use or to track recent query activity. |
 
 
 

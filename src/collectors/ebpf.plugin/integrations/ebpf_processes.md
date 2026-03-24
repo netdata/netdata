@@ -52,77 +52,6 @@ The default configuration for this integration does not impose any limits on dat
 
 This thread will add overhead every time that an internal kernel function monitored by this thread is called.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per eBPF Processes instance
-
-These metrics show total number of calls to functions inside kernel.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.process_thread | process | calls/s |
-| system.process_status | process, zombie | difference |
-| system.exit | process | calls/s |
-| system.task_error | task | calls/s |
-
-### Per apps
-
-These Metrics show grouped information per apps group.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| app_group | The name of the group defined in the configuration. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.process_create | calls | calls/s |
-| app.thread_create | call | calls/s |
-| app.task_exit | call | calls/s |
-| app.task_close | call | calls/s |
-| app.task_error | app | calls/s |
-
-### Per cgroup
-
-These Metrics show grouped information per cgroup/service.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.process_create | process | calls/s |
-| cgroup.thread_create | thread | calls/s |
-| cgroup.task_exit | exit | calls/s |
-| cgroup.task_close | process | calls/s |
-| cgroup.task_error | process | calls/s |
-| services.process_create | a dimension per systemd service | calls/s |
-| services.thread_create | a dimension per systemd service | calls/s |
-| services.task_close | a dimension per systemd service | calls/s |
-| services.task_exit | a dimension per systemd service | calls/s |
-| services.task_error | a dimension per systemd service | calls/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -203,5 +132,76 @@ sudo ./edit-config ebpf.d/process.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per eBPF Processes instance
+
+These metrics show total number of calls to functions inside kernel.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.process_thread | process | calls/s |
+| system.process_status | process, zombie | difference |
+| system.exit | process | calls/s |
+| system.task_error | task | calls/s |
+
+### Per apps
+
+These Metrics show grouped information per apps group.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| app.process_create | calls | calls/s |
+| app.thread_create | call | calls/s |
+| app.task_exit | call | calls/s |
+| app.task_close | call | calls/s |
+| app.task_error | app | calls/s |
+
+### Per cgroup
+
+These Metrics show grouped information per cgroup/service.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cgroup.process_create | process | calls/s |
+| cgroup.thread_create | thread | calls/s |
+| cgroup.task_exit | exit | calls/s |
+| cgroup.task_close | process | calls/s |
+| cgroup.task_error | process | calls/s |
+| services.process_create | a dimension per systemd service | calls/s |
+| services.thread_create | a dimension per systemd service | calls/s |
+| services.task_close | a dimension per systemd service | calls/s |
+| services.task_exit | a dimension per systemd service | calls/s |
+| services.task_error | a dimension per systemd service | calls/s |
 
 

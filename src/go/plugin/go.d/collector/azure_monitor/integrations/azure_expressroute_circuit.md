@@ -57,58 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.express_route_circuit.arp_availability | average | percentage |
-| azure_monitor.express_route_circuit.bgp_availability | average | percentage |
-| azure_monitor.express_route_circuit.throughput | in, out | bits/s |
-| azure_monitor.express_route_circuit.bandwidth_utilization | ingress, egress | percentage |
-| azure_monitor.express_route_circuit.qos_dropped_bits | in, out | bits/s |
-| azure_monitor.express_route_circuit.fastpath_routes | maximum | routes |
-| azure_monitor.express_route_circuit.global_reach_throughput | in, out | bits/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_express_route_circuit_arp_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.arp_availability | ExpressRoute ARP availability on ${label:resource_name} |
-| [ am_express_route_circuit_bgp_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.bgp_availability | ExpressRoute BGP availability on ${label:resource_name} |
-| [ am_express_route_circuit_ingress_bandwidth_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.bandwidth_utilization | ExpressRoute ingress bandwidth on ${label:resource_name} |
-| [ am_express_route_circuit_egress_bandwidth_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.bandwidth_utilization | ExpressRoute egress bandwidth on ${label:resource_name} |
-| [ am_express_route_circuit_qos_drop_in ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.qos_dropped_bits | ExpressRoute QoS ingress drops on ${label:resource_name} |
-| [ am_express_route_circuit_qos_drop_out ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.qos_dropped_bits | ExpressRoute QoS egress drops on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -327,6 +275,58 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_express_route_circuit_arp_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.arp_availability | ExpressRoute ARP availability on ${label:resource_name} |
+| [ am_express_route_circuit_bgp_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.bgp_availability | ExpressRoute BGP availability on ${label:resource_name} |
+| [ am_express_route_circuit_ingress_bandwidth_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.bandwidth_utilization | ExpressRoute ingress bandwidth on ${label:resource_name} |
+| [ am_express_route_circuit_egress_bandwidth_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.bandwidth_utilization | ExpressRoute egress bandwidth on ${label:resource_name} |
+| [ am_express_route_circuit_qos_drop_in ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.qos_dropped_bits | ExpressRoute QoS ingress drops on ${label:resource_name} |
+| [ am_express_route_circuit_qos_drop_out ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_circuit.conf) | azure_monitor.express_route_circuit.qos_dropped_bits | ExpressRoute QoS egress drops on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.express_route_circuit.arp_availability | average | percentage |
+| azure_monitor.express_route_circuit.bgp_availability | average | percentage |
+| azure_monitor.express_route_circuit.throughput | in, out | bits/s |
+| azure_monitor.express_route_circuit.bandwidth_utilization | ingress, egress | percentage |
+| azure_monitor.express_route_circuit.qos_dropped_bits | in, out | bits/s |
+| azure_monitor.express_route_circuit.fastpath_routes | maximum | routes |
+| azure_monitor.express_route_circuit.global_reach_throughput | in, out | bits/s |
 
 
 

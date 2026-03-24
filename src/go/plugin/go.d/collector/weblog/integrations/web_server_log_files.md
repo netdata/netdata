@@ -46,108 +46,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Web server log files instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| web_log.requests | requests | requests/s |
-| web_log.excluded_requests | unmatched | requests/s |
-| web_log.type_requests | success, bad, redirect, error | requests/s |
-| web_log.status_code_class_responses | 1xx, 2xx, 3xx, 4xx, 5xx | responses/s |
-| web_log.status_code_class_1xx_responses | a dimension per 1xx code | responses/s |
-| web_log.status_code_class_2xx_responses | a dimension per 2xx code | responses/s |
-| web_log.status_code_class_3xx_responses | a dimension per 3xx code | responses/s |
-| web_log.status_code_class_4xx_responses | a dimension per 4xx code | responses/s |
-| web_log.status_code_class_5xx_responses | a dimension per 5xx code | responses/s |
-| web_log.bandwidth | received, sent | kilobits/s |
-| web_log.request_processing_time | min, max, avg | milliseconds |
-| web_log.requests_processing_time_histogram | a dimension per bucket | requests/s |
-| web_log.upstream_response_time | min, max, avg | milliseconds |
-| web_log.upstream_responses_time_histogram | a dimension per bucket | requests/s |
-| web_log.current_poll_uniq_clients | ipv4, ipv6 | clients |
-| web_log.vhost_requests | a dimension per vhost | requests/s |
-| web_log.port_requests | a dimension per port | requests/s |
-| web_log.scheme_requests | http, https | requests/s |
-| web_log.http_method_requests | a dimension per HTTP method | requests/s |
-| web_log.http_version_requests | a dimension per HTTP version | requests/s |
-| web_log.ip_proto_requests | ipv4, ipv6 | requests/s |
-| web_log.ssl_proto_requests | a dimension per SSL protocol | requests/s |
-| web_log.ssl_cipher_suite_requests | a dimension per SSL cipher suite | requests/s |
-| web_log.url_pattern_requests | a dimension per URL pattern | requests/s |
-| web_log.custom_field_pattern_requests | a dimension per custom field pattern | requests/s |
-
-### Per custom time field
-
-TBD
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| web_log.custom_time_field_summary | min, max, avg | milliseconds |
-| web_log.custom_time_field_histogram | a dimension per bucket | observations |
-
-### Per custom numeric field
-
-TBD
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| web_log.custom_numeric_field_{{field_name}}_summary | min, max, avg | {{units}} |
-
-### Per URL pattern
-
-TBD
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| web_log.url_pattern_status_code_responses | a dimension per pattern | responses/s |
-| web_log.url_pattern_http_method_requests | a dimension per HTTP method | requests/s |
-| web_log.url_pattern_bandwidth | received, sent | kilobits/s |
-| web_log.url_pattern_request_processing_time | min, max, avg | milliseconds |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ web_log_1m_unmatched ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.excluded_requests | percentage of unparsed log lines over the last minute |
-| [ web_log_1m_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.type_requests | ratio of successful HTTP requests over the last minute (1xx, 2xx, 304, 401) |
-| [ web_log_1m_redirects ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.type_requests | ratio of redirection HTTP requests over the last minute (3xx except 304) |
-| [ web_log_1m_bad_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.type_requests | ratio of client error HTTP requests over the last minute (4xx except 401) |
-| [ web_log_1m_internal_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.type_requests | ratio of server error HTTP requests over the last minute (5xx) |
-| [ web_log_web_slow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.request_processing_time | average HTTP response time over the last 1 minute |
-| [ web_log_5m_requests_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.type_requests | ratio of successful HTTP requests over over the last 5 minutes, compared with the previous 5 minutes |
-
-
 ## Setup
 
 
@@ -380,6 +278,108 @@ sudo ./edit-config go.d/web_log.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ web_log_1m_unmatched ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.excluded_requests | percentage of unparsed log lines over the last minute |
+| [ web_log_1m_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.type_requests | ratio of successful HTTP requests over the last minute (1xx, 2xx, 304, 401) |
+| [ web_log_1m_redirects ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.type_requests | ratio of redirection HTTP requests over the last minute (3xx except 304) |
+| [ web_log_1m_bad_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.type_requests | ratio of client error HTTP requests over the last minute (4xx except 401) |
+| [ web_log_1m_internal_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.type_requests | ratio of server error HTTP requests over the last minute (5xx) |
+| [ web_log_web_slow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.request_processing_time | average HTTP response time over the last 1 minute |
+| [ web_log_5m_requests_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.type_requests | ratio of successful HTTP requests over over the last 5 minutes, compared with the previous 5 minutes |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Web server log files instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| web_log.requests | requests | requests/s |
+| web_log.excluded_requests | unmatched | requests/s |
+| web_log.type_requests | success, bad, redirect, error | requests/s |
+| web_log.status_code_class_responses | 1xx, 2xx, 3xx, 4xx, 5xx | responses/s |
+| web_log.status_code_class_1xx_responses | a dimension per 1xx code | responses/s |
+| web_log.status_code_class_2xx_responses | a dimension per 2xx code | responses/s |
+| web_log.status_code_class_3xx_responses | a dimension per 3xx code | responses/s |
+| web_log.status_code_class_4xx_responses | a dimension per 4xx code | responses/s |
+| web_log.status_code_class_5xx_responses | a dimension per 5xx code | responses/s |
+| web_log.bandwidth | received, sent | kilobits/s |
+| web_log.request_processing_time | min, max, avg | milliseconds |
+| web_log.requests_processing_time_histogram | a dimension per bucket | requests/s |
+| web_log.upstream_response_time | min, max, avg | milliseconds |
+| web_log.upstream_responses_time_histogram | a dimension per bucket | requests/s |
+| web_log.current_poll_uniq_clients | ipv4, ipv6 | clients |
+| web_log.vhost_requests | a dimension per vhost | requests/s |
+| web_log.port_requests | a dimension per port | requests/s |
+| web_log.scheme_requests | http, https | requests/s |
+| web_log.http_method_requests | a dimension per HTTP method | requests/s |
+| web_log.http_version_requests | a dimension per HTTP version | requests/s |
+| web_log.ip_proto_requests | ipv4, ipv6 | requests/s |
+| web_log.ssl_proto_requests | a dimension per SSL protocol | requests/s |
+| web_log.ssl_cipher_suite_requests | a dimension per SSL cipher suite | requests/s |
+| web_log.url_pattern_requests | a dimension per URL pattern | requests/s |
+| web_log.custom_field_pattern_requests | a dimension per custom field pattern | requests/s |
+
+### Per custom time field
+
+TBD
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| web_log.custom_time_field_summary | min, max, avg | milliseconds |
+| web_log.custom_time_field_histogram | a dimension per bucket | observations |
+
+### Per custom numeric field
+
+TBD
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| web_log.custom_numeric_field_{{field_name}}_summary | min, max, avg | {{units}} |
+
+### Per URL pattern
+
+TBD
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| web_log.url_pattern_status_code_responses | a dimension per pattern | responses/s |
+| web_log.url_pattern_http_method_requests | a dimension per HTTP method | requests/s |
+| web_log.url_pattern_bandwidth | received, sent | kilobits/s |
+| web_log.url_pattern_request_processing_time | min, max, avg | milliseconds |
 
 
 

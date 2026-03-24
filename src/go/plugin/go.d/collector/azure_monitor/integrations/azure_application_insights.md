@@ -57,80 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.application_insights.availability_percentage | average | percentage |
-| azure_monitor.application_insights.availability_tests | tests | tests/s |
-| azure_monitor.application_insights.availability_duration | average | milliseconds |
-| azure_monitor.application_insights.server_requests | total, failed | requests/s |
-| azure_monitor.application_insights.server_request_rate | average | requests/s |
-| azure_monitor.application_insights.server_response_time | average | milliseconds |
-| azure_monitor.application_insights.dependency_calls | total, failed | calls/s |
-| azure_monitor.application_insights.dependency_duration | average | milliseconds |
-| azure_monitor.application_insights.exceptions | total, browser, server | exceptions/s |
-| azure_monitor.application_insights.browser_page_load_time | total | milliseconds |
-| azure_monitor.application_insights.browser_timing_breakdown | network, send, receive, processing | milliseconds |
-| azure_monitor.application_insights.cpu_utilization | process, processor | percentage |
-| azure_monitor.application_insights.memory | available, private | bytes |
-| azure_monitor.application_insights.process_io_rate | average | bytes/s |
-| azure_monitor.application_insights.exception_rate | average | exceptions/s |
-| azure_monitor.application_insights.http_request_execution_time | average | milliseconds |
-| azure_monitor.application_insights.http_request_queue | queued | requests |
-| azure_monitor.application_insights.http_request_rate | average | requests/s |
-| azure_monitor.application_insights.page_views | views | views/s |
-| azure_monitor.application_insights.page_view_load_time | average | milliseconds |
-| azure_monitor.application_insights.traces | traces | traces/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_appinsights_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.availability_percentage | App Insights availability on ${label:resource_name} |
-| [ am_appinsights_availability_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.availability_duration | App Insights availability test duration on ${label:resource_name} |
-| [ am_appinsights_failed_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.server_requests | App Insights failed requests on ${label:resource_name} |
-| [ am_appinsights_response_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.server_response_time | App Insights server response time on ${label:resource_name} |
-| [ am_appinsights_failed_dependencies ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.dependency_calls | App Insights failed dependencies on ${label:resource_name} |
-| [ am_appinsights_dependency_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.dependency_duration | App Insights dependency duration on ${label:resource_name} |
-| [ am_appinsights_exception_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.exception_rate | App Insights exception rate on ${label:resource_name} |
-| [ am_appinsights_server_exceptions ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.exceptions | App Insights server exceptions on ${label:resource_name} |
-| [ am_appinsights_browser_page_load_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.browser_page_load_time | App Insights browser page load time on ${label:resource_name} |
-| [ am_appinsights_process_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.cpu_utilization | App Insights process CPU on ${label:resource_name} |
-| [ am_appinsights_processor_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.cpu_utilization | App Insights processor CPU on ${label:resource_name} |
-| [ am_appinsights_http_execution_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.http_request_execution_time | App Insights HTTP execution time on ${label:resource_name} |
-| [ am_appinsights_http_queue_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.http_request_queue | App Insights HTTP request queue on ${label:resource_name} |
-| [ am_appinsights_page_view_load_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.page_view_load_time | App Insights page view load time on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -349,6 +275,80 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_appinsights_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.availability_percentage | App Insights availability on ${label:resource_name} |
+| [ am_appinsights_availability_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.availability_duration | App Insights availability test duration on ${label:resource_name} |
+| [ am_appinsights_failed_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.server_requests | App Insights failed requests on ${label:resource_name} |
+| [ am_appinsights_response_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.server_response_time | App Insights server response time on ${label:resource_name} |
+| [ am_appinsights_failed_dependencies ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.dependency_calls | App Insights failed dependencies on ${label:resource_name} |
+| [ am_appinsights_dependency_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.dependency_duration | App Insights dependency duration on ${label:resource_name} |
+| [ am_appinsights_exception_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.exception_rate | App Insights exception rate on ${label:resource_name} |
+| [ am_appinsights_server_exceptions ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.exceptions | App Insights server exceptions on ${label:resource_name} |
+| [ am_appinsights_browser_page_load_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.browser_page_load_time | App Insights browser page load time on ${label:resource_name} |
+| [ am_appinsights_process_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.cpu_utilization | App Insights process CPU on ${label:resource_name} |
+| [ am_appinsights_processor_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.cpu_utilization | App Insights processor CPU on ${label:resource_name} |
+| [ am_appinsights_http_execution_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.http_request_execution_time | App Insights HTTP execution time on ${label:resource_name} |
+| [ am_appinsights_http_queue_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.http_request_queue | App Insights HTTP request queue on ${label:resource_name} |
+| [ am_appinsights_page_view_load_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.page_view_load_time | App Insights page view load time on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.application_insights.availability_percentage | average | percentage |
+| azure_monitor.application_insights.availability_tests | tests | tests/s |
+| azure_monitor.application_insights.availability_duration | average | milliseconds |
+| azure_monitor.application_insights.server_requests | total, failed | requests/s |
+| azure_monitor.application_insights.server_request_rate | average | requests/s |
+| azure_monitor.application_insights.server_response_time | average | milliseconds |
+| azure_monitor.application_insights.dependency_calls | total, failed | calls/s |
+| azure_monitor.application_insights.dependency_duration | average | milliseconds |
+| azure_monitor.application_insights.exceptions | total, browser, server | exceptions/s |
+| azure_monitor.application_insights.browser_page_load_time | total | milliseconds |
+| azure_monitor.application_insights.browser_timing_breakdown | network, send, receive, processing | milliseconds |
+| azure_monitor.application_insights.cpu_utilization | process, processor | percentage |
+| azure_monitor.application_insights.memory | available, private | bytes |
+| azure_monitor.application_insights.process_io_rate | average | bytes/s |
+| azure_monitor.application_insights.exception_rate | average | exceptions/s |
+| azure_monitor.application_insights.http_request_execution_time | average | milliseconds |
+| azure_monitor.application_insights.http_request_queue | queued | requests |
+| azure_monitor.application_insights.http_request_rate | average | requests/s |
+| azure_monitor.application_insights.page_views | views | views/s |
+| azure_monitor.application_insights.page_view_load_time | average | milliseconds |
+| azure_monitor.application_insights.traces | traces | traces/s |
 
 
 

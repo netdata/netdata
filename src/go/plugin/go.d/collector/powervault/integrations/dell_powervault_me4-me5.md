@@ -75,157 +75,6 @@ The MCI API is lightweight and read-only. The collector's impact on the storage 
 Session keys are reused across collection cycles and automatically refreshed on expiry (HTTP 401).
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Dell PowerVault ME4/ME5 instance
-
-These metrics refer to the entire monitored PowerVault array.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powervault.system_health | health | status |
-| powervault.hw_health_controller | ok, degraded, fault, unknown | controllers |
-| powervault.hw_health_drive | ok, degraded, fault, unknown | drives |
-| powervault.hw_health_fan | ok, degraded, fault, unknown | fans |
-| powervault.hw_health_psu | ok, degraded, fault, unknown | PSUs |
-| powervault.hw_health_fru | ok, degraded, fault, unknown | FRUs |
-| powervault.hw_health_port | ok, degraded, fault, unknown | ports |
-
-### Per controller
-
-These metrics refer to individual RAID controllers (typically controller_a and controller_b in a dual-controller configuration).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| controller | Controller durable ID (e.g., `controller_a`, `controller_b`). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powervault.controller_iops | iops | ops/s |
-| powervault.controller_throughput | throughput | bytes/s |
-| powervault.controller_cpu_load | cpu_load | percentage |
-| powervault.controller_write_cache_used | write_cache_used | percentage |
-| powervault.controller_forwarded_cmds | forwarded | commands |
-| powervault.controller_io | read, written | bytes |
-| powervault.controller_ops | read, write | ops |
-| powervault.controller_cache_hits | read_hits, read_misses, write_hits, write_misses | hits |
-
-### Per volume
-
-These metrics refer to individual storage volumes. Volumes can be filtered using the `volume_selector` configuration option.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| volume | Volume name (e.g., `prod-db-01`). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powervault.volume_iops | iops | ops/s |
-| powervault.volume_throughput | throughput | bytes/s |
-| powervault.volume_write_cache_percent | write_cache | percentage |
-| powervault.volume_io | read, written | bytes |
-| powervault.volume_ops | read, write | ops |
-| powervault.volume_cache_hits | read_hits, read_misses, write_hits, write_misses | hits |
-| powervault.volume_tier_distribution | ssd, sas, sata | percentage |
-
-### Per port
-
-These metrics refer to individual host ports (SAS/FC ports used for host connectivity).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| port | Port durable ID (e.g., `hostport_A0`). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powervault.port_io | read, written | bytes |
-| powervault.port_ops | read, write | ops |
-| powervault.phy_errors | disparity, lost_dwords, invalid_dwords | errors |
-
-### Per pool
-
-These metrics refer to individual storage pools (also known as disk groups or virtual pools).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| pool | Pool name (e.g., `Pool-A`). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powervault.pool_capacity | total, available | bytes |
-
-### Per drive
-
-These metrics refer to individual physical drives (HDDs and SSDs).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| drive | Drive location (e.g., `0.0` for enclosure 0, slot 0). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powervault.drive_temperature | temperature | Celsius |
-| powervault.drive_power_on_hours | power_on_hours | hours |
-| powervault.drive_ssd_life_left | life_left | percentage |
-
-### Per sensor
-
-These metrics refer to individual hardware sensors. Sensor types include temperature,
-voltage, current, and charge capacity (supercapacitor/battery backup units).
-
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| sensor | Sensor durable ID (e.g., `sensor_temp_ctrl_A.1`). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powervault.sensor_temperature | temperature | Celsius |
-| powervault.sensor_voltage | voltage | millivolts |
-| powervault.sensor_current | current | milliamps |
-| powervault.sensor_charge_capacity | charge_capacity | percentage |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -411,6 +260,157 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Dell PowerVault ME4/ME5 instance
+
+These metrics refer to the entire monitored PowerVault array.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powervault.system_health | health | status |
+| powervault.hw_health_controller | ok, degraded, fault, unknown | controllers |
+| powervault.hw_health_drive | ok, degraded, fault, unknown | drives |
+| powervault.hw_health_fan | ok, degraded, fault, unknown | fans |
+| powervault.hw_health_psu | ok, degraded, fault, unknown | PSUs |
+| powervault.hw_health_fru | ok, degraded, fault, unknown | FRUs |
+| powervault.hw_health_port | ok, degraded, fault, unknown | ports |
+
+### Per controller
+
+These metrics refer to individual RAID controllers (typically controller_a and controller_b in a dual-controller configuration).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| controller | Controller durable ID (e.g., `controller_a`, `controller_b`). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powervault.controller_iops | iops | ops/s |
+| powervault.controller_throughput | throughput | bytes/s |
+| powervault.controller_cpu_load | cpu_load | percentage |
+| powervault.controller_write_cache_used | write_cache_used | percentage |
+| powervault.controller_forwarded_cmds | forwarded | commands |
+| powervault.controller_io | read, written | bytes |
+| powervault.controller_ops | read, write | ops |
+| powervault.controller_cache_hits | read_hits, read_misses, write_hits, write_misses | hits |
+
+### Per volume
+
+These metrics refer to individual storage volumes. Volumes can be filtered using the `volume_selector` configuration option.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| volume | Volume name (e.g., `prod-db-01`). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powervault.volume_iops | iops | ops/s |
+| powervault.volume_throughput | throughput | bytes/s |
+| powervault.volume_write_cache_percent | write_cache | percentage |
+| powervault.volume_io | read, written | bytes |
+| powervault.volume_ops | read, write | ops |
+| powervault.volume_cache_hits | read_hits, read_misses, write_hits, write_misses | hits |
+| powervault.volume_tier_distribution | ssd, sas, sata | percentage |
+
+### Per port
+
+These metrics refer to individual host ports (SAS/FC ports used for host connectivity).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| port | Port durable ID (e.g., `hostport_A0`). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powervault.port_io | read, written | bytes |
+| powervault.port_ops | read, write | ops |
+| powervault.phy_errors | disparity, lost_dwords, invalid_dwords | errors |
+
+### Per pool
+
+These metrics refer to individual storage pools (also known as disk groups or virtual pools).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| pool | Pool name (e.g., `Pool-A`). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powervault.pool_capacity | total, available | bytes |
+
+### Per drive
+
+These metrics refer to individual physical drives (HDDs and SSDs).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| drive | Drive location (e.g., `0.0` for enclosure 0, slot 0). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powervault.drive_temperature | temperature | Celsius |
+| powervault.drive_power_on_hours | power_on_hours | hours |
+| powervault.drive_ssd_life_left | life_left | percentage |
+
+### Per sensor
+
+These metrics refer to individual hardware sensors. Sensor types include temperature,
+voltage, current, and charge capacity (supercapacitor/battery backup units).
+
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| sensor | Sensor durable ID (e.g., `sensor_temp_ctrl_A.1`). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powervault.sensor_temperature | temperature | Celsius |
+| powervault.sensor_voltage | voltage | millivolts |
+| powervault.sensor_current | current | milliamps |
+| powervault.sensor_charge_capacity | charge_capacity | percentage |
 
 
 

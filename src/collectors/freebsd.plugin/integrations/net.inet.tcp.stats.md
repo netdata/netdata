@@ -43,48 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per net.inet.tcp.stats instance
-
-These metrics show TCP connections statistics.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipv4.tcppackets | received, sent | packets/s |
-| ipv4.tcperrors | InErrs, InCsumErrors, RetransSegs | packets/s |
-| ipv4.tcphandshake | EstabResets, ActiveOpens, PassiveOpens, AttemptFails | events/s |
-| ipv4.tcpconnaborts | baddata, userclosed, nomemory, timeout, linger | connections/s |
-| ipv4.tcpofo | inqueue | packets/s |
-| ipv4.tcpsyncookies | received, sent, failed | packets/s |
-| ipv4.tcplistenissues | overflows | packets/s |
-| ipv4.ecnpkts | InCEPkts, InECT0Pkts, InECT1Pkts, OutECT0Pkts, OutECT1Pkts | packets/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ 1m_ipv4_tcp_resets_sent ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of sent TCP RESETS over the last minute |
-| [ 10s_ipv4_tcp_resets_sent ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has crashed. Netdata will not send a clear notification for this alarm. |
-| [ 1m_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of received TCP RESETS over the last minute |
-| [ 10s_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed. Netdata will not send a clear notification for this alarm. |
-
-
 ## Setup
 
 
@@ -143,5 +101,47 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ 1m_ipv4_tcp_resets_sent ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of sent TCP RESETS over the last minute |
+| [ 10s_ipv4_tcp_resets_sent ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has crashed. Netdata will not send a clear notification for this alarm. |
+| [ 1m_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of received TCP RESETS over the last minute |
+| [ 10s_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed. Netdata will not send a clear notification for this alarm. |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per net.inet.tcp.stats instance
+
+These metrics show TCP connections statistics.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ipv4.tcppackets | received, sent | packets/s |
+| ipv4.tcperrors | InErrs, InCsumErrors, RetransSegs | packets/s |
+| ipv4.tcphandshake | EstabResets, ActiveOpens, PassiveOpens, AttemptFails | events/s |
+| ipv4.tcpconnaborts | baddata, userclosed, nomemory, timeout, linger | connections/s |
+| ipv4.tcpofo | inqueue | packets/s |
+| ipv4.tcpsyncookies | received, sent, failed | packets/s |
+| ipv4.tcplistenissues | overflows | packets/s |
+| ipv4.ecnpkts | InCEPkts, InECT0Pkts, InECT1Pkts, OutECT0Pkts, OutECT1Pkts | packets/s |
 
 

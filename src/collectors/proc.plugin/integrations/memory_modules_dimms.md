@@ -57,6 +57,45 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ ecc_memory_mc_noinfo_correctable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_errors | memory controller ${label:controller} ECC correctable errors (unknown DIMM slot) |
+| [ ecc_memory_mc_noinfo_uncorrectable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_errors | memory controller ${label:controller} ECC uncorrectable errors (unknown DIMM slot) |
+| [ ecc_memory_dimm_correctable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_dimm_errors | DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC correctable errors |
+| [ ecc_memory_dimm_uncorrectable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_dimm_errors | DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC uncorrectable errors |
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -106,44 +145,5 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | mem.edac_mc_errors | correctable, uncorrectable | errors |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ ecc_memory_mc_noinfo_correctable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_errors | memory controller ${label:controller} ECC correctable errors (unknown DIMM slot) |
-| [ ecc_memory_mc_noinfo_uncorrectable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_errors | memory controller ${label:controller} ECC uncorrectable errors (unknown DIMM slot) |
-| [ ecc_memory_dimm_correctable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_dimm_errors | DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC correctable errors |
-| [ ecc_memory_dimm_uncorrectable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_dimm_errors | DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC uncorrectable errors |
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

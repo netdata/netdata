@@ -49,52 +49,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Certificate Service Certificate
-
-These metrics refer to the Certificate instances defined on host.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| cert | The certificate name. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| adcs.cert_requests | requests | requests/s |
-| adcs.cert_request_processing_time | processing_times | seconds |
-| adcs.cert_retrievals | retrievals | retrievals/s |
-| adcs.cert_failed_requests | failed | requests/s |
-| adcs.cert_issued_requests | issued | requests/s |
-| adcs.cert_pending_requests | pending | requests/s |
-| adcs.cert_challenge_responses | challenge | responses/s |
-| adcs.cert_retrieval_processing_time | processing_time | seconds |
-| adcs.cert_request_cryptographic_signing_time | singing_time | seconds |
-| adcs.cert_request_policy_module_processing | processing_time | seconds |
-| adcs.cert_request_policy_module_processing | processing_time | seconds |
-| adcs.cert_challenge_response_processing_time | processing_time | seconds |
-| adcs.cert_signed_certificate_timestamp_lists | processing_time | lists/s |
-| adcs.cert_signed_certificate_timestamp_lists | lists | lists/s |
-| adcs.cert_signed_certificate_timestamp_list_processing_time | processing_time | seconds |
-| adcs.cert_retrieval_processing_time | processing_time | seconds |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -142,5 +96,51 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Certificate Service Certificate
+
+These metrics refer to the Certificate instances defined on host.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| cert | The certificate name. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| adcs.cert_requests | requests | requests/s |
+| adcs.cert_request_processing_time | processing_times | seconds |
+| adcs.cert_retrievals | retrievals | retrievals/s |
+| adcs.cert_failed_requests | failed | requests/s |
+| adcs.cert_issued_requests | issued | requests/s |
+| adcs.cert_pending_requests | pending | requests/s |
+| adcs.cert_challenge_responses | challenge | responses/s |
+| adcs.cert_retrieval_processing_time | processing_time | seconds |
+| adcs.cert_request_cryptographic_signing_time | singing_time | seconds |
+| adcs.cert_request_policy_module_processing | processing_time | seconds |
+| adcs.cert_request_policy_module_processing | processing_time | seconds |
+| adcs.cert_challenge_response_processing_time | processing_time | seconds |
+| adcs.cert_signed_certificate_timestamp_lists | processing_time | lists/s |
+| adcs.cert_signed_certificate_timestamp_lists | lists | lists/s |
+| adcs.cert_signed_certificate_timestamp_list_processing_time | processing_time | seconds |
+| adcs.cert_retrieval_processing_time | processing_time | seconds |
 
 

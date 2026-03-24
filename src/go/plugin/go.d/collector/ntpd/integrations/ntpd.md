@@ -45,69 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per NTPd instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ntpd.sys_offset | offset | milliseconds |
-| ntpd.sys_jitter | system, clock | milliseconds |
-| ntpd.sys_frequency | frequency | ppm |
-| ntpd.sys_wander | clock | ppm |
-| ntpd.sys_rootdelay | delay | milliseconds |
-| ntpd.sys_rootdisp | dispersion | milliseconds |
-| ntpd.sys_stratum | stratum | stratum |
-| ntpd.sys_tc | current, minimum | log2 |
-| ntpd.sys_precision | precision | log2 |
-
-### Per peer
-
-These metrics refer to the NTPd peer.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| peer_address | peer's source IP address |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ntpd.peer_offset | offset | milliseconds |
-| ntpd.peer_delay | delay | milliseconds |
-| ntpd.peer_dispersion | dispersion | milliseconds |
-| ntpd.peer_jitter | jitter | milliseconds |
-| ntpd.peer_xleave | xleave | milliseconds |
-| ntpd.peer_rootdelay | rootdelay | milliseconds |
-| ntpd.peer_rootdisp | dispersion | milliseconds |
-| ntpd.peer_stratum | stratum | stratum |
-| ntpd.peer_hmode | hmode | hmode |
-| ntpd.peer_pmode | pmode | pmode |
-| ntpd.peer_hpoll | hpoll | log2 |
-| ntpd.peer_ppoll | ppoll | log2 |
-| ntpd.peer_precision | precision | log2 |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -238,6 +175,69 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per NTPd instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ntpd.sys_offset | offset | milliseconds |
+| ntpd.sys_jitter | system, clock | milliseconds |
+| ntpd.sys_frequency | frequency | ppm |
+| ntpd.sys_wander | clock | ppm |
+| ntpd.sys_rootdelay | delay | milliseconds |
+| ntpd.sys_rootdisp | dispersion | milliseconds |
+| ntpd.sys_stratum | stratum | stratum |
+| ntpd.sys_tc | current, minimum | log2 |
+| ntpd.sys_precision | precision | log2 |
+
+### Per peer
+
+These metrics refer to the NTPd peer.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| peer_address | peer's source IP address |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ntpd.peer_offset | offset | milliseconds |
+| ntpd.peer_delay | delay | milliseconds |
+| ntpd.peer_dispersion | dispersion | milliseconds |
+| ntpd.peer_jitter | jitter | milliseconds |
+| ntpd.peer_xleave | xleave | milliseconds |
+| ntpd.peer_rootdelay | rootdelay | milliseconds |
+| ntpd.peer_rootdisp | dispersion | milliseconds |
+| ntpd.peer_stratum | stratum | stratum |
+| ntpd.peer_hmode | hmode | hmode |
+| ntpd.peer_pmode | pmode | pmode |
+| ntpd.peer_hpoll | hpoll | log2 |
+| ntpd.peer_ppoll | ppoll | log2 |
+| ntpd.peer_precision | precision | log2 |
 
 
 

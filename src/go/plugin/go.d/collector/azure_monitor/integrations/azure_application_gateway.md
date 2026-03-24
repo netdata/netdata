@@ -57,72 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.application_gateway.throughput | average | bytes/s |
-| azure_monitor.application_gateway.traffic_volume | received, sent | bytes/s |
-| azure_monitor.application_gateway.requests | total, failed | requests/s |
-| azure_monitor.application_gateway.response_status | gateway, backend | responses/s |
-| azure_monitor.application_gateway.backend_health | healthy, unhealthy | hosts |
-| azure_monitor.application_gateway.backend_request_load | per_healthy_host | requests |
-| azure_monitor.application_gateway.backend_latency | connect, first_byte, last_byte | milliseconds |
-| azure_monitor.application_gateway.client_latency | total_time, client_rtt | milliseconds |
-| azure_monitor.application_gateway.current_connections | current | connections |
-| azure_monitor.application_gateway.new_connections | average | connections/s |
-| azure_monitor.application_gateway.websocket_connections | active | connections |
-| azure_monitor.application_gateway.websocket_close_codes | total | connections/s |
-| azure_monitor.application_gateway.capacity | capacity, compute, billed, fixed_billed | units |
-| azure_monitor.application_gateway.cpu | average | percentage |
-| azure_monitor.application_gateway.tls_connections | total | connections/s |
-| azure_monitor.application_gateway.waf_requests | total, blocked, matched | requests/s |
-| azure_monitor.application_gateway.waf_rule_matches | managed, custom, bot | matches/s |
-| azure_monitor.application_gateway.waf_challenges | captcha, js_challenge | requests/s |
-| azure_monitor.application_gateway.waf_penalty_box | size | IPs |
-| azure_monitor.application_gateway.waf_penalty_box_hits | total | hits/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_appgw_failed_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.requests | App Gateway failed requests on ${label:resource_name} |
-| [ am_appgw_unhealthy_hosts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.backend_health | App Gateway unhealthy backends on ${label:resource_name} |
-| [ am_appgw_backend_connect_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.backend_latency | App Gateway backend connect time on ${label:resource_name} |
-| [ am_appgw_backend_first_byte ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.backend_latency | App Gateway backend TTFB on ${label:resource_name} |
-| [ am_appgw_total_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.client_latency | App Gateway total request time on ${label:resource_name} |
-| [ am_appgw_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.cpu | App Gateway CPU utilization on ${label:resource_name} |
-| [ am_appgw_waf_blocked_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.waf_requests | App Gateway WAF block ratio on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -341,6 +275,72 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_appgw_failed_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.requests | App Gateway failed requests on ${label:resource_name} |
+| [ am_appgw_unhealthy_hosts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.backend_health | App Gateway unhealthy backends on ${label:resource_name} |
+| [ am_appgw_backend_connect_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.backend_latency | App Gateway backend connect time on ${label:resource_name} |
+| [ am_appgw_backend_first_byte ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.backend_latency | App Gateway backend TTFB on ${label:resource_name} |
+| [ am_appgw_total_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.client_latency | App Gateway total request time on ${label:resource_name} |
+| [ am_appgw_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.cpu | App Gateway CPU utilization on ${label:resource_name} |
+| [ am_appgw_waf_blocked_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_gateway.conf) | azure_monitor.application_gateway.waf_requests | App Gateway WAF block ratio on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.application_gateway.throughput | average | bytes/s |
+| azure_monitor.application_gateway.traffic_volume | received, sent | bytes/s |
+| azure_monitor.application_gateway.requests | total, failed | requests/s |
+| azure_monitor.application_gateway.response_status | gateway, backend | responses/s |
+| azure_monitor.application_gateway.backend_health | healthy, unhealthy | hosts |
+| azure_monitor.application_gateway.backend_request_load | per_healthy_host | requests |
+| azure_monitor.application_gateway.backend_latency | connect, first_byte, last_byte | milliseconds |
+| azure_monitor.application_gateway.client_latency | total_time, client_rtt | milliseconds |
+| azure_monitor.application_gateway.current_connections | current | connections |
+| azure_monitor.application_gateway.new_connections | average | connections/s |
+| azure_monitor.application_gateway.websocket_connections | active | connections |
+| azure_monitor.application_gateway.websocket_close_codes | total | connections/s |
+| azure_monitor.application_gateway.capacity | capacity, compute, billed, fixed_billed | units |
+| azure_monitor.application_gateway.cpu | average | percentage |
+| azure_monitor.application_gateway.tls_connections | total | connections/s |
+| azure_monitor.application_gateway.waf_requests | total, blocked, matched | requests/s |
+| azure_monitor.application_gateway.waf_rule_matches | managed, custom, bot | matches/s |
+| azure_monitor.application_gateway.waf_challenges | captcha, js_challenge | requests/s |
+| azure_monitor.application_gateway.waf_penalty_box | size | IPs |
+| azure_monitor.application_gateway.waf_penalty_box_hits | total | hits/s |
 
 
 

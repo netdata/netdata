@@ -54,42 +54,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per NGINX VTS instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nginxvts.requests_total | requests | requests/s |
-| nginxvts.active_connections | active | connections |
-| nginxvts.connections_total | reading, writing, waiting, accepted, handled | connections/s |
-| nginxvts.uptime | uptime | seconds |
-| nginxvts.shm_usage | max, used | bytes |
-| nginxvts.shm_used_node | used | nodes |
-| nginxvts.server_requests_total | requests | requests/s |
-| nginxvts.server_responses_total | 1xx, 2xx, 3xx, 4xx, 5xx | responses/s |
-| nginxvts.server_traffic_total | in, out | bytes/s |
-| nginxvts.server_cache_total | miss, bypass, expired, stale, updating, revalidated, hit, scarce | events/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -251,6 +215,42 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per NGINX VTS instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nginxvts.requests_total | requests | requests/s |
+| nginxvts.active_connections | active | connections |
+| nginxvts.connections_total | reading, writing, waiting, accepted, handled | connections/s |
+| nginxvts.uptime | uptime | seconds |
+| nginxvts.shm_usage | max, used | bytes |
+| nginxvts.shm_used_node | used | nodes |
+| nginxvts.server_requests_total | requests | requests/s |
+| nginxvts.server_responses_total | 1xx, 2xx, 3xx, 4xx, 5xx | responses/s |
+| nginxvts.server_traffic_total | in, out | bytes/s |
+| nginxvts.server_cache_total | miss, bypass, expired, stale, updating, revalidated, hit, scarce | events/s |
 
 
 

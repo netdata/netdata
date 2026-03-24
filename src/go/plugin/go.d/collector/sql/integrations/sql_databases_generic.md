@@ -98,45 +98,6 @@ Prefer indexed reads, avoid full table scans or heavy aggregations, and
 consider using database views tailored for monitoring.
 
 
-## Metrics
-
-Metrics and charts are **defined by your SQL queries and metric blocks** at runtime. They differ by database engine, schema, and configuration, and may include, for example, connection counts, cache hit ratios, row throughput, lock statistics, or custom business KPIs. Use the **Metrics** tab on the job’s dashboard to see exactly what is collected for that job.
-
-:::tip
-
- To change what is collected, edit the `metrics` (and optionally `queries`) sections in `go.d/sql.conf` for the corresponding job. Each change is reflected in Netdata charts after the next data collection.
-
-:::
-
-
-
-## Functions
-
-This collector supports user-defined SQL functions that expose query results as
-interactive table views in Netdata's **Live** tab. Functions are configured per job
-in the `functions` section of the job configuration. Since functions are entirely
-user-defined, no predefined functions are listed here.
-
-In the Live tab, functions appear in a hierarchical menu:
-
-```
-Databases
-└── SQL
-    └── <job_name>
-        ├── <function_name_1>
-        └── <function_name_2>
-```
-
-Each job creates its own group containing all functions defined for that job.
-
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -828,6 +789,45 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics and charts are **defined by your SQL queries and metric blocks** at runtime. They differ by database engine, schema, and configuration, and may include, for example, connection counts, cache hit ratios, row throughput, lock statistics, or custom business KPIs. Use the **Metrics** tab on the job’s dashboard to see exactly what is collected for that job.
+
+:::tip
+
+ To change what is collected, edit the `metrics` (and optionally `queries`) sections in `go.d/sql.conf` for the corresponding job. Each change is reflected in Netdata charts after the next data collection.
+
+:::
+
+
+
+## Live Data
+
+This collector supports user-defined SQL functions that expose query results as
+interactive table views in Netdata's **Live** tab. Functions are configured per job
+in the `functions` section of the job configuration. Since functions are entirely
+user-defined, no predefined functions are listed here.
+
+In the Live tab, functions appear in a hierarchical menu:
+
+```
+Databases
+└── SQL
+    └── <job_name>
+        ├── <function_name_1>
+        └── <function_name_2>
+```
+
+Each job creates its own group containing all functions defined for that job.
+
 
 
 

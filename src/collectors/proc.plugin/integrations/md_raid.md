@@ -44,6 +44,45 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ mdstat_last_collected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf) | md.disks | number of seconds since the last successful data collection |
+| [ mdstat_disks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf) | md.disks | number of devices in the down state for the ${label:device} ${label:raid_level} array. Any number > 0 indicates that the array is degraded. |
+| [ mdstat_mismatch_cnt ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf) | md.mismatch_cnt | number of unsynchronized blocks for the ${label:device} ${label:raid_level} array |
+| [ mdstat_nonredundant_last_collected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf) | md.nonredundant | number of seconds since the last successful data collection |
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -85,44 +124,5 @@ Metrics:
 | md.expected_time_until_operation_finish | finish_in | seconds |
 | md.operation_speed | speed | KiB/s |
 | md.nonredundant | available | boolean |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ mdstat_last_collected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf) | md.disks | number of seconds since the last successful data collection |
-| [ mdstat_disks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf) | md.disks | number of devices in the down state for the ${label:device} ${label:raid_level} array. Any number > 0 indicates that the array is degraded. |
-| [ mdstat_mismatch_cnt ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf) | md.mismatch_cnt | number of unsynchronized blocks for the ${label:device} ${label:raid_level} array |
-| [ mdstat_nonredundant_last_collected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf) | md.nonredundant | number of seconds since the last successful data collection |
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

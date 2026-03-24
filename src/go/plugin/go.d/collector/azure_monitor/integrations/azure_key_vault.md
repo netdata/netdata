@@ -57,52 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.key_vault.availability | average | percentage |
-| azure_monitor.key_vault.api_latency | average | milliseconds |
-| azure_monitor.key_vault.saturation | average | percentage |
-| azure_monitor.key_vault.api_activity | hits, results | operations/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_key_vault_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.availability | Key Vault availability on ${label:resource_name} |
-| [ am_key_vault_api_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.api_latency | Key Vault API latency on ${label:resource_name} |
-| [ am_key_vault_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.saturation | Key Vault saturation on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -321,6 +275,52 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_key_vault_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.availability | Key Vault availability on ${label:resource_name} |
+| [ am_key_vault_api_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.api_latency | Key Vault API latency on ${label:resource_name} |
+| [ am_key_vault_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.saturation | Key Vault saturation on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.key_vault.availability | average | percentage |
+| azure_monitor.key_vault.api_latency | average | milliseconds |
+| azure_monitor.key_vault.saturation | average | percentage |
+| azure_monitor.key_vault.api_activity | hits, results | operations/s |
 
 
 

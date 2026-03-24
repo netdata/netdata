@@ -44,6 +44,42 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ netfilter_conntrack_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/netfilter.conf) | netfilter.conntrack_sockets | netfilter connection tracker table size utilization |
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -68,41 +104,5 @@ Metrics:
 | netfilter.conntrack_expect | created, deleted, new | expectations/s |
 | netfilter.conntrack_search | searched, restarted, found | searches/s |
 | netfilter.conntrack_errors | icmp_error, error_failed, drop, early_drop | events/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ netfilter_conntrack_full ](https://github.com/netdata/netdata/blob/master/src/health/health.d/netfilter.conf) | netfilter.conntrack_sockets | netfilter connection tracker table size utilization |
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

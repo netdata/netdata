@@ -46,6 +46,40 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+#### Netdata flags.
+
+To have these charts you need to compile netdata with flag `NETDATA_DEV_MODE`.
+
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -74,39 +108,5 @@ Metrics:
 | netdata.ebpf_hash_tables_insert_pid_elements | thread | rows |
 | netdata.ebpf_hash_tables_remove_pid_elements | thread | rows |
 | netdata.ebpf_ipc_usage | positions | % |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
-## Setup
-
-
-### Prerequisites
-
-#### Netdata flags.
-
-To have these charts you need to compile netdata with flag `NETDATA_DEV_MODE`.
-
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

@@ -57,88 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.redis_cache.cache_hits | hits, misses | operations/s |
-| azure_monitor.redis_cache.throughput | read, write | bytes/s |
-| azure_monitor.redis_cache.server_load | maximum | percentage |
-| azure_monitor.redis_cache.cpu | maximum | percentage |
-| azure_monitor.redis_cache.memory_usage | used, rss | bytes |
-| azure_monitor.redis_cache.memory_utilization | maximum | percentage |
-| azure_monitor.redis_cache.clients | maximum | clients |
-| azure_monitor.redis_cache.operations | maximum | operations/s |
-| azure_monitor.redis_cache.commands | total | commands/s |
-| azure_monitor.redis_cache.command_types | get, set | commands/s |
-| azure_monitor.redis_cache.latency | average | microseconds |
-| azure_monitor.redis_cache.key_events | evicted, expired | keys/s |
-| azure_monitor.redis_cache.total_keys | maximum | keys |
-| azure_monitor.redis_cache.errors | maximum | errors |
-| azure_monitor.redis_cache.miss_rate | miss_rate | percentage |
-| azure_monitor.redis_cache.latency_p99 | p99 | microseconds |
-| azure_monitor.redis_cache.connection_rate | created, closed | connections/s |
-| azure_monitor.redis_cache.aad_clients | maximum | clients |
-| azure_monitor.redis_cache.instance_cache_hits | hits, misses | operations/s |
-| azure_monitor.redis_cache.instance_throughput | read, write | bytes/s |
-| azure_monitor.redis_cache.instance_server_load | server_load, cpu | percentage |
-| azure_monitor.redis_cache.instance_memory_usage | used, rss | bytes |
-| azure_monitor.redis_cache.instance_memory_utilization | maximum | percentage |
-| azure_monitor.redis_cache.instance_clients | maximum | clients |
-| azure_monitor.redis_cache.instance_operations | maximum | operations/s |
-| azure_monitor.redis_cache.instance_commands | total, get, set | commands/s |
-| azure_monitor.redis_cache.instance_total_keys | maximum | keys |
-| azure_monitor.redis_cache.instance_key_events | evicted, expired | keys/s |
-| azure_monitor.redis_cache.geo_replication_lag | average | seconds |
-| azure_monitor.redis_cache.geo_replication_sync_offset | average | bytes |
-| azure_monitor.redis_cache.geo_replication_sync_events | started, finished | events/s |
-| azure_monitor.redis_cache.geo_replication_health | average | status |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_redis_cache_server_load ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.server_load | Redis server load on ${label:resource_name} |
-| [ am_redis_cache_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.cpu | Redis CPU on ${label:resource_name} |
-| [ am_redis_cache_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.memory_utilization | Redis memory utilization on ${label:resource_name} |
-| [ am_redis_cache_miss_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.miss_rate | Redis cache miss rate on ${label:resource_name} |
-| [ am_redis_cache_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.errors | Redis errors on ${label:resource_name} |
-| [ am_redis_cache_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.latency | Redis average latency on ${label:resource_name} |
-| [ am_redis_cache_latency_p99 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.latency_p99 | Redis P99 latency on ${label:resource_name} |
-| [ am_redis_cache_evicted_keys ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.key_events | Redis key evictions on ${label:resource_name} |
-| [ am_redis_cache_geo_replication_health ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.geo_replication_health | Redis geo-replication health on ${label:resource_name} |
-| [ am_redis_cache_geo_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.geo_replication_lag | Redis geo-replication lag on ${label:resource_name} |
-| [ am_redis_cache_geo_replication_sync_offset ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.geo_replication_sync_offset | Redis geo-replication sync offset on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -357,6 +275,88 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_redis_cache_server_load ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.server_load | Redis server load on ${label:resource_name} |
+| [ am_redis_cache_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.cpu | Redis CPU on ${label:resource_name} |
+| [ am_redis_cache_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.memory_utilization | Redis memory utilization on ${label:resource_name} |
+| [ am_redis_cache_miss_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.miss_rate | Redis cache miss rate on ${label:resource_name} |
+| [ am_redis_cache_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.errors | Redis errors on ${label:resource_name} |
+| [ am_redis_cache_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.latency | Redis average latency on ${label:resource_name} |
+| [ am_redis_cache_latency_p99 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.latency_p99 | Redis P99 latency on ${label:resource_name} |
+| [ am_redis_cache_evicted_keys ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.key_events | Redis key evictions on ${label:resource_name} |
+| [ am_redis_cache_geo_replication_health ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.geo_replication_health | Redis geo-replication health on ${label:resource_name} |
+| [ am_redis_cache_geo_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.geo_replication_lag | Redis geo-replication lag on ${label:resource_name} |
+| [ am_redis_cache_geo_replication_sync_offset ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_redis_cache.conf) | azure_monitor.redis_cache.geo_replication_sync_offset | Redis geo-replication sync offset on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.redis_cache.cache_hits | hits, misses | operations/s |
+| azure_monitor.redis_cache.throughput | read, write | bytes/s |
+| azure_monitor.redis_cache.server_load | maximum | percentage |
+| azure_monitor.redis_cache.cpu | maximum | percentage |
+| azure_monitor.redis_cache.memory_usage | used, rss | bytes |
+| azure_monitor.redis_cache.memory_utilization | maximum | percentage |
+| azure_monitor.redis_cache.clients | maximum | clients |
+| azure_monitor.redis_cache.operations | maximum | operations/s |
+| azure_monitor.redis_cache.commands | total | commands/s |
+| azure_monitor.redis_cache.command_types | get, set | commands/s |
+| azure_monitor.redis_cache.latency | average | microseconds |
+| azure_monitor.redis_cache.key_events | evicted, expired | keys/s |
+| azure_monitor.redis_cache.total_keys | maximum | keys |
+| azure_monitor.redis_cache.errors | maximum | errors |
+| azure_monitor.redis_cache.miss_rate | miss_rate | percentage |
+| azure_monitor.redis_cache.latency_p99 | p99 | microseconds |
+| azure_monitor.redis_cache.connection_rate | created, closed | connections/s |
+| azure_monitor.redis_cache.aad_clients | maximum | clients |
+| azure_monitor.redis_cache.instance_cache_hits | hits, misses | operations/s |
+| azure_monitor.redis_cache.instance_throughput | read, write | bytes/s |
+| azure_monitor.redis_cache.instance_server_load | server_load, cpu | percentage |
+| azure_monitor.redis_cache.instance_memory_usage | used, rss | bytes |
+| azure_monitor.redis_cache.instance_memory_utilization | maximum | percentage |
+| azure_monitor.redis_cache.instance_clients | maximum | clients |
+| azure_monitor.redis_cache.instance_operations | maximum | operations/s |
+| azure_monitor.redis_cache.instance_commands | total, get, set | commands/s |
+| azure_monitor.redis_cache.instance_total_keys | maximum | keys |
+| azure_monitor.redis_cache.instance_key_events | evicted, expired | keys/s |
+| azure_monitor.redis_cache.geo_replication_lag | average | seconds |
+| azure_monitor.redis_cache.geo_replication_sync_offset | average | bytes |
+| azure_monitor.redis_cache.geo_replication_sync_events | started, finished | events/s |
+| azure_monitor.redis_cache.geo_replication_health | average | status |
 
 
 

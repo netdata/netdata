@@ -43,39 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per net.inet6.icmp6.stats instance
-
-Collect IPv6 ICMP traffic statistics.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipv6.icmp | received, sent | messages/s |
-| ipv6.icmpredir | received, sent | redirects/s |
-| ipv6.icmperrors | InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutTimeExcds, OutParmProblems | errors/s |
-| ipv6.icmpechos | InEchos, OutEchos, InEchoReplies, OutEchoReplies | messages/s |
-| ipv6.icmprouter | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
-| ipv6.icmpneighbor | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
-| ipv6.icmptypes | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -133,5 +100,38 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per net.inet6.icmp6.stats instance
+
+Collect IPv6 ICMP traffic statistics.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ipv6.icmp | received, sent | messages/s |
+| ipv6.icmpredir | received, sent | redirects/s |
+| ipv6.icmperrors | InErrors, OutErrors, InCsumErrors, InDestUnreachs, InPktTooBigs, InTimeExcds, InParmProblems, OutDestUnreachs, OutTimeExcds, OutParmProblems | errors/s |
+| ipv6.icmpechos | InEchos, OutEchos, InEchoReplies, OutEchoReplies | messages/s |
+| ipv6.icmprouter | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
+| ipv6.icmpneighbor | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
+| ipv6.icmptypes | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
 
 

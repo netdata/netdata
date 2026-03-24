@@ -49,62 +49,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per uWSGI instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| uwsgi.transmitted_data | tx | bytes/s |
-| uwsgi.requests | requests | requests/s |
-| uwsgi.harakiris | harakiris | harakiris/s |
-| uwsgi.respawns | respawns | respawns/s |
-
-### Per worker
-
-These metrics refer to the Worker process.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| worker_id | Worker ID. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| uwsgi.worker_transmitted_data | tx | bytes/s |
-| uwsgi.worker_requests | requests | requests/s |
-| uwsgi.worker_delta_requests | delta_requests | requests/s |
-| uwsgi.worker_average_request_time | avg | milliseconds |
-| uwsgi.worker_harakiris | harakiris | harakiris/s |
-| uwsgi.worker_exceptions | exceptions | exceptions/s |
-| uwsgi.worker_status | idle, busy, cheap, pause, sig | status |
-| uwsgi.worker_request_handling_status | accepting, not_accepting | status |
-| uwsgi.worker_respawns | respawns | respawns/s |
-| uwsgi.worker_memory_rss | rss | bytes |
-| uwsgi.worker_memory_vsz | vsz | bytes |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -223,6 +167,62 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per uWSGI instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| uwsgi.transmitted_data | tx | bytes/s |
+| uwsgi.requests | requests | requests/s |
+| uwsgi.harakiris | harakiris | harakiris/s |
+| uwsgi.respawns | respawns | respawns/s |
+
+### Per worker
+
+These metrics refer to the Worker process.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| worker_id | Worker ID. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| uwsgi.worker_transmitted_data | tx | bytes/s |
+| uwsgi.worker_requests | requests | requests/s |
+| uwsgi.worker_delta_requests | delta_requests | requests/s |
+| uwsgi.worker_average_request_time | avg | milliseconds |
+| uwsgi.worker_harakiris | harakiris | harakiris/s |
+| uwsgi.worker_exceptions | exceptions | exceptions/s |
+| uwsgi.worker_status | idle, busy, cheap, pause, sig | status |
+| uwsgi.worker_request_handling_status | accepting, not_accepting | status |
+| uwsgi.worker_respawns | respawns | respawns/s |
+| uwsgi.worker_memory_rss | rss | bytes |
+| uwsgi.worker_memory_vsz | vsz | bytes |
 
 
 

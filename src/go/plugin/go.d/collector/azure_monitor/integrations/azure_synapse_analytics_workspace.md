@@ -57,71 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.synapse.builtin_sql_pool_data_processed | processed | bytes/s |
-| azure_monitor.synapse.builtin_sql_pool_login_attempts | login_attempts | attempts/s |
-| azure_monitor.synapse.builtin_sql_pool_requests | requests | requests/s |
-| azure_monitor.synapse.activity_runs | ended | runs/s |
-| azure_monitor.synapse.pipeline_runs | ended | runs/s |
-| azure_monitor.synapse.trigger_runs | ended | runs/s |
-| azure_monitor.synapse.link_connection_events | events | events/s |
-| azure_monitor.synapse.link_table_events | events | events/s |
-| azure_monitor.synapse.link_processed_rows | changed_rows | rows/s |
-| azure_monitor.synapse.link_data_volume | processed | bytes/s |
-| azure_monitor.synapse.link_processing_latency | average | seconds |
-| azure_monitor.synapse.streaming_event_flow | in, out | events/s |
-| azure_monitor.synapse.streaming_input_throughput | received | bytes/s |
-| azure_monitor.synapse.streaming_input_sources | received | sources/s |
-| azure_monitor.synapse.streaming_event_timing | late, early, out_of_order, backlogged | events/s |
-| azure_monitor.synapse.streaming_watermark_delay | delay | seconds |
-| azure_monitor.synapse.streaming_errors | runtime, data_conversion, deserialization | errors/s |
-| azure_monitor.synapse.streaming_resource_utilization | utilization | percentage |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_synapse_streaming_resource_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_resource_utilization | Synapse streaming SU utilization on ${label:resource_name} |
-| [ am_synapse_streaming_runtime_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_errors | Synapse streaming runtime errors on ${label:resource_name} |
-| [ am_synapse_streaming_data_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_errors | Synapse streaming data errors on ${label:resource_name} |
-| [ am_synapse_streaming_watermark_delay ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_watermark_delay | Synapse streaming watermark delay on ${label:resource_name} |
-| [ am_synapse_streaming_late_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_event_timing | Synapse streaming late events on ${label:resource_name} |
-| [ am_synapse_streaming_out_of_order_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_event_timing | Synapse streaming out-of-order events on ${label:resource_name} |
-| [ am_synapse_streaming_backlogged_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_event_timing | Synapse streaming backlogged events on ${label:resource_name} |
-| [ am_synapse_link_processing_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.link_processing_latency | Synapse Link processing latency on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -340,6 +275,71 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_synapse_streaming_resource_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_resource_utilization | Synapse streaming SU utilization on ${label:resource_name} |
+| [ am_synapse_streaming_runtime_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_errors | Synapse streaming runtime errors on ${label:resource_name} |
+| [ am_synapse_streaming_data_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_errors | Synapse streaming data errors on ${label:resource_name} |
+| [ am_synapse_streaming_watermark_delay ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_watermark_delay | Synapse streaming watermark delay on ${label:resource_name} |
+| [ am_synapse_streaming_late_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_event_timing | Synapse streaming late events on ${label:resource_name} |
+| [ am_synapse_streaming_out_of_order_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_event_timing | Synapse streaming out-of-order events on ${label:resource_name} |
+| [ am_synapse_streaming_backlogged_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.streaming_event_timing | Synapse streaming backlogged events on ${label:resource_name} |
+| [ am_synapse_link_processing_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_synapse.conf) | azure_monitor.synapse.link_processing_latency | Synapse Link processing latency on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.synapse.builtin_sql_pool_data_processed | processed | bytes/s |
+| azure_monitor.synapse.builtin_sql_pool_login_attempts | login_attempts | attempts/s |
+| azure_monitor.synapse.builtin_sql_pool_requests | requests | requests/s |
+| azure_monitor.synapse.activity_runs | ended | runs/s |
+| azure_monitor.synapse.pipeline_runs | ended | runs/s |
+| azure_monitor.synapse.trigger_runs | ended | runs/s |
+| azure_monitor.synapse.link_connection_events | events | events/s |
+| azure_monitor.synapse.link_table_events | events | events/s |
+| azure_monitor.synapse.link_processed_rows | changed_rows | rows/s |
+| azure_monitor.synapse.link_data_volume | processed | bytes/s |
+| azure_monitor.synapse.link_processing_latency | average | seconds |
+| azure_monitor.synapse.streaming_event_flow | in, out | events/s |
+| azure_monitor.synapse.streaming_input_throughput | received | bytes/s |
+| azure_monitor.synapse.streaming_input_sources | received | sources/s |
+| azure_monitor.synapse.streaming_event_timing | late, early, out_of_order, backlogged | events/s |
+| azure_monitor.synapse.streaming_watermark_delay | delay | seconds |
+| azure_monitor.synapse.streaming_errors | runtime, data_conversion, deserialization | errors/s |
+| azure_monitor.synapse.streaming_resource_utilization | utilization | percentage |
 
 
 

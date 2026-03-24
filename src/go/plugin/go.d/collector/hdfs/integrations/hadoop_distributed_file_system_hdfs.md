@@ -47,65 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Hadoop Distributed File System (HDFS) instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit | DataNode | NameNode |
-|:------|:----------|:----|:---:|:---:|
-| hdfs.heap_memory | committed, used | MiB | • | • |
-| hdfs.gc_count_total | gc | events/s | • | • |
-| hdfs.gc_time_total | ms | ms | • | • |
-| hdfs.gc_threshold | info, warn | events/s | • | • |
-| hdfs.threads | new, runnable, blocked, waiting, timed_waiting, terminated | num | • | • |
-| hdfs.logs_total | info, error, warn, fatal | logs/s | • | • |
-| hdfs.rpc_bandwidth | received, sent | kilobits/s | • | • |
-| hdfs.rpc_calls | calls | calls/s | • | • |
-| hdfs.open_connections | open | connections | • | • |
-| hdfs.call_queue_length | length | num | • | • |
-| hdfs.avg_queue_time | time | ms | • | • |
-| hdfs.avg_processing_time | time | ms | • | • |
-| hdfs.capacity | remaining, used | KiB |   | • |
-| hdfs.used_capacity | dfs, non_dfs | KiB |   | • |
-| hdfs.load | load | load |   | • |
-| hdfs.volume_failures_total | failures | events/s |   | • |
-| hdfs.files_total | files | num |   | • |
-| hdfs.blocks_total | blocks | num |   | • |
-| hdfs.blocks | corrupt, missing, under_replicated | num |   | • |
-| hdfs.data_nodes | live, dead, stale | num |   | • |
-| hdfs.datanode_capacity | remaining, used | KiB | • |   |
-| hdfs.datanode_used_capacity | dfs, non_dfs | KiB | • |   |
-| hdfs.datanode_failed_volumes | failed volumes | num | • |   |
-| hdfs.datanode_bandwidth | reads, writes | KiB/s | • |   |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ hdfs_capacity_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.capacity | summary datanodes space capacity utilization |
-| [ hdfs_missing_blocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.blocks | number of missing blocks |
-| [ hdfs_stale_nodes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.data_nodes | number of datanodes marked stale due to delayed heartbeat |
-| [ hdfs_dead_nodes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.data_nodes | number of datanodes which are currently dead |
-| [ hdfs_num_failed_volumes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.num_failed_volumes | number of failed volumes |
-
-
 ## Setup
 
 
@@ -263,6 +204,65 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ hdfs_capacity_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.capacity | summary datanodes space capacity utilization |
+| [ hdfs_missing_blocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.blocks | number of missing blocks |
+| [ hdfs_stale_nodes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.data_nodes | number of datanodes marked stale due to delayed heartbeat |
+| [ hdfs_dead_nodes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.data_nodes | number of datanodes which are currently dead |
+| [ hdfs_num_failed_volumes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf) | hdfs.num_failed_volumes | number of failed volumes |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Hadoop Distributed File System (HDFS) instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit | DataNode | NameNode |
+|:------|:----------|:----|:---:|:---:|
+| hdfs.heap_memory | committed, used | MiB | • | • |
+| hdfs.gc_count_total | gc | events/s | • | • |
+| hdfs.gc_time_total | ms | ms | • | • |
+| hdfs.gc_threshold | info, warn | events/s | • | • |
+| hdfs.threads | new, runnable, blocked, waiting, timed_waiting, terminated | num | • | • |
+| hdfs.logs_total | info, error, warn, fatal | logs/s | • | • |
+| hdfs.rpc_bandwidth | received, sent | kilobits/s | • | • |
+| hdfs.rpc_calls | calls | calls/s | • | • |
+| hdfs.open_connections | open | connections | • | • |
+| hdfs.call_queue_length | length | num | • | • |
+| hdfs.avg_queue_time | time | ms | • | • |
+| hdfs.avg_processing_time | time | ms | • | • |
+| hdfs.capacity | remaining, used | KiB |   | • |
+| hdfs.used_capacity | dfs, non_dfs | KiB |   | • |
+| hdfs.load | load | load |   | • |
+| hdfs.volume_failures_total | failures | events/s |   | • |
+| hdfs.files_total | files | num |   | • |
+| hdfs.blocks_total | blocks | num |   | • |
+| hdfs.blocks | corrupt, missing, under_replicated | num |   | • |
+| hdfs.data_nodes | live, dead, stale | num |   | • |
+| hdfs.datanode_capacity | remaining, used | KiB | • |   |
+| hdfs.datanode_used_capacity | dfs, non_dfs | KiB | • |   |
+| hdfs.datanode_failed_volumes | failed volumes | num | • |   |
+| hdfs.datanode_bandwidth | reads, writes | KiB/s | • |   |
 
 
 

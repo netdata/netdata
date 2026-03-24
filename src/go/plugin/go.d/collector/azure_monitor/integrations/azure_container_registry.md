@@ -57,52 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.container_registry.storage_used | used | bytes |
-| azure_monitor.container_registry.pull_count | successful, total | pulls/s |
-| azure_monitor.container_registry.push_count | successful, total | pushes/s |
-| azure_monitor.container_registry.agentpool_cpu_time | cpu_time | seconds/s |
-| azure_monitor.container_registry.run_duration | duration | milliseconds/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_container_registry_pull_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_registry.conf) | azure_monitor.container_registry.pull_count | ACR pull failures on ${label:resource_name} |
-| [ am_container_registry_push_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_registry.conf) | azure_monitor.container_registry.push_count | ACR push failures on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -321,6 +275,52 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_container_registry_pull_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_registry.conf) | azure_monitor.container_registry.pull_count | ACR pull failures on ${label:resource_name} |
+| [ am_container_registry_push_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_registry.conf) | azure_monitor.container_registry.push_count | ACR push failures on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.container_registry.storage_used | used | bytes |
+| azure_monitor.container_registry.pull_count | successful, total | pulls/s |
+| azure_monitor.container_registry.push_count | successful, total | pushes/s |
+| azure_monitor.container_registry.agentpool_cpu_time | cpu_time | seconds/s |
+| azure_monitor.container_registry.run_duration | duration | milliseconds/s |
 
 
 

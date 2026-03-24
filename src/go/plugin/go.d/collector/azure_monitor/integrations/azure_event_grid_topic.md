@@ -57,57 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.event_grid.publish_rate | success, failed | events/s |
-| azure_monitor.event_grid.publish_latency | latency | milliseconds |
-| azure_monitor.event_grid.routing | matched, unmatched | events/s |
-| azure_monitor.event_grid.advanced_filter_evaluations | evaluations | evaluations/s |
-| azure_monitor.event_grid.delivery | delivered, failed, dropped, dead_lettered | events/s |
-| azure_monitor.event_grid.destination_processing_duration | average | milliseconds |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_event_grid_publish_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.publish_rate | Event Grid publish failures on ${label:resource_name} |
-| [ am_event_grid_delivery_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.delivery | Event Grid delivery failures on ${label:resource_name} |
-| [ am_event_grid_dropped_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.delivery | Event Grid dropped events on ${label:resource_name} |
-| [ am_event_grid_dead_lettered_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.delivery | Event Grid dead-lettered events on ${label:resource_name} |
-| [ am_event_grid_unmatched_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.routing | Event Grid unmatched events on ${label:resource_name} |
-| [ am_event_grid_destination_processing_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.destination_processing_duration | Event Grid destination processing duration on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -326,6 +275,57 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_event_grid_publish_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.publish_rate | Event Grid publish failures on ${label:resource_name} |
+| [ am_event_grid_delivery_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.delivery | Event Grid delivery failures on ${label:resource_name} |
+| [ am_event_grid_dropped_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.delivery | Event Grid dropped events on ${label:resource_name} |
+| [ am_event_grid_dead_lettered_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.delivery | Event Grid dead-lettered events on ${label:resource_name} |
+| [ am_event_grid_unmatched_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.routing | Event Grid unmatched events on ${label:resource_name} |
+| [ am_event_grid_destination_processing_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.destination_processing_duration | Event Grid destination processing duration on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.event_grid.publish_rate | success, failed | events/s |
+| azure_monitor.event_grid.publish_latency | latency | milliseconds |
+| azure_monitor.event_grid.routing | matched, unmatched | events/s |
+| azure_monitor.event_grid.advanced_filter_evaluations | evaluations | evaluations/s |
+| azure_monitor.event_grid.delivery | delivered, failed, dropped, dead_lettered | events/s |
+| azure_monitor.event_grid.destination_processing_duration | average | milliseconds |
 
 
 
