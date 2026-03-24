@@ -168,10 +168,12 @@ void get_metric_retention_by_id(RRDHOST *host, UUIDMAP_ID id, time_t *min_first_
 
 bool rrdmetric_update_retention(RRDMETRIC *rm) {
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
+    RRDDIM *rd = rrdmetric_rrddim_get_and_lock(rm);
 
-    if(rm->rrddim) {
-        min_first_time_t = rrddim_first_entry_s(rm->rrddim);
-        max_last_time_t = rrddim_last_entry_s(rm->rrddim);
+    if(rd) {
+        min_first_time_t = rrddim_first_entry_s(rd);
+        max_last_time_t = rrddim_last_entry_s(rd);
+        rrdmetric_rrddim_unlock(rd);
         rrd_flag_clear(rm, RRD_FLAG_NO_TIER0_RETENTION);
     }
     else {
@@ -219,7 +221,7 @@ static inline bool rrdmetric_should_be_deleted(RRDMETRIC *rm) {
     if(likely(rrd_flag_check(rm, RRD_FLAGS_PREVENTING_DELETIONS)))
         return false;
 
-    if(likely(rm->rrddim))
+    if(likely(rrdmetric_rrddim_atomic_load(rm)))
         return false;
 
     rrdmetric_update_retention(rm);
@@ -540,7 +542,7 @@ static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count,
         size_t metrics_cleared = 0;
         RRDMETRIC *rm;
         dfe_start_read(ri->rrdmetrics, rm) {
-            if(!rrd_flag_check(rm, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(rm) || rm->rrddim)
+            if(!rrd_flag_check(rm, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(rm) || rrdmetric_rrddim_atomic_load(rm))
                 continue;
 
             rrdmetric_update_retention(rm);
