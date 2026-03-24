@@ -82,7 +82,7 @@ Each file contains a `jobs` array. The backend kind is determined by the filenam
 | Backend | Kind | Operand Format | Example Operand | Docs |
 |:--------|:-----|:---------------|:----------------|:-----|
 [% for backend in secretstores %]
-| [[ backend.name_link ]] | `[[ backend.kind ]]` | [[ backend.operand_format ]] | [[ backend.example_operand ]] | [[ backend.readme_markdown ]] |
+| [[ backend.name_link ]] | `[[ backend.kind ]]` | `[[ backend.operand_format ]]` | `[[ backend.example_operand ]]` | [[ backend.readme_markdown ]] |
 [% endfor %]
 
 ## How It Works

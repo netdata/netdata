@@ -134,24 +134,6 @@ jobs:
     "secretstores": {
         "heading": "## Supported Secretstore Backends",
         "intro": "Use the backend README for provider-specific authentication, operand rules, configuration examples, and troubleshooting.",
-        "backends": {
-            "vault": {
-                "operand_format": "`path#key`",
-                "example_operand": "`secret/data/netdata/mysql#password`",
-            },
-            "aws-sm": {
-                "operand_format": "`secret-name` or `secret-name#key`",
-                "example_operand": "`netdata/mysql#password`",
-            },
-            "azure-kv": {
-                "operand_format": "`vault-name/secret-name`",
-                "example_operand": "`my-keyvault/mysql-password`",
-            },
-            "gcp-sm": {
-                "operand_format": "`project/secret` or `project/secret/version`",
-                "example_operand": "`my-project/mysql-password`",
-            },
-        },
     },
     "how_it_works": [
         "Secrets are resolved each time a collector job starts or restarts.",
@@ -273,13 +255,14 @@ def get_jinja_env():
 
 def build_secretstores_context(integrations: Any) -> List[Dict[str, str]]:
     """Build template context for discovered secretstore backends."""
-    backends = SECRETS_PAGE["secretstores"]["backends"]
     items = []
 
     for integ in collect_secretstore_integrations(integrations):
         meta = integ.get("meta", {})
+        summary = integ.get("collector_configs_summary", {})
+        if not isinstance(summary, dict):
+            summary = {}
         kind = meta.get("kind", "")
-        backend = backends.get(kind, {})
         readme_link = get_secretstore_readme_link(integ)
         name = meta.get("name", "")
         items.append(
@@ -290,8 +273,8 @@ def build_secretstores_context(integrations: Any) -> List[Dict[str, str]]:
                 "readme_link": readme_link,
                 "name_link": f'[{name}]({readme_link})',
                 "readme_markdown": f'[README]({readme_link})',
-                "operand_format": backend.get("operand_format", "See backend README"),
-                "example_operand": backend.get("example_operand", "See backend README"),
+                "operand_format": summary.get("operand_format", "See backend README"),
+                "example_operand": summary.get("example_operand", "See backend README"),
             }
         )
 

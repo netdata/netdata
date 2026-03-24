@@ -1152,6 +1152,15 @@ def render_secretstores(categories, secretstores, ids):
         item['edit_link'] = make_edit_link(item)
 
         clean_item = deepcopy(item)
+        collector_configs = item.get('collector_configs', {})
+        collector_configs_summary = {}
+        if isinstance(collector_configs, dict):
+            summary = collector_configs.get('summary', {})
+            if isinstance(summary, dict):
+                collector_configs_summary = deepcopy(summary)
+
+        item['collector_configs_summary'] = deepcopy(collector_configs_summary)
+        clean_item['collector_configs_summary'] = deepcopy(collector_configs_summary)
 
         for key in SECRETSTORE_RENDER_KEYS:
             if key in item.keys():

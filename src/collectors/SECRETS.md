@@ -120,9 +120,9 @@ Use the backend README for provider-specific authentication, operand rules, conf
 
 | Backend | Kind | Operand Format | Example Operand | Docs |
 |:--------|:-----|:---------------|:----------------|:-----|
-| [AWS Secrets Manager](/src/go/plugin/agent/secrets/secretstore/backends/aws/README.md) | `aws-sm` | `secret-name` or `secret-name#key` | `netdata/mysql#password` | [README](/src/go/plugin/agent/secrets/secretstore/backends/aws/README.md) |
+| [AWS Secrets Manager](/src/go/plugin/agent/secrets/secretstore/backends/aws/README.md) | `aws-sm` | `secret-name[#key]` | `netdata/mysql#password` | [README](/src/go/plugin/agent/secrets/secretstore/backends/aws/README.md) |
 | [Azure Key Vault](/src/go/plugin/agent/secrets/secretstore/backends/azure/README.md) | `azure-kv` | `vault-name/secret-name` | `my-keyvault/mysql-password` | [README](/src/go/plugin/agent/secrets/secretstore/backends/azure/README.md) |
-| [Google Secret Manager](/src/go/plugin/agent/secrets/secretstore/backends/gcp/README.md) | `gcp-sm` | `project/secret` or `project/secret/version` | `my-project/mysql-password` | [README](/src/go/plugin/agent/secrets/secretstore/backends/gcp/README.md) |
+| [Google Secret Manager](/src/go/plugin/agent/secrets/secretstore/backends/gcp/README.md) | `gcp-sm` | `project/secret[/version]` | `my-project/mysql-password` | [README](/src/go/plugin/agent/secrets/secretstore/backends/gcp/README.md) |
 | [Vault](/src/go/plugin/agent/secrets/secretstore/backends/vault/README.md) | `vault` | `path#key` | `secret/data/netdata/mysql#password` | [README](/src/go/plugin/agent/secrets/secretstore/backends/vault/README.md) |
 
 ## How It Works
