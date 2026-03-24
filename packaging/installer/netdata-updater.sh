@@ -667,6 +667,8 @@ check_for_remote_file() {
     return 0
   fi
 
+  check_for_curl
+
   if [ -n "${curl}" ]; then
     checked=1
 
