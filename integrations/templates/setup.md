@@ -1,5 +1,8 @@
+[% if entry.integration_type == 'secretstore' %]
+[% include 'setup/secretstore.md' %]
+[% elif entry.integration_type == 'logs' %]
+
 ## Setup
-[% if entry.integration_type == 'logs' %]
 
 ## Prerequisites
 

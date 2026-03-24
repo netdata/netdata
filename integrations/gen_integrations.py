@@ -60,6 +60,10 @@ AUTHENTICATION_SOURCES = [
     (AGENT_REPO, INTEGRATIONS_PATH / 'cloud-authentication' / 'metadata.yaml', False),
 ]
 
+SECRETSTORE_SOURCES = [
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'agent' / 'secrets' / 'secretstore' / 'backends', True),
+]
+
 COLLECTOR_RENDER_KEYS = [
     'alerts',
     'metrics',
@@ -95,6 +99,13 @@ LOGS_RENDER_KEYS = [
 AUTHENTICATION_RENDER_KEYS = [
     'overview',
     'setup',
+    'troubleshooting',
+]
+
+SECRETSTORE_RENDER_KEYS = [
+    'overview',
+    'setup',
+    'collector_configs',
     'troubleshooting',
 ]
 
@@ -182,6 +193,11 @@ AUTHENTICATION_VALIDATOR = Draft7Validator(
 
 COLLECTOR_VALIDATOR = Draft7Validator(
     {'$ref': './collector.json#'},
+    registry=registry,
+)
+
+SECRETSTORE_VALIDATOR = Draft7Validator(
+    {'$ref': './secretstore.json#'},
     registry=registry,
 )
 
@@ -609,6 +625,54 @@ def load_authentications():
                 ret.extend(_load_authentication_file(file, repo))
         elif not match and path.exists() and path.is_file():
             ret.extend(_load_authentication_file(path, repo))
+
+    return ret
+
+
+def _load_secretstore_file(file, repo):
+    debug(f'Loading {file}.')
+    data = load_yaml(file)
+
+    if not data:
+        return []
+
+    try:
+        SECRETSTORE_VALIDATOR.validate(data)
+    except ValidationError as e:
+        warn(
+            f'Failed to validate {file} against the schema: {e.message} (path: {"/".join(str(p) for p in e.absolute_path)})',
+            file)
+        return []
+
+    if 'id' in data:
+        data['integration_type'] = 'secretstore'
+        data['_src_path'] = file
+        data['_repo'] = repo
+        data['_index'] = 0
+
+        return [data]
+    else:
+        ret = []
+
+        for idx, item in enumerate(data):
+            item['integration_type'] = 'secretstore'
+            item['_src_path'] = file
+            item['_repo'] = repo
+            item['_index'] = idx
+            ret.append(item)
+
+        return ret
+
+
+def load_secretstores():
+    ret = []
+
+    for repo, path, match in SECRETSTORE_SOURCES:
+        if match and path.exists() and path.is_dir():
+            for file in path.glob(METADATA_PATTERN):
+                ret.extend(_load_secretstore_file(file, repo))
+        elif not match and path.exists() and path.is_file():
+            ret.extend(_load_secretstore_file(path, repo))
 
     return ret
 
@@ -1061,6 +1125,48 @@ def render_authentications(categories, authentications, ids):
     return authentications, clean_authentications, ids
 
 
+def render_secretstores(categories, secretstores, ids):
+    debug('Sorting secretstores.')
+
+    sort_integrations(secretstores)
+
+    debug('Checking secretstore ids.')
+
+    secretstores, ids = dedupe_integrations(secretstores, ids)
+
+    clean_secretstores = []
+
+    for item in secretstores:
+        item['edit_link'] = make_edit_link(item)
+
+        clean_item = deepcopy(item)
+
+        for key in SECRETSTORE_RENDER_KEYS:
+            if key in item.keys():
+                template = get_jinja_env().get_template(f'{key}.md')
+                data = template.render(entry=item, clean=False)
+                clean_data = template.render(entry=item, clean=True)
+
+                if 'variables' in item['meta']:
+                    template = get_jinja_env().from_string(data)
+                    data = template.render(variables=item['meta']['variables'], clean=False)
+                    template = get_jinja_env().from_string(clean_data)
+                    clean_data = template.render(variables=item['meta']['variables'], clean=True)
+            else:
+                data = ''
+                clean_data = ''
+
+            item[key] = data
+            clean_item[key] = clean_data
+
+        for k in ['_src_path', '_repo', '_index']:
+            del item[k], clean_item[k]
+
+        clean_secretstores.append(clean_item)
+
+    return secretstores, clean_secretstores, ids
+
+
 def convert_local_links(text, prefix):
     return text.replace("](/", f"]({prefix}/")
 
@@ -1092,6 +1198,7 @@ def main():
     cloud_notifications = load_cloud_notifications()
     logs = load_logs()
     authentications = load_authentications()
+    secretstores = load_secretstores()
 
     collectors, clean_collectors, ids = render_collectors(categories, collectors, dict())
     deploy, clean_deploy, ids = render_deploy(distros, categories, deploy, ids)
@@ -1102,11 +1209,12 @@ def main():
                                                                                      ids)
     logs, clean_logs, ids = render_logs(categories, logs, ids)
     authentications, clean_authentications, ids = render_authentications(categories, authentications, ids)
+    secretstores, clean_secretstores, ids = render_secretstores(categories, secretstores, ids)
 
-    integrations = collectors + deploy + exporters + agent_notifications + cloud_notifications + logs + authentications
+    integrations = collectors + deploy + exporters + agent_notifications + cloud_notifications + logs + authentications + secretstores
     render_integrations(categories, integrations)
 
-    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_agent_notifications + clean_cloud_notifications + clean_logs + clean_authentications
+    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_agent_notifications + clean_cloud_notifications + clean_logs + clean_authentications + clean_secretstores
     render_json(categories, clean_integrations)
 
     return fail_on_warnings()
