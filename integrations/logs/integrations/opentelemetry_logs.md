@@ -40,12 +40,12 @@ You can start exploring OpenTelemetry logs on the "Logs" tab of the Netdata UI.
 
 ## Setup
 
-## Prerequisites
+### Prerequisites
 
 - A Netdata Cloud account
 - The `otel.plugin` configured to ingest OpenTelemetry logs
 
 
-## Configuration
+### Configuration
 
 There is no configuration needed for this integration.

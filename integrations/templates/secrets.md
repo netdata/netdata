@@ -79,10 +79,10 @@ Each file contains a `jobs` array. The backend kind is determined by the filenam
 
 [[ page.secretstores.intro ]]
 
-| Backend | Kind | Operand Format | Example Operand | Docs |
-|:--------|:-----|:---------------|:----------------|:-----|
+| Backend | Kind | Operand Format | Example Operand |
+|:--------|:-----|:---------------|:----------------|
 [% for backend in secretstores %]
-| [[ backend.name_link ]] | `[[ backend.kind ]]` | `[[ backend.operand_format ]]` | `[[ backend.example_operand ]]` | [[ backend.readme_markdown ]] |
+| [[ backend.name_link ]] | `[[ backend.kind ]]` | `[[ backend.operand_format ]]` | `[[ backend.example_operand ]]` |
 [% endfor %]
 
 ## How It Works

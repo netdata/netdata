@@ -118,12 +118,12 @@ File-based secretstores are loaded at agent startup. If you edit these files, re
 
 Use the backend README for provider-specific authentication, operand rules, configuration examples, and troubleshooting.
 
-| Backend | Kind | Operand Format | Example Operand | Docs |
-|:--------|:-----|:---------------|:----------------|:-----|
-| [AWS Secrets Manager](/src/go/plugin/agent/secrets/secretstore/backends/aws/README.md) | `aws-sm` | `secret-name[#key]` | `netdata/mysql#password` | [README](/src/go/plugin/agent/secrets/secretstore/backends/aws/README.md) |
-| [Azure Key Vault](/src/go/plugin/agent/secrets/secretstore/backends/azure/README.md) | `azure-kv` | `vault-name/secret-name` | `my-keyvault/mysql-password` | [README](/src/go/plugin/agent/secrets/secretstore/backends/azure/README.md) |
-| [Google Secret Manager](/src/go/plugin/agent/secrets/secretstore/backends/gcp/README.md) | `gcp-sm` | `project/secret[/version]` | `my-project/mysql-password` | [README](/src/go/plugin/agent/secrets/secretstore/backends/gcp/README.md) |
-| [Vault](/src/go/plugin/agent/secrets/secretstore/backends/vault/README.md) | `vault` | `path#key` | `secret/data/netdata/mysql#password` | [README](/src/go/plugin/agent/secrets/secretstore/backends/vault/README.md) |
+| Backend | Kind | Operand Format | Example Operand |
+|:--------|:-----|:---------------|:----------------|
+| [AWS Secrets Manager](/src/go/plugin/agent/secrets/secretstore/backends/aws/README.md) | `aws-sm` | `secret-name[#key]` | `netdata/mysql#password` |
+| [Azure Key Vault](/src/go/plugin/agent/secrets/secretstore/backends/azure/README.md) | `azure-kv` | `vault-name/secret-name` | `my-keyvault/mysql-password` |
+| [Google Secret Manager](/src/go/plugin/agent/secrets/secretstore/backends/gcp/README.md) | `gcp-sm` | `project/secret[/version]` | `my-project/mysql-password` |
+| [Vault](/src/go/plugin/agent/secrets/secretstore/backends/vault/README.md) | `vault` | `path#key` | `secret/data/netdata/mysql#password` |
 
 ## How It Works
 

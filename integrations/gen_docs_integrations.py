@@ -93,19 +93,21 @@ def build_path(meta_yaml_link: str) -> str:
 # Content builders
 # -----------------------------
 def add_custom_edit_url(markdown_string: str, meta_yaml_link: str, sidebar_label_string: str,
-                        mode: str = "default") -> str:
+                        mode: str = "default", output_slug: str = None) -> str:
     """
     Inject custom_edit_url into the metadata header.
     """
+    slug = output_slug or clean_string(sidebar_label_string)
+
     if mode == "default":
-        path_to_md_file = f"{meta_yaml_link.replace('/metadata.yaml', '')}/integrations/{clean_string(sidebar_label_string)}"
+        path_to_md_file = f"{meta_yaml_link.replace('/metadata.yaml', '')}/integrations/{slug}"
     elif mode in ("cloud-notification", "logs", "cloud-authentication"):
-        path_to_md_file = meta_yaml_link.replace("metadata.yaml", f"integrations/{clean_string(sidebar_label_string)}")
+        path_to_md_file = meta_yaml_link.replace("metadata.yaml", f"integrations/{slug}")
     elif mode == "agent-notification":
         path_to_md_file = meta_yaml_link.replace("metadata.yaml", "README")
     else:
         # safe fallback
-        path_to_md_file = f"{meta_yaml_link.replace('/metadata.yaml', '')}/integrations/{clean_string(sidebar_label_string)}"
+        path_to_md_file = f"{meta_yaml_link.replace('/metadata.yaml', '')}/integrations/{slug}"
 
     return markdown_string.replace(
         "<!--startmeta", f"<!--startmeta\ncustom_edit_url: \"{path_to_md_file}.md\""
@@ -357,7 +359,7 @@ endmeta-->
 
         elif mode == "secretstore":
             meta_yaml = integration["edit_link"].replace("blob", "edit")
-            sidebar_label = integration["meta"]["kind"]
+            sidebar_label = integration["meta"]["name"]
             learn_rel_path = "Collecting Metrics/Secret Stores"
             keywords = integration["keywords"] if "keywords" in integration else None
 
@@ -405,7 +407,7 @@ def create_overview_banner(md: str, community_badge: str) -> str:
 
 
 def write_to_file(path: str, md: str, meta_yaml: str, sidebar_label: str, community: str, integration=None,
-                  mode: str = "default", integration_id: str = None):
+                  mode: str = "default", integration_id: str = None, output_slug: str = None):
     """
     Write the generated markdown into an `integrations/` subdirectory located alongside the `metadata.yaml` file.
     This mirrors the original behavior of placing docs next to their source metadata.
@@ -418,10 +420,11 @@ def write_to_file(path: str, md: str, meta_yaml: str, sidebar_label: str, commun
         if base.exists():
             integrations_dir = base / "integrations"
             integrations_dir.mkdir(exist_ok=True)
+            slug = output_slug or clean_string(sidebar_label)
 
             try:
-                md2 = add_custom_edit_url(md, meta_yaml, sidebar_label)
-                outfile = integrations_dir / f"{clean_string(sidebar_label)}.md"
+                md2 = add_custom_edit_url(md, meta_yaml, sidebar_label, output_slug=slug)
+                outfile = integrations_dir / f"{slug}.md"
                 clean_and_write(md2, outfile)
                 if integration_id:
                     id_to_path[integration_id] = str(outfile)
@@ -430,7 +433,7 @@ def write_to_file(path: str, md: str, meta_yaml: str, sidebar_label: str, commun
 
             # If there's only one file inside the directory, register it for README symlink
             if len(list(integrations_dir.iterdir())) == 1:
-                symlink_dict.update({path: f"integrations/{clean_string(sidebar_label)}.md"})
+                symlink_dict.update({path: f"integrations/{slug}.md"})
             else:
                 try:
                     symlink_dict.pop(path)
@@ -596,7 +599,15 @@ def main():
                 integration, categories, mode="secretstore"
             )
             path = build_path(meta_yaml)
-            write_to_file(path, md, meta_yaml, sidebar_label, community, integration_id=iid)
+            write_to_file(
+                path,
+                md,
+                meta_yaml,
+                sidebar_label,
+                community,
+                integration_id=iid,
+                output_slug=clean_string(integration["meta"]["kind"]),
+            )
 
         elif itype == "agent_notification" and not args.collector:
             meta_yaml, sidebar_label, learn_rel_path, md, community = build_readme_from_integration(

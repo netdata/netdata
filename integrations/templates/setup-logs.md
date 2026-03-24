@@ -1,9 +1,9 @@
 ## Setup
 
-## Prerequisites
+### Prerequisites
 
 [[ entry.setup.prerequisites.description]]
 
-## Configuration
+### Configuration
 
 There is no configuration needed for this integration.

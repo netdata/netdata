@@ -1,7 +1,7 @@
 <!--startmeta
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/plugin/agent/secrets/secretstore/backends/gcp/README.md"
 meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/plugin/agent/secrets/secretstore/backends/gcp/metadata.yaml"
-sidebar_label: "gcp-sm"
+sidebar_label: "Google Secret Manager"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Secret Stores"
 keywords: ['secretstore', 'secrets', 'gcp', 'gcp-sm', 'google secret manager']

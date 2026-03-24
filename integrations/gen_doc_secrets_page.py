@@ -270,9 +270,7 @@ def build_secretstores_context(integrations: Any) -> List[Dict[str, str]]:
                 "name": name,
                 "kind": kind,
                 "config_file": f"/etc/netdata/go.d/ss/{kind}.conf",
-                "readme_link": readme_link,
                 "name_link": f'[{name}]({readme_link})',
-                "readme_markdown": f'[README]({readme_link})',
                 "operand_format": summary.get("operand_format", "See backend README"),
                 "example_operand": summary.get("example_operand", "See backend README"),
             }
