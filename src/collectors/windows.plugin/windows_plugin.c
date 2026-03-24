@@ -39,7 +39,7 @@ static struct proc_module {
      .func = do_GetPowerSupply,
      .rd = NULL,
      .thread = NULL,
-     .cleanup = NULL},
+     .cleanup = do_GetPowerSupply_cleanup},
     {.name = "GetSensors",
      .dim = "GetSensors",
      .enabled = CONFIG_BOOLEAN_YES,

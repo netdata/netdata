@@ -346,6 +346,39 @@ struct sensor_data {
 
 DICTIONARY *sensors;
 
+static void netdata_sensors_free_extra_values(struct netdata_sensors_extra_values *values)
+{
+    while (values) {
+        struct netdata_sensors_extra_values *next = values->next;
+        freez(values);
+        values = next;
+    }
+}
+
+static void netdata_sensor_cleanup(struct sensor_data *sd)
+{
+    if (sd->st_sensor_state)
+        rrdset_is_obsolete___safe_from_collector_thread(sd->st_sensor_state);
+    if (sd->st_sensor_data)
+        rrdset_is_obsolete___safe_from_collector_thread(sd->st_sensor_data);
+
+    freez((void *)sd->type);
+    freez((void *)sd->category);
+    freez((void *)sd->name);
+    freez((void *)sd->manufacturer);
+    freez((void *)sd->model);
+    freez(sd->external_config);
+    netdata_sensors_free_extra_values(sd->values);
+
+    sd->type = NULL;
+    sd->category = NULL;
+    sd->name = NULL;
+    sd->manufacturer = NULL;
+    sd->model = NULL;
+    sd->external_config = NULL;
+    sd->values = NULL;
+}
+
 // Microsoft appends additional data
 #define ADDTIONAL_UUID_STR_LEN (UUID_STR_LEN + 17)
 
@@ -512,7 +545,7 @@ static void netdata_sensors_get_custom_data(struct sensor_data *sd, ISensor *pSe
 {
     collected_number current;
     // Last two values have been constant through all collections. One of the values are always negative.
-    for (int i = NETDATA_WIN_SENSOR_TYPE_CUSTOM_VALUE1; i < NETDATA_WIN_SENSOR_TYPE_CUSTOM_VALUE25; i++) {
+    for (int i = NETDATA_WIN_SENSOR_TYPE_CUSTOM_VALUE1; i < NETDATA_WIN_SENSOR_NEVER_USE_ME; i++) {
         if (netdata_collect_sensor_data(&current, pSensor, sensor_keys[i], sd->div_factor)) {
             if (unlikely(!sd->enabled)) {
                 sd->sensor_data_type = i;
@@ -712,6 +745,12 @@ void dict_sensor_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value,
     sd->add_factor = 0.0;
 }
 
+void dict_sensor_delete(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct sensor_data *sd = value;
+    netdata_sensor_cleanup(sd);
+}
+
 static int initialize(int update_every)
 {
     // Note: COM and Sensor API initialization is now done in the sensor thread
@@ -724,6 +763,7 @@ static int initialize(int update_every)
     sensors = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct sensor_data));
     dictionary_register_insert_callback(sensors, dict_sensor_insert, NULL);
+    dictionary_register_delete_callback(sensors, dict_sensor_delete, NULL);
 
     sensors_thread_update =
         nd_thread_create("sensors_upd", NETDATA_THREAD_OPTION_DEFAULT, netdata_sensors_monitor, &update_every);
@@ -906,9 +946,11 @@ void do_Sensors_cleanup()
     // The thread handles its own COM cleanup (CoUninitialize) and pSensorManager release
     if (nd_thread_join(sensors_thread_update))
         nd_log_daemon(NDLP_ERR, "Failed to join sensors thread update");
+    sensors_thread_update = NULL;
 
     __netdata_mutex_destroy(&sensors_mutex);
     dictionary_destroy(sensors);
+    sensors = NULL;
     // Note: pSensorManager is owned and cleaned up by the sensor thread itself
     // No additional cleanup needed here since the thread has already released resources
 }
