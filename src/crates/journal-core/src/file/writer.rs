@@ -172,6 +172,7 @@ impl JournalWriter {
         // within the same write operation can find the newly written object.
         let header = journal_file.journal_header_mut();
         header.arena_size = self.append_offset.get() - header.header_size;
+        journal_file.set_cached_arena_end(self.append_offset.get());
     }
 
     fn entry_added(&mut self, header: &mut JournalHeader, realtime: u64, monotonic: u64) {

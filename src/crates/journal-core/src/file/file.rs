@@ -7,6 +7,7 @@ use crate::file::guarded_cell::GuardedCell;
 use crate::file::hash;
 use crate::file::object::*;
 use crate::file::offset_array;
+use std::cell::Cell;
 use std::fs::{File, OpenOptions};
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
@@ -243,6 +244,11 @@ pub struct JournalFile<M: MemoryMap> {
 
     // Window manager for other objects (owns the guard flag internally)
     window_manager: GuardedCell<WindowManager<M>>,
+    is_keyed_hash: bool,
+    is_compact: bool,
+    header_size: u64,
+    arena_end: Cell<u64>,
+    file_id: [u8; 16],
 }
 
 fn map_hash_table<M: MemoryMap>(
@@ -310,6 +316,11 @@ impl<M: MemoryMap> JournalFile<M> {
         if header.signature != *b"LPKSHHRH" {
             return Err(JournalError::InvalidMagicNumber);
         }
+        let is_keyed_hash = header.has_incompatible_flag(HeaderIncompatibleFlags::KeyedHash);
+        let is_compact = header.has_incompatible_flag(HeaderIncompatibleFlags::Compact);
+        let header_size = header.header_size;
+        let arena_end = header.header_size + header.arena_size;
+        let file_id = header.file_id;
 
         // Initialize the hash table maps if they exist
         let data_hash_table_map = map_hash_table(
@@ -332,6 +343,11 @@ impl<M: MemoryMap> JournalFile<M> {
             data_hash_table_map,
             field_hash_table_map,
             window_manager,
+            is_keyed_hash,
+            is_compact,
+            header_size,
+            arena_end: Cell::new(arena_end),
+            file_id,
         })
     }
 
@@ -340,15 +356,11 @@ impl<M: MemoryMap> JournalFile<M> {
     }
 
     pub fn hash(&self, data: &[u8]) -> u64 {
-        let is_keyed_hash = self
-            .journal_header_ref()
-            .has_incompatible_flag(HeaderIncompatibleFlags::KeyedHash);
-
         hash::journal_hash_data(
             data,
-            is_keyed_hash,
-            if is_keyed_hash {
-                Some(&self.journal_header_ref().file_id)
+            self.is_keyed_hash,
+            if self.is_keyed_hash {
+                Some(&self.file_id)
             } else {
                 None
             },
@@ -423,13 +435,8 @@ impl<M: MemoryMap> JournalFile<M> {
     {
         validate_offset_alignment(offset)?;
 
-        let journal_header = self.journal_header_ref();
-        let is_compact = journal_header.has_incompatible_flag(HeaderIncompatibleFlags::Compact);
-        let header_size = journal_header.header_size;
-        let arena_end = header_size + journal_header.arena_size;
-
         // Objects cannot be located in the file header
-        if offset.get() < header_size {
+        if offset.get() < self.header_size {
             return Err(JournalError::ObjectExceedsFileBounds);
         }
 
@@ -448,7 +455,7 @@ impl<M: MemoryMap> JournalFile<M> {
                 .get()
                 .checked_add(size_needed)
                 .ok_or(JournalError::ObjectExceedsFileBounds)?;
-            if end_offset > arena_end {
+            if end_offset > self.arena_end.get() {
                 return Err(JournalError::ObjectExceedsFileBounds);
             }
 
@@ -456,7 +463,8 @@ impl<M: MemoryMap> JournalFile<M> {
             let data = wm.get_slice(offset.get(), size_needed)?;
 
             // Parse the object
-            let value = T::from_data(data, is_compact).ok_or(JournalError::ZerocopyFailure)?;
+            let value =
+                T::from_data(data, self.is_compact).ok_or(JournalError::ZerocopyFailure)?;
 
             Ok(value)
         })
@@ -804,6 +812,11 @@ impl<M: MemoryMapMut> JournalFile<M> {
             data_hash_table_map,
             field_hash_table_map,
             window_manager,
+            is_keyed_hash: options.enable_keyed_hash,
+            is_compact: header.has_incompatible_flag(HeaderIncompatibleFlags::Compact),
+            header_size: header.header_size,
+            arena_end: Cell::new(header.header_size + header.arena_size),
+            file_id: header.file_id,
         };
 
         // write data hash table object header info
@@ -848,6 +861,10 @@ impl<M: MemoryMapMut> JournalFile<M> {
             .0
     }
 
+    pub(crate) fn set_cached_arena_end(&self, arena_end: u64) {
+        self.arena_end.set(arena_end);
+    }
+
     pub fn data_hash_table_mut(&mut self) -> Option<DataHashTable<&mut [u8]>> {
         self.data_hash_table_map
             .as_mut()
@@ -880,13 +897,8 @@ impl<M: MemoryMapMut> JournalFile<M> {
     {
         validate_offset_alignment(offset)?;
 
-        let journal_header = self.journal_header_ref();
-        let is_compact = journal_header.has_incompatible_flag(HeaderIncompatibleFlags::Compact);
-        let header_size = journal_header.header_size;
-        let arena_end = header_size + journal_header.arena_size;
-
         // Objects cannot be located in the file header
-        if offset.get() < header_size {
+        if offset.get() < self.header_size {
             return Err(JournalError::ObjectExceedsFileBounds);
         }
 
@@ -920,7 +932,7 @@ impl<M: MemoryMapMut> JournalFile<M> {
                         .get()
                         .checked_add(size)
                         .ok_or(JournalError::ObjectExceedsFileBounds)?;
-                    if end_offset > arena_end {
+                    if end_offset > self.arena_end.get() {
                         return Err(JournalError::ObjectExceedsFileBounds);
                     }
 
@@ -932,7 +944,8 @@ impl<M: MemoryMapMut> JournalFile<M> {
             let data = wm.get_slice_mut(offset.get(), size_needed)?;
 
             // Parse the mutable object
-            let value = T::from_data_mut(data, is_compact).ok_or(JournalError::ZerocopyFailure)?;
+            let value =
+                T::from_data_mut(data, self.is_compact).ok_or(JournalError::ZerocopyFailure)?;
 
             Ok(value)
         })
@@ -946,10 +959,7 @@ impl<M: MemoryMapMut> JournalFile<M> {
         let size = capacity.map(|c| {
             let mut size = std::mem::size_of::<OffsetArrayObjectHeader>() as u64;
 
-            let is_compact = self
-                .journal_header_ref()
-                .has_incompatible_flag(HeaderIncompatibleFlags::Compact);
-            if is_compact {
+            if self.is_compact {
                 size += c.get() * std::mem::size_of::<u32>() as u64;
             } else {
                 size += c.get() * std::mem::size_of::<u64>() as u64;
