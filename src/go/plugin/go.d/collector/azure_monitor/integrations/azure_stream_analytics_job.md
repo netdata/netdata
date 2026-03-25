@@ -57,65 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.stream_analytics.event_flow | in, out | events/s |
-| azure_monitor.stream_analytics.input_data_throughput | received | bytes/s |
-| azure_monitor.stream_analytics.input_sources_received | received | sources/s |
-| azure_monitor.stream_analytics.event_timing | late, early, out_of_order | events/s |
-| azure_monitor.stream_analytics.backlogged_events | backlogged | events |
-| azure_monitor.stream_analytics.watermark_delay | delay | seconds |
-| azure_monitor.stream_analytics.errors | runtime, data_conversion, deserialization | errors/s |
-| azure_monitor.stream_analytics.function_requests | total, failed | requests/s |
-| azure_monitor.stream_analytics.function_events | input | events/s |
-| azure_monitor.stream_analytics.resource_utilization | cpu, su_memory | percentage |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_stream_analytics_su_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.resource_utilization | Stream Analytics SU utilization on ${label:resource_name} |
-| [ am_stream_analytics_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.resource_utilization | Stream Analytics CPU on ${label:resource_name} |
-| [ am_stream_analytics_watermark_delay ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.watermark_delay | Stream Analytics watermark delay on ${label:resource_name} |
-| [ am_stream_analytics_runtime_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.errors | Stream Analytics runtime errors on ${label:resource_name} |
-| [ am_stream_analytics_data_conversion_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.errors | Stream Analytics conversion errors on ${label:resource_name} |
-| [ am_stream_analytics_deserialization_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.errors | Stream Analytics deserialization errors on ${label:resource_name} |
-| [ am_stream_analytics_out_of_order_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.event_timing | Stream Analytics out-of-order events on ${label:resource_name} |
-| [ am_stream_analytics_late_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.event_timing | Stream Analytics late events on ${label:resource_name} |
-| [ am_stream_analytics_backlogged_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.backlogged_events | Stream Analytics backlog on ${label:resource_name} |
-| [ am_stream_analytics_function_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.function_requests | Stream Analytics ML function failures on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -334,6 +275,65 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_stream_analytics_su_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.resource_utilization | Stream Analytics SU utilization on ${label:resource_name} |
+| [ am_stream_analytics_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.resource_utilization | Stream Analytics CPU on ${label:resource_name} |
+| [ am_stream_analytics_watermark_delay ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.watermark_delay | Stream Analytics watermark delay on ${label:resource_name} |
+| [ am_stream_analytics_runtime_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.errors | Stream Analytics runtime errors on ${label:resource_name} |
+| [ am_stream_analytics_data_conversion_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.errors | Stream Analytics conversion errors on ${label:resource_name} |
+| [ am_stream_analytics_deserialization_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.errors | Stream Analytics deserialization errors on ${label:resource_name} |
+| [ am_stream_analytics_out_of_order_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.event_timing | Stream Analytics out-of-order events on ${label:resource_name} |
+| [ am_stream_analytics_late_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.event_timing | Stream Analytics late events on ${label:resource_name} |
+| [ am_stream_analytics_backlogged_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.backlogged_events | Stream Analytics backlog on ${label:resource_name} |
+| [ am_stream_analytics_function_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.function_requests | Stream Analytics ML function failures on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.stream_analytics.event_flow | in, out | events/s |
+| azure_monitor.stream_analytics.input_data_throughput | received | bytes/s |
+| azure_monitor.stream_analytics.input_sources_received | received | sources/s |
+| azure_monitor.stream_analytics.event_timing | late, early, out_of_order | events/s |
+| azure_monitor.stream_analytics.backlogged_events | backlogged | events |
+| azure_monitor.stream_analytics.watermark_delay | delay | seconds |
+| azure_monitor.stream_analytics.errors | runtime, data_conversion, deserialization | errors/s |
+| azure_monitor.stream_analytics.function_requests | total, failed | requests/s |
+| azure_monitor.stream_analytics.function_events | input | events/s |
+| azure_monitor.stream_analytics.resource_utilization | cpu, su_memory | percentage |
 
 
 

@@ -57,79 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.app_service.requests | requests | requests/s |
-| azure_monitor.app_service.response_time | average | seconds |
-| azure_monitor.app_service.http_status | 2xx, 3xx, 4xx, 5xx | responses/s |
-| azure_monitor.app_service.http_error_detail | 101_websocket, 401_unauthorized, 403_forbidden, 404_not_found, 406_not_acceptable | responses/s |
-| azure_monitor.app_service.cpu | average | percentage |
-| azure_monitor.app_service.cpu_time | total | seconds |
-| azure_monitor.app_service.memory_usage | average_working_set, working_set, private | bytes |
-| azure_monitor.app_service.health | average | percentage |
-| azure_monitor.app_service.network_traffic | received, sent | bytes/s |
-| azure_monitor.app_service.connections | average | connections |
-| azure_monitor.app_service.io_throughput | read, write, other | bytes/s |
-| azure_monitor.app_service.io_operations | read, write, other | operations/s |
-| azure_monitor.app_service.threads | average | threads |
-| azure_monitor.app_service.handles | average | handles |
-| azure_monitor.app_service.gc_collections | gen0, gen1, gen2 | collections/s |
-| azure_monitor.app_service.function_executions | total | executions/s |
-| azure_monitor.app_service.function_execution_units | total | MB-milliseconds/s |
-| azure_monitor.app_service.always_ready_function_executions | total | executions/s |
-| azure_monitor.app_service.always_ready_function_execution_units | total | MB-milliseconds/s |
-| azure_monitor.app_service.always_ready_units | total | units |
-| azure_monitor.app_service.on_demand_function_executions | total | executions/s |
-| azure_monitor.app_service.on_demand_function_execution_units | total | MB-milliseconds/s |
-| azure_monitor.app_service.request_queue | queued | requests |
-| azure_monitor.app_service.instances | running | instances |
-| azure_monitor.app_service.assemblies | loaded | assemblies |
-| azure_monitor.app_service.app_domains | loaded, unloaded | domains |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_app_service_health_check ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.health | App Service health on ${label:resource_name} |
-| [ am_app_service_http_5xx_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_status | App Service 5xx errors on ${label:resource_name} |
-| [ am_app_service_response_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.response_time | App Service response time on ${label:resource_name} |
-| [ am_app_service_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.cpu | App Service CPU on ${label:resource_name} |
-| [ am_app_service_request_queue ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.request_queue | App Service request queue on ${label:resource_name} |
-| [ am_app_service_http_4xx_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_status | App Service 4xx errors on ${label:resource_name} |
-| [ am_app_service_http_403_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_error_detail | App Service 403 forbidden on ${label:resource_name} |
-| [ am_app_service_http_401_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_error_detail | App Service 401 unauthorized on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -348,6 +275,79 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_app_service_health_check ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.health | App Service health on ${label:resource_name} |
+| [ am_app_service_http_5xx_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_status | App Service 5xx errors on ${label:resource_name} |
+| [ am_app_service_response_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.response_time | App Service response time on ${label:resource_name} |
+| [ am_app_service_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.cpu | App Service CPU on ${label:resource_name} |
+| [ am_app_service_request_queue ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.request_queue | App Service request queue on ${label:resource_name} |
+| [ am_app_service_http_4xx_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_status | App Service 4xx errors on ${label:resource_name} |
+| [ am_app_service_http_403_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_error_detail | App Service 403 forbidden on ${label:resource_name} |
+| [ am_app_service_http_401_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_app_service.conf) | azure_monitor.app_service.http_error_detail | App Service 401 unauthorized on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.app_service.requests | requests | requests/s |
+| azure_monitor.app_service.response_time | average | seconds |
+| azure_monitor.app_service.http_status | 2xx, 3xx, 4xx, 5xx | responses/s |
+| azure_monitor.app_service.http_error_detail | 101_websocket, 401_unauthorized, 403_forbidden, 404_not_found, 406_not_acceptable | responses/s |
+| azure_monitor.app_service.cpu | average | percentage |
+| azure_monitor.app_service.cpu_time | total | seconds |
+| azure_monitor.app_service.memory_usage | average_working_set, working_set, private | bytes |
+| azure_monitor.app_service.health | average | percentage |
+| azure_monitor.app_service.network_traffic | received, sent | bytes/s |
+| azure_monitor.app_service.connections | average | connections |
+| azure_monitor.app_service.io_throughput | read, write, other | bytes/s |
+| azure_monitor.app_service.io_operations | read, write, other | operations/s |
+| azure_monitor.app_service.threads | average | threads |
+| azure_monitor.app_service.handles | average | handles |
+| azure_monitor.app_service.gc_collections | gen0, gen1, gen2 | collections/s |
+| azure_monitor.app_service.function_executions | total | executions/s |
+| azure_monitor.app_service.function_execution_units | total | MB-milliseconds/s |
+| azure_monitor.app_service.always_ready_function_executions | total | executions/s |
+| azure_monitor.app_service.always_ready_function_execution_units | total | MB-milliseconds/s |
+| azure_monitor.app_service.always_ready_units | total | units |
+| azure_monitor.app_service.on_demand_function_executions | total | executions/s |
+| azure_monitor.app_service.on_demand_function_execution_units | total | MB-milliseconds/s |
+| azure_monitor.app_service.request_queue | queued | requests |
+| azure_monitor.app_service.instances | running | instances |
+| azure_monitor.app_service.assemblies | loaded | assemblies |
+| azure_monitor.app_service.app_domains | loaded, unloaded | domains |
 
 
 

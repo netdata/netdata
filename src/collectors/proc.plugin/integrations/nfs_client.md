@@ -44,37 +44,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per NFS Client instance
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nfs.net | udp, tcp | operations/s |
-| nfs.rpc | calls, retransmits, auth_refresh | calls/s |
-| nfs.proc2 | a dimension per proc2 call | calls/s |
-| nfs.proc3 | a dimension per proc3 call | calls/s |
-| nfs.proc4 | a dimension per proc4 call | calls/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -98,5 +67,36 @@ There is no configuration file.
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per NFS Client instance
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nfs.net | udp, tcp | operations/s |
+| nfs.rpc | calls, retransmits, auth_refresh | calls/s |
+| nfs.proc2 | a dimension per proc2 call | calls/s |
+| nfs.proc3 | a dimension per proc3 call | calls/s |
+| nfs.proc4 | a dimension per proc4 call | calls/s |
 
 

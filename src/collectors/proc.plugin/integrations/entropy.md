@@ -77,38 +77,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Entropy instance
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.entropy | entropy | entropy |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ lowest_entropy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/entropy.conf) | system.entropy | minimum number of bits of entropy available for the kernel’s random number generator |
-
-
 ## Setup
 
 
@@ -132,5 +100,37 @@ There is no configuration file.
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ lowest_entropy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/entropy.conf) | system.entropy | minimum number of bits of entropy available for the kernel’s random number generator |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Entropy instance
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.entropy | entropy | entropy |
 
 

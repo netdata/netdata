@@ -52,70 +52,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Varnish instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| varnish.client_session_connections | accepted, dropped | connections/s |
-| varnish.client_requests | received | requests/s |
-| varnish.cache_hit_ratio_total | hit, miss, hitpass, hitmiss | percent |
-| varnish.cache_hit_ratio_delta | hit, miss, hitpass, hitmiss | percent |
-| varnish.cache_expired_objects | expired | objects/s |
-| varnish.cache_lru_activity | nuked, moved | objects/s |
-| varnish.threads | threads | threads |
-| varnish.thread_management_activity | created, failed, destroyed, limited | threads/s |
-| varnish.thread_queue_len | queue_length | threads |
-| varnish.backends_requests | sent | requests/s |
-| varnish.esi_parsing_issues | errors, warnings | issues/s |
-| varnish.mgmt_process_uptime | uptime | seconds |
-| varnish.child_process_uptime | uptime | seconds |
-
-### Per Backend
-
-These metrics refer to the Backend (VBE).
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| varnish.backend_data_transfer | req_header, req_body, resp_header, resp_body | bytes/s |
-
-### Per Storage
-
-These metrics refer to the Storage (SMA, SMF, MSE).
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| varnish.storage_space_usage | free, used | bytes |
-| varnish.storage_allocated_objects | allocated | objects |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -206,6 +142,70 @@ jobs:
     update_every: 5
 
 ```
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Varnish instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| varnish.client_session_connections | accepted, dropped | connections/s |
+| varnish.client_requests | received | requests/s |
+| varnish.cache_hit_ratio_total | hit, miss, hitpass, hitmiss | percent |
+| varnish.cache_hit_ratio_delta | hit, miss, hitpass, hitmiss | percent |
+| varnish.cache_expired_objects | expired | objects/s |
+| varnish.cache_lru_activity | nuked, moved | objects/s |
+| varnish.threads | threads | threads |
+| varnish.thread_management_activity | created, failed, destroyed, limited | threads/s |
+| varnish.thread_queue_len | queue_length | threads |
+| varnish.backends_requests | sent | requests/s |
+| varnish.esi_parsing_issues | errors, warnings | issues/s |
+| varnish.mgmt_process_uptime | uptime | seconds |
+| varnish.child_process_uptime | uptime | seconds |
+
+### Per Backend
+
+These metrics refer to the Backend (VBE).
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| varnish.backend_data_transfer | req_header, req_body, resp_header, resp_body | bytes/s |
+
+### Per Storage
+
+These metrics refer to the Storage (SMA, SMF, MSE).
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| varnish.storage_space_usage | free, used | bytes |
+| varnish.storage_allocated_objects | allocated | objects |
+
 
 
 ## Troubleshooting

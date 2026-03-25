@@ -57,68 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.event_hubs.message_flow | in, out | messages/s |
-| azure_monitor.event_hubs.data_throughput | in, out | bytes/s |
-| azure_monitor.event_hubs.requests | incoming, successful | requests/s |
-| azure_monitor.event_hubs.errors | server, user, throttled, quota_exceeded | errors/s |
-| azure_monitor.event_hubs.connections | active | connections |
-| azure_monitor.event_hubs.connection_events | opened, closed | connections |
-| azure_monitor.event_hubs.captured_messages | total | messages/s |
-| azure_monitor.event_hubs.captured_data | total | bytes/s |
-| azure_monitor.event_hubs.namespace_size | average | bytes |
-| azure_monitor.event_hubs.capture_backlog | backlog | messages |
-| azure_monitor.event_hubs.namespace_resources | cpu, memory | percentage |
-| azure_monitor.event_hubs.replication_lag | messages | messages |
-| azure_monitor.event_hubs.replication_lag_duration | duration | seconds |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_event_hubs_server_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Event Hubs server errors on ${label:resource_name} |
-| [ am_event_hubs_throttled_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Event Hubs throttled requests on ${label:resource_name} |
-| [ am_event_hubs_quota_exceeded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Event Hubs quota exceeded on ${label:resource_name} |
-| [ am_event_hubs_user_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Event Hubs user errors on ${label:resource_name} |
-| [ am_event_hubs_success_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.requests | Event Hubs request success rate on ${label:resource_name} |
-| [ am_event_hubs_namespace_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.namespace_resources | Event Hubs namespace CPU on ${label:resource_name} |
-| [ am_event_hubs_namespace_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.namespace_resources | Event Hubs namespace memory on ${label:resource_name} |
-| [ am_event_hubs_capture_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.capture_backlog | Event Hubs capture backlog on ${label:resource_name} |
-| [ am_event_hubs_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.replication_lag | Event Hubs replication lag on ${label:resource_name} |
-| [ am_event_hubs_replication_lag_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.replication_lag_duration | Event Hubs replication lag duration on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -337,6 +275,68 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_event_hubs_server_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Event Hubs server errors on ${label:resource_name} |
+| [ am_event_hubs_throttled_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Event Hubs throttled requests on ${label:resource_name} |
+| [ am_event_hubs_quota_exceeded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Event Hubs quota exceeded on ${label:resource_name} |
+| [ am_event_hubs_user_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.errors | Event Hubs user errors on ${label:resource_name} |
+| [ am_event_hubs_success_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.requests | Event Hubs request success rate on ${label:resource_name} |
+| [ am_event_hubs_namespace_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.namespace_resources | Event Hubs namespace CPU on ${label:resource_name} |
+| [ am_event_hubs_namespace_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.namespace_resources | Event Hubs namespace memory on ${label:resource_name} |
+| [ am_event_hubs_capture_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.capture_backlog | Event Hubs capture backlog on ${label:resource_name} |
+| [ am_event_hubs_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.replication_lag | Event Hubs replication lag on ${label:resource_name} |
+| [ am_event_hubs_replication_lag_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.replication_lag_duration | Event Hubs replication lag duration on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.event_hubs.message_flow | in, out | messages/s |
+| azure_monitor.event_hubs.data_throughput | in, out | bytes/s |
+| azure_monitor.event_hubs.requests | incoming, successful | requests/s |
+| azure_monitor.event_hubs.errors | server, user, throttled, quota_exceeded | errors/s |
+| azure_monitor.event_hubs.connections | active | connections |
+| azure_monitor.event_hubs.connection_events | opened, closed | connections |
+| azure_monitor.event_hubs.captured_messages | total | messages/s |
+| azure_monitor.event_hubs.captured_data | total | bytes/s |
+| azure_monitor.event_hubs.namespace_size | average | bytes |
+| azure_monitor.event_hubs.capture_backlog | backlog | messages |
+| azure_monitor.event_hubs.namespace_resources | cpu, memory | percentage |
+| azure_monitor.event_hubs.replication_lag | messages | messages |
+| azure_monitor.event_hubs.replication_lag_duration | duration | seconds |
 
 
 

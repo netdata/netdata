@@ -46,43 +46,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per network device direction
-
-Metrics related to QoS network device directions. Each direction (in/out) produces its own set of the following metrics.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| device | The network interface. |
-| device_name | The network interface name |
-| group | The device family |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| tc.qos | a dimension per class | kilobits/s |
-| tc.qos_packets | a dimension per class | packets/s |
-| tc.qos_dropped | a dimension per class | packets/s |
-| tc.qos_tokens | a dimension per class | tokens |
-| tc.qos_ctokens | a dimension per class | ctokens |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -173,4 +136,41 @@ You can read more about setting up the tc rules in rc.local in this [GitHub issu
   enable show all classes and qdiscs for all interfaces = yes
 
 ```
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per network device direction
+
+Metrics related to QoS network device directions. Each direction (in/out) produces its own set of the following metrics.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| device | The network interface. |
+| device_name | The network interface name |
+| group | The device family |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| tc.qos | a dimension per class | kilobits/s |
+| tc.qos_packets | a dimension per class | packets/s |
+| tc.qos_dropped | a dimension per class | packets/s |
+| tc.qos_tokens | a dimension per class | tokens |
+| tc.qos_ctokens | a dimension per class | ctokens |
+
 

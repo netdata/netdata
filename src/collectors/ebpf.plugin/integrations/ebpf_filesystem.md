@@ -47,59 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per filesystem
-
-Latency charts associate with filesystem actions.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| filesystem.read_latency | latency period | calls/s |
-| filesystem.open_latency | latency period | calls/s |
-| filesystem.sync_latency | latency period | calls/s |
-
-### Per iilesystem
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| filesystem.write_latency | latency period | calls/s |
-
-### Per eBPF Filesystem instance
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| filesystem.attributte_latency | latency period | calls/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -174,5 +121,58 @@ sudo ./edit-config ebpf.d/filesystem.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per filesystem
+
+Latency charts associate with filesystem actions.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| filesystem.read_latency | latency period | calls/s |
+| filesystem.open_latency | latency period | calls/s |
+| filesystem.sync_latency | latency period | calls/s |
+
+### Per iilesystem
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| filesystem.write_latency | latency period | calls/s |
+
+### Per eBPF Filesystem instance
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| filesystem.attributte_latency | latency period | calls/s |
 
 

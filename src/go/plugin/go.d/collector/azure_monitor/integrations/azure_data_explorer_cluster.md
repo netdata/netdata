@@ -57,110 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.data_explorer.cpu_utilization | average | percentage |
-| azure_monitor.data_explorer.utilization | ingestion, cache | percentage |
-| azure_monitor.data_explorer.keep_alive | average | count |
-| azure_monitor.data_explorer.instance_count | average, maximum, minimum | instances |
-| azure_monitor.data_explorer.extents | average | extents |
-| azure_monitor.data_explorer.throttled_commands | total | commands/s |
-| azure_monitor.data_explorer.follower_latency | average | milliseconds |
-| azure_monitor.data_explorer.query_duration | average | milliseconds |
-| azure_monitor.data_explorer.query_count | count | queries/s |
-| azure_monitor.data_explorer.concurrent_queries | average, maximum | queries |
-| azure_monitor.data_explorer.throttled_queries | total | queries/s |
-| azure_monitor.data_explorer.weak_consistency_latency | average | seconds |
-| azure_monitor.data_explorer.ingestion_result | total | sources/s |
-| azure_monitor.data_explorer.ingestion_volume | total | bytes/s |
-| azure_monitor.data_explorer.ingestion_latency | average | seconds |
-| azure_monitor.data_explorer.events | received, processed, dropped | events/s |
-| azure_monitor.data_explorer.blobs | received, processed, dropped | blobs/s |
-| azure_monitor.data_explorer.discovery_latency | average | seconds |
-| azure_monitor.data_explorer.stage_latency | average | seconds |
-| azure_monitor.data_explorer.ingestion_queue | length | messages |
-| azure_monitor.data_explorer.queue_oldest_message | age | seconds |
-| azure_monitor.data_explorer.received_data_size | total | bytes/s |
-| azure_monitor.data_explorer.batches_processed | total | batches/s |
-| azure_monitor.data_explorer.batch_blob_count | average | blobs |
-| azure_monitor.data_explorer.batch_size | average | bytes |
-| azure_monitor.data_explorer.batch_duration | average | seconds |
-| azure_monitor.data_explorer.export_utilization | maximum | percentage |
-| azure_monitor.data_explorer.continuous_export_records | total | records/s |
-| azure_monitor.data_explorer.continuous_export_result | count | results/s |
-| azure_monitor.data_explorer.continuous_export_pending | maximum | jobs |
-| azure_monitor.data_explorer.continuous_export_lateness | maximum | minutes |
-| azure_monitor.data_explorer.streaming_ingest_data_rate | average | bytes/s |
-| azure_monitor.data_explorer.streaming_ingest_duration | average | milliseconds |
-| azure_monitor.data_explorer.streaming_ingest_result | count | results/s |
-| azure_monitor.data_explorer.streaming_ingest_utilization | average | percentage |
-| azure_monitor.data_explorer.materialized_view_health | health | status |
-| azure_monitor.data_explorer.materialized_view_age | minutes | minutes |
-| azure_monitor.data_explorer.materialized_view_age_seconds | average | seconds |
-| azure_monitor.data_explorer.materialized_view_records_in_delta | average | records |
-| azure_monitor.data_explorer.materialized_view_extents_rebuild | average | extents |
-| azure_monitor.data_explorer.materialized_view_data_loss | maximum | status |
-| azure_monitor.data_explorer.materialized_view_result | average | status |
-| azure_monitor.data_explorer.partitioning_percentage | total, hot | percentage |
-| azure_monitor.data_explorer.partitioned_records | average | records |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_data_explorer_keep_alive ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.keep_alive | Data Explorer keep alive on ${label:resource_name} |
-| [ am_data_explorer_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.cpu_utilization | Data Explorer CPU on ${label:resource_name} |
-| [ am_data_explorer_ingestion_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.utilization | Data Explorer ingestion utilization on ${label:resource_name} |
-| [ am_data_explorer_cache_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.utilization | Data Explorer cache utilization on ${label:resource_name} |
-| [ am_data_explorer_throttled_commands ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.throttled_commands | Data Explorer throttled commands on ${label:resource_name} |
-| [ am_data_explorer_query_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.query_duration | Data Explorer query duration on ${label:resource_name} |
-| [ am_data_explorer_throttled_queries ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.throttled_queries | Data Explorer throttled queries on ${label:resource_name} |
-| [ am_data_explorer_ingestion_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.ingestion_latency | Data Explorer ingestion latency on ${label:resource_name} |
-| [ am_data_explorer_events_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.events | Data Explorer events dropped on ${label:resource_name} |
-| [ am_data_explorer_blobs_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.blobs | Data Explorer blobs dropped on ${label:resource_name} |
-| [ am_data_explorer_ingestion_queue_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.ingestion_queue | Data Explorer ingestion queue on ${label:resource_name} |
-| [ am_data_explorer_queue_oldest_message ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.queue_oldest_message | Data Explorer queue oldest message age on ${label:resource_name} |
-| [ am_data_explorer_export_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.export_utilization | Data Explorer export utilization on ${label:resource_name} |
-| [ am_data_explorer_continuous_export_pending ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.continuous_export_pending | Data Explorer continuous export pending on ${label:resource_name} |
-| [ am_data_explorer_continuous_export_lateness ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.continuous_export_lateness | Data Explorer continuous export lateness on ${label:resource_name} |
-| [ am_data_explorer_streaming_ingest_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.streaming_ingest_utilization | Data Explorer streaming ingest utilization on ${label:resource_name} |
-| [ am_data_explorer_streaming_ingest_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.streaming_ingest_duration | Data Explorer streaming ingest duration on ${label:resource_name} |
-| [ am_data_explorer_materialized_view_health ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.materialized_view_health | Data Explorer materialized view health on ${label:resource_name} |
-| [ am_data_explorer_materialized_view_age ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.materialized_view_age | Data Explorer materialized view age on ${label:resource_name} |
-| [ am_data_explorer_materialized_view_data_loss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.materialized_view_data_loss | Data Explorer materialized view data loss on ${label:resource_name} |
-| [ am_data_explorer_follower_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.follower_latency | Data Explorer follower latency on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -379,6 +275,110 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_data_explorer_keep_alive ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.keep_alive | Data Explorer keep alive on ${label:resource_name} |
+| [ am_data_explorer_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.cpu_utilization | Data Explorer CPU on ${label:resource_name} |
+| [ am_data_explorer_ingestion_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.utilization | Data Explorer ingestion utilization on ${label:resource_name} |
+| [ am_data_explorer_cache_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.utilization | Data Explorer cache utilization on ${label:resource_name} |
+| [ am_data_explorer_throttled_commands ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.throttled_commands | Data Explorer throttled commands on ${label:resource_name} |
+| [ am_data_explorer_query_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.query_duration | Data Explorer query duration on ${label:resource_name} |
+| [ am_data_explorer_throttled_queries ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.throttled_queries | Data Explorer throttled queries on ${label:resource_name} |
+| [ am_data_explorer_ingestion_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.ingestion_latency | Data Explorer ingestion latency on ${label:resource_name} |
+| [ am_data_explorer_events_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.events | Data Explorer events dropped on ${label:resource_name} |
+| [ am_data_explorer_blobs_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.blobs | Data Explorer blobs dropped on ${label:resource_name} |
+| [ am_data_explorer_ingestion_queue_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.ingestion_queue | Data Explorer ingestion queue on ${label:resource_name} |
+| [ am_data_explorer_queue_oldest_message ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.queue_oldest_message | Data Explorer queue oldest message age on ${label:resource_name} |
+| [ am_data_explorer_export_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.export_utilization | Data Explorer export utilization on ${label:resource_name} |
+| [ am_data_explorer_continuous_export_pending ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.continuous_export_pending | Data Explorer continuous export pending on ${label:resource_name} |
+| [ am_data_explorer_continuous_export_lateness ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.continuous_export_lateness | Data Explorer continuous export lateness on ${label:resource_name} |
+| [ am_data_explorer_streaming_ingest_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.streaming_ingest_utilization | Data Explorer streaming ingest utilization on ${label:resource_name} |
+| [ am_data_explorer_streaming_ingest_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.streaming_ingest_duration | Data Explorer streaming ingest duration on ${label:resource_name} |
+| [ am_data_explorer_materialized_view_health ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.materialized_view_health | Data Explorer materialized view health on ${label:resource_name} |
+| [ am_data_explorer_materialized_view_age ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.materialized_view_age | Data Explorer materialized view age on ${label:resource_name} |
+| [ am_data_explorer_materialized_view_data_loss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.materialized_view_data_loss | Data Explorer materialized view data loss on ${label:resource_name} |
+| [ am_data_explorer_follower_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.follower_latency | Data Explorer follower latency on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.data_explorer.cpu_utilization | average | percentage |
+| azure_monitor.data_explorer.utilization | ingestion, cache | percentage |
+| azure_monitor.data_explorer.keep_alive | average | count |
+| azure_monitor.data_explorer.instance_count | average, maximum, minimum | instances |
+| azure_monitor.data_explorer.extents | average | extents |
+| azure_monitor.data_explorer.throttled_commands | total | commands/s |
+| azure_monitor.data_explorer.follower_latency | average | milliseconds |
+| azure_monitor.data_explorer.query_duration | average | milliseconds |
+| azure_monitor.data_explorer.query_count | count | queries/s |
+| azure_monitor.data_explorer.concurrent_queries | average, maximum | queries |
+| azure_monitor.data_explorer.throttled_queries | total | queries/s |
+| azure_monitor.data_explorer.weak_consistency_latency | average | seconds |
+| azure_monitor.data_explorer.ingestion_result | total | sources/s |
+| azure_monitor.data_explorer.ingestion_volume | total | bytes/s |
+| azure_monitor.data_explorer.ingestion_latency | average | seconds |
+| azure_monitor.data_explorer.events | received, processed, dropped | events/s |
+| azure_monitor.data_explorer.blobs | received, processed, dropped | blobs/s |
+| azure_monitor.data_explorer.discovery_latency | average | seconds |
+| azure_monitor.data_explorer.stage_latency | average | seconds |
+| azure_monitor.data_explorer.ingestion_queue | length | messages |
+| azure_monitor.data_explorer.queue_oldest_message | age | seconds |
+| azure_monitor.data_explorer.received_data_size | total | bytes/s |
+| azure_monitor.data_explorer.batches_processed | total | batches/s |
+| azure_monitor.data_explorer.batch_blob_count | average | blobs |
+| azure_monitor.data_explorer.batch_size | average | bytes |
+| azure_monitor.data_explorer.batch_duration | average | seconds |
+| azure_monitor.data_explorer.export_utilization | maximum | percentage |
+| azure_monitor.data_explorer.continuous_export_records | total | records/s |
+| azure_monitor.data_explorer.continuous_export_result | count | results/s |
+| azure_monitor.data_explorer.continuous_export_pending | maximum | jobs |
+| azure_monitor.data_explorer.continuous_export_lateness | maximum | minutes |
+| azure_monitor.data_explorer.streaming_ingest_data_rate | average | bytes/s |
+| azure_monitor.data_explorer.streaming_ingest_duration | average | milliseconds |
+| azure_monitor.data_explorer.streaming_ingest_result | count | results/s |
+| azure_monitor.data_explorer.streaming_ingest_utilization | average | percentage |
+| azure_monitor.data_explorer.materialized_view_health | health | status |
+| azure_monitor.data_explorer.materialized_view_age | minutes | minutes |
+| azure_monitor.data_explorer.materialized_view_age_seconds | average | seconds |
+| azure_monitor.data_explorer.materialized_view_records_in_delta | average | records |
+| azure_monitor.data_explorer.materialized_view_extents_rebuild | average | extents |
+| azure_monitor.data_explorer.materialized_view_data_loss | maximum | status |
+| azure_monitor.data_explorer.materialized_view_result | average | status |
+| azure_monitor.data_explorer.partitioning_percentage | total, hot | percentage |
+| azure_monitor.data_explorer.partitioned_records | average | records |
 
 
 

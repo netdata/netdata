@@ -45,42 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per dmcache device
-
-These metrics refer to the DMCache device.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| device | Device name |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| dmcache.device_cache_space_usage | free, used | bytes |
-| dmcache.device_metadata_space_usage | free, used | bytes |
-| dmcache.device_cache_read_efficiency | hits, misses | requests/s |
-| dmcache.device_cache_write_efficiency | hits, misses | requests/s |
-| dmcache.device_cache_activity | promotions, demotions | bytes/s |
-| dmcache.device_cache_dirty_size | dirty | bytes |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -172,6 +136,42 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per dmcache device
+
+These metrics refer to the DMCache device.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| device | Device name |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| dmcache.device_cache_space_usage | free, used | bytes |
+| dmcache.device_metadata_space_usage | free, used | bytes |
+| dmcache.device_cache_read_efficiency | hits, misses | requests/s |
+| dmcache.device_cache_write_efficiency | hits, misses | requests/s |
+| dmcache.device_cache_activity | promotions, demotions | bytes/s |
+| dmcache.device_cache_dirty_size | dirty | bytes |
 
 
 

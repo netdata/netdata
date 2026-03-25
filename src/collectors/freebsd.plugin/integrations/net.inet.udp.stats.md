@@ -43,40 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per net.inet.udp.stats instance
-
-These metrics show UDP connections statistics.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipv4.udppackets | received, sent | packets/s |
-| ipv4.udperrors | InErrors, NoPorts, RcvbufErrors, InCsumErrors, IgnoredMulti | events/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ 1m_ipv4_udp_receive_buffer_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP receive buffer errors over the last minute |
-| [ 1m_ipv4_udp_send_buffer_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP send buffer errors over the last minute |
-
-
 ## Setup
 
 
@@ -129,5 +95,39 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ 1m_ipv4_udp_receive_buffer_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP receive buffer errors over the last minute |
+| [ 1m_ipv4_udp_send_buffer_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP send buffer errors over the last minute |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per net.inet.udp.stats instance
+
+These metrics show UDP connections statistics.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ipv4.udppackets | received, sent | packets/s |
+| ipv4.udperrors | InErrors, NoPorts, RcvbufErrors, InCsumErrors, IgnoredMulti | events/s |
 
 

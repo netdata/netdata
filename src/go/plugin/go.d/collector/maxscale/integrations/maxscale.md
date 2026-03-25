@@ -53,58 +53,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per MaxScale instance
-
-These metrics refer to the monitored MaxScale instance.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| maxscale.poll_events | reads, writes, accepts, errors, hangups | events/s |
-| maxscale.current_sessions | sessions | sessions |
-| maxscale.current_zombie_connections | zombie | connections |
-| maxscale.threads_by_state | active, draining, dormant | threads |
-| maxscale.current_fds | managed | fds |
-| maxscale.qc_cache_efficiency | hits, misses | requests/s |
-| maxscale.qc_cache_operations | inserts, evictions | operations/s |
-| maxscale.uptime | uptime | seconds |
-
-### Per server
-
-These metrics refer to the MariaDB server.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| server | Server ID. |
-| address | Server address. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| maxscale.server_state | master, slave, running, down, maintenance, draining, drained, relay_master, binlog_relay, synced | state |
-| maxscale.server_current_connections | connections | connections |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -253,6 +201,58 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per MaxScale instance
+
+These metrics refer to the monitored MaxScale instance.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| maxscale.poll_events | reads, writes, accepts, errors, hangups | events/s |
+| maxscale.current_sessions | sessions | sessions |
+| maxscale.current_zombie_connections | zombie | connections |
+| maxscale.threads_by_state | active, draining, dormant | threads |
+| maxscale.current_fds | managed | fds |
+| maxscale.qc_cache_efficiency | hits, misses | requests/s |
+| maxscale.qc_cache_operations | inserts, evictions | operations/s |
+| maxscale.uptime | uptime | seconds |
+
+### Per server
+
+These metrics refer to the MariaDB server.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| server | Server ID. |
+| address | Server address. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| maxscale.server_state | master, slave, running, down, maintenance, draining, drained, relay_master, binlog_relay, synced | state |
+| maxscale.server_current_connections | connections | connections |
 
 
 

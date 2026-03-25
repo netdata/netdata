@@ -57,56 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.storage_accounts.availability | average | percentage |
-| azure_monitor.storage_accounts.transactions | total | transactions/s |
-| azure_monitor.storage_accounts.throughput | ingress, egress | bytes/s |
-| azure_monitor.storage_accounts.e2e_latency | average, maximum | milliseconds |
-| azure_monitor.storage_accounts.server_latency | average, maximum | milliseconds |
-| azure_monitor.storage_accounts.used_capacity | average | bytes |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_storage_accounts_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.availability | Storage availability on ${label:resource_name} |
-| [ am_storage_accounts_e2e_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.e2e_latency | Storage E2E latency on ${label:resource_name} |
-| [ am_storage_accounts_e2e_latency_peak ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.e2e_latency | Storage E2E latency peak on ${label:resource_name} |
-| [ am_storage_accounts_server_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.server_latency | Storage server latency on ${label:resource_name} |
-| [ am_storage_accounts_server_latency_peak ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.server_latency | Storage server latency peak on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -325,6 +275,56 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_storage_accounts_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.availability | Storage availability on ${label:resource_name} |
+| [ am_storage_accounts_e2e_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.e2e_latency | Storage E2E latency on ${label:resource_name} |
+| [ am_storage_accounts_e2e_latency_peak ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.e2e_latency | Storage E2E latency peak on ${label:resource_name} |
+| [ am_storage_accounts_server_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.server_latency | Storage server latency on ${label:resource_name} |
+| [ am_storage_accounts_server_latency_peak ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.server_latency | Storage server latency peak on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.storage_accounts.availability | average | percentage |
+| azure_monitor.storage_accounts.transactions | total | transactions/s |
+| azure_monitor.storage_accounts.throughput | ingress, egress | bytes/s |
+| azure_monitor.storage_accounts.e2e_latency | average, maximum | milliseconds |
+| azure_monitor.storage_accounts.server_latency | average, maximum | milliseconds |
+| azure_monitor.storage_accounts.used_capacity | average | bytes |
 
 
 

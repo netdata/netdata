@@ -47,41 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Optical Transceiver Module
-
-Metrics collected from optical transceiver modules that support Digital Diagnostic Monitoring (DDM).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| iface | Network interface name where the optical transceiver module is installed. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ethtool.optical_module_receiver_signal_power | rx_power | dBm |
-| ethtool.optical_module_laser_output_power | tx_power | dBm |
-| ethtool.optical_module_laser_bias_current | bias_current | mA |
-| ethtool.optical_module_temperature | temperature | Celsius |
-| ethtool.optical_module_voltage | voltage | Volts |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -175,6 +140,41 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Optical Transceiver Module
+
+Metrics collected from optical transceiver modules that support Digital Diagnostic Monitoring (DDM).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| iface | Network interface name where the optical transceiver module is installed. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ethtool.optical_module_receiver_signal_power | rx_power | dBm |
+| ethtool.optical_module_laser_output_power | tx_power | dBm |
+| ethtool.optical_module_laser_bias_current | bias_current | mA |
+| ethtool.optical_module_temperature | temperature | Celsius |
+| ethtool.optical_module_voltage | voltage | Volts |
 
 
 

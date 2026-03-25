@@ -47,55 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per syscall
-
-These metrics refer to the the Syscall.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| syscall | Syscall name |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| samba.syscall_calls | syscalls | calls/s |
-| samba.syscall_transferred_data | transferred | bytes/s |
-
-### Per smb2call
-
-These metrics refer to the the SMB2 Call.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| smb2call | SMB2 call name |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| samba.smb2_call_calls | smb2 | calls/s |
-| samba.smb2_call_transferred_data | in, out | bytes/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -214,6 +165,55 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per syscall
+
+These metrics refer to the the Syscall.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| syscall | Syscall name |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| samba.syscall_calls | syscalls | calls/s |
+| samba.syscall_transferred_data | transferred | bytes/s |
+
+### Per smb2call
+
+These metrics refer to the the SMB2 Call.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| smb2call | SMB2 call name |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| samba.smb2_call_calls | smb2 | calls/s |
+| samba.smb2_call_transferred_data | in, out | bytes/s |
 
 
 

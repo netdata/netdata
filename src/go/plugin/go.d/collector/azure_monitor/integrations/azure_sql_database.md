@@ -57,86 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.sql_database.cpu | average, maximum | percentage |
-| azure_monitor.sql_database.instance_cpu | average | percentage |
-| azure_monitor.sql_database.instance_memory | average | percentage |
-| azure_monitor.sql_database.dtu_consumption | average | percentage |
-| azure_monitor.sql_database.io_utilization | data_read, log_write | percentage |
-| azure_monitor.sql_database.resource_utilization | workers, sessions | percentage |
-| azure_monitor.sql_database.availability | average | percentage |
-| azure_monitor.sql_database.connections | successful, failed_system, failed_user, firewall_blocked | connections/s |
-| azure_monitor.sql_database.deadlocks | total | deadlocks/s |
-| azure_monitor.sql_database.storage | used, allocated | bytes |
-| azure_monitor.sql_database.storage_utilization | average | percentage |
-| azure_monitor.sql_database.tempdb_size | data, log | KiB |
-| azure_monitor.sql_database.tempdb_log_utilization | average | percentage |
-| azure_monitor.sql_database.vcore_usage | used, limit | vCores |
-| azure_monitor.sql_database.dtu_usage | used, limit | DTU |
-| azure_monitor.sql_database.sessions_count | average | sessions |
-| azure_monitor.sql_database.replication_lag | average | seconds |
-| azure_monitor.sql_database.xtp_storage | average | percentage |
-| azure_monitor.sql_database.serverless_utilization | cpu, memory | percentage |
-| azure_monitor.sql_database.serverless_billing | total, ha_replicas | vCore-seconds/s |
-| azure_monitor.sql_database.free_tier_usage | consumed, remaining | vCore-seconds |
-| azure_monitor.sql_database.ledger_digest | success, failed | events/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_sql_database_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.availability | SQL Database availability on ${label:resource_name} |
-| [ am_sql_database_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.cpu | SQL Database CPU on ${label:resource_name} |
-| [ am_sql_database_instance_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.instance_cpu | SQL Database instance CPU on ${label:resource_name} |
-| [ am_sql_database_instance_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.instance_memory | SQL Database instance memory on ${label:resource_name} |
-| [ am_sql_database_dtu_consumption ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.dtu_consumption | SQL Database DTU consumption on ${label:resource_name} |
-| [ am_sql_database_data_io ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.io_utilization | SQL Database data I/O on ${label:resource_name} |
-| [ am_sql_database_log_write ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.io_utilization | SQL Database log write I/O on ${label:resource_name} |
-| [ am_sql_database_workers ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.resource_utilization | SQL Database worker utilization on ${label:resource_name} |
-| [ am_sql_database_sessions ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.resource_utilization | SQL Database session utilization on ${label:resource_name} |
-| [ am_sql_database_connection_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.connections | SQL Database system connection failures on ${label:resource_name} |
-| [ am_sql_database_firewall_blocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.connections | SQL Database firewall blocks on ${label:resource_name} |
-| [ am_sql_database_deadlocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.deadlocks | SQL Database deadlocks on ${label:resource_name} |
-| [ am_sql_database_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.storage_utilization | SQL Database storage utilization on ${label:resource_name} |
-| [ am_sql_database_xtp_storage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.xtp_storage | SQL Database In-Memory OLTP storage on ${label:resource_name} |
-| [ am_sql_database_tempdb_log_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.tempdb_log_utilization | SQL Database tempdb log utilization on ${label:resource_name} |
-| [ am_sql_database_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.replication_lag | SQL Database replication lag on ${label:resource_name} |
-| [ am_sql_database_serverless_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.serverless_utilization | SQL Database serverless CPU on ${label:resource_name} |
-| [ am_sql_database_serverless_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.serverless_utilization | SQL Database serverless memory on ${label:resource_name} |
-| [ am_sql_database_ledger_digest_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.ledger_digest | SQL Database ledger digest failures on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -355,6 +275,86 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_sql_database_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.availability | SQL Database availability on ${label:resource_name} |
+| [ am_sql_database_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.cpu | SQL Database CPU on ${label:resource_name} |
+| [ am_sql_database_instance_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.instance_cpu | SQL Database instance CPU on ${label:resource_name} |
+| [ am_sql_database_instance_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.instance_memory | SQL Database instance memory on ${label:resource_name} |
+| [ am_sql_database_dtu_consumption ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.dtu_consumption | SQL Database DTU consumption on ${label:resource_name} |
+| [ am_sql_database_data_io ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.io_utilization | SQL Database data I/O on ${label:resource_name} |
+| [ am_sql_database_log_write ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.io_utilization | SQL Database log write I/O on ${label:resource_name} |
+| [ am_sql_database_workers ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.resource_utilization | SQL Database worker utilization on ${label:resource_name} |
+| [ am_sql_database_sessions ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.resource_utilization | SQL Database session utilization on ${label:resource_name} |
+| [ am_sql_database_connection_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.connections | SQL Database system connection failures on ${label:resource_name} |
+| [ am_sql_database_firewall_blocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.connections | SQL Database firewall blocks on ${label:resource_name} |
+| [ am_sql_database_deadlocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.deadlocks | SQL Database deadlocks on ${label:resource_name} |
+| [ am_sql_database_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.storage_utilization | SQL Database storage utilization on ${label:resource_name} |
+| [ am_sql_database_xtp_storage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.xtp_storage | SQL Database In-Memory OLTP storage on ${label:resource_name} |
+| [ am_sql_database_tempdb_log_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.tempdb_log_utilization | SQL Database tempdb log utilization on ${label:resource_name} |
+| [ am_sql_database_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.replication_lag | SQL Database replication lag on ${label:resource_name} |
+| [ am_sql_database_serverless_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.serverless_utilization | SQL Database serverless CPU on ${label:resource_name} |
+| [ am_sql_database_serverless_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.serverless_utilization | SQL Database serverless memory on ${label:resource_name} |
+| [ am_sql_database_ledger_digest_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.ledger_digest | SQL Database ledger digest failures on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.sql_database.cpu | average, maximum | percentage |
+| azure_monitor.sql_database.instance_cpu | average | percentage |
+| azure_monitor.sql_database.instance_memory | average | percentage |
+| azure_monitor.sql_database.dtu_consumption | average | percentage |
+| azure_monitor.sql_database.io_utilization | data_read, log_write | percentage |
+| azure_monitor.sql_database.resource_utilization | workers, sessions | percentage |
+| azure_monitor.sql_database.availability | average | percentage |
+| azure_monitor.sql_database.connections | successful, failed_system, failed_user, firewall_blocked | connections/s |
+| azure_monitor.sql_database.deadlocks | total | deadlocks/s |
+| azure_monitor.sql_database.storage | used, allocated | bytes |
+| azure_monitor.sql_database.storage_utilization | average | percentage |
+| azure_monitor.sql_database.tempdb_size | data, log | KiB |
+| azure_monitor.sql_database.tempdb_log_utilization | average | percentage |
+| azure_monitor.sql_database.vcore_usage | used, limit | vCores |
+| azure_monitor.sql_database.dtu_usage | used, limit | DTU |
+| azure_monitor.sql_database.sessions_count | average | sessions |
+| azure_monitor.sql_database.replication_lag | average | seconds |
+| azure_monitor.sql_database.xtp_storage | average | percentage |
+| azure_monitor.sql_database.serverless_utilization | cpu, memory | percentage |
+| azure_monitor.sql_database.serverless_billing | total, ha_replicas | vCore-seconds/s |
+| azure_monitor.sql_database.free_tier_usage | consumed, remaining | vCore-seconds |
+| azure_monitor.sql_database.ledger_digest | success, failed | events/s |
 
 
 

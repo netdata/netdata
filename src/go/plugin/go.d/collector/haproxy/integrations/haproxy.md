@@ -45,50 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per HAProxy instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| haproxy.backend_current_sessions | a dimension per proxy | sessions |
-| haproxy.backend_sessions | a dimension per proxy | sessions/s |
-| haproxy.backend_response_time_average | a dimension per proxy | milliseconds |
-| haproxy.backend_queue_time_average | a dimension per proxy | milliseconds |
-| haproxy.backend_current_queue | a dimension per proxy | requests |
-
-### Per proxy
-
-These metrics refer to the Proxy.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| haproxy.backend_http_responses | 1xx, 2xx, 3xx, 4xx, 5xx, other | responses/s |
-| haproxy.backend_network_io | in, out | bytes/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -252,6 +208,50 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per HAProxy instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| haproxy.backend_current_sessions | a dimension per proxy | sessions |
+| haproxy.backend_sessions | a dimension per proxy | sessions/s |
+| haproxy.backend_response_time_average | a dimension per proxy | milliseconds |
+| haproxy.backend_queue_time_average | a dimension per proxy | milliseconds |
+| haproxy.backend_current_queue | a dimension per proxy | requests |
+
+### Per proxy
+
+These metrics refer to the Proxy.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| haproxy.backend_http_responses | 1xx, 2xx, 3xx, 4xx, 5xx, other | responses/s |
+| haproxy.backend_network_io | in, out | bytes/s |
 
 
 

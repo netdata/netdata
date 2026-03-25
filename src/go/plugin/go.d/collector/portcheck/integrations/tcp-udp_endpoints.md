@@ -66,65 +66,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per TCP endpoint
-
-These metrics refer to the TCP endpoint.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| host | The hostname or IP address of the target system, as specified in the configuration. |
-| port | The TCP port being monitored, as defined in the 'ports' configuration parameter. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| portcheck.status | success, failed, timeout | boolean |
-| portcheck.state_duration | time | seconds |
-| portcheck.latency | time | ms |
-
-### Per UDP endpoint
-
-These metrics refer to the UDP endpoint.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| host | The hostname or IP address of the target system, as specified in the configuration. |
-| port | The UDP port being monitored, as defined in the 'udp_ports' configuration parameter. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| portcheck.udp_port_status | open/filtered, closed | status |
-| portcheck.udp_port_status_duration | time | seconds |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ portcheck_service_reachable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf) | portcheck.status | TCP host ${label:host} port ${label:port} liveness status |
-| [ portcheck_connection_timeouts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf) | portcheck.status | percentage of timed-out TCP connections to host ${label:host} port ${label:port} in the last 5 minutes |
-| [ portcheck_connection_fails ](https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf) | portcheck.status | percentage of failed TCP connections to host ${label:host} port ${label:port} in the last 5 minutes |
-
-
 ## Setup
 
 
@@ -301,6 +242,65 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ portcheck_service_reachable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf) | portcheck.status | TCP host ${label:host} port ${label:port} liveness status |
+| [ portcheck_connection_timeouts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf) | portcheck.status | percentage of timed-out TCP connections to host ${label:host} port ${label:port} in the last 5 minutes |
+| [ portcheck_connection_fails ](https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf) | portcheck.status | percentage of failed TCP connections to host ${label:host} port ${label:port} in the last 5 minutes |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per TCP endpoint
+
+These metrics refer to the TCP endpoint.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| host | The hostname or IP address of the target system, as specified in the configuration. |
+| port | The TCP port being monitored, as defined in the 'ports' configuration parameter. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| portcheck.status | success, failed, timeout | boolean |
+| portcheck.state_duration | time | seconds |
+| portcheck.latency | time | ms |
+
+### Per UDP endpoint
+
+These metrics refer to the UDP endpoint.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| host | The hostname or IP address of the target system, as specified in the configuration. |
+| port | The UDP port being monitored, as defined in the 'udp_ports' configuration parameter. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| portcheck.udp_port_status | open/filtered, closed | status |
+| portcheck.udp_port_status_duration | time | seconds |
 
 
 

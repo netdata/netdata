@@ -69,49 +69,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per host
-
-These metrics refer to the remote host.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| host | remote host |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ping.host_rtt | min, max, avg | milliseconds |
-| ping.host_std_dev_rtt | std_dev | milliseconds |
-| ping.host_jitter | mean, ewma, sma | milliseconds |
-| ping.host_rtt_variance | variance | ms² |
-| ping.host_packet_loss | loss | percentage |
-| ping.host_packets | received, sent | packets |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ ping_host_reachable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_packet_loss | network host ${label:host} reachability status |
-| [ ping_packet_loss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_packet_loss | packet loss percentage to the network host ${label:host} over the last 10 minutes |
-| [ ping_host_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_rtt | average latency to the network host ${label:host} over the last 10 seconds |
-
-
 ## Setup
 
 
@@ -256,6 +213,49 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ ping_host_reachable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_packet_loss | network host ${label:host} reachability status |
+| [ ping_packet_loss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_packet_loss | packet loss percentage to the network host ${label:host} over the last 10 minutes |
+| [ ping_host_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_rtt | average latency to the network host ${label:host} over the last 10 seconds |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per host
+
+These metrics refer to the remote host.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| host | remote host |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ping.host_rtt | min, max, avg | milliseconds |
+| ping.host_std_dev_rtt | std_dev | milliseconds |
+| ping.host_jitter | mean, ewma, sma | milliseconds |
+| ping.host_rtt_variance | variance | ms² |
+| ping.host_packet_loss | loss | percentage |
+| ping.host_packets | received, sent | packets |
 
 
 

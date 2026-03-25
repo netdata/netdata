@@ -60,6 +60,74 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+#### Enable monitoring interface
+
+Ensure the IBM DB2 monitoring interface is accessible.
+
+
+
+### Configuration
+
+#### Options
+
+Configuration options for the db2 collector.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update_every | Data collection frequency. | 1 | no |
+| endpoint | Connection endpoint. | dummy://localhost | no |
+
+
+</details>
+
+
+
+#### via File
+
+The configuration file name for this integration is `ibm.d/db2.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config ibm.d/db2.conf
+```
+
+##### Examples
+
+###### Basic
+
+Basic configuration example.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    endpoint: dummy://localhost
+
+```
+</details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -410,73 +478,5 @@ Metrics:
 | db2.tablespace_group_size | used, free | bytes |
 | db2.tablespace_group_usable_size | total, usable | bytes |
 | db2.tablespace_group_state | state | state |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
-## Setup
-
-
-### Prerequisites
-
-#### Enable monitoring interface
-
-Ensure the IBM DB2 monitoring interface is accessible.
-
-
-
-### Configuration
-
-#### Options
-
-Configuration options for the db2 collector.
-
-
-<details open><summary>Config options</summary>
-
-
-
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 1 | no |
-| endpoint | Connection endpoint. | dummy://localhost | no |
-
-
-</details>
-
-
-
-#### via File
-
-The configuration file name for this integration is `ibm.d/db2.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config ibm.d/db2.conf
-```
-
-##### Examples
-
-###### Basic
-
-Basic configuration example.
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: local
-    endpoint: dummy://localhost
-
-```
-</details>
 
 

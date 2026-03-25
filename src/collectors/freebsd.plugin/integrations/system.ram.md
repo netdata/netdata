@@ -43,42 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per system.ram instance
-
-This metric shows RAM usage statistics.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.ram | free, active, inactive, wired, cache, laundry, buffers | MiB |
-| mem.available | avail | MiB |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | system.ram | system memory utilization |
-| [ ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | system.ram | system memory utilization |
-| [ ram_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.available | percentage of estimated amount of RAM available for userspace processes, without causing swapping |
-| [ ram_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.available | percentage of estimated amount of RAM available for userspace processes, without causing swapping |
-
-
 ## Setup
 
 
@@ -130,5 +94,41 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | system.ram | system memory utilization |
+| [ ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | system.ram | system memory utilization |
+| [ ram_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.available | percentage of estimated amount of RAM available for userspace processes, without causing swapping |
+| [ ram_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.available | percentage of estimated amount of RAM available for userspace processes, without causing swapping |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per system.ram instance
+
+This metric shows RAM usage statistics.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.ram | free, active, inactive, wired, cache, laundry, buffers | MiB |
+| mem.available | avail | MiB |
 
 

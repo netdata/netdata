@@ -57,53 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.sql_managed_instance.cpu | average, maximum | percentage |
-| azure_monitor.sql_managed_instance.io_throughput | read, written | bytes/s |
-| azure_monitor.sql_managed_instance.io_requests | average | requests/s |
-| azure_monitor.sql_managed_instance.storage | reserved, used | MiB |
-| azure_monitor.sql_managed_instance.virtual_core_count | average | cores |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_sql_managed_instance_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.cpu | SQL MI CPU utilization on ${label:resource_name} |
-| [ am_sql_managed_instance_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.storage | SQL MI storage utilization on ${label:resource_name} |
-| [ am_sql_managed_instance_io_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.io_requests | SQL MI I/O requests on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -322,6 +275,53 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_sql_managed_instance_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.cpu | SQL MI CPU utilization on ${label:resource_name} |
+| [ am_sql_managed_instance_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.storage | SQL MI storage utilization on ${label:resource_name} |
+| [ am_sql_managed_instance_io_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_managed_instance.conf) | azure_monitor.sql_managed_instance.io_requests | SQL MI I/O requests on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.sql_managed_instance.cpu | average, maximum | percentage |
+| azure_monitor.sql_managed_instance.io_throughput | read, written | bytes/s |
+| azure_monitor.sql_managed_instance.io_requests | average | requests/s |
+| azure_monitor.sql_managed_instance.storage | reserved, used | MiB |
+| azure_monitor.sql_managed_instance.virtual_core_count | average | cores |
 
 
 

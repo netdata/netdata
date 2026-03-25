@@ -109,7 +109,7 @@ modules:
       plugin_name: windows.plugin
       module_name: PerflibMemory
       monitored_instance:
-        name: Memory statistics
+        name: Memory Statistics (Win)
         link: "https://learn.microsoft.com/en-us/windows/win32/Memory/memory-management"
         categories:
           - data-collection.operating-systems
@@ -1069,7 +1069,7 @@ modules:
       plugin_name: windows.plugin
       module_name: GetPowerSupply
       monitored_instance:
-        name: Power supply
+        name: Power Supply (Win)
         link: "https://learn.microsoft.com/en-us/windows/win32/power/power-management-portal"
         categories:
           - data-collection.hardware-and-sensors

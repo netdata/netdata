@@ -180,6 +180,16 @@
 - Docs: remove Nagios from Prometheus meta ([#22020](https://github.com/netdata/netdata/issues/22020))
 - Regenerate integrations docs ([#22022](https://github.com/netdata/netdata/issues/22022))
 - Fix clocks (ebpf.plugin and others) ([#22009](https://github.com/netdata/netdata/issues/22009))
+- Windows documentation ([#22021](https://github.com/netdata/netdata/issues/22021))
+- Compilation Warning (BSD and Windows) ([#22024](https://github.com/netdata/netdata/issues/22024))
+- Docs(integrations): add generated secretstore docs and SECRETS page ([#22028](https://github.com/netdata/netdata/issues/22028))
+- Docs: update secrets management section ([#22030](https://github.com/netdata/netdata/issues/22030))
+- Docs: add file permissions and ownership documentation for claim.conf ([#22017](https://github.com/netdata/netdata/issues/22017))
+- Docs: Add cloud.d directory contents section to claim README ([#21966](https://github.com/netdata/netdata/issues/21966))
+- Docs: fix integration name collision ([#22031](https://github.com/netdata/netdata/issues/22031))
+- Regenerate integrations docs ([#22032](https://github.com/netdata/netdata/issues/22032))
+- Docs(integrations): reorder collector README sections for better onboarding ([#22033](https://github.com/netdata/netdata/issues/22033))
+- Regenerate integrations docs ([#22034](https://github.com/netdata/netdata/issues/22034))
 
 ## [2.9.0] - 2026-02-16
 

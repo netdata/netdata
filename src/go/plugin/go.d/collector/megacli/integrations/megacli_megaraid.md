@@ -55,87 +55,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per adapter
-
-These metrics refer to the MegaCLI Adapter.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| adapter_number | Adapter number |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| megacli.adapter_health_state | optimal, degraded, partially_degraded, failed | state |
-
-### Per physical drive
-
-These metrics refer to the MegaCLI Physical Drive.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| adapter_number | Adapter number |
-| wwn | World Wide Name |
-| slot_number | Slot number |
-| drive_position | Position (e.g. DiskGroup: 0, Span: 0, Arm: 2) |
-| drive_type | Type (e.g. SATA) |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| megacli.phys_drive_media_errors_rate | media_errors | errors/s |
-| megacli.phys_drive_predictive_failures_rate | predictive_failures | failures/s |
-
-### Per backup battery unit
-
-These metrics refer to the MegaCLI Backup Battery Unit.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| adapter_number | Adapter number |
-| battery_type | Battery type (e.g. BBU) |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| megacli.bbu_charge | charge | percentage |
-| megacli.bbu_recharge_cycles | recharge | cycles |
-| megacli.bbu_capacity_degradation | cap_degradation | percent |
-| megacli.bbu_temperature | temperature | Celsius |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ megacli_adapter_health_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.adapter_health_state | MegaCLI adapter ${label:adapter_number} is in the degraded state |
-| [ megacli_phys_drive_media_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.phys_drive_media_errors | MegaCLI physical drive adapter ${label:adapter_number} slot ${label:slot_number} media errors |
-| [ megacli_phys_drive_predictive_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.phys_drive_predictive_failures | MegaCLI physical drive (adapter ${label:adapter_number} slot ${label:slot_number}) predictive failures |
-| [ megacli_bbu_charge ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.bbu_charge | MegaCLI Backup Battery Unit (adapter ${label:adapter_number}) average charge over the last minute |
-| [ megacli_bbu_recharge_cycles ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.bbu_recharge_cycles | MegaCLI Backup Battery Unit (adapter ${label:adapter_number}) average charge over the last minute |
-
-
 ## Setup
 
 
@@ -227,6 +146,87 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ megacli_adapter_health_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.adapter_health_state | MegaCLI adapter ${label:adapter_number} is in the degraded state |
+| [ megacli_phys_drive_media_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.phys_drive_media_errors | MegaCLI physical drive adapter ${label:adapter_number} slot ${label:slot_number} media errors |
+| [ megacli_phys_drive_predictive_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.phys_drive_predictive_failures | MegaCLI physical drive (adapter ${label:adapter_number} slot ${label:slot_number}) predictive failures |
+| [ megacli_bbu_charge ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.bbu_charge | MegaCLI Backup Battery Unit (adapter ${label:adapter_number}) average charge over the last minute |
+| [ megacli_bbu_recharge_cycles ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.bbu_recharge_cycles | MegaCLI Backup Battery Unit (adapter ${label:adapter_number}) average charge over the last minute |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per adapter
+
+These metrics refer to the MegaCLI Adapter.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| adapter_number | Adapter number |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| megacli.adapter_health_state | optimal, degraded, partially_degraded, failed | state |
+
+### Per physical drive
+
+These metrics refer to the MegaCLI Physical Drive.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| adapter_number | Adapter number |
+| wwn | World Wide Name |
+| slot_number | Slot number |
+| drive_position | Position (e.g. DiskGroup: 0, Span: 0, Arm: 2) |
+| drive_type | Type (e.g. SATA) |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| megacli.phys_drive_media_errors_rate | media_errors | errors/s |
+| megacli.phys_drive_predictive_failures_rate | predictive_failures | failures/s |
+
+### Per backup battery unit
+
+These metrics refer to the MegaCLI Backup Battery Unit.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| adapter_number | Adapter number |
+| battery_type | Battery type (e.g. BBU) |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| megacli.bbu_charge | charge | percentage |
+| megacli.bbu_recharge_cycles | recharge | cycles |
+| megacli.bbu_capacity_degradation | cap_degradation | percent |
+| megacli.bbu_temperature | temperature | Celsius |
 
 
 

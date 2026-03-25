@@ -52,91 +52,6 @@ The default configuration for this integration does not impose any limits on dat
 
 This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per eBPF Socket instance
-
-These metrics show total number of calls to functions inside kernel.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ip.inbound_conn | connection_tcp | connections/s |
-| ip.tcp_outbound_conn | received | connections/s |
-| ip.tcp_functions | received, send, closed | calls/s |
-| ip.total_tcp_bandwidth | received, send | kilobits/s |
-| ip.tcp_error | received, send | calls/s |
-| ip.tcp_retransmit | retransmited | calls/s |
-| ip.udp_functions | received, send | calls/s |
-| ip.total_udp_bandwidth | received, send | kilobits/s |
-| ip.udp_error | received, send | calls/s |
-
-### Per apps
-
-These metrics show grouped information per apps group.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| app_group | The name of the group defined in the configuration. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.ebpf_call_tcp_v4_connection | connections | connections/s |
-| app.ebpf_call_tcp_v6_connection | connections | connections/s |
-| app.ebpf_sock_total_bandwidth | received, sent | kilobits/s |
-| app.ebpf_call_tcp_sendmsg | calls | calls/s |
-| app.ebpf_call_tcp_cleanup_rbuf | calls | calls/s |
-| app.ebpf_call_tcp_retransmit | calls | calls/s |
-| app.ebpf_call_udp_sendmsg | calls | calls/s |
-| app.ebpf_call_udp_recvmsg | calls | calls/s |
-
-### Per cgroup
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.net_conn_ipv4 | connections | connections/s |
-| cgroup.net_conn_ipv6 | connections | connections/s |
-| cgroup.net_total_bandwidth | received, sent | kilobits/s |
-| cgroup.net_tcp_recv | calls | calls/s |
-| cgroup.net_tcp_send | calls | calls/s |
-| cgroup.net_retransmit | calls | calls/s |
-| cgroup.net_udp_send | calls | calls/s |
-| cgroup.net_udp_recv | calls | calls/s |
-| services.net_conn_ipv4 | connections | connections/s |
-| services.net_conn_ipv6 | connections | connections/s |
-| services.net_total_bandwidth | received, sent | kilobits/s |
-| services.net_tcp_recv | calls | calls/s |
-| services.net_tcp_send | calls | calls/s |
-| services.net_tcp_retransmit | calls | calls/s |
-| services.net_udp_send | calls | calls/s |
-| services.net_udp_recv | calls | calls/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -215,5 +130,90 @@ sudo ./edit-config ebpf.d/network.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per eBPF Socket instance
+
+These metrics show total number of calls to functions inside kernel.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ip.inbound_conn | connection_tcp | connections/s |
+| ip.tcp_outbound_conn | received | connections/s |
+| ip.tcp_functions | received, send, closed | calls/s |
+| ip.total_tcp_bandwidth | received, send | kilobits/s |
+| ip.tcp_error | received, send | calls/s |
+| ip.tcp_retransmit | retransmited | calls/s |
+| ip.udp_functions | received, send | calls/s |
+| ip.total_udp_bandwidth | received, send | kilobits/s |
+| ip.udp_error | received, send | calls/s |
+
+### Per apps
+
+These metrics show grouped information per apps group.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| app.ebpf_call_tcp_v4_connection | connections | connections/s |
+| app.ebpf_call_tcp_v6_connection | connections | connections/s |
+| app.ebpf_sock_total_bandwidth | received, sent | kilobits/s |
+| app.ebpf_call_tcp_sendmsg | calls | calls/s |
+| app.ebpf_call_tcp_cleanup_rbuf | calls | calls/s |
+| app.ebpf_call_tcp_retransmit | calls | calls/s |
+| app.ebpf_call_udp_sendmsg | calls | calls/s |
+| app.ebpf_call_udp_recvmsg | calls | calls/s |
+
+### Per cgroup
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cgroup.net_conn_ipv4 | connections | connections/s |
+| cgroup.net_conn_ipv6 | connections | connections/s |
+| cgroup.net_total_bandwidth | received, sent | kilobits/s |
+| cgroup.net_tcp_recv | calls | calls/s |
+| cgroup.net_tcp_send | calls | calls/s |
+| cgroup.net_retransmit | calls | calls/s |
+| cgroup.net_udp_send | calls | calls/s |
+| cgroup.net_udp_recv | calls | calls/s |
+| services.net_conn_ipv4 | connections | connections/s |
+| services.net_conn_ipv6 | connections | connections/s |
+| services.net_total_bandwidth | received, sent | kilobits/s |
+| services.net_tcp_recv | calls | calls/s |
+| services.net_tcp_send | calls | calls/s |
+| services.net_tcp_retransmit | calls | calls/s |
+| services.net_udp_send | calls | calls/s |
+| services.net_udp_recv | calls | calls/s |
 
 

@@ -49,39 +49,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-Monitor the overall memory fragmentation of the system.
-
-### Per node
-
-Memory fragmentation statistics for each NUMA node in the system.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| numa_node | The NUMA node the metrics are associated with. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.fragmentation_index_dma | order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10 | index |
-| mem.fragmentation_index_dma32 | order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10 | index |
-| mem.fragmentation_index_normal | order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10 | index |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -138,5 +105,38 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+Monitor the overall memory fragmentation of the system.
+
+### Per node
+
+Memory fragmentation statistics for each NUMA node in the system.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| numa_node | The NUMA node the metrics are associated with. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| mem.fragmentation_index_dma | order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10 | index |
+| mem.fragmentation_index_dma32 | order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10 | index |
+| mem.fragmentation_index_normal | order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10 | index |
 
 

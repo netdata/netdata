@@ -213,14 +213,14 @@ endmeta-->
 
 {create_overview(integration, integration['meta']['monitored_instance']['icon_filename'])}"""
 
+            if integration.get("setup"):
+                md += f"\n{integration['setup']}\n"
+            if integration.get("alerts"):
+                md += f"\n{integration['alerts']}\n"
             if integration.get("metrics"):
                 md += f"\n{integration['metrics']}\n"
             if integration.get("functions"):
                 md += f"\n{integration['functions']}\n"
-            if integration.get("alerts"):
-                md += f"\n{integration['alerts']}\n"
-            if integration.get("setup"):
-                md += f"\n{integration['setup']}\n"
             if integration.get("troubleshooting"):
                 md += f"\n{integration['troubleshooting']}\n"
 

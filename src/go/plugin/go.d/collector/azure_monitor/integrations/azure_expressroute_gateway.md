@@ -57,60 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.express_route_gateway.connection_throughput | in, out | bits/s |
-| azure_monitor.express_route_gateway.gateway_throughput | average | bits/s |
-| azure_monitor.express_route_gateway.cpu_utilization | average | percentage |
-| azure_monitor.express_route_gateway.packets | average | packets/s |
-| azure_monitor.express_route_gateway.active_flows | average | flows |
-| azure_monitor.express_route_gateway.routes_advertised | maximum | routes |
-| azure_monitor.express_route_gateway.routes_learned | maximum | routes |
-| azure_monitor.express_route_gateway.route_changes | total | changes/s |
-| azure_monitor.express_route_gateway.max_flows_creation_rate | maximum | flows/s |
-| azure_monitor.express_route_gateway.vm_count | maximum | VMs |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_express_route_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.cpu_utilization | ExpressRoute GW CPU on ${label:resource_name} |
-| [ am_express_route_gateway_active_flows ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.active_flows | ExpressRoute GW active flows on ${label:resource_name} |
-| [ am_express_route_gateway_route_changes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.route_changes | ExpressRoute GW route churn on ${label:resource_name} |
-| [ am_express_route_gateway_routes_advertised ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.routes_advertised | ExpressRoute GW routes advertised on ${label:resource_name} |
-| [ am_express_route_gateway_routes_learned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.routes_learned | ExpressRoute GW routes learned on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -329,6 +275,60 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_express_route_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.cpu_utilization | ExpressRoute GW CPU on ${label:resource_name} |
+| [ am_express_route_gateway_active_flows ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.active_flows | ExpressRoute GW active flows on ${label:resource_name} |
+| [ am_express_route_gateway_route_changes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.route_changes | ExpressRoute GW route churn on ${label:resource_name} |
+| [ am_express_route_gateway_routes_advertised ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.routes_advertised | ExpressRoute GW routes advertised on ${label:resource_name} |
+| [ am_express_route_gateway_routes_learned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.routes_learned | ExpressRoute GW routes learned on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.express_route_gateway.connection_throughput | in, out | bits/s |
+| azure_monitor.express_route_gateway.gateway_throughput | average | bits/s |
+| azure_monitor.express_route_gateway.cpu_utilization | average | percentage |
+| azure_monitor.express_route_gateway.packets | average | packets/s |
+| azure_monitor.express_route_gateway.active_flows | average | flows |
+| azure_monitor.express_route_gateway.routes_advertised | maximum | routes |
+| azure_monitor.express_route_gateway.routes_learned | maximum | routes |
+| azure_monitor.express_route_gateway.route_changes | total | changes/s |
+| azure_monitor.express_route_gateway.max_flows_creation_rate | maximum | flows/s |
+| azure_monitor.express_route_gateway.vm_count | maximum | VMs |
 
 
 

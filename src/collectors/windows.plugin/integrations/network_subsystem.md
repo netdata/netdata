@@ -49,6 +49,70 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update every | Data collection frequency. | 1 | no |
+
+
+
+
+#### via File
+
+The configuration file name for this integration is `netdata.conf`.
+Configuration for this specific integration is located in the `[plugin:windows:PerflibNetwork]` section within that file.
+
+The file format is a modified INI syntax. The general structure is:
+
+```ini
+[section1]
+    option1 = some value
+    option2 = some other value
+
+[section2]
+    option3 = some third value
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config netdata.conf
+```
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ inbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | Ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes |
+| [ outbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | Ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes |
+| [ 1m_received_traffic_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | Average inbound utilization for the network interface ${label:device} over the last minute |
+| [ 1m_sent_traffic_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | Average outbound utilization for the network interface ${label:device} over the last minute |
+| [ network_interface_output_queue_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.queue_length | Output Queue Length on interface ${label:device} should be zero, otherwise there are delays and bottlenecks. |
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -108,69 +172,5 @@ Metrics:
 | net.rsc_exceptions | exceptions | exceptions/s |
 | net.rsc_average_packet_size | average | bytes |
 | net.chimney_connections | connections | connections |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ inbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | Ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes |
-| [ outbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | Ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes |
-| [ 1m_received_traffic_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | Average inbound utilization for the network interface ${label:device} over the last minute |
-| [ 1m_sent_traffic_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | Average outbound utilization for the network interface ${label:device} over the last minute |
-| [ network_interface_output_queue_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.queue_length | Output Queue Length on interface ${label:device} should be zero, otherwise there are delays and bottlenecks. |
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-
-
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update every | Data collection frequency. | 1 | no |
-
-
-
-
-#### via File
-
-The configuration file name for this integration is `netdata.conf`.
-Configuration for this specific integration is located in the `[plugin:windows:PerflibNetwork]` section within that file.
-
-The file format is a modified INI syntax. The general structure is:
-
-```ini
-[section1]
-    option1 = some value
-    option2 = some other value
-
-[section2]
-    option3 = some third value
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config netdata.conf
-```
-
-##### Examples
-There are no configuration examples.
 
 
