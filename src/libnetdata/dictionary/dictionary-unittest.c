@@ -1070,12 +1070,13 @@ struct dict_bench_stats {
     uint64_t items_seen;
     uint64_t latency_total_ut;
     size_t latency_samples_used;
+    uint64_t latency_samples_seen;
     usec_t latency_samples[DICT_BENCH_MAX_SAMPLES];
 };
 
 struct dict_bench_thread {
     int id;
-    volatile int *join;
+    int *join;
     DICTIONARY *dict;
     const struct dict_bench_config *cfg;
     struct dict_bench_stats stats;
@@ -1100,18 +1101,26 @@ static int dict_bench_usec_cmp(const void *a, const void *b) {
     return (ua > ub) - (ua < ub);
 }
 
-static inline void dict_bench_record_latency(struct dict_bench_stats *stats, usec_t latency_ut) {
-    stats->latency_total_ut += latency_ut;
-
-    if(stats->latency_samples_used < DICT_BENCH_MAX_SAMPLES)
-        stats->latency_samples[stats->latency_samples_used++] = latency_ut;
-}
-
 static inline uint32_t dict_bench_rand(uint32_t *state) {
+    if(!*state) *state = 1;
     *state ^= *state << 13;
     *state ^= *state >> 17;
     *state ^= *state << 5;
     return *state;
+}
+
+static inline void dict_bench_record_latency(struct dict_bench_stats *stats, usec_t latency_ut, uint32_t *rng) {
+    stats->latency_total_ut += latency_ut;
+    stats->latency_samples_seen++;
+
+    if(stats->latency_samples_used < DICT_BENCH_MAX_SAMPLES)
+        stats->latency_samples[stats->latency_samples_used++] = latency_ut;
+    else {
+        // reservoir sampling: replace a random slot with probability N/total_seen
+        uint32_t idx = dict_bench_rand(rng) % stats->latency_samples_seen;
+        if(idx < DICT_BENCH_MAX_SAMPLES)
+            stats->latency_samples[idx] = latency_ut;
+    }
 }
 
 static void dict_bench_lookup_key(char *buf, size_t len, size_t key_idx) {
@@ -1153,7 +1162,7 @@ static void dict_bench_reader_thread(void *arg) {
         ctx->stats.ops++;
 
         if(sample_latency)
-            dict_bench_record_latency(&ctx->stats, now_monotonic_usec() - started_ut);
+            dict_bench_record_latency(&ctx->stats, now_monotonic_usec() - started_ut, &ctx->rng_state);
     }
 }
 
@@ -1187,7 +1196,7 @@ static void dict_bench_writer_thread(void *arg) {
         ctx->stats.ops++;
 
         if(sample_latency)
-            dict_bench_record_latency(&ctx->stats, now_monotonic_usec() - started_ut);
+            dict_bench_record_latency(&ctx->stats, now_monotonic_usec() - started_ut, &ctx->rng_state);
     }
 }
 
@@ -1218,7 +1227,8 @@ static void dict_bench_aggregate_latency(
     double *avg_ut,
     double *p99_ut
 ) {
-    usec_t samples[DICT_BENCH_MAX_SAMPLES * 16];
+    size_t max_samples = (size_t)DICT_BENCH_MAX_SAMPLES * count;
+    usec_t *samples = callocz(max_samples, sizeof(usec_t));
     size_t samples_used = 0;
     uint64_t total_latency_ut = 0;
     uint64_t total_ops = 0;
@@ -1230,7 +1240,7 @@ static void dict_bench_aggregate_latency(
         total_latency_ut += threads[i].stats.latency_total_ut;
         total_ops += threads[i].stats.latency_samples_used;
 
-        size_t available = sizeof(samples) / sizeof(samples[0]) - samples_used;
+        size_t available = max_samples - samples_used;
         size_t copy = MIN(available, threads[i].stats.latency_samples_used);
         if(copy) {
             memcpy(&samples[samples_used], threads[i].stats.latency_samples, copy * sizeof(usec_t));
@@ -1240,16 +1250,15 @@ static void dict_bench_aggregate_latency(
 
     *avg_ut = total_ops ? (double)total_latency_ut / (double)total_ops : 0.0;
     *p99_ut = dict_bench_percentile_ut(samples, samples_used, 99);
+    freez(samples);
 }
 
 static void dict_bench_run_case(const struct dict_bench_config *cfg) {
     int total_threads = cfg->readers + cfg->writers;
-    volatile int join = 0;
-    struct dict_bench_thread threads[total_threads];
+    int join = 0;
+    struct dict_bench_thread *threads = callocz(total_threads, sizeof(*threads));
     struct dict_bench_summary summary = {0};
     DICTIONARY *dict = dictionary_create(DICT_OPTION_NONE);
-
-    memset(threads, 0, sizeof(threads));
     dict_bench_prepopulate(dict, cfg->entries);
 
     for(int i = 0; i < cfg->readers; i++) {
@@ -1300,6 +1309,7 @@ static void dict_bench_run_case(const struct dict_bench_config *cfg) {
     dict_bench_aggregate_latency(threads, total_threads, true, &summary.write_avg_ut, &summary.write_p99_ut);
     dictionary_destroy(dict);
     cleanup_destroyed_dictionaries(false);
+    freez(threads);
 
     if(cfg->read_mode == DICT_BENCH_READ_TRAVERSAL) {
         fprintf(stderr, "%-14s %8zu %8d %8d %14.0f %14.0f %14.0f %14.2f %14.2f %14.2f %14.2f\n",
