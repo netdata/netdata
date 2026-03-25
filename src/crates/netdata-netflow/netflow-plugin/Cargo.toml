@@ -29,6 +29,7 @@ journal-registry = { workspace = true }
 journal-session = { workspace = true }
 humantime = { workspace = true }
 humantime-serde = { workspace = true }
+hashbrown = { workspace = true }
 ipnet = { workspace = true }
 ipnet-trie = "0.3.0"
 itoa = "1"

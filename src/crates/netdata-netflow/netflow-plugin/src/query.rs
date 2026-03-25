@@ -8,6 +8,7 @@ use crate::tiering::{
 };
 use anyhow::{Context, Result};
 use chrono::Utc;
+use hashbrown::HashMap as FastHashMap;
 use journal_common::{Seconds, load_machine_id};
 use journal_registry::{Monitor, Registry, repository::File as RegistryFile};
 use journal_session::{Direction as SessionDirection, JournalSession};
@@ -26,6 +27,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, RwLock};
+use std::time::Instant;
 use tokio::sync::mpsc::UnboundedReceiver;
 use twox_hash::XxHash64;
 
@@ -573,6 +575,57 @@ struct QuerySetup {
     stats: HashMap<String, u64>,
 }
 
+struct ProjectedFacetScanState {
+    requested_fields: Vec<String>,
+    requested_set: HashSet<String>,
+    needed_fields: HashSet<String>,
+    accumulators: Vec<FacetDistinctAccumulator>,
+}
+
+impl ProjectedFacetScanState {
+    fn new(request: &FlowsRequest) -> Self {
+        let requested_fields = requested_facet_fields(request);
+        let requested_set = requested_fields.iter().cloned().collect::<HashSet<_>>();
+        let mut needed_fields = request
+            .selections
+            .keys()
+            .map(|field| field.to_ascii_uppercase())
+            .collect::<HashSet<_>>();
+        needed_fields.extend(requested_fields.iter().cloned());
+        expand_virtual_flow_field_dependencies(&mut needed_fields);
+
+        let accumulator_count = requested_fields.len();
+        Self {
+            requested_fields,
+            requested_set,
+            needed_fields,
+            accumulators: std::iter::repeat_with(FacetDistinctAccumulator::default)
+                .take(accumulator_count)
+                .collect(),
+        }
+    }
+
+    fn active(&self) -> bool {
+        !self.requested_fields.is_empty()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum ProjectedIdentityField {
+    #[default]
+    None,
+    Src,
+    Dst,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct ProjectedPayloadAction {
+    group_slot: Option<usize>,
+    direct_facet_slot: Option<usize>,
+    capture_slot: Option<usize>,
+    identity: ProjectedIdentityField,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct TimeseriesLayout {
     after: u32,
@@ -986,6 +1039,7 @@ impl FlowQueryService {
         setup: &QuerySetup,
         request: &FlowsRequest,
         grouped_aggregates: &mut CompactGroupAccumulator,
+        mut projected_facets: Option<&mut ProjectedFacetScanState>,
     ) -> Result<ScanCounts> {
         let after_usec = (setup.after as u64).saturating_mul(1_000_000);
         let before_usec = (setup.before as u64).saturating_mul(1_000_000);
@@ -1013,7 +1067,13 @@ impl FlowQueryService {
             .direction(SessionDirection::Forward)
             .since(after_usec)
             .until(until_usec);
-        for (field, value) in cursor_prefilter_pairs(&request.selections) {
+        let prefilter_pairs =
+            if let Some(facets) = projected_facets.as_ref().filter(|facets| facets.active()) {
+                cursor_prefilter_pairs_excluding(&request.selections, &facets.requested_set)
+            } else {
+                cursor_prefilter_pairs(&request.selections)
+            };
+        for (field, value) in prefilter_pairs {
             let pair = format!("{}={}", field, value);
             cursor_builder = cursor_builder.add_match(pair.as_bytes());
         }
@@ -1021,17 +1081,77 @@ impl FlowQueryService {
             .build()
             .context("failed to build journal session cursor for projected grouped query")?;
 
-        let group_by_positions: HashMap<&str, usize> = setup
-            .effective_group_by
-            .iter()
-            .enumerate()
-            .map(|(index, field)| (field.as_str(), index))
-            .collect();
         let mut row_group_field_ids = vec![None; setup.effective_group_by.len()];
         let mut row_missing_values = std::iter::repeat_with(|| None)
             .take(setup.effective_group_by.len())
             .collect::<Vec<Option<String>>>();
         let mut empty_field_ids = vec![None; setup.effective_group_by.len()];
+        let selections_empty = request.selections.is_empty();
+        let mut direct_facet_positions = FastHashMap::new();
+        let mut requested_virtual_facets = Vec::new();
+        let mut facet_capture_positions = FastHashMap::new();
+        let mut facet_captured_values = Vec::new();
+        if let Some(facets) = projected_facets.as_ref().filter(|facets| facets.active()) {
+            if selections_empty {
+                for (field_index, field) in facets.requested_fields.iter().enumerate() {
+                    if is_virtual_flow_field(field) {
+                        requested_virtual_facets.push((field_index, field.clone()));
+                    } else {
+                        direct_facet_positions.insert(field.clone(), field_index);
+                    }
+                }
+            }
+
+            let mut captured_fields = if selections_empty {
+                let mut fields = HashSet::new();
+                for (_, field) in &requested_virtual_facets {
+                    fields.extend(
+                        virtual_flow_field_dependencies(field.as_str())
+                            .iter()
+                            .map(|dependency| (*dependency).to_string()),
+                    );
+                }
+                fields.into_iter().collect::<Vec<_>>()
+            } else {
+                facets.needed_fields.iter().cloned().collect::<Vec<_>>()
+            };
+            captured_fields.sort_unstable();
+            facet_capture_positions = captured_fields
+                .iter()
+                .cloned()
+                .enumerate()
+                .map(|(index, field)| (field, index))
+                .collect::<FastHashMap<_, _>>();
+            facet_captured_values = vec![None; captured_fields.len()];
+        }
+        let mut payload_actions = FastHashMap::new();
+        for (index, field) in setup.effective_group_by.iter().enumerate() {
+            payload_actions
+                .entry(field.clone())
+                .or_insert_with(ProjectedPayloadAction::default)
+                .group_slot = Some(index);
+        }
+        for (field, field_index) in &direct_facet_positions {
+            payload_actions
+                .entry(field.clone())
+                .or_insert_with(ProjectedPayloadAction::default)
+                .direct_facet_slot = Some(*field_index);
+        }
+        for (field, field_index) in &facet_capture_positions {
+            payload_actions
+                .entry(field.clone())
+                .or_insert_with(ProjectedPayloadAction::default)
+                .capture_slot = Some(*field_index);
+        }
+        payload_actions
+            .entry("SRC_ADDR".to_string())
+            .or_insert_with(ProjectedPayloadAction::default)
+            .identity = ProjectedIdentityField::Src;
+        payload_actions
+            .entry("DST_ADDR".to_string())
+            .or_insert_with(ProjectedPayloadAction::default)
+            .identity = ProjectedIdentityField::Dst;
+
         loop {
             let has_entry = cursor
                 .step()
@@ -1048,6 +1168,9 @@ impl FlowQueryService {
 
             row_group_field_ids.fill(None);
             for value in &mut row_missing_values {
+                let _ = value.take();
+            }
+            for value in &mut facet_captured_values {
                 let _ = value.take();
             }
             let mut metrics = FlowMetrics::default();
@@ -1092,16 +1215,32 @@ impl FlowQueryService {
                     _ => {}
                 }
 
-                let group_slot = group_by_positions.get(key).copied();
-                let needs_identity = matches!(key, "SRC_ADDR" | "DST_ADDR");
-                if group_slot.is_none() && !needs_identity {
+                let Some(action) = payload_actions.get(key).copied() else {
                     continue;
-                }
+                };
 
                 let value = payload_value(value_bytes);
                 let value_ref = value.as_ref();
 
-                if let Some(field_index) = group_slot {
+                if let Some(field_index) = action.direct_facet_slot {
+                    if !value_ref.is_empty() {
+                        if let Some(facets) = projected_facets.as_mut() {
+                            accumulate_distinct_value(
+                                &mut facets.accumulators[field_index],
+                                value_ref,
+                                self.facet_max_values_per_field,
+                            );
+                        }
+                    }
+                }
+
+                if let Some(slot) = action.capture_slot {
+                    if !value_ref.is_empty() && facet_captured_values[slot].is_none() {
+                        facet_captured_values[slot] = Some(value_ref.to_string());
+                    }
+                }
+
+                if let Some(field_index) = action.group_slot {
                     if !value_ref.is_empty() {
                         match grouped_aggregates
                             .index
@@ -1120,10 +1259,67 @@ impl FlowQueryService {
                 if value_ref.is_empty() {
                     continue;
                 }
-                match key {
-                    "SRC_ADDR" => src_hash = Some(fingerprint_value(value_ref)),
-                    "DST_ADDR" => dst_hash = Some(fingerprint_value(value_ref)),
-                    _ => {}
+                match action.identity {
+                    ProjectedIdentityField::Src => src_hash = Some(fingerprint_value(value_ref)),
+                    ProjectedIdentityField::Dst => dst_hash = Some(fingerprint_value(value_ref)),
+                    ProjectedIdentityField::None => {}
+                }
+            }
+
+            if let Some(facets) = projected_facets.as_mut().filter(|facets| facets.active()) {
+                if selections_empty {
+                    for (field_index, field) in &requested_virtual_facets {
+                        let Some(value) = captured_facet_field_value(
+                            field,
+                            &facet_capture_positions,
+                            &facet_captured_values,
+                        ) else {
+                            continue;
+                        };
+                        if value.is_empty() {
+                            continue;
+                        }
+                        accumulate_distinct_value(
+                            &mut facets.accumulators[*field_index],
+                            value.as_ref(),
+                            self.facet_max_values_per_field,
+                        );
+                    }
+                } else {
+                    for (field_index, field) in facets.requested_fields.iter().enumerate() {
+                        let Some(value) = captured_facet_field_value(
+                            field,
+                            &facet_capture_positions,
+                            &facet_captured_values,
+                        ) else {
+                            continue;
+                        };
+                        if value.is_empty() {
+                            continue;
+                        }
+                        if !captured_facet_matches_selections_except(
+                            Some(field.as_str()),
+                            &request.selections,
+                            &facet_capture_positions,
+                            &facet_captured_values,
+                        ) {
+                            continue;
+                        }
+                        accumulate_distinct_value(
+                            &mut facets.accumulators[field_index],
+                            value.as_ref(),
+                            self.facet_max_values_per_field,
+                        );
+                    }
+
+                    if !captured_facet_matches_selections_except(
+                        None,
+                        &request.selections,
+                        &facet_capture_positions,
+                        &facet_captured_values,
+                    ) {
+                        continue;
+                    }
                 }
             }
 
@@ -1150,13 +1346,19 @@ impl FlowQueryService {
     pub(crate) async fn query_flows(&self, request: &FlowsRequest) -> Result<FlowQueryOutput> {
         let setup = self.prepare_query(request)?;
         let mut open_records: Option<Vec<FlowRecord>> = None;
+        let projected_grouped_scan = grouped_query_can_use_projected_scan(request);
+        let mut precomputed_journal_facets =
+            (projected_grouped_scan && request.query.is_empty())
+                .then(|| ProjectedFacetScanState::new(request));
 
         let mut grouped_aggregates = CompactGroupAccumulator::new(&setup.effective_group_by)?;
-        let counts = if grouped_query_can_use_projected_scan(request) {
+        let scan_started = Instant::now();
+        let counts = if projected_grouped_scan {
             let mut counts = self.scan_matching_grouped_records_projected(
                 &setup,
                 request,
                 &mut grouped_aggregates,
+                precomputed_journal_facets.as_mut(),
             )?;
             if setup.selected_tier != TierKind::Raw {
                 if let Some((open_bucket_records, matched_entries)) = self
@@ -1215,6 +1417,7 @@ impl FlowQueryService {
             }
             counts
         };
+        let scan_elapsed_ms = scan_started.elapsed().as_millis() as u64;
         let need_open_records_for_facets = setup.selected_tier != TierKind::Raw
             && (!request.query.is_empty()
                 || !open_tier_index_path_supported(
@@ -1225,17 +1428,22 @@ impl FlowQueryService {
             open_records =
                 Some(self.open_records_for_tier(setup.selected_tier, setup.after, setup.before));
         }
+        let facets_started = Instant::now();
         let facet_payload = self.collect_distinct_facet_values(
             &setup,
             request,
             open_records.as_deref().unwrap_or(&[]),
+            precomputed_journal_facets.map(|state| state.accumulators),
         )?;
+        let facets_elapsed_ms = facets_started.elapsed().as_millis() as u64;
+        let build_started = Instant::now();
         let build_result = self.build_grouped_flows_from_compact(
             &setup,
             grouped_aggregates,
             setup.sort_by,
             setup.limit,
         )?;
+        let build_elapsed_ms = build_started.elapsed().as_millis() as u64;
 
         let mut stats = setup.stats;
         stats.insert(
@@ -1260,6 +1468,9 @@ impl FlowQueryService {
             "query_returned_rows".to_string(),
             build_result.flows.len() as u64,
         );
+        stats.insert("query_group_scan_ms".to_string(), scan_elapsed_ms);
+        stats.insert("query_facet_scan_ms".to_string(), facets_elapsed_ms);
+        stats.insert("query_build_rows_ms".to_string(), build_elapsed_ms);
         stats.insert(
             "query_truncated".to_string(),
             u64::from(build_result.truncated),
@@ -1379,6 +1590,7 @@ impl FlowQueryService {
         setup: &QuerySetup,
         request: &FlowsRequest,
         open_records: &[FlowRecord],
+        precomputed_journal_accumulators: Option<Vec<FacetDistinctAccumulator>>,
     ) -> Result<Value> {
         let requested_fields = requested_facet_fields(request);
         if requested_fields.is_empty() {
@@ -1422,96 +1634,134 @@ impl FlowQueryService {
             &mut distinct_values,
         )?;
 
-        if !setup.files.is_empty() {
-            let tier_paths: Vec<PathBuf> = setup
-                .files
-                .iter()
-                .map(|file| PathBuf::from(file.path()))
-                .collect();
-
-            let session = JournalSession::builder()
-                .files(tier_paths)
-                .load_remappings(false)
-                .build()
-                .context("failed to open journal session for facet discovery")?;
-
-            let mut cursor_builder = session
-                .cursor_builder()
-                .direction(SessionDirection::Forward)
-                .since(after_usec)
-                .until(until_usec);
-            for (field, value) in
-                cursor_prefilter_pairs_excluding(&request.selections, &requested_set)
-            {
-                let pair = format!("{}={}", field, value);
-                cursor_builder = cursor_builder.add_match(pair.as_bytes());
-            }
-            let mut cursor = cursor_builder
-                .build()
-                .context("failed to build journal session cursor for facet discovery")?;
-
-            loop {
-                let has_entry = cursor
-                    .step()
-                    .context("failed to step journal session cursor for facet discovery")?;
-                if !has_entry {
-                    break;
-                }
-
-                let timestamp_usec = cursor.realtime_usec();
-                if timestamp_usec < after_usec || timestamp_usec >= before_usec {
-                    continue;
-                }
-
-                let mut fields = BTreeMap::new();
-                let mut regex_match = query_regex.is_none();
-                let mut payloads = cursor
-                    .payloads()
-                    .context("failed to open payload iterator for facet discovery")?;
-                while let Some(payload) = payloads
-                    .next()
-                    .context("failed to read journal payload for facet discovery")?
-                {
-                    if let Some(regex) = &query_regex {
-                        if !regex_match {
-                            if let Ok(text) = std::str::from_utf8(payload) {
-                                if regex.is_match(text) {
-                                    regex_match = true;
-                                }
-                            } else if regex.is_match(&String::from_utf8_lossy(payload)) {
-                                regex_match = true;
-                            }
-                        }
-                    }
-
-                    let Some((key, value_bytes)) = split_payload(payload) else {
-                        continue;
-                    };
-                    if !needed_fields.contains(key) {
-                        continue;
-                    }
-
-                    let value = payload_value(value_bytes);
-                    if value.is_empty() {
-                        continue;
-                    }
-
-                    fields.insert(key.to_string(), value.into_owned());
-                }
-
-                if !regex_match {
-                    continue;
-                }
-
-                let record = FlowRecord::new(timestamp_usec, fields);
-                accumulate_requested_distinct_facets(
-                    &record,
-                    &request.selections,
-                    &requested_fields,
-                    &mut distinct_values,
+        let journal_precomputed = precomputed_journal_accumulators.is_some();
+        let mut journal_accumulators = precomputed_journal_accumulators.unwrap_or_else(|| {
+            std::iter::repeat_with(FacetDistinctAccumulator::default)
+                .take(requested_fields.len())
+                .collect::<Vec<_>>()
+        });
+        for (field_index, field) in requested_fields.iter().enumerate() {
+            if let Some(accumulator) = distinct_values.remove(field) {
+                merge_distinct_accumulator(
+                    &mut journal_accumulators[field_index],
+                    accumulator,
                     self.facet_max_values_per_field,
                 );
             }
+        }
+
+        if !journal_precomputed && !setup.files.is_empty() {
+            if query_regex.is_none() {
+                self.collect_distinct_journal_facets_projected_no_regex(
+                    setup,
+                    request,
+                    &requested_fields,
+                    &requested_set,
+                    &needed_fields,
+                    &mut journal_accumulators,
+                )?;
+            } else {
+                let tier_paths: Vec<PathBuf> = setup
+                    .files
+                    .iter()
+                    .map(|file| PathBuf::from(file.path()))
+                    .collect();
+
+                let session = JournalSession::builder()
+                    .files(tier_paths)
+                    .load_remappings(false)
+                    .build()
+                    .context("failed to open journal session for facet discovery")?;
+
+                let mut cursor_builder = session
+                    .cursor_builder()
+                    .direction(SessionDirection::Forward)
+                    .since(after_usec)
+                    .until(until_usec);
+                for (field, value) in
+                    cursor_prefilter_pairs_excluding(&request.selections, &requested_set)
+                {
+                    let pair = format!("{}={}", field, value);
+                    cursor_builder = cursor_builder.add_match(pair.as_bytes());
+                }
+                let mut cursor = cursor_builder
+                    .build()
+                    .context("failed to build journal session cursor for facet discovery")?;
+
+                loop {
+                    let has_entry = cursor
+                        .step()
+                        .context("failed to step journal session cursor for facet discovery")?;
+                    if !has_entry {
+                        break;
+                    }
+
+                    let timestamp_usec = cursor.realtime_usec();
+                    if timestamp_usec < after_usec || timestamp_usec >= before_usec {
+                        continue;
+                    }
+
+                    let mut fields = BTreeMap::new();
+                    let mut regex_match = false;
+                    let mut payloads = cursor
+                        .payloads()
+                        .context("failed to open payload iterator for facet discovery")?;
+                    while let Some(payload) = payloads
+                        .next()
+                        .context("failed to read journal payload for facet discovery")?
+                    {
+                        if let Some(regex) = &query_regex {
+                            if !regex_match {
+                                if let Ok(text) = std::str::from_utf8(payload) {
+                                    if regex.is_match(text) {
+                                        regex_match = true;
+                                    }
+                                } else if regex.is_match(&String::from_utf8_lossy(payload)) {
+                                    regex_match = true;
+                                }
+                            }
+                        }
+
+                        let Some((key, value_bytes)) = split_payload(payload) else {
+                            continue;
+                        };
+                        if !needed_fields.contains(key) {
+                            continue;
+                        }
+
+                        let value = payload_value(value_bytes);
+                        if value.is_empty() {
+                            continue;
+                        }
+
+                        fields.insert(key.to_string(), value.into_owned());
+                    }
+
+                    if !regex_match {
+                        continue;
+                    }
+
+                    let record = FlowRecord::new(timestamp_usec, fields);
+                    accumulate_requested_distinct_facets(
+                        &record,
+                        &request.selections,
+                        &requested_fields,
+                        &mut distinct_values,
+                        self.facet_max_values_per_field,
+                    );
+                }
+            }
+        }
+
+        for (field, accumulator) in requested_fields
+            .iter()
+            .cloned()
+            .zip(journal_accumulators.into_iter())
+        {
+            if accumulator.values.is_empty() && accumulator.overflow_values == 0 {
+                continue;
+            }
+            distinct_values.insert(field, accumulator);
         }
 
         if setup.selected_tier != TierKind::Raw && !used_open_tier_index_path {
@@ -1535,6 +1785,121 @@ impl FlowQueryService {
             &request.selections,
             self.facet_max_values_per_field,
         ))
+    }
+
+    fn collect_distinct_journal_facets_projected_no_regex(
+        &self,
+        setup: &QuerySetup,
+        request: &FlowsRequest,
+        requested_fields: &[String],
+        requested_set: &HashSet<String>,
+        needed_fields: &HashSet<String>,
+        accumulators: &mut [FacetDistinctAccumulator],
+    ) -> Result<()> {
+        let after_usec = (setup.after as u64).saturating_mul(1_000_000);
+        let before_usec = (setup.before as u64).saturating_mul(1_000_000);
+        let until_usec = before_usec.saturating_sub(1);
+
+        let tier_paths: Vec<PathBuf> = setup
+            .files
+            .iter()
+            .map(|file| PathBuf::from(file.path()))
+            .collect();
+
+        let session = JournalSession::builder()
+            .files(tier_paths)
+            .load_remappings(false)
+            .build()
+            .context("failed to open journal session for facet discovery")?;
+
+        let mut cursor_builder = session
+            .cursor_builder()
+            .direction(SessionDirection::Forward)
+            .since(after_usec)
+            .until(until_usec);
+        for (field, value) in cursor_prefilter_pairs_excluding(&request.selections, requested_set) {
+            let pair = format!("{}={}", field, value);
+            cursor_builder = cursor_builder.add_match(pair.as_bytes());
+        }
+        let mut cursor = cursor_builder
+            .build()
+            .context("failed to build journal session cursor for facet discovery")?;
+
+        let mut captured_fields = needed_fields.iter().cloned().collect::<Vec<_>>();
+        captured_fields.sort_unstable();
+        let capture_positions = captured_fields
+            .iter()
+            .cloned()
+            .enumerate()
+            .map(|(index, field)| (field, index))
+            .collect::<FastHashMap<_, _>>();
+        let mut captured_values = vec![None; captured_fields.len()];
+
+        loop {
+            let has_entry = cursor
+                .step()
+                .context("failed to step journal session cursor for facet discovery")?;
+            if !has_entry {
+                break;
+            }
+
+            let timestamp_usec = cursor.realtime_usec();
+            if timestamp_usec < after_usec || timestamp_usec >= before_usec {
+                continue;
+            }
+
+            for value in &mut captured_values {
+                let _ = value.take();
+            }
+
+            let mut payloads = cursor
+                .payloads()
+                .context("failed to open projected payload iterator for facet discovery")?;
+            while let Some(payload) = payloads
+                .next()
+                .context("failed to read projected journal payload for facet discovery")?
+            {
+                let Some((key, value_bytes)) = split_payload(payload) else {
+                    continue;
+                };
+                let Some(slot) = capture_positions.get(key).copied() else {
+                    continue;
+                };
+                if captured_values[slot].is_some() {
+                    continue;
+                }
+
+                let value = payload_value(value_bytes);
+                if value.is_empty() {
+                    continue;
+                }
+                captured_values[slot] = Some(value.into_owned());
+            }
+
+            for (field_index, field) in requested_fields.iter().enumerate() {
+                let Some(value) = captured_facet_field_value(field, &capture_positions, &captured_values) else {
+                    continue;
+                };
+                if value.is_empty() {
+                    continue;
+                }
+                if !captured_facet_matches_selections_except(
+                    Some(field.as_str()),
+                    &request.selections,
+                    &capture_positions,
+                    &captured_values,
+                ) {
+                    continue;
+                }
+                accumulate_distinct_value(
+                    &mut accumulators[field_index],
+                    value.as_ref(),
+                    self.facet_max_values_per_field,
+                );
+            }
+        }
+
+        Ok(())
     }
 
     fn accumulate_requested_distinct_open_tier_facets(
@@ -3616,6 +3981,61 @@ fn open_tier_row_field_value(
     }
 }
 
+fn captured_stored_facet_field_value<'a>(
+    field: &str,
+    capture_positions: &FastHashMap<String, usize>,
+    captured_values: &'a [Option<String>],
+) -> Option<&'a str> {
+    let slot = capture_positions.get(field).copied()?;
+    captured_values.get(slot)?.as_deref()
+}
+
+fn captured_facet_field_value<'a>(
+    field: &str,
+    capture_positions: &FastHashMap<String, usize>,
+    captured_values: &'a [Option<String>],
+) -> Option<Cow<'a, str>> {
+    match field.to_ascii_uppercase().as_str() {
+        "ICMPV4" => presentation::icmp_virtual_value(
+            "ICMPV4",
+            captured_stored_facet_field_value("PROTOCOL", capture_positions, captured_values),
+            captured_stored_facet_field_value("ICMPV4_TYPE", capture_positions, captured_values),
+            captured_stored_facet_field_value("ICMPV4_CODE", capture_positions, captured_values),
+        )
+        .map(Cow::Owned),
+        "ICMPV6" => presentation::icmp_virtual_value(
+            "ICMPV6",
+            captured_stored_facet_field_value("PROTOCOL", capture_positions, captured_values),
+            captured_stored_facet_field_value("ICMPV6_TYPE", capture_positions, captured_values),
+            captured_stored_facet_field_value("ICMPV6_CODE", capture_positions, captured_values),
+        )
+        .map(Cow::Owned),
+        _ => captured_stored_facet_field_value(field, capture_positions, captured_values)
+            .map(Cow::Borrowed),
+    }
+}
+
+fn captured_facet_matches_selections_except(
+    ignored_field: Option<&str>,
+    selections: &HashMap<String, Vec<String>>,
+    capture_positions: &FastHashMap<String, usize>,
+    captured_values: &[Option<String>],
+) -> bool {
+    selections.iter().all(|(field, values)| {
+        if ignored_field.is_some_and(|ignored| ignored.eq_ignore_ascii_case(field)) {
+            return true;
+        }
+        if values.is_empty() {
+            return true;
+        }
+        let Some(record_value) = captured_facet_field_value(field, capture_positions, captured_values)
+        else {
+            return false;
+        };
+        values.iter().any(|value| value == record_value.as_ref())
+    })
+}
+
 fn cursor_prefilter_pairs(selections: &HashMap<String, Vec<String>>) -> Vec<(String, String)> {
     cursor_prefilter_pairs_excluding(selections, &HashSet::new())
 }
@@ -3794,6 +4214,14 @@ fn accumulate_distinct_facet_value(
     facet_max_values_per_field: usize,
 ) {
     let field_acc = by_field.entry(field.to_string()).or_default();
+    accumulate_distinct_value(field_acc, value, facet_max_values_per_field);
+}
+
+fn accumulate_distinct_value(
+    field_acc: &mut FacetDistinctAccumulator,
+    value: &str,
+    facet_max_values_per_field: usize,
+) {
     if field_acc.values.contains(value) {
         return;
     }
@@ -3802,6 +4230,17 @@ fn accumulate_distinct_facet_value(
         return;
     }
     field_acc.overflow_values = field_acc.overflow_values.saturating_add(1);
+}
+
+fn merge_distinct_accumulator(
+    into: &mut FacetDistinctAccumulator,
+    from: FacetDistinctAccumulator,
+    facet_max_values_per_field: usize,
+) {
+    into.overflow_values = into.overflow_values.saturating_add(from.overflow_values);
+    for value in from.values {
+        accumulate_distinct_value(into, &value, facet_max_values_per_field);
+    }
 }
 
 fn build_distinct_facets_from_accumulator(
@@ -4966,6 +5405,47 @@ mod tests {
                 .iter()
                 .all(|entry| entry.get("metrics").is_none())
         );
+    }
+
+    #[test]
+    fn captured_facet_helpers_resolve_virtual_values_and_ignore_self_selection() {
+        let capture_positions = super::FastHashMap::from([
+            ("PROTOCOL".to_string(), 0usize),
+            ("ICMPV4_TYPE".to_string(), 1usize),
+            ("ICMPV4_CODE".to_string(), 2usize),
+            ("SRC_AS_NAME".to_string(), 3usize),
+        ]);
+        let captured_values = vec![
+            Some("1".to_string()),
+            Some("3".to_string()),
+            Some("1".to_string()),
+            Some("NETDATA".to_string()),
+        ];
+
+        let value = super::captured_facet_field_value(
+            "ICMPV4",
+            &capture_positions,
+            &captured_values,
+        )
+        .expect("virtual icmpv4 value");
+        assert_eq!(value.as_ref(), "Host Unreachable");
+
+        let selections = HashMap::from([
+            ("ICMPV4".to_string(), vec!["Echo Request".to_string()]),
+            ("SRC_AS_NAME".to_string(), vec!["NETDATA".to_string()]),
+        ]);
+        assert!(super::captured_facet_matches_selections_except(
+            Some("ICMPV4"),
+            &selections,
+            &capture_positions,
+            &captured_values,
+        ));
+        assert!(!super::captured_facet_matches_selections_except(
+            Some("SRC_AS_NAME"),
+            &HashMap::from([("ICMPV4".to_string(), vec!["Echo Request".to_string()])]),
+            &capture_positions,
+            &captured_values,
+        ));
     }
 
     #[test]
