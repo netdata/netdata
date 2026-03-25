@@ -43,34 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per kern.ipc.shm instance
-
-These metrics give status about current shared memory segments.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.ipc_shared_mem_segs | segments | segments |
-| system.ipc_shared_mem_size | allocated | KiB |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -122,5 +94,33 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per kern.ipc.shm instance
+
+These metrics give status about current shared memory segments.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.ipc_shared_mem_segs | segments | segments |
+| system.ipc_shared_mem_size | allocated | KiB |
 
 

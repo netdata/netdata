@@ -50,56 +50,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Riak KV instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| riak.kv.throughput | gets, puts | operations/s |
-| riak.dt.vnode_updates | counters, sets, maps | operations/s |
-| riak.search | queries | queries/s |
-| riak.search.documents | indexed | documents/s |
-| riak.consistent.operations | gets, puts | operations/s |
-| riak.kv.latency.get | mean, median, 95, 99, 100 | ms |
-| riak.kv.latency.put | mean, median, 95, 99, 100 | ms |
-| riak.dt.latency.counter_merge | mean, median, 95, 99, 100 | ms |
-| riak.dt.latency.set_merge | mean, median, 95, 99, 100 | ms |
-| riak.dt.latency.map_merge | mean, median, 95, 99, 100 | ms |
-| riak.search.latency.query | median, min, 95, 99, 999, max | ms |
-| riak.search.latency.index | median, min, 95, 99, 999, max | ms |
-| riak.consistent.latency.get | mean, median, 95, 99, 100 | ms |
-| riak.consistent.latency.put | mean, median, 95, 99, 100 | ms |
-| riak.vm | processes | total |
-| riak.vm.memory.processes | allocated, used | MB |
-| riak.kv.siblings_encountered.get | mean, median, 95, 99, 100 | siblings |
-| riak.kv.objsize.get | mean, median, 95, 99, 100 | KB |
-| riak.search.vnodeq_size | mean, median, 95, 99, 100 | messages |
-| riak.search.index | index_fail, bad_entry, extract_fail | errors |
-| riak.core.protobuf_connections | active | connections |
-| riak.core.repairs | read | repairs |
-| riak.core.fsm_active | get, put, secondary index, list keys | fsms |
-| riak.core.fsm_rejected | get, put | fsms |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -260,6 +210,56 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Riak KV instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| riak.kv.throughput | gets, puts | operations/s |
+| riak.dt.vnode_updates | counters, sets, maps | operations/s |
+| riak.search | queries | queries/s |
+| riak.search.documents | indexed | documents/s |
+| riak.consistent.operations | gets, puts | operations/s |
+| riak.kv.latency.get | mean, median, 95, 99, 100 | ms |
+| riak.kv.latency.put | mean, median, 95, 99, 100 | ms |
+| riak.dt.latency.counter_merge | mean, median, 95, 99, 100 | ms |
+| riak.dt.latency.set_merge | mean, median, 95, 99, 100 | ms |
+| riak.dt.latency.map_merge | mean, median, 95, 99, 100 | ms |
+| riak.search.latency.query | median, min, 95, 99, 999, max | ms |
+| riak.search.latency.index | median, min, 95, 99, 999, max | ms |
+| riak.consistent.latency.get | mean, median, 95, 99, 100 | ms |
+| riak.consistent.latency.put | mean, median, 95, 99, 100 | ms |
+| riak.vm | processes | total |
+| riak.vm.memory.processes | allocated, used | MB |
+| riak.kv.siblings_encountered.get | mean, median, 95, 99, 100 | siblings |
+| riak.kv.objsize.get | mean, median, 95, 99, 100 | KB |
+| riak.search.vnodeq_size | mean, median, 95, 99, 100 | messages |
+| riak.search.index | index_fail, bad_entry, extract_fail | errors |
+| riak.core.protobuf_connections | active | connections |
+| riak.core.repairs | read | repairs |
+| riak.core.fsm_active | get, put, secondary index, list keys | fsms |
+| riak.core.fsm_rejected | get, put | fsms |
 
 
 

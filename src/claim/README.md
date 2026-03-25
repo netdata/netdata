@@ -40,6 +40,20 @@ Create `/INSTALL_PREFIX/etc/netdata/claim.conf`:
    insecure = no
 ```
 
+:::info 
+
+**File Permissions and Ownership:**
+
+The `claim.conf` file contains sensitive claiming tokens and must be properly secured:
+
+- **Required permissions:** `0640` (owner read/write, group read, no world access)
+- **Required ownership:** `root:netdata` (owner root, group netdata)
+
+The claiming script automatically sets these permissions when creating or updating `claim.conf`. If you create the file manually, ensure it follows these same security standards to prevent unauthorized access to your claiming tokens.
+
+:::
+
+
 **Configuration Options:**
 
 |  option  | description                                                                            | required |
@@ -193,9 +207,33 @@ To remove a node from your Space and connect it to another, follow these steps:
 
 4. **Connect to new Space**
 
-   Go to your new Space, copy the installation command with the new claim token and run it. If you're using a `docker-compose.yml` file, you will have to overwrite it with the new claiming token. The node should now appear online in that Space.
+    Go to your new Space, copy the installation command with the new claim token and run it. If you're using a `docker-compose.yml` file, you will have to overwrite it with the new claiming token. The node should now appear online in that Space.
 
 </details>
+
+### `cloud.d` Directory Contents
+
+When an Agent is claimed to Netdata Cloud, the `cloud.d/` directory (located in your Netdata library directory, typically `/var/lib/netdata/cloud.d/`) stores the credentials and identity information for the Agent-Cloud Link (ACLK). The directory typically includes the following core files:
+
+| File | Description |
+|------|-------------|
+| `cloud.conf` | Primary Cloud configuration file, including the canonical `claimed_id` and other ACLK settings |
+| `private.pem` | RSA private key for ACLK authentication |
+| `public.pem` | RSA public key for ACLK authentication |
+| `claimed_id` | Legacy file duplicating the `claimed_id` from `cloud.conf`, kept mainly for backwards compatibility and fallback |
+
+In addition to these, depending on your configuration and features in use, you may also see the following optional files:
+
+- `token` / `rooms`: Used for split-file auto-claiming workflows.
+- `trusted.pem` / `cloud_fullchain.pem`: Optional custom CA bundle files used to validate the TLS connection to Netdata Cloud.
+
+:::note
+
+The `claimed_id` is separate from the Machine GUID. It uniquely identifies the connection between the Agent and Cloud, while the Machine GUID identifies the node itself.
+
+:::
+
+For detailed explanations of all identity types and their relationships, see [Node Identities](/docs/learn/node-identities.md).
 
 ### Regenerate Claiming Token
 

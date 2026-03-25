@@ -139,12 +139,12 @@ static void sanity_check(void)
     BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_OPCODE_MAX + 2));
 
     /* Magic numbers must fit in the super-blocks */
-    BUILD_BUG_ON(strlen(RRDENG_DF_MAGIC) > RRDENG_MAGIC_SZ);
-    BUILD_BUG_ON(strlen(RRDENG_JF_MAGIC) > RRDENG_MAGIC_SZ);
+    BUILD_BUG_ON(sizeof(RRDENG_DF_MAGIC) - 1 > RRDENG_MAGIC_SZ);
+    BUILD_BUG_ON(sizeof(RRDENG_JF_MAGIC) - 1 > RRDENG_MAGIC_SZ);
 
     /* Version strings must fit in the super-blocks */
-    BUILD_BUG_ON(strlen(RRDENG_DF_VER) > RRDENG_VER_SZ);
-    BUILD_BUG_ON(strlen(RRDENG_JF_VER) > RRDENG_VER_SZ);
+    BUILD_BUG_ON(sizeof(RRDENG_DF_VER) - 1 > RRDENG_VER_SZ);
+    BUILD_BUG_ON(sizeof(RRDENG_JF_VER) - 1 > RRDENG_VER_SZ);
 
     /* Data file super-block cannot be larger than RRDENG_BLOCK_SIZE */
     BUILD_BUG_ON(RRDENG_DF_SB_PADDING_SZ < 0);

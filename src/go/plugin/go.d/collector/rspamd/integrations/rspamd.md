@@ -52,38 +52,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Rspamd instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rspamd.classifications | ham, spam | messages/s |
-| rspamd.actions | reject, soft_reject, rewrite_subject, add_header, greylist, custom, discard, quarantine, no_action | messages/s |
-| rspamd.scans | scanned | messages/s |
-| rspamd.learns | learned | messages/s |
-| rspamd.connections | connections | connections/s |
-| rspamd.control_connections | control_connections | connections/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -225,6 +193,38 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Rspamd instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| rspamd.classifications | ham, spam | messages/s |
+| rspamd.actions | reject, soft_reject, rewrite_subject, add_header, greylist, custom, discard, quarantine, no_action | messages/s |
+| rspamd.scans | scanned | messages/s |
+| rspamd.learns | learned | messages/s |
+| rspamd.connections | connections | connections/s |
+| rspamd.control_connections | control_connections | connections/s |
 
 
 

@@ -59,55 +59,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per sensor
-
-These metrics refer to the system sensor.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| chip | The path to the sensor's chip device, excluding the /sys/devices prefix. This provides a unique identifier for the physical hardware component. |
-| chip_id | A unique identifier for the sensor's chip, formatted as `chipName-busType-hash`. |
-| sensor | The name of the specific sensor within the chip device. This provides a direct identifier for the individual measurement point. |
-| label | A label provided by the kernel driver to indicate the intended use or purpose of the sensor. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| sensors.chip_sensor_temperature | input | Celsius |
-| sensors.chip_sensor_temperature_alarm | clear, triggered | status |
-| sensors.chip_sensor_voltage | input | Volts |
-| sensors.chip_sensor_voltage_average | average | Volts |
-| sensors.chip_sensor_voltage_alarm | clear, triggered | status |
-| sensors.chip_sensor_fan | input | RPM |
-| sensors.chip_sensor_fan_alarm | clear, triggered | status |
-| sensors.chip_sensor_current | input | Amperes |
-| sensors.chip_sensor_current_average | average | Amperes |
-| sensors.chip_sensor_current_alarm | clear, triggered | status |
-| sensors.chip_sensor_power | input | Watts |
-| sensors.chip_sensor_power_average | average | Watts |
-| sensors.chip_sensor_power_alarm | clear, triggered | status |
-| sensors.chip_sensor_energy | input | Joules |
-| sensors.chip_sensor_humidity | input | percent |
-| sensors.chip_sensor_intrusion_alarm | clear, triggered | status |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -223,6 +174,55 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per sensor
+
+These metrics refer to the system sensor.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| chip | The path to the sensor's chip device, excluding the /sys/devices prefix. This provides a unique identifier for the physical hardware component. |
+| chip_id | A unique identifier for the sensor's chip, formatted as `chipName-busType-hash`. |
+| sensor | The name of the specific sensor within the chip device. This provides a direct identifier for the individual measurement point. |
+| label | A label provided by the kernel driver to indicate the intended use or purpose of the sensor. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| sensors.chip_sensor_temperature | input | Celsius |
+| sensors.chip_sensor_temperature_alarm | clear, triggered | status |
+| sensors.chip_sensor_voltage | input | Volts |
+| sensors.chip_sensor_voltage_average | average | Volts |
+| sensors.chip_sensor_voltage_alarm | clear, triggered | status |
+| sensors.chip_sensor_fan | input | RPM |
+| sensors.chip_sensor_fan_alarm | clear, triggered | status |
+| sensors.chip_sensor_current | input | Amperes |
+| sensors.chip_sensor_current_average | average | Amperes |
+| sensors.chip_sensor_current_alarm | clear, triggered | status |
+| sensors.chip_sensor_power | input | Watts |
+| sensors.chip_sensor_power_average | average | Watts |
+| sensors.chip_sensor_power_alarm | clear, triggered | status |
+| sensors.chip_sensor_energy | input | Joules |
+| sensors.chip_sensor_humidity | input | percent |
+| sensors.chip_sensor_intrusion_alarm | clear, triggered | status |
 
 
 

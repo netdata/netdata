@@ -54,56 +54,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Dnsmasq DHCP instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| dnsmasq_dhcp.dhcp_ranges | ipv4, ipv6 | ranges |
-| dnsmasq_dhcp.dhcp_hosts | ipv4, ipv6 | hosts |
-
-### Per dhcp range
-
-These metrics refer to the DHCP range.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| dhcp_range | DHCP range in `START_IP:END_IP` format |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| dnsmasq_dhcp.dhcp_range_utilization | used | percentage |
-| dnsmasq_dhcp.dhcp_range_allocated_leases | allocated | leases |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ dnsmasq_dhcp_dhcp_range_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dnsmasq_dhcp.conf) | dnsmasq_dhcp.dhcp_range_utilization | DHCP range utilization |
-
-
 ## Setup
 
 
@@ -216,6 +166,56 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ dnsmasq_dhcp_dhcp_range_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dnsmasq_dhcp.conf) | dnsmasq_dhcp.dhcp_range_utilization | DHCP range utilization |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Dnsmasq DHCP instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| dnsmasq_dhcp.dhcp_ranges | ipv4, ipv6 | ranges |
+| dnsmasq_dhcp.dhcp_hosts | ipv4, ipv6 | hosts |
+
+### Per dhcp range
+
+These metrics refer to the DHCP range.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| dhcp_range | DHCP range in `START_IP:END_IP` format |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| dnsmasq_dhcp.dhcp_range_utilization | used | percentage |
+| dnsmasq_dhcp.dhcp_range_allocated_leases | allocated | leases |
 
 
 

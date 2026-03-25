@@ -49,12 +49,43 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
 ## Metrics
 
 
 
 
-## Functions
+## Live Data
 
 This plugin exposes a real-time function for viewing active network connections.
 
@@ -92,36 +123,5 @@ This function has no parameters.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

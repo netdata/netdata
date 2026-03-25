@@ -59,21 +59,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics depend on which Azure Monitor profiles are enabled. Each profile corresponds to an Azure
-service type and defines the specific metrics collected. With the default `profiles: [auto]` setting,
-profiles are automatically enabled for resource types found in your subscription.
-
-See the service-specific integrations below for detailed metrics lists.
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -292,6 +277,21 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics depend on which Azure Monitor profiles are enabled. Each profile corresponds to an Azure
+service type and defines the specific metrics collected. With the default `profiles: [auto]` setting,
+profiles are automatically enabled for resource types found in your subscription.
+
+See the service-specific integrations below for detailed metrics lists.
 
 
 

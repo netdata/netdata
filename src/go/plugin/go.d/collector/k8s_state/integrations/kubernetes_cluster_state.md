@@ -53,6 +53,87 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+You can configure the **k8s_state** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **k8s_state**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/k8s_state.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+#### via UI
+
+Configure the **k8s_state** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the k8s_state data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _k8s_state_ (or scroll the list) to locate the **k8s_state** collector.
+5. Click the **+** next to the **k8s_state** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/k8s_state.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name2
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/k8s_state.conf
+```
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ k8s_state_deployment_condition_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8sstate.conf) | k8s_state.deployment_conditions | Deployment ${label:k8s_deployment_name} does not have the minimum required replicas |
+| [ k8s_state_cronjob_last_execution_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8sstate.conf) | k8s_state.cronjob_last_execution_status | CronJob ${label:k8s_cronjob_name} in ${label:k8s_namespace} failing |
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -205,87 +286,6 @@ Metrics:
 | k8s_state.pod_container_state | running, waiting, terminated | state |
 | k8s_state.pod_container_waiting_state_reason | ContainerCreating, CrashLoopBackOff, CreateContainerConfigError, CreateContainerError, ErrImagePull, ImagePullBackOff, InvalidImageName, PodInitializing, Other | state |
 | k8s_state.pod_container_terminated_state_reason | Completed, ContainerCannotRun, DeadlineExceeded, Error, Evicted, OOMKilled, Other | state |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ k8s_state_deployment_condition_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8sstate.conf) | k8s_state.deployment_conditions | Deployment ${label:k8s_deployment_name} does not have the minimum required replicas |
-| [ k8s_state_cronjob_last_execution_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8sstate.conf) | k8s_state.cronjob_last_execution_status | CronJob ${label:k8s_cronjob_name} in ${label:k8s_namespace} failing |
-
-
-## Setup
-
-
-You can configure the **k8s_state** collector in two ways:
-
-| Method                | Best for                                                                                 | How to                                                                                                                                 |
-|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **k8s_state**, then click **+** to add a job. |
-| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/k8s_state.conf` and add a job.                                                                        |
-
-:::important
-
-UI configuration requires paid Netdata Cloud plan.
-
-:::
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-#### via UI
-
-Configure the **k8s_state** collector from the Netdata web interface:
-
-1. Go to **Nodes**.
-2. Select the node **where you want the k8s_state data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
-3. The **Collectors → Jobs** view opens by default.
-4. In the Search box, type _k8s_state_ (or scroll the list) to locate the **k8s_state** collector.
-5. Click the **+** next to the **k8s_state** collector to add a new job.
-6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
-    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
-
-
-#### via File
-
-The configuration file name for this integration is `go.d/k8s_state.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name2
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/k8s_state.conf
-```
-
-##### Examples
-There are no configuration examples.
 
 
 

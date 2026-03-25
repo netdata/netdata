@@ -50,39 +50,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per service
-
-These metrics refer to the monitored Service.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| server_hostname | Hostname of the Monit server. |
-| service_check_name | Service check name. |
-| service_check_type | Service check type. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| monit.service_check_status | ok, error, initializing, not_monitored | status |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -232,6 +199,39 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per service
+
+These metrics refer to the monitored Service.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| server_hostname | Hostname of the Monit server. |
+| service_check_name | Service check name. |
+| service_check_type | Service check type. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| monit.service_check_status | ok, error, initializing, not_monitored | status |
 
 
 

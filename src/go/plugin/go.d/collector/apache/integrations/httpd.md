@@ -58,43 +58,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-All metrics available only if [ExtendedStatus](https://httpd.apache.org/docs/2.4/mod/core.html#extendedstatus) is on.
-
-
-### Per Apache instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit | Basic | Extended |
-|:------|:----------|:----|:---:|:---:|
-| apache.connections | connections | connections | • | • |
-| apache.conns_async | keepalive, closing, writing | connections | • | • |
-| apache.workers | idle, busy | workers | • | • |
-| apache.scoreboard | waiting, starting, reading, sending, keepalive, dns_lookup, closing, logging, finishing, idle_cleanup, open | connections | • | • |
-| apache.requests | requests | requests/s |   | • |
-| apache.net | sent | kilobit/s |   | • |
-| apache.reqpersec | requests | requests/s |   | • |
-| apache.bytespersec | served | KiB/s |   | • |
-| apache.bytesperreq | size | KiB |   | • |
-| apache.uptime | uptime | seconds |   | • |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -256,6 +219,43 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+All metrics available only if [ExtendedStatus](https://httpd.apache.org/docs/2.4/mod/core.html#extendedstatus) is on.
+
+
+### Per Apache instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit | Basic | Extended |
+|:------|:----------|:----|:---:|:---:|
+| apache.connections | connections | connections | • | • |
+| apache.conns_async | keepalive, closing, writing | connections | • | • |
+| apache.workers | idle, busy | workers | • | • |
+| apache.scoreboard | waiting, starting, reading, sending, keepalive, dns_lookup, closing, logging, finishing, idle_cleanup, open | connections | • | • |
+| apache.requests | requests | requests/s |   | • |
+| apache.net | sent | kilobit/s |   | • |
+| apache.reqpersec | requests | requests/s |   | • |
+| apache.bytespersec | served | KiB/s |   | • |
+| apache.bytesperreq | size | KiB |   | • |
+| apache.uptime | uptime | seconds |   | • |
 
 
 

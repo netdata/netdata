@@ -48,58 +48,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per device
-
-These metrics refer to the NVME device.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| device | NVMe device name |
-| model_number | NVMe device model |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nvme.device_estimated_endurance_perc | used | % |
-| nvme.device_available_spare_perc | spare | % |
-| nvme.device_composite_temperature | temperature | celsius |
-| nvme.device_io_transferred_count | read, written | bytes |
-| nvme.device_power_cycles_count | power | cycles |
-| nvme.device_power_on_time | power-on | seconds |
-| nvme.device_critical_warnings_state | available_spare, temp_threshold, nvm_subsystem_reliability, read_only, volatile_mem_backup_failed, persistent_memory_read_only | state |
-| nvme.device_unsafe_shutdowns_count | unsafe | shutdowns |
-| nvme.device_media_errors_rate | media | errors/s |
-| nvme.device_error_log_entries_rate | error_log | entries/s |
-| nvme.device_warning_composite_temperature_time | wctemp | seconds |
-| nvme.device_critical_composite_temperature_time | cctemp | seconds |
-| nvme.device_thermal_mgmt_temp1_transitions_rate | temp1 | transitions/s |
-| nvme.device_thermal_mgmt_temp2_transitions_rate | temp2 | transitions/s |
-| nvme.device_thermal_mgmt_temp1_time | temp1 | seconds |
-| nvme.device_thermal_mgmt_temp2_time | temp2 | seconds |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ nvme_device_critical_warnings_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/nvme.conf) | nvme.device_critical_warnings_state | NVMe device ${label:device} has critical warnings |
-
-
 ## Setup
 
 
@@ -220,6 +168,58 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ nvme_device_critical_warnings_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/nvme.conf) | nvme.device_critical_warnings_state | NVMe device ${label:device} has critical warnings |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per device
+
+These metrics refer to the NVME device.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| device | NVMe device name |
+| model_number | NVMe device model |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nvme.device_estimated_endurance_perc | used | % |
+| nvme.device_available_spare_perc | spare | % |
+| nvme.device_composite_temperature | temperature | celsius |
+| nvme.device_io_transferred_count | read, written | bytes |
+| nvme.device_power_cycles_count | power | cycles |
+| nvme.device_power_on_time | power-on | seconds |
+| nvme.device_critical_warnings_state | available_spare, temp_threshold, nvm_subsystem_reliability, read_only, volatile_mem_backup_failed, persistent_memory_read_only | state |
+| nvme.device_unsafe_shutdowns_count | unsafe | shutdowns |
+| nvme.device_media_errors_rate | media | errors/s |
+| nvme.device_error_log_entries_rate | error_log | entries/s |
+| nvme.device_warning_composite_temperature_time | wctemp | seconds |
+| nvme.device_critical_composite_temperature_time | cctemp | seconds |
+| nvme.device_thermal_mgmt_temp1_transitions_rate | temp1 | transitions/s |
+| nvme.device_thermal_mgmt_temp2_transitions_rate | temp2 | transitions/s |
+| nvme.device_thermal_mgmt_temp1_time | temp1 | seconds |
+| nvme.device_thermal_mgmt_temp2_time | temp2 | seconds |
 
 
 

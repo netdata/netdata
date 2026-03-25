@@ -45,42 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per domain
-
-These metrics refer to the configured source.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| domain | Configured source |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| whoisquery.time_until_expiration | expiry | seconds |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ whoisquery_days_until_expiration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/whoisquery.conf) | whoisquery.time_until_expiration | time until the domain name registration expires |
-
-
 ## Setup
 
 
@@ -197,6 +161,42 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ whoisquery_days_until_expiration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/whoisquery.conf) | whoisquery.time_until_expiration | time until the domain name registration expires |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per domain
+
+These metrics refer to the configured source.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| domain | Configured source |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| whoisquery.time_until_expiration | expiry | seconds |
 
 
 

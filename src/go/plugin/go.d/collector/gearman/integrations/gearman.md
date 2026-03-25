@@ -50,52 +50,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Gearman instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| gearman.queued_jobs_activity | running, waiting | jobs |
-| gearman.queued_jobs_priority | high, normal, low | jobs |
-
-### Per Gearman instance
-
-These metrics refer to the Function (task).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| function_name | Function name. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| gearman.function_queued_jobs_activity | running, waiting | jobs |
-| gearman.function_queued_jobs_priority | high, normal, low | jobs |
-| gearman.function_workers | available | workers |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -210,6 +164,52 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Gearman instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| gearman.queued_jobs_activity | running, waiting | jobs |
+| gearman.queued_jobs_priority | high, normal, low | jobs |
+
+### Per Gearman instance
+
+These metrics refer to the Function (task).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| function_name | Function name. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| gearman.function_queued_jobs_activity | running, waiting | jobs |
+| gearman.function_queued_jobs_priority | high, normal, low | jobs |
+| gearman.function_workers | available | workers |
 
 
 

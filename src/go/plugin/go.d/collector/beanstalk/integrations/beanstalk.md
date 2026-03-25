@@ -52,67 +52,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Beanstalk instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| beanstalk.current_jobs | ready, buried, urgent, delayed, reserved | jobs |
-| beanstalk.jobs_rate | created | jobs/s |
-| beanstalk.jobs_timeouts | timeouts | jobs/s |
-| beanstalk.current_tubes | tubes | tubes |
-| beanstalk.commands_rate | put, peek, peek-ready, peek-delayed, peek-buried, reserve, reserve-with-timeout, touch, use, watch, ignore, delete, bury, kick, stats, stats-job, stats-tube, list-tubes, list-tube-used, list-tubes-watched, pause-tube | commands/s |
-| beanstalk.current_connections | open, producers, workers, waiting | connections |
-| beanstalk.connections_rate | created | connections/s |
-| beanstalk.binlog_records | written, migrated | records/s |
-| beanstalk.cpu_usage | user, system | percent |
-| beanstalk.uptime | uptime | seconds |
-
-### Per tube
-
-Metrics related to Beanstalk tubes. This set of metrics is provided for each tube.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| tube_name | Tube name. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| beanstalk.tube_current_jobs | ready, buried, urgent, delayed, reserved | jobs |
-| beanstalk.tube_jobs_rate | created | jobs/s |
-| beanstalk.tube_commands_rate | delete, pause-tube | commands/s |
-| beanstalk.tube_current_connections | using, waiting, watching | connections |
-| beanstalk.tube_pause_time | since, left | seconds |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ beanstalk_server_buried_jobs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/beanstalkd.conf) | beanstalk.current_jobs | number of buried jobs across all tubes. You need to manually kick them so they can be processed. Presence of buried jobs in a tube does not affect new jobs. |
-
-
 ## Setup
 
 
@@ -228,6 +167,67 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ beanstalk_server_buried_jobs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/beanstalkd.conf) | beanstalk.current_jobs | number of buried jobs across all tubes. You need to manually kick them so they can be processed. Presence of buried jobs in a tube does not affect new jobs. |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Beanstalk instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| beanstalk.current_jobs | ready, buried, urgent, delayed, reserved | jobs |
+| beanstalk.jobs_rate | created | jobs/s |
+| beanstalk.jobs_timeouts | timeouts | jobs/s |
+| beanstalk.current_tubes | tubes | tubes |
+| beanstalk.commands_rate | put, peek, peek-ready, peek-delayed, peek-buried, reserve, reserve-with-timeout, touch, use, watch, ignore, delete, bury, kick, stats, stats-job, stats-tube, list-tubes, list-tube-used, list-tubes-watched, pause-tube | commands/s |
+| beanstalk.current_connections | open, producers, workers, waiting | connections |
+| beanstalk.connections_rate | created | connections/s |
+| beanstalk.binlog_records | written, migrated | records/s |
+| beanstalk.cpu_usage | user, system | percent |
+| beanstalk.uptime | uptime | seconds |
+
+### Per tube
+
+Metrics related to Beanstalk tubes. This set of metrics is provided for each tube.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| tube_name | Tube name. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| beanstalk.tube_current_jobs | ready, buried, urgent, delayed, reserved | jobs |
+| beanstalk.tube_jobs_rate | created | jobs/s |
+| beanstalk.tube_commands_rate | delete, pause-tube | commands/s |
+| beanstalk.tube_current_connections | using, waiting, watching | connections |
+| beanstalk.tube_pause_time | since, left | seconds |
 
 
 

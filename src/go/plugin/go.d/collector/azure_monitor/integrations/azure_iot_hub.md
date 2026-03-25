@@ -57,101 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.iot_hub.c2d_commands | completed, abandoned, rejected | messages/s |
-| azure_monitor.iot_hub.c2d_messages_expired | expired | messages/s |
-| azure_monitor.iot_hub.c2d_methods | successful, failed | invocations/s |
-| azure_monitor.iot_hub.c2d_methods_request_size | average | bytes |
-| azure_monitor.iot_hub.c2d_methods_response_size | average | bytes |
-| azure_monitor.iot_hub.c2d_twin_reads | successful, failed | operations/s |
-| azure_monitor.iot_hub.c2d_twin_read_size | average | bytes |
-| azure_monitor.iot_hub.c2d_twin_updates | successful, failed | operations/s |
-| azure_monitor.iot_hub.c2d_twin_update_size | average | bytes |
-| azure_monitor.iot_hub.d2c_telemetry | attempted, sent | messages/s |
-| azure_monitor.iot_hub.d2c_telemetry_throttle | throttled | errors/s |
-| azure_monitor.iot_hub.d2c_twin_reads | successful, failed | operations/s |
-| azure_monitor.iot_hub.d2c_twin_read_size | average | bytes |
-| azure_monitor.iot_hub.d2c_twin_updates | successful, failed | operations/s |
-| azure_monitor.iot_hub.d2c_twin_update_size | average | bytes |
-| azure_monitor.iot_hub.routing_deliveries | delivered, dropped, orphaned, invalid, fallback | messages/s |
-| azure_monitor.iot_hub.routing_delivery_by_endpoint | builtin_events, event_hubs, service_bus_queues, service_bus_topics, storage | messages/s |
-| azure_monitor.iot_hub.routing_storage_blobs | blobs | blobs/s |
-| azure_monitor.iot_hub.routing_storage_data | bytes | bytes/s |
-| azure_monitor.iot_hub.routing_latency | builtin_events, event_hubs, service_bus_queues, service_bus_topics, storage | milliseconds |
-| azure_monitor.iot_hub.routing_deliveries_preview | deliveries | deliveries/s |
-| azure_monitor.iot_hub.routing_delivery_latency_preview | average | milliseconds |
-| azure_monitor.iot_hub.routing_data_size_preview | bytes | bytes/s |
-| azure_monitor.iot_hub.connections | successful | connections/s |
-| azure_monitor.iot_hub.connected_devices | connected | devices |
-| azure_monitor.iot_hub.total_devices | total | devices |
-| azure_monitor.iot_hub.daily_message_quota | used | messages |
-| azure_monitor.iot_hub.data_usage | data_usage, data_usage_v2 | bytes/s |
-| azure_monitor.iot_hub.configurations | operations | operations/s |
-| azure_monitor.iot_hub.event_grid_deliveries | deliveries | deliveries/s |
-| azure_monitor.iot_hub.event_grid_latency | average | milliseconds |
-| azure_monitor.iot_hub.jobs_status | completed, failed | operations/s |
-| azure_monitor.iot_hub.jobs_cancel | successful, failed | operations/s |
-| azure_monitor.iot_hub.jobs_create_method | successful, failed | operations/s |
-| azure_monitor.iot_hub.jobs_create_twin_update | successful, failed | operations/s |
-| azure_monitor.iot_hub.jobs_list | successful, failed | operations/s |
-| azure_monitor.iot_hub.jobs_query | successful, failed | operations/s |
-| azure_monitor.iot_hub.twin_queries | successful, failed | queries/s |
-| azure_monitor.iot_hub.twin_queries_result_size | average | bytes |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_iot_hub_d2c_telemetry_throttle ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.d2c_telemetry_throttle | IoT Hub telemetry throttling on ${label:resource_name} |
-| [ am_iot_hub_c2d_messages_expired ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_messages_expired | IoT Hub C2D messages expiring on ${label:resource_name} |
-| [ am_iot_hub_c2d_methods_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_methods | IoT Hub direct method failures on ${label:resource_name} |
-| [ am_iot_hub_c2d_twin_read_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_twin_reads | IoT Hub backend twin read failures on ${label:resource_name} |
-| [ am_iot_hub_c2d_twin_update_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_twin_updates | IoT Hub backend twin update failures on ${label:resource_name} |
-| [ am_iot_hub_d2c_twin_read_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.d2c_twin_reads | IoT Hub device twin read failures on ${label:resource_name} |
-| [ am_iot_hub_d2c_twin_update_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.d2c_twin_updates | IoT Hub device twin update failures on ${label:resource_name} |
-| [ am_iot_hub_routing_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_deliveries | IoT Hub routing dropped messages on ${label:resource_name} |
-| [ am_iot_hub_routing_orphaned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_deliveries | IoT Hub routing orphaned messages on ${label:resource_name} |
-| [ am_iot_hub_routing_invalid ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_deliveries | IoT Hub routing invalid messages on ${label:resource_name} |
-| [ am_iot_hub_routing_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_latency | IoT Hub routing latency on ${label:resource_name} |
-| [ am_iot_hub_event_grid_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.event_grid_latency | IoT Hub Event Grid latency on ${label:resource_name} |
-| [ am_iot_hub_jobs_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.jobs_status | IoT Hub job failures on ${label:resource_name} |
-| [ am_iot_hub_twin_query_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.twin_queries | IoT Hub twin query failures on ${label:resource_name} |
-| [ am_iot_hub_c2d_commands_abandoned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_commands | IoT Hub C2D commands abandoned on ${label:resource_name} |
-| [ am_iot_hub_c2d_commands_rejected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_commands | IoT Hub C2D commands rejected on ${label:resource_name} |
-| [ am_iot_hub_routing_delivery_latency_preview ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_delivery_latency_preview | IoT Hub routing delivery latency on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -370,6 +275,101 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_iot_hub_d2c_telemetry_throttle ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.d2c_telemetry_throttle | IoT Hub telemetry throttling on ${label:resource_name} |
+| [ am_iot_hub_c2d_messages_expired ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_messages_expired | IoT Hub C2D messages expiring on ${label:resource_name} |
+| [ am_iot_hub_c2d_methods_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_methods | IoT Hub direct method failures on ${label:resource_name} |
+| [ am_iot_hub_c2d_twin_read_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_twin_reads | IoT Hub backend twin read failures on ${label:resource_name} |
+| [ am_iot_hub_c2d_twin_update_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_twin_updates | IoT Hub backend twin update failures on ${label:resource_name} |
+| [ am_iot_hub_d2c_twin_read_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.d2c_twin_reads | IoT Hub device twin read failures on ${label:resource_name} |
+| [ am_iot_hub_d2c_twin_update_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.d2c_twin_updates | IoT Hub device twin update failures on ${label:resource_name} |
+| [ am_iot_hub_routing_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_deliveries | IoT Hub routing dropped messages on ${label:resource_name} |
+| [ am_iot_hub_routing_orphaned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_deliveries | IoT Hub routing orphaned messages on ${label:resource_name} |
+| [ am_iot_hub_routing_invalid ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_deliveries | IoT Hub routing invalid messages on ${label:resource_name} |
+| [ am_iot_hub_routing_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_latency | IoT Hub routing latency on ${label:resource_name} |
+| [ am_iot_hub_event_grid_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.event_grid_latency | IoT Hub Event Grid latency on ${label:resource_name} |
+| [ am_iot_hub_jobs_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.jobs_status | IoT Hub job failures on ${label:resource_name} |
+| [ am_iot_hub_twin_query_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.twin_queries | IoT Hub twin query failures on ${label:resource_name} |
+| [ am_iot_hub_c2d_commands_abandoned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_commands | IoT Hub C2D commands abandoned on ${label:resource_name} |
+| [ am_iot_hub_c2d_commands_rejected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.c2d_commands | IoT Hub C2D commands rejected on ${label:resource_name} |
+| [ am_iot_hub_routing_delivery_latency_preview ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_delivery_latency_preview | IoT Hub routing delivery latency on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.iot_hub.c2d_commands | completed, abandoned, rejected | messages/s |
+| azure_monitor.iot_hub.c2d_messages_expired | expired | messages/s |
+| azure_monitor.iot_hub.c2d_methods | successful, failed | invocations/s |
+| azure_monitor.iot_hub.c2d_methods_request_size | average | bytes |
+| azure_monitor.iot_hub.c2d_methods_response_size | average | bytes |
+| azure_monitor.iot_hub.c2d_twin_reads | successful, failed | operations/s |
+| azure_monitor.iot_hub.c2d_twin_read_size | average | bytes |
+| azure_monitor.iot_hub.c2d_twin_updates | successful, failed | operations/s |
+| azure_monitor.iot_hub.c2d_twin_update_size | average | bytes |
+| azure_monitor.iot_hub.d2c_telemetry | attempted, sent | messages/s |
+| azure_monitor.iot_hub.d2c_telemetry_throttle | throttled | errors/s |
+| azure_monitor.iot_hub.d2c_twin_reads | successful, failed | operations/s |
+| azure_monitor.iot_hub.d2c_twin_read_size | average | bytes |
+| azure_monitor.iot_hub.d2c_twin_updates | successful, failed | operations/s |
+| azure_monitor.iot_hub.d2c_twin_update_size | average | bytes |
+| azure_monitor.iot_hub.routing_deliveries | delivered, dropped, orphaned, invalid, fallback | messages/s |
+| azure_monitor.iot_hub.routing_delivery_by_endpoint | builtin_events, event_hubs, service_bus_queues, service_bus_topics, storage | messages/s |
+| azure_monitor.iot_hub.routing_storage_blobs | blobs | blobs/s |
+| azure_monitor.iot_hub.routing_storage_data | bytes | bytes/s |
+| azure_monitor.iot_hub.routing_latency | builtin_events, event_hubs, service_bus_queues, service_bus_topics, storage | milliseconds |
+| azure_monitor.iot_hub.routing_deliveries_preview | deliveries | deliveries/s |
+| azure_monitor.iot_hub.routing_delivery_latency_preview | average | milliseconds |
+| azure_monitor.iot_hub.routing_data_size_preview | bytes | bytes/s |
+| azure_monitor.iot_hub.connections | successful | connections/s |
+| azure_monitor.iot_hub.connected_devices | connected | devices |
+| azure_monitor.iot_hub.total_devices | total | devices |
+| azure_monitor.iot_hub.daily_message_quota | used | messages |
+| azure_monitor.iot_hub.data_usage | data_usage, data_usage_v2 | bytes/s |
+| azure_monitor.iot_hub.configurations | operations | operations/s |
+| azure_monitor.iot_hub.event_grid_deliveries | deliveries | deliveries/s |
+| azure_monitor.iot_hub.event_grid_latency | average | milliseconds |
+| azure_monitor.iot_hub.jobs_status | completed, failed | operations/s |
+| azure_monitor.iot_hub.jobs_cancel | successful, failed | operations/s |
+| azure_monitor.iot_hub.jobs_create_method | successful, failed | operations/s |
+| azure_monitor.iot_hub.jobs_create_twin_update | successful, failed | operations/s |
+| azure_monitor.iot_hub.jobs_list | successful, failed | operations/s |
+| azure_monitor.iot_hub.jobs_query | successful, failed | operations/s |
+| azure_monitor.iot_hub.twin_queries | successful, failed | queries/s |
+| azure_monitor.iot_hub.twin_queries_result_size | average | bytes |
 
 
 

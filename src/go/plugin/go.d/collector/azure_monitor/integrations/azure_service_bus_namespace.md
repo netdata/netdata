@@ -57,73 +57,6 @@ The collector uses bounded request concurrency and batches resources and metrics
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.service_bus.message_flow | in, out | messages/s |
-| azure_monitor.service_bus.message_operations | completed, abandoned | messages/s |
-| azure_monitor.service_bus.queue_depth | active | messages |
-| azure_monitor.service_bus.problem_messages | dead_lettered, scheduled | messages |
-| azure_monitor.service_bus.requests | incoming, successful | requests/s |
-| azure_monitor.service_bus.errors | server, user, throttled | errors/s |
-| azure_monitor.service_bus.connections | active | connections |
-| azure_monitor.service_bus.connection_events | opened, closed | connections |
-| azure_monitor.service_bus.namespace_size | average | bytes |
-| azure_monitor.service_bus.data_throughput | in, out | bytes/s |
-| azure_monitor.service_bus.total_messages | total | messages |
-| azure_monitor.service_bus.namespace_resources | cpu, memory | percentage |
-| azure_monitor.service_bus.send_latency | average | milliseconds |
-| azure_monitor.service_bus.replication_lag | messages | messages |
-| azure_monitor.service_bus.replication_lag_duration | duration | seconds |
-| azure_monitor.service_bus.checkpoint_operations | pending | operations |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_service_bus_server_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.errors | Service Bus server errors on ${label:resource_name} |
-| [ am_service_bus_throttled_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.errors | Service Bus throttled requests on ${label:resource_name} |
-| [ am_service_bus_user_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.errors | Service Bus user errors on ${label:resource_name} |
-| [ am_service_bus_namespace_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.namespace_resources | Service Bus namespace CPU on ${label:resource_name} |
-| [ am_service_bus_namespace_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.namespace_resources | Service Bus namespace memory on ${label:resource_name} |
-| [ am_service_bus_send_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.send_latency | Service Bus send latency on ${label:resource_name} |
-| [ am_service_bus_dead_lettered_messages ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.problem_messages | Service Bus dead-lettered messages on ${label:resource_name} |
-| [ am_service_bus_active_messages ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.queue_depth | Service Bus queue depth on ${label:resource_name} |
-| [ am_service_bus_request_success_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.requests | Service Bus request success rate on ${label:resource_name} |
-| [ am_service_bus_abandoned_messages ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.message_operations | Service Bus abandoned messages on ${label:resource_name} |
-| [ am_service_bus_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.replication_lag | Service Bus replication lag on ${label:resource_name} |
-| [ am_service_bus_replication_lag_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.replication_lag_duration | Service Bus replication lag duration on ${label:resource_name} |
-
-
 ## Setup
 
 
@@ -342,6 +275,73 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_service_bus_server_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.errors | Service Bus server errors on ${label:resource_name} |
+| [ am_service_bus_throttled_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.errors | Service Bus throttled requests on ${label:resource_name} |
+| [ am_service_bus_user_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.errors | Service Bus user errors on ${label:resource_name} |
+| [ am_service_bus_namespace_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.namespace_resources | Service Bus namespace CPU on ${label:resource_name} |
+| [ am_service_bus_namespace_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.namespace_resources | Service Bus namespace memory on ${label:resource_name} |
+| [ am_service_bus_send_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.send_latency | Service Bus send latency on ${label:resource_name} |
+| [ am_service_bus_dead_lettered_messages ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.problem_messages | Service Bus dead-lettered messages on ${label:resource_name} |
+| [ am_service_bus_active_messages ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.queue_depth | Service Bus queue depth on ${label:resource_name} |
+| [ am_service_bus_request_success_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.requests | Service Bus request success rate on ${label:resource_name} |
+| [ am_service_bus_abandoned_messages ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.message_operations | Service Bus abandoned messages on ${label:resource_name} |
+| [ am_service_bus_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.replication_lag | Service Bus replication lag on ${label:resource_name} |
+| [ am_service_bus_replication_lag_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.replication_lag_duration | Service Bus replication lag duration on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.service_bus.message_flow | in, out | messages/s |
+| azure_monitor.service_bus.message_operations | completed, abandoned | messages/s |
+| azure_monitor.service_bus.queue_depth | active | messages |
+| azure_monitor.service_bus.problem_messages | dead_lettered, scheduled | messages |
+| azure_monitor.service_bus.requests | incoming, successful | requests/s |
+| azure_monitor.service_bus.errors | server, user, throttled | errors/s |
+| azure_monitor.service_bus.connections | active | connections |
+| azure_monitor.service_bus.connection_events | opened, closed | connections |
+| azure_monitor.service_bus.namespace_size | average | bytes |
+| azure_monitor.service_bus.data_throughput | in, out | bytes/s |
+| azure_monitor.service_bus.total_messages | total | messages |
+| azure_monitor.service_bus.namespace_resources | cpu, memory | percentage |
+| azure_monitor.service_bus.send_latency | average | milliseconds |
+| azure_monitor.service_bus.replication_lag | messages | messages |
+| azure_monitor.service_bus.replication_lag_duration | duration | seconds |
+| azure_monitor.service_bus.checkpoint_operations | pending | operations |
 
 
 

@@ -47,36 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per systemd-logind users instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| logind.sessions | remote, local | sessions |
-| logind.sessions_type | console, graphical, other | sessions |
-| logind.sessions_state | online, closing, active | sessions |
-| logind.users_state | offline, closing, online, lingering, active | users |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -143,6 +113,36 @@ sudo ./edit-config go.d/logind.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per systemd-logind users instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| logind.sessions | remote, local | sessions |
+| logind.sessions_type | console, graphical, other | sessions |
+| logind.sessions_state | online, closing, active | sessions |
+| logind.users_state | offline, closing, online, lingering, active | users |
 
 
 

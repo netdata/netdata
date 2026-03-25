@@ -1,14 +1,4 @@
 ## Setup
-[% if entry.integration_type == 'logs' %]
-
-## Prerequisites
-
-[[ entry.setup.prerequisites.description]]
-
-## Configuration
-
-There is no configuration needed for this integration.
-[% else %]
 
 [% if entry.meta.plugin_name == 'go.d.plugin' %]
 
@@ -169,6 +159,5 @@ There is no configuration file.
 [% else%]
 There are no configuration examples.
 
-[% endif %]
 [% endif %]
 [% endif %]

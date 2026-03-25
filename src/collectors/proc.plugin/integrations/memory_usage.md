@@ -60,6 +60,45 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | system.ram | system memory utilization |
+| [ ram_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.available | percentage of estimated amount of RAM available for userspace processes, without causing swapping |
+| [ used_swap ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.swap | swap memory utilization |
+| [ 1hour_memory_hw_corrupted ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.hwcorrupt | amount of memory corrupted due to a hardware failure |
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -95,44 +134,5 @@ Metrics:
 | mem.high_low | high_used, low_used, high_free, low_free | MiB |
 | mem.cma | used, free | MiB |
 | mem.directmaps | 4k, 2m, 4m, 1g | MiB |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | system.ram | system memory utilization |
-| [ ram_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.available | percentage of estimated amount of RAM available for userspace processes, without causing swapping |
-| [ used_swap ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.swap | swap memory utilization |
-| [ 1hour_memory_hw_corrupted ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.hwcorrupt | amount of memory corrupted due to a hardware failure |
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

@@ -47,34 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per eBPF Mount instance
-
-Calls for syscalls mount an umount.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mount_points.call | mount, umount | calls/s |
-| mount_points.error | mount, umount | calls/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -151,5 +123,33 @@ sudo ./edit-config ebpf.d/mount.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per eBPF Mount instance
+
+Calls for syscalls mount an umount.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| mount_points.call | mount, umount | calls/s |
+| mount_points.error | mount, umount | calls/s |
 
 

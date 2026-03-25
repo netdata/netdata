@@ -54,38 +54,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Kubeproxy instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s_kubeproxy.kubeproxy_sync_proxy_rules | sync_proxy_rules | events/s |
-| k8s_kubeproxy.kubeproxy_sync_proxy_rules_latency_microsecond | 0.001, 0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128, 0.256, 0.512, 1.024, 2.048, 4.096, 8.192, 16.384, +Inf | observes/s |
-| k8s_kubeproxy.kubeproxy_sync_proxy_rules_latency | 0.001, 0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128, 0.256, 0.512, 1.024, 2.048, 4.096, 8.192, 16.384, +Inf | percentage |
-| k8s_kubeproxy.rest_client_requests_by_code | a dimension per HTTP status code | requests/s |
-| k8s_kubeproxy.rest_client_requests_by_method | a dimension per HTTP method | requests/s |
-| k8s_kubeproxy.http_request_duration | 0.5, 0.9, 0.99 | microseconds |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -207,6 +175,38 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Kubeproxy instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| k8s_kubeproxy.kubeproxy_sync_proxy_rules | sync_proxy_rules | events/s |
+| k8s_kubeproxy.kubeproxy_sync_proxy_rules_latency_microsecond | 0.001, 0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128, 0.256, 0.512, 1.024, 2.048, 4.096, 8.192, 16.384, +Inf | observes/s |
+| k8s_kubeproxy.kubeproxy_sync_proxy_rules_latency | 0.001, 0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128, 0.256, 0.512, 1.024, 2.048, 4.096, 8.192, 16.384, +Inf | percentage |
+| k8s_kubeproxy.rest_client_requests_by_code | a dimension per HTTP status code | requests/s |
+| k8s_kubeproxy.rest_client_requests_by_method | a dimension per HTTP method | requests/s |
+| k8s_kubeproxy.http_request_duration | 0.5, 0.9, 0.99 | microseconds |
 
 
 

@@ -48,6 +48,43 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ 10min_disk_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.backlog | average backlog size of the ${label:device} disk over the last 10 minutes |
+| [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | average percentage of time ${label:device} disk was busy over the last 10 minutes |
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -101,42 +138,5 @@ Metrics:
 | disk.avgsz | reads, writes | KiB/operation |
 | disk_ext.avgsz | discards | KiB/operation |
 | disk.svctm | svctm | milliseconds/operation |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ 10min_disk_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.backlog | average backlog size of the ${label:device} disk over the last 10 minutes |
-| [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | average percentage of time ${label:device} disk was busy over the last 10 minutes |
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

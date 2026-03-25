@@ -48,46 +48,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per logical volume
-
-These metrics refer to the LVM logical volume.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| lv_name | Logical volume name |
-| vg_name | Volume group name |
-| volume_type | Type of the volume |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| lvm.lv_data_space_utilization | utilization | % |
-| lvm.lv_metadata_space_utilization | utilization | % |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ lvm_lv_data_space_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/lvm.conf) | lvm.lv_data_space_utilization | LVM logical volume high data space usage (LV ${label:lv_name} VG ${label:vg_name} Type ${label:volume_type}) |
-| [ lvm_lv_metadata_space_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/lvm.conf) | lvm.lv_metadata_space_utilization | LVM logical volume high metadata space usage (LV ${label:lv_name} VG ${label:vg_name} Type ${label:volume_type}) |
-
-
 ## Setup
 
 
@@ -179,6 +139,46 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ lvm_lv_data_space_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/lvm.conf) | lvm.lv_data_space_utilization | LVM logical volume high data space usage (LV ${label:lv_name} VG ${label:vg_name} Type ${label:volume_type}) |
+| [ lvm_lv_metadata_space_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/lvm.conf) | lvm.lv_metadata_space_utilization | LVM logical volume high metadata space usage (LV ${label:lv_name} VG ${label:vg_name} Type ${label:volume_type}) |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per logical volume
+
+These metrics refer to the LVM logical volume.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| lv_name | Logical volume name |
+| vg_name | Volume group name |
+| volume_type | Type of the volume |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| lvm.lv_data_space_utilization | utilization | % |
+| lvm.lv_metadata_space_utilization | utilization | % |
 
 
 
