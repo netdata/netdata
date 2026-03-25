@@ -10,6 +10,8 @@
 #include <cstring>
 #include <vector>
 
+static constexpr double ML_PI = 3.14159265358979323846;
+
 static int tests_run = 0;
 static int tests_failed = 0;
 
@@ -165,7 +167,7 @@ static void test_full_pipeline()
     const size_t num_samples = 100;
     calculated_number_t normal_data[100];
     for (size_t i = 0; i < num_samples; i++)
-        normal_data[i] = 50.0 + 20.0 * std::sin(2.0 * M_PI * (double)i / 25.0);
+        normal_data[i] = 50.0 + 20.0 * std::sin(2.0 * ML_PI * (double)i / 25.0);
 
     // Simulate prediction: slide a window of size n over the data,
     // preprocess each window, collect the first feature vector.
@@ -432,7 +434,7 @@ static void test_preprocess_predict_equivalence()
     // Various input patterns
     auto fill_sine = [](calculated_number_t *buf, size_t n) {
         for (size_t i = 0; i < n; i++)
-            buf[i] = 50.0 + 20.0 * std::sin(2.0 * M_PI * (double)i / 7.0);
+            buf[i] = 50.0 + 20.0 * std::sin(2.0 * ML_PI * (double)i / 7.0);
     };
     auto fill_ramp = [](calculated_number_t *buf, size_t n) {
         for (size_t i = 0; i < n; i++)
@@ -661,7 +663,7 @@ static void test_parameter_combinations()
         calculated_number_t src[128], dst[128];
         memset(src, 0, sizeof(src));
         for (size_t i = 0; i < n; i++)
-            src[i] = 10.0 + 5.0 * std::sin(2.0 * M_PI * (double)i / (double)n);
+            src[i] = 10.0 + 5.0 * std::sin(2.0 * ML_PI * (double)i / (double)n);
         memcpy(dst, src, n * sizeof(calculated_number_t));
 
         std::vector<DSample> pf;
@@ -699,7 +701,7 @@ static void test_parameter_combinations()
         calculated_number_t src_large[128], dst_large[128];
         memset(src_large, 0, sizeof(src_large));
         for (size_t i = 0; i < large_n; i++)
-            src_large[i] = 10.0 + 5.0 * std::sin(2.0 * M_PI * (double)i / (double)n);
+            src_large[i] = 10.0 + 5.0 * std::sin(2.0 * ML_PI * (double)i / (double)n);
         memcpy(dst_large, src_large, large_n * sizeof(calculated_number_t));
 
         std::vector<DSample> pf_large;
