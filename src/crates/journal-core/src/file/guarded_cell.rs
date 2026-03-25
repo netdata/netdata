@@ -48,19 +48,19 @@ use std::num::NonZeroU64;
 /// }
 ///
 /// impl Container {
-///     fn get_slice(&self, offset: u64, size: u64) -> Result<ValueGuard<&[u8]>> {
+///     fn get_slice(&self, offset: NonZeroU64, size: u64) -> Result<ValueGuard<&[u8]>> {
 ///         // Check if guard is already held
 ///         if self.window_manager.guard().get() {
-///             return Err(Error::AlreadyBorrowed);
+///             return Err(JournalError::ValueGuardInUse);
 ///         }
 ///
 ///         // Borrow the window manager
 ///         let wm = self.window_manager.borrow_mut_checked()?;
-///         let slice = wm.get_slice(offset, size)?;
+///         let slice = wm.get_slice(offset.get(), size)?;
 ///
 ///         // Set guard and return RAII guard that clears it on drop
 ///         self.window_manager.guard().set(true);
-///         Ok(ValueGuard::new(slice, self.window_manager.guard()))
+///         Ok(ValueGuard::new(offset, slice, self.window_manager.guard()))
 ///     }
 /// }
 /// ```
