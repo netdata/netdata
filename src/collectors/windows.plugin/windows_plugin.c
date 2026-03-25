@@ -326,11 +326,13 @@ void win_plugin_main(void *ptr)
     // Join threads
     for (i = 0; win_modules[i].name; i++) {
         struct proc_module *pm = &win_modules[i];
-        if (pm->cleanup)
-            pm->cleanup();
 
         if (pm->thread) {
             nd_thread_join(pm->thread);
+            pm->thread = NULL;
         }
+
+        if (pm->cleanup)
+            pm->cleanup();
     }
 }
