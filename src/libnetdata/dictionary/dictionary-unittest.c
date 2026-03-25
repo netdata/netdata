@@ -1055,7 +1055,6 @@ typedef enum {
 } dict_bench_write_mode_t;
 
 struct dict_bench_config {
-    const char *suite;
     const char *workload;
     size_t entries;
     int readers;
@@ -1238,7 +1237,7 @@ static void dict_bench_aggregate_latency(
             continue;
 
         total_latency_ut += threads[i].stats.latency_total_ut;
-        total_ops += threads[i].stats.latency_samples_used;
+        total_ops += threads[i].stats.latency_samples_seen;
 
         size_t available = max_samples - samples_used;
         size_t copy = MIN(available, threads[i].stats.latency_samples_used);
@@ -1393,7 +1392,6 @@ int dictionary_unittest_benchmark(void) {
     for(size_t i = 0; i < sizeof(readers) / sizeof(readers[0]); i++) {
         for(size_t j = 0; j < sizeof(writers) / sizeof(writers[0]); j++) {
             struct dict_bench_config cfg = {
-                .suite = "traversal",
                 .workload = "traversal",
                 .entries = 10000,
                 .readers = readers[i],
@@ -1417,7 +1415,6 @@ int dictionary_unittest_benchmark(void) {
         for(size_t i = 0; i < sizeof(readers) / sizeof(readers[0]); i++) {
             for(size_t j = 0; j < sizeof(writers) / sizeof(writers[0]); j++) {
                 struct dict_bench_config hot_cfg = {
-                    .suite = "lookup",
                     .workload = "lookup-hot",
                     .entries = sizes[s],
                     .readers = readers[i],
@@ -1445,10 +1442,10 @@ int dictionary_unittest_benchmark(void) {
     );
     {
         const struct dict_bench_config configs[] = {
-            {.suite = "mixed", .workload = "mixed-8r1w", .entries = 10000, .readers = 8, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_UPDATE},
-            {.suite = "mixed", .workload = "mixed-8r2w", .entries = 10000, .readers = 8, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_UPDATE},
-            {.suite = "mixed", .workload = "mixed-4r1w", .entries = 10000, .readers = 4, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_CHURN},
-            {.suite = "mixed", .workload = "mixed-4r2w", .entries = 10000, .readers = 4, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_CHURN},
+            {.workload = "mixed-8r1w", .entries = 10000, .readers = 8, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_UPDATE},
+            {.workload = "mixed-8r2w", .entries = 10000, .readers = 8, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_UPDATE},
+            {.workload = "mixed-4r1w", .entries = 10000, .readers = 4, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_CHURN},
+            {.workload = "mixed-4r2w", .entries = 10000, .readers = 4, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_CHURN},
         };
 
         for(size_t i = 0; i < sizeof(configs) / sizeof(configs[0]); i++)
@@ -1464,12 +1461,12 @@ int dictionary_unittest_benchmark(void) {
     );
     {
         const struct dict_bench_config configs[] = {
-            {.suite = "writer", .workload = "update-1w", .entries = 10000, .readers = 0, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_NONE, .write_mode = DICT_BENCH_WRITE_UPDATE},
-            {.suite = "writer", .workload = "update-2w", .entries = 10000, .readers = 0, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_NONE, .write_mode = DICT_BENCH_WRITE_UPDATE},
-            {.suite = "writer", .workload = "churn-1w",  .entries = 10000, .readers = 0, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_NONE, .write_mode = DICT_BENCH_WRITE_CHURN},
-            {.suite = "writer", .workload = "churn-2w",  .entries = 10000, .readers = 0, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_NONE, .write_mode = DICT_BENCH_WRITE_CHURN},
-            {.suite = "writer", .workload = "update+r",  .entries = 10000, .readers = 8, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_UPDATE},
-            {.suite = "writer", .workload = "churn+r",   .entries = 10000, .readers = 8, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_CHURN},
+            {.workload = "update-1w", .entries = 10000, .readers = 0, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_NONE, .write_mode = DICT_BENCH_WRITE_UPDATE},
+            {.workload = "update-2w", .entries = 10000, .readers = 0, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_NONE, .write_mode = DICT_BENCH_WRITE_UPDATE},
+            {.workload = "churn-1w",  .entries = 10000, .readers = 0, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_NONE, .write_mode = DICT_BENCH_WRITE_CHURN},
+            {.workload = "churn-2w",  .entries = 10000, .readers = 0, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_NONE, .write_mode = DICT_BENCH_WRITE_CHURN},
+            {.workload = "update+r",  .entries = 10000, .readers = 8, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_UPDATE},
+            {.workload = "churn+r",   .entries = 10000, .readers = 8, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_CHURN},
         };
 
         for(size_t i = 0; i < sizeof(configs) / sizeof(configs[0]); i++)
