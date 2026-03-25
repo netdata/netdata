@@ -38,6 +38,7 @@ jaq-interpret = "1.2.0"
 jaq-std = "1.5.0"
 jaq-syn = "1.6.0"
 maxminddb = "0.25.0"
+memchr = { workspace = true }
 netflow_parser = "0.9.0"
 netgauze-bgp-pkt = "0.9.0"
 netgauze-bmp-pkt = { version = "0.9.0", features = ["codec"] }

@@ -9,6 +9,7 @@ use crate::tiering::{
 use anyhow::{Context, Result};
 use chrono::Utc;
 use hashbrown::HashMap as FastHashMap;
+use memchr::memchr;
 use journal_common::{Seconds, load_machine_id};
 use journal_registry::{Monitor, Registry, repository::File as RegistryFile};
 use journal_session::{Direction as SessionDirection, JournalSession};
@@ -1176,94 +1177,107 @@ impl FlowQueryService {
             let mut metrics = FlowMetrics::default();
             let mut src_hash = None;
             let mut dst_hash = None;
+            let mut payload_error: Option<anyhow::Error> = None;
 
-            let mut payloads = cursor
-                .payloads()
-                .context("failed to open projected payload iterator for journal entry")?;
-            while let Some(payload) = payloads
-                .next()
-                .context("failed to read projected journal payload")?
-            {
-                let Some((key_bytes, value_bytes)) = split_payload_bytes(payload) else {
-                    continue;
-                };
-                match key_bytes {
-                    b"BYTES" => {
-                        if let Some(value) = parse_u64_ascii(value_bytes) {
-                            metrics.bytes = value;
-                        }
-                        continue;
+            cursor
+                .visit_payloads(|payload| {
+                    if payload_error.is_some() {
+                        return Ok(());
                     }
-                    b"PACKETS" => {
-                        if let Some(value) = parse_u64_ascii(value_bytes) {
-                            metrics.packets = value;
-                        }
-                        continue;
-                    }
-                    b"RAW_BYTES" => {
-                        if let Some(value) = parse_u64_ascii(value_bytes) {
-                            metrics.raw_bytes = value;
-                        }
-                        continue;
-                    }
-                    b"RAW_PACKETS" => {
-                        if let Some(value) = parse_u64_ascii(value_bytes) {
-                            metrics.raw_packets = value;
-                        }
-                        continue;
-                    }
-                    _ => {}
-                }
 
-                let Some(action) = payload_actions.get(key_bytes).copied() else {
-                    continue;
-                };
-
-                let value = payload_value(value_bytes);
-                let value_ref = value.as_ref();
-
-                if let Some(field_index) = action.direct_facet_slot {
-                    if !value_ref.is_empty() {
-                        if let Some(facets) = projected_facets.as_mut() {
-                            accumulate_distinct_value(
-                                &mut facets.accumulators[field_index],
-                                value_ref,
-                                self.facet_max_values_per_field,
-                            );
-                        }
-                    }
-                }
-
-                if let Some(slot) = action.capture_slot {
-                    if !value_ref.is_empty() && facet_captured_values[slot].is_none() {
-                        facet_captured_values[slot] = Some(value_ref.to_string());
-                    }
-                }
-
-                if let Some(field_index) = action.group_slot {
-                    if !value_ref.is_empty() {
-                        match grouped_aggregates
-                            .index
-                            .find_field_value(field_index, IndexFieldValue::Text(value_ref))
-                            .context("failed to resolve projected grouped field value from compact query index")?
-                        {
-                            Some(field_id) => row_group_field_ids[field_index] = Some(field_id),
-                            None if grouped_aggregates.grouped_total() < self.max_groups => {
-                                row_missing_values[field_index] = Some(value_ref.to_string());
+                    let result: Result<()> = (|| {
+                    let Some((key_bytes, value_bytes)) = split_payload_bytes(payload) else {
+                        return Ok(());
+                    };
+                    match key_bytes {
+                        b"BYTES" => {
+                            if let Some(value) = parse_u64_ascii(value_bytes) {
+                                metrics.bytes = value;
                             }
-                            None => {}
+                            return Ok(());
+                        }
+                        b"PACKETS" => {
+                            if let Some(value) = parse_u64_ascii(value_bytes) {
+                                metrics.packets = value;
+                            }
+                            return Ok(());
+                        }
+                        b"RAW_BYTES" => {
+                            if let Some(value) = parse_u64_ascii(value_bytes) {
+                                metrics.raw_bytes = value;
+                            }
+                            return Ok(());
+                        }
+                        b"RAW_PACKETS" => {
+                            if let Some(value) = parse_u64_ascii(value_bytes) {
+                                metrics.raw_packets = value;
+                            }
+                            return Ok(());
+                        }
+                        _ => {}
+                    }
+
+                    let Some(action) = payload_actions.get(key_bytes).copied() else {
+                        return Ok(());
+                    };
+
+                    let value = payload_value(value_bytes);
+                    let value_ref = value.as_ref();
+
+                    if let Some(field_index) = action.direct_facet_slot {
+                        if !value_ref.is_empty() {
+                            if let Some(facets) = projected_facets.as_mut() {
+                                accumulate_distinct_value(
+                                    &mut facets.accumulators[field_index],
+                                    value_ref,
+                                    self.facet_max_values_per_field,
+                                );
+                            }
                         }
                     }
-                }
 
-                if value_ref.is_empty() {
-                    continue;
-                }
-                match action.identity {
-                    ProjectedIdentityField::Src => src_hash = Some(fingerprint_value(value_ref)),
-                    ProjectedIdentityField::Dst => dst_hash = Some(fingerprint_value(value_ref)),
-                    ProjectedIdentityField::None => {}
-                }
+                    if let Some(slot) = action.capture_slot {
+                        if !value_ref.is_empty() && facet_captured_values[slot].is_none() {
+                            facet_captured_values[slot] = Some(value_ref.to_string());
+                        }
+                    }
+
+                    if let Some(field_index) = action.group_slot {
+                        if !value_ref.is_empty() {
+                            match grouped_aggregates
+                                .index
+                                .find_field_value(field_index, IndexFieldValue::Text(value_ref))
+                                .context("failed to resolve projected grouped field value from compact query index")?
+                            {
+                                Some(field_id) => row_group_field_ids[field_index] = Some(field_id),
+                                None if grouped_aggregates.grouped_total() < self.max_groups => {
+                                    row_missing_values[field_index] = Some(value_ref.to_string());
+                                }
+                                None => {}
+                            }
+                        }
+                    }
+
+                    if value_ref.is_empty() {
+                        return Ok(());
+                    }
+                    match action.identity {
+                        ProjectedIdentityField::Src => src_hash = Some(fingerprint_value(value_ref)),
+                        ProjectedIdentityField::Dst => dst_hash = Some(fingerprint_value(value_ref)),
+                        ProjectedIdentityField::None => {}
+                    }
+                    Ok(())
+                    })();
+
+                    if let Err(err) = result {
+                        payload_error = Some(err);
+                    }
+
+                    Ok(())
+                })
+                .context("failed to visit projected journal payloads")?;
+            if let Some(err) = payload_error {
+                return Err(err);
             }
 
             if let Some(facets) = projected_facets.as_mut().filter(|facets| facets.active()) {
@@ -4092,7 +4106,7 @@ fn split_payload(payload: &[u8]) -> Option<(&str, &[u8])> {
 }
 
 fn split_payload_bytes(payload: &[u8]) -> Option<(&[u8], &[u8])> {
-    let eq_pos = payload.iter().position(|&byte| byte == b'=')?;
+    let eq_pos = memchr(b'=', payload)?;
     Some((&payload[..eq_pos], &payload[eq_pos + 1..]))
 }
 

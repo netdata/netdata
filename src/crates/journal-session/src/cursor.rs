@@ -487,6 +487,46 @@ impl Cursor {
             buf: &mut self.decompress_buf,
         })
     }
+
+    pub fn visit_payloads<F>(&mut self, mut visitor: F) -> Result<(), SessionError>
+    where
+        F: FnMut(&[u8]) -> Result<(), SessionError>,
+    {
+        let entry_offset = self.entry_offset.expect("visit_payloads() called without step()");
+        let jf = self.journal_file.as_ref().unwrap();
+        let buf = &mut self.decompress_buf;
+        let data_offsets = &mut self.entry_data_offsets;
+        let mut visitor_error = None;
+
+        jf.visit_entry_payloads(entry_offset, data_offsets, |data_object| {
+            if visitor_error.is_some() {
+                return Ok(());
+            }
+
+            let result = if data_object.is_compressed() {
+                if let Err(err) = data_object.decompress(buf) {
+                    visitor_error = Some(SessionError::from(err));
+                    return Ok(());
+                }
+                visitor(buf)
+            } else {
+                visitor(data_object.raw_payload())
+            };
+
+            if let Err(err) = result {
+                visitor_error = Some(err);
+            }
+
+            Ok(())
+        })
+        .map_err(SessionError::from)?;
+
+        if let Some(err) = visitor_error {
+            return Err(err);
+        }
+
+        Ok(())
+    }
 }
 
 /// Lending iterator over a journal entry's data objects.

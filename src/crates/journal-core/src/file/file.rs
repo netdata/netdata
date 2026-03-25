@@ -273,6 +273,39 @@ fn map_hash_table<M: MemoryMap>(
 }
 
 impl<M: MemoryMap> JournalFile<M> {
+    fn parse_object_in_window<'a, T>(
+        &'a self,
+        wm: &'a mut WindowManager<M>,
+        offset: NonZeroU64,
+    ) -> Result<T>
+    where
+        T: JournalObject<&'a [u8]>,
+    {
+        validate_offset_alignment(offset)?;
+
+        if offset.get() < self.header_size {
+            return Err(JournalError::ObjectExceedsFileBounds);
+        }
+
+        let size_needed = {
+            let header_slice = wm.get_slice(offset.get(), std::mem::size_of::<ObjectHeader>() as u64)?;
+            let header =
+                ObjectHeader::ref_from_bytes(header_slice).map_err(|_| JournalError::ZerocopyFailure)?;
+            header.validated_size()?
+        };
+
+        let end_offset = offset
+            .get()
+            .checked_add(size_needed)
+            .ok_or(JournalError::ObjectExceedsFileBounds)?;
+        if end_offset > self.arena_end.get() {
+            return Err(JournalError::ObjectExceedsFileBounds);
+        }
+
+        let data = wm.get_slice(offset.get(), size_needed)?;
+        T::from_data(data, self.is_compact).ok_or(JournalError::ZerocopyFailure)
+    }
+
     pub fn visit_bucket<'a, H, V>(
         &'a self,
         hash_table: Option<H>,
@@ -430,41 +463,8 @@ impl<M: MemoryMap> JournalFile<M> {
     where
         T: JournalObject<&'a [u8]>,
     {
-        validate_offset_alignment(offset)?;
-
-        // Objects cannot be located in the file header
-        if offset.get() < self.header_size {
-            return Err(JournalError::ObjectExceedsFileBounds);
-        }
-
-        self.window_manager.with_guarded(offset, |wm| {
-            // Get the object header to determine size
-            let size_needed = {
-                let header_slice =
-                    wm.get_slice(offset.get(), std::mem::size_of::<ObjectHeader>() as u64)?;
-                let header = ObjectHeader::ref_from_bytes(header_slice)
-                    .map_err(|_| JournalError::ZerocopyFailure)?;
-                header.validated_size()?
-            };
-
-            // Validate that the object doesn't exceed the journal's arena bounds
-            let end_offset = offset
-                .get()
-                .checked_add(size_needed)
-                .ok_or(JournalError::ObjectExceedsFileBounds)?;
-            if end_offset > self.arena_end.get() {
-                return Err(JournalError::ObjectExceedsFileBounds);
-            }
-
-            // Get the full object data
-            let data = wm.get_slice(offset.get(), size_needed)?;
-
-            // Parse the object
-            let value =
-                T::from_data(data, self.is_compact).ok_or(JournalError::ZerocopyFailure)?;
-
-            Ok(value)
-        })
+        self.window_manager
+            .with_guarded(offset, |wm| self.parse_object_in_window(wm, offset))
     }
 
     pub fn offset_array_ref(
@@ -643,6 +643,34 @@ impl<M: MemoryMap> JournalFile<M> {
             data_offsets,
             current_index: 0,
         })
+    }
+
+    pub fn visit_entry_payloads<F>(
+        &self,
+        entry_offset: NonZeroU64,
+        data_offsets: &mut Vec<NonZeroU64>,
+        mut visitor: F,
+    ) -> Result<()>
+    where
+        F: for<'a> FnMut(DataObject<&'a [u8]>) -> Result<()>,
+    {
+        data_offsets.clear();
+
+        self.window_manager.with_guarded(entry_offset, |wm| {
+            {
+                let entry: EntryObject<&[u8]> = self.parse_object_in_window(wm, entry_offset)?;
+                entry.collect_offsets(data_offsets)?;
+            }
+
+            for data_offset in data_offsets.iter().copied() {
+                let data_object: DataObject<&[u8]> = self.parse_object_in_window(wm, data_offset)?;
+                visitor(data_object)?;
+            }
+
+            Ok(())
+        })?;
+
+        Ok(())
     }
 
     /// Get hash table bucket utilization statistics
