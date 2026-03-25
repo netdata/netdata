@@ -437,7 +437,7 @@ static inline double perflib_average_timer_ms(COUNTER_DATA *d)
     LONGLONG freq1 = d->current.Frequency;
 
     if (data1 >= data0 && time1 > time0 && time0 && freq1)
-        return ((double)(data1 - data0) / (double)(freq1 / MSEC_PER_SEC)) / (double)(time1 - time0);
+        return ((double)(data1 - data0) * (double)MSEC_PER_SEC) / ((double)freq1 * (double)(time1 - time0));
 
     return 0;
 }
@@ -482,6 +482,8 @@ static DiskDriveInfoWMI infos[MAX_WMI_DRIVES];
 static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut)
 {
     DICTIONARY *dict = physicalDisks;
+    size_t infoCount = 0;
+    bool infos_loaded = false;
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "PhysicalDisk");
     if (!pObjectType)
@@ -526,7 +528,11 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
 
         if (!d->collected_metadata) {
             if (!is_system && device_index != -1) {
-                size_t infoCount = GetDiskDriveInfo(infos, _countof(infos));
+                if (!infos_loaded) {
+                    infoCount = GetDiskDriveInfo(infos, _countof(infos));
+                    infos_loaded = true;
+                }
+
                 for (size_t k = 0; k < infoCount; k++) {
                     if (infos[k].Index != device_index)
                         continue;
@@ -706,23 +712,35 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
 int do_PerflibStorage(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
+    PERF_DATA_BLOCK *logicalDataBlock = NULL;
+    PERF_DATA_BLOCK *physicalDataBlock = NULL;
+    DWORD logical_id, physical_id;
 
     if (unlikely(!initialized)) {
         initialize();
         initialized = true;
     }
 
-    DWORD id = RegistryFindIDByName("LogicalDisk");
-    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
+    logical_id = RegistryFindIDByName("LogicalDisk");
+    physical_id = RegistryFindIDByName("PhysicalDisk");
+
+    if (logical_id == PERFLIB_REGISTRY_NAME_NOT_FOUND && physical_id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
         return -1;
 
-    PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
-    if (!pDataBlock)
+    if (logical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND)
+        logicalDataBlock = perflibGetPerformanceData(logical_id);
+
+    if (physical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND)
+        physicalDataBlock = perflibGetPerformanceData(physical_id);
+
+    if (!logicalDataBlock && !physicalDataBlock)
         return -1;
 
     usec_t now_ut = now_monotonic_usec();
-    do_logical_disk(pDataBlock, update_every, now_ut);
-    do_physical_disk(pDataBlock, update_every, now_ut);
+    if (logicalDataBlock)
+        do_logical_disk(logicalDataBlock, update_every, now_ut);
+    if (physicalDataBlock)
+        do_physical_disk(physicalDataBlock, update_every, now_ut);
 
     return 0;
 }
