@@ -826,6 +826,13 @@ mod tests {
             group_by_param
                 .options
                 .iter()
+                .any(|option| option.id == "SRC_AS"),
+            "expected SRC_AS group_by option to be available"
+        );
+        assert!(
+            group_by_param
+                .options
+                .iter()
                 .any(|option| option.id == "SRC_AS_NAME"),
             "expected SRC_AS_NAME group_by option to be available"
         );

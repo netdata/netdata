@@ -492,7 +492,9 @@ impl Cursor {
     where
         F: FnMut(&[u8]) -> Result<(), SessionError>,
     {
-        let entry_offset = self.entry_offset.expect("visit_payloads() called without step()");
+        let entry_offset = self
+            .entry_offset
+            .expect("visit_payloads() called without step()");
         let jf = self.journal_file.as_ref().unwrap();
         let buf = &mut self.decompress_buf;
         let data_offsets = &mut self.entry_data_offsets;

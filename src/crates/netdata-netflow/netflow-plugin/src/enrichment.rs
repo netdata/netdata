@@ -3167,19 +3167,30 @@ fn decode_ip_class(record: &AsnLookupRecord) -> Option<String> {
     (!ip_class.is_empty()).then(|| ip_class.to_string())
 }
 
+fn format_as_name(asn: u32, name: &str) -> String {
+    let name = name.trim();
+    if name.is_empty() {
+        format!("AS{asn}")
+    } else {
+        format!("AS{asn} {name}")
+    }
+}
+
 fn effective_as_name(attrs: Option<&NetworkAttributes>, resolved_asn: u32) -> String {
     let Some(attrs) = attrs else {
-        return (resolved_asn == 0)
-            .then(|| UNKNOWN_ASN_LABEL.to_string())
-            .unwrap_or_default();
+        return if resolved_asn == 0 {
+            format_as_name(0, UNKNOWN_ASN_LABEL)
+        } else {
+            format_as_name(resolved_asn, "")
+        };
     };
 
     if resolved_asn == 0 && attrs.ip_class == "private" {
-        PRIVATE_IP_ADDRESS_SPACE_LABEL.to_string()
+        format_as_name(0, PRIVATE_IP_ADDRESS_SPACE_LABEL)
     } else if resolved_asn == 0 {
-        UNKNOWN_ASN_LABEL.to_string()
+        format_as_name(0, UNKNOWN_ASN_LABEL)
     } else {
-        attrs.asn_name.clone()
+        format_as_name(resolved_asn, &attrs.asn_name)
     }
 }
 
@@ -5420,17 +5431,17 @@ mod tests {
 
         assert_eq!(
             effective_as_name(Some(&attrs), 0),
-            PRIVATE_IP_ADDRESS_SPACE_LABEL
+            "AS0 Private IP Address Space"
         );
-        assert_eq!(effective_as_name(Some(&attrs), 64_500), "");
-        assert_eq!(effective_as_name(None, 0), UNKNOWN_ASN_LABEL);
+        assert_eq!(effective_as_name(Some(&attrs), 64_500), "AS64500");
+        assert_eq!(effective_as_name(None, 0), "AS0 Unknown ASN");
     }
 
     #[test]
     fn effective_as_name_uses_unknown_label_for_non_private_zero_asn() {
         let attrs = NetworkAttributes::default();
 
-        assert_eq!(effective_as_name(Some(&attrs), 0), UNKNOWN_ASN_LABEL);
+        assert_eq!(effective_as_name(Some(&attrs), 0), "AS0 Unknown ASN");
     }
 
     #[test]
@@ -5445,7 +5456,7 @@ mod tests {
 
         assert_eq!(
             fields.get("SRC_AS_NAME").map(String::as_str),
-            Some(PRIVATE_IP_ADDRESS_SPACE_LABEL)
+            Some("AS0 Private IP Address Space")
         );
     }
 
@@ -5458,7 +5469,7 @@ mod tests {
 
         assert_eq!(
             fields.get("SRC_AS_NAME").map(String::as_str),
-            Some(UNKNOWN_ASN_LABEL)
+            Some("AS0 Unknown ASN")
         );
     }
 
@@ -5472,7 +5483,7 @@ mod tests {
 
         write_network_attributes_record_src(&mut rec, Some(&attrs));
 
-        assert_eq!(rec.src_as_name, UNKNOWN_ASN_LABEL);
+        assert_eq!(rec.src_as_name, "AS0 Unknown ASN");
     }
 
     #[test]

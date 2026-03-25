@@ -278,6 +278,9 @@ impl<M: MemoryMap> JournalFile<M> {
         wm: &'a mut WindowManager<M>,
         offset: NonZeroU64,
     ) -> Result<&'a [u8]> {
+        const OBJECT_HEADER_SIZE: u64 = std::mem::size_of::<ObjectHeader>() as u64;
+        const OBJECT_SIZE_OFFSET: usize = 8;
+
         validate_offset_alignment(offset)?;
 
         if offset.get() < self.header_size {
@@ -285,11 +288,16 @@ impl<M: MemoryMap> JournalFile<M> {
         }
 
         let size_needed = {
-            let header_slice =
-                wm.get_slice(offset.get(), std::mem::size_of::<ObjectHeader>() as u64)?;
-            let header =
-                ObjectHeader::ref_from_bytes(header_slice).map_err(|_| JournalError::ZerocopyFailure)?;
-            header.validated_size()?
+            let header_slice = wm.get_slice(offset.get(), OBJECT_HEADER_SIZE)?;
+            let size = u64::from_le_bytes(
+                header_slice[OBJECT_SIZE_OFFSET..OBJECT_SIZE_OFFSET + std::mem::size_of::<u64>()]
+                    .try_into()
+                    .map_err(|_| JournalError::ZerocopyFailure)?,
+            );
+            if size < OBJECT_HEADER_SIZE {
+                return Err(JournalError::InvalidObjectSize(size));
+            }
+            size
         };
 
         let end_offset = offset

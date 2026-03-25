@@ -89,6 +89,53 @@ impl FlowMetrics {
 const HOUR_BUCKET_USEC: u64 = 60 * 60 * 1_000_000;
 const INTERNAL_EXPORTER_IP_PRESENT: &str = "_EXPORTER_IP_PRESENT";
 const INTERNAL_NEXT_HOP_PRESENT: &str = "_NEXT_HOP_PRESENT";
+const INTERNAL_DIRECTION_PRESENT: &str = "_DIRECTION_PRESENT";
+const INTERNAL_ETYPE_PRESENT: &str = "_ETYPE_PRESENT";
+const INTERNAL_FORWARDING_STATUS_PRESENT: &str = "_FORWARDING_STATUS_PRESENT";
+const INTERNAL_IPTOS_PRESENT: &str = "_IPTOS_PRESENT";
+const INTERNAL_TCP_FLAGS_PRESENT: &str = "_TCP_FLAGS_PRESENT";
+const INTERNAL_ICMPV4_TYPE_PRESENT: &str = "_ICMPV4_TYPE_PRESENT";
+const INTERNAL_ICMPV4_CODE_PRESENT: &str = "_ICMPV4_CODE_PRESENT";
+const INTERNAL_ICMPV6_TYPE_PRESENT: &str = "_ICMPV6_TYPE_PRESENT";
+const INTERNAL_ICMPV6_CODE_PRESENT: &str = "_ICMPV6_CODE_PRESENT";
+const INTERNAL_IN_IF_SPEED_PRESENT: &str = "_IN_IF_SPEED_PRESENT";
+const INTERNAL_OUT_IF_SPEED_PRESENT: &str = "_OUT_IF_SPEED_PRESENT";
+const INTERNAL_IN_IF_BOUNDARY_PRESENT: &str = "_IN_IF_BOUNDARY_PRESENT";
+const INTERNAL_OUT_IF_BOUNDARY_PRESENT: &str = "_OUT_IF_BOUNDARY_PRESENT";
+const INTERNAL_SRC_VLAN_PRESENT: &str = "_SRC_VLAN_PRESENT";
+const INTERNAL_DST_VLAN_PRESENT: &str = "_DST_VLAN_PRESENT";
+const INTERNAL_SAMPLING_RATE_PRESENT: &str = "_SAMPLING_RATE_PRESENT";
+
+const ROLLUP_PRESENCE_FIELDS: &[(&str, &str)] = &[
+    ("DIRECTION", INTERNAL_DIRECTION_PRESENT),
+    ("ETYPE", INTERNAL_ETYPE_PRESENT),
+    ("FORWARDING_STATUS", INTERNAL_FORWARDING_STATUS_PRESENT),
+    ("IPTOS", INTERNAL_IPTOS_PRESENT),
+    ("TCP_FLAGS", INTERNAL_TCP_FLAGS_PRESENT),
+    ("ICMPV4_TYPE", INTERNAL_ICMPV4_TYPE_PRESENT),
+    ("ICMPV4_CODE", INTERNAL_ICMPV4_CODE_PRESENT),
+    ("ICMPV6_TYPE", INTERNAL_ICMPV6_TYPE_PRESENT),
+    ("ICMPV6_CODE", INTERNAL_ICMPV6_CODE_PRESENT),
+    ("IN_IF_SPEED", INTERNAL_IN_IF_SPEED_PRESENT),
+    ("OUT_IF_SPEED", INTERNAL_OUT_IF_SPEED_PRESENT),
+    ("IN_IF_BOUNDARY", INTERNAL_IN_IF_BOUNDARY_PRESENT),
+    ("OUT_IF_BOUNDARY", INTERNAL_OUT_IF_BOUNDARY_PRESENT),
+    ("SRC_VLAN", INTERNAL_SRC_VLAN_PRESENT),
+    ("DST_VLAN", INTERNAL_DST_VLAN_PRESENT),
+    ("SAMPLING_RATE", INTERNAL_SAMPLING_RATE_PRESENT),
+];
+
+fn rollup_presence_field(field: &str) -> Option<&'static str> {
+    ROLLUP_PRESENCE_FIELDS
+        .iter()
+        .find_map(|(actual, internal)| (*actual == field).then_some(*internal))
+}
+
+fn is_internal_rollup_presence_field(field: &str) -> bool {
+    ROLLUP_PRESENCE_FIELDS
+        .iter()
+        .any(|(_, internal)| *internal == field)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct TierFlowRef {
@@ -374,6 +421,70 @@ const ROLLUP_FIELD_DEFS: &[RollupFieldDef] = &[
         name: "SAMPLING_RATE",
         kind: IndexFieldKind::U64,
     },
+    RollupFieldDef {
+        name: INTERNAL_DIRECTION_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_ETYPE_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_FORWARDING_STATUS_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_IPTOS_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_TCP_FLAGS_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_ICMPV4_TYPE_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_ICMPV4_CODE_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_ICMPV6_TYPE_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_ICMPV6_CODE_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_IN_IF_SPEED_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_OUT_IF_SPEED_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_IN_IF_BOUNDARY_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_OUT_IF_BOUNDARY_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_SRC_VLAN_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_DST_VLAN_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
+    RollupFieldDef {
+        name: INTERNAL_SAMPLING_RATE_PRESENT,
+        kind: IndexFieldKind::U8,
+    },
 ];
 
 impl TierFlowIndexStore {
@@ -454,6 +565,11 @@ impl TierFlowIndexStore {
                 rollup_field_value(index, field_ids, "NEXT_HOP").map(compact_index_value_to_string)
             }
             "DIRECTION" => {
+                let present = rollup_field_value(index, field_ids, INTERNAL_DIRECTION_PRESENT)
+                    .is_some_and(|value| matches!(value, IndexFieldValue::U8(1)));
+                if !present {
+                    return Some(String::new());
+                }
                 let value = rollup_field_value(index, field_ids, "DIRECTION")?;
                 match value {
                     IndexFieldValue::U8(direction) => {
@@ -462,8 +578,17 @@ impl TierFlowIndexStore {
                     _ => None,
                 }
             }
-            _ => rollup_field_value(index, field_ids, normalized.as_str())
-                .map(compact_index_value_to_string),
+            _ => {
+                if let Some(internal_field) = rollup_presence_field(normalized.as_str()) {
+                    let present = rollup_field_value(index, field_ids, internal_field)
+                        .is_some_and(|value| matches!(value, IndexFieldValue::U8(1)));
+                    if !present {
+                        return Some(String::new());
+                    }
+                }
+                rollup_field_value(index, field_ids, normalized.as_str())
+                    .map(compact_index_value_to_string)
+            }
         }
     }
 
@@ -760,6 +885,68 @@ fn push_rollup_field_ids(
         .push(index.get_or_insert_field_value(57, IndexFieldValue::U16(rec.dst_vlan))?);
     scratch_field_ids
         .push(index.get_or_insert_field_value(58, IndexFieldValue::U64(rec.sampling_rate))?);
+    scratch_field_ids.push(
+        index.get_or_insert_field_value(59, IndexFieldValue::U8(u8::from(rec.has_direction())))?,
+    );
+    scratch_field_ids
+        .push(index.get_or_insert_field_value(60, IndexFieldValue::U8(u8::from(rec.has_etype())))?);
+    scratch_field_ids.push(index.get_or_insert_field_value(
+        61,
+        IndexFieldValue::U8(u8::from(rec.has_forwarding_status())),
+    )?);
+    scratch_field_ids
+        .push(index.get_or_insert_field_value(62, IndexFieldValue::U8(u8::from(rec.has_iptos())))?);
+    scratch_field_ids.push(
+        index.get_or_insert_field_value(63, IndexFieldValue::U8(u8::from(rec.has_tcp_flags())))?,
+    );
+    scratch_field_ids.push(
+        index
+            .get_or_insert_field_value(64, IndexFieldValue::U8(u8::from(rec.has_icmpv4_type())))?,
+    );
+    scratch_field_ids.push(
+        index
+            .get_or_insert_field_value(65, IndexFieldValue::U8(u8::from(rec.has_icmpv4_code())))?,
+    );
+    scratch_field_ids.push(
+        index
+            .get_or_insert_field_value(66, IndexFieldValue::U8(u8::from(rec.has_icmpv6_type())))?,
+    );
+    scratch_field_ids.push(
+        index
+            .get_or_insert_field_value(67, IndexFieldValue::U8(u8::from(rec.has_icmpv6_code())))?,
+    );
+    scratch_field_ids.push(
+        index
+            .get_or_insert_field_value(68, IndexFieldValue::U8(u8::from(rec.has_in_if_speed())))?,
+    );
+    scratch_field_ids.push(
+        index
+            .get_or_insert_field_value(69, IndexFieldValue::U8(u8::from(rec.has_out_if_speed())))?,
+    );
+    scratch_field_ids.push(
+        index.get_or_insert_field_value(
+            70,
+            IndexFieldValue::U8(u8::from(rec.has_in_if_boundary())),
+        )?,
+    );
+    scratch_field_ids.push(
+        index.get_or_insert_field_value(
+            71,
+            IndexFieldValue::U8(u8::from(rec.has_out_if_boundary())),
+        )?,
+    );
+    scratch_field_ids.push(
+        index.get_or_insert_field_value(72, IndexFieldValue::U8(u8::from(rec.has_src_vlan())))?,
+    );
+    scratch_field_ids.push(
+        index.get_or_insert_field_value(73, IndexFieldValue::U8(u8::from(rec.has_dst_vlan())))?,
+    );
+    scratch_field_ids.push(
+        index.get_or_insert_field_value(
+            74,
+            IndexFieldValue::U8(u8::from(rec.has_sampling_rate())),
+        )?,
+    );
     Ok(())
 }
 
@@ -781,6 +968,7 @@ fn materialize_rollup_fields(index: &FlowIndex, flow_id: IndexedFlowId) -> Optio
             INTERNAL_NEXT_HOP_PRESENT => {
                 next_hop_present = matches!(value, IndexFieldValue::U8(1));
             }
+            name if is_internal_rollup_presence_field(name) => {}
             "EXPORTER_IP" => {
                 if let IndexFieldValue::IpAddr(ip) = value {
                     exporter_ip = ip;
@@ -818,6 +1006,13 @@ fn materialize_rollup_fields(index: &FlowIndex, flow_id: IndexedFlowId) -> Optio
             String::new()
         },
     );
+    for &(field, internal_field) in ROLLUP_PRESENCE_FIELDS {
+        let present = rollup_field_value(index, field_ids, internal_field)
+            .is_some_and(|value| matches!(value, IndexFieldValue::U8(1)));
+        if !present {
+            fields.insert(field, String::new());
+        }
+    }
 
     Some(fields)
 }
@@ -955,15 +1150,15 @@ mod tests {
         rec.exporter_ip = Some("192.0.2.10".parse().unwrap());
         rec.exporter_port = 12345;
         rec.protocol = 6;
-        rec.etype = 2048;
+        rec.set_etype(2048);
         rec.src_as = 64512;
         rec.dst_as = 15169;
-        rec.src_as_name = "Example Transit".to_string();
-        rec.dst_as_name = "Google LLC".to_string();
+        rec.src_as_name = "AS64512 Example Transit".to_string();
+        rec.dst_as_name = "AS15169 Google LLC".to_string();
         rec.in_if = 10;
         rec.out_if = 20;
-        rec.sampling_rate = 100;
-        rec.direction = FlowDirection::Ingress;
+        rec.set_sampling_rate(100);
+        rec.set_direction(FlowDirection::Ingress);
         rec.src_country = "US".to_string();
         rec.dst_country = "DE".to_string();
 
@@ -979,11 +1174,11 @@ mod tests {
         assert_eq!(fields.get("DST_AS").map(String::as_str), Some("15169"));
         assert_eq!(
             fields.get("SRC_AS_NAME").map(String::as_str),
-            Some("Example Transit")
+            Some("AS64512 Example Transit")
         );
         assert_eq!(
             fields.get("DST_AS_NAME").map(String::as_str),
-            Some("Google LLC")
+            Some("AS15169 Google LLC")
         );
         assert_eq!(fields.get("SRC_COUNTRY").map(String::as_str), Some("US"));
         assert_eq!(fields.get("DST_COUNTRY").map(String::as_str), Some("DE"));
@@ -995,9 +1190,9 @@ mod tests {
     fn indexed_field_lookup_matches_rollup_materialization_semantics() {
         let mut store = TierFlowIndexStore::default();
         let mut rec = FlowRecord::default();
-        rec.direction = FlowDirection::Ingress;
+        rec.set_direction(FlowDirection::Ingress);
         rec.protocol = 6;
-        rec.src_as_name = "Private IP Address Space".to_string();
+        rec.src_as_name = "AS0 Private IP Address Space".to_string();
 
         let flow_ref = store
             .get_or_insert_record_flow(120_000_000, &rec)
@@ -1013,7 +1208,7 @@ mod tests {
         );
         assert_eq!(
             store.field_value_string(flow_ref, "SRC_AS_NAME").as_deref(),
-            Some("Private IP Address Space")
+            Some("AS0 Private IP Address Space")
         );
         assert_eq!(
             store.field_value_string(flow_ref, "EXPORTER_IP").as_deref(),

@@ -926,7 +926,9 @@ impl IngestService {
             let data = match self.decoders.export_decoder_state_namespace(&key) {
                 Ok(Some(data)) => data,
                 Ok(None) => {
-                    if path.is_file() && let Err(err) = fs::remove_file(&path) {
+                    if path.is_file()
+                        && let Err(err) = fs::remove_file(&path)
+                    {
                         self.metrics
                             .decoder_state_write_errors
                             .fetch_add(1, Ordering::Relaxed);
@@ -1003,16 +1005,17 @@ impl IngestService {
             if path.is_file() {
                 match fs::read(&path) {
                     Ok(data) => {
-                        if let Err(err) = self
-                            .decoders
-                            .import_decoder_state_namespace(key.clone(), source, &data)
+                        if let Err(err) =
+                            self.decoders
+                                .import_decoder_state_namespace(key.clone(), source, &data)
                         {
                             tracing::warn!(
                                 "failed to restore netflow decoder state namespace from {}: {}",
                                 path.display(),
                                 err
                             );
-                            self.decoders.mark_decoder_state_namespace_absent(key, source);
+                            self.decoders
+                                .mark_decoder_state_namespace_absent(key, source);
                         }
                     }
                     Err(err) => {
@@ -1021,16 +1024,20 @@ impl IngestService {
                             path.display(),
                             err
                         );
-                        self.decoders.mark_decoder_state_namespace_absent(key, source);
+                        self.decoders
+                            .mark_decoder_state_namespace_absent(key, source);
                     }
                 }
             } else {
-                self.decoders.mark_decoder_state_namespace_absent(key, source);
+                self.decoders
+                    .mark_decoder_state_namespace_absent(key, source);
             }
             return;
         }
 
-        if self.decoders.decoder_state_source_needs_hydration(&key, source)
+        if self
+            .decoders
+            .decoder_state_source_needs_hydration(&key, source)
             && let Err(err) = self
                 .decoders
                 .hydrate_loaded_decoder_state_namespace(&key, source)
@@ -1258,7 +1265,12 @@ mod tests {
             first.decoder_state_dir.display()
         );
         let persisted_files = std::fs::read_dir(&first.decoder_state_dir)
-            .unwrap_or_else(|e| panic!("read decoder state dir {}: {e}", first.decoder_state_dir.display()))
+            .unwrap_or_else(|e| {
+                panic!(
+                    "read decoder state dir {}: {e}",
+                    first.decoder_state_dir.display()
+                )
+            })
             .count();
         assert!(
             persisted_files >= 2,
@@ -1338,7 +1350,10 @@ mod tests {
             })
             .count();
 
-        assert_eq!(calls_after_first, 1, "expected exactly one dirty namespace write");
+        assert_eq!(
+            calls_after_first, 1,
+            "expected exactly one dirty namespace write"
+        );
         assert!(bytes_after_first > 0, "expected persisted namespace bytes");
         assert_eq!(
             persisted_files_after_first, 1,
@@ -1423,7 +1438,10 @@ mod tests {
         out
     }
 
-    fn decode_pcap_flows(path: &Path, service: &mut IngestService) -> Vec<crate::decoder::FlowFields> {
+    fn decode_pcap_flows(
+        path: &Path,
+        service: &mut IngestService,
+    ) -> Vec<crate::decoder::FlowFields> {
         let file = File::open(path).unwrap_or_else(|e| panic!("open {}: {e}", path.display()));
         let mut reader =
             PcapReader::new(file).unwrap_or_else(|e| panic!("pcap reader {}: {e}", path.display()));

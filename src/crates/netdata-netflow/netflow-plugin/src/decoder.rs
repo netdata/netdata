@@ -1165,7 +1165,11 @@ impl FlowRecord {
         push_str!("EXPORTER_SITE", &self.exporter_site);
         push_str!("EXPORTER_REGION", &self.exporter_region);
         push_str!("EXPORTER_TENANT", &self.exporter_tenant);
-        push_u64_when!(self.has_sampling_rate(), "SAMPLING_RATE", self.sampling_rate);
+        push_u64_when!(
+            self.has_sampling_rate(),
+            "SAMPLING_RATE",
+            self.sampling_rate
+        );
         push_u16_when!(self.has_etype(), "ETYPE", self.etype);
         push_u8!("PROTOCOL", self.protocol);
         push_u64!("BYTES", self.bytes);
@@ -1250,7 +1254,11 @@ impl FlowRecord {
         push_str!("OUT_IF_PROVIDER", &self.out_if_provider);
         push_str!("IN_IF_CONNECTIVITY", &self.in_if_connectivity);
         push_str!("OUT_IF_CONNECTIVITY", &self.out_if_connectivity);
-        push_u8_when!(self.has_in_if_boundary(), "IN_IF_BOUNDARY", self.in_if_boundary);
+        push_u8_when!(
+            self.has_in_if_boundary(),
+            "IN_IF_BOUNDARY",
+            self.in_if_boundary
+        );
         push_u8_when!(
             self.has_out_if_boundary(),
             "OUT_IF_BOUNDARY",
@@ -1535,7 +1543,10 @@ impl DecoderStateNamespace {
             template_id,
             fields,
         };
-        self.v9_templates.insert(template_id, template.clone()).as_ref() != Some(&template)
+        self.v9_templates
+            .insert(template_id, template.clone())
+            .as_ref()
+            != Some(&template)
     }
 
     fn set_v9_options_template(
@@ -2102,10 +2113,7 @@ impl FlowDecoders {
         )
     }
 
-    pub(crate) fn is_decoder_state_namespace_loaded(
-        &self,
-        key: &DecoderStateNamespaceKey,
-    ) -> bool {
+    pub(crate) fn is_decoder_state_namespace_loaded(&self, key: &DecoderStateNamespaceKey) -> bool {
         self.loaded_decoder_namespaces.contains(key)
     }
 
@@ -2210,7 +2218,10 @@ impl FlowDecoders {
         .map(Some)
     }
 
-    pub(crate) fn mark_decoder_state_namespace_persisted(&mut self, key: &DecoderStateNamespaceKey) {
+    pub(crate) fn mark_decoder_state_namespace_persisted(
+        &mut self,
+        key: &DecoderStateNamespaceKey,
+    ) {
         self.dirty_decoder_namespaces.remove(key);
     }
 
@@ -2929,7 +2940,11 @@ fn merge_enriched_records(existing: &mut DecodedFlow, incoming: &DecodedFlow) ->
     merge_copy!(flows);
     merge_copy!(raw_bytes);
     merge_copy!(raw_packets);
-    merge_present_copy!(has_forwarding_status, set_forwarding_status, forwarding_status);
+    merge_present_copy!(
+        has_forwarding_status,
+        set_forwarding_status,
+        forwarding_status
+    );
 
     // Endpoints
     merge_copy!(src_addr);
@@ -4166,10 +4181,7 @@ fn observe_v9_sampling_data(
     changed
 }
 
-fn observe_ipfix_options_templates(
-    body: &[u8],
-    namespace: &mut DecoderStateNamespace,
-) -> bool {
+fn observe_ipfix_options_templates(body: &[u8], namespace: &mut DecoderStateNamespace) -> bool {
     let mut cursor = body;
     let mut changed = false;
     while cursor.len() >= 6 {
@@ -4283,11 +4295,8 @@ fn observe_ipfix_v9_options_templates(body: &[u8], namespace: &mut DecoderStateN
             fields = &fields[4..];
         }
 
-        changed |= namespace.set_ipfix_v9_options_template(
-            template_id,
-            scope_fields,
-            option_fields,
-        );
+        changed |=
+            namespace.set_ipfix_v9_options_template(template_id, scope_fields, option_fields);
         cursor = &cursor[record_len..];
     }
 
@@ -6005,19 +6014,19 @@ fn apply_v9_special_mappings_record(rec: &mut FlowRecord, field: V9Field, value:
                 if !rec.has_icmpv6_type() {
                     rec.set_icmpv6_type(
                         value
-                        .parse::<u64>()
-                        .ok()
-                        .map(|v| ((v >> 8) & 0xff) as u8)
-                        .unwrap_or(0),
+                            .parse::<u64>()
+                            .ok()
+                            .map(|v| ((v >> 8) & 0xff) as u8)
+                            .unwrap_or(0),
                     );
                 }
                 if !rec.has_icmpv6_code() {
                     rec.set_icmpv6_code(
                         value
-                        .parse::<u64>()
-                        .ok()
-                        .map(|v| (v & 0xff) as u8)
-                        .unwrap_or(0),
+                            .parse::<u64>()
+                            .ok()
+                            .map(|v| (v & 0xff) as u8)
+                            .unwrap_or(0),
                     );
                 }
             }
@@ -6181,17 +6190,17 @@ fn apply_icmp_port_fallback(fields: &mut FlowFields) {
     let icmp_type = ((dst_port >> 8) & 0xff).to_string();
     let icmp_code = (dst_port & 0xff).to_string();
 
-        match protocol {
-            1 => {
-                set_if_missing_or_empty(fields, "ICMPV4_TYPE", &icmp_type);
-                set_if_missing_or_empty(fields, "ICMPV4_CODE", &icmp_code);
-            }
-            58 => {
-                set_if_missing_or_empty(fields, "ICMPV6_TYPE", &icmp_type);
-                set_if_missing_or_empty(fields, "ICMPV6_CODE", &icmp_code);
-            }
-            _ => {}
+    match protocol {
+        1 => {
+            set_if_missing_or_empty(fields, "ICMPV4_TYPE", &icmp_type);
+            set_if_missing_or_empty(fields, "ICMPV4_CODE", &icmp_code);
         }
+        58 => {
+            set_if_missing_or_empty(fields, "ICMPV6_TYPE", &icmp_type);
+            set_if_missing_or_empty(fields, "ICMPV6_CODE", &icmp_code);
+        }
+        _ => {}
+    }
 }
 
 fn set_if_missing_or_empty(fields: &mut FlowFields, key: &'static str, value: &str) {
@@ -9374,13 +9383,8 @@ mod tests {
         let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
         let alternate_source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9999);
         let template = synthetic_v9_datalink_template_packet(256, 42, 96);
-        let data = synthetic_v9_datalink_data_packet(
-            256,
-            42,
-            582,
-            0,
-            &synthetic_vlan_ipv4_udp_frame(),
-        );
+        let data =
+            synthetic_v9_datalink_data_packet(256, 42, 582, 0, &synthetic_vlan_ipv4_udp_frame());
 
         let mut warm = FlowDecoders::new();
         let _ = warm.decode_udp_payload(source, &template);
@@ -9404,7 +9408,11 @@ mod tests {
             .hydrate_loaded_decoder_state_namespace(&key, alternate_source)
             .expect("failed to hydrate decoder namespace for alternate source");
         let decoded = restored.decode_udp_payload(alternate_source, &data);
-        assert_eq!(decoded.flows.len(), 1, "alternate source should decode after hydration");
+        assert_eq!(
+            decoded.flows.len(),
+            1,
+            "alternate source should decode after hydration"
+        );
         let flow = decoded.flows[0].record.to_fields();
         assert_eq!(flow.get("IN_IF").map(String::as_str), Some("582"));
         assert_eq!(flow.get("SRC_VLAN").map(String::as_str), Some("231"));
@@ -9752,7 +9760,9 @@ mod tests {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/flows")
     }
 
-    fn single_decoder_state_namespace_key(decoders: &FlowDecoders) -> super::DecoderStateNamespaceKey {
+    fn single_decoder_state_namespace_key(
+        decoders: &FlowDecoders,
+    ) -> super::DecoderStateNamespaceKey {
         let keys = decoders.decoder_state_namespace_keys();
         assert_eq!(
             keys.len(),
