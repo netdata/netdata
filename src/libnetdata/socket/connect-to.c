@@ -351,8 +351,7 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
         return -ND_SOCK_ERR_NO_HOST_IN_DEFINITION;
     }
 
-    char buffer[strlen(definition) + 1];
-    strcpy(buffer, definition);
+    char *buffer = strdupz(definition);
 
     char default_service[10 + 1];
     snprintfz(default_service, 10, "%d", default_port);
@@ -363,14 +362,18 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
 
     int rc = parse_connection_definition(
         buffer, &host, &service, &iface, &protocol, &socktype, &unix_path);
-    if(rc == 1)
-        return connect_to_unix(unix_path, timeout);
+    if(rc == 1) {
+        int fd = connect_to_unix(unix_path, timeout);
+        freez(buffer);
+        return fd;
+    }
 
     if(rc == -1) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "Definition '%s' does not specify a host.",
                definition);
 
+        freez(buffer);
         return -ND_SOCK_ERR_NO_HOST_IN_DEFINITION;
     }
 
@@ -386,7 +389,9 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
         service = default_service;
 
 
-    return connect_to_this_ip46(protocol, socktype, host, scope_id, service, timeout, NULL);
+    int fd = connect_to_this_ip46(protocol, socktype, host, scope_id, service, timeout, NULL);
+    freez(buffer);
+    return fd;
 }
 
 void foreach_entry_in_connection_string(const char *destination, bool (*callback)(char *entry, void *data), void *data) {
@@ -403,10 +408,11 @@ void foreach_entry_in_connection_string(const char *destination, bool (*callback
         // is there anything?
         if(!*s || s == e) break;
 
-        char buf[e - s + 1];
-        strncpyz(buf, s, e - s);
+        char *buf = strndupz(s, (size_t)(e - s));
+        bool stop = callback(buf, data);
+        freez(buf);
 
-        if(callback(buf, data)) break;
+        if(stop) break;
 
         s = e;
     }

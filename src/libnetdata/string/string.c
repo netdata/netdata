@@ -340,13 +340,13 @@ STRING *string_strndupz(const char *str, size_t len) {
     uint8_t partition = string_partition_str(str);
 #endif
 
-    char buf[len + 1];
-    memcpy(buf, str, len);
-    buf[len] = '\0';
+    char *buf = strndupz(str, len);
 
     STRING *string = string_index_search(buf, len + 1);
     while(!string)
         string = string_index_insert(buf, len + 1);
+
+    freez(buf);
 
     string_stats_atomic_increment(partition, active_references);
 
@@ -450,7 +450,9 @@ STRING *string_2way_merge(STRING *a, STRING *b) {
     size_t alen = string_strlen(a);
     size_t blen = string_strlen(b);
     size_t length = alen + blen + string_strlen(string_2way_merge_X) + 1;
-    char buf1[length + 1], buf2[length + 1], *dst1;
+    char *buf1 = mallocz(length + 1);
+    char *buf2 = mallocz(length + 1);
+    char *dst1;
     const char *s1, *s2;
 
     s1 = string2str(a);
@@ -476,7 +478,10 @@ STRING *string_2way_merge(STRING *a, STRING *b) {
         strcpy(dst1, dst2);
     }
 
-    return string_strdupz(buf1);
+    STRING *ret = string_strdupz(buf1);
+    freez(buf2);
+    freez(buf1);
+    return ret;
 }
 
 // ----------------------------------------------------------------------------

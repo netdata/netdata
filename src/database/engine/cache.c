@@ -2922,8 +2922,8 @@ void unittest_stress_test(void) {
                           NETDATA_THREAD_OPTION_DONT_LOG,
                           unittest_stress_test_service, NULL);
 
-    pthread_t collect_threads[pgc_uts.collect_threads];
-    size_t collect_thread_ids[pgc_uts.collect_threads];
+    pthread_t *collect_threads = callocz(pgc_uts.collect_threads, sizeof(*collect_threads));
+    size_t *collect_thread_ids = callocz(pgc_uts.collect_threads, sizeof(*collect_thread_ids));
     for(size_t i = 0; i < pgc_uts.collect_threads ;i++) {
         collect_thread_ids[i] = i;
         char buffer[100 + 1];
@@ -2933,8 +2933,8 @@ void unittest_stress_test(void) {
                               unittest_stress_test_collector, &collect_thread_ids[i]);
     }
 
-    pthread_t queries_threads[pgc_uts.query_threads];
-    size_t query_thread_ids[pgc_uts.query_threads];
+    pthread_t *queries_threads = callocz(pgc_uts.query_threads, sizeof(*queries_threads));
+    size_t *query_thread_ids = callocz(pgc_uts.query_threads, sizeof(*query_thread_ids));
     pgc_uts.random_data = callocz(pgc_uts.query_threads, sizeof(struct random_data));
     for(size_t i = 0; i < pgc_uts.query_threads ;i++) {
         query_thread_ids[i] = i;
@@ -3072,6 +3072,10 @@ void unittest_stress_test(void) {
 
     pgc_destroy(pgc_uts.cache);
 
+    freez(query_thread_ids);
+    freez(queries_threads);
+    freez(collect_thread_ids);
+    freez(collect_threads);
     freez(pgc_uts.metrics);
     freez(pgc_uts.random_data);
 }

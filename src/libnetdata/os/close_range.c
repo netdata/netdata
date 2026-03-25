@@ -89,8 +89,8 @@ void os_close_all_non_std_open_fds_except(const int fds[], size_t fds_num, int f
     }
 
     // copy the fds array to ensure we will not alter them
-    int fds_copy[fds_num];
-    memcpy(fds_copy, fds, sizeof(fds_copy));
+    int *fds_copy = mallocz(fds_num * sizeof(*fds_copy));
+    memcpy(fds_copy, fds, fds_num * sizeof(*fds_copy));
 
     qsort(fds_copy, fds_num, sizeof(int), compare_ints);
 
@@ -110,4 +110,5 @@ void os_close_all_non_std_open_fds_except(const int fds[], size_t fds_num, int f
     }
 
     os_close_range(start, CLOSE_RANGE_FD_MAX, flags);
+    freez(fds_copy);
 }

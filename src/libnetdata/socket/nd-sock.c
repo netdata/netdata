@@ -76,8 +76,7 @@ bool nd_sock_connect_to_this(ND_SOCK *s, const char *definition, int default_por
 
     // Extract hostname for SNI before establishing connection
     if(ssl) {
-        char buffer[strlen(definition) + 1];
-        strcpy(buffer, definition);
+        char *buffer = strdupz(definition);
         
         char *host = buffer;
         
@@ -106,6 +105,8 @@ bool nd_sock_connect_to_this(ND_SOCK *s, const char *definition, int default_por
         if(host && *host) {
             s->sni_hostname = strdupz(host);
         }
+
+        freez(buffer);
     }
 
     struct timeval tv = {

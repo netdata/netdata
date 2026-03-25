@@ -123,7 +123,7 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
         return 0;
     }
 
-    long weight[nd_profile.storage_tiers];
+    long *weight = callocz(nd_profile.storage_tiers, sizeof(*weight));
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
 
@@ -170,6 +170,7 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
     if(weight[best_tier] == -LONG_MAX)
         best_tier = 0;
 
+    freez(weight);
     return best_tier;
 }
 

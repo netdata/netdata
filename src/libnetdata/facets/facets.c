@@ -726,13 +726,12 @@ static void facet_key_set_name(FACET_KEY *k, const char *name, size_t name_lengt
 
     // an actual value, not a filter
 
-    char buf[name_length + 1];
-    memcpy(buf, name, name_length);
-    buf[name_length] = '\0';
+    char *buf = strndupz(name, name_length);
 
     internal_fatal(strchr(buf, '='), "found = in key");
 
     k->name = strdupz(buf);
+    freez(buf);
     facet_key_late_init(k->facets, k);
 }
 

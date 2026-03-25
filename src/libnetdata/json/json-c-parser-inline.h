@@ -525,7 +525,7 @@
             }                                                                                                   \
         }                                                                                                       \
         else {                                                                                                  \
-            char _new_path[strlen(path) + strlen(member) + 2];                                                  \
+            char _new_path[sizeof(path)];                                                                       \
             snprintfz(_new_path, sizeof(_new_path), "%s%s%s", path, *path?".":"", member);                      \
             if (!callback(_j, _new_path, dst, error, flags)) {                                                  \
                 return false;                                                                                   \
@@ -587,7 +587,7 @@
         else {                                                                                                  \
             json_object *JSONC_TEMP_VAR(saved_jobj, __LINE__) = jobj;                                           \
             jobj = JSONC_TEMP_VAR(_j, __LINE__);                                                                \
-            char JSONC_TEMP_VAR(saved_path, __LINE__)[strlen(path) + 1];                                        \
+            char JSONC_TEMP_VAR(saved_path, __LINE__)[sizeof(path)];                                            \
             strncpyz(JSONC_TEMP_VAR(saved_path, __LINE__), path, sizeof(JSONC_TEMP_VAR(saved_path, __LINE__))); \
             JSONC_PATH_CONCAT(path, sizeof(path), path, member, error);                                         \
             /* Run the user's code block */                                                                     \
@@ -618,7 +618,7 @@
         else {                                                                                                  \
             json_object *JSONC_TEMP_VAR(saved_jobj, __LINE__) = jobj;                                           \
             jobj = JSONC_TEMP_VAR(_jarray, __LINE__);                                                           \
-            char JSONC_TEMP_VAR(saved_path, __LINE__)[strlen(path) + 1];                                        \
+            char JSONC_TEMP_VAR(saved_path, __LINE__)[sizeof(path)];                                            \
             strncpyz(JSONC_TEMP_VAR(saved_path, __LINE__), path, sizeof(JSONC_TEMP_VAR(saved_path, __LINE__))); \
             JSONC_PATH_CONCAT(path, sizeof(path), path, member, error);                                         \
             /* Run the user's code block */                                                                     \
@@ -643,7 +643,7 @@
         else {                                                                                                  \
             json_object *JSONC_TEMP_VAR(saved_jobj, __LINE__) = jobj;                                           \
             jobj = JSONC_TEMP_VAR(_jitem, __LINE__);                                                            \
-            char JSONC_TEMP_VAR(saved_path, __LINE__)[strlen(path) + 1];                                        \
+            char JSONC_TEMP_VAR(saved_path, __LINE__)[sizeof(path)];                                            \
             strncpyz(JSONC_TEMP_VAR(saved_path, __LINE__), path, sizeof(JSONC_TEMP_VAR(saved_path, __LINE__))); \
             JSONC_PATH_CONCAT_INDEX(path, sizeof(path), index, error);                                          \
             /* Run the user's code block */                                                                     \

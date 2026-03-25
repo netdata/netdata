@@ -1489,7 +1489,7 @@ static void aral_test_thread(void *ptr) {
 
             // fprintf(stderr, "all %zu, to free %zu, step %zu\n", all, to_free, step);
 
-            size_t free_list[to_free];
+            size_t *free_list = callocz(to_free, sizeof(*free_list));
             for (size_t i = 0; i < to_free; i++) {
                 size_t pos = step * i;
                 aral_freez(ar, pointers[pos]);
@@ -1501,6 +1501,8 @@ static void aral_test_thread(void *ptr) {
                 size_t pos = free_list[i];
                 pointers[pos] = unittest_aral_malloc(ar, marked);
             }
+
+            freez(free_list);
         }
 
         for (size_t i = 0; i < elements; i++) {

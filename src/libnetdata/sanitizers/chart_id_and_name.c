@@ -198,8 +198,9 @@ char *rrdset_strncpyz_name(char *dst, const char *src, size_t dst_size_minus_1) 
 
 bool rrdvar_fix_name(char *variable) {
     size_t len = strlen(variable);
-    char buf[len + 1];
-    memcpy(buf, variable, sizeof(buf));
+    char *buf = strdupz(variable);
     sanitize_chart_name(variable, variable, len + 1);
-    return memcmp(buf, variable, sizeof(buf)) != 0;
+    bool changed = strcmp(buf, variable) != 0;
+    freez(buf);
+    return changed;
 }

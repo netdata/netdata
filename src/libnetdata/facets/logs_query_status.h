@@ -493,8 +493,7 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
 
     buffer_json_member_add_object(wb, "_request");
 
-    char func_copy[strlen(function) + 1];
-    memcpy(func_copy, function, sizeof(func_copy));
+    char *func_copy = strdupz(function);
 
     char *words[LQS_MAX_PARAMS] = { NULL };
     size_t num_words = quoted_strings_splitter_whitespace(func_copy, words, LQS_MAX_PARAMS);
@@ -504,6 +503,7 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
 
         if(strcmp(keyword, LQS_PARAMETER_HELP) == 0) {
             lqs_function_help(lqs, wb);
+            freez(func_copy);
             return false;
         }
         else if(strcmp(keyword, LQS_PARAMETER_INFO) == 0) {
@@ -658,6 +658,7 @@ static inline bool lqs_request_parse_GET(LOGS_QUERY_STATUS *lqs, BUFFER *wb, cha
 
     facets_use_hashes_for_ids(facets, true);
     rq->fields_are_ids = true;
+    freez(func_copy);
     return true;
 }
 

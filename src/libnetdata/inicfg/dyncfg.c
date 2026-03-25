@@ -273,8 +273,7 @@ int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction,
     if(!function || !*function)
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "command received is empty");
 
-    char buf[strlen(function) + 1];
-    memcpy(buf, function, sizeof(buf));
+    char *buf = strdupz(function);
 
     char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, MAX_FUNCTION_PARAMETERS);
@@ -283,19 +282,27 @@ int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction,
     const char *action = get_word(words, num_words, 2);
     const char *add_name = get_word(words, num_words, 3);
 
-    if(!id || !*id)
+    if(!id || !*id) {
+        freez(buf);
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "dyncfg node: id is missing from the request");
+    }
 
-    if(!action || !*action)
+    if(!action || !*action) {
+        freez(buf);
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "dyncfg node: action is missing from the request");
+    }
 
     DYNCFG_CMDS cmd = dyncfg_cmds2id(action);
-    if(cmd == DYNCFG_CMD_NONE)
+    if(cmd == DYNCFG_CMD_NONE) {
+        freez(buf);
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "dyncfg node: action given in request is unknown");
+    }
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_nodes, id);
-    if(!item)
+    if(!item) {
+        freez(buf);
         return dyncfg_default_response(result, HTTP_RESP_NOT_FOUND, "dyncfg node: id is not found");
+    }
 
     struct dyncfg_node *df = dictionary_acquired_item_value(item);
 
@@ -311,6 +318,7 @@ int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction,
         dyncfg_default_response(result, code, "");
 
     dictionary_acquired_item_release(dyncfg_nodes, item);
+    freez(buf);
 
     return code;
 }

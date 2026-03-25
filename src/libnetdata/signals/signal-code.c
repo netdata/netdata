@@ -237,8 +237,7 @@ void SIGNAL_CODE_2str_h(SIGNAL_CODE code, char *buf, size_t size) {
 SIGNAL_CODE SIGNAL_CODE_2id_h(const char *str) {
     if(!str || !*str) return 0;
 
-    char buf[strlen(str) + 1];
-    memcpy(buf, str, strlen(str) + 1);
+    char *buf = strdupz(str);
 
     char *si_code_str = strchr(buf, '/');
     if(si_code_str) {
@@ -251,14 +250,17 @@ SIGNAL_CODE SIGNAL_CODE_2id_h(const char *str) {
         signo = str2i(buf);
 
     SIGNAL_CODE code = si_code_str ? SIGNAL_CODE_2id(si_code_str) : SIG_NOT_FOUND;
-    if(code != SIG_NOT_FOUND)
+    if(code != SIG_NOT_FOUND) {
+        freez(buf);
         // this has both signo and si_code in it
         return code;
+    }
 
     int si_code = si_code_str ? SI_CODE_2id(si_code_str) : SIG_NOT_FOUND;
     if(si_code == SIG_NOT_FOUND)
         si_code = si_code_str ? str2i(si_code_str) : 0;
 
+    freez(buf);
     return SIGNAL_CODE_CREATE(signo, si_code);
 }
 

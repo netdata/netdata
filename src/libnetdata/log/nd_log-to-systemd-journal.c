@@ -93,10 +93,8 @@ bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_
     //
     // UPDATE ALL OF THEM FOR NEW FEATURES OR FIXES
 
-    struct iovec iov[fields_max];
+    struct iovec *iov = callocz(fields_max, sizeof(*iov));
     int iov_count = 0;
-
-    memset(iov, 0, sizeof(iov));
 
     CLEAN_BUFFER *tmp = NULL;
 
@@ -185,6 +183,8 @@ bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_
             free(iov[i].iov_base);
         }
     }
+
+    freez(iov);
 
     return r == 0;
 #else

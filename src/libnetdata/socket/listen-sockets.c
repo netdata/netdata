@@ -338,8 +338,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
     struct addrinfo hints;
     struct addrinfo *result = NULL, *rp = NULL;
 
-    char buffer[strlen(definition) + 1];
-    strcpy(buffer, definition);
+    char *buffer = strdupz(definition);
 
     char buffer2[10 + 1];
     snprintfz(buffer2, 10, "%d", default_port);
@@ -380,6 +379,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
             listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, path, 0, acl_flags);
             added++;
         }
+        freez(buffer);
         return added;
     }
 
@@ -466,6 +466,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
                "LISTENER: getaddrinfo('%s', '%s'): %s\n",
                ip, port, gai_strerror(r));
 
+        freez(buffer);
         return -1;
     }
 
@@ -516,7 +517,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
     }
 
     freeaddrinfo(result);
-
+    freez(buffer);
     return added;
 }
 
@@ -549,9 +550,9 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
         // is there anything?
         if(!*s || s == e) break;
 
-        char buf[e - s + 1];
-        strncpyz(buf, s, e - s);
+        char *buf = strndupz(s, (size_t)(e - s));
         bind_to_this(sockets, buf, sockets->default_port, sockets->backlog);
+        freez(buf);
 
         s = e;
     }
