@@ -20,7 +20,8 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const GEOIP_RELOAD_CHECK_INTERVAL: Duration = Duration::from_secs(30);
-const PRIVATE_IP_ADDRESS_SPACE_LABEL: &str = "Private IP Address Space";
+pub(crate) const PRIVATE_IP_ADDRESS_SPACE_LABEL: &str = "Private IP Address Space";
+pub(crate) const UNKNOWN_ASN_LABEL: &str = "Unknown ASN";
 
 #[derive(Debug)]
 pub(crate) struct FlowEnricher {
@@ -525,17 +526,33 @@ impl FlowEnricher {
 
         fields.insert("IN_IF_NAME", in_classification.name);
         fields.insert("IN_IF_DESCRIPTION", in_classification.description);
-        fields.insert("IN_IF_SPEED", in_interface.speed.to_string());
+        if in_interface.speed > 0 {
+            fields.insert("IN_IF_SPEED", in_interface.speed.to_string());
+        } else {
+            fields.remove("IN_IF_SPEED");
+        }
         fields.insert("IN_IF_PROVIDER", in_classification.provider);
         fields.insert("IN_IF_CONNECTIVITY", in_classification.connectivity);
-        fields.insert("IN_IF_BOUNDARY", in_classification.boundary.to_string());
+        if in_classification.boundary != 0 {
+            fields.insert("IN_IF_BOUNDARY", in_classification.boundary.to_string());
+        } else {
+            fields.remove("IN_IF_BOUNDARY");
+        }
 
         fields.insert("OUT_IF_NAME", out_classification.name);
         fields.insert("OUT_IF_DESCRIPTION", out_classification.description);
-        fields.insert("OUT_IF_SPEED", out_interface.speed.to_string());
+        if out_interface.speed > 0 {
+            fields.insert("OUT_IF_SPEED", out_interface.speed.to_string());
+        } else {
+            fields.remove("OUT_IF_SPEED");
+        }
         fields.insert("OUT_IF_PROVIDER", out_classification.provider);
         fields.insert("OUT_IF_CONNECTIVITY", out_classification.connectivity);
-        fields.insert("OUT_IF_BOUNDARY", out_classification.boundary.to_string());
+        if out_classification.boundary != 0 {
+            fields.insert("OUT_IF_BOUNDARY", out_classification.boundary.to_string());
+        } else {
+            fields.remove("OUT_IF_BOUNDARY");
+        }
 
         true
     }
@@ -612,16 +629,16 @@ impl FlowEnricher {
             .copied()
             .filter(|rate| *rate > 0)
         {
-            rec.sampling_rate = sampling_rate;
+            rec.set_sampling_rate(sampling_rate);
         }
-        if rec.sampling_rate == 0 {
+        if !rec.has_sampling_rate() {
             if let Some(sampling_rate) = self
                 .default_sampling_rate
                 .lookup(exporter_ip)
                 .copied()
                 .filter(|rate| *rate > 0)
             {
-                rec.sampling_rate = sampling_rate;
+                rec.set_sampling_rate(sampling_rate);
             }
         }
 
@@ -709,17 +726,33 @@ impl FlowEnricher {
         // Interface classification — move strings, no clone.
         rec.in_if_name = in_classification.name;
         rec.in_if_description = in_classification.description;
-        rec.in_if_speed = in_interface.speed;
+        if in_interface.speed > 0 {
+            rec.set_in_if_speed(in_interface.speed);
+        } else {
+            rec.clear_in_if_speed();
+        }
         rec.in_if_provider = in_classification.provider;
         rec.in_if_connectivity = in_classification.connectivity;
-        rec.in_if_boundary = in_classification.boundary;
+        if in_classification.boundary != 0 {
+            rec.set_in_if_boundary(in_classification.boundary);
+        } else {
+            rec.clear_in_if_boundary();
+        }
 
         rec.out_if_name = out_classification.name;
         rec.out_if_description = out_classification.description;
-        rec.out_if_speed = out_interface.speed;
+        if out_interface.speed > 0 {
+            rec.set_out_if_speed(out_interface.speed);
+        } else {
+            rec.clear_out_if_speed();
+        }
         rec.out_if_provider = out_classification.provider;
         rec.out_if_connectivity = out_classification.connectivity;
-        rec.out_if_boundary = out_classification.boundary;
+        if out_classification.boundary != 0 {
+            rec.set_out_if_boundary(out_classification.boundary);
+        } else {
+            rec.clear_out_if_boundary();
+        }
 
         true
     }
@@ -3136,11 +3169,15 @@ fn decode_ip_class(record: &AsnLookupRecord) -> Option<String> {
 
 fn effective_as_name(attrs: Option<&NetworkAttributes>, resolved_asn: u32) -> String {
     let Some(attrs) = attrs else {
-        return String::new();
+        return (resolved_asn == 0)
+            .then(|| UNKNOWN_ASN_LABEL.to_string())
+            .unwrap_or_default();
     };
 
     if resolved_asn == 0 && attrs.ip_class == "private" {
         PRIVATE_IP_ADDRESS_SPACE_LABEL.to_string()
+    } else if resolved_asn == 0 {
+        UNKNOWN_ASN_LABEL.to_string()
     } else {
         attrs.asn_name.clone()
     }
@@ -4487,7 +4524,7 @@ mod tests {
 
         assert!(enricher.enrich_fields(&mut fields));
         assert_eq!(fields.get("IN_IF_PROVIDER").map(String::as_str), Some(""));
-        assert_eq!(fields.get("IN_IF_BOUNDARY").map(String::as_str), Some("0"));
+        assert_eq!(fields.get("IN_IF_BOUNDARY"), None);
     }
 
     #[test]
@@ -4561,7 +4598,7 @@ mod tests {
 
         assert!(enricher.enrich_fields(&mut fields));
         assert_eq!(fields.get("IN_IF_BOUNDARY").map(String::as_str), Some("1"));
-        assert_eq!(fields.get("OUT_IF_BOUNDARY").map(String::as_str), Some("0"));
+        assert_eq!(fields.get("OUT_IF_BOUNDARY"), None);
     }
 
     #[test]
@@ -5386,7 +5423,14 @@ mod tests {
             PRIVATE_IP_ADDRESS_SPACE_LABEL
         );
         assert_eq!(effective_as_name(Some(&attrs), 64_500), "");
-        assert_eq!(effective_as_name(None, 0), "");
+        assert_eq!(effective_as_name(None, 0), UNKNOWN_ASN_LABEL);
+    }
+
+    #[test]
+    fn effective_as_name_uses_unknown_label_for_non_private_zero_asn() {
+        let attrs = NetworkAttributes::default();
+
+        assert_eq!(effective_as_name(Some(&attrs), 0), UNKNOWN_ASN_LABEL);
     }
 
     #[test]
@@ -5403,6 +5447,32 @@ mod tests {
             fields.get("SRC_AS_NAME").map(String::as_str),
             Some(PRIVATE_IP_ADDRESS_SPACE_LABEL)
         );
+    }
+
+    #[test]
+    fn write_network_attributes_uses_unknown_label_for_zero_non_private_asn() {
+        let attrs = NetworkAttributes::default();
+        let mut fields = FlowFields::new();
+
+        write_network_attributes(&mut fields, &SRC_KEYS, Some(&attrs), 0);
+
+        assert_eq!(
+            fields.get("SRC_AS_NAME").map(String::as_str),
+            Some(UNKNOWN_ASN_LABEL)
+        );
+    }
+
+    #[test]
+    fn write_network_attributes_record_src_uses_unknown_label_for_zero_non_private_asn() {
+        let attrs = NetworkAttributes::default();
+        let mut rec = FlowRecord {
+            src_as: 0,
+            ..FlowRecord::default()
+        };
+
+        write_network_attributes_record_src(&mut rec, Some(&attrs));
+
+        assert_eq!(rec.src_as_name, UNKNOWN_ASN_LABEL);
     }
 
     #[test]
@@ -5485,6 +5555,19 @@ mod tests {
         cfg
     }
 
+    fn metadata_config_with_zero_interface_state() -> StaticMetadataConfig {
+        let mut cfg = metadata_config_without_interface_classification();
+        for exporter in cfg.exporters.values_mut() {
+            exporter.default.speed = 0;
+            exporter.default.boundary = 0;
+            for iface in exporter.if_indexes.values_mut() {
+                iface.speed = 0;
+                iface.boundary = 0;
+            }
+        }
+        cfg
+    }
+
     fn base_fields(
         exporter_ip: &str,
         in_if: u32,
@@ -5537,15 +5620,16 @@ mod tests {
         src_vlan: u16,
         dst_vlan: u16,
     ) -> FlowRecord {
-        FlowRecord {
+        let mut rec = FlowRecord {
             exporter_ip: exporter_ip.parse::<IpAddr>().ok(),
             in_if,
             out_if,
-            sampling_rate,
-            src_vlan,
-            dst_vlan,
             ..Default::default()
-        }
+        };
+        rec.set_sampling_rate(sampling_rate);
+        rec.set_src_vlan(src_vlan);
+        rec.set_dst_vlan(dst_vlan);
+        rec
     }
 
     /// Compare enriched FlowFields from enrich_fields with to_fields() output
@@ -5640,6 +5724,33 @@ mod tests {
         let mut rec = base_record("192.0.2.10", 10, 20, 250, 10, 300);
 
         assert_enrich_equivalence(&cfg, &mut fields, &mut rec);
+    }
+
+    #[test]
+    fn zero_interface_speed_and_boundary_are_omitted_from_enrichment_output() {
+        let cfg = EnrichmentConfig {
+            metadata_static: metadata_config_with_zero_interface_state(),
+            ..Default::default()
+        };
+
+        let mut fields = base_fields("192.0.2.10", 10, 20, 250, 10, 300);
+        let mut rec = base_record("192.0.2.10", 10, 20, 250, 10, 300);
+
+        assert_enrich_equivalence(&cfg, &mut fields, &mut rec);
+
+        assert_eq!(fields.get("IN_IF_SPEED"), None);
+        assert_eq!(fields.get("OUT_IF_SPEED"), None);
+        assert_eq!(fields.get("IN_IF_BOUNDARY"), None);
+        assert_eq!(fields.get("OUT_IF_BOUNDARY"), None);
+
+        assert!(!rec.has_in_if_speed());
+        assert!(!rec.has_out_if_speed());
+        assert!(!rec.has_in_if_boundary());
+        assert!(!rec.has_out_if_boundary());
+        assert_eq!(rec.in_if_speed, 0);
+        assert_eq!(rec.out_if_speed, 0);
+        assert_eq!(rec.in_if_boundary, 0);
+        assert_eq!(rec.out_if_boundary, 0);
     }
 
     #[test]

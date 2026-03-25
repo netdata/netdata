@@ -1,4 +1,5 @@
 use crate::decoder::canonical_flow_field_names;
+use crate::enrichment::{PRIVATE_IP_ADDRESS_SPACE_LABEL, UNKNOWN_ASN_LABEL};
 use crate::plugin_config::PluginConfig;
 use crate::presentation;
 #[cfg(test)]
@@ -11,7 +12,7 @@ use chrono::Utc;
 use hashbrown::HashMap as FastHashMap;
 use memchr::memchr;
 use journal_common::{Seconds, load_machine_id};
-use journal_registry::{Monitor, Registry, repository::File as RegistryFile};
+use journal_registry::{Monitor, Registry};
 use journal_session::{Direction as SessionDirection, JournalSession};
 use netdata_flow_index::{
     FieldKind as IndexFieldKind, FieldSpec as IndexFieldSpec, FieldValue as IndexFieldValue,
@@ -26,6 +27,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, RwLock};
 use std::time::Instant;
@@ -41,7 +43,8 @@ const DEFAULT_GROUP_ACCUMULATOR_MAX_GROUPS: usize = 50_000;
 const FACET_VALUE_LIMIT: usize = 100;
 #[cfg(test)]
 const DEFAULT_FACET_ACCUMULATOR_MAX_VALUES_PER_FIELD: usize = 5_000;
-const HISTOGRAM_TARGET_BUCKETS: u32 = 60;
+const TIMESERIES_MIN_BUCKETS: u32 = 100;
+const TIMESERIES_MAX_BUCKETS: u32 = 500;
 const MIN_TIMESERIES_BUCKET_SECONDS: u32 = 60;
 const OTHER_BUCKET_LABEL: &str = "__other__";
 const OVERFLOW_BUCKET_LABEL: &str = "__overflow__";
@@ -566,13 +569,10 @@ pub(crate) struct FlowMetricsQueryOutput {
 
 struct QuerySetup {
     sort_by: SortBy,
-    after: u32,
-    before: u32,
     timeseries_layout: Option<TimeseriesLayout>,
     effective_group_by: Vec<String>,
-    selected_tier: TierKind,
     limit: usize,
-    files: Vec<RegistryFile>,
+    spans: Vec<PreparedQuerySpan>,
     stats: HashMap<String, u64>,
 }
 
@@ -635,6 +635,19 @@ struct TimeseriesLayout {
     bucket_count: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct QueryTierSpan {
+    tier: TierKind,
+    after: u32,
+    before: u32,
+}
+
+#[derive(Debug, Clone)]
+struct PreparedQuerySpan {
+    span: QueryTierSpan,
+    files: Vec<PathBuf>,
+}
+
 #[derive(Default)]
 struct ScanCounts {
     streamed_entries: u64,
@@ -672,8 +685,6 @@ pub(crate) struct FlowQueryService {
     tier_dirs: HashMap<TierKind, PathBuf>,
     open_tiers: Arc<RwLock<OpenTierState>>,
     tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
-    tier_1m_threshold_secs: u32,
-    tier_5m_threshold_secs: u32,
     max_groups: usize,
     facet_max_values_per_field: usize,
 }
@@ -709,8 +720,6 @@ impl FlowQueryService {
         let agent_id = load_machine_id()
             .map(|id| id.as_simple().to_string())
             .context("failed to load machine id")?;
-        let tier_1m_threshold_secs = cfg.journal.query_1m_max_window.as_secs() as u32;
-        let tier_5m_threshold_secs = cfg.journal.query_5m_max_window.as_secs() as u32;
         let max_groups = cfg.journal.query_max_groups;
         let facet_max_values_per_field = cfg.journal.query_facet_max_values_per_field;
 
@@ -721,8 +730,6 @@ impl FlowQueryService {
                 tier_dirs,
                 open_tiers,
                 tier_flow_indexes,
-                tier_1m_threshold_secs,
-                tier_5m_threshold_secs,
                 max_groups,
                 facet_max_values_per_field,
             },
@@ -781,67 +788,86 @@ impl FlowQueryService {
         Vec::new()
     }
 
-    fn select_query_tier(&self, after: u32, before: u32, force_raw: bool) -> TierKind {
-        if force_raw {
-            return TierKind::Raw;
+    fn open_records_for_spans(&self, spans: &[PreparedQuerySpan]) -> Vec<FlowRecord> {
+        let mut records = Vec::new();
+        for span in spans {
+            if span.span.tier == TierKind::Raw {
+                continue;
+            }
+            records.extend(self.open_records_for_tier(
+                span.span.tier,
+                span.span.after,
+                span.span.before,
+            ));
         }
-
-        let window = before.saturating_sub(after);
-        if window <= self.tier_1m_threshold_secs {
-            TierKind::Minute1
-        } else if window <= self.tier_5m_threshold_secs {
-            TierKind::Minute5
-        } else {
-            TierKind::Hour1
-        }
-    }
-
-    fn select_timeseries_query_tier(&self, bucket_seconds: u32, force_raw: bool) -> TierKind {
-        if force_raw {
-            return TierKind::Raw;
-        }
-
-        if bucket_seconds < 5 * 60 {
-            TierKind::Minute1
-        } else if bucket_seconds < 60 * 60 {
-            TierKind::Minute5
-        } else {
-            TierKind::Hour1
-        }
+        records
     }
 
     fn prepare_query(&self, request: &FlowsRequest) -> Result<QuerySetup> {
         let sort_by = request.normalized_sort_by();
         let (requested_after, requested_before) = resolve_time_bounds(request);
-        let timeseries_layout = request
-            .is_timeseries_view()
-            .then(|| init_timeseries_layout(requested_after, requested_before));
-        let (after, before) = timeseries_layout
-            .map(|layout| (layout.after, layout.before))
-            .unwrap_or((requested_after, requested_before));
         let effective_group_by = resolve_effective_group_by(request);
         let force_raw_tier =
             requires_raw_tier_for_fields(&effective_group_by, &request.selections, &request.query);
-        let selected_tier = if let Some(layout) = timeseries_layout {
-            self.select_timeseries_query_tier(layout.bucket_seconds, force_raw_tier)
-        } else {
-            self.select_query_tier(after, before, force_raw_tier)
-        };
-        let selected_tier_dir = self
-            .tier_dirs
-            .get(&selected_tier)
-            .context("missing selected tier directory")?;
+        let (selected_tier, timeseries_layout, after, before, planned_spans) =
+            if request.is_timeseries_view() {
+                let selected_tier = select_timeseries_source_tier(
+                    requested_after,
+                    requested_before,
+                    force_raw_tier,
+                );
+                let layout = init_timeseries_layout_for_tier(
+                    requested_after,
+                    requested_before,
+                    selected_tier,
+                );
+                let planned_spans = plan_query_tier_spans(
+                    layout.after,
+                    layout.before,
+                    timeseries_candidate_tiers(selected_tier),
+                    force_raw_tier,
+                );
+                (
+                    selected_tier,
+                    Some(layout),
+                    layout.after,
+                    layout.before,
+                    planned_spans,
+                )
+            } else {
+                let planned_spans = plan_query_tier_spans(
+                    requested_after,
+                    requested_before,
+                    &[TierKind::Hour1, TierKind::Minute5, TierKind::Minute1],
+                    force_raw_tier,
+                );
+                (
+                    summary_query_tier(&planned_spans),
+                    None,
+                    requested_after,
+                    requested_before,
+                    planned_spans,
+                )
+            };
 
-        let files: Vec<_> = self
-            .registry
-            .find_files_in_range(Seconds(after), Seconds(before))
-            .context("failed to locate netflow journal files in time range")?
-            .into_iter()
-            .filter(|file_info| {
-                Path::new(file_info.file.path()).starts_with(selected_tier_dir.as_path())
-            })
-            .map(|file_info| file_info.file)
-            .collect();
+        let mut spans = Vec::with_capacity(planned_spans.len());
+        for span in planned_spans {
+            let tier_dir = self
+                .tier_dirs
+                .get(&span.tier)
+                .context("missing selected tier directory")?;
+            let files = self
+                .registry
+                .find_files_in_range(Seconds(span.after), Seconds(span.before))
+                .context("failed to locate netflow journal files in time range")?
+                .into_iter()
+                .filter(|file_info| {
+                    Path::new(file_info.file.path()).starts_with(tier_dir.as_path())
+                })
+                .map(|file_info| PathBuf::from(file_info.file.path()))
+                .collect::<Vec<_>>();
+            spans.push(PreparedQuerySpan { span, files });
+        }
 
         let limit = sanitize_limit(request.top_n);
         let mut stats = HashMap::new();
@@ -862,7 +888,39 @@ impl FlowQueryService {
             requested_before as u64,
         );
         stats.insert("query_limit".to_string(), limit as u64);
-        stats.insert("query_files".to_string(), files.len() as u64);
+        stats.insert(
+            "query_files".to_string(),
+            spans.iter().map(|span| span.files.len() as u64).sum(),
+        );
+        stats.insert("query_span_count".to_string(), spans.len() as u64);
+        stats.insert(
+            "query_raw_spans".to_string(),
+            spans
+                .iter()
+                .filter(|span| span.span.tier == TierKind::Raw)
+                .count() as u64,
+        );
+        stats.insert(
+            "query_1m_spans".to_string(),
+            spans
+                .iter()
+                .filter(|span| span.span.tier == TierKind::Minute1)
+                .count() as u64,
+        );
+        stats.insert(
+            "query_5m_spans".to_string(),
+            spans
+                .iter()
+                .filter(|span| span.span.tier == TierKind::Minute5)
+                .count() as u64,
+        );
+        stats.insert(
+            "query_1h_spans".to_string(),
+            spans
+                .iter()
+                .filter(|span| span.span.tier == TierKind::Hour1)
+                .count() as u64,
+        );
         stats.insert(
             "query_forced_raw_tier".to_string(),
             u64::from(force_raw_tier),
@@ -896,13 +954,10 @@ impl FlowQueryService {
 
         Ok(QuerySetup {
             sort_by,
-            after,
-            before,
             timeseries_layout,
             effective_group_by,
-            selected_tier,
             limit,
-            files,
+            spans,
             stats,
         })
     }
@@ -917,9 +972,6 @@ impl FlowQueryService {
     where
         F: FnMut(&FlowRecord, RecordHandle),
     {
-        let after_usec = (setup.after as u64).saturating_mul(1_000_000);
-        let before_usec = (setup.before as u64).saturating_mul(1_000_000);
-        let until_usec = before_usec.saturating_sub(1);
         let query_regex = if request.query.is_empty() {
             None
         } else {
@@ -931,15 +983,16 @@ impl FlowQueryService {
 
         let mut counts = ScanCounts::default();
 
-        if !setup.files.is_empty() {
-            let tier_paths: Vec<PathBuf> = setup
-                .files
-                .iter()
-                .map(|file| PathBuf::from(file.path()))
-                .collect();
+        for span in &setup.spans {
+            if span.files.is_empty() {
+                continue;
+            }
 
+            let after_usec = (span.span.after as u64).saturating_mul(1_000_000);
+            let before_usec = (span.span.before as u64).saturating_mul(1_000_000);
+            let until_usec = before_usec.saturating_sub(1);
             let session = JournalSession::builder()
-                .files(tier_paths)
+                .files(span.files.clone())
                 .load_remappings(false)
                 .build()
                 .context("failed to open journal session for selected tier")?;
@@ -1012,13 +1065,19 @@ impl FlowQueryService {
                 if !record_matches_selections(&record, &request.selections) {
                     continue;
                 }
-                on_record(&record, RecordHandle::JournalRealtime(timestamp_usec));
+                on_record(
+                    &record,
+                    RecordHandle::JournalRealtime {
+                        tier: span.span.tier,
+                        timestamp_usec,
+                    },
+                );
                 counts.matched_entries = counts.matched_entries.saturating_add(1);
             }
         }
 
-        if setup.selected_tier != TierKind::Raw {
-            counts.open_bucket_records = open_records.len() as u64;
+        counts.open_bucket_records = open_records.len() as u64;
+        if !open_records.is_empty() {
             for (index, record) in open_records.iter().enumerate() {
                 if !record_matches_selections(&record, &request.selections) {
                     continue;
@@ -1042,45 +1101,17 @@ impl FlowQueryService {
         grouped_aggregates: &mut CompactGroupAccumulator,
         mut projected_facets: Option<&mut ProjectedFacetScanState>,
     ) -> Result<ScanCounts> {
-        let after_usec = (setup.after as u64).saturating_mul(1_000_000);
-        let before_usec = (setup.before as u64).saturating_mul(1_000_000);
-        let until_usec = before_usec.saturating_sub(1);
         let mut counts = ScanCounts::default();
 
-        if setup.files.is_empty() {
+        if setup.spans.iter().all(|span| span.files.is_empty()) {
             return Ok(counts);
         }
-
-        let tier_paths: Vec<PathBuf> = setup
-            .files
-            .iter()
-            .map(|file| PathBuf::from(file.path()))
-            .collect();
-
-        let session = JournalSession::builder()
-            .files(tier_paths)
-            .load_remappings(false)
-            .build()
-            .context("failed to open journal session for projected grouped query")?;
-
-        let mut cursor_builder = session
-            .cursor_builder()
-            .direction(SessionDirection::Forward)
-            .since(after_usec)
-            .until(until_usec);
         let prefilter_pairs =
             if let Some(facets) = projected_facets.as_ref().filter(|facets| facets.active()) {
                 cursor_prefilter_pairs_excluding(&request.selections, &facets.requested_set)
             } else {
                 cursor_prefilter_pairs(&request.selections)
             };
-        for (field, value) in prefilter_pairs {
-            let pair = format!("{}={}", field, value);
-            cursor_builder = cursor_builder.add_match(pair.as_bytes());
-        }
-        let mut cursor = cursor_builder
-            .build()
-            .context("failed to build journal session cursor for projected grouped query")?;
 
         let mut row_group_field_ids = vec![None; setup.effective_group_by.len()];
         let mut row_missing_values = std::iter::repeat_with(|| None)
@@ -1089,42 +1120,74 @@ impl FlowQueryService {
         let mut empty_field_ids = vec![None; setup.effective_group_by.len()];
         let selections_empty = request.selections.is_empty();
         let mut direct_facet_positions = FastHashMap::new();
-        let mut requested_virtual_facets = Vec::new();
-        let mut facet_capture_positions = FastHashMap::new();
-        let mut facet_captured_values = Vec::new();
+        let mut deferred_direct_facets = Vec::new();
+        let mut projected_capture_fields = HashSet::new();
+        for field in request.selections.keys() {
+            if field_requires_as_name_normalization(field) {
+                projected_capture_fields.extend(
+                    field_normalization_dependencies(field)
+                        .iter()
+                        .map(|dependency| (*dependency).to_string()),
+                );
+            } else {
+                projected_capture_fields.insert(field.to_ascii_uppercase());
+            }
+        }
+        for field in &setup.effective_group_by {
+            if field_requires_as_name_normalization(field) {
+                projected_capture_fields.extend(
+                    field_normalization_dependencies(field)
+                        .iter()
+                        .map(|dependency| (*dependency).to_string()),
+                );
+            }
+        }
         if let Some(facets) = projected_facets.as_ref().filter(|facets| facets.active()) {
             if selections_empty {
                 for (field_index, field) in facets.requested_fields.iter().enumerate() {
-                    if is_virtual_flow_field(field) {
-                        requested_virtual_facets.push((field_index, field.clone()));
+                    if is_virtual_flow_field(field) || field_requires_as_name_normalization(field) {
+                        deferred_direct_facets.push((field_index, field.clone()));
                     } else {
                         direct_facet_positions.insert(field.clone(), field_index);
                     }
                 }
             }
 
-            let mut captured_fields = if selections_empty {
-                let mut fields = HashSet::new();
-                for (_, field) in &requested_virtual_facets {
-                    fields.extend(
-                        virtual_flow_field_dependencies(field.as_str())
+            let source_fields = if selections_empty {
+                deferred_direct_facets
+                    .iter()
+                    .map(|(_, field)| field)
+                    .collect::<Vec<_>>()
+            } else {
+                facets.needed_fields.iter().collect::<Vec<_>>()
+            };
+            for field in source_fields {
+                if field_requires_as_name_normalization(field) {
+                    projected_capture_fields.extend(
+                        field_normalization_dependencies(field)
                             .iter()
                             .map(|dependency| (*dependency).to_string()),
                     );
+                } else if is_virtual_flow_field(field) {
+                    projected_capture_fields.extend(
+                        virtual_flow_field_dependencies(field)
+                            .iter()
+                            .map(|dependency| (*dependency).to_string()),
+                    );
+                } else {
+                    projected_capture_fields.insert(field.to_ascii_uppercase());
                 }
-                fields.into_iter().collect::<Vec<_>>()
-            } else {
-                facets.needed_fields.iter().cloned().collect::<Vec<_>>()
-            };
-            captured_fields.sort_unstable();
-            facet_capture_positions = captured_fields
-                .iter()
-                .cloned()
-                .enumerate()
-                .map(|(index, field)| (field, index))
-                .collect::<FastHashMap<_, _>>();
-            facet_captured_values = vec![None; captured_fields.len()];
+            }
         }
+        let mut captured_fields = projected_capture_fields.into_iter().collect::<Vec<_>>();
+        captured_fields.sort_unstable();
+        let projected_capture_positions = captured_fields
+            .iter()
+            .cloned()
+            .enumerate()
+            .map(|(index, field)| (field, index))
+            .collect::<FastHashMap<_, _>>();
+        let mut projected_captured_values = vec![None; captured_fields.len()];
         let mut payload_actions = FastHashMap::new();
         for (index, field) in setup.effective_group_by.iter().enumerate() {
             payload_actions
@@ -1138,7 +1201,7 @@ impl FlowQueryService {
                 .or_insert_with(ProjectedPayloadAction::default)
                 .direct_facet_slot = Some(*field_index);
         }
-        for (field, field_index) in &facet_capture_positions {
+        for (field, field_index) in &projected_capture_positions {
             payload_actions
                 .entry(field.as_bytes().to_vec())
                 .or_insert_with(ProjectedPayloadAction::default)
@@ -1153,205 +1216,255 @@ impl FlowQueryService {
             .or_insert_with(ProjectedPayloadAction::default)
             .identity = ProjectedIdentityField::Dst;
 
-        loop {
-            let has_entry = cursor
-                .step()
-                .context("failed to step projected grouped query cursor")?;
-            if !has_entry {
-                break;
-            }
-
-            counts.streamed_entries = counts.streamed_entries.saturating_add(1);
-            let timestamp_usec = cursor.realtime_usec();
-            if timestamp_usec < after_usec || timestamp_usec >= before_usec {
+        for span in &setup.spans {
+            if span.files.is_empty() {
                 continue;
             }
 
-            row_group_field_ids.fill(None);
-            for value in &mut row_missing_values {
-                let _ = value.take();
+            let after_usec = (span.span.after as u64).saturating_mul(1_000_000);
+            let before_usec = (span.span.before as u64).saturating_mul(1_000_000);
+            let until_usec = before_usec.saturating_sub(1);
+
+            let session = JournalSession::builder()
+                .files(span.files.clone())
+                .load_remappings(false)
+                .build()
+                .context("failed to open journal session for projected grouped query")?;
+
+            let mut cursor_builder = session
+                .cursor_builder()
+                .direction(SessionDirection::Forward)
+                .since(after_usec)
+                .until(until_usec);
+            for (field, value) in &prefilter_pairs {
+                let pair = format!("{}={}", field, value);
+                cursor_builder = cursor_builder.add_match(pair.as_bytes());
             }
-            for value in &mut facet_captured_values {
-                let _ = value.take();
-            }
-            let mut metrics = FlowMetrics::default();
-            let mut src_hash = None;
-            let mut dst_hash = None;
-            let mut payload_error: Option<anyhow::Error> = None;
+            let mut cursor = cursor_builder
+                .build()
+                .context("failed to build journal session cursor for projected grouped query")?;
 
-            cursor
-                .visit_payloads(|payload| {
-                    if payload_error.is_some() {
-                        return Ok(());
-                    }
+            loop {
+                let has_entry = cursor
+                    .step()
+                    .context("failed to step projected grouped query cursor")?;
+                if !has_entry {
+                    break;
+                }
 
-                    let result: Result<()> = (|| {
-                    let Some((key_bytes, value_bytes)) = split_payload_bytes(payload) else {
-                        return Ok(());
-                    };
-                    match key_bytes {
-                        b"BYTES" => {
-                            if let Some(value) = parse_u64_ascii(value_bytes) {
-                                metrics.bytes = value;
-                            }
+                counts.streamed_entries = counts.streamed_entries.saturating_add(1);
+                let timestamp_usec = cursor.realtime_usec();
+                if timestamp_usec < after_usec || timestamp_usec >= before_usec {
+                    continue;
+                }
+
+                row_group_field_ids.fill(None);
+                for value in &mut row_missing_values {
+                    let _ = value.take();
+                }
+                for value in &mut projected_captured_values {
+                    let _ = value.take();
+                }
+                let mut metrics = FlowMetrics::default();
+                let mut src_hash = None;
+                let mut dst_hash = None;
+                let mut payload_error: Option<anyhow::Error> = None;
+
+                cursor
+                    .visit_payloads(|payload| {
+                        if payload_error.is_some() {
                             return Ok(());
                         }
-                        b"PACKETS" => {
-                            if let Some(value) = parse_u64_ascii(value_bytes) {
-                                metrics.packets = value;
-                            }
+
+                        let result: Result<()> = (|| {
+                        let Some((key_bytes, value_bytes)) = split_payload_bytes(payload) else {
                             return Ok(());
-                        }
-                        b"RAW_BYTES" => {
-                            if let Some(value) = parse_u64_ascii(value_bytes) {
-                                metrics.raw_bytes = value;
-                            }
-                            return Ok(());
-                        }
-                        b"RAW_PACKETS" => {
-                            if let Some(value) = parse_u64_ascii(value_bytes) {
-                                metrics.raw_packets = value;
-                            }
-                            return Ok(());
-                        }
-                        _ => {}
-                    }
-
-                    let Some(action) = payload_actions.get(key_bytes).copied() else {
-                        return Ok(());
-                    };
-
-                    let value = payload_value(value_bytes);
-                    let value_ref = value.as_ref();
-
-                    if let Some(field_index) = action.direct_facet_slot {
-                        if !value_ref.is_empty() {
-                            if let Some(facets) = projected_facets.as_mut() {
-                                accumulate_distinct_value(
-                                    &mut facets.accumulators[field_index],
-                                    value_ref,
-                                    self.facet_max_values_per_field,
-                                );
-                            }
-                        }
-                    }
-
-                    if let Some(slot) = action.capture_slot {
-                        if !value_ref.is_empty() && facet_captured_values[slot].is_none() {
-                            facet_captured_values[slot] = Some(value_ref.to_string());
-                        }
-                    }
-
-                    if let Some(field_index) = action.group_slot {
-                        if !value_ref.is_empty() {
-                            match grouped_aggregates
-                                .index
-                                .find_field_value(field_index, IndexFieldValue::Text(value_ref))
-                                .context("failed to resolve projected grouped field value from compact query index")?
-                            {
-                                Some(field_id) => row_group_field_ids[field_index] = Some(field_id),
-                                None if grouped_aggregates.grouped_total() < self.max_groups => {
-                                    row_missing_values[field_index] = Some(value_ref.to_string());
+                        };
+                        match key_bytes {
+                            b"BYTES" => {
+                                if let Some(value) = parse_u64_ascii(value_bytes) {
+                                    metrics.bytes = value;
                                 }
-                                None => {}
+                                return Ok(());
+                            }
+                            b"PACKETS" => {
+                                if let Some(value) = parse_u64_ascii(value_bytes) {
+                                    metrics.packets = value;
+                                }
+                                return Ok(());
+                            }
+                            b"RAW_BYTES" => {
+                                if let Some(value) = parse_u64_ascii(value_bytes) {
+                                    metrics.raw_bytes = value;
+                                }
+                                return Ok(());
+                            }
+                            b"RAW_PACKETS" => {
+                                if let Some(value) = parse_u64_ascii(value_bytes) {
+                                    metrics.raw_packets = value;
+                                }
+                                return Ok(());
+                            }
+                            _ => {}
+                        }
+
+                        let Some(action) = payload_actions.get(key_bytes).copied() else {
+                            return Ok(());
+                        };
+
+                        let value = payload_value(value_bytes);
+                        let value_ref = value.as_ref();
+
+                        if let Some(field_index) = action.direct_facet_slot {
+                            if !value_ref.is_empty() {
+                                if let Some(facets) = projected_facets.as_mut() {
+                                    accumulate_distinct_value(
+                                        &mut facets.accumulators[field_index],
+                                        value_ref,
+                                        self.facet_max_values_per_field,
+                                    );
+                                }
                             }
                         }
-                    }
 
-                    if value_ref.is_empty() {
-                        return Ok(());
-                    }
-                    match action.identity {
-                        ProjectedIdentityField::Src => src_hash = Some(fingerprint_value(value_ref)),
-                        ProjectedIdentityField::Dst => dst_hash = Some(fingerprint_value(value_ref)),
-                        ProjectedIdentityField::None => {}
-                    }
-                    Ok(())
-                    })();
-
-                    if let Err(err) = result {
-                        payload_error = Some(err);
-                    }
-
-                    Ok(())
-                })
-                .context("failed to visit projected journal payloads")?;
-            if let Some(err) = payload_error {
-                return Err(err);
-            }
-
-            if let Some(facets) = projected_facets.as_mut().filter(|facets| facets.active()) {
-                if selections_empty {
-                    for (field_index, field) in &requested_virtual_facets {
-                        let Some(value) = captured_facet_field_value(
-                            field,
-                            &facet_capture_positions,
-                            &facet_captured_values,
-                        ) else {
-                            continue;
-                        };
-                        if value.is_empty() {
-                            continue;
+                        if let Some(slot) = action.capture_slot {
+                            if !value_ref.is_empty() && projected_captured_values[slot].is_none() {
+                                projected_captured_values[slot] = Some(value_ref.to_string());
+                            }
                         }
-                        accumulate_distinct_value(
-                            &mut facets.accumulators[*field_index],
-                            value.as_ref(),
-                            self.facet_max_values_per_field,
-                        );
-                    }
-                } else {
-                    for (field_index, field) in facets.requested_fields.iter().enumerate() {
-                        let Some(value) = captured_facet_field_value(
-                            field,
-                            &facet_capture_positions,
-                            &facet_captured_values,
-                        ) else {
-                            continue;
-                        };
-                        if value.is_empty() {
-                            continue;
-                        }
-                        if !captured_facet_matches_selections_except(
-                            Some(field.as_str()),
-                            &request.selections,
-                            &facet_capture_positions,
-                            &facet_captured_values,
-                        ) {
-                            continue;
-                        }
-                        accumulate_distinct_value(
-                            &mut facets.accumulators[field_index],
-                            value.as_ref(),
-                            self.facet_max_values_per_field,
-                        );
-                    }
 
-                    if !captured_facet_matches_selections_except(
+                        if let Some(field_index) = action.group_slot {
+                            if !value_ref.is_empty() {
+                                match grouped_aggregates
+                                    .index
+                                    .find_field_value(field_index, IndexFieldValue::Text(value_ref))
+                                    .context("failed to resolve projected grouped field value from compact query index")?
+                                {
+                                    Some(field_id) => row_group_field_ids[field_index] = Some(field_id),
+                                    None if grouped_aggregates.grouped_total() < self.max_groups => {
+                                        row_missing_values[field_index] = Some(value_ref.to_string());
+                                    }
+                                    None => {}
+                                }
+                            }
+                        }
+
+                        if value_ref.is_empty() {
+                            return Ok(());
+                        }
+                        match action.identity {
+                            ProjectedIdentityField::Src => src_hash = Some(fingerprint_value(value_ref)),
+                            ProjectedIdentityField::Dst => dst_hash = Some(fingerprint_value(value_ref)),
+                            ProjectedIdentityField::None => {}
+                        }
+                        Ok(())
+                        })();
+
+                        if let Err(err) = result {
+                            payload_error = Some(err);
+                        }
+
+                        Ok(())
+                    })
+                    .context("failed to visit projected journal payloads")?;
+                if let Some(err) = payload_error {
+                    return Err(err);
+                }
+
+                if !request.selections.is_empty()
+                    && !captured_facet_matches_selections_except(
                         None,
                         &request.selections,
-                        &facet_capture_positions,
-                        &facet_captured_values,
-                    ) {
+                        &projected_capture_positions,
+                        &projected_captured_values,
+                    )
+                {
+                    continue;
+                }
+
+                for (field_index, field_name) in setup.effective_group_by.iter().enumerate() {
+                    if !field_requires_as_name_normalization(field_name) {
                         continue;
                     }
+                    apply_normalized_projected_group_value(
+                        grouped_aggregates,
+                        field_name,
+                        field_index,
+                        &projected_capture_positions,
+                        &projected_captured_values,
+                        &mut row_group_field_ids,
+                        &mut row_missing_values,
+                        self.max_groups,
+                    )?;
                 }
-            }
 
-            accumulate_projected_compact_grouped_record(
-                &setup.effective_group_by,
-                timestamp_usec,
-                RecordHandle::JournalRealtime(timestamp_usec),
-                metrics,
-                grouped_aggregates,
-                self.max_groups,
-                &mut row_group_field_ids,
-                &mut row_missing_values,
-                &mut empty_field_ids,
-                src_hash,
-                dst_hash,
-                None,
-            )?;
-            counts.matched_entries = counts.matched_entries.saturating_add(1);
+                if let Some(facets) = projected_facets.as_mut().filter(|facets| facets.active()) {
+                    if selections_empty {
+                        for (field_index, field) in &deferred_direct_facets {
+                            let Some(value) = captured_facet_field_value(
+                                field,
+                                &projected_capture_positions,
+                                &projected_captured_values,
+                            ) else {
+                                continue;
+                            };
+                            if value.is_empty() {
+                                continue;
+                            }
+                            accumulate_distinct_value(
+                                &mut facets.accumulators[*field_index],
+                                value.as_ref(),
+                                self.facet_max_values_per_field,
+                            );
+                        }
+                    } else {
+                        for (field_index, field) in facets.requested_fields.iter().enumerate() {
+                            let Some(value) = captured_facet_field_value(
+                                field,
+                                &projected_capture_positions,
+                                &projected_captured_values,
+                            ) else {
+                                continue;
+                            };
+                            if value.is_empty() {
+                                continue;
+                            }
+                            if !captured_facet_matches_selections_except(
+                                Some(field.as_str()),
+                                &request.selections,
+                                &projected_capture_positions,
+                                &projected_captured_values,
+                            ) {
+                                continue;
+                            }
+                            accumulate_distinct_value(
+                                &mut facets.accumulators[field_index],
+                                value.as_ref(),
+                                self.facet_max_values_per_field,
+                            );
+                        }
+                    }
+                }
+
+                accumulate_projected_compact_grouped_record(
+                    &setup.effective_group_by,
+                    timestamp_usec,
+                    RecordHandle::JournalRealtime {
+                        tier: span.span.tier,
+                        timestamp_usec,
+                    },
+                    metrics,
+                    grouped_aggregates,
+                    self.max_groups,
+                    &mut row_group_field_ids,
+                    &mut row_missing_values,
+                    &mut empty_field_ids,
+                    src_hash,
+                    dst_hash,
+                    None,
+                )?;
+                counts.matched_entries = counts.matched_entries.saturating_add(1);
+            }
         }
 
         Ok(counts)
@@ -1374,7 +1487,7 @@ impl FlowQueryService {
                 &mut grouped_aggregates,
                 precomputed_journal_facets.as_mut(),
             )?;
-            if setup.selected_tier != TierKind::Raw {
+            if setup.spans.iter().any(|span| span.span.tier != TierKind::Raw) {
                 if let Some((open_bucket_records, matched_entries)) = self
                     .scan_matching_open_tier_grouped_records_projected(
                         &setup,
@@ -1385,8 +1498,7 @@ impl FlowQueryService {
                     counts.open_bucket_records = open_bucket_records;
                     counts.matched_entries = counts.matched_entries.saturating_add(matched_entries);
                 } else {
-                    let records =
-                        self.open_records_for_tier(setup.selected_tier, setup.after, setup.before);
+                    let records = self.open_records_for_spans(&setup.spans);
                     counts.open_bucket_records = records.len() as u64;
                     for (index, record) in records.iter().enumerate() {
                         if !record_matches_selections(record, &request.selections) {
@@ -1408,8 +1520,7 @@ impl FlowQueryService {
             counts
         } else {
             let mut accumulate_error = None;
-            let records =
-                self.open_records_for_tier(setup.selected_tier, setup.after, setup.before);
+            let records = self.open_records_for_spans(&setup.spans);
             let counts =
                 self.scan_matching_records(&setup, request, &records, |record, handle| {
                     if accumulate_error.is_some() {
@@ -1432,15 +1543,14 @@ impl FlowQueryService {
             counts
         };
         let scan_elapsed_ms = scan_started.elapsed().as_millis() as u64;
-        let need_open_records_for_facets = setup.selected_tier != TierKind::Raw
+        let need_open_records_for_facets = setup.spans.iter().any(|span| span.span.tier != TierKind::Raw)
             && (!request.query.is_empty()
                 || !open_tier_index_path_supported(
                     &requested_facet_fields(request),
                     &request.selections,
                 ));
         if open_records.is_none() && need_open_records_for_facets {
-            open_records =
-                Some(self.open_records_for_tier(setup.selected_tier, setup.after, setup.before));
+            open_records = Some(self.open_records_for_spans(&setup.spans));
         }
         let facets_started = Instant::now();
         let facet_payload = self.collect_distinct_facet_values(
@@ -1524,79 +1634,74 @@ impl FlowQueryService {
         request: &FlowsRequest,
         grouped_aggregates: &mut CompactGroupAccumulator,
     ) -> Result<Option<(u64, usize)>> {
-        if setup.selected_tier == TierKind::Raw
-            || !open_tier_projected_grouped_path_supported(
-                &setup.effective_group_by,
-                &request.selections,
-            )
-        {
+        if !open_tier_projected_grouped_path_supported(
+            &setup.effective_group_by,
+            &request.selections,
+        ) {
             return Ok(None);
         }
 
-        let after_usec = (setup.after as u64).saturating_mul(1_000_000);
-        let before_usec = (setup.before as u64).saturating_mul(1_000_000);
+        let mut total_rows = 0u64;
+        let mut total_matched = 0usize;
+        let mut used_any = false;
 
-        for _ in 0..3 {
-            let (generation, rows) = {
-                let Ok(state) = self.open_tiers.read() else {
-                    return Ok(None);
-                };
-                let rows = state
-                    .rows_for_tier(setup.selected_tier)
-                    .iter()
-                    .copied()
-                    .filter(|row| {
-                        row.timestamp_usec >= after_usec && row.timestamp_usec < before_usec
-                    })
-                    .collect::<Vec<_>>();
-                (state.generation, rows)
-            };
-
-            let Ok(tier_flow_indexes) = self.tier_flow_indexes.read() else {
-                return Ok(None);
-            };
-            if tier_flow_indexes.generation() != generation {
+        for span in &setup.spans {
+            if span.span.tier == TierKind::Raw {
                 continue;
             }
 
-            let mut matched_entries = 0usize;
             let mut row_group_field_ids = vec![None; setup.effective_group_by.len()];
             let mut row_missing_values = std::iter::repeat_with(|| None)
                 .take(setup.effective_group_by.len())
                 .collect::<Vec<Option<String>>>();
             let mut empty_field_ids = vec![None; setup.effective_group_by.len()];
 
-            for (index, row) in rows.iter().enumerate() {
-                if !open_tier_row_matches_selections_except(
-                    row,
-                    &tier_flow_indexes,
-                    &request.selections,
-                    None,
-                ) {
-                    continue;
-                }
+            if let Some((rows_len, matched_entries)) = self.with_open_tier_rows_for_span(
+                span.span.tier,
+                span.span.after,
+                span.span.before,
+                |rows, tier_flow_indexes| {
+                    let mut matched_entries = 0usize;
+                    for (index, row) in rows.iter().enumerate() {
+                        if !open_tier_row_matches_selections_except(
+                            row,
+                            tier_flow_indexes,
+                            &request.selections,
+                            None,
+                        ) {
+                            continue;
+                        }
 
-                let representative =
-                    compact_representative_from_open_tier_row(row, &tier_flow_indexes);
-                accumulate_projected_open_tier_grouped_record(
-                    index,
-                    row,
-                    &tier_flow_indexes,
-                    &setup.effective_group_by,
-                    grouped_aggregates,
-                    self.max_groups,
-                    &mut row_group_field_ids,
-                    &mut row_missing_values,
-                    &mut empty_field_ids,
-                    representative,
-                )?;
-                matched_entries = matched_entries.saturating_add(1);
+                        let representative =
+                            compact_representative_from_open_tier_row(row, tier_flow_indexes);
+                        accumulate_projected_open_tier_grouped_record(
+                            index,
+                            row,
+                            tier_flow_indexes,
+                            &setup.effective_group_by,
+                            grouped_aggregates,
+                            self.max_groups,
+                            &mut row_group_field_ids,
+                            &mut row_missing_values,
+                            &mut empty_field_ids,
+                            representative,
+                        )?;
+                        matched_entries = matched_entries.saturating_add(1);
+                    }
+                    Ok((rows.len() as u64, matched_entries))
+                },
+            )? {
+                used_any = true;
+                total_rows = total_rows.saturating_add(rows_len);
+                total_matched = total_matched.saturating_add(matched_entries);
             }
-
-            return Ok(Some((rows.len() as u64, matched_entries)));
         }
 
-        Ok(None)
+        if used_any {
+            Ok(Some((total_rows, total_matched)))
+        } else {
+            Ok(None)
+        }
     }
 
     fn collect_distinct_facet_values(
@@ -1637,9 +1742,6 @@ impl FlowQueryService {
         needed_fields.extend(requested_fields.iter().cloned());
         expand_virtual_flow_field_dependencies(&mut needed_fields);
 
-        let after_usec = (setup.after as u64).saturating_mul(1_000_000);
-        let before_usec = (setup.before as u64).saturating_mul(1_000_000);
-        let until_usec = before_usec.saturating_sub(1);
         let mut distinct_values: BTreeMap<String, FacetDistinctAccumulator> = BTreeMap::new();
         let used_open_tier_index_path = self.accumulate_requested_distinct_open_tier_facets(
             setup,
@@ -1664,7 +1766,7 @@ impl FlowQueryService {
             }
         }
 
-        if !journal_precomputed && !setup.files.is_empty() {
+        if !journal_precomputed && setup.spans.iter().any(|span| !span.files.is_empty()) {
             if query_regex.is_none() {
                 self.collect_distinct_journal_facets_projected_no_regex(
                     setup,
@@ -1675,94 +1777,98 @@ impl FlowQueryService {
                     &mut journal_accumulators,
                 )?;
             } else {
-                let tier_paths: Vec<PathBuf> = setup
-                    .files
-                    .iter()
-                    .map(|file| PathBuf::from(file.path()))
-                    .collect();
-
-                let session = JournalSession::builder()
-                    .files(tier_paths)
-                    .load_remappings(false)
-                    .build()
-                    .context("failed to open journal session for facet discovery")?;
-
-                let mut cursor_builder = session
-                    .cursor_builder()
-                    .direction(SessionDirection::Forward)
-                    .since(after_usec)
-                    .until(until_usec);
-                for (field, value) in
-                    cursor_prefilter_pairs_excluding(&request.selections, &requested_set)
-                {
-                    let pair = format!("{}={}", field, value);
-                    cursor_builder = cursor_builder.add_match(pair.as_bytes());
-                }
-                let mut cursor = cursor_builder
-                    .build()
-                    .context("failed to build journal session cursor for facet discovery")?;
-
-                loop {
-                    let has_entry = cursor
-                        .step()
-                        .context("failed to step journal session cursor for facet discovery")?;
-                    if !has_entry {
-                        break;
-                    }
-
-                    let timestamp_usec = cursor.realtime_usec();
-                    if timestamp_usec < after_usec || timestamp_usec >= before_usec {
+                let prefilter_pairs =
+                    cursor_prefilter_pairs_excluding(&request.selections, &requested_set);
+                for span in &setup.spans {
+                    if span.files.is_empty() {
                         continue;
                     }
 
-                    let mut fields = BTreeMap::new();
-                    let mut regex_match = false;
-                    let mut payloads = cursor
-                        .payloads()
-                        .context("failed to open payload iterator for facet discovery")?;
-                    while let Some(payload) = payloads
-                        .next()
-                        .context("failed to read journal payload for facet discovery")?
-                    {
-                        if let Some(regex) = &query_regex {
-                            if !regex_match {
-                                if let Ok(text) = std::str::from_utf8(payload) {
-                                    if regex.is_match(text) {
+                    let after_usec = (span.span.after as u64).saturating_mul(1_000_000);
+                    let before_usec = (span.span.before as u64).saturating_mul(1_000_000);
+                    let until_usec = before_usec.saturating_sub(1);
+
+                    let session = JournalSession::builder()
+                        .files(span.files.clone())
+                        .load_remappings(false)
+                        .build()
+                        .context("failed to open journal session for facet discovery")?;
+
+                    let mut cursor_builder = session
+                        .cursor_builder()
+                        .direction(SessionDirection::Forward)
+                        .since(after_usec)
+                        .until(until_usec);
+                    for (field, value) in &prefilter_pairs {
+                        let pair = format!("{}={}", field, value);
+                        cursor_builder = cursor_builder.add_match(pair.as_bytes());
+                    }
+                    let mut cursor = cursor_builder
+                        .build()
+                        .context("failed to build journal session cursor for facet discovery")?;
+
+                    loop {
+                        let has_entry = cursor
+                            .step()
+                            .context("failed to step journal session cursor for facet discovery")?;
+                        if !has_entry {
+                            break;
+                        }
+
+                        let timestamp_usec = cursor.realtime_usec();
+                        if timestamp_usec < after_usec || timestamp_usec >= before_usec {
+                            continue;
+                        }
+
+                        let mut fields = BTreeMap::new();
+                        let mut regex_match = false;
+                        let mut payloads = cursor
+                            .payloads()
+                            .context("failed to open payload iterator for facet discovery")?;
+                        while let Some(payload) = payloads
+                            .next()
+                            .context("failed to read journal payload for facet discovery")?
+                        {
+                            if let Some(regex) = &query_regex {
+                                if !regex_match {
+                                    if let Ok(text) = std::str::from_utf8(payload) {
+                                        if regex.is_match(text) {
+                                            regex_match = true;
+                                        }
+                                    } else if regex.is_match(&String::from_utf8_lossy(payload)) {
                                         regex_match = true;
                                     }
-                                } else if regex.is_match(&String::from_utf8_lossy(payload)) {
-                                    regex_match = true;
                                 }
                             }
+
+                            let Some((key, value_bytes)) = split_payload(payload) else {
+                                continue;
+                            };
+                            if !needed_fields.contains(key) {
+                                continue;
+                            }
+
+                            let value = payload_value(value_bytes);
+                            if value.is_empty() {
+                                continue;
+                            }
+
+                            fields.insert(key.to_string(), value.into_owned());
                         }
 
-                        let Some((key, value_bytes)) = split_payload(payload) else {
-                            continue;
-                        };
-                        if !needed_fields.contains(key) {
+                        if !regex_match {
                             continue;
                         }
 
-                        let value = payload_value(value_bytes);
-                        if value.is_empty() {
-                            continue;
-                        }
-
-                        fields.insert(key.to_string(), value.into_owned());
+                        let record = FlowRecord::new(timestamp_usec, fields);
+                        accumulate_requested_distinct_facets(
+                            &record,
+                            &request.selections,
+                            &requested_fields,
+                            &mut distinct_values,
+                            self.facet_max_values_per_field,
+                        );
                     }
-
-                    if !regex_match {
-                        continue;
-                    }
-
-                    let record = FlowRecord::new(timestamp_usec, fields);
-                    accumulate_requested_distinct_facets(
-                        &record,
-                        &request.selections,
-                        &requested_fields,
-                        &mut distinct_values,
-                        self.facet_max_values_per_field,
-                    );
                 }
             }
         }
@@ -1778,7 +1884,7 @@ impl FlowQueryService {
             distinct_values.insert(field, accumulator);
         }
 
-        if setup.selected_tier != TierKind::Raw && !used_open_tier_index_path {
+        if setup.spans.iter().any(|span| span.span.tier != TierKind::Raw) && !used_open_tier_index_path {
             for record in open_records {
                 if !record_matches_regex(record, query_regex.as_ref()) {
                     continue;
@@ -1810,35 +1916,6 @@ impl FlowQueryService {
         needed_fields: &HashSet<String>,
         accumulators: &mut [FacetDistinctAccumulator],
     ) -> Result<()> {
-        let after_usec = (setup.after as u64).saturating_mul(1_000_000);
-        let before_usec = (setup.before as u64).saturating_mul(1_000_000);
-        let until_usec = before_usec.saturating_sub(1);
-
-        let tier_paths: Vec<PathBuf> = setup
-            .files
-            .iter()
-            .map(|file| PathBuf::from(file.path()))
-            .collect();
-
-        let session = JournalSession::builder()
-            .files(tier_paths)
-            .load_remappings(false)
-            .build()
-            .context("failed to open journal session for facet discovery")?;
-
-        let mut cursor_builder = session
-            .cursor_builder()
-            .direction(SessionDirection::Forward)
-            .since(after_usec)
-            .until(until_usec);
-        for (field, value) in cursor_prefilter_pairs_excluding(&request.selections, requested_set) {
-            let pair = format!("{}={}", field, value);
-            cursor_builder = cursor_builder.add_match(pair.as_bytes());
-        }
-        let mut cursor = cursor_builder
-            .build()
-            .context("failed to build journal session cursor for facet discovery")?;
-
         let mut captured_fields = needed_fields.iter().cloned().collect::<Vec<_>>();
         captured_fields.sort_unstable();
         let capture_positions = captured_fields
@@ -1849,67 +1926,101 @@ impl FlowQueryService {
             .collect::<FastHashMap<_, _>>();
         let mut captured_values = vec![None; captured_fields.len()];
 
-        loop {
-            let has_entry = cursor
-                .step()
-                .context("failed to step journal session cursor for facet discovery")?;
-            if !has_entry {
-                break;
-            }
+        let prefilter_pairs =
+            cursor_prefilter_pairs_excluding(&request.selections, requested_set);
 
-            let timestamp_usec = cursor.realtime_usec();
-            if timestamp_usec < after_usec || timestamp_usec >= before_usec {
+        for span in &setup.spans {
+            if span.files.is_empty() {
                 continue;
             }
 
-            for value in &mut captured_values {
-                let _ = value.take();
+            let after_usec = (span.span.after as u64).saturating_mul(1_000_000);
+            let before_usec = (span.span.before as u64).saturating_mul(1_000_000);
+            let until_usec = before_usec.saturating_sub(1);
+
+            let session = JournalSession::builder()
+                .files(span.files.clone())
+                .load_remappings(false)
+                .build()
+                .context("failed to open journal session for facet discovery")?;
+
+            let mut cursor_builder = session
+                .cursor_builder()
+                .direction(SessionDirection::Forward)
+                .since(after_usec)
+                .until(until_usec);
+            for (field, value) in &prefilter_pairs {
+                let pair = format!("{}={}", field, value);
+                cursor_builder = cursor_builder.add_match(pair.as_bytes());
             }
+            let mut cursor = cursor_builder
+                .build()
+                .context("failed to build journal session cursor for facet discovery")?;
 
-            let mut payloads = cursor
-                .payloads()
-                .context("failed to open projected payload iterator for facet discovery")?;
-            while let Some(payload) = payloads
-                .next()
-                .context("failed to read projected journal payload for facet discovery")?
-            {
-                let Some((key, value_bytes)) = split_payload(payload) else {
-                    continue;
-                };
-                let Some(slot) = capture_positions.get(key).copied() else {
-                    continue;
-                };
-                if captured_values[slot].is_some() {
-                    continue;
+            loop {
+                let has_entry = cursor
+                    .step()
+                    .context("failed to step journal session cursor for facet discovery")?;
+                if !has_entry {
+                    break;
                 }
 
-                let value = payload_value(value_bytes);
-                if value.is_empty() {
+                let timestamp_usec = cursor.realtime_usec();
+                if timestamp_usec < after_usec || timestamp_usec >= before_usec {
                     continue;
                 }
-                captured_values[slot] = Some(value.into_owned());
-            }
 
-            for (field_index, field) in requested_fields.iter().enumerate() {
-                let Some(value) = captured_facet_field_value(field, &capture_positions, &captured_values) else {
-                    continue;
-                };
-                if value.is_empty() {
-                    continue;
+                for value in &mut captured_values {
+                    let _ = value.take();
                 }
-                if !captured_facet_matches_selections_except(
-                    Some(field.as_str()),
-                    &request.selections,
-                    &capture_positions,
-                    &captured_values,
-                ) {
-                    continue;
+
+                let mut payloads = cursor
+                    .payloads()
+                    .context("failed to open projected payload iterator for facet discovery")?;
+                while let Some(payload) = payloads
+                    .next()
+                    .context("failed to read projected journal payload for facet discovery")?
+                {
+                    let Some((key, value_bytes)) = split_payload(payload) else {
+                        continue;
+                    };
+                    let Some(slot) = capture_positions.get(key).copied() else {
+                        continue;
+                    };
+                    if captured_values[slot].is_some() {
+                        continue;
+                    }
+
+                    let value = payload_value(value_bytes);
+                    if value.is_empty() {
+                        continue;
+                    }
+                    captured_values[slot] = Some(value.into_owned());
                 }
-                accumulate_distinct_value(
-                    &mut accumulators[field_index],
-                    value.as_ref(),
-                    self.facet_max_values_per_field,
-                );
+
+                for (field_index, field) in requested_fields.iter().enumerate() {
+                    let Some(value) =
+                        captured_facet_field_value(field, &capture_positions, &captured_values)
+                    else {
+                        continue;
+                    };
+                    if value.is_empty() {
+                        continue;
+                    }
+                    if !captured_facet_matches_selections_except(
+                        Some(field.as_str()),
+                        &request.selections,
+                        &capture_positions,
+                        &captured_values,
+                    ) {
+                        continue;
+                    }
+                    accumulate_distinct_value(
+                        &mut accumulators[field_index],
+                        value.as_ref(),
+                        self.facet_max_values_per_field,
+                    );
+                }
             }
         }
 
@@ -1923,51 +2034,39 @@ impl FlowQueryService {
         requested_fields: &[String],
         distinct_values: &mut BTreeMap<String, FacetDistinctAccumulator>,
     ) -> Result<bool> {
-        if setup.selected_tier == TierKind::Raw
-            || !request.query.is_empty()
+        if !request.query.is_empty()
             || !open_tier_index_path_supported(requested_fields, &request.selections)
         {
             return Ok(false);
         }
 
-        let after_usec = (setup.after as u64).saturating_mul(1_000_000);
-        let before_usec = (setup.before as u64).saturating_mul(1_000_000);
-
-        for _ in 0..3 {
-            let (generation, rows) = {
-                let Ok(state) = self.open_tiers.read() else {
-                    return Ok(false);
-                };
-                let rows = state
-                    .rows_for_tier(setup.selected_tier)
-                    .iter()
-                    .copied()
-                    .filter(|row| {
-                        row.timestamp_usec >= after_usec && row.timestamp_usec < before_usec
-                    })
-                    .collect::<Vec<_>>();
-                (state.generation, rows)
-            };
-
-            let Ok(tier_flow_indexes) = self.tier_flow_indexes.read() else {
-                return Ok(false);
-            };
-            if tier_flow_indexes.generation() != generation {
+        let mut used_any = false;
+        for span in &setup.spans {
+            if span.span.tier == TierKind::Raw {
                 continue;
             }
 
-            accumulate_requested_distinct_open_tier_facets(
-                &rows,
-                &tier_flow_indexes,
-                &request.selections,
-                requested_fields,
-                distinct_values,
-                self.facet_max_values_per_field,
-            );
-            return Ok(true);
+            if let Some(()) = self.with_open_tier_rows_for_span(
+                span.span.tier,
+                span.span.after,
+                span.span.before,
+                |rows, tier_flow_indexes| {
+                    accumulate_requested_distinct_open_tier_facets(
+                        rows,
+                        tier_flow_indexes,
+                        &request.selections,
+                        requested_fields,
+                        distinct_values,
+                        self.facet_max_values_per_field,
+                    );
+                    Ok(())
+                },
+            )? {
+                used_any = true;
+            }
         }
 
-        Ok(false)
+        Ok(used_any)
     }
 
     fn scan_matching_open_tier_timeseries_records_projected_pass1(
@@ -1977,29 +2076,54 @@ impl FlowQueryService {
         grouped_aggregates: &mut HashMap<GroupKey, AggregatedFlow>,
         group_overflow: &mut GroupOverflow,
     ) -> Result<Option<(u64, usize)>> {
-        self.with_open_tier_rows(setup, |rows, tier_flow_indexes| {
-            let mut matched_entries = 0usize;
-            for row in rows {
-                if !open_tier_row_matches_selections_except(
-                    row,
-                    tier_flow_indexes,
-                    &request.selections,
-                    None,
-                ) {
-                    continue;
-                }
-                accumulate_open_tier_timeseries_grouped_record(
-                    row,
-                    tier_flow_indexes,
-                    &setup.effective_group_by,
-                    grouped_aggregates,
-                    group_overflow,
-                    self.max_groups,
-                );
-                matched_entries = matched_entries.saturating_add(1);
+        let mut total_rows = 0u64;
+        let mut total_matched = 0usize;
+        let mut used_any = false;
+
+        for span in &setup.spans {
+            if span.span.tier == TierKind::Raw {
+                continue;
             }
-            Ok((rows.len() as u64, matched_entries))
-        })
+
+            if let Some((rows_len, matched_entries)) = self.with_open_tier_rows_for_span(
+                span.span.tier,
+                span.span.after,
+                span.span.before,
+                |rows, tier_flow_indexes| {
+                    let mut matched_entries = 0usize;
+                    for row in rows {
+                        if !open_tier_row_matches_selections_except(
+                            row,
+                            tier_flow_indexes,
+                            &request.selections,
+                            None,
+                        ) {
+                            continue;
+                        }
+                        accumulate_open_tier_timeseries_grouped_record(
+                            row,
+                            tier_flow_indexes,
+                            &setup.effective_group_by,
+                            grouped_aggregates,
+                            group_overflow,
+                            self.max_groups,
+                        );
+                        matched_entries = matched_entries.saturating_add(1);
+                    }
+                    Ok((rows.len() as u64, matched_entries))
+                },
+            )? {
+                used_any = true;
+                total_rows = total_rows.saturating_add(rows_len);
+                total_matched = total_matched.saturating_add(matched_entries);
+            }
+        }
+
+        if used_any {
+            Ok(Some((total_rows, total_matched)))
+        } else {
+            Ok(None)
+        }
     }
 
     fn scan_matching_open_tier_timeseries_records_projected_pass2(
@@ -2013,50 +2137,81 @@ impl FlowQueryService {
         bucket_seconds: u32,
         sort_by: SortBy,
     ) -> Result<Option<(u64, usize)>> {
-        self.with_open_tier_rows(setup, |rows, tier_flow_indexes| {
-            let mut matched_entries = 0usize;
-            for row in rows {
-                if !open_tier_row_matches_selections_except(
-                    row,
-                    tier_flow_indexes,
-                    &request.selections,
-                    None,
-                ) {
-                    continue;
-                }
+        let mut total_rows = 0u64;
+        let mut total_matched = 0usize;
+        let mut used_any = false;
 
-                let labels =
-                    open_tier_row_labels(row, tier_flow_indexes, &setup.effective_group_by);
-                let key = group_key_from_labels(&labels);
-                let Some(index) = top_keys.get(&key).copied() else {
-                    continue;
-                };
-
-                accumulate_series_bucket(
-                    series_buckets,
-                    row.timestamp_usec,
-                    after,
-                    before,
-                    bucket_seconds,
-                    index,
-                    sampled_metric_value_from_open_tier_row(sort_by, row, tier_flow_indexes),
-                );
-                matched_entries = matched_entries.saturating_add(1);
+        for span in &setup.spans {
+            if span.span.tier == TierKind::Raw {
+                continue;
             }
-            Ok((rows.len() as u64, matched_entries))
-        })
+
+            if let Some((rows_len, matched_entries)) = self.with_open_tier_rows_for_span(
+                span.span.tier,
+                span.span.after,
+                span.span.before,
+                |rows, tier_flow_indexes| {
+                    let mut matched_entries = 0usize;
+                    for row in rows {
+                        if !open_tier_row_matches_selections_except(
+                            row,
+                            tier_flow_indexes,
+                            &request.selections,
+                            None,
+                        ) {
+                            continue;
+                        }
+
+                        let labels =
+                            open_tier_row_labels(row, tier_flow_indexes, &setup.effective_group_by);
+                        let key = group_key_from_labels(&labels);
+                        let Some(index) = top_keys.get(&key).copied() else {
+                            continue;
+                        };
+
+                        accumulate_series_bucket(
+                            series_buckets,
+                            row.timestamp_usec,
+                            after,
+                            before,
+                            bucket_seconds,
+                            index,
+                            sampled_metric_value_from_open_tier_row(sort_by, row, tier_flow_indexes),
+                        );
+                        matched_entries = matched_entries.saturating_add(1);
+                    }
+                    Ok((rows.len() as u64, matched_entries))
+                },
+            )? {
+                used_any = true;
+                total_rows = total_rows.saturating_add(rows_len);
+                total_matched = total_matched.saturating_add(matched_entries);
+            }
+        }
+
+        if used_any {
+            Ok(Some((total_rows, total_matched)))
+        } else {
+            Ok(None)
+        }
     }
 
-    fn with_open_tier_rows<R, F>(&self, setup: &QuerySetup, mut f: F) -> Result<Option<R>>
+    fn with_open_tier_rows_for_span<R, F>(
+        &self,
+        tier: TierKind,
+        after: u32,
+        before: u32,
+        mut f: F,
+    ) -> Result<Option<R>>
     where
         F: FnMut(&[OpenTierRow], &TierFlowIndexStore) -> Result<R>,
     {
-        if setup.selected_tier == TierKind::Raw {
+        if tier == TierKind::Raw {
             return Ok(None);
         }
 
-        let after_usec = (setup.after as u64).saturating_mul(1_000_000);
-        let before_usec = (setup.before as u64).saturating_mul(1_000_000);
+        let after_usec = (after as u64).saturating_mul(1_000_000);
+        let before_usec = (before as u64).saturating_mul(1_000_000);
 
         for _ in 0..3 {
             let (generation, rows) = {
@@ -2064,7 +2219,7 @@ impl FlowQueryService {
                     return Ok(None);
                 };
                 let rows = state
-                    .rows_for_tier(setup.selected_tier)
+                    .rows_for_tier(tier)
                     .iter()
                     .copied()
                     .filter(|row| {
@@ -2095,7 +2250,7 @@ impl FlowQueryService {
         let layout = setup
             .timeseries_layout
             .context("timeseries query missing aligned layout")?;
-        let open_tier_projected = setup.selected_tier != TierKind::Raw
+        let open_tier_projected = setup.spans.iter().any(|span| span.span.tier != TierKind::Raw)
             && request.query.is_empty()
             && open_tier_projected_grouped_path_supported(
                 &setup.effective_group_by,
@@ -2118,8 +2273,7 @@ impl FlowQueryService {
                 );
             })?
         } else {
-            let records =
-                self.open_records_for_tier(setup.selected_tier, setup.after, setup.before);
+            let records = self.open_records_for_spans(&setup.spans);
             let counts = self.scan_matching_records(&setup, request, &records, |record, _| {
                 let metrics = sampled_metrics_from_fields(&record.fields);
                 accumulate_grouped_record(
@@ -2322,28 +2476,17 @@ impl FlowQueryService {
             &index,
         )?;
 
-        let session = if setup.files.is_empty() {
+        let sessions = if setup.spans.iter().all(|span| span.files.is_empty()) {
             None
         } else {
-            let tier_paths: Vec<PathBuf> = setup
-                .files
-                .iter()
-                .map(|file| PathBuf::from(file.path()))
-                .collect();
-            Some(
-                JournalSession::builder()
-                    .files(tier_paths)
-                    .load_remappings(false)
-                    .build()
-                    .context("failed to open journal session for compact row materialization")?,
-            )
+            Some(self.build_materialization_sessions(&setup.spans)?)
         };
 
         let mut totals = FlowMetrics::default();
         let mut flows = Vec::with_capacity(rows.len() + usize::from(other.is_some()));
         for agg in rows {
             let materialized = self.materialize_compact_aggregate(
-                session.as_ref(),
+                sessions.as_ref(),
                 &setup.effective_group_by,
                 &index,
                 agg,
@@ -2370,7 +2513,7 @@ impl FlowQueryService {
 
     fn materialize_compact_aggregate(
         &self,
-        session: Option<&JournalSession>,
+        sessions: Option<&HashMap<TierKind, JournalSession>>,
         group_by: &[String],
         index: &FlowIndex,
         agg: CompactAggregatedFlow,
@@ -2384,7 +2527,7 @@ impl FlowQueryService {
             if snapshot.is_some() && matches!(agg.representative, RecordHandle::OpenRowIndex(_)) {
                 None
             } else {
-                self.lookup_record_by_handle(session, agg.representative)?
+                self.lookup_record_by_handle(sessions, agg.representative)?
                     .with_context(|| {
                         format!(
                             "failed to materialize representative netflow row for {:?}",
@@ -2416,12 +2559,12 @@ impl FlowQueryService {
 
     fn lookup_record_by_handle(
         &self,
-        session: Option<&JournalSession>,
+        sessions: Option<&HashMap<TierKind, JournalSession>>,
         handle: RecordHandle,
     ) -> Result<Option<FlowRecord>> {
         match handle {
-            RecordHandle::JournalRealtime(timestamp_usec) => {
-                let Some(session) = session else {
+            RecordHandle::JournalRealtime { tier, timestamp_usec } => {
+                let Some(session) = sessions.and_then(|sessions| sessions.get(&tier)) else {
                     return Ok(None);
                 };
 
@@ -2450,6 +2593,41 @@ impl FlowQueryService {
             }
             RecordHandle::OpenRowIndex(_) => Ok(None),
         }
+    }
+
+    fn build_materialization_sessions(
+        &self,
+        spans: &[PreparedQuerySpan],
+    ) -> Result<HashMap<TierKind, JournalSession>> {
+        let mut files_by_tier = HashMap::<TierKind, Vec<PathBuf>>::new();
+        for span in spans {
+            if span.files.is_empty() {
+                continue;
+            }
+            files_by_tier
+                .entry(span.span.tier)
+                .or_default()
+                .extend(span.files.iter().cloned());
+        }
+
+        let mut sessions = HashMap::with_capacity(files_by_tier.len());
+        for (tier, mut files) in files_by_tier {
+            files.sort();
+            files.dedup();
+            let session = JournalSession::builder()
+                .files(files)
+                .load_remappings(false)
+                .build()
+                .with_context(|| {
+                    format!(
+                        "failed to open journal session for compact row materialization tier {:?}",
+                        tier
+                    )
+                })?;
+            sessions.insert(tier, session);
+        }
+
+        Ok(sessions)
     }
 }
 
@@ -2508,7 +2686,7 @@ struct CompactRepresentativeFields {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RecordHandle {
-    JournalRealtime(u64),
+    JournalRealtime { tier: TierKind, timestamp_usec: u64 },
     OpenRowIndex(usize),
 }
 
@@ -2573,7 +2751,10 @@ impl CompactAggregatedFlow {
 
     fn new_synthetic_bucket(bucket_label: &'static str) -> Self {
         Self {
-            representative: RecordHandle::JournalRealtime(0),
+            representative: RecordHandle::JournalRealtime {
+                tier: TierKind::Raw,
+                timestamp_usec: 0,
+            },
             flow_id: None,
             first_ts: 0,
             last_ts: 0,
@@ -2792,6 +2973,7 @@ struct GroupOverflow {
 }
 
 #[derive(Debug, Default)]
+#[cfg(test)]
 struct FacetFieldAccumulator {
     values: BTreeMap<String, FlowMetrics>,
     overflow_metrics: FlowMetrics,
@@ -3342,8 +3524,10 @@ fn update_aggregate_entry(entry: &mut AggregatedFlow, record: &FlowRecord, metri
 fn labels_for_group(record: &FlowRecord, group_by: &[String]) -> BTreeMap<String, String> {
     let mut labels = BTreeMap::new();
     for field in group_by {
-        let value = record.fields.get(field).cloned().unwrap_or_default();
-        labels.insert(field.clone(), value);
+        labels.insert(
+            field.clone(),
+            normalized_record_field_value(record, field).into_owned(),
+        );
     }
     labels
 }
@@ -3454,6 +3638,110 @@ fn compact_index_value_to_string(value: IndexFieldValue<'_>) -> String {
         IndexFieldValue::U64(value) => value.to_string(),
         IndexFieldValue::IpAddr(value) => value.to_string(),
     }
+}
+
+fn field_requires_as_name_normalization(field: &str) -> bool {
+    matches!(
+        field.to_ascii_uppercase().as_str(),
+        "SRC_AS_NAME" | "DST_AS_NAME"
+    )
+}
+
+fn field_normalization_dependencies(field: &str) -> &'static [&'static str] {
+    match field.to_ascii_uppercase().as_str() {
+        "SRC_AS_NAME" => &["SRC_AS_NAME", "SRC_AS", "SRC_ADDR"],
+        "DST_AS_NAME" => &["DST_AS_NAME", "DST_AS", "DST_ADDR"],
+        _ => &[],
+    }
+}
+
+fn is_private_ip_address(value: &str) -> bool {
+    match value.parse::<IpAddr>() {
+        Ok(IpAddr::V4(ip)) => ip.is_private(),
+        Ok(IpAddr::V6(ip)) => ip.is_unique_local(),
+        Err(_) => false,
+    }
+}
+
+fn normalize_zero_asn_name<'a>(
+    raw_value: Option<&'a str>,
+    asn_value: Option<&str>,
+    addr_value: Option<&str>,
+) -> Cow<'a, str> {
+    let raw_value = raw_value.unwrap_or_default();
+    if asn_value == Some("0") && raw_value.is_empty() {
+        if addr_value.is_some_and(is_private_ip_address) {
+            Cow::Borrowed(PRIVATE_IP_ADDRESS_SPACE_LABEL)
+        } else {
+            Cow::Borrowed(UNKNOWN_ASN_LABEL)
+        }
+    } else {
+        Cow::Borrowed(raw_value)
+    }
+}
+
+fn normalized_record_field_value<'a>(record: &'a FlowRecord, field: &str) -> Cow<'a, str> {
+    match field.to_ascii_uppercase().as_str() {
+        "SRC_AS_NAME" => normalize_zero_asn_name(
+            record.fields.get("SRC_AS_NAME").map(String::as_str),
+            record.fields.get("SRC_AS").map(String::as_str),
+            record.fields.get("SRC_ADDR").map(String::as_str),
+        ),
+        "DST_AS_NAME" => normalize_zero_asn_name(
+            record.fields.get("DST_AS_NAME").map(String::as_str),
+            record.fields.get("DST_AS").map(String::as_str),
+            record.fields.get("DST_ADDR").map(String::as_str),
+        ),
+        _ => Cow::Borrowed(
+            record
+                .fields
+                .get(field)
+                .map(String::as_str)
+                .unwrap_or_default(),
+        ),
+    }
+}
+
+fn apply_normalized_projected_group_value(
+    grouped_aggregates: &mut CompactGroupAccumulator,
+    field_name: &str,
+    field_index: usize,
+    capture_positions: &FastHashMap<String, usize>,
+    captured_values: &[Option<String>],
+    row_group_field_ids: &mut [Option<u32>],
+    row_missing_values: &mut [Option<String>],
+    max_groups: usize,
+) -> Result<()> {
+    let Some(value) = captured_facet_field_value(field_name, capture_positions, captured_values) else {
+        return Ok(());
+    };
+    if value.is_empty() {
+        row_group_field_ids[field_index] = None;
+        row_missing_values[field_index] = None;
+        return Ok(());
+    }
+
+    let value_ref = value.as_ref();
+    match grouped_aggregates
+        .index
+        .find_field_value(field_index, IndexFieldValue::Text(value_ref))
+        .context("failed to resolve normalized projected grouped field value from compact query index")?
+    {
+        Some(field_id) => {
+            row_group_field_ids[field_index] = Some(field_id);
+            row_missing_values[field_index] = None;
+        }
+        None if grouped_aggregates.grouped_total() < max_groups => {
+            row_group_field_ids[field_index] = None;
+            row_missing_values[field_index] = Some(value.into_owned());
+        }
+        None => {
+            row_group_field_ids[field_index] = None;
+            row_missing_values[field_index] = None;
+        }
+    }
+
+    Ok(())
 }
 
 fn group_key_from_labels(labels: &BTreeMap<String, String>) -> GroupKey {
@@ -3817,10 +4105,8 @@ fn record_matches_selections_except(
             return true;
         }
         let normalized = field.to_ascii_uppercase();
-        let Some(record_value) = record.fields.get(&normalized) else {
-            return false;
-        };
-        values.iter().any(|value| value == record_value)
+        let record_value = normalized_record_field_value(record, &normalized);
+        values.iter().any(|value| value == record_value.as_ref())
     })
 }
 
@@ -4010,6 +4296,16 @@ fn captured_facet_field_value<'a>(
     captured_values: &'a [Option<String>],
 ) -> Option<Cow<'a, str>> {
     match field.to_ascii_uppercase().as_str() {
+        "SRC_AS_NAME" => Some(normalize_zero_asn_name(
+            captured_stored_facet_field_value("SRC_AS_NAME", capture_positions, captured_values),
+            captured_stored_facet_field_value("SRC_AS", capture_positions, captured_values),
+            captured_stored_facet_field_value("SRC_ADDR", capture_positions, captured_values),
+        )),
+        "DST_AS_NAME" => Some(normalize_zero_asn_name(
+            captured_stored_facet_field_value("DST_AS_NAME", capture_positions, captured_values),
+            captured_stored_facet_field_value("DST_AS", capture_positions, captured_values),
+            captured_stored_facet_field_value("DST_ADDR", capture_positions, captured_values),
+        )),
         "ICMPV4" => presentation::icmp_virtual_value(
             "ICMPV4",
             captured_stored_facet_field_value("PROTOCOL", capture_positions, captured_values),
@@ -4064,9 +4360,15 @@ fn cursor_prefilter_pairs_excluding(
             !excluded_fields.contains(&field.to_ascii_uppercase()) && !is_virtual_flow_field(field)
         })
         .flat_map(|(field, values)| {
+            let normalized_field = field.to_ascii_uppercase();
             values
                 .iter()
                 .filter(|value| !value.is_empty())
+                .filter(move |value| {
+                    !(field_requires_as_name_normalization(&normalized_field)
+                        && (**value == PRIVATE_IP_ADDRESS_SPACE_LABEL
+                            || **value == UNKNOWN_ASN_LABEL))
+                })
                 .map(|value| (field.to_ascii_uppercase(), value.clone()))
         })
         .collect::<Vec<_>>();
@@ -4353,6 +4655,7 @@ fn compare_distinct_facet_values(
     }
 }
 
+#[cfg(test)]
 fn accumulate_record(
     record: &FlowRecord,
     handle: RecordHandle,
@@ -4375,6 +4678,7 @@ fn accumulate_record(
     Ok(())
 }
 
+#[cfg(test)]
 fn accumulate_facet_record(
     record: &FlowRecord,
     metrics: FlowMetrics,
@@ -4401,6 +4705,7 @@ fn accumulate_facet_record(
     }
 }
 
+#[cfg(test)]
 fn build_facets_from_accumulator(
     by_field: BTreeMap<String, FacetFieldAccumulator>,
     sort_by: SortBy,
@@ -4489,7 +4794,127 @@ fn align_up(timestamp: u32, step: u32) -> u32 {
     }
 }
 
-fn init_timeseries_layout(after: u32, before: u32) -> TimeseriesLayout {
+fn aligned_bucket_count(after: u32, before: u32, step: u32) -> u32 {
+    if before <= after || step == 0 {
+        return 0;
+    }
+
+    let aligned_after = align_down(after, step);
+    let aligned_before = align_up(before, step);
+    aligned_before
+        .saturating_sub(aligned_after)
+        .saturating_div(step)
+}
+
+fn push_query_tier_span(spans: &mut Vec<QueryTierSpan>, tier: TierKind, after: u32, before: u32) {
+    if before <= after {
+        return;
+    }
+
+    if let Some(last) = spans.last_mut() {
+        if last.tier == tier && last.before == after {
+            last.before = before;
+            return;
+        }
+    }
+
+    spans.push(QueryTierSpan {
+        tier,
+        after,
+        before,
+    });
+}
+
+fn plan_query_tier_spans_recursive(
+    spans: &mut Vec<QueryTierSpan>,
+    after: u32,
+    before: u32,
+    candidate_tiers: &[TierKind],
+) {
+    if before <= after {
+        return;
+    }
+
+    let Some((&tier, remaining_tiers)) = candidate_tiers.split_first() else {
+        push_query_tier_span(spans, TierKind::Raw, after, before);
+        return;
+    };
+
+    let Some(step) = tier.bucket_duration().map(|duration| duration.as_secs() as u32) else {
+        push_query_tier_span(spans, TierKind::Raw, after, before);
+        return;
+    };
+
+    let aligned_after = align_up(after, step);
+    let aligned_before = align_down(before, step);
+
+    if aligned_after < aligned_before {
+        plan_query_tier_spans_recursive(spans, after, aligned_after, remaining_tiers);
+        push_query_tier_span(spans, tier, aligned_after, aligned_before);
+        plan_query_tier_spans_recursive(spans, aligned_before, before, remaining_tiers);
+    } else {
+        plan_query_tier_spans_recursive(spans, after, before, remaining_tiers);
+    }
+}
+
+fn plan_query_tier_spans(
+    after: u32,
+    before: u32,
+    candidate_tiers: &[TierKind],
+    force_raw: bool,
+) -> Vec<QueryTierSpan> {
+    if before <= after {
+        return Vec::new();
+    }
+    if force_raw {
+        return vec![QueryTierSpan {
+            tier: TierKind::Raw,
+            after,
+            before,
+        }];
+    }
+
+    let mut spans = Vec::new();
+    plan_query_tier_spans_recursive(&mut spans, after, before, candidate_tiers);
+    spans
+}
+
+fn summary_query_tier(spans: &[QueryTierSpan]) -> TierKind {
+    if spans.iter().any(|span| span.tier == TierKind::Hour1) {
+        TierKind::Hour1
+    } else if spans.iter().any(|span| span.tier == TierKind::Minute5) {
+        TierKind::Minute5
+    } else if spans.iter().any(|span| span.tier == TierKind::Minute1) {
+        TierKind::Minute1
+    } else {
+        TierKind::Raw
+    }
+}
+
+fn select_timeseries_source_tier(after: u32, before: u32, force_raw: bool) -> TierKind {
+    if force_raw {
+        return TierKind::Raw;
+    }
+
+    for tier in [TierKind::Hour1, TierKind::Minute5, TierKind::Minute1] {
+        let step = tier.bucket_duration().unwrap().as_secs() as u32;
+        if aligned_bucket_count(after, before, step) >= TIMESERIES_MIN_BUCKETS {
+            return tier;
+        }
+    }
+
+    TierKind::Minute1
+}
+
+fn timeseries_candidate_tiers(source_tier: TierKind) -> &'static [TierKind] {
+    match source_tier {
+        TierKind::Hour1 => &[TierKind::Hour1, TierKind::Minute5, TierKind::Minute1],
+        TierKind::Minute5 => &[TierKind::Minute5, TierKind::Minute1],
+        TierKind::Minute1 | TierKind::Raw => &[TierKind::Minute1],
+    }
+}
+
+fn init_timeseries_layout_for_tier(after: u32, before: u32, source_tier: TierKind) -> TimeseriesLayout {
     if before <= after {
         return TimeseriesLayout {
             after,
@@ -4498,11 +4923,16 @@ fn init_timeseries_layout(after: u32, before: u32) -> TimeseriesLayout {
             bucket_count: 0,
         };
     }
+
+    let floor_seconds = source_tier
+        .bucket_duration()
+        .map(|duration| duration.as_secs() as u32)
+        .unwrap_or(MIN_TIMESERIES_BUCKET_SECONDS)
+        .max(MIN_TIMESERIES_BUCKET_SECONDS);
     let window = before - after;
-    let raw_bucket_seconds = ((window + HISTOGRAM_TARGET_BUCKETS - 1) / HISTOGRAM_TARGET_BUCKETS)
-        .max(MIN_TIMESERIES_BUCKET_SECONDS);
-    let bucket_seconds = align_up(raw_bucket_seconds, MIN_TIMESERIES_BUCKET_SECONDS)
-        .max(MIN_TIMESERIES_BUCKET_SECONDS);
+    let raw_bucket_seconds =
+        (window + TIMESERIES_MAX_BUCKETS - 1) / TIMESERIES_MAX_BUCKETS;
+    let bucket_seconds = align_up(raw_bucket_seconds.max(floor_seconds), floor_seconds);
     let aligned_after = align_down(after, bucket_seconds);
     let aligned_before = align_up(before, bucket_seconds);
     let bucket_count = ((aligned_before.saturating_sub(aligned_after)) / bucket_seconds).max(1);
@@ -4513,6 +4943,12 @@ fn init_timeseries_layout(after: u32, before: u32) -> TimeseriesLayout {
         bucket_seconds,
         bucket_count: bucket_count as usize,
     }
+}
+
+#[cfg(test)]
+fn init_timeseries_layout(after: u32, before: u32) -> TimeseriesLayout {
+    let source_tier = select_timeseries_source_tier(after, before, false);
+    init_timeseries_layout_for_tier(after, before, source_tier)
 }
 
 fn accumulate_series_bucket(
@@ -5271,6 +5707,22 @@ mod tests {
     }
 
     #[test]
+    fn cursor_prefilter_skips_synthetic_as_name_values() {
+        let selections = HashMap::from([
+            (
+                "SRC_AS_NAME".to_string(),
+                vec![super::PRIVATE_IP_ADDRESS_SPACE_LABEL.to_string()],
+            ),
+            ("DST_AS_NAME".to_string(), vec![super::UNKNOWN_ASN_LABEL.to_string()]),
+            ("PROTOCOL".to_string(), vec!["6".to_string()]),
+        ]);
+
+        let pairs = super::cursor_prefilter_pairs(&selections);
+
+        assert_eq!(pairs, vec![("PROTOCOL".to_string(), "6".to_string())]);
+    }
+
+    #[test]
     fn virtual_facet_dependencies_expand_to_stored_fields() {
         let mut fields = HashSet::from([
             "ICMPV4".to_string(),
@@ -5288,6 +5740,66 @@ mod tests {
         assert!(fields.contains("ICMPV4_CODE"));
         assert!(fields.contains("ICMPV6_TYPE"));
         assert!(fields.contains("ICMPV6_CODE"));
+    }
+
+    #[test]
+    fn labels_for_group_normalize_zero_asn_names_from_record_fields() {
+        let record = super::FlowRecord::new(
+            42,
+            BTreeMap::from([
+                ("SRC_AS".to_string(), "0".to_string()),
+                ("SRC_AS_NAME".to_string(), String::new()),
+                ("SRC_ADDR".to_string(), "10.1.2.3".to_string()),
+                ("DST_AS".to_string(), "0".to_string()),
+                ("DST_AS_NAME".to_string(), String::new()),
+                ("DST_ADDR".to_string(), "198.51.100.10".to_string()),
+            ]),
+        );
+
+        let labels = super::labels_for_group(
+            &record,
+            &["SRC_AS_NAME".to_string(), "DST_AS_NAME".to_string()],
+        );
+
+        assert_eq!(
+            labels.get("SRC_AS_NAME").map(String::as_str),
+            Some(super::PRIVATE_IP_ADDRESS_SPACE_LABEL)
+        );
+        assert_eq!(
+            labels.get("DST_AS_NAME").map(String::as_str),
+            Some(super::UNKNOWN_ASN_LABEL)
+        );
+    }
+
+    #[test]
+    fn captured_facet_field_value_normalizes_zero_asn_names() {
+        let capture_positions = super::FastHashMap::from([
+            ("SRC_AS_NAME".to_string(), 0usize),
+            ("SRC_AS".to_string(), 1usize),
+            ("SRC_ADDR".to_string(), 2usize),
+            ("DST_AS_NAME".to_string(), 3usize),
+            ("DST_AS".to_string(), 4usize),
+            ("DST_ADDR".to_string(), 5usize),
+        ]);
+        let captured_values = vec![
+            Some(String::new()),
+            Some("0".to_string()),
+            Some("10.0.0.1".to_string()),
+            Some(String::new()),
+            Some("0".to_string()),
+            Some("198.51.100.10".to_string()),
+        ];
+
+        assert_eq!(
+            super::captured_facet_field_value("SRC_AS_NAME", &capture_positions, &captured_values)
+                .as_deref(),
+            Some(super::PRIVATE_IP_ADDRESS_SPACE_LABEL)
+        );
+        assert_eq!(
+            super::captured_facet_field_value("DST_AS_NAME", &capture_positions, &captured_values)
+                .as_deref(),
+            Some(super::UNKNOWN_ASN_LABEL)
+        );
     }
 
     #[test]
@@ -5851,7 +6363,10 @@ mod tests {
             };
             super::accumulate_compact_grouped_record(
                 &record,
-                super::RecordHandle::JournalRealtime(record.timestamp_usec),
+                super::RecordHandle::JournalRealtime {
+                    tier: super::TierKind::Raw,
+                    timestamp_usec: record.timestamp_usec,
+                },
                 metrics_from_fields(&record.fields),
                 &group_by,
                 &mut aggregates,
@@ -5870,7 +6385,10 @@ mod tests {
         };
         super::accumulate_compact_grouped_record(
             &overflow_record,
-            super::RecordHandle::JournalRealtime(overflow_record.timestamp_usec),
+            super::RecordHandle::JournalRealtime {
+                tier: super::TierKind::Raw,
+                timestamp_usec: overflow_record.timestamp_usec,
+            },
             metrics_from_fields(&overflow_record.fields),
             &group_by,
             &mut aggregates,
@@ -5914,7 +6432,10 @@ mod tests {
             };
             super::accumulate_compact_grouped_record(
                 &record,
-                super::RecordHandle::JournalRealtime(record.timestamp_usec),
+                super::RecordHandle::JournalRealtime {
+                    tier: super::TierKind::Raw,
+                    timestamp_usec: record.timestamp_usec,
+                },
                 metrics_from_fields(&record.fields),
                 &group_by,
                 &mut aggregates,
@@ -5969,7 +6490,10 @@ mod tests {
             };
             super::accumulate_compact_grouped_record(
                 &record,
-                super::RecordHandle::JournalRealtime(record.timestamp_usec),
+                super::RecordHandle::JournalRealtime {
+                    tier: super::TierKind::Raw,
+                    timestamp_usec: record.timestamp_usec,
+                },
                 metrics_from_fields(&record.fields),
                 &group_by,
                 &mut aggregates,
@@ -6287,7 +6811,10 @@ mod tests {
         for record in &records {
             super::accumulate_compact_grouped_record(
                 record,
-                super::RecordHandle::JournalRealtime(record.timestamp_usec),
+                super::RecordHandle::JournalRealtime {
+                    tier: super::TierKind::Raw,
+                    timestamp_usec: record.timestamp_usec,
+                },
                 metrics_from_fields(&record.fields),
                 &group_by,
                 &mut compact_only,
@@ -6304,7 +6831,10 @@ mod tests {
         for record in &records {
             super::accumulate_record(
                 record,
-                super::RecordHandle::JournalRealtime(record.timestamp_usec),
+                super::RecordHandle::JournalRealtime {
+                    tier: super::TierKind::Raw,
+                    timestamp_usec: record.timestamp_usec,
+                },
                 &group_by,
                 &mut compact_with_facets,
                 &mut facet_values,
@@ -6401,9 +6931,132 @@ mod tests {
     #[test]
     fn init_timeseries_layout_rounds_up_to_whole_minutes() {
         let layout = super::init_timeseries_layout(61, 7_261);
-        assert_eq!(layout.bucket_seconds, 120);
-        assert_eq!(layout.after, 0);
+        assert_eq!(layout.bucket_seconds, 60);
+        assert_eq!(layout.after, 60);
         assert_eq!(layout.before, 7_320);
-        assert_eq!(layout.bucket_count, 61);
+        assert_eq!(layout.bucket_count, 121);
+    }
+
+    #[test]
+    fn select_timeseries_source_tier_prefers_highest_resolution_with_at_least_100_points() {
+        assert_eq!(
+            super::select_timeseries_source_tier(0, 24 * 60 * 60, false),
+            super::TierKind::Minute5
+        );
+        assert_eq!(
+            super::select_timeseries_source_tier(0, 7 * 24 * 60 * 60, false),
+            super::TierKind::Hour1
+        );
+        assert_eq!(
+            super::select_timeseries_source_tier(0, 3 * 60 * 60, false),
+            super::TierKind::Minute1
+        );
+    }
+
+    #[test]
+    fn timeseries_span_plan_uses_source_tier_and_finer_edges_only() {
+        let spans = super::plan_query_tier_spans(
+            14 * 3600 + 12 * 60 + 30,
+            17 * 3600 + 12 * 60 + 30,
+            super::timeseries_candidate_tiers(super::TierKind::Minute5),
+            false,
+        );
+        assert_eq!(
+            spans,
+            vec![
+                super::QueryTierSpan {
+                    tier: super::TierKind::Raw,
+                    after: 14 * 3600 + 12 * 60 + 30,
+                    before: 14 * 3600 + 13 * 60,
+                },
+                super::QueryTierSpan {
+                    tier: super::TierKind::Minute1,
+                    after: 14 * 3600 + 13 * 60,
+                    before: 14 * 3600 + 15 * 60,
+                },
+                super::QueryTierSpan {
+                    tier: super::TierKind::Minute5,
+                    after: 14 * 3600 + 15 * 60,
+                    before: 17 * 3600 + 10 * 60,
+                },
+                super::QueryTierSpan {
+                    tier: super::TierKind::Minute1,
+                    after: 17 * 3600 + 10 * 60,
+                    before: 17 * 3600 + 12 * 60,
+                },
+                super::QueryTierSpan {
+                    tier: super::TierKind::Raw,
+                    after: 17 * 3600 + 12 * 60,
+                    before: 17 * 3600 + 12 * 60 + 30,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn init_timeseries_layout_uses_source_tier_as_bucket_floor() {
+        let layout = super::init_timeseries_layout_for_tier(
+            0,
+            24 * 60 * 60,
+            super::TierKind::Minute5,
+        );
+        assert_eq!(layout.bucket_seconds, 300);
+        assert_eq!(layout.after, 0);
+        assert_eq!(layout.before, 24 * 60 * 60);
+        assert_eq!(layout.bucket_count, 288);
+    }
+
+    #[test]
+    fn plan_query_tier_spans_stitches_aligned_ranges_greedily() {
+        let spans = super::plan_query_tier_spans(
+            14 * 3600 + 12 * 60 + 30,
+            17 * 3600 + 12 * 60 + 30,
+            &[
+                super::TierKind::Hour1,
+                super::TierKind::Minute5,
+                super::TierKind::Minute1,
+            ],
+            false,
+        );
+        assert_eq!(
+            spans,
+            vec![
+                super::QueryTierSpan {
+                    tier: super::TierKind::Raw,
+                    after: 14 * 3600 + 12 * 60 + 30,
+                    before: 14 * 3600 + 13 * 60,
+                },
+                super::QueryTierSpan {
+                    tier: super::TierKind::Minute1,
+                    after: 14 * 3600 + 13 * 60,
+                    before: 14 * 3600 + 15 * 60,
+                },
+                super::QueryTierSpan {
+                    tier: super::TierKind::Minute5,
+                    after: 14 * 3600 + 15 * 60,
+                    before: 15 * 3600,
+                },
+                super::QueryTierSpan {
+                    tier: super::TierKind::Hour1,
+                    after: 15 * 3600,
+                    before: 17 * 3600,
+                },
+                super::QueryTierSpan {
+                    tier: super::TierKind::Minute5,
+                    after: 17 * 3600,
+                    before: 17 * 3600 + 10 * 60,
+                },
+                super::QueryTierSpan {
+                    tier: super::TierKind::Minute1,
+                    after: 17 * 3600 + 10 * 60,
+                    before: 17 * 3600 + 12 * 60,
+                },
+                super::QueryTierSpan {
+                    tier: super::TierKind::Raw,
+                    after: 17 * 3600 + 12 * 60,
+                    before: 17 * 3600 + 12 * 60 + 30,
+                },
+            ]
+        );
     }
 }
