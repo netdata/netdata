@@ -479,7 +479,6 @@ impl JournalWriter {
         Ok(())
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::JournalWriter;
@@ -487,6 +486,7 @@ mod tests {
     use crate::file::{EntryItemsType, Mmap};
     use crate::repository::File as RepositoryFile;
     use crate::{Direction, JournalFile, JournalFileOptions, JournalReader, Location};
+    use std::num::NonZeroU64;
     use tempfile::TempDir;
     use uuid::Uuid;
 
@@ -495,9 +495,7 @@ mod tests {
     }
 
     fn active_journal_file(dir: &TempDir) -> RepositoryFile {
-        let journal_dir = dir
-            .path()
-            .join("11111111-1111-1111-1111-111111111111");
+        let journal_dir = dir.path().join("11111111-1111-1111-1111-111111111111");
         std::fs::create_dir_all(&journal_dir).expect("create test journal directory");
         let path = journal_dir.join("system.journal");
         RepositoryFile::from_path(&path).expect("test journal path should parse")
@@ -539,11 +537,16 @@ mod tests {
             .value(&journal_file)?
             .expect("expected one entry");
 
-        let mut offsets = Vec::new();
+        let mut offsets = vec![NonZeroU64::new(123).expect("non-zero sentinel")];
         let err = journal_file
             .entry_data_object_offsets(entry_offset, &mut offsets)
             .expect_err("expected invalid entry item offset to fail");
         assert!(matches!(err, JournalError::InvalidOffset));
+        assert_eq!(
+            offsets,
+            vec![NonZeroU64::new(123).expect("non-zero sentinel")],
+            "entry_data_object_offsets() must leave the caller buffer unchanged on error"
+        );
 
         match journal_file.entry_data_objects(entry_offset) {
             Err(JournalError::InvalidOffset) => {}

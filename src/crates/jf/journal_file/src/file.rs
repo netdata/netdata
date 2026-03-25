@@ -643,7 +643,11 @@ impl<M: MemoryMap> JournalFile<M> {
         })
     }
 
-    /// Appends all DATA object offsets for a specific entry to the provided buffer.
+    /// Appends all DATA object offsets for a specific entry to `data_offsets`.
+    ///
+    /// Returns [`JournalError::InvalidOffset`] when the entry contains a zero or
+    /// otherwise invalid object offset. On error, `data_offsets` is restored to
+    /// its original length.
     pub fn entry_data_object_offsets(
         &self,
         entry_offset: NonZeroU64,
