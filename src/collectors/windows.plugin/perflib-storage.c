@@ -712,8 +712,6 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec
 int do_PerflibStorage(int update_every, usec_t dt __maybe_unused)
 {
     static bool initialized = false;
-    PERF_DATA_BLOCK *logicalDataBlock = NULL;
-    PERF_DATA_BLOCK *physicalDataBlock = NULL;
     DWORD logical_id, physical_id;
 
     if (unlikely(!initialized)) {
@@ -727,20 +725,26 @@ int do_PerflibStorage(int update_every, usec_t dt __maybe_unused)
     if (logical_id == PERFLIB_REGISTRY_NAME_NOT_FOUND && physical_id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
         return -1;
 
-    if (logical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND)
-        logicalDataBlock = perflibGetPerformanceData(logical_id);
-
-    if (physical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND)
-        physicalDataBlock = perflibGetPerformanceData(physical_id);
-
-    if (!logicalDataBlock && !physicalDataBlock)
-        return -1;
-
+    // Each perflibGetPerformanceData() call reuses the same internal buffer, so we must
+    // query and consume each block before issuing the next call to avoid pointer aliasing.
     usec_t now_ut = now_monotonic_usec();
-    if (logicalDataBlock)
-        do_logical_disk(logicalDataBlock, update_every, now_ut);
-    if (physicalDataBlock)
-        do_physical_disk(physicalDataBlock, update_every, now_ut);
+    bool processed_any = false;
 
-    return 0;
+    if (logical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+        PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(logical_id);
+        if (pDataBlock) {
+            do_logical_disk(pDataBlock, update_every, now_ut);
+            processed_any = true;
+        }
+    }
+
+    if (physical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+        PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(physical_id);
+        if (pDataBlock) {
+            do_physical_disk(pDataBlock, update_every, now_ut);
+            processed_any = true;
+        }
+    }
+
+    return processed_any ? 0 : -1;
 }

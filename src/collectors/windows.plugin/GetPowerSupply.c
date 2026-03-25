@@ -18,6 +18,7 @@
 struct win_battery {
     struct power_supply ps;
     struct simple_property voltage;
+    bool seen; // true if discovered in the current collection pass
     struct win_battery *next;
 };
 
@@ -107,6 +108,9 @@ void do_GetPowerSupply_cleanup(void)
 
 int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
 {
+    for (struct win_battery *b = batteries_root; b; b = b->next)
+        b->seen = false;
+
     HDEVINFO hdev = SetupDiGetClassDevs(&GUID_DEVCLASS_BATTERY, 0, 0, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
     if (hdev == INVALID_HANDLE_VALUE)
         return -1;
@@ -167,6 +171,7 @@ int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
         char name[RRD_ID_LENGTH_MAX + 1];
         snprintfz(name, sizeof(name), "BAT%d", i + 1);
         struct win_battery *battery = netdata_get_or_create_battery(name);
+        battery->seen = true;
         netdata_update_power_supply_values(battery, hBattery, &bi, &bqi);
         netdata_power_supply_plot(battery, update_every);
 
@@ -179,6 +184,24 @@ int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
     }
 
     SetupDiDestroyDeviceInfoList(hdev);
+
+    // Retire batteries that were not seen in this discovery pass (e.g. physically removed).
+    struct win_battery **pp = &batteries_root;
+    while (*pp) {
+        struct win_battery *b = *pp;
+        if (!b->seen) {
+            if (b->ps.capacity && b->ps.capacity->st)
+                rrdset_is_obsolete___safe_from_collector_thread(b->ps.capacity->st);
+            if (b->voltage.st)
+                rrdset_is_obsolete___safe_from_collector_thread(b->voltage.st);
+            *pp = b->next;
+            freez(b->ps.name);
+            freez(b->ps.capacity);
+            freez(b);
+        } else {
+            pp = &b->next;
+        }
+    }
 
     return 0;
 }
