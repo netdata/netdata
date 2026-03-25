@@ -4,6 +4,7 @@
 #include "ml_features.h"
 #include "ml_kmeans.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -420,10 +421,11 @@ static int test_circular_buffer_equivalence()
     return tests_failed == 0 ? 0 : 1;
 }
 
-// Test: preprocess_predict produces the same feature vector as preprocess with sampling_ratio=1.0
-// On master, ml_features_preprocess with the prediction-sized window (n = diff_n + smooth_n + lag_n)
-// produces exactly 1 feature vector. The branch's ml_features_preprocess_predict must match it.
-// This test validates both paths produce identical results across various inputs.
+// Test: ml_features_preprocess with a prediction-sized window produces the same
+// feature vector as a manual reimplementation of diff + smooth + extract.
+// This validates the preprocessing math and serves as a baseline for verifying
+// that any optimized prediction path (e.g. ml_features_preprocess_predict)
+// produces identical results.
 static int test_preprocess_predict_equivalence()
 {
     fprintf(stderr, "  test_preprocess_predict_equivalence...\n");
@@ -733,7 +735,7 @@ static int test_parameter_combinations()
     return tests_failed == 0 ? 0 : 1;
 }
 
-int ml_unittest()
+extern "C" int ml_unittest()
 {
     fprintf(stderr, "\nML unit tests:\n");
 

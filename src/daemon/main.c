@@ -225,7 +225,9 @@ int health_config_unittest(void);
 int utf8_sanitizer_unittest(void);
 int yaml_unittest(void);
 int json_c_parser_unittest(void);
+#ifdef ENABLE_ML
 int ml_unittest(void);
+#endif
 bool netdata_random_session_id_generate(void);
 
 #ifdef OS_WINDOWS
@@ -394,10 +396,15 @@ int netdata_main(int argc, char **argv) {
                         }
 
                         if(strcmp(optarg, "mltest") == 0) {
+#ifdef ENABLE_ML
                             unittest_running = true;
                             if (ml_unittest()) return 1;
                             fprintf(stderr, "\n\nML TESTS PASSED\n\n");
                             return 0;
+#else
+                            fprintf(stderr, "ML support is disabled in this build.\n");
+                            return 1;
+#endif
                         }
 
                         if(strcmp(optarg, "unittest") == 0) {
