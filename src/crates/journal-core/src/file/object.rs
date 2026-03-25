@@ -594,7 +594,7 @@ impl<B: SplitByteSlice> JournalObject<B> for OffsetArrayObject<B> {
             .split_at(std::mem::size_of::<OffsetArrayObjectHeader>())
             .ok()?;
 
-        let header = zerocopy::Ref::from_bytes(header_data).ok()?;
+        let header = zerocopy::Ref::<_, OffsetArrayObjectHeader>::from_bytes(header_data).ok()?;
 
         let items_type = if is_compact {
             let compact_items = zerocopy::Ref::from_bytes(items_data).ok()?;
@@ -617,7 +617,7 @@ impl<B: SplitByteSliceMut> JournalObjectMut<B> for OffsetArrayObject<B> {
             .split_at(std::mem::size_of::<OffsetArrayObjectHeader>())
             .ok()?;
 
-        let header = zerocopy::Ref::from_bytes(header_data).ok()?;
+        let header = zerocopy::Ref::<_, OffsetArrayObjectHeader>::from_bytes(header_data).ok()?;
 
         let items_type = if is_compact {
             let compact_items = zerocopy::Ref::from_bytes(items_data).ok()?;
@@ -884,6 +884,11 @@ pub struct DataObject<B: ByteSlice> {
     pub payload: DataPayloadType<B>,
 }
 
+pub struct DataPayloadRef<'a> {
+    pub header: Ref<&'a [u8], DataObjectHeader>,
+    pub payload: &'a [u8],
+}
+
 impl<B: ByteSlice> std::fmt::Debug for DataObject<B> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DataObject")
@@ -899,7 +904,7 @@ impl<B: SplitByteSlice> JournalObject<B> for DataObject<B> {
             .split_at(std::mem::size_of::<DataObjectHeader>())
             .ok()?;
 
-        let header = zerocopy::Ref::from_bytes(header_data).ok()?;
+        let header = zerocopy::Ref::<_, DataObjectHeader>::from_bytes(header_data).ok()?;
 
         let payload = if is_compact {
             let (fields_data, payload_data) = remaining_data
@@ -977,49 +982,114 @@ impl<B: ByteSlice> DataObject<B> {
 
     pub fn decompress(&self, buf: &mut Vec<u8>) -> Result<usize> {
         debug_assert!(self.is_compressed());
+        decompress_payload(
+            self.raw_payload(),
+            self.zstd_compressed(),
+            self.lz4_compressed(),
+            self.xz_compressed(),
+            buf,
+        )
+    }
+}
 
-        if self.zstd_compressed() {
-            use ruzstd::decoding::StreamingDecoder;
-            use ruzstd::io::Read;
-
-            let payload = self.raw_payload();
-            let mut decoder =
-                StreamingDecoder::new(payload).map_err(|_| JournalError::DecompressorError)?;
-
-            buf.clear();
-            decoder
-                .read_to_end(buf)
-                .map_err(|_| JournalError::DecompressorError)
-        } else if self.lz4_compressed() {
-            let payload = self.raw_payload();
-
-            // First 8 bytes are the uncompressed size (little-endian u64)
-            if payload.len() < 8 {
-                return Err(JournalError::DecompressorError);
-            }
-
-            let uncompressed_size = u64::from_le_bytes(payload[..8].try_into().unwrap()) as usize;
-            let compressed_data = &payload[8..];
-
-            buf.clear();
-            buf.resize(uncompressed_size, 0);
-
-            lz4_flex::block::decompress_into(compressed_data, buf)
-                .map_err(|_| JournalError::DecompressorError)
-        } else if self.xz_compressed() {
-            use lzma_rust2::XzReader;
-            use std::io::Read;
-
-            let payload = self.raw_payload();
-            let mut decoder = XzReader::new(payload, false);
-
-            buf.clear();
-            decoder
-                .read_to_end(buf)
-                .map_err(|_| JournalError::DecompressorError)
-        } else {
-            Err(JournalError::UnknownCompressionMethod)
+impl<'a> DataPayloadRef<'a> {
+    pub fn from_object_bytes(data: &'a [u8], is_compact: bool) -> Option<Self> {
+        let header_size = std::mem::size_of::<DataObjectHeader>();
+        if data.len() < header_size {
+            return None;
         }
+        let (header_data, remaining_data) = data.split_at(header_size);
+
+        let header = zerocopy::Ref::<_, DataObjectHeader>::from_bytes(header_data).ok()?;
+        let payload = if is_compact {
+            let compact_size = std::mem::size_of::<CompactDataFields>();
+            if remaining_data.len() < compact_size {
+                return None;
+            }
+            let (_, payload_data) = remaining_data.split_at(compact_size);
+            payload_data
+        } else {
+            remaining_data
+        };
+
+        Some(Self { header, payload })
+    }
+
+    pub fn raw_payload(&self) -> &[u8] {
+        self.payload
+    }
+
+    pub fn is_compressed(&self) -> bool {
+        self.header.is_compressed()
+    }
+
+    pub fn xz_compressed(&self) -> bool {
+        self.header.xz_compressed()
+    }
+
+    pub fn lz4_compressed(&self) -> bool {
+        self.header.lz4_compressed()
+    }
+
+    pub fn zstd_compressed(&self) -> bool {
+        self.header.zstd_compressed()
+    }
+
+    pub fn decompress(&self, buf: &mut Vec<u8>) -> Result<usize> {
+        debug_assert!(self.is_compressed());
+        decompress_payload(
+            self.payload,
+            self.zstd_compressed(),
+            self.lz4_compressed(),
+            self.xz_compressed(),
+            buf,
+        )
+    }
+}
+
+fn decompress_payload(
+    payload: &[u8],
+    zstd_compressed: bool,
+    lz4_compressed: bool,
+    xz_compressed: bool,
+    buf: &mut Vec<u8>,
+) -> Result<usize> {
+    if zstd_compressed {
+        use ruzstd::decoding::StreamingDecoder;
+        use ruzstd::io::Read;
+
+        let mut decoder =
+            StreamingDecoder::new(payload).map_err(|_| JournalError::DecompressorError)?;
+
+        buf.clear();
+        decoder
+            .read_to_end(buf)
+            .map_err(|_| JournalError::DecompressorError)
+    } else if lz4_compressed {
+        if payload.len() < 8 {
+            return Err(JournalError::DecompressorError);
+        }
+
+        let uncompressed_size = u64::from_le_bytes(payload[..8].try_into().unwrap()) as usize;
+        let compressed_data = &payload[8..];
+
+        buf.clear();
+        buf.resize(uncompressed_size, 0);
+
+        lz4_flex::block::decompress_into(compressed_data, buf)
+            .map_err(|_| JournalError::DecompressorError)
+    } else if xz_compressed {
+        use lzma_rust2::XzReader;
+        use std::io::Read;
+
+        let mut decoder = XzReader::new(payload, false);
+
+        buf.clear();
+        decoder
+            .read_to_end(buf)
+            .map_err(|_| JournalError::DecompressorError)
+    } else {
+        Err(JournalError::UnknownCompressionMethod)
     }
 }
 

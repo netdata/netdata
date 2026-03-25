@@ -30,9 +30,7 @@ fn archived_journal_path(
     head_seqnum: u64,
     head_realtime: u64,
 ) -> PathBuf {
-    let journal_dir = dir
-        .path()
-        .join("11111111-1111-1111-1111-111111111111");
+    let journal_dir = dir.path().join("11111111-1111-1111-1111-111111111111");
     std::fs::create_dir_all(&journal_dir).expect("create test journal directory");
     journal_dir.join(format!(
         "system@{}-{head_seqnum:016x}-{head_realtime:016x}.journal",
@@ -81,7 +79,9 @@ fn write_archived_journal(
     Ok(())
 }
 
-fn read_payload_map(cursor: &mut super::Cursor) -> Result<BTreeMap<String, String>, super::SessionError> {
+fn read_payload_map(
+    cursor: &mut super::Cursor,
+) -> Result<BTreeMap<String, String>, super::SessionError> {
     let mut payloads = cursor.payloads()?;
     let mut fields = BTreeMap::new();
     while let Some(payload) = payloads.next()? {
@@ -91,6 +91,21 @@ fn read_payload_map(cursor: &mut super::Cursor) -> Result<BTreeMap<String, Strin
             fields.insert(key, value);
         }
     }
+    Ok(fields)
+}
+
+fn read_payload_map_via_visit(
+    cursor: &mut super::Cursor,
+) -> Result<BTreeMap<String, String>, super::SessionError> {
+    let mut fields = BTreeMap::new();
+    cursor.visit_payloads(|payload| {
+        if let Some(eq_pos) = payload.iter().position(|&b| b == b'=') {
+            let key = String::from_utf8_lossy(&payload[..eq_pos]).into_owned();
+            let value = String::from_utf8_lossy(&payload[eq_pos + 1..]).into_owned();
+            fields.insert(key, value);
+        }
+        Ok(())
+    })?;
     Ok(fields)
 }
 
@@ -340,5 +355,41 @@ fn non_matching_exact_filter_returns_empty_results() -> TestResult {
         .build()?;
 
     assert!(!cursor.step()?);
+    Ok(())
+}
+
+#[test]
+fn visit_payloads_matches_payload_iterator() -> TestResult {
+    let dir = TempDir::new()?;
+    let path = archived_journal_path(&dir, 0x21, 1, 1_000_000);
+
+    write_archived_journal(
+        &path,
+        0x31,
+        &[TestEntry {
+            realtime: 1_000_000,
+            monotonic: 100,
+            fields: &[
+                "MESSAGE=hello",
+                "_SYSTEMD_UNIT=test.service",
+                "FLOW_VERSION=9",
+            ],
+        }],
+    )?;
+
+    let session = JournalSession::builder()
+        .files(vec![path])
+        .load_remappings(false)
+        .build()?;
+
+    let mut cursor = session.cursor(Direction::Forward)?;
+    assert!(cursor.step()?);
+    let fields_via_iterator = read_payload_map(&mut cursor)?;
+
+    let mut cursor = session.cursor(Direction::Forward)?;
+    assert!(cursor.step()?);
+    let fields_via_visit = read_payload_map_via_visit(&mut cursor)?;
+
+    assert_eq!(fields_via_iterator, fields_via_visit);
     Ok(())
 }

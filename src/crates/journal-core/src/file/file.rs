@@ -273,14 +273,11 @@ fn map_hash_table<M: MemoryMap>(
 }
 
 impl<M: MemoryMap> JournalFile<M> {
-    fn parse_object_in_window<'a, T>(
+    fn object_bytes_in_window<'a>(
         &'a self,
         wm: &'a mut WindowManager<M>,
         offset: NonZeroU64,
-    ) -> Result<T>
-    where
-        T: JournalObject<&'a [u8]>,
-    {
+    ) -> Result<&'a [u8]> {
         validate_offset_alignment(offset)?;
 
         if offset.get() < self.header_size {
@@ -288,7 +285,8 @@ impl<M: MemoryMap> JournalFile<M> {
         }
 
         let size_needed = {
-            let header_slice = wm.get_slice(offset.get(), std::mem::size_of::<ObjectHeader>() as u64)?;
+            let header_slice =
+                wm.get_slice(offset.get(), std::mem::size_of::<ObjectHeader>() as u64)?;
             let header =
                 ObjectHeader::ref_from_bytes(header_slice).map_err(|_| JournalError::ZerocopyFailure)?;
             header.validated_size()?
@@ -302,8 +300,29 @@ impl<M: MemoryMap> JournalFile<M> {
             return Err(JournalError::ObjectExceedsFileBounds);
         }
 
-        let data = wm.get_slice(offset.get(), size_needed)?;
+        wm.get_slice(offset.get(), size_needed)
+    }
+
+    fn parse_object_in_window<'a, T>(
+        &'a self,
+        wm: &'a mut WindowManager<M>,
+        offset: NonZeroU64,
+    ) -> Result<T>
+    where
+        T: JournalObject<&'a [u8]>,
+    {
+        let data = self.object_bytes_in_window(wm, offset)?;
         T::from_data(data, self.is_compact).ok_or(JournalError::ZerocopyFailure)
+    }
+
+    fn data_payload_in_window<'a>(
+        &'a self,
+        wm: &'a mut WindowManager<M>,
+        offset: NonZeroU64,
+    ) -> Result<DataPayloadRef<'a>> {
+        let data = self.object_bytes_in_window(wm, offset)?;
+        DataPayloadRef::from_object_bytes(data, self.is_compact)
+            .ok_or(JournalError::ZerocopyFailure)
     }
 
     pub fn visit_bucket<'a, H, V>(
@@ -652,7 +671,7 @@ impl<M: MemoryMap> JournalFile<M> {
         mut visitor: F,
     ) -> Result<()>
     where
-        F: for<'a> FnMut(DataObject<&'a [u8]>) -> Result<()>,
+        F: for<'a> FnMut(DataPayloadRef<'a>) -> Result<()>,
     {
         data_offsets.clear();
 
@@ -663,8 +682,8 @@ impl<M: MemoryMap> JournalFile<M> {
             }
 
             for data_offset in data_offsets.iter().copied() {
-                let data_object: DataObject<&[u8]> = self.parse_object_in_window(wm, data_offset)?;
-                visitor(data_object)?;
+                let payload = self.data_payload_in_window(wm, data_offset)?;
+                visitor(payload)?;
             }
 
             Ok(())

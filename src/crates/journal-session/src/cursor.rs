@@ -498,19 +498,19 @@ impl Cursor {
         let data_offsets = &mut self.entry_data_offsets;
         let mut visitor_error = None;
 
-        jf.visit_entry_payloads(entry_offset, data_offsets, |data_object| {
+        jf.visit_entry_payloads(entry_offset, data_offsets, |payload| {
             if visitor_error.is_some() {
                 return Ok(());
             }
 
-            let result = if data_object.is_compressed() {
-                if let Err(err) = data_object.decompress(buf) {
+            let result = if payload.is_compressed() {
+                if let Err(err) = payload.decompress(buf) {
                     visitor_error = Some(SessionError::from(err));
                     return Ok(());
                 }
                 visitor(buf)
             } else {
-                visitor(data_object.raw_payload())
+                visitor(payload.raw_payload())
             };
 
             if let Err(err) = result {
