@@ -8,6 +8,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ap"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/apache"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/apcupsd"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor"
 	// _ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/as400" // Moved to ibm.d.plugin (requires CGO)
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/beanstalk"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/bind"
@@ -90,6 +91,8 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/postgres"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/powerdns"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/powerdns_recursor"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/powerstore"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/powervault"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/proxysql"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/pulsar"

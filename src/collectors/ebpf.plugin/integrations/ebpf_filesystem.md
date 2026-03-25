@@ -47,6 +47,88 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+#### Compile kernel
+
+Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+with different names.
+
+Now follow steps:
+1. Copy the configuration file to /usr/src/linux/.config.
+2. Select the necessary options: make oldconfig
+3. Compile your kernel image: make bzImage
+4. Compile your modules: make modules
+5. Copy your new kernel image for boot loader directory
+6. Install the new modules: make modules_install
+7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+8. Update your boot loader
+
+
+
+### Configuration
+
+#### Options
+
+This configuration file have two different sections. The `[global]` overwrites default options, while `[filesystem]` allow user to select the filesystems to monitor.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update every | Data collection frequency. | 10 | no |
+| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
+| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
+| btrfsdist | Enable or disable latency monitoring for functions associated with btrfs filesystem. | yes | no |
+| ext4dist | Enable or disable latency monitoring for functions associated with ext4 filesystem. | yes | no |
+| nfsdist | Enable or disable latency monitoring for functions associated with nfs filesystem. | yes | no |
+| xfsdist | Enable or disable latency monitoring for functions associated with xfs filesystem. | yes | no |
+| zfsdist | Enable or disable latency monitoring for functions associated with zfs filesystem. | yes | no |
+
+
+</details>
+
+
+
+#### via File
+
+The configuration file name for this integration is `ebpf.d/filesystem.conf`.
+
+The file format is a modified INI syntax. The general structure is:
+
+```ini
+[section1]
+    option1 = some value
+    option2 = some other value
+
+[section2]
+    option3 = some third value
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config ebpf.d/filesystem.conf
+```
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -92,87 +174,5 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | filesystem.attributte_latency | latency period | calls/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
-## Setup
-
-
-### Prerequisites
-
-#### Compile kernel
-
-Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
-When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
-with different names.
-
-Now follow steps:
-1. Copy the configuration file to /usr/src/linux/.config.
-2. Select the necessary options: make oldconfig
-3. Compile your kernel image: make bzImage
-4. Compile your modules: make modules
-5. Copy your new kernel image for boot loader directory
-6. Install the new modules: make modules_install
-7. Generate an initial ramdisk image (`initrd`) if it is necessary.
-8. Update your boot loader
-
-
-
-### Configuration
-
-#### Options
-
-This configuration file have two different sections. The `[global]` overwrites default options, while `[filesystem]` allow user to select the filesystems to monitor.
-
-
-<details open><summary>Config options</summary>
-
-
-
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update every | Data collection frequency. | 5 | no |
-| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
-| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
-| btrfsdist | Enable or disable latency monitoring for functions associated with btrfs filesystem. | yes | no |
-| ext4dist | Enable or disable latency monitoring for functions associated with ext4 filesystem. | yes | no |
-| nfsdist | Enable or disable latency monitoring for functions associated with nfs filesystem. | yes | no |
-| xfsdist | Enable or disable latency monitoring for functions associated with xfs filesystem. | yes | no |
-| zfsdist | Enable or disable latency monitoring for functions associated with zfs filesystem. | yes | no |
-
-
-</details>
-
-
-
-#### via File
-
-The configuration file name for this integration is `ebpf.d/filesystem.conf`.
-
-The file format is a modified INI syntax. The general structure is:
-
-```ini
-[section1]
-    option1 = some value
-    option2 = some other value
-
-[section2]
-    option3 = some third value
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config ebpf.d/filesystem.conf
-```
-
-##### Examples
-There are no configuration examples.
 
 

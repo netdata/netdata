@@ -101,6 +101,14 @@ void system_tz_free(SYSTEM_TZ *tz);
 extern bool netdata_ready;
 extern time_t netdata_start_time;
 
+static inline bool netdata_ready_load(void) {
+    return __atomic_load_n(&netdata_ready, __ATOMIC_ACQUIRE);
+}
+
+static inline void netdata_ready_store(bool ready) {
+    __atomic_store_n(&netdata_ready, ready, __ATOMIC_RELEASE);
+}
+
 void set_environment_for_plugins_and_scripts(void);
 
 #ifdef __cplusplus

@@ -125,6 +125,7 @@ static void pluginsd_host_define_cleanup(PARSER *parser) {
     parser->user.host_define.hostname = NULL;
     parser->user.host_define.rrdlabels = NULL;
     parser->user.host_define.parsing_host = false;
+    parser->user.host_define.node_stale_after_seconds = 0;
 }
 
 static inline bool pluginsd_validate_machine_guid(const char *guid, nd_uuid_t *uuid, char *output) {
@@ -153,6 +154,7 @@ static inline PARSER_RC pluginsd_host_define(char **words, size_t num_words, PAR
     parser->user.host_define.hostname = string_strdupz(hostname);
     parser->user.host_define.rrdlabels = rrdlabels_create();
     parser->user.host_define.parsing_host = true;
+    parser->user.host_define.node_stale_after_seconds = 0;
 
     return PARSER_RC_OK;
 }

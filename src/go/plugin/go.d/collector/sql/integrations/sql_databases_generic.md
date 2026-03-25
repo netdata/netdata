@@ -98,45 +98,6 @@ Prefer indexed reads, avoid full table scans or heavy aggregations, and
 consider using database views tailored for monitoring.
 
 
-## Metrics
-
-Metrics and charts are **defined by your SQL queries and metric blocks** at runtime. They differ by database engine, schema, and configuration, and may include, for example, connection counts, cache hit ratios, row throughput, lock statistics, or custom business KPIs. Use the **Metrics** tab on the job’s dashboard to see exactly what is collected for that job.
-
-:::tip
-
- To change what is collected, edit the `metrics` (and optionally `queries`) sections in `go.d/sql.conf` for the corresponding job. Each change is reflected in Netdata charts after the next data collection.
-
-:::
-
-
-
-## Functions
-
-This collector supports user-defined SQL functions that expose query results as
-interactive table views in Netdata's **Live** tab. Functions are configured per job
-in the `functions` section of the job configuration. Since functions are entirely
-user-defined, no predefined functions are listed here.
-
-In the Live tab, functions appear in a hierarchical menu:
-
-```
-Databases
-└── SQL
-    └── <job_name>
-        ├── <function_name_1>
-        └── <function_name_2>
-```
-
-Each job creates its own group containing all functions defined for that job.
-
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -201,10 +162,12 @@ cloud_auth:                                  # OPTIONAL. Cloud auth for pgx/sqls
   provider: <none|azure_ad>                 # OPTIONAL. Default: none.
   azure_ad:
     mode: <service_principal|managed_identity|default>
-    tenant_id: "<tenant-id>"                # REQUIRED for service_principal
-    client_id: "<client-id>"                # REQUIRED for service_principal
-    client_secret: "<client-secret>"        # REQUIRED for service_principal
-    managed_identity_client_id: "<client-id>" # Optional for user-assigned MI
+    mode_service_principal:                  # REQUIRED for service_principal
+      tenant_id: "<tenant-id>"
+      client_id: "<client-id>"
+      client_secret: "<client-secret>"
+    mode_managed_identity:                   # OPTIONAL for managed_identity
+      client_id: "<client-id>"               # Optional for user-assigned MI
 
 # Optional static labels applied to all charts
 static_labels:
@@ -312,11 +275,11 @@ functions:
 | **Target** | driver | SQL driver to use. Supported values: `mysql`, `pgx`, `oracle`, `sqlserver`, `azuresql`. | mysql | yes |
 |  | dsn | Database connection string (DSN). The format depends on the selected driver ( [MySQL](https://github.com/go-sql-driver/mysql#dsn-data-source-name), [PostgreSQL](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS), [MS SQL Server](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn)). |  | yes |
 | **Cloud Auth** | cloud_auth.provider | Cloud auth provider (`none` or `azure_ad`). Supported for `pgx`, `sqlserver`, and `azuresql`. | none | no |
-| **Cloud Auth/Azure** | cloud_auth.azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). | default | no |
-|  | cloud_auth.azure_ad.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
-|  | cloud_auth.azure_ad.client_id | Azure client ID. Required for `service_principal`; optional for user-assigned managed identity. |  | no |
-|  | cloud_auth.azure_ad.client_secret | Azure client secret for `service_principal` mode. |  | no |
-|  | cloud_auth.azure_ad.managed_identity_client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
+| **Cloud Auth/Azure** | cloud_auth.azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). Required when `cloud_auth.provider` is `azure_ad`. |  | yes |
+|  | cloud_auth.azure_ad.mode_service_principal.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.mode_service_principal.client_id | Azure client ID. Required for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.mode_service_principal.client_secret | Azure client secret for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.mode_managed_identity.client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
 | **Connection** | timeout | Query and connection check timeout (seconds). | 5 | no |
 | **Labels** | static_labels | A map of static labels added to every chart created by this job. Useful for tagging charts with environment, region, or role. | {} | no |
 | **Queries & Metrics** | queries | A list of reusable queries. Metric blocks can reference these via `query_ref` to avoid repeating SQL. See [Configuration Structure](#configuration) for details. | [] | no |
@@ -392,9 +355,10 @@ jobs:
       provider: azure_ad
       azure_ad:
         mode: service_principal
-        tenant_id: "00000000-0000-0000-0000-000000000000"
-        client_id: "11111111-1111-1111-1111-111111111111"
-        client_secret: "super-secret-value"
+        mode_service_principal:
+          tenant_id: "00000000-0000-0000-0000-000000000000"
+          client_id: "11111111-1111-1111-1111-111111111111"
+          client_secret: "super-secret-value"
     metrics:
       - id: user_connections
         mode: columns
@@ -825,6 +789,45 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics and charts are **defined by your SQL queries and metric blocks** at runtime. They differ by database engine, schema, and configuration, and may include, for example, connection counts, cache hit ratios, row throughput, lock statistics, or custom business KPIs. Use the **Metrics** tab on the job’s dashboard to see exactly what is collected for that job.
+
+:::tip
+
+ To change what is collected, edit the `metrics` (and optionally `queries`) sections in `go.d/sql.conf` for the corresponding job. Each change is reflected in Netdata charts after the next data collection.
+
+:::
+
+
+
+## Live Data
+
+This collector supports user-defined SQL functions that expose query results as
+interactive table views in Netdata's **Live** tab. Functions are configured per job
+in the `functions` section of the job configuration. Since functions are entirely
+user-defined, no predefined functions are listed here.
+
+In the Live tab, functions appear in a hierarchical menu:
+
+```
+Databases
+└── SQL
+    └── <job_name>
+        ├── <function_name_1>
+        └── <function_name_2>
+```
+
+Each job creates its own group containing all functions defined for that job.
+
 
 
 

@@ -18,7 +18,7 @@ It is the input schema consumed by `chartengine`.
 ## Processing Pipeline
 
 1. **Decode** — Strict YAML decode (`yaml.UnmarshalStrict`). Unknown fields fail decoding.
-2. **Defaults** — `version` defaults to `v1` (top-level only); chart `type` defaults to `line` (applied recursively across groups).
+2. **Defaults** — `version` defaults to `v1` (top-level only); chart `type` defaults to `line`; inheritable `group.chart_defaults` are applied recursively using nearest-group-wins replace semantics.
 3. **Semantic validation** — Field-level checks with path-aware errors (metric scoping, selectors, dimension rules, lifecycle bounds).
 
 ## Syntax (v1)
@@ -39,6 +39,7 @@ It is the input schema consumed by `chartengine`.
 | `family`            | string        | yes      | Family segment used for chart family composition                                     |
 | `context_namespace` | string        | no       | Context segment appended to inherited context namespace                              |
 | `metrics`           | array[string] | no       | Metrics available for dimension selectors in this group (inherited by nested groups) |
+| `chart_defaults`    | object        | no       | Inheritable chart fields for descendant charts in this group subtree                 |
 | `charts`            | array         | no       | Chart definitions                                                                    |
 | `groups`            | array         | no       | Nested groups                                                                        |
 
@@ -46,6 +47,22 @@ It is the input schema consumed by `chartengine`.
 `<top context_namespace>.<group context_namespace>...<chart.context>`.
 For example, with top-level `context_namespace: netdata.go.plugin`, group `context_namespace: mysql`,
 and chart `context: queries`, the resulting context is `netdata.go.plugin.mysql.queries`.
+
+### `chart_defaults`
+
+`chart_defaults` applies only to descendant charts of the current group. Supported fields are:
+
+| Field             | Type          | Description                              |
+|-------------------|---------------|------------------------------------------|
+| `label_promotion` | array[string] | Default chart label promotion policy     |
+| `instances`       | object        | Default chart instance identity policy   |
+
+Inheritance rules:
+
+- nearest group default wins
+- chart-local field overrides inherited default
+- list/object fields replace the inherited field wholesale
+- no deep merge or append semantics
 
 ### `charts[]`
 
@@ -144,6 +161,7 @@ All rules below produce semantic validation errors unless noted:
 - `groups[]` must be non-empty
 - `group.family` must not be empty or whitespace-only
 - `group.metrics[]` entries must not be empty or whitespace-only; no duplicates within same group
+- `group.chart_defaults.instances.by_labels` follows the same validation rules as `chart.instances.by_labels`
 - `chart.title`, `chart.context`, `chart.units` must be non-empty
 - `dimension.selector` must include explicit metric name (prefix before `{`)
 - Selector metric must be visible in current group metric scope

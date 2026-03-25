@@ -74,18 +74,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics are dynamically created based on the OpenTelemetry data received.
-The specific metrics depend on the OTLP sources sending data to the plugin.
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -264,5 +252,17 @@ logs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics are dynamically created based on the OpenTelemetry data received.
+The specific metrics depend on the OTLP sources sending data to the plugin.
 
 

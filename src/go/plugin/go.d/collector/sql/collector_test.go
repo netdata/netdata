@@ -164,9 +164,11 @@ func TestCollector_Init_ConfigValidation(t *testing.T) {
 				c.Functions = []ConfigFunction{{ID: "test", Query: "SELECT 1"}}
 				c.CloudAuth.Provider = "azure_ad"
 				c.CloudAuth.AzureAD = &cloudauth.AzureADAuthConfig{
-					Mode:     "service_principal",
-					TenantID: "tenant",
-					ClientID: "client",
+					Mode: "service_principal",
+					ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
+						TenantID: "tenant",
+						ClientID: "client",
+					},
 				}
 			},
 			wantFail: true,

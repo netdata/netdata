@@ -2,6 +2,7 @@
 
 #include "ebpf.h"
 #include "ebpf_process.h"
+#include "libbpf_api/ebpf_library.h"
 
 /*****************************************************************
  *
@@ -14,11 +15,11 @@ static char *process_id_names[NETDATA_KEY_PUBLISH_PROCESS_END] = {"do_exit", "re
 static char *status[] = {"process", "zombie"};
 
 netdata_ebpf_targets_t process_targets[] = {
-        {.name = "release_task", .mode = EBPF_LOAD_TRAMPOLINE},
-        {.name = "__x64_sys_clone", .mode = EBPF_LOAD_TRAMPOLINE},
-        {.name = "__x64_sys_clone3", .mode = EBPF_LOAD_TRAMPOLINE},
-        {.name = "_do_fork", .mode = EBPF_LOAD_TRAMPOLINE},
-        {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+    {.name = "release_task", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = "__x64_sys_clone", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = "__x64_sys_clone3", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = "_do_fork", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 static ebpf_local_maps_t process_maps[] = {
     {.name = "tbl_pid_stats",
@@ -58,16 +59,17 @@ static ebpf_local_maps_t process_maps[] = {
 #endif
     }};
 
-char *tracepoint_sched_type = {"sched"};
-char *tracepoint_sched_process_exit = {"sched_process_exit"};
-char *tracepoint_sched_process_exec = {"sched_process_exec"};
-char *tracepoint_sched_process_fork = {"sched_process_fork"};
+char *tracepoint_sched_type = "sched";
+char *tracepoint_sched_process_exit = "sched_process_exit";
+char *tracepoint_sched_process_exec = "sched_process_exec";
+char *tracepoint_sched_process_fork = "sched_process_fork";
 static int was_sched_process_exit_enabled = 0;
 static int was_sched_process_exec_enabled = 0;
 static int was_sched_process_fork_enabled = 0;
 
 static netdata_idx_t *process_hash_values = NULL;
 ebpf_process_stat_t *process_stat_vector = NULL;
+static bool process_safe_clean = false;
 static netdata_syscall_stat_t process_aggregated_data[NETDATA_KEY_PUBLISH_PROCESS_END];
 static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_END];
 
@@ -98,14 +100,12 @@ static void ebpf_disable_tracepoints(struct process_bpf *obj)
 
 static void ebpf_set_trampoline_target(struct process_bpf *obj)
 {
-    bpf_program__set_attach_target(obj->progs.netdata_release_task_fentry, 0,
-                                   process_targets[PROCESS_RELEASE_TASK_NAME].name);
+    bpf_program__set_attach_target(
+        obj->progs.netdata_release_task_fentry, 0, process_targets[PROCESS_RELEASE_TASK_NAME].name);
 
-    bpf_program__set_attach_target(obj->progs.netdata_clone_fexit, 0,
-                                   process_targets[PROCESS_SYS_CLONE].name);
+    bpf_program__set_attach_target(obj->progs.netdata_clone_fexit, 0, process_targets[PROCESS_SYS_CLONE].name);
 
-    bpf_program__set_attach_target(obj->progs.netdata_clone3_fexit, 0,
-                                   process_targets[PROCESS_SYS_CLONE3].name);
+    bpf_program__set_attach_target(obj->progs.netdata_clone3_fexit, 0, process_targets[PROCESS_SYS_CLONE3].name);
 }
 
 /*
@@ -150,19 +150,19 @@ static inline void ebpf_adjust_process_fork(struct process_bpf *obj)
  */
 static inline int process_attach_kprobe_target(struct process_bpf *obj)
 {
-    obj->links.netdata_release_task_probe = bpf_program__attach_kprobe(obj->progs.netdata_release_task_probe,
-                                                                    false, process_targets[PROCESS_RELEASE_TASK_NAME].name);
+    obj->links.netdata_release_task_probe = bpf_program__attach_kprobe(
+        obj->progs.netdata_release_task_probe, false, process_targets[PROCESS_RELEASE_TASK_NAME].name);
     int ret = libbpf_get_error(obj->links.netdata_release_task_probe);
     if (ret)
         goto endakt;
 
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_9_16) {
-        obj->links.netdata_do_fork_probe = bpf_program__attach_kprobe(obj->progs.netdata_do_fork_probe,
-                                                                    false, process_targets[PROCESS_SYS_FORK].name);
+        obj->links.netdata_do_fork_probe =
+            bpf_program__attach_kprobe(obj->progs.netdata_do_fork_probe, false, process_targets[PROCESS_SYS_FORK].name);
         ret = libbpf_get_error(obj->links.netdata_do_fork_probe);
     } else {
-        obj->links.netdata_kernel_clone_probe = bpf_program__attach_kprobe(obj->progs.netdata_kernel_clone_probe,
-                                                                    false, process_targets[PROCESS_KERNEL_CLONE].name);
+        obj->links.netdata_kernel_clone_probe = bpf_program__attach_kprobe(
+            obj->progs.netdata_kernel_clone_probe, false, process_targets[PROCESS_KERNEL_CLONE].name);
         ret = libbpf_get_error(obj->links.netdata_kernel_clone_probe);
     }
 endakt:
@@ -195,21 +195,20 @@ static void ebpf_process_set_hash_tables(struct process_bpf *obj)
  */
 static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_module_t *em)
 {
-    netdata_ebpf_targets_t *mt = em->targets;
-    netdata_ebpf_program_loaded_t test = mt[PROCESS_RELEASE_TASK_NAME].mode;
-    if (test == EBPF_LOAD_TRAMPOLINE) {
+    netdata_ebpf_program_loaded_t mode = em->targets[PROCESS_RELEASE_TASK_NAME].mode;
+    if (mode == EBPF_LOAD_TRAMPOLINE) {
         ebpf_process_disable_probe(obj);
         ebpf_disable_tracepoints(obj);
 
         ebpf_set_trampoline_target(obj);
-    } else if (test == EBPF_LOAD_PROBE || test == EBPF_LOAD_RETPROBE) {
+    } else if (mode == EBPF_LOAD_PROBE || mode == EBPF_LOAD_RETPROBE) {
         ebpf_disable_tracepoints(obj);
         ebpf_disable_trampoline(obj);
 
-        bpf_program__set_autoload((running_on_kernel <= NETDATA_EBPF_KERNEL_5_9_16) ?
-                                  obj->progs.netdata_kernel_clone_probe :
-                                  obj->progs.netdata_do_fork_probe,
-                                  false);
+        bpf_program__set_autoload(
+            (running_on_kernel <= NETDATA_EBPF_KERNEL_5_9_16) ? obj->progs.netdata_kernel_clone_probe :
+                                                                obj->progs.netdata_do_fork_probe,
+            false);
     } else { // Tracepoint
         ebpf_process_disable_probe(obj);
         ebpf_disable_trampoline(obj);
@@ -226,7 +225,7 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
         return ret;
     }
 
-    ret = (test == EBPF_LOAD_TRAMPOLINE) ? process_bpf__attach(obj) : process_attach_kprobe_target(obj);
+    ret = (mode == EBPF_LOAD_TRAMPOLINE) ? process_bpf__attach(obj) : process_attach_kprobe_target(obj);
     if (!ret) {
         ebpf_process_set_hash_tables(obj);
 
@@ -263,8 +262,13 @@ static int ebpf_process_load_bpf(ebpf_module_t *em)
         process_bpf_obj = process_bpf__open();
         if (!process_bpf_obj)
             ret = -1;
-        else
+        else {
             ret = ebpf_process_load_and_attach(process_bpf_obj, em);
+            if (ret) {
+                process_bpf__destroy(process_bpf_obj);
+                process_bpf_obj = NULL;
+            }
+        }
     }
 #endif
 
@@ -372,6 +376,9 @@ void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
     struct ebpf_target *w;
 
     for (w = root; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_PROCESS_IDX))))
             continue;
 
@@ -450,6 +457,9 @@ static void ebpf_update_process_cgroup()
     ebpf_cgroup_target_t *ect;
     netdata_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
@@ -581,6 +591,9 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
     struct ebpf_target *w;
     int update_every = em->update_every;
     for (w = root; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!w->exposed))
             continue;
 
@@ -923,7 +936,7 @@ static void ebpf_obsolete_process_global(ebpf_module_t *em)
  */
 static void ebpf_process_disable_tracepoints()
 {
-    char *default_message = {"Cannot disable the tracepoint"};
+    char *default_message = "Cannot disable the tracepoint";
     if (!was_sched_process_exit_enabled) {
         if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exit))
             netdata_log_error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exit);
@@ -940,25 +953,25 @@ static void ebpf_process_disable_tracepoints()
     }
 }
 
-/**
- * Process Exit
- *
- * Cancel child thread.
- *
- * @param ptr thread data.
- */
 static void ebpf_process_exit(void *pptr)
 {
-    pids_fd[NETDATA_EBPF_PIDS_PROCESS_IDX] = -1;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_PROCESS_IDX, -1);
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if (!em)
         return;
+
+    if (!process_safe_clean) {
+        netdata_mutex_lock(&ebpf_exit_cleanup);
+        em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
+        return;
+    }
 
     netdata_mutex_lock(&lock);
     collect_pids &= ~(1 << EBPF_MODULE_PROCESS_IDX);
     netdata_mutex_unlock(&lock);
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
             ebpf_obsolete_process_cgroup_charts(em);
@@ -975,23 +988,17 @@ static void ebpf_process_exit(void *pptr)
         netdata_mutex_unlock(&lock);
     }
 
-    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
-
-    if (em->objects) {
-        ebpf_unload_legacy_code(em->objects, em->probe_links);
-        em->objects = NULL;
-        em->probe_links = NULL;
-    }
-
     freez(process_hash_values);
     freez(process_stat_vector);
 
     ebpf_process_disable_tracepoints();
 
+    if (!ebpf_plugin_stop() && em->functions.bpf_unload)
+        em->functions.bpf_unload(em);
+
     netdata_mutex_lock(&ebpf_exit_cleanup);
     process_pid_fd = -1;
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
-    ebpf_update_stats(&plugin_statistics, em);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -1329,6 +1336,9 @@ static void ebpf_create_systemd_process_charts(ebpf_module_t *em)
             task_error.update_every = em->update_every;
 
     for (w = ebpf_cgroup_pids; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!w->systemd || w->flags & NETDATA_EBPF_SERVICES_HAS_PROCESS_CHART))
             continue;
 
@@ -1358,6 +1368,9 @@ static void ebpf_send_systemd_process_charts(ebpf_module_t *em)
 {
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(ect->flags & NETDATA_EBPF_SERVICES_HAS_PROCESS_CHART))) {
             continue;
         }
@@ -1399,6 +1412,11 @@ static void ebpf_process_send_cgroup_data(ebpf_module_t *em)
         ebpf_process_sum_cgroup_pids(&ect->publish_systemd_ps, ect->pids);
     }
 
+    if (ebpf_plugin_stop()) {
+        netdata_mutex_unlock(&mutex_cgroup_shm);
+        return;
+    }
+
     if (shm_ebpf_cgroup.header->systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_process_charts(em);
@@ -1408,6 +1426,9 @@ static void ebpf_process_send_cgroup_data(ebpf_module_t *em)
     }
 
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (ect->systemd)
             continue;
 
@@ -1457,6 +1478,9 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
     ebpf_process_stat_t *total = &out[0];
     uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
+        if (ebpf_plugin_stop())
+            break;
+
         ebpf_process_stat_t *w = &out[i];
         total->exit_call += w->exit_call;
         total->task_err += w->task_err;
@@ -1480,6 +1504,9 @@ void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_
 {
     memset(process, 0, sizeof(ebpf_process_stat_t));
     for (; root; root = root->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         uint32_t pid = root->pid;
         netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_PROCESS_IDX);
         if (!local_pid)
@@ -1509,7 +1536,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
     if (tbl_pid_stats_fd == -1)
         return;
 
-    pids_fd[NETDATA_EBPF_PIDS_PROCESS_IDX] = tbl_pid_stats_fd;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_PROCESS_IDX, tbl_pid_stats_fd);
     size_t length = sizeof(ebpf_process_stat_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
@@ -1517,6 +1544,9 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
     if (tbl_pid_stats_fd != -1) {
         uint32_t key = 0, next_key = 0;
         while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
+            if (ebpf_plugin_stop())
+                break;
+
             if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, process_stat_vector)) {
                 goto end_process_loop;
             }
@@ -1534,13 +1564,12 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
                 w->ct = process_stat_vector[0].ct;
                 w->create_thread = process_stat_vector[0].create_thread;
                 w->exit_call = process_stat_vector[0].exit_call;
-                w->create_thread = process_stat_vector[0].create_thread;
                 w->create_process = process_stat_vector[0].create_process;
                 w->release_call = process_stat_vector[0].release_call;
                 w->task_err = process_stat_vector[0].task_err;
             } else {
                 if (kill((pid_t)key, 0)) { // No PID found
-                    if (netdata_ebpf_reset_shm_pointer_unsafe(tbl_pid_stats_fd, key, NETDATA_EBPF_PIDS_CACHESTAT_IDX))
+                    if (netdata_ebpf_reset_shm_pointer_unsafe(tbl_pid_stats_fd, key, NETDATA_EBPF_PIDS_PROCESS_IDX))
                         memset(w, 0, sizeof(*w));
                 }
             }
@@ -1553,6 +1582,9 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
 
     struct ebpf_target *w;
     for (w = apps_groups_root_target; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->processes)))
             continue;
 
@@ -1581,11 +1613,14 @@ static void process_collector(ebpf_module_t *em)
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
-    memset(stats, 0, sizeof(em->hash_table_stats));
+    memset(stats, 0, sizeof(netdata_idx_t) * NETDATA_EBPF_GLOBAL_TABLE_STATUS_END);
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
     int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     while (!ebpf_plugin_stop() && running_time < lifetime) {
+        if (ebpf_plugin_stop())
+            break;
+
         heartbeat_next(&hb);
 
         if (ebpf_plugin_stop())
@@ -1599,7 +1634,11 @@ static void process_collector(ebpf_module_t *em)
             netdata_apps_integration_flags_t apps_enabled = em->apps_charts;
 
             if (ebpf_all_pids_count > 0) {
-                sem_wait(shm_mutex_ebpf_integration);
+                if (!ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+                    if (errno != ECANCELED)
+                        netdata_log_error("PROCESS: Failed to wait on semaphore.");
+                    break;
+                }
                 netdata_mutex_lock(&collect_data_mutex);
                 collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
 
@@ -1607,8 +1646,17 @@ static void process_collector(ebpf_module_t *em)
                     ebpf_update_process_cgroup();
                 }
                 netdata_mutex_unlock(&collect_data_mutex);
-                sem_post(shm_mutex_ebpf_integration);
+                if (sem_post(shm_mutex_ebpf_integration)) {
+                    netdata_log_error("PROCESS: Failed to post semaphore.");
+                    break;
+                }
             }
+
+            // Avoid acquiring lock for data-send when shutdown is in progress;
+            // the main thread may be holding lock for apps-parsing at this point,
+            // which would delay this thread's join and compound the shutdown time.
+            if (ebpf_plugin_stop())
+                break;
 
             netdata_mutex_lock(&lock);
 
@@ -1622,23 +1670,23 @@ static void process_collector(ebpf_module_t *em)
             }
 
             if (cgroups && shm_ebpf_cgroup.header) {
-                ebpf_process_send_cgroup_data(em);
+                if (!ebpf_plugin_stop())
+                    ebpf_process_send_cgroup_data(em);
             }
 
             netdata_mutex_unlock(&collect_data_mutex);
             netdata_mutex_unlock(&lock);
 
-            netdata_mutex_lock(&ebpf_exit_cleanup);
-            if (running_time && !em->running_time)
-                running_time = update_every;
-            else
-                running_time += update_every;
+            fflush(stdout);
 
+            if (ebpf_plugin_stop())
+                break;
+
+            netdata_mutex_lock(&ebpf_exit_cleanup);
+            running_time += update_every;
             em->running_time = running_time;
             netdata_mutex_unlock(&ebpf_exit_cleanup);
         }
-
-        fflush(stdout);
     }
 }
 
@@ -1665,7 +1713,7 @@ static void ebpf_process_allocate_global_vectors(size_t length)
 
 static void change_syscalls()
 {
-    static char *lfork = {"do_fork"};
+    static char *lfork = "do_fork";
     process_id_names[NETDATA_KEY_PUBLISH_PROCESS_FORK] = lfork;
 }
 
@@ -1686,6 +1734,29 @@ static void set_local_pointers()
  *****************************************************************/
 
 /**
+ * Enable a single tracepoint
+ *
+ * Enable a tracepoint and store whether it was already enabled.
+ *
+ * @param event    the tracepoint event name
+ * @param was_enabled  pointer to store the previous state
+ *
+ * @return 0 on success, -1 on error
+ */
+static int ebpf_enable_single_tracepoint(const char *event, int *was_enabled)
+{
+    int enabled = ebpf_is_tracepoint_enabled(tracepoint_sched_type, event);
+    if (enabled == -1)
+        return -1;
+    if (!enabled) {
+        if (ebpf_enable_tracing_values(tracepoint_sched_type, event))
+            return -1;
+    }
+    *was_enabled = enabled;
+    return 0;
+}
+
+/**
  * Enable tracepoints
  *
  * Enable necessary tracepoints for thread.
@@ -1694,32 +1765,14 @@ static void set_local_pointers()
  */
 static int ebpf_process_enable_tracepoints()
 {
-    int test = ebpf_is_tracepoint_enabled(tracepoint_sched_type, tracepoint_sched_process_exit);
-    if (test == -1)
+    if (ebpf_enable_single_tracepoint(tracepoint_sched_process_exit, &was_sched_process_exit_enabled))
         return -1;
-    else if (!test) {
-        if (ebpf_enable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exit))
-            return -1;
-    }
-    was_sched_process_exit_enabled = test;
 
-    test = ebpf_is_tracepoint_enabled(tracepoint_sched_type, tracepoint_sched_process_exec);
-    if (test == -1)
+    if (ebpf_enable_single_tracepoint(tracepoint_sched_process_exec, &was_sched_process_exec_enabled))
         return -1;
-    else if (!test) {
-        if (ebpf_enable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exec))
-            return -1;
-    }
-    was_sched_process_exec_enabled = test;
 
-    test = ebpf_is_tracepoint_enabled(tracepoint_sched_type, tracepoint_sched_process_fork);
-    if (test == -1)
+    if (ebpf_enable_single_tracepoint(tracepoint_sched_process_fork, &was_sched_process_fork_enabled))
         return -1;
-    else if (!test) {
-        if (ebpf_enable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_fork))
-            return -1;
-    }
-    was_sched_process_fork_enabled = test;
 
     return 0;
 }
@@ -1737,7 +1790,17 @@ void ebpf_process_thread(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    process_safe_clean = false;
+
     CLEANUP_FUNCTION_REGISTER(ebpf_process_exit) cleanup_ptr = em;
+
+    if (!ebpf_module_thread_has_valid_state(em)) {
+        em->enabled = em->global_charts = em->apps_charts = em->cgroup_charts = NETDATA_THREAD_EBPF_STOPPING;
+        netdata_mutex_lock(&ebpf_exit_cleanup);
+        ebpf_update_disabled_plugin_stats(em);
+        netdata_mutex_unlock(&ebpf_exit_cleanup);
+        return;
+    }
 
     em->maps = process_maps;
 
@@ -1774,6 +1837,7 @@ void ebpf_process_thread(void *ptr)
 
     netdata_mutex_unlock(&lock);
 
+    process_safe_clean = true;
     process_collector(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);

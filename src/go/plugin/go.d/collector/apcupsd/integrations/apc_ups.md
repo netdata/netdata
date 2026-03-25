@@ -49,58 +49,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per ups
-
-These metrics refer to the UPS unit.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| apcupsd.ups_status | TRIM, BOOST, CAL, ONLINE, ONBATT, OVERLOAD, LOWBATT, REPLACEBATT, NOBATT, SLAVE, SLAVEDOWN, COMMLOST, SHUTTING_DOWN | status |
-| apcupsd.ups_selftest | NO, NG, WN, IP, OK, BT, UNK | status |
-| apcupsd.ups_battery_charge | charge | percent |
-| apcupsd.ups_battery_time_remaining | timeleft | seconds |
-| apcupsd.ups_battery_time_since_replacement | since_replacement | seconds |
-| apcupsd.ups_battery_voltage | voltage, nominal_voltage | Volts |
-| apcupsd.ups_load_capacity_utilization | load | percent |
-| apcupsd.ups_load | load | Watts |
-| apcupsd.ups_temperature | temperature | Celsius |
-| apcupsd.ups_input_voltage | voltage, min_voltage, max_voltage | Volts |
-| apcupsd.ups_input_frequency | frequency | Hz |
-| apcupsd.ups_output_voltage | voltage | Volts |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ apcupsd_ups_load_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_load_capacity_utilization | APC UPS average load over the last 10 minutes |
-| [ apcupsd_ups_battery_charge ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_battery_charge | APC UPS average battery charge over the last minute |
-| [ apcupsd_last_collected_secs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS number of seconds since the last successful data collection |
-| [ apcupsd_ups_selftest_warning ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_selftest | APC UPS self-test failed due to insufficient battery capacity or due to overload |
-| [ apcupsd_ups_status_onbatt ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS has switched to battery power because the input power has failed |
-| [ apcupsd_ups_status_overload ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS is overloaded and cannot supply enough power to the load |
-| [ apcupsd_ups_status_lowbatt ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS battery is low and needs to be recharged |
-| [ apcupsd_ups_status_replacebatt ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS battery has reached the end of its lifespan and needs to be replaced |
-| [ apcupsd_ups_status_nobatt ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS has no battery |
-| [ apcupsd_ups_status_commlost ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS communication link is lost |
-
-
 ## Setup
 
 
@@ -215,6 +163,58 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ apcupsd_ups_load_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_load_capacity_utilization | APC UPS average load over the last 10 minutes |
+| [ apcupsd_ups_battery_charge ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_battery_charge | APC UPS average battery charge over the last minute |
+| [ apcupsd_last_collected_secs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS number of seconds since the last successful data collection |
+| [ apcupsd_ups_selftest_warning ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_selftest | APC UPS self-test failed due to insufficient battery capacity or due to overload |
+| [ apcupsd_ups_status_onbatt ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS has switched to battery power because the input power has failed |
+| [ apcupsd_ups_status_overload ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS is overloaded and cannot supply enough power to the load |
+| [ apcupsd_ups_status_lowbatt ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS battery is low and needs to be recharged |
+| [ apcupsd_ups_status_replacebatt ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS battery has reached the end of its lifespan and needs to be replaced |
+| [ apcupsd_ups_status_nobatt ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS has no battery |
+| [ apcupsd_ups_status_commlost ](https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf) | apcupsd.ups_status | APC UPS communication link is lost |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per ups
+
+These metrics refer to the UPS unit.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| apcupsd.ups_status | TRIM, BOOST, CAL, ONLINE, ONBATT, OVERLOAD, LOWBATT, REPLACEBATT, NOBATT, SLAVE, SLAVEDOWN, COMMLOST, SHUTTING_DOWN | status |
+| apcupsd.ups_selftest | NO, NG, WN, IP, OK, BT, UNK | status |
+| apcupsd.ups_battery_charge | charge | percent |
+| apcupsd.ups_battery_time_remaining | timeleft | seconds |
+| apcupsd.ups_battery_time_since_replacement | since_replacement | seconds |
+| apcupsd.ups_battery_voltage | voltage, nominal_voltage | Volts |
+| apcupsd.ups_load_capacity_utilization | load | percent |
+| apcupsd.ups_load | load | Watts |
+| apcupsd.ups_temperature | temperature | Celsius |
+| apcupsd.ups_input_voltage | voltage, min_voltage, max_voltage | Volts |
+| apcupsd.ups_input_frequency | frequency | Hz |
+| apcupsd.ups_output_voltage | voltage | Volts |
 
 
 

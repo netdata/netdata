@@ -44,6 +44,73 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+#### Libraries
+
+1. Install `xen-dom0-libs-devel` and `yajl-devel` using the package manager of your system.
+
+  Note: On Cent-OS systems you will need `centos-release-xen` repository and the required package for xen is `xen-devel`
+
+2. Re-install Netdata from source. The installer will detect that the required libraries are now available and will also build xenstat.plugin.
+
+
+
+### Configuration
+
+#### Options
+
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update every | Data collection frequency. | 1 | no |
+
+
+</details>
+
+
+
+#### via File
+
+The configuration file name for this integration is `netdata.conf`.
+Configuration for this specific integration is located in the `[plugin:xenstat]` section within that file.
+
+The file format is a modified INI syntax. The general structure is:
+
+```ini
+[section1]
+    option1 = some value
+    option2 = some other value
+
+[section2]
+    option3 = some third value
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config netdata.conf
+```
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -110,72 +177,5 @@ Metrics:
 | xendomain.packets_network | received, sent | packets/s |
 | xendomain.errors_network | received, sent | errors/s |
 | xendomain.drops_network | received, sent | drops/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
-## Setup
-
-
-### Prerequisites
-
-#### Libraries
-
-1. Install `xen-dom0-libs-devel` and `yajl-devel` using the package manager of your system.
-
-  Note: On Cent-OS systems you will need `centos-release-xen` repository and the required package for xen is `xen-devel`
-
-2. Re-install Netdata from source. The installer will detect that the required libraries are now available and will also build xenstat.plugin.
-
-
-
-### Configuration
-
-#### Options
-
-
-
-<details open><summary>Config options</summary>
-
-
-
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update every | Data collection frequency. | 1 | no |
-
-
-</details>
-
-
-
-#### via File
-
-The configuration file name for this integration is `netdata.conf`.
-Configuration for this specific integration is located in the `[plugin:xenstat]` section within that file.
-
-The file format is a modified INI syntax. The general structure is:
-
-```ini
-[section1]
-    option1 = some value
-    option2 = some other value
-
-[section2]
-    option3 = some third value
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config netdata.conf
-```
-
-##### Examples
-There are no configuration examples.
 
 

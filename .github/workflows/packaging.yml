@@ -238,7 +238,7 @@ jobs:
       - name: Fetch images
         id: fetch-images
         if: needs.file-check.outputs.run == 'true'
-        uses: nick-invision/retry@v3
+        uses: nick-invision/retry@v4
         with:
           max_attempts: 3
           retry_wait_seconds: 30
@@ -248,7 +248,7 @@ jobs:
             docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-${{ matrix.builder_rev }}
       - name: Fetch IBM MQ libs
         id: fetch-ibm-mq
-        if: matrix.arch == 'x86_64' && needs.file-check.outputs.run == 'true'
+        if: (matrix.arch == 'amd64' || matrix.arch == 'x86_64') && needs.file-check.outputs.run == 'true'
         run: .github/scripts/prep-ibm-mq-libs.sh
       - name: Build Packages
         id: build

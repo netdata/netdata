@@ -47,33 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 This thread will add overhead every time that `md_flush_request` is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per eBPF MDflush instance
-
-Number of times md_flush_request was called since last time.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mdstat.mdstat_flush | disk | flushes |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -110,7 +83,7 @@ All options are defined inside section `[global]`.
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
-| update every | Data collection frequency. | 5 | no |
+| update every | Data collection frequency. | 10 | no |
 | ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
 | lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
 
@@ -143,5 +116,32 @@ sudo ./edit-config ebpf.d/mdflush.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per eBPF MDflush instance
+
+Number of times md_flush_request was called since last time.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| mdstat.mdstat_flush | disk | flushes |
 
 

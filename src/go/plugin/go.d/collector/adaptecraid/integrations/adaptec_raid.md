@@ -55,66 +55,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per logical device
-
-These metrics refer to the Logical Device (LD).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| ld_number | Logical device index number |
-| ld_name | Logical device name |
-| raid_level | RAID level |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| adaptecraid.logical_device_status | ok, critical | status |
-
-### Per physical device
-
-These metrics refer to the Physical Device (PD).
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| pd_number | Physical device index number |
-| location | Physical device location (e.g. Connector 0, Device 1) |
-| vendor | Physical device vendor |
-| model | Physical device model |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| adaptecraid.physical_device_state | ok, critical | status |
-| adaptecraid.physical_device_smart_warnings | smart | warnings |
-| adaptecraid.physical_device_temperature | temperature | Celsius |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ adaptec_raid_ld_health_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf) | adaptecraid.logical_device_status | Adaptec RAID logical device (number ${label:ld_number} name ${label:ld_name}) health status is critical |
-| [ adaptec_raid_pd_health_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf) | adaptecraid.physical_device_state | Adaptec RAID physical device (number ${label:pd_number} location ${label:location}) health state is critical |
-
-
 ## Setup
 
 
@@ -206,6 +146,66 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ adaptec_raid_ld_health_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf) | adaptecraid.logical_device_status | Adaptec RAID logical device (number ${label:ld_number} name ${label:ld_name}) health status is critical |
+| [ adaptec_raid_pd_health_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf) | adaptecraid.physical_device_state | Adaptec RAID physical device (number ${label:pd_number} location ${label:location}) health state is critical |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per logical device
+
+These metrics refer to the Logical Device (LD).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| ld_number | Logical device index number |
+| ld_name | Logical device name |
+| raid_level | RAID level |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| adaptecraid.logical_device_status | ok, critical | status |
+
+### Per physical device
+
+These metrics refer to the Physical Device (PD).
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| pd_number | Physical device index number |
+| location | Physical device location (e.g. Connector 0, Device 1) |
+| vendor | Physical device vendor |
+| model | Physical device model |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| adaptecraid.physical_device_state | ok, critical | status |
+| adaptecraid.physical_device_smart_warnings | smart | warnings |
+| adaptecraid.physical_device_temperature | temperature | Celsius |
 
 
 

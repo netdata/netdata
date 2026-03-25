@@ -542,10 +542,11 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 	}
 
 	metricMeta := MetricMeta{
-		Description: strings.TrimSpace(cfg.description),
-		ChartFamily: strings.TrimSpace(cfg.chartFamily),
-		Unit:        strings.TrimSpace(cfg.unit),
-		Float:       cfg.float,
+		Description:   strings.TrimSpace(cfg.description),
+		ChartFamily:   strings.TrimSpace(cfg.chartFamily),
+		ChartPriority: cfg.chartPriority,
+		Unit:          strings.TrimSpace(cfg.unit),
+		Float:         cfg.float,
 	}
 
 	var histogram *histogramSchema
@@ -619,6 +620,9 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 		}
 		if cfg.chartFamilySet && d.meta.ChartFamily != metricMeta.ChartFamily {
 			return nil, fmt.Errorf("metrix: metric chart family mismatch for %s", name)
+		}
+		if cfg.chartPrioritySet && d.meta.ChartPriority != metricMeta.ChartPriority {
+			return nil, fmt.Errorf("metrix: metric chart priority mismatch for %s", name)
 		}
 		if cfg.unitSet && d.meta.Unit != metricMeta.Unit {
 			return nil, fmt.Errorf("metrix: metric unit mismatch for %s", name)

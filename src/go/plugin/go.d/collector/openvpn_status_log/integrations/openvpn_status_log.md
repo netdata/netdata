@@ -47,51 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per OpenVPN status log instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| openvpn.active_clients | clients | clients |
-| openvpn.total_traffic | in, out | kilobits/s |
-
-### Per user
-
-These metrics refer to the VPN user.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| username | VPN username |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| openvpn.user_traffic | in, out | kilobits/s |
-| openvpn.user_connection_time | time | seconds |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -187,6 +142,51 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per OpenVPN status log instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| openvpn.active_clients | clients | clients |
+| openvpn.total_traffic | in, out | kilobits/s |
+
+### Per user
+
+These metrics refer to the VPN user.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| username | VPN username |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| openvpn.user_traffic | in, out | kilobits/s |
+| openvpn.user_connection_time | time | seconds |
 
 
 

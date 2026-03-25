@@ -43,52 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per net.isr instance
-
-These metrics show statistics about softnet stats.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.softnet_stat | dispatched, hybrid_dispatched, qdrops, queued | events/s |
-
-### Per core
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cpu.softnet_stat | dispatched, hybrid_dispatched, qdrops, queued | events/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ 1min_netdev_backlog_exceeded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf) | system.softnet_stat | average number of dropped packets in the last minute due to exceeded net.core.netdev_max_backlog |
-| [ 1min_netdev_budget_ran_outs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf) | system.softnet_stat | average number of times ksoftirq ran out of sysctl net.core.netdev_budget or net.core.netdev_budget_usecs with work remaining over the last minute (this can be a cause for dropped packets) |
-| [ 10min_netisr_backlog_exceeded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf) | system.softnet_stat | average number of drops in the last minute due to exceeded sysctl net.route.netisr_maxqlen (this can be a cause for dropped packets) |
-
-
 ## Setup
 
 
@@ -141,5 +95,51 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ 1min_netdev_backlog_exceeded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf) | system.softnet_stat | average number of dropped packets in the last minute due to exceeded net.core.netdev_max_backlog |
+| [ 1min_netdev_budget_ran_outs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf) | system.softnet_stat | average number of times ksoftirq ran out of sysctl net.core.netdev_budget or net.core.netdev_budget_usecs with work remaining over the last minute (this can be a cause for dropped packets) |
+| [ 10min_netisr_backlog_exceeded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf) | system.softnet_stat | average number of drops in the last minute due to exceeded sysctl net.route.netisr_maxqlen (this can be a cause for dropped packets) |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per net.isr instance
+
+These metrics show statistics about softnet stats.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.softnet_stat | dispatched, hybrid_dispatched, qdrops, queued | events/s |
+
+### Per core
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cpu.softnet_stat | dispatched, hybrid_dispatched, qdrops, queued | events/s |
 
 

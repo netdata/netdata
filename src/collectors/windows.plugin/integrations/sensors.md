@@ -49,59 +49,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Sensor
-
-These metrics refer to Sensors.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| name | Sensor friendly name. |
-| manufacturer | The sensor manufacturer. |
-| model | The sensor model. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.hw.sensor.temperature.input | input | Cel |
-| system.hw.sensor.power.input | input | W |
-| system.hw.sensor.current.input | input | A |
-| system.hw.sensor.humidity.input | input | % |
-| system.hw.sensor.lux.input | input | lx |
-| system.hw.sensor.color.input | input | Cel |
-| system.hw.sensor.voltage.input | input | V |
-| system.hw.sensor.resistance.input | input | Ohms |
-| system.hw.sensor.capacitance.input | input | F |
-| system.hw.sensor.inductance.input | input | H |
-| system.hw.sensor.pressure.input | input | Pa |
-| system.hw.sensor.latitude.input | input | Degrees |
-| system.hw.sensor.longitude.input | input | Degrees |
-| system.hw.sensor.force.input | input | N |
-| system.hw.sensor.gauge_pressure.input | input | Pa |
-| system.hw.sensor.human_presence.input | input | presence |
-| system.hw.sensor.human_proximity.input | input | m |
-| system.hw.sensor.distance.input | inputX, inputY, inputZ | m |
-| system.hw.sensor.acceleration.input | inputX, inputY, inputZ | g |
-| system.hw.sensor.state.input | ready, not_available, no_data, initializing, access_denied, error | status |
-| system.hw.sensor.custom | inputN | nd |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -160,4 +107,57 @@ You can add custom sensor information by creating a dedicated sensor section.
   title = Current speed.
 
 ```
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Sensor
+
+These metrics refer to Sensors.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| name | Sensor friendly name. |
+| manufacturer | The sensor manufacturer. |
+| model | The sensor model. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.hw.sensor.temperature.input | input | Cel |
+| system.hw.sensor.power.input | input | W |
+| system.hw.sensor.current.input | input | A |
+| system.hw.sensor.humidity.input | input | % |
+| system.hw.sensor.lux.input | input | lx |
+| system.hw.sensor.color.input | input | Cel |
+| system.hw.sensor.voltage.input | input | V |
+| system.hw.sensor.resistance.input | input | Ohms |
+| system.hw.sensor.capacitance.input | input | F |
+| system.hw.sensor.inductance.input | input | H |
+| system.hw.sensor.pressure.input | input | Pa |
+| system.hw.sensor.latitude.input | input | Degrees |
+| system.hw.sensor.longitude.input | input | Degrees |
+| system.hw.sensor.force.input | input | N |
+| system.hw.sensor.gauge_pressure.input | input | Pa |
+| system.hw.sensor.human_presence.input | input | presence |
+| system.hw.sensor.human_proximity.input | input | m |
+| system.hw.sensor.distance.input | inputX, inputY, inputZ | m |
+| system.hw.sensor.acceleration.input | inputX, inputY, inputZ | g |
+| system.hw.sensor.state.input | ready, not_available, no_data, initializing, access_denied, error | status |
+| system.hw.sensor.custom | inputN | nd |
+
 

@@ -39,10 +39,12 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 			cfg: cloudauth.Config{
 				Provider: cloudauth.ProviderAzureAD,
 				AzureAD: &cloudauth.AzureADAuthConfig{
-					Mode:         cloudauth.AzureADAuthModeServicePrincipal,
-					TenantID:     "tenant",
-					ClientID:     "client",
-					ClientSecret: "secret",
+					Mode: cloudauth.AzureADAuthModeServicePrincipal,
+					ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
+						TenantID:     "tenant",
+						ClientID:     "client",
+						ClientSecret: "secret",
+					},
 				},
 			},
 			parseDSN: true,
@@ -59,8 +61,10 @@ func TestBuildMSSQLAzureADDSN(t *testing.T) {
 			cfg: cloudauth.Config{
 				Provider: cloudauth.ProviderAzureAD,
 				AzureAD: &cloudauth.AzureADAuthConfig{
-					Mode:                    cloudauth.AzureADAuthModeManagedIdentity,
-					ManagedIdentityClientID: "mi-client-id",
+					Mode: cloudauth.AzureADAuthModeManagedIdentity,
+					ModeManagedIdentity: &cloudauth.AzureADModeManagedIdentityConfig{
+						ClientID: "mi-client-id",
+					},
 				},
 			},
 			parseDSN: true,

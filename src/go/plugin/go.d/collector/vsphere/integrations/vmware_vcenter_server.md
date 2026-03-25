@@ -91,180 +91,6 @@ There you can see that discovering took `525.614041ms`, and collecting metrics t
 `update_every` and `timeout` parameters should be adjusted based on these numbers.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per virtual machine
-
-These metrics refer to the Virtual Machine.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| datacenter | Datacenter name |
-| cluster | Cluster name |
-| host | Host name |
-| vm | Virtual Machine name |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.vm_cpu_utilization | used | percentage |
-| vsphere.vm_mem_utilization | used | percentage |
-| vsphere.vm_mem_usage | granted, consumed, active, shared | KiB |
-| vsphere.vm_mem_swap_usage | swapped | KiB |
-| vsphere.vm_mem_swap_io | in, out | KiB/s |
-| vsphere.vm_disk_io | read, write | KiB/s |
-| vsphere.vm_disk_max_latency | latency | milliseconds |
-| vsphere.vm_net_traffic | received, sent | KiB/s |
-| vsphere.vm_net_packets | received, sent | packets |
-| vsphere.vm_net_drops | received, sent | packets |
-| vsphere.vm_overall_status | green, red, yellow, gray | status |
-| vsphere.vm_system_uptime | uptime | seconds |
-
-### Per host
-
-These metrics refer to the ESXi host.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| datacenter | Datacenter name |
-| cluster | Cluster name |
-| host | Host name |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.host_cpu_utilization | used | percentage |
-| vsphere.host_mem_utilization | used | percentage |
-| vsphere.host_mem_usage | granted, consumed, active, shared, sharedcommon | KiB |
-| vsphere.host_mem_swap_io | in, out | KiB/s |
-| vsphere.host_disk_io | read, write | KiB/s |
-| vsphere.host_disk_max_latency | latency | milliseconds |
-| vsphere.host_net_traffic | received, sent | KiB/s |
-| vsphere.host_net_packets | received, sent | packets |
-| vsphere.host_net_drops | received, sent | packets |
-| vsphere.host_net_errors | received, sent | errors |
-| vsphere.host_overall_status | green, red, yellow, gray | status |
-| vsphere.host_system_uptime | uptime | seconds |
-
-### Per datastore
-
-These metrics refer to the Datastore.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| datacenter | Datacenter name |
-| datastore | Datastore name |
-| type | Datastore type (VMFS, NFS, NFS41, vsan, VVOL, PMEM) |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.datastore_disk_io | read, write | KiB/s |
-| vsphere.datastore_disk_iops | reads, writes | operations/s |
-| vsphere.datastore_disk_latency | read, write | milliseconds |
-| vsphere.datastore_space_utilization | used | percentage |
-| vsphere.datastore_space_usage | capacity, free, used | bytes |
-| vsphere.datastore_overall_status | green, red, yellow, gray | status |
-
-### Per cluster
-
-These metrics refer to the vSphere Cluster.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| datacenter | Datacenter name |
-| cluster | Cluster name |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.cluster_hosts | total, effective | hosts |
-| vsphere.cluster_cpu_capacity | total, effective | MHz |
-| vsphere.cluster_mem_capacity | total, effective | bytes |
-| vsphere.cluster_cpu_topology | cores, threads | count |
-| vsphere.cluster_drs_config | enabled | status |
-| vsphere.cluster_ha_config | enabled, admission_control | status |
-| vsphere.cluster_overall_status | green, red, yellow, gray | status |
-| vsphere.cluster_vmotions | vmotions | migrations |
-| vsphere.cluster_drs_score | score | percentage |
-| vsphere.cluster_drs_balance | current, target | score |
-| vsphere.cluster_vm_count | total, powered_off | VMs |
-| vsphere.cluster_usage_cpu | demand, entitled, reserved | MHz |
-| vsphere.cluster_usage_mem | demand, entitled, reserved | MB |
-| vsphere.cluster_cpu_utilization | used | percentage |
-| vsphere.cluster_cpu_usage | used, total | MHz |
-| vsphere.cluster_mem_utilization | used | percentage |
-| vsphere.cluster_mem_usage | consumed, active, granted, shared, overhead, swap_used | KiB |
-| vsphere.cluster_services_fairness | cpu, memory | score |
-| vsphere.cluster_services_effective_cpu | effective_cpu | MHz |
-| vsphere.cluster_services_effective_mem | effective_mem | MB |
-| vsphere.cluster_services_failover | failures_tolerable | failures |
-| vsphere.cluster_vm_migrations | vmotion, svmotion, xvmotion | operations |
-| vsphere.cluster_vm_lifecycle | poweron, poweroff, create, destroy, clone, deploy | operations |
-| vsphere.cluster_vm_management | reconfigure, reset, suspend, register, unregister | operations |
-| vsphere.cluster_vm_guest_ops | reboot, shutdown, standby | operations |
-| vsphere.cluster_vm_cold_migrations | change_ds, change_host, change_host_ds | operations |
-
-### Per resource pool
-
-These metrics refer to the vSphere Resource Pool.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| datacenter | Datacenter name |
-| cluster | Cluster name |
-| resource_pool | Resource Pool name |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vsphere.resource_pool_cpu_usage | usage, demand | MHz |
-| vsphere.resource_pool_cpu_entitlement | distributed | MHz |
-| vsphere.resource_pool_cpu_allocation | reservation_used, unreserved_for_vm, max_usage | MHz |
-| vsphere.resource_pool_mem_usage | host, guest | MB |
-| vsphere.resource_pool_mem_entitlement | distributed | MB |
-| vsphere.resource_pool_mem_allocation | reservation_used, unreserved_for_vm, max_usage | bytes |
-| vsphere.resource_pool_mem_breakdown | private, shared, swapped, ballooned, overhead, consumed_overhead, compressed | MB |
-| vsphere.resource_pool_cpu_config | reservation, limit | MHz |
-| vsphere.resource_pool_mem_config | reservation, limit | MB |
-| vsphere.resource_pool_overall_status | green, red, yellow, gray | status |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ vsphere_vm_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_cpu_utilization | Virtual Machine CPU utilization |
-| [ vsphere_vm_mem_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_mem_utilization | Virtual Machine memory utilization |
-| [ vsphere_host_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_cpu_utilization | ESXi Host CPU utilization |
-| [ vsphere_host_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_mem_utilization | ESXi Host memory utilization |
-
-
 ## Setup
 
 
@@ -467,6 +293,180 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ vsphere_vm_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_cpu_utilization | Virtual Machine CPU utilization |
+| [ vsphere_vm_mem_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_mem_utilization | Virtual Machine memory utilization |
+| [ vsphere_host_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_cpu_utilization | ESXi Host CPU utilization |
+| [ vsphere_host_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_mem_utilization | ESXi Host memory utilization |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per virtual machine
+
+These metrics refer to the Virtual Machine.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| datacenter | Datacenter name |
+| cluster | Cluster name |
+| host | Host name |
+| vm | Virtual Machine name |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.vm_cpu_utilization | used | percentage |
+| vsphere.vm_mem_utilization | used | percentage |
+| vsphere.vm_mem_usage | granted, consumed, active, shared | KiB |
+| vsphere.vm_mem_swap_usage | swapped | KiB |
+| vsphere.vm_mem_swap_io | in, out | KiB/s |
+| vsphere.vm_disk_io | read, write | KiB/s |
+| vsphere.vm_disk_max_latency | latency | milliseconds |
+| vsphere.vm_net_traffic | received, sent | KiB/s |
+| vsphere.vm_net_packets | received, sent | packets |
+| vsphere.vm_net_drops | received, sent | packets |
+| vsphere.vm_overall_status | green, red, yellow, gray | status |
+| vsphere.vm_system_uptime | uptime | seconds |
+
+### Per host
+
+These metrics refer to the ESXi host.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| datacenter | Datacenter name |
+| cluster | Cluster name |
+| host | Host name |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.host_cpu_utilization | used | percentage |
+| vsphere.host_mem_utilization | used | percentage |
+| vsphere.host_mem_usage | granted, consumed, active, shared, sharedcommon | KiB |
+| vsphere.host_mem_swap_io | in, out | KiB/s |
+| vsphere.host_disk_io | read, write | KiB/s |
+| vsphere.host_disk_max_latency | latency | milliseconds |
+| vsphere.host_net_traffic | received, sent | KiB/s |
+| vsphere.host_net_packets | received, sent | packets |
+| vsphere.host_net_drops | received, sent | packets |
+| vsphere.host_net_errors | received, sent | errors |
+| vsphere.host_overall_status | green, red, yellow, gray | status |
+| vsphere.host_system_uptime | uptime | seconds |
+
+### Per datastore
+
+These metrics refer to the Datastore.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| datacenter | Datacenter name |
+| datastore | Datastore name |
+| type | Datastore type (VMFS, NFS, NFS41, vsan, VVOL, PMEM) |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.datastore_disk_io | read, write | KiB/s |
+| vsphere.datastore_disk_iops | reads, writes | operations/s |
+| vsphere.datastore_disk_latency | read, write | milliseconds |
+| vsphere.datastore_space_utilization | used | percentage |
+| vsphere.datastore_space_usage | capacity, free, used | bytes |
+| vsphere.datastore_overall_status | green, red, yellow, gray | status |
+
+### Per cluster
+
+These metrics refer to the vSphere Cluster.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| datacenter | Datacenter name |
+| cluster | Cluster name |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.cluster_hosts | total, effective | hosts |
+| vsphere.cluster_cpu_capacity | total, effective | MHz |
+| vsphere.cluster_mem_capacity | total, effective | bytes |
+| vsphere.cluster_cpu_topology | cores, threads | count |
+| vsphere.cluster_drs_config | enabled | status |
+| vsphere.cluster_ha_config | enabled, admission_control | status |
+| vsphere.cluster_overall_status | green, red, yellow, gray | status |
+| vsphere.cluster_vmotions | vmotions | migrations |
+| vsphere.cluster_drs_score | score | percentage |
+| vsphere.cluster_drs_balance | current, target | score |
+| vsphere.cluster_vm_count | total, powered_off | VMs |
+| vsphere.cluster_usage_cpu | demand, entitled, reserved | MHz |
+| vsphere.cluster_usage_mem | demand, entitled, reserved | MB |
+| vsphere.cluster_cpu_utilization | used | percentage |
+| vsphere.cluster_cpu_usage | used, total | MHz |
+| vsphere.cluster_mem_utilization | used | percentage |
+| vsphere.cluster_mem_usage | consumed, active, granted, shared, overhead, swap_used | KiB |
+| vsphere.cluster_services_fairness | cpu, memory | score |
+| vsphere.cluster_services_effective_cpu | effective_cpu | MHz |
+| vsphere.cluster_services_effective_mem | effective_mem | MB |
+| vsphere.cluster_services_failover | failures_tolerable | failures |
+| vsphere.cluster_vm_migrations | vmotion, svmotion, xvmotion | operations |
+| vsphere.cluster_vm_lifecycle | poweron, poweroff, create, destroy, clone, deploy | operations |
+| vsphere.cluster_vm_management | reconfigure, reset, suspend, register, unregister | operations |
+| vsphere.cluster_vm_guest_ops | reboot, shutdown, standby | operations |
+| vsphere.cluster_vm_cold_migrations | change_ds, change_host, change_host_ds | operations |
+
+### Per resource pool
+
+These metrics refer to the vSphere Resource Pool.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| datacenter | Datacenter name |
+| cluster | Cluster name |
+| resource_pool | Resource Pool name |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| vsphere.resource_pool_cpu_usage | usage, demand | MHz |
+| vsphere.resource_pool_cpu_entitlement | distributed | MHz |
+| vsphere.resource_pool_cpu_allocation | reservation_used, unreserved_for_vm, max_usage | MHz |
+| vsphere.resource_pool_mem_usage | host, guest | MB |
+| vsphere.resource_pool_mem_entitlement | distributed | MB |
+| vsphere.resource_pool_mem_allocation | reservation_used, unreserved_for_vm, max_usage | bytes |
+| vsphere.resource_pool_mem_breakdown | private, shared, swapped, ballooned, overhead, consumed_overhead, compressed | MB |
+| vsphere.resource_pool_cpu_config | reservation, limit | MHz |
+| vsphere.resource_pool_mem_config | reservation, limit | MB |
+| vsphere.resource_pool_overall_status | green, red, yellow, gray | status |
 
 
 

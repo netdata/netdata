@@ -58,6 +58,43 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+### Prerequisites
+
+No action required.
+
+### Configuration
+
+#### Options
+
+
+
+There are no configuration options.
+
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ semaphores_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphores | IPC semaphore utilization |
+| [ semaphore_arrays_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphore_arrays | IPC semaphore arrays utilization |
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -82,42 +119,5 @@ Metrics:
 | system.message_queue_bytes | a dimension per queue | bytes |
 | system.shared_memory_segments | segments | segments |
 | system.shared_memory_bytes | bytes | bytes |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ semaphores_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphores | IPC semaphore utilization |
-| [ semaphore_arrays_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphore_arrays | IPC semaphore arrays utilization |
-
-
-## Setup
-
-
-### Prerequisites
-
-No action required.
-
-### Configuration
-
-#### Options
-
-
-
-There are no configuration options.
-
-
-
-#### via File
-
-There is no configuration file.
-
-##### Examples
-There are no configuration examples.
 
 

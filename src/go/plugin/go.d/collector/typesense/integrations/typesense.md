@@ -54,37 +54,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Typesense instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| typesense.health_status | ok, out_of_disk, out_of_memory | status |
-| typesense.total_requests | requests | requests/s |
-| typesense.requests_by_operation | search, write, import, delete | requests/s |
-| typesense.latency_by_operation | search, write, import, delete | milliseconds |
-| typesense.overloaded_requests | overloaded | requests/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -222,6 +191,37 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Typesense instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| typesense.health_status | ok, out_of_disk, out_of_memory | status |
+| typesense.total_requests | requests | requests/s |
+| typesense.requests_by_operation | search, write, import, delete | requests/s |
+| typesense.latency_by_operation | search, write, import, delete | milliseconds |
+| typesense.overloaded_requests | overloaded | requests/s |
 
 
 

@@ -52,6 +52,92 @@ The default configuration for this integration does not impose any limits on dat
 
 This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology.
 
+## Setup
+
+
+### Prerequisites
+
+#### Compile kernel
+
+Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
+When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
+with different names.
+
+Now follow steps:
+1. Copy the configuration file to /usr/src/linux/.config.
+2. Select the necessary options: make oldconfig
+3. Compile your kernel image: make bzImage
+4. Compile your modules: make modules
+5. Copy your new kernel image for boot loader directory
+6. Install the new modules: make modules_install
+7. Generate an initial ramdisk image (`initrd`) if it is necessary.
+8. Update your boot loader
+
+
+
+### Configuration
+
+#### Options
+
+All options are defined inside section `[global]`. Options inside `network connections` are ignored for while.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update every | Data collection frequency. | 10 | no |
+| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
+| apps | Enable or disable integration with apps.plugin | no | no |
+| cgroups | Enable or disable integration with cgroup.plugin | no | no |
+| bandwidth table size | Number of elements stored inside hash tables used to monitor calls per PID. | 16384 | no |
+| ipv4 connection table size | Number of elements stored inside hash tables used to monitor calls per IPV4 connections. | 16384 | no |
+| ipv6 connection table size | Number of elements stored inside hash tables used to monitor calls per IPV6 connections. | 16384 | no |
+| udp connection table size | Number of temporary elements stored inside hash tables used to monitor UDP connections. | 4096 | no |
+| ebpf type format | Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load). | auto | no |
+| ebpf co-re tracing | Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). | trampoline | no |
+| maps per core | Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information. | yes | no |
+| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
+
+
+</details>
+
+
+
+#### via File
+
+The configuration file name for this integration is `ebpf.d/network.conf`.
+
+The file format is a modified INI syntax. The general structure is:
+
+```ini
+[section1]
+    option1 = some value
+    option2 = some other value
+
+[section2]
+    option3 = some third value
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config ebpf.d/network.conf
+```
+
+##### Examples
+There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -129,91 +215,5 @@ Metrics:
 | services.net_tcp_retransmit | calls | calls/s |
 | services.net_udp_send | calls | calls/s |
 | services.net_udp_recv | calls | calls/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
-## Setup
-
-
-### Prerequisites
-
-#### Compile kernel
-
-Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different accoring preferences of Linux distributions.
-When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well definedd pattern, but distributions can deliver their configuration files
-with different names.
-
-Now follow steps:
-1. Copy the configuration file to /usr/src/linux/.config.
-2. Select the necessary options: make oldconfig
-3. Compile your kernel image: make bzImage
-4. Compile your modules: make modules
-5. Copy your new kernel image for boot loader directory
-6. Install the new modules: make modules_install
-7. Generate an initial ramdisk image (`initrd`) if it is necessary.
-8. Update your boot loader
-
-
-
-### Configuration
-
-#### Options
-
-All options are defined inside section `[global]`. Options inside `network connections` are ignored for while.
-
-
-<details open><summary>Config options</summary>
-
-
-
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update every | Data collection frequency. | 5 | no |
-| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
-| apps | Enable or disable integration with apps.plugin | no | no |
-| cgroups | Enable or disable integration with cgroup.plugin | no | no |
-| bandwidth table size | Number of elements stored inside hash tables used to monitor calls per PID. | 16384 | no |
-| ipv4 connection table size | Number of elements stored inside hash tables used to monitor calls per IPV4 connections. | 16384 | no |
-| ipv6 connection table size | Number of elements stored inside hash tables used to monitor calls per IPV6 connections. | 16384 | no |
-| udp connection table size | Number of temporary elements stored inside hash tables used to monitor UDP connections. | 4096 | no |
-| ebpf type format | Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load). | auto | no |
-| ebpf co-re tracing | Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). | trampoline | no |
-| maps per core | Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information. | yes | no |
-| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
-
-
-</details>
-
-
-
-#### via File
-
-The configuration file name for this integration is `ebpf.d/network.conf`.
-
-The file format is a modified INI syntax. The general structure is:
-
-```ini
-[section1]
-    option1 = some value
-    option2 = some other value
-
-[section2]
-    option3 = some third value
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config ebpf.d/network.conf
-```
-
-##### Examples
-There are no configuration examples.
 
 

@@ -4,7 +4,6 @@ package chartemit
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -86,21 +85,21 @@ func TestApplyPlanEmitsNetdataWire(t *testing.T) {
 	require.NoError(t, err)
 
 	out := buf.String()
-	assert.Contains(t, out, "CHART 'collector.job.win_nic_traffic_eth0'")
-	assert.Contains(t, out, "CLABEL 'instance' 'localhost' '2'")
-	assert.Contains(t, out, "CLABEL '_collect_job' 'job01' '1'")
-	assert.Contains(t, out, "CLABEL_COMMIT")
-	assert.Contains(t, out, "DIMENSION 'received' 'received' 'incremental' '1' '1' 'type=float'")
-	assert.Contains(t, out, "BEGIN 'collector.job.win_nic_traffic_eth0' 100")
-	assert.Contains(t, out, "SET 'received' = 123.5")
-	assert.Contains(t, out, "DIMENSION 'received' 'received' 'incremental' '1' '1' 'obsolete type=float'")
-	assert.Contains(t, out, "obsolete")
+	assert.Equal(t, `HOST ''
 
-	createPos := strings.Index(out, "CHART 'collector.job.win_nic_traffic_eth0'")
-	beginPos := strings.Index(out, "BEGIN 'collector.job.win_nic_traffic_eth0' 100")
-	require.NotEqual(t, -1, createPos)
-	require.NotEqual(t, -1, beginPos)
-	assert.Less(t, createPos, beginPos)
+CHART 'collector.job.win_nic_traffic_eth0' '' 'NIC traffic' 'bytes/s' 'Net' 'nic_traffic' 'line' '1' '5' '' 'go.d.plugin' 'windows'
+CLABEL 'instance' 'localhost' '2'
+CLABEL '_collect_job' 'job01' '1'
+CLABEL_COMMIT
+DIMENSION 'received' 'received' 'incremental' '1' '1' 'type=float'
+BEGIN 'collector.job.win_nic_traffic_eth0' 100
+SET 'received' = 123.5
+END
+
+CHART 'collector.job.win_nic_traffic_eth0' '' 'NIC traffic' 'bytes/s' 'Net' 'nic_traffic' 'line' '1' '5' '' 'go.d.plugin' 'windows'
+DIMENSION 'received' 'received' 'incremental' '1' '1' 'obsolete type=float'
+CHART 'collector.job.win_nic_traffic_eth0' '' 'NIC traffic' 'bytes/s' 'Net' 'nic_traffic' 'line' '1' '5' 'obsolete' 'go.d.plugin' 'windows'
+`, out)
 }
 
 func TestApplyPlanAutogenChartCreateUpdateRemove(t *testing.T) {
@@ -161,12 +160,19 @@ func TestApplyPlanAutogenChartCreateUpdateRemove(t *testing.T) {
 	require.NoError(t, err)
 
 	out := buf.String()
-	assert.Contains(t, out, "CHART 'collector.job.svc.errors_total-method=GET'")
-	assert.Contains(t, out, "CLABEL 'method' 'GET' '1'")
-	assert.Contains(t, out, "DIMENSION 'svc.errors_total' 'svc.errors_total' 'incremental' '1' '1' ''")
-	assert.Contains(t, out, "BEGIN 'collector.job.svc.errors_total-method=GET'")
-	assert.Contains(t, out, "SET 'svc.errors_total' = 10")
-	assert.Contains(t, out, "obsolete")
+	assert.Equal(t, `HOST ''
+
+CHART 'collector.job.svc.errors_total-method=GET' '' 'Metric "svc.errors_total"' 'events/s' 'svc_errors' 'svc.errors_total' 'line' '0' '1' '' 'go.d.plugin' 'prometheus'
+CLABEL 'method' 'GET' '1'
+CLABEL '_collect_job' 'job01' '1'
+CLABEL_COMMIT
+DIMENSION 'svc.errors_total' 'svc.errors_total' 'incremental' '1' '1' ''
+BEGIN 'collector.job.svc.errors_total-method=GET'
+SET 'svc.errors_total' = 10
+END
+
+CHART 'collector.job.svc.errors_total-method=GET' '' 'Metric "svc.errors_total"' 'events/s' 'svc_errors' 'svc.errors_total' 'line' '0' '1' 'obsolete' 'go.d.plugin' 'prometheus'
+`, out)
 }
 
 func TestApplyPlanUsesIntegerSETForNonFloatUpdates(t *testing.T) {
@@ -222,9 +228,17 @@ func TestApplyPlanUsesIntegerSETForNonFloatUpdates(t *testing.T) {
 	require.NoError(t, err)
 
 	out := buf.String()
-	assert.Contains(t, out, "DIMENSION 'total' 'total' 'absolute' '1' '1' ''")
-	assert.Contains(t, out, "BEGIN 'collector.job.runtime_jobs' 1")
-	assert.Contains(t, out, "SET 'total' = 7")
+	assert.Equal(t, `HOST ''
+
+CHART 'collector.job.runtime_jobs' '' 'Runtime jobs' 'jobs' 'Runtime' 'runtime.jobs' 'line' '0' '1' '' 'go.d.plugin' 'runtime'
+CLABEL '_collect_job' 'job01' '1'
+CLABEL_COMMIT
+DIMENSION 'total' 'total' 'absolute' '1' '1' ''
+BEGIN 'collector.job.runtime_jobs' 1
+SET 'total' = 7
+END
+
+`, out)
 	assert.NotContains(t, out, "SET 'total' = 7.9")
 }
 
@@ -267,11 +281,14 @@ func TestApplyPlanDimensionOnlyCreateEmitsLabelsAndCommit(t *testing.T) {
 	require.NoError(t, err)
 
 	out := buf.String()
-	assert.Contains(t, out, "CHART 'collector.job.dimension_only_chart'")
-	assert.Contains(t, out, "CLABEL 'instance' 'localhost' '2'")
-	assert.Contains(t, out, "CLABEL '_collect_job' 'job01' '1'")
-	assert.Contains(t, out, "CLABEL_COMMIT")
-	assert.Contains(t, out, "DIMENSION 'value' 'value' 'absolute' '1' '1' ''")
+	assert.Equal(t, `HOST ''
+
+CHART 'collector.job.dimension_only_chart' '' 'Dimension-only chart' '1' 'Runtime' 'runtime.dimension_only' 'line' '0' '1' '' 'go.d.plugin' 'runtime'
+CLABEL 'instance' 'localhost' '2'
+CLABEL '_collect_job' 'job01' '1'
+CLABEL_COMMIT
+DIMENSION 'value' 'value' 'absolute' '1' '1' ''
+`, out)
 }
 
 func TestApplyPlanSanitizesWireValues(t *testing.T) {
@@ -332,13 +349,19 @@ func TestApplyPlanSanitizesWireValues(t *testing.T) {
 	require.NoError(t, err)
 
 	out := buf.String()
-	assert.Contains(t, out, "CHART 'collector.job.chartid'")
-	assert.Contains(t, out, "DIMENSION 'dimname' 'dimname' 'absolute' '1' '1' ''")
-	assert.Contains(t, out, "BEGIN 'collector.job.chartid' 1")
-	assert.Contains(t, out, "SET 'dimname' = 5")
-	assert.Contains(t, out, "CLABEL 'instance' 'localhost ' '2'")
-	assert.Contains(t, out, "CLABEL 'label' 'value ' '1'")
-	assert.Contains(t, out, "CLABEL '_collect_job' 'job01 ' '1'")
+	assert.Equal(t, `HOST ''
+
+CHART 'collector.job.chartid' '' 'Title ' 'units ' 'Family ' 'Context ' 'line' '0' '1' '' 'go.dplugin ' 'module '
+CLABEL 'instance' 'localhost ' '2'
+CLABEL 'label' 'value ' '1'
+CLABEL '_collect_job' 'job01 ' '1'
+CLABEL_COMMIT
+DIMENSION 'dimname' 'dimname' 'absolute' '1' '1' ''
+BEGIN 'collector.job.chartid' 1
+SET 'dimname' = 5
+END
+
+`, out)
 }
 
 func TestApplyPlanRejectsEmptyTypeID(t *testing.T) {
@@ -368,6 +391,186 @@ func TestApplyPlanRejectsEmptyTypeID(t *testing.T) {
 			assert.ErrorContains(t, err, tc.wantErr)
 		})
 	}
+}
+
+func TestApplyPlanDefaultGlobalHostSelection(t *testing.T) {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+
+	meta := chartengine.ChartMeta{
+		Title:   "Requests",
+		Family:  "Service",
+		Context: "requests",
+		Units:   "req/s",
+		Type:    chartengine.ChartTypeLine,
+	}
+	plan := Plan{
+		Actions: []EngineAction{
+			chartengine.CreateChartAction{
+				ChartID: "requests",
+				Meta:    meta,
+			},
+		},
+	}
+
+	require.NoError(t, ApplyPlan(api, plan, EmitEnv{
+		TypeID:      "collector.job",
+		UpdateEvery: 1,
+		Plugin:      "go.d.plugin",
+		Module:      "httpcheck",
+		JobName:     "job01",
+	}))
+
+	out := buf.String()
+	assert.Equal(t, `HOST ''
+
+CHART 'collector.job.requests' '' 'Requests' 'req/s' 'Service' 'requests' 'line' '0' '1' '' 'go.d.plugin' 'httpcheck'
+CLABEL '_collect_job' 'job01' '1'
+CLABEL_COMMIT
+`, out)
+}
+
+func TestApplyPlanVnodeHostSelectionAndDefine(t *testing.T) {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+
+	meta := chartengine.ChartMeta{
+		Title:   "Workers Busy",
+		Family:  "Workers",
+		Context: "workers_busy",
+		Units:   "workers",
+		Type:    chartengine.ChartTypeLine,
+	}
+	info, err := PrepareHostInfo(netdataapi.HostInfo{
+		GUID:     "node-guid",
+		Hostname: "node-host",
+		Labels: map[string]string{
+			"region": "eu'\n",
+		},
+	})
+	require.NoError(t, err)
+
+	plan := Plan{
+		Actions: []EngineAction{
+			chartengine.CreateChartAction{
+				ChartID: "workers_busy",
+				Meta:    meta,
+			},
+		},
+	}
+
+	require.NoError(t, ApplyPlan(api, plan, EmitEnv{
+		TypeID:      "collector.job",
+		UpdateEvery: 1,
+		Plugin:      "go.d.plugin",
+		Module:      "apache",
+		JobName:     "job01",
+		HostScope: &HostScope{
+			GUID:   "node-guid",
+			Define: &info,
+		},
+	}))
+
+	out := buf.String()
+	assert.Equal(t, `HOST_DEFINE 'node-guid' 'node-host'
+HOST_LABEL '_hostname' 'node-host'
+HOST_LABEL 'region' 'eu '
+HOST_DEFINE_END
+
+HOST 'node-guid'
+
+CHART 'collector.job.workers_busy' '' 'Workers Busy' 'workers' 'Workers' 'workers_busy' 'line' '0' '1' '' 'go.d.plugin' 'apache'
+CLABEL '_collect_job' 'job01' '1'
+CLABEL_COMMIT
+`, out)
+}
+
+func TestApplyPlanSkipsHostSelectionForEmptyPlans(t *testing.T) {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+
+	require.NoError(t, ApplyPlan(api, Plan{}, EmitEnv{
+		TypeID:      "collector.job",
+		UpdateEvery: 1,
+		Plugin:      "go.d.plugin",
+		Module:      "runtime",
+		JobName:     "job01",
+	}))
+	assert.Equal(t, "", buf.String())
+}
+
+func TestApplyPlanRejectsMismatchedHostDefine(t *testing.T) {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+
+	meta := chartengine.ChartMeta{
+		Title:   "Requests",
+		Family:  "Service",
+		Context: "requests",
+		Units:   "req/s",
+		Type:    chartengine.ChartTypeLine,
+	}
+	plan := Plan{
+		Actions: []EngineAction{
+			chartengine.CreateChartAction{
+				ChartID: "requests",
+				Meta:    meta,
+			},
+		},
+	}
+
+	err := ApplyPlan(api, plan, EmitEnv{
+		TypeID:      "collector.job",
+		UpdateEvery: 1,
+		Plugin:      "go.d.plugin",
+		Module:      "httpcheck",
+		JobName:     "job01",
+		HostScope: &HostScope{
+			GUID: "guid-a",
+			Define: &netdataapi.HostInfo{
+				GUID:     "guid-b",
+				Hostname: "node-host",
+			},
+		},
+	})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "does not match")
+	assert.Equal(t, "", buf.String())
+}
+
+func TestApplyPlanRemoveOnlyBatchStillSelectsHost(t *testing.T) {
+	var buf bytes.Buffer
+	api := netdataapi.New(&buf)
+
+	meta := chartengine.ChartMeta{
+		Title:   "Requests",
+		Family:  "Service",
+		Context: "requests",
+		Units:   "req/s",
+		Type:    chartengine.ChartTypeLine,
+	}
+	plan := Plan{
+		Actions: []EngineAction{
+			chartengine.RemoveChartAction{
+				ChartID: "requests",
+				Meta:    meta,
+			},
+		},
+	}
+
+	require.NoError(t, ApplyPlan(api, plan, EmitEnv{
+		TypeID:      "collector.job",
+		UpdateEvery: 1,
+		Plugin:      "go.d.plugin",
+		Module:      "httpcheck",
+		JobName:     "job01",
+	}))
+
+	out := buf.String()
+	assert.Equal(t, `HOST ''
+
+CHART 'collector.job.requests' '' 'Requests' 'req/s' 'Service' 'requests' 'line' '0' '1' 'obsolete' 'go.d.plugin' 'httpcheck'
+`, out)
 }
 
 func TestNormalizeActionsOrderingDeterminism(t *testing.T) {

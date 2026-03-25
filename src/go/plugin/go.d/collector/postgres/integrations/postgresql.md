@@ -58,6 +58,238 @@ These limits can be changed in the configuration file.
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Setup
+
+
+You can configure the **postgres** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **postgres**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/postgres.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
+### Prerequisites
+
+#### Create netdata user
+
+Create a user with granted `pg_monitor`
+or `pg_read_all_stat` [built-in role](https://www.postgresql.org/docs/current/predefined-roles.html).
+
+To create the `netdata` user with these permissions, execute the following in the psql session, as a user with CREATEROLE privileges:
+
+```postgresql
+CREATE USER netdata;
+GRANT pg_monitor TO netdata;
+```
+
+After creating the new user, restart the Netdata Agent with `sudo systemctl restart netdata`, or
+the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/start-stop-restart.md) for your
+system.
+
+
+
+### Configuration
+
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | dsn | Postgres connection string (DSN). See [DSN syntax](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING). | postgres://postgres:postgres@127.0.0.1:5432/postgres | yes |
+| **Cloud Auth** | cloud_auth.provider | Cloud auth provider (`none` or `azure_ad`). | none | no |
+| **Cloud Auth/Azure** | cloud_auth.azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). Required when `cloud_auth.provider` is `azure_ad`. |  | yes |
+|  | cloud_auth.azure_ad.mode_service_principal.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.mode_service_principal.client_id | Azure client ID. Required for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.mode_service_principal.client_secret | Azure client secret for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.mode_managed_identity.client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
+| **Target** | timeout | Query timeout (seconds). | 2 | no |
+| **Filters** | collect_databases_matching | Database selector. Controls which databases are included. Uses [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#simple-patterns-matcher). |  | no |
+| **Limits** | max_db_tables | Maximum number of tables per database to collect metrics for (0 = no limit). | 50 | no |
+|  | max_db_indexes | Maximum number of indexes per database to collect metrics for (0 = no limit). | 250 | no |
+| **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
+|  | functions.top_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.top_queries.limit | Maximum number of queries to return. | 500 | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+
+</details>
+
+
+#### via UI
+
+Configure the **postgres** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the postgres data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _postgres_ (or scroll the list) to locate the **postgres** collector.
+5. Click the **+** next to the **postgres** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/postgres.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name2
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/postgres.conf
+```
+
+##### Examples
+
+###### TCP socket
+
+An example configuration.
+
+```yaml
+jobs:
+  - name: local
+    dsn: 'postgresql://netdata@127.0.0.1:5432/postgres'
+
+```
+###### Unix socket
+
+An example configuration.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    dsn: 'host=/var/run/postgresql dbname=postgres user=netdata'
+
+```
+</details>
+
+###### Unix socket (custom port)
+
+Connect to PostgreSQL using a Unix socket with a non-default port (5433).
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    dsn: 'host=/var/run/postgresql port=5433 dbname=postgres user=netdata'
+
+```
+</details>
+
+###### Azure Database for PostgreSQL with service principal
+
+Use Microsoft Entra service principal authentication.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: azure_postgres_sp
+    dsn: 'postgresql://netdata@myserver.postgres.database.azure.com:5432/postgres?sslmode=require'
+    cloud_auth:
+      provider: azure_ad
+      azure_ad:
+        mode: service_principal
+        mode_service_principal:
+          tenant_id: "00000000-0000-0000-0000-000000000000"
+          client_id: "11111111-1111-1111-1111-111111111111"
+          client_secret: "super-secret-value"
+
+```
+</details>
+
+###### Azure Database for PostgreSQL with managed identity
+
+Use managed identity authentication (system-assigned by default).
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: azure_postgres_mi
+    dsn: 'postgresql://netdata@myserver.postgres.database.azure.com:5432/postgres?sslmode=require'
+    cloud_auth:
+      provider: azure_ad
+      azure_ad:
+        mode: managed_identity
+
+```
+</details>
+
+###### Multi-instance
+
+> **Note**: When you define multiple jobs, their names must be unique.
+
+Local and remote instances.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    dsn: 'postgresql://netdata@127.0.0.1:5432/postgres'
+
+  - name: remote
+    dsn: 'postgresql://netdata@203.0.113.0:5432/postgres'
+
+```
+</details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ postgres_total_connection_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.connections_utilization | average total connection utilization over the last minute |
+| [ postgres_acquired_locks_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.locks_utilization | average acquired locks utilization over the last minute |
+| [ postgres_txid_exhaustion_perc ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.txid_exhaustion_perc | percent towards TXID wraparound |
+| [ postgres_db_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.db_cache_io_ratio | average cache hit ratio in db ${label:database} over the last minute |
+| [ postgres_db_transactions_rollback_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.db_cache_io_ratio | average aborted transactions percentage in db ${label:database} over the last five minutes |
+| [ postgres_db_deadlocks_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.db_deadlocks_rate | number of deadlocks detected in db ${label:database} in the last minute |
+| [ postgres_table_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_cache_io_ratio | average cache hit ratio in db ${label:database} table ${label:table} over the last minute |
+| [ postgres_table_index_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_index_cache_io_ratio | average index cache hit ratio in db ${label:database} table ${label:table} over the last minute |
+| [ postgres_table_toast_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_toast_cache_io_ratio | average TOAST hit ratio in db ${label:database} table ${label:table} over the last minute |
+| [ postgres_table_toast_index_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_toast_index_cache_io_ratio | average index TOAST hit ratio in db ${label:database} table ${label:table} over the last minute |
+| [ postgres_table_bloat_size_perc ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_bloat_size_perc | bloat size percentage in db ${label:database} table ${label:table} |
+| [ postgres_table_last_autovacuum_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_autovacuum_since_time | time elapsed since db ${label:database} table ${label:table} was vacuumed by the autovacuum daemon |
+| [ postgres_table_last_autoanalyze_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_autoanalyze_since_time | time elapsed since db ${label:database} table ${label:table} was analyzed by the autovacuum daemon |
+| [ postgres_index_bloat_size_perc ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.index_bloat_size_perc | bloat size percentage in db ${label:database} table ${label:table} index ${label:index} |
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -231,7 +463,7 @@ Metrics:
 
 
 
-## Functions
+## Live Data
 
 This collector exposes real-time functions for interactive troubleshooting in the Live tab.
 
@@ -450,237 +682,6 @@ Live query data from `pg_stat_activity`. Each row represents a currently active 
 | Client Port | integer |  | hidden | TCP port of client (-1 for Unix socket, NULL for internal process). |
 | Backend Xid | string |  | hidden | Top-level transaction identifier of this backend. |
 | Backend Xmin | string |  | hidden | Backend's xmin horizon. |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ postgres_total_connection_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.connections_utilization | average total connection utilization over the last minute |
-| [ postgres_acquired_locks_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.locks_utilization | average acquired locks utilization over the last minute |
-| [ postgres_txid_exhaustion_perc ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.txid_exhaustion_perc | percent towards TXID wraparound |
-| [ postgres_db_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.db_cache_io_ratio | average cache hit ratio in db ${label:database} over the last minute |
-| [ postgres_db_transactions_rollback_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.db_cache_io_ratio | average aborted transactions percentage in db ${label:database} over the last five minutes |
-| [ postgres_db_deadlocks_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.db_deadlocks_rate | number of deadlocks detected in db ${label:database} in the last minute |
-| [ postgres_table_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_cache_io_ratio | average cache hit ratio in db ${label:database} table ${label:table} over the last minute |
-| [ postgres_table_index_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_index_cache_io_ratio | average index cache hit ratio in db ${label:database} table ${label:table} over the last minute |
-| [ postgres_table_toast_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_toast_cache_io_ratio | average TOAST hit ratio in db ${label:database} table ${label:table} over the last minute |
-| [ postgres_table_toast_index_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_toast_index_cache_io_ratio | average index TOAST hit ratio in db ${label:database} table ${label:table} over the last minute |
-| [ postgres_table_bloat_size_perc ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_bloat_size_perc | bloat size percentage in db ${label:database} table ${label:table} |
-| [ postgres_table_last_autovacuum_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_autovacuum_since_time | time elapsed since db ${label:database} table ${label:table} was vacuumed by the autovacuum daemon |
-| [ postgres_table_last_autoanalyze_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_autoanalyze_since_time | time elapsed since db ${label:database} table ${label:table} was analyzed by the autovacuum daemon |
-| [ postgres_index_bloat_size_perc ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.index_bloat_size_perc | bloat size percentage in db ${label:database} table ${label:table} index ${label:index} |
-
-
-## Setup
-
-
-You can configure the **postgres** collector in two ways:
-
-| Method                | Best for                                                                                 | How to                                                                                                                                 |
-|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **postgres**, then click **+** to add a job. |
-| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/postgres.conf` and add a job.                                                                        |
-
-:::important
-
-UI configuration requires paid Netdata Cloud plan.
-
-:::
-
-
-### Prerequisites
-
-#### Create netdata user
-
-Create a user with granted `pg_monitor`
-or `pg_read_all_stat` [built-in role](https://www.postgresql.org/docs/current/predefined-roles.html).
-
-To create the `netdata` user with these permissions, execute the following in the psql session, as a user with CREATEROLE privileges:
-
-```postgresql
-CREATE USER netdata;
-GRANT pg_monitor TO netdata;
-```
-
-After creating the new user, restart the Netdata Agent with `sudo systemctl restart netdata`, or
-the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/start-stop-restart.md) for your
-system.
-
-
-
-### Configuration
-
-#### Options
-
-The following options can be defined globally: update_every, autodetection_retry.
-
-
-<details open><summary>Config options</summary>
-
-
-
-| Group | Option | Description | Default | Required |
-|:------|:-----|:------------|:--------|:---------:|
-| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
-|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| **Target** | dsn | Postgres connection string (DSN). See [DSN syntax](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING). | postgres://postgres:postgres@127.0.0.1:5432/postgres | yes |
-| **Cloud Auth** | cloud_auth.provider | Cloud auth provider (`none` or `azure_ad`). | none | no |
-| **Cloud Auth/Azure** | cloud_auth.azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). | default | no |
-|  | cloud_auth.azure_ad.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
-|  | cloud_auth.azure_ad.client_id | Azure client ID. Required for `service_principal`; optional for user-assigned managed identity. |  | no |
-|  | cloud_auth.azure_ad.client_secret | Azure client secret for `service_principal` mode. |  | no |
-|  | cloud_auth.azure_ad.managed_identity_client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
-| **Target** | timeout | Query timeout (seconds). | 2 | no |
-| **Filters** | collect_databases_matching | Database selector. Controls which databases are included. Uses [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#simple-patterns-matcher). |  | no |
-| **Limits** | max_db_tables | Maximum number of tables per database to collect metrics for (0 = no limit). | 50 | no |
-|  | max_db_indexes | Maximum number of indexes per database to collect metrics for (0 = no limit). | 250 | no |
-| **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
-|  | functions.top_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
-|  | functions.top_queries.limit | Maximum number of queries to return. | 500 | no |
-| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
-
-
-</details>
-
-
-#### via UI
-
-Configure the **postgres** collector from the Netdata web interface:
-
-1. Go to **Nodes**.
-2. Select the node **where you want the postgres data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
-3. The **Collectors → Jobs** view opens by default.
-4. In the Search box, type _postgres_ (or scroll the list) to locate the **postgres** collector.
-5. Click the **+** next to the **postgres** collector to add a new job.
-6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
-    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
-
-
-#### via File
-
-The configuration file name for this integration is `go.d/postgres.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name2
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/postgres.conf
-```
-
-##### Examples
-
-###### TCP socket
-
-An example configuration.
-
-```yaml
-jobs:
-  - name: local
-    dsn: 'postgresql://netdata@127.0.0.1:5432/postgres'
-
-```
-###### Unix socket
-
-An example configuration.
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: local
-    dsn: 'host=/var/run/postgresql dbname=postgres user=netdata'
-
-```
-</details>
-
-###### Unix socket (custom port)
-
-Connect to PostgreSQL using a Unix socket with a non-default port (5433).
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: local
-    dsn: 'host=/var/run/postgresql port=5433 dbname=postgres user=netdata'
-
-```
-</details>
-
-###### Azure Database for PostgreSQL with service principal
-
-Use Microsoft Entra service principal authentication.
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: azure_postgres_sp
-    dsn: 'postgresql://netdata@myserver.postgres.database.azure.com:5432/postgres?sslmode=require'
-    cloud_auth:
-      provider: azure_ad
-      azure_ad:
-        mode: service_principal
-        tenant_id: "00000000-0000-0000-0000-000000000000"
-        client_id: "11111111-1111-1111-1111-111111111111"
-        client_secret: "super-secret-value"
-
-```
-</details>
-
-###### Azure Database for PostgreSQL with managed identity
-
-Use managed identity authentication (system-assigned by default).
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: azure_postgres_mi
-    dsn: 'postgresql://netdata@myserver.postgres.database.azure.com:5432/postgres?sslmode=require'
-    cloud_auth:
-      provider: azure_ad
-      azure_ad:
-        mode: managed_identity
-
-```
-</details>
-
-###### Multi-instance
-
-> **Note**: When you define multiple jobs, their names must be unique.
-
-Local and remote instances.
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: local
-    dsn: 'postgresql://netdata@127.0.0.1:5432/postgres'
-
-  - name: remote
-    dsn: 'postgresql://netdata@203.0.113.0:5432/postgres'
-
-```
-</details>
 
 
 

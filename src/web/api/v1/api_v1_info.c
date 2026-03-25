@@ -165,7 +165,7 @@ static int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
 int api_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
-    if (!netdata_ready) return HTTP_RESP_SERVICE_UNAVAILABLE;
+    if (!netdata_ready_load()) return HTTP_RESP_SERVICE_UNAVAILABLE;
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;

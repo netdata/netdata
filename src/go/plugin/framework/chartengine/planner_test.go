@@ -184,7 +184,7 @@ groups:
 			store := metrix.NewCollectorStore()
 			tc.setup(t, store)
 
-			plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+			plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 			require.NoError(t, err)
 
 			got := make([]string, 0, len(plan.InferredDimensions))
@@ -217,6 +217,7 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 		"BuildPlanAutogenOptionKeepsTemplateSelector":                  {run: runTestBuildPlanAutogenOptionKeepsTemplateSelector},
 		"BuildPlanAutogenCreatesChartForUnmatchedScalar":               {run: runTestBuildPlanAutogenCreatesChartForUnmatchedScalar},
 		"BuildPlanAutogenUsesMetricMetadataForScalar":                  {run: runTestBuildPlanAutogenUsesMetricMetadataForScalar},
+		"BuildPlanAutogenUsesMetricPriorityMetadataForScalar":          {run: runTestBuildPlanAutogenUsesMetricPriorityMetadataForScalar},
 		"BuildPlanAutogenUsesMetricMetadataForHistogram":               {run: runTestBuildPlanAutogenUsesMetricMetadataForHistogram},
 		"BuildPlanAutogenUsesMetricFloatMetadataForScalar":             {run: runTestBuildPlanAutogenUsesMetricFloatMetadataForScalar},
 		"BuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles": {run: runTestBuildPlanAutogenUsesMetricMetadataForSummaryWithoutQuantiles},
@@ -270,11 +271,11 @@ groups:
 	ss.Enable("ok")
 	cc.CommitCycleSuccess()
 
-	_, err = e.BuildPlan(store.Read())
+	_, err = buildPlan(e, store.Read())
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "Read(metrix.ReadFlatten())")
 
-	_, err = e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	_, err = buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 }
 
@@ -306,7 +307,7 @@ groups:
 	c.ObserveTotal(10)
 	cc.CommitCycleSuccess()
 
-	plan1, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan1, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
 	stats1 := e.stats()
@@ -319,7 +320,7 @@ groups:
 	c.ObserveTotal(20)
 	cc.CommitCycleSuccess()
 
-	plan2, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan2, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionUpdateChart}, actionKinds(plan2.Actions))
 	stats2 := e.stats()
@@ -367,7 +368,7 @@ groups:
 	modeMetric.Observe(1, modeOK)
 	cc.CommitCycleSuccess()
 
-	plan1, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan1, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
 
@@ -375,7 +376,7 @@ groups:
 	total.Observe(101)
 	cc.CommitCycleSuccess()
 
-	plan2, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan2, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionUpdateChart, ActionRemoveDimension}, actionKinds(plan2.Actions))
 	removeDim := findRemoveDimensionAction(plan2)
@@ -413,14 +414,14 @@ groups:
 	c.ObserveTotal(10)
 	cc.CommitCycleSuccess()
 
-	plan1, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan1, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
 
 	cc.BeginCycle()
 	cc.CommitCycleSuccess()
 
-	plan2, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan2, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionRemoveChart}, actionKinds(plan2.Actions))
 }
@@ -455,21 +456,21 @@ groups:
 	c.ObserveTotal(10)
 	cc.CommitCycleSuccess()
 
-	plan1, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan1, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
 
 	cc.BeginCycle()
 	cc.AbortCycle()
 
-	plan2, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan2, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Empty(t, plan2.Actions)
 
 	cc.BeginCycle()
 	cc.CommitCycleSuccess()
 
-	plan3, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan3, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionRemoveChart}, actionKinds(plan3.Actions))
 }
@@ -510,7 +511,7 @@ groups:
 	rx.ObserveTotal(20, eth0)
 	cc.CommitCycleSuccess()
 
-	plan1, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan1, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{
 		ActionCreateChart, ActionCreateDimension, ActionUpdateChart,
@@ -539,7 +540,7 @@ groups:
 	rx.ObserveTotal(11, eth1)
 	cc.CommitCycleSuccess()
 
-	plan2, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan2, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionUpdateChart, ActionUpdateChart}, actionKinds(plan2.Actions))
 }
@@ -581,7 +582,7 @@ groups:
 	rx.ObserveTotal(10, eth0)
 	cc.CommitCycleSuccess()
 
-	plan1, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan1, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
 
@@ -590,7 +591,7 @@ groups:
 	rx.ObserveTotal(20, eth1)
 	cc.CommitCycleSuccess()
 
-	plan2, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan2, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	// eth0 exists and is seen, so eth1 is dropped under max_instances=1.
 	assert.Equal(t, []ActionKind{ActionUpdateChart}, actionKinds(plan2.Actions))
@@ -602,7 +603,7 @@ groups:
 	rx.ObserveTotal(21, eth1)
 	cc.CommitCycleSuccess()
 
-	plan3, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan3, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{
 		ActionRemoveChart,
@@ -650,7 +651,7 @@ groups:
 	g.Observe(1, modeB)
 	cc.CommitCycleSuccess()
 
-	plan1, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan1, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
 
@@ -660,7 +661,7 @@ groups:
 	g.Observe(1, modeC)
 	cc.CommitCycleSuccess()
 
-	plan2, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan2, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	// a,b seen; c is dropped under max_dims=2.
 	assert.Equal(t, []ActionKind{ActionUpdateChart}, actionKinds(plan2.Actions))
@@ -673,7 +674,7 @@ groups:
 	g.Observe(1, modeC)
 	cc.CommitCycleSuccess()
 
-	plan3, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan3, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{
 		ActionRemoveDimension,
@@ -727,7 +728,7 @@ groups:
 	m.ObserveTotal(20, out)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	var create *CreateChartAction
@@ -772,7 +773,7 @@ groups:
 	unmatched.ObserveTotal(10)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Empty(t, plan.Actions)
 }
@@ -815,7 +816,7 @@ groups:
 	unmatched.ObserveTotal(20, methodPOST)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
@@ -859,7 +860,7 @@ groups:
 	unmatched.ObserveTotal(20, methodPOST)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
@@ -903,7 +904,7 @@ groups:
 	unmatched.ObserveTotal(20, methodPOST)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
@@ -941,7 +942,7 @@ groups:
 	unmatched.ObserveTotal(20, methodPOST)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
@@ -980,7 +981,7 @@ groups:
 	unmatched.ObserveTotal(10, methodGET)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
@@ -1031,7 +1032,7 @@ groups:
 	unmatched.ObserveTotal(10)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	create := findCreateChartAction(plan)
@@ -1039,6 +1040,49 @@ groups:
 	assert.Equal(t, "HTTP traffic", create.Meta.Title)
 	assert.Equal(t, "Traffic", create.Meta.Family)
 	assert.Equal(t, "bytes/s", create.Meta.Units)
+	assert.Equal(t, Priority, create.Meta.Priority)
+}
+
+func runTestBuildPlanAutogenUsesMetricPriorityMetadataForScalar(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true}}))
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Service
+    metrics:
+      - svc.requests_total
+    charts:
+      - title: Requests
+        context: requests
+        units: requests/s
+        dimensions:
+          - selector: svc.requests_total
+            name: total
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	unmatched := store.Write().SnapshotMeter("svc").Counter(
+		"bytes_total",
+		metrix.WithDescription("HTTP traffic"),
+		metrix.WithChartFamily("Traffic"),
+		metrix.WithChartPriority(Priority+321),
+		metrix.WithUnit("bytes"),
+	)
+
+	cc.BeginCycle()
+	unmatched.ObserveTotal(10)
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, Priority+321, create.Meta.Priority)
 }
 
 func runTestBuildPlanAutogenUsesMetricMetadataForHistogram(t *testing.T) {
@@ -1082,7 +1126,7 @@ groups:
 	})
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	buckets := findCreateChartActionByID(plan, "svc.request_duration_ms")
@@ -1129,7 +1173,7 @@ groups:
 	unmatched.Observe(10.5)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	var created *CreateDimensionAction
@@ -1186,7 +1230,7 @@ groups:
 	})
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	sum := findCreateChartActionByID(plan, "svc.query_duration_ms_sum")
@@ -1227,7 +1271,7 @@ groups:
 	m.ObserveTotal(10, methodGET)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
 	create := findCreateChartAction(plan)
@@ -1288,7 +1332,7 @@ groups:
 	metric.ObserveTotal(10, ls)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Empty(t, plan.Actions)
 }
@@ -1330,7 +1374,7 @@ groups:
 	}, method)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	var bucketChart *CreateChartAction
@@ -1392,7 +1436,7 @@ groups:
 	g.Observe(7, queueMain)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
@@ -1442,7 +1486,7 @@ groups:
 	ss.Enable("operational")
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	assert.Equal(t, []ActionKind{
@@ -1505,7 +1549,7 @@ groups:
 	ss.Enable("operational")
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	create := findCreateChartAction(plan)
@@ -1553,7 +1597,7 @@ groups:
 	ms.ObservePoint(metrix.MeasureSetPoint{Values: []metrix.SampleValue{1.5, 0.5}})
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	assert.Equal(t, []ActionKind{
@@ -1635,7 +1679,7 @@ groups:
 	ms.ObserveTotalPoint(metrix.MeasureSetPoint{Values: []metrix.SampleValue{10, 2}})
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	assert.Equal(t, []ActionKind{
@@ -1713,7 +1757,7 @@ groups:
 	fooTotal.ObserveTotal(7, methodGET)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan.Actions))
@@ -1760,14 +1804,14 @@ groups:
 	c.ObserveTotal(10)
 	cc.CommitCycleSuccess()
 
-	plan1, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan1, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionCreateChart, ActionCreateDimension, ActionUpdateChart}, actionKinds(plan1.Actions))
 
 	cc.BeginCycle()
 	cc.CommitCycleSuccess()
 
-	plan2, err := e.BuildPlan(store.Read(metrix.ReadFlatten()))
+	plan2, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
 	assert.Equal(t, []ActionKind{ActionRemoveChart}, actionKinds(plan2.Actions))
 }
@@ -1814,7 +1858,7 @@ groups:
 	b.Observe(3, total)
 	cc.CommitCycleSuccess()
 
-	plan, err := e.BuildPlan(store.Read())
+	plan, err := buildPlan(e, store.Read())
 	require.NoError(t, err)
 
 	assert.Equal(t, []ActionKind{
@@ -1881,7 +1925,7 @@ groups:
 	mode.Observe(2, warnSet)
 	cc.CommitCycleSuccess()
 
-	plan1, err := e.BuildPlan(store.Read())
+	plan1, err := buildPlan(e, store.Read())
 	require.NoError(t, err)
 	require.NotNil(t, findUpdateAction(plan1))
 
@@ -1889,14 +1933,13 @@ groups:
 	require.NotNil(t, matChart)
 	require.Contains(t, matChart.scratchEntries, "ok")
 	require.Contains(t, matChart.scratchEntries, "warn")
-	okEntryPtr := matChart.scratchEntries["ok"]
-	require.NotNil(t, okEntryPtr)
+	require.NotNil(t, matChart.scratchEntries["ok"])
 
 	cc.BeginCycle()
 	mode.Observe(3, okSet)
 	cc.CommitCycleSuccess()
 
-	plan2, err := e.BuildPlan(store.Read())
+	plan2, err := buildPlan(e, store.Read())
 	require.NoError(t, err)
 
 	update2 := findUpdateAction(plan2)
@@ -1916,13 +1959,12 @@ groups:
 	assert.NotContains(t, matChart.dimensions, "warn")
 	require.Contains(t, matChart.scratchEntries, "warn")
 	require.Contains(t, matChart.scratchEntries, "ok")
-	assert.Equal(t, okEntryPtr, matChart.scratchEntries["ok"])
 
 	cc.BeginCycle()
 	mode.Observe(4, okSet)
 	cc.CommitCycleSuccess()
 
-	plan3, err := e.BuildPlan(store.Read())
+	plan3, err := buildPlan(e, store.Read())
 	require.NoError(t, err)
 	update3 := findUpdateAction(plan3)
 	require.NotNil(t, update3)
@@ -1967,11 +2009,11 @@ groups:
 				g.Observe(5)
 				cc.CommitCycleSuccess()
 
-				plan1, err := e.BuildPlan(store.Read())
+				plan1, err := buildPlan(e, store.Read())
 				require.NoError(t, err)
 				require.NotNil(t, findUpdateAction(plan1))
 
-				plan2, err := e.BuildPlan(store.Read())
+				plan2, err := buildPlan(e, store.Read())
 				require.NoError(t, err)
 				assert.Empty(t, plan2.Actions)
 			},
@@ -2002,7 +2044,7 @@ groups:
 				vec.WithLabelValues("warn").Set(2)
 
 				reader := store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
-				plan1, err := e.BuildPlan(reader)
+				plan1, err := buildPlan(e, reader)
 				require.NoError(t, err)
 				require.NotNil(t, findUpdateAction(plan1))
 
@@ -2010,10 +2052,9 @@ groups:
 				require.NotNil(t, matChart)
 				require.Contains(t, matChart.scratchEntries, "ok")
 				require.Contains(t, matChart.scratchEntries, "warn")
-				okEntry := matChart.scratchEntries["ok"]
-				require.NotNil(t, okEntry)
+				require.NotNil(t, matChart.scratchEntries["ok"])
 
-				plan2, err := e.BuildPlan(reader)
+				plan2, err := buildPlan(e, reader)
 				require.NoError(t, err)
 				assert.Equal(t, []ActionKind{ActionUpdateChart}, actionKinds(plan2.Actions))
 				require.NotNil(t, findUpdateAction(plan2))
@@ -2029,7 +2070,6 @@ groups:
 				require.NotNil(t, matChart)
 				require.Contains(t, matChart.scratchEntries, "ok")
 				require.Contains(t, matChart.scratchEntries, "warn")
-				assert.Equal(t, okEntry, matChart.scratchEntries["ok"])
 			},
 		},
 	}
@@ -2080,7 +2120,8 @@ groups:
 			}
 			reader := store.Read()
 			meta := reader.CollectMeta()
-			ctx, err := e.preparePlanBuildContext(reader, &out, meta, meta.LastSuccessSeq)
+			materialized := e.state.materialized.clone()
+			ctx, err := e.preparePlanBuildContext(reader, &out, meta, meta.LastSuccessSeq, &materialized)
 			require.NoError(t, err)
 			require.NoError(t, e.scanPlanSeries(ctx))
 
@@ -2130,7 +2171,8 @@ groups:
 			}
 			reader := store.Read()
 			meta := reader.CollectMeta()
-			ctx, err := e.preparePlanBuildContext(reader, &out, meta, meta.LastSuccessSeq)
+			materialized := e.state.materialized.clone()
+			ctx, err := e.preparePlanBuildContext(reader, &out, meta, meta.LastSuccessSeq, &materialized)
 			require.NoError(t, err)
 			require.NoError(t, e.scanPlanSeries(ctx))
 			require.NoError(t, e.materializePlanCharts(ctx))

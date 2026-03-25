@@ -55,61 +55,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per PgBouncer instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| pgbouncer.client_connections_utilization | used | percentage |
-
-### Per database
-
-These metrics refer to the database.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| database | database name |
-| postgres_database | Postgres database name |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| pgbouncer.db_client_connections | active, waiting, cancel_req | connections |
-| pgbouncer.db_server_connections | active, idle, used, tested, login | connections |
-| pgbouncer.db_server_connections_utilization | used | percentage |
-| pgbouncer.db_clients_wait_time | time | seconds |
-| pgbouncer.db_client_max_wait_time | time | seconds |
-| pgbouncer.db_transactions | transactions | transactions/s |
-| pgbouncer.db_transactions_time | time | seconds |
-| pgbouncer.db_transaction_avg_time | time | seconds |
-| pgbouncer.db_queries | queries | queries/s |
-| pgbouncer.db_queries_time | time | seconds |
-| pgbouncer.db_query_avg_time | time | seconds |
-| pgbouncer.db_network_io | received, sent | B/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -264,6 +209,61 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per PgBouncer instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| pgbouncer.client_connections_utilization | used | percentage |
+
+### Per database
+
+These metrics refer to the database.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| database | database name |
+| postgres_database | Postgres database name |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| pgbouncer.db_client_connections | active, waiting, cancel_req | connections |
+| pgbouncer.db_server_connections | active, idle, used, tested, login | connections |
+| pgbouncer.db_server_connections_utilization | used | percentage |
+| pgbouncer.db_clients_wait_time | time | seconds |
+| pgbouncer.db_client_max_wait_time | time | seconds |
+| pgbouncer.db_transactions | transactions | transactions/s |
+| pgbouncer.db_transactions_time | time | seconds |
+| pgbouncer.db_transaction_avg_time | time | seconds |
+| pgbouncer.db_queries | queries | queries/s |
+| pgbouncer.db_queries_time | time | seconds |
+| pgbouncer.db_query_avg_time | time | seconds |
+| pgbouncer.db_network_io | received, sent | B/s |
 
 
 

@@ -110,6 +110,34 @@ func TestSpecValidateScenarios(t *testing.T) {
 			wantErr: true,
 			errLike: "duplicate token",
 		},
+		"fails on duplicate chart_defaults by_labels tokens": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{
+					{
+						Family: "Database",
+						ChartDefaults: &ChartDefaults{
+							Instances: &Instances{
+								ByLabels: []string{"*", "*"},
+							},
+						},
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "chart_defaults.instances.by_labels",
+		},
 		"fails on empty metric name": {
 			spec: Spec{
 				Version: VersionV1,

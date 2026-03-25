@@ -4,6 +4,7 @@
 
 #include "ebpf.h"
 #include "ebpf_socket.h"
+#include "libbpf_api/ebpf_library.h"
 
 /*****************************************************************
  *
@@ -123,6 +124,8 @@ struct netdata_static_thread ebpf_read_socket = {
 
 ARAL *aral_socket_table = NULL;
 
+#define NETDATA_MAX(a, b) ((a) > (b) ? (a) : (b))
+
 #ifdef LIBBPF_MAJOR_VERSION
 /**
  * Disable Probe
@@ -190,7 +193,7 @@ static void ebpf_set_trampoline_target(struct socket_bpf *obj)
     bpf_program__set_attach_target(
         obj->progs.netdata_tcp_v4_connect_fexit, 0, socket_targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
 
-    if (tcp_v6_connect_address.type == 'T') {
+    if (tcp_v6_connect_address.type == TCP_V6_CONNECT_TYPE) {
         bpf_program__set_attach_target(
             obj->progs.netdata_tcp_v6_connect_fentry, 0, socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
 
@@ -284,90 +287,118 @@ static long ebpf_socket_attach_probes(struct socket_bpf *obj, netdata_run_mode_t
     obj->links.netdata_inet_csk_accept_kretprobe = bpf_program__attach_kprobe(
         obj->progs.netdata_inet_csk_accept_kretprobe, true, socket_targets[NETDATA_FCNT_INET_CSK_ACCEPT].name);
     long ret = libbpf_get_error(obj->links.netdata_inet_csk_accept_kretprobe);
-    if (ret)
+    if (ret) {
+        collector_error("Cannot attach kprobe for %s", socket_targets[NETDATA_FCNT_INET_CSK_ACCEPT].name);
         return -1;
+    }
 
     obj->links.netdata_tcp_retransmit_skb_kprobe = bpf_program__attach_kprobe(
         obj->progs.netdata_tcp_retransmit_skb_kprobe, false, socket_targets[NETDATA_FCNT_TCP_RETRANSMIT].name);
     ret = libbpf_get_error(obj->links.netdata_tcp_retransmit_skb_kprobe);
-    if (ret)
+    if (ret) {
+        collector_error("Cannot attach kprobe for %s", socket_targets[NETDATA_FCNT_TCP_RETRANSMIT].name);
         return -1;
+    }
 
     obj->links.netdata_tcp_cleanup_rbuf_kprobe = bpf_program__attach_kprobe(
         obj->progs.netdata_tcp_cleanup_rbuf_kprobe, false, socket_targets[NETDATA_FCNT_CLEANUP_RBUF].name);
     ret = libbpf_get_error(obj->links.netdata_tcp_cleanup_rbuf_kprobe);
-    if (ret)
+    if (ret) {
+        collector_error("Cannot attach kprobe for %s", socket_targets[NETDATA_FCNT_CLEANUP_RBUF].name);
         return -1;
+    }
 
     obj->links.netdata_tcp_close_kprobe = bpf_program__attach_kprobe(
         obj->progs.netdata_tcp_close_kprobe, false, socket_targets[NETDATA_FCNT_TCP_CLOSE].name);
     ret = libbpf_get_error(obj->links.netdata_tcp_close_kprobe);
-    if (ret)
+    if (ret) {
+        collector_error("Cannot attach kprobe for %s", socket_targets[NETDATA_FCNT_TCP_CLOSE].name);
         return -1;
+    }
 
     obj->links.netdata_udp_recvmsg_kprobe = bpf_program__attach_kprobe(
         obj->progs.netdata_udp_recvmsg_kprobe, false, socket_targets[NETDATA_FCNT_UDP_RECEVMSG].name);
     ret = libbpf_get_error(obj->links.netdata_udp_recvmsg_kprobe);
-    if (ret)
+    if (ret) {
+        collector_error("Cannot attach kprobe for %s", socket_targets[NETDATA_FCNT_UDP_RECEVMSG].name);
         return -1;
+    }
 
     obj->links.netdata_udp_recvmsg_kretprobe = bpf_program__attach_kprobe(
         obj->progs.netdata_udp_recvmsg_kretprobe, true, socket_targets[NETDATA_FCNT_UDP_RECEVMSG].name);
     ret = libbpf_get_error(obj->links.netdata_udp_recvmsg_kretprobe);
-    if (ret)
+    if (ret) {
+        collector_error("Cannot attach kretprobe for %s", socket_targets[NETDATA_FCNT_UDP_RECEVMSG].name);
         return -1;
+    }
 
     if (sel == MODE_RETURN) {
         obj->links.netdata_tcp_sendmsg_kretprobe = bpf_program__attach_kprobe(
             obj->progs.netdata_tcp_sendmsg_kretprobe, true, socket_targets[NETDATA_FCNT_TCP_SENDMSG].name);
         ret = libbpf_get_error(obj->links.netdata_tcp_sendmsg_kretprobe);
-        if (ret)
+        if (ret) {
+            collector_error("Cannot attach kretprobe for %s", socket_targets[NETDATA_FCNT_TCP_SENDMSG].name);
             return -1;
+        }
 
         obj->links.netdata_udp_sendmsg_kretprobe = bpf_program__attach_kprobe(
             obj->progs.netdata_udp_sendmsg_kretprobe, true, socket_targets[NETDATA_FCNT_UDP_SENDMSG].name);
         ret = libbpf_get_error(obj->links.netdata_udp_sendmsg_kretprobe);
-        if (ret)
+        if (ret) {
+            collector_error("Cannot attach kretprobe for %s", socket_targets[NETDATA_FCNT_UDP_SENDMSG].name);
             return -1;
+        }
 
         obj->links.netdata_tcp_v4_connect_kretprobe = bpf_program__attach_kprobe(
             obj->progs.netdata_tcp_v4_connect_kretprobe, true, socket_targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
         ret = libbpf_get_error(obj->links.netdata_tcp_v4_connect_kretprobe);
-        if (ret)
+        if (ret) {
+            collector_error("Cannot attach kretprobe for %s", socket_targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
             return -1;
+        }
 
-        if (tcp_v6_connect_address.type == 'T') {
+        if (tcp_v6_connect_address.type == TCP_V6_CONNECT_TYPE) {
             obj->links.netdata_tcp_v6_connect_kretprobe = bpf_program__attach_kprobe(
                 obj->progs.netdata_tcp_v6_connect_kretprobe, true, socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
             ret = libbpf_get_error(obj->links.netdata_tcp_v6_connect_kretprobe);
-            if (ret)
+            if (ret) {
+                collector_error("Cannot attach kretprobe for %s", socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
                 return -1;
+            }
         }
     } else {
         obj->links.netdata_tcp_sendmsg_kprobe = bpf_program__attach_kprobe(
             obj->progs.netdata_tcp_sendmsg_kprobe, false, socket_targets[NETDATA_FCNT_TCP_SENDMSG].name);
         ret = libbpf_get_error(obj->links.netdata_tcp_sendmsg_kprobe);
-        if (ret)
+        if (ret) {
+            collector_error("Cannot attach kprobe for %s", socket_targets[NETDATA_FCNT_TCP_SENDMSG].name);
             return -1;
+        }
 
         obj->links.netdata_udp_sendmsg_kprobe = bpf_program__attach_kprobe(
             obj->progs.netdata_udp_sendmsg_kprobe, false, socket_targets[NETDATA_FCNT_UDP_SENDMSG].name);
         ret = libbpf_get_error(obj->links.netdata_udp_sendmsg_kprobe);
-        if (ret)
+        if (ret) {
+            collector_error("Cannot attach kprobe for %s", socket_targets[NETDATA_FCNT_UDP_SENDMSG].name);
             return -1;
+        }
 
         obj->links.netdata_tcp_v4_connect_kprobe = bpf_program__attach_kprobe(
             obj->progs.netdata_tcp_v4_connect_kprobe, false, socket_targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
         ret = libbpf_get_error(obj->links.netdata_tcp_v4_connect_kprobe);
-        if (ret)
+        if (ret) {
+            collector_error("Cannot attach kprobe for %s", socket_targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
             return -1;
+        }
 
-        if (tcp_v6_connect_address.type == 'T') {
+        if (tcp_v6_connect_address.type == TCP_V6_CONNECT_TYPE) {
             obj->links.netdata_tcp_v6_connect_kprobe = bpf_program__attach_kprobe(
                 obj->progs.netdata_tcp_v6_connect_kprobe, false, socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
             ret = libbpf_get_error(obj->links.netdata_tcp_v6_connect_kprobe);
-            if (ret)
+            if (ret) {
+                collector_error("Cannot attach kprobe for %s", socket_targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
                 return -1;
+            }
         }
     }
 
@@ -496,7 +527,6 @@ static void ebpf_socket_free(ebpf_module_t *em)
     netdata_mutex_lock(&ebpf_exit_cleanup);
     em->enabled = NETDATA_THREAD_EBPF_STOPPED;
     ebpf_update_stats(&plugin_statistics, em);
-    ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_REMOVE);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 
     netdata_mutex_lock(&lock);
@@ -513,7 +543,7 @@ static void ebpf_socket_free(ebpf_module_t *em)
  **/
 static void ebpf_obsolete_systemd_socket_charts(int update_every, char *id)
 {
-    int order = 20080;
+    int order = NETDATA_SOCKET_SYSTEMD_ORDER_BASE;
     ebpf_write_chart_obsolete(
         id,
         NETDATA_SOCK_ID_OR_SUFFIX_CONNECTION_TCP_V4,
@@ -526,7 +556,7 @@ static void ebpf_obsolete_systemd_socket_charts(int update_every, char *id)
         order++,
         update_every);
 
-    if (tcp_v6_connect_address.type == 'T') {
+    if (tcp_v6_connect_address.type == TCP_V6_CONNECT_TYPE) {
         ebpf_write_chart_obsolete(
             id,
             NETDATA_SOCK_ID_OR_SUFFIX_CONNECTION_TCP_V6,
@@ -647,7 +677,7 @@ static inline void ebpf_obsolete_socket_cgroup_charts(ebpf_module_t *em)
  */
 void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
 {
-    int order = 20130;
+    int order = NETDATA_SOCKET_APPS_ORDER_BASE;
     struct ebpf_target *w;
     int update_every = em->update_every;
     netdata_mutex_lock(&collect_data_mutex);
@@ -667,7 +697,7 @@ void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
             order++,
             update_every);
 
-        if (tcp_v6_connect_address.type == 'T') {
+        if (tcp_v6_connect_address.type == TCP_V6_CONNECT_TYPE) {
             ebpf_write_chart_obsolete(
                 NETDATA_APP_FAMILY,
                 w->clean_name,
@@ -767,7 +797,7 @@ void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
  */
 static void ebpf_socket_obsolete_global_charts(ebpf_module_t *em)
 {
-    int order = 21070;
+    int order = NETDATA_SOCKET_CHART_ORDER_BASE;
     ebpf_write_chart_obsolete(
         NETDATA_EBPF_IP_FAMILY,
         NETDATA_INBOUND_CONNECTIONS,
@@ -895,10 +925,12 @@ static void ebpf_socket_exit(void *pptr)
     if (!em)
         return;
 
-    if (ebpf_read_socket.thread)
+    if (ebpf_read_socket.thread) {
         nd_thread_signal_cancel(ebpf_read_socket.thread);
+        nd_thread_join(ebpf_read_socket.thread);
+    }
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
+    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
 
         if (em->cgroup_charts) {
@@ -915,6 +947,9 @@ static void ebpf_socket_exit(void *pptr)
 
         netdata_mutex_unlock(&lock);
     }
+
+    if (!ebpf_plugin_stop() && em->functions.bpf_unload)
+        em->functions.bpf_unload(em);
 
     ebpf_socket_free(em);
 }
@@ -942,11 +977,10 @@ static void ebpf_update_global_publish(
     netdata_publish_syscall_t *move = publish;
     while (move) {
         if (input->call != move->pcall) {
-            // This condition happens to avoid initial values with dimensions higher than normal values.
             if (move->pcall) {
                 move->ncall = (input->call > move->pcall) ? input->call - move->pcall : move->pcall - input->call;
                 move->nbyte = (input->bytes > move->pbyte) ? input->bytes - move->pbyte : move->pbyte - input->bytes;
-                move->nerr = (input->ecall > move->nerr) ? input->ecall - move->perr : move->perr - input->ecall;
+                move->nerr = (input->ecall > move->perr) ? input->ecall - move->perr : move->perr - input->ecall;
             } else {
                 move->ncall = 0;
                 move->nbyte = 0;
@@ -984,7 +1018,7 @@ static void ebpf_update_global_publish(
  */
 static inline collected_number ebpf_socket_bytes2bits(uint64_t value)
 {
-    return (collected_number)(value * 8 / BITS_IN_A_KILOBIT);
+    return value * 8 / BITS_IN_A_KILOBIT;
 }
 
 /**
@@ -1069,6 +1103,9 @@ void ebpf_socket_send_apps_data()
     struct ebpf_target *w;
     netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SOCKET_IDX))))
             continue;
 
@@ -1077,7 +1114,7 @@ void ebpf_socket_send_apps_data()
         write_chart_dimension("connections", (collected_number)values->call_tcp_v4_connection);
         ebpf_write_end_chart();
 
-        if (tcp_v6_connect_address.type == 'T') {
+        if (tcp_v6_connect_address.type == TCP_V6_CONNECT_TYPE) {
             ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_tcp_v6_connection");
             write_chart_dimension("connections", (collected_number)values->call_tcp_v6_connection);
             ebpf_write_end_chart();
@@ -1127,7 +1164,7 @@ void ebpf_socket_send_apps_data()
  */
 static void ebpf_socket_create_global_charts(ebpf_module_t *em)
 {
-    int order = 21070;
+    int order = NETDATA_SOCKET_CHART_ORDER_BASE;
     ebpf_create_chart(
         NETDATA_EBPF_IP_FAMILY,
         NETDATA_INBOUND_CONNECTIONS,
@@ -1282,9 +1319,12 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
     struct ebpf_target *root = ptr;
     struct ebpf_target *w;
-    int order = 20130;
+    int order = NETDATA_SOCKET_APPS_ORDER_BASE;
     int update_every = em->update_every;
     for (w = root; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!w->exposed))
             continue;
 
@@ -1304,7 +1344,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION connections '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
-        if (tcp_v6_connect_address.type == 'T') {
+        if (tcp_v6_connect_address.type == TCP_V6_CONNECT_TYPE) {
             ebpf_write_chart_cmd(
                 NETDATA_APP_FAMILY,
                 w->clean_name,
@@ -1587,6 +1627,9 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, int end)
     uint16_t family = AF_UNSPEC;
     uint32_t external_origin = values[0].external_origin;
     for (i = 1; i < end; i++) {
+        if (ebpf_plugin_stop())
+            break;
+
         netdata_socket_t *w = &values[i];
 
         values[0].tcp.call_tcp_sent += w->tcp.call_tcp_sent;
@@ -1761,7 +1804,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
 
     netdata_socket_t *values = socket_values;
     size_t length = sizeof(netdata_socket_t);
-    int test, end;
+    int ret, end;
     if (maps_per_core) {
         length *= ebpf_nprocs;
         end = ebpf_nprocs;
@@ -1774,9 +1817,12 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     memset(values, 0, length);
     time_t update_time = time(NULL);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
-        test = bpf_map_lookup_elem(fd, &key, values);
+        if (ebpf_plugin_stop())
+            break;
+
+        ret = bpf_map_lookup_elem(fd, &key, values);
         bool deleted = true;
-        if (test < 0) {
+        if (ret < 0) {
             goto end_socket_loop;
         }
 
@@ -1785,14 +1831,6 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         }
 
         ebpf_hash_socket_accumulator(values, end);
-
-        // We update UDP to show info with charts, but we do not show them with functions
-        /*
-        if (key.dport == NETDATA_EBPF_UDP_PORT && values[0].protocol == IPPROTO_UDP) {
-            bpf_map_delete_elem(fd, &key);
-            goto end_socket_loop;
-        }
-         */
 
         // Discard non-bind sockets
         if (!key.daddr.addr64[0] && !key.daddr.addr64[1] && !key.saddr.addr64[0] && !key.saddr.addr64[1]) {
@@ -1849,7 +1887,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         rw_spinlock_write_unlock(&pid_ptr->socket_stats.rw_spinlock);
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
-    end_socket_loop: ;// the empty statement is here to allow code to be compiled by old compilers
+    end_socket_loop:; // the empty statement is here to allow code to be compiled by old compilers
         netdata_ebpf_pid_stats_t *local_pid =
             netdata_ebpf_get_shm_pointer_unsafe(key.pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
         if (!local_pid)
@@ -1876,6 +1914,9 @@ void ebpf_socket_resume_apps_data()
 
     netdata_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SOCKET_IDX))))
             continue;
 
@@ -1917,6 +1958,9 @@ static void ebpf_update_socket_cgroup()
 
     netdata_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
@@ -1968,21 +2012,43 @@ void ebpf_read_socket_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     int cgroups = em->cgroup_charts;
     heartbeat_t hb;
-    heartbeat_init(&hb, update_every * USEC_PER_SEC);
+    heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
+        if (ebpf_plugin_stop())
+            break;
+
         heartbeat_next(&hb);
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
-        sem_wait(shm_mutex_ebpf_integration);
+        if (!ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+            if (errno != ECANCELED)
+                netdata_log_error("SOCKET: Failed to wait on semaphore.");
+            break;
+        }
         ebpf_update_array_vectors(em);
         ebpf_socket_resume_apps_data();
+        if (ebpf_plugin_stop()) {
+            if (sem_post(shm_mutex_ebpf_integration))
+                netdata_log_error("SOCKET: Failed to post semaphore.");
+            break;
+        }
+
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_socket_cgroup();
 
-        sem_post(shm_mutex_ebpf_integration);
+        if (sem_post(shm_mutex_ebpf_integration)) {
+            netdata_log_error("SOCKET: Failed to post semaphore.");
+            break;
+        }
 
         counter = 0;
+
+        if (ebpf_plugin_stop())
+            break;
     }
 }
 
@@ -2059,8 +2125,11 @@ static void read_listen_table()
     int fd = socket_maps[NETDATA_SOCKET_LPORTS].map_fd;
     netdata_passive_connection_t value = {};
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
-        int test = bpf_map_lookup_elem(fd, &key, &value);
-        if (test < 0) {
+        if (ebpf_plugin_stop())
+            break;
+
+        int ret = bpf_map_lookup_elem(fd, &key, &value);
+        if (ret < 0) {
             key = next_key;
             continue;
         }
@@ -2146,7 +2215,6 @@ void ebpf_socket_fill_publish_apps(ebpf_socket_publish_apps_t *curr, netdata_soc
     curr->call_udp_received = ns->udp.call_udp_received;
 }
 
-
 /**
  * Sum PIDs
  *
@@ -2177,27 +2245,16 @@ static void ebpf_socket_sum_cgroup_pids(ebpf_socket_publish_apps_t *socket, stru
         pids = pids->next;
     }
 
-    socket->bytes_sent = (accumulator.bytes_sent >= socket->bytes_sent) ? accumulator.bytes_sent : socket->bytes_sent;
-    socket->bytes_received =
-        (accumulator.bytes_received >= socket->bytes_received) ? accumulator.bytes_received : socket->bytes_received;
-    socket->call_tcp_sent =
-        (accumulator.call_tcp_sent >= socket->call_tcp_sent) ? accumulator.call_tcp_sent : socket->call_tcp_sent;
-    socket->call_tcp_received = (accumulator.call_tcp_received >= socket->call_tcp_received) ?
-                                    accumulator.call_tcp_received :
-                                    socket->call_tcp_received;
-    socket->retransmit = (accumulator.retransmit >= socket->retransmit) ? accumulator.retransmit : socket->retransmit;
-    socket->call_udp_sent =
-        (accumulator.call_udp_sent >= socket->call_udp_sent) ? accumulator.call_udp_sent : socket->call_udp_sent;
-    socket->call_udp_received = (accumulator.call_udp_received >= socket->call_udp_received) ?
-                                    accumulator.call_udp_received :
-                                    socket->call_udp_received;
-    socket->call_close = (accumulator.call_close >= socket->call_close) ? accumulator.call_close : socket->call_close;
-    socket->call_tcp_v4_connection = (accumulator.call_tcp_v4_connection >= socket->call_tcp_v4_connection) ?
-                                         accumulator.call_tcp_v4_connection :
-                                         socket->call_tcp_v4_connection;
-    socket->call_tcp_v6_connection = (accumulator.call_tcp_v6_connection >= socket->call_tcp_v6_connection) ?
-                                         accumulator.call_tcp_v6_connection :
-                                         socket->call_tcp_v6_connection;
+    socket->bytes_sent = NETDATA_MAX(accumulator.bytes_sent, socket->bytes_sent);
+    socket->bytes_received = NETDATA_MAX(accumulator.bytes_received, socket->bytes_received);
+    socket->call_tcp_sent = NETDATA_MAX(accumulator.call_tcp_sent, socket->call_tcp_sent);
+    socket->call_tcp_received = NETDATA_MAX(accumulator.call_tcp_received, socket->call_tcp_received);
+    socket->retransmit = NETDATA_MAX(accumulator.retransmit, socket->retransmit);
+    socket->call_udp_sent = NETDATA_MAX(accumulator.call_udp_sent, socket->call_udp_sent);
+    socket->call_udp_received = NETDATA_MAX(accumulator.call_udp_received, socket->call_udp_received);
+    socket->call_close = NETDATA_MAX(accumulator.call_close, socket->call_close);
+    socket->call_tcp_v4_connection = NETDATA_MAX(accumulator.call_tcp_v4_connection, socket->call_tcp_v4_connection);
+    socket->call_tcp_v6_connection = NETDATA_MAX(accumulator.call_tcp_v6_connection, socket->call_tcp_v6_connection);
 }
 
 /**
@@ -2210,7 +2267,7 @@ static void ebpf_socket_sum_cgroup_pids(ebpf_socket_publish_apps_t *socket, stru
  */
 static void ebpf_create_specific_socket_charts(char *type, int update_every)
 {
-    int order_basis = 5300;
+    int order_basis = NETDATA_SOCKET_CGROUP_ORDER_BASE;
     char *label = (!strncmp(type, "cgroup_", 7)) ? &type[7] : type;
     ebpf_write_chart_cmd(
         type,
@@ -2228,7 +2285,7 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
     ebpf_commit_label();
     fprintf(stdout, "DIMENSION connections '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
-    if (tcp_v6_connect_address.type == 'T') {
+    if (tcp_v6_connect_address.type == TCP_V6_CONNECT_TYPE) {
         ebpf_write_chart_cmd(
             type,
             NETDATA_SOCK_ID_OR_SUFFIX_CONNECTION_TCP_V6,
@@ -2354,7 +2411,7 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
  */
 static void ebpf_obsolete_specific_socket_charts(char *type, int update_every)
 {
-    int order_basis = 5300;
+    int order_basis = NETDATA_SOCKET_CGROUP_ORDER_BASE;
     ebpf_write_chart_obsolete(
         type,
         NETDATA_SOCK_ID_OR_SUFFIX_CONNECTION_TCP_V4,
@@ -2367,7 +2424,7 @@ static void ebpf_obsolete_specific_socket_charts(char *type, int update_every)
         NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + order_basis++,
         update_every);
 
-    if (tcp_v6_connect_address.type == 'T') {
+    if (tcp_v6_connect_address.type == TCP_V6_CONNECT_TYPE) {
         ebpf_write_chart_obsolete(
             type,
             NETDATA_SOCK_ID_OR_SUFFIX_CONNECTION_TCP_V6,
@@ -2468,7 +2525,7 @@ static void ebpf_send_specific_socket_data(char *type, ebpf_socket_publish_apps_
     write_chart_dimension("connections", (long long)values->call_tcp_v4_connection);
     ebpf_write_end_chart();
 
-    if (tcp_v6_connect_address.type == 'T') {
+    if (tcp_v6_connect_address.type == TCP_V6_CONNECT_TYPE) {
         ebpf_write_begin_chart(type, NETDATA_SOCK_ID_OR_SUFFIX_CONNECTION_TCP_V6, "");
         write_chart_dimension("connections", (long long)values->call_tcp_v6_connection);
         ebpf_write_end_chart();
@@ -2620,6 +2677,9 @@ static void ebpf_create_systemd_socket_charts(int update_every)
 
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w; w = w->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!w->systemd || w->flags & NETDATA_EBPF_SERVICES_HAS_SOCKET_CHART))
             continue;
 
@@ -2627,7 +2687,7 @@ static void ebpf_create_systemd_socket_charts(int update_every)
             data_tcp_retransmit.id = data_udp_send.id = data_udp_recv.id = w->name;
 
         ebpf_create_charts_on_systemd(&data_tcp_v4);
-        if (tcp_v6_connect_address.type == 'T') {
+        if (tcp_v6_connect_address.type == TCP_V6_CONNECT_TYPE) {
             ebpf_create_charts_on_systemd(&data_tcp_v6);
         }
 
@@ -2656,6 +2716,9 @@ static void ebpf_send_systemd_socket_charts()
 {
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (unlikely(!(ect->flags & NETDATA_EBPF_SERVICES_HAS_SOCKET_CHART))) {
             continue;
         }
@@ -2664,7 +2727,7 @@ static void ebpf_send_systemd_socket_charts()
         write_chart_dimension("connections", (long long)ect->publish_socket.call_tcp_v4_connection);
         ebpf_write_end_chart();
 
-        if (tcp_v6_connect_address.type == 'T') {
+        if (tcp_v6_connect_address.type == TCP_V6_CONNECT_TYPE) {
             ebpf_write_begin_chart(ect->name, NETDATA_SOCK_ID_OR_SUFFIX_CONNECTION_TCP_V6, "");
             write_chart_dimension("connections", (long long)ect->publish_socket.call_tcp_v6_connection);
             ebpf_write_end_chart();
@@ -2724,6 +2787,11 @@ static void ebpf_socket_send_cgroup_data(int update_every)
         ebpf_socket_sum_cgroup_pids(&ect->publish_socket, ect->pids);
     }
 
+    if (ebpf_plugin_stop()) {
+        netdata_mutex_unlock(&mutex_cgroup_shm);
+        return;
+    }
+
     if (shm_ebpf_cgroup.header->systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_socket_charts(update_every);
@@ -2732,6 +2800,9 @@ static void ebpf_socket_send_cgroup_data(int update_every)
     }
 
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (ebpf_plugin_stop())
+            break;
+
         if (ect->systemd)
             continue;
 
@@ -2779,8 +2850,14 @@ static void socket_collector(ebpf_module_t *em)
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
     while (!ebpf_plugin_stop() && running_time < lifetime) {
+        if (ebpf_plugin_stop())
+            break;
+
         heartbeat_next(&hb);
-        if (ebpf_plugin_stop() || ++counter != update_every)
+        if (ebpf_plugin_stop())
+            break;
+
+        if (++counter != update_every)
             continue;
 
         counter = 0;
@@ -2790,12 +2867,20 @@ static void socket_collector(ebpf_module_t *em)
             ebpf_socket_read_hash_global_tables(stats, maps_per_core);
         }
 
+        if (ebpf_plugin_stop())
+            break;
+
         netdata_mutex_lock(&lock);
         if (socket_global_enabled)
             ebpf_socket_send_data(em);
 
         if (socket_apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_socket_send_apps_data();
+
+        if (ebpf_plugin_stop()) {
+            netdata_mutex_unlock(&lock);
+            break;
+        }
 
         if (cgroups && shm_ebpf_cgroup.header)
             ebpf_socket_send_cgroup_data(update_every);
@@ -2804,12 +2889,11 @@ static void socket_collector(ebpf_module_t *em)
 
         netdata_mutex_unlock(&lock);
 
-        netdata_mutex_lock(&ebpf_exit_cleanup);
-        if (running_time && !em->running_time)
-            running_time = update_every;
-        else
-            running_time += update_every;
+        if (ebpf_plugin_stop())
+            break;
 
+        netdata_mutex_lock(&ebpf_exit_cleanup);
+        running_time += update_every;
         em->running_time = running_time;
         netdata_mutex_unlock(&ebpf_exit_cleanup);
     }
@@ -2857,8 +2941,8 @@ static void ebpf_socket_initialize_global_vectors()
  */
 static void ebpf_link_dimension_name(const char *port, uint32_t hash, const char *value)
 {
-    int test = str2i(port);
-    if (test < NETDATA_MINIMUM_PORT_VALUE || test > NETDATA_MAXIMUM_PORT_VALUE) {
+    int port_val = str2i(port);
+    if (port_val < NETDATA_MINIMUM_PORT_VALUE || port_val > NETDATA_MAXIMUM_PORT_VALUE) {
         netdata_log_error("The dimension given (%s = %s) has an invalid value and it will be ignored.", port, value);
         return;
     }
@@ -2869,7 +2953,7 @@ static void ebpf_link_dimension_name(const char *port, uint32_t hash, const char
     w->name = strdupz(value);
     w->hash = hash;
 
-    w->port = (uint16_t)htons(test);
+    w->port = (uint16_t)htons(port_val);
 
     ebpf_network_viewer_dim_name_t *names = network_viewer_opt.names;
     if (unlikely(!names)) {
@@ -2972,8 +3056,13 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
         socket_bpf_obj = socket_bpf__open();
         if (!socket_bpf_obj)
             ret = -1;
-        else
+        else {
             ret = ebpf_socket_load_and_attach(socket_bpf_obj, em);
+            if (ret) {
+                socket_bpf__destroy(socket_bpf_obj);
+                socket_bpf_obj = NULL;
+            }
+        }
     }
 #endif
 
@@ -2995,15 +3084,13 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
  */
 void ebpf_socket_thread(void *ptr)
 {
-    pids_fd[NETDATA_EBPF_PIDS_SOCKET_IDX] = -1;
+    ebpf_set_pid_map_fd(NETDATA_EBPF_PIDS_SOCKET_IDX, -1);
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     CLEANUP_FUNCTION_REGISTER(ebpf_socket_exit) cleanup_ptr = em;
 
-    if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-        collector_error("There is already a thread %s running", em->info.thread_name);
-        return;
-    }
+    if (!ebpf_module_thread_has_valid_state(em))
+        goto endsocket;
 
     em->maps = socket_maps;
 

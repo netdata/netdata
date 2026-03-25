@@ -43,40 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per mount point
-
-These metrics show detailss about mount point usages.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| disk.space | avail, used, reserved_for_root | GiB |
-| disk.inodes | avail, used, reserved_for_root | inodes |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ disk_space_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | disk ${label:mount_point} space utilization |
-| [ disk_inode_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.inodes | disk ${label:mount_point} inode utilization |
-
-
 ## Setup
 
 
@@ -132,5 +98,39 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ disk_space_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | disk ${label:mount_point} space utilization |
+| [ disk_inode_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.inodes | disk ${label:mount_point} inode utilization |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per mount point
+
+These metrics show detailss about mount point usages.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| disk.space | avail, used, reserved_for_root | GiB |
+| disk.inodes | avail, used, reserved_for_root | inodes |
 
 

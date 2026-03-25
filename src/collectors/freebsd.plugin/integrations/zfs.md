@@ -43,65 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per zfs instance
-
-These metrics show detailed information about ZFS filesystem.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| zfs.arc_size | arcsz, target, min, max | MiB |
-| zfs.l2_size | actual, size | MiB |
-| zfs.reads | arc, demand, prefetch, metadata, l2 | reads/s |
-| zfs.bytes | read, write | KiB/s |
-| zfs.hits | hits, misses | percentage |
-| zfs.hits_rate | hits, misses | events/s |
-| zfs.dhits | hits, misses | percentage |
-| zfs.dhits_rate | hits, misses | events/s |
-| zfs.phits | hits, misses | percentage |
-| zfs.phits_rate | hits, misses | events/s |
-| zfs.mhits | hits, misses | percentage |
-| zfs.mhits_rate | hits, misses | events/s |
-| zfs.l2hits | hits, misses | percentage |
-| zfs.l2hits_rate | hits, misses | events/s |
-| zfs.list_hits | mfu, mfu_ghost, mru, mru_ghost | hits/s |
-| zfs.arc_size_breakdown | recent, frequent | percentage |
-| zfs.memory_ops | throttled | operations/s |
-| zfs.important_ops | evict_skip, deleted, mutex_miss, hash_collisions | operations/s |
-| zfs.actual_hits | hits, misses | percentage |
-| zfs.actual_hits_rate | hits, misses | events/s |
-| zfs.demand_data_hits | hits, misses | percentage |
-| zfs.demand_data_hits_rate | hits, misses | events/s |
-| zfs.prefetch_data_hits | hits, misses | percentage |
-| zfs.prefetch_data_hits_rate | hits, misses | events/s |
-| zfs.hash_elements | current, max | elements |
-| zfs.hash_chains | current, max | chains |
-| zfs.trim_bytes | TRIMmed | bytes |
-| zfs.trim_requests | successful, failed, unsupported | requests |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ zfs_memory_throttle ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfs.memory_ops | number of times ZFS had to limit the ARC growth in the last 10 minutes |
-
-
 ## Setup
 
 
@@ -153,5 +94,64 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ zfs_memory_throttle ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfs.memory_ops | number of times ZFS had to limit the ARC growth in the last 10 minutes |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per zfs instance
+
+These metrics show detailed information about ZFS filesystem.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| zfs.arc_size | arcsz, target, min, max | MiB |
+| zfs.l2_size | actual, size | MiB |
+| zfs.reads | arc, demand, prefetch, metadata, l2 | reads/s |
+| zfs.bytes | read, write | KiB/s |
+| zfs.hits | hits, misses | percentage |
+| zfs.hits_rate | hits, misses | events/s |
+| zfs.dhits | hits, misses | percentage |
+| zfs.dhits_rate | hits, misses | events/s |
+| zfs.phits | hits, misses | percentage |
+| zfs.phits_rate | hits, misses | events/s |
+| zfs.mhits | hits, misses | percentage |
+| zfs.mhits_rate | hits, misses | events/s |
+| zfs.l2hits | hits, misses | percentage |
+| zfs.l2hits_rate | hits, misses | events/s |
+| zfs.list_hits | mfu, mfu_ghost, mru, mru_ghost | hits/s |
+| zfs.arc_size_breakdown | recent, frequent | percentage |
+| zfs.memory_ops | throttled | operations/s |
+| zfs.important_ops | evict_skip, deleted, mutex_miss, hash_collisions | operations/s |
+| zfs.actual_hits | hits, misses | percentage |
+| zfs.actual_hits_rate | hits, misses | events/s |
+| zfs.demand_data_hits | hits, misses | percentage |
+| zfs.demand_data_hits_rate | hits, misses | events/s |
+| zfs.prefetch_data_hits | hits, misses | percentage |
+| zfs.prefetch_data_hits_rate | hits, misses | events/s |
+| zfs.hash_elements | current, max | elements |
+| zfs.hash_chains | current, max | chains |
+| zfs.trim_bytes | TRIMmed | bytes |
+| zfs.trim_requests | successful, failed, unsupported | requests |
 
 

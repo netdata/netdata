@@ -43,40 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per vm.vmtotal instance
-
-These metrics show an overall vision about processes running.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.active_processes | active | processes |
-| system.processes | running, blocked | processes |
-| mem.real | used | MiB |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ active_processes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/processes.conf) | system.active_processes | system process IDs (PID) space utilization |
-
-
 ## Setup
 
 
@@ -130,5 +96,39 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ active_processes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/processes.conf) | system.active_processes | system process IDs (PID) space utilization |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per vm.vmtotal instance
+
+These metrics show an overall vision about processes running.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.active_processes | active | processes |
+| system.processes | running, blocked | processes |
+| mem.real | used | MiB |
 
 

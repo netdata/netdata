@@ -8,6 +8,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
@@ -180,6 +181,22 @@ func (a *Agent) setupVnodeRegistry() map[string]*vnodes.VirtualNode {
 	a.Infof("found '%s' (%d vhosts)", dirPath, len(reg))
 
 	return reg
+}
+
+func (a *Agent) setupSecretStoreConfigs() []secretstore.Config {
+	a.Debugf("looking for 'ss/' in %v", a.CollectorsConfDir)
+	if len(a.CollectorsConfDir) == 0 {
+		return nil
+	}
+
+	cfgs, errs := secretstore.LoadFileConfigs(a.CollectorsConfDir)
+	for _, err := range errs {
+		a.Warningf("%v", err)
+	}
+	if len(cfgs) > 0 {
+		a.Infof("loaded %d secretstore configs from 'ss/'", len(cfgs))
+	}
+	return cfgs
 }
 
 func loadYAML(conf any, path string) error {
