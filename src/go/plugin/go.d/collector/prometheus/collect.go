@@ -19,7 +19,7 @@ const (
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
-	mfs, err := c.prom.Scrape()
+	mfs, err := c.prom.ScrapeLegacy()
 	if err != nil {
 		return nil, err
 	}

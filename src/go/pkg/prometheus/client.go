@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -21,8 +22,9 @@ type (
 	// Prometheus is a helper for scrape and parse prometheus format metrics.
 	Prometheus interface {
 		// ScrapeSeries and parse prometheus format metrics
+		Scrape() (promscrapemodel.Samples, error)
 		ScrapeSeries() (Series, error)
-		Scrape() (MetricFamilies, error)
+		ScrapeLegacy() (MetricFamilies, error)
 		HTTPClient() *http.Client
 	}
 
@@ -33,7 +35,8 @@ type (
 
 		sr selector.Selector
 
-		parser promTextParser
+		parser       promTextParser
+		scrapeParser promscrapemodel.Parser
 
 		buf     *bytes.Buffer
 		gzipr   *gzip.Reader
@@ -53,11 +56,12 @@ func New(client *http.Client, request web.RequestConfig) Prometheus {
 // NewWithSelector creates a Prometheus instance with the selector.
 func NewWithSelector(client *http.Client, request web.RequestConfig, sr selector.Selector) Prometheus {
 	p := &prometheus{
-		client:  client,
-		request: request,
-		sr:      sr,
-		buf:     bytes.NewBuffer(make([]byte, 0, 16000)),
-		parser:  promTextParser{sr: sr},
+		client:       client,
+		request:      request,
+		sr:           sr,
+		buf:          bytes.NewBuffer(make([]byte, 0, 16000)),
+		parser:       promTextParser{sr: sr},
+		scrapeParser: promscrapemodel.NewParser(sr),
 	}
 
 	if v, err := url.Parse(request.URL); err == nil && v.Scheme == "file" {
@@ -71,6 +75,16 @@ func (p *prometheus) HTTPClient() *http.Client {
 	return p.client
 }
 
+func (p *prometheus) Scrape() (promscrapemodel.Samples, error) {
+	p.buf.Reset()
+
+	if err := p.fetch(p.buf); err != nil {
+		return nil, err
+	}
+
+	return p.scrapeParser.Parse(p.buf.Bytes())
+}
+
 // ScrapeSeries scrapes metrics, parses and sorts
 func (p *prometheus) ScrapeSeries() (Series, error) {
 	p.buf.Reset()
@@ -82,7 +96,7 @@ func (p *prometheus) ScrapeSeries() (Series, error) {
 	return p.parser.parseToSeries(p.buf.Bytes())
 }
 
-func (p *prometheus) Scrape() (MetricFamilies, error) {
+func (p *prometheus) ScrapeLegacy() (MetricFamilies, error) {
 	p.buf.Reset()
 
 	if err := p.fetch(p.buf); err != nil {

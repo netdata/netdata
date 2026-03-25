@@ -11,9 +11,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/prometheus/common/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
@@ -61,6 +63,59 @@ func TestPrometheusPlain(t *testing.T) {
 
 	assert.NoError(t, err)
 	verifyTestData(t, res)
+}
+
+func TestPrometheusScrapeModel(t *testing.T) {
+	tests := map[string]struct {
+		selectorExpr string
+		verify       func(t *testing.T, samples promscrapemodel.Samples)
+	}{
+		"plain": {
+			verify: func(t *testing.T, samples promscrapemodel.Samples) {
+				require.NotEmpty(t, samples)
+
+				sample, ok := findScrapeModelSample(samples, "go_gc_duration_seconds", map[string]string{"quantile": "0.25"})
+				require.True(t, ok)
+				assert.Equal(t, "0.25", sample.Labels.Get("quantile"))
+				assert.Equal(t, model.MetricTypeSummary, sample.FamilyType)
+			},
+		},
+		"with selector": {
+			selectorExpr: "go_gc*",
+			verify: func(t *testing.T, samples promscrapemodel.Samples) {
+				require.NotEmpty(t, samples)
+				for _, sample := range samples {
+					assert.Truef(t, strings.HasPrefix(sample.Name, "go_gc"), sample.Name)
+				}
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tsMux := http.NewServeMux()
+			tsMux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write(testData)
+			})
+			ts := httptest.NewServer(tsMux)
+			defer ts.Close()
+
+			req := web.RequestConfig{URL: ts.URL + "/metrics"}
+
+			var prom Prometheus
+			if test.selectorExpr != "" {
+				sr, err := selector.Parse(test.selectorExpr)
+				require.NoError(t, err)
+				prom = NewWithSelector(http.DefaultClient, req, sr)
+			} else {
+				prom = New(http.DefaultClient, req)
+			}
+
+			res, err := prom.Scrape()
+			require.NoError(t, err)
+			test.verify(t, res)
+		})
+	}
 }
 
 func TestPrometheusPlainWithSelector(t *testing.T) {
@@ -143,4 +198,25 @@ func verifyTestData(t *testing.T, ms Series) {
 
 	targetInterval := ms.FindByName("prometheus_target_interval_length_seconds")
 	assert.Len(t, targetInterval, 5)
+}
+
+func findScrapeModelSample(samples []promscrapemodel.Sample, name string, labelsMatch map[string]string) (promscrapemodel.Sample, bool) {
+	for _, sample := range promscrapemodel.Samples(samples).FindByName(name) {
+		if sample.Name != name {
+			continue
+		}
+
+		matched := true
+		for key, value := range labelsMatch {
+			if sample.Labels.Get(key) != value {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return sample, true
+		}
+	}
+
+	return promscrapemodel.Sample{}, false
 }
