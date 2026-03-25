@@ -83,6 +83,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     pub fn build_filter(&mut self, journal_file: &JournalFile<M>) -> Result<Option<FilterExpr>> {
         if let Some(filter) = self.filter.as_mut() {
             let expr = filter.build(journal_file)?;
+            self.cursor.set_filter(expr.clone());
             self.filter = None;
             Ok(Some(expr))
         } else {
@@ -217,5 +218,70 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
 
         self.data_guard = Some(journal_file.data_ref(data_offset)?);
         Ok(self.data_guard.as_ref())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        Direction, JournalFile, JournalFileOptions, JournalReader, JournalWriter, Location, Mmap,
+    };
+    use tempfile::NamedTempFile;
+
+    fn test_uuid(seed: u8) -> [u8; 16] {
+        [seed; 16]
+    }
+
+    #[test]
+    fn build_filter_keeps_cursor_filter_in_sync() -> Result<()> {
+        let temp_file = NamedTempFile::new().map_err(error::JournalError::Io)?;
+        let journal_path = temp_file.path();
+        let boot_id = test_uuid(9);
+
+        {
+            let options =
+                JournalFileOptions::new(test_uuid(1), test_uuid(2), test_uuid(3), test_uuid(4));
+            let mut journal_file = JournalFile::create(&journal_path, options)?;
+            let mut writer = JournalWriter::new(&mut journal_file)?;
+            writer.add_entry(
+                &mut journal_file,
+                &[
+                    b"MESSAGE=first".as_slice(),
+                    b"_SYSTEMD_UNIT=first.service".as_slice(),
+                ],
+                1_000_000,
+                500_000,
+                boot_id,
+            )?;
+            writer.add_entry(
+                &mut journal_file,
+                &[
+                    b"MESSAGE=second".as_slice(),
+                    b"_SYSTEMD_UNIT=second.service".as_slice(),
+                ],
+                2_000_000,
+                600_000,
+                boot_id,
+            )?;
+        }
+
+        let journal_file = JournalFile::<Mmap>::open(&journal_path, 8 * 1024)?;
+        let mut reader = JournalReader::default();
+        reader.set_location(Location::Head);
+        reader.add_match(b"MESSAGE=first");
+        assert!(reader.step(&journal_file, Direction::Forward)?);
+        assert_eq!(reader.get_realtime_usec(&journal_file)?, 1_000_000);
+
+        reader.set_location(Location::Head);
+        reader.add_match(b"MESSAGE=second");
+        let built = reader
+            .build_filter(&journal_file)?
+            .expect("expected a rebuilt filter expression");
+        assert!(matches!(built, crate::FilterExpr::Match(..)));
+        assert!(reader.step(&journal_file, Direction::Forward)?);
+        assert_eq!(reader.get_realtime_usec(&journal_file)?, 2_000_000);
+
+        Ok(())
     }
 }

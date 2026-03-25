@@ -2297,14 +2297,14 @@ func parseJavaTestFile(absPath, relPath string) ([]methodRow, []assertionRow, er
 		inBlockComment = nextInBlockComment
 		trimmed := strings.TrimSpace(cleanLine)
 
-		if matches := assertionCallRE.FindAllStringSubmatchIndex(rawLine, -1); len(matches) > 0 {
+		if matches := assertionCallRE.FindAllStringSubmatchIndex(cleanLine, -1); len(matches) > 0 {
 			for _, m := range matches {
 				if len(m) < 4 {
 					continue
 				}
 				candidates = append(candidates, assertionCandidate{
 					Line: lineNo,
-					Call: rawLine[m[2]:m[3]],
+					Call: cleanLine[m[2]:m[3]],
 				})
 			}
 		}

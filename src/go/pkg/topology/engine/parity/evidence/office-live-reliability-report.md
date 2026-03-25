@@ -3,7 +3,7 @@
 ## Scope
 - Gate: `T4.5` + `T4.6`
 - Office seed: `10.20.4.0/24`
-- Community: `atadteN`
+- Community: `<redacted>`
 - Function under validation: `topology:snmp` (`topology_view:l2|l3|merged`)
 
 ## Commands

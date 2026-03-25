@@ -344,6 +344,12 @@ func compareCollapseActorPriority(left, right topologyActor) int {
 	}
 	leftID := strings.ToLower(strings.TrimSpace(left.ActorID))
 	rightID := strings.ToLower(strings.TrimSpace(right.ActorID))
+	if (leftID == "") != (rightID == "") {
+		if leftID != "" {
+			return -1
+		}
+		return 1
+	}
 	return strings.Compare(leftID, rightID)
 }
 

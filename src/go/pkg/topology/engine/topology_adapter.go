@@ -7042,6 +7042,9 @@ func topologyAttrInt(attrs map[string]any, key string) int {
 		if typed <= 0 {
 			return 0
 		}
+		if typed > math.MaxInt {
+			return math.MaxInt
+		}
 		return int(typed)
 	case string:
 		parsed, err := strconv.Atoi(strings.TrimSpace(typed))

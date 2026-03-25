@@ -4,6 +4,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -135,7 +136,7 @@ func parseIPToASNCombinedTSV(payload []byte) ([]asnRange, []countryRange, error)
 	asnRanges := make([]asnRange, 0, 1<<20)
 	countryRanges := make([]countryRange, 0, 1<<20)
 
-	scanner := bufio.NewScanner(strings.NewReader(string(payload)))
+	scanner := bufio.NewScanner(bytes.NewReader(payload))
 	lineNo := 0
 	for scanner.Scan() {
 		lineNo++

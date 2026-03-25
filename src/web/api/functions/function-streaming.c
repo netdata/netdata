@@ -1023,16 +1023,16 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                                 // find this parent's outbound destination (next hop in its own path)
                                 const char *dst_hostname = NULL;
                                 char dst_actor_id[256] = "";
+                                char dst_hostname_fallback[UUID_STR_LEN] = "";
                                 {
                                     ND_UUID host_path[128];
                                     uint16_t host_pn = streaming_topology_get_path_ids(host, 0, host_path, 128);
                                     for(uint16_t pi = 0; pi < host_pn; pi++) {
                                         if(UUIDeq(host_path[pi], host->host_id) && pi + 1 < host_pn) {
-                                            char guid[UUID_STR_LEN];
-                                            uuid_unparse_lower(host_path[pi + 1].uuid, guid);
-                                            snprintf(dst_actor_id, sizeof(dst_actor_id), "netdata-machine-guid:%s", guid);
-                                            RRDHOST *dst = rrdhost_find_by_guid(guid);
-                                            dst_hostname = dst ? rrdhost_hostname(dst) : guid;
+                                            uuid_unparse_lower(host_path[pi + 1].uuid, dst_hostname_fallback);
+                                            snprintf(dst_actor_id, sizeof(dst_actor_id), "netdata-machine-guid:%s", dst_hostname_fallback);
+                                            RRDHOST *dst = rrdhost_find_by_guid(dst_hostname_fallback);
+                                            dst_hostname = dst ? rrdhost_hostname(dst) : dst_hostname_fallback;
                                             break;
                                         }
                                     }

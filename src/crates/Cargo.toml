@@ -85,6 +85,7 @@ serde_yaml = "0.9.34"
 serde_regex = "1.1.0"
 tokio = { version = "1.45", features = ["full"] }
 ipnet = "2.11.0"
+ipnet-trie = "0.3.0"
 
 # Tracing
 tracing = { version = "0.1" }

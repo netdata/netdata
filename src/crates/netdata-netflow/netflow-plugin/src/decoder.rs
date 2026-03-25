@@ -2190,6 +2190,20 @@ impl FlowDecoders {
         self.hydrate_loaded_decoder_state_namespace(&expected_key, source)
     }
 
+    pub(crate) fn preload_decoder_state_namespace(
+        &mut self,
+        data: &[u8],
+    ) -> Result<DecoderStateNamespaceKey, String> {
+        let persisted = decode_persisted_namespace_file(data)?;
+        let key = persisted.key.clone();
+        self.loaded_decoder_namespaces.insert(key.clone());
+        self.decoder_state_namespaces
+            .insert(key.clone(), persisted.namespace);
+        self.dirty_decoder_namespaces.remove(&key);
+        self.hydrated_namespace_sources.remove(&key);
+        Ok(key)
+    }
+
     pub(crate) fn dirty_decoder_state_namespaces(&self) -> Vec<DecoderStateNamespaceKey> {
         let mut keys: Vec<_> = self.dirty_decoder_namespaces.iter().cloned().collect();
         keys.sort_by(|left, right| {

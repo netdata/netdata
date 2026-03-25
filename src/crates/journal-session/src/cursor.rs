@@ -472,14 +472,14 @@ impl Cursor {
     ///
     /// Must be called after [`step()`](Cursor::step) returns `true`.
     pub fn payloads(&mut self) -> Result<Payloads<'_>, SessionError> {
-        let entry_offset = self.entry_offset.expect("fields() called without step()");
+        let entry_offset = self.entry_offset.ok_or(SessionError::CursorNotPositioned)?;
+        let jf = self
+            .journal_file
+            .as_ref()
+            .ok_or(SessionError::CursorNotPositioned)?;
         self.entry_data_offsets.clear();
-        {
-            let jf = self.journal_file.as_ref().unwrap();
-            jf.entry_data_object_offsets(entry_offset, &mut self.entry_data_offsets)?;
-        }
+        jf.entry_data_object_offsets(entry_offset, &mut self.entry_data_offsets)?;
 
-        let jf = self.journal_file.as_ref().unwrap();
         Ok(Payloads {
             journal: jf,
             data_offsets: &self.entry_data_offsets,
@@ -492,10 +492,11 @@ impl Cursor {
     where
         F: FnMut(&[u8]) -> Result<(), SessionError>,
     {
-        let entry_offset = self
-            .entry_offset
-            .expect("visit_payloads() called without step()");
-        let jf = self.journal_file.as_ref().unwrap();
+        let entry_offset = self.entry_offset.ok_or(SessionError::CursorNotPositioned)?;
+        let jf = self
+            .journal_file
+            .as_ref()
+            .ok_or(SessionError::CursorNotPositioned)?;
         let buf = &mut self.decompress_buf;
         let data_offsets = &mut self.entry_data_offsets;
         let mut visitor_error = None;

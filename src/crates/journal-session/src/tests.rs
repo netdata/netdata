@@ -179,6 +179,64 @@ fn iterates_multiple_files_in_chronological_order() -> TestResult {
 }
 
 #[test]
+fn payloads_requires_step() -> TestResult {
+    let dir = TempDir::new()?;
+    let path = archived_journal_path(&dir, 0x11, 1, 1_000_000);
+    write_archived_journal(
+        &path,
+        0x21,
+        &[TestEntry {
+            realtime: 1_000_000,
+            monotonic: 100,
+            fields: &["MESSAGE=first-a"],
+        }],
+    )?;
+
+    let session = JournalSession::builder()
+        .files(vec![path])
+        .load_remappings(false)
+        .build()?;
+
+    let mut cursor = session.cursor(Direction::Forward)?;
+    let err = match cursor.payloads() {
+        Ok(_) => panic!("payloads() without step() should fail"),
+        Err(err) => err,
+    };
+    assert!(matches!(err, super::SessionError::CursorNotPositioned));
+
+    Ok(())
+}
+
+#[test]
+fn visit_payloads_requires_step() -> TestResult {
+    let dir = TempDir::new()?;
+    let path = archived_journal_path(&dir, 0x31, 1, 1_000_000);
+    write_archived_journal(
+        &path,
+        0x41,
+        &[TestEntry {
+            realtime: 1_000_000,
+            monotonic: 100,
+            fields: &["MESSAGE=first-a"],
+        }],
+    )?;
+
+    let session = JournalSession::builder()
+        .files(vec![path])
+        .load_remappings(false)
+        .build()?;
+
+    let mut cursor = session.cursor(Direction::Forward)?;
+    let err = match cursor.visit_payloads(|_| Ok(())) {
+        Ok(_) => panic!("visit_payloads() without step() should fail"),
+        Err(err) => err,
+    };
+    assert!(matches!(err, super::SessionError::CursorNotPositioned));
+
+    Ok(())
+}
+
+#[test]
 fn applies_time_bounds_across_file_transitions() -> TestResult {
     let dir = TempDir::new()?;
     let first_path = archived_journal_path(&dir, 0x51, 1, 1_000_000);

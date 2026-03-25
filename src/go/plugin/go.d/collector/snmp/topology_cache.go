@@ -1147,16 +1147,6 @@ func (c *topologyCache) updateDot1qVlanMap(tags map[string]string) {
 	}
 
 	c.fdbIDToVlanID[fdbID] = vlanID
-	if vlanName := strings.TrimSpace(c.vlanIDToName[vlanID]); vlanName != "" {
-		for _, entry := range c.fdbEntries {
-			if entry == nil || strings.TrimSpace(entry.fdbID) != fdbID {
-				continue
-			}
-			if strings.TrimSpace(entry.vlanName) == "" {
-				entry.vlanName = vlanName
-			}
-		}
-	}
 	for _, entry := range c.fdbEntries {
 		if entry == nil || strings.TrimSpace(entry.fdbID) != fdbID {
 			continue

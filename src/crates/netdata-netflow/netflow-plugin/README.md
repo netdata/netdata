@@ -181,7 +181,7 @@ enrichment:
 should emit objects with fields compatible with:
 
 - `prefix` (required)
-- `name`, `role`, `site`, `region`, `country`, `state`, `city`, `tenant`, `asn` (optional)
+- `name`, `role`, `site`, `region`, `country`, `state`, `city`, `tenant`, `asn`, `asn_name` (optional)
 
 `network_sources.*.tls` follows Akvorado-style source TLS controls:
 

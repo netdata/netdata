@@ -211,18 +211,33 @@ impl<T> GuardedCell<T> {
             return Err(JournalError::ValueGuardInUse);
         }
 
-        // SAFETY: We've verified via the guard that no other mutable reference exists.
-        // The closure gets temporary mutable access, but we ensure the guard is set
-        // before returning the ValueGuard.
-        let value_ref = unsafe { &mut *self.value.get() };
-
-        // Execute the user's closure to extract/create the result value
-        let result = f(value_ref)?;
-
-        // Mark the guard as in use
         self.guard.set(true);
+        struct GuardReset<'a> {
+            flag: &'a Cell<bool>,
+            armed: bool,
+        }
 
-        // Return a ValueGuard that will automatically clear the guard on drop
+        impl Drop for GuardReset<'_> {
+            fn drop(&mut self) {
+                if self.armed {
+                    self.flag.set(false);
+                }
+            }
+        }
+
+        let mut reset = GuardReset {
+            flag: &self.guard,
+            armed: true,
+        };
+
+        // SAFETY: We've verified via the guard that no other mutable reference exists.
+        // The guard is marked as in-use before the closure runs, so reentrant borrows
+        // of the same cell fail while the mutable reference is live.
+        let value_ref = unsafe { &mut *self.value.get() };
+        let result = f(value_ref)?;
+        reset.armed = false;
+
+        // Return a ValueGuard that will automatically clear the guard on drop.
         Ok(ValueGuard::new(offset, result, &self.guard))
     }
 }
@@ -315,5 +330,24 @@ mod tests {
 
         let data = cell.into_inner();
         assert_eq!(data.value, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_with_guarded_rejects_reentrant_borrow() {
+        let cell = GuardedCell::new(TestData {
+            value: vec![1, 2, 3],
+        });
+
+        let err = cell
+            .with_guarded(NonZeroU64::new(1).expect("non-zero"), |data| {
+                let slice = data.get_slice(0, 1);
+                assert_eq!(slice, &[1]);
+                cell.with_guarded(NonZeroU64::new(2).expect("non-zero"), |_| Ok(()))
+                    .expect_err("reentrant borrow should fail");
+                Ok(())
+            })
+            .expect("outer borrow should succeed");
+
+        assert_eq!(*err, ());
     }
 }

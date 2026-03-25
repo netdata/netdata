@@ -121,6 +121,24 @@ func TestTopologyRegistry_SnapshotSingleCacheKeepsLLDPUnidirectional(t *testing.
 	require.Equal(t, 0, data.Stats["links_bidirectional"].(int))
 }
 
+func TestCompareCollapseActorPriorityPrefersNonEmptyActorID(t *testing.T) {
+	left := topologyActor{
+		ActorID:   "",
+		ActorType: "device",
+		Layer:     "2",
+		Source:    "snmp",
+	}
+	right := topologyActor{
+		ActorID:   "device-1",
+		ActorType: "device",
+		Layer:     "2",
+		Source:    "snmp",
+	}
+
+	assert.Greater(t, compareCollapseActorPriority(left, right), 0)
+	assert.Less(t, compareCollapseActorPriority(right, left), 0)
+}
+
 func TestTopologyRegistry_SnapshotWithOptions_LLDPManagedKeepsRequestedMapType(t *testing.T) {
 	registry := newTopologyRegistry()
 	registry.register(newTestTopologyCacheLLDP(

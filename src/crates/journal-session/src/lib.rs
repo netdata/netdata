@@ -35,6 +35,9 @@ pub enum SessionError {
 
     #[error("repository error: {0}")]
     Repository(#[from] journal_registry::repository::error::RepositoryError),
+
+    #[error("cursor is not positioned on an entry; call step() first")]
+    CursorNotPositioned,
 }
 
 /// Default mmap window size (8 MiB).

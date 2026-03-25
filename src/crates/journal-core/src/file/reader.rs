@@ -93,6 +93,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     pub fn build_filter(&mut self, journal_file: &JournalFile<M>) -> Result<Option<FilterExpr>> {
         if let Some(filter) = self.filter.as_mut() {
             let expr = filter.build(journal_file)?;
+            self.cursor.set_filter(expr.clone());
             self.filter = None;
             Ok(Some(expr))
         } else {

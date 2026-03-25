@@ -36,6 +36,8 @@ struct RemoteRecord {
     tenant: String,
     #[serde(default)]
     asn: AsnValue,
+    #[serde(default)]
+    asn_name: String,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -254,7 +256,7 @@ fn decode_remote_records(
             city: remote.city,
             tenant: remote.tenant,
             asn: decode_remote_asn(remote.asn),
-            asn_name: String::new(),
+            asn_name: remote.asn_name.trim().to_string(),
             ip_class: String::new(),
         };
         out.push(NetworkSourceRecord { prefix, attrs });
@@ -353,6 +355,9 @@ fn build_client(use_proxy: bool, tls: &RemoteNetworkSourceTlsConfig) -> Result<C
         let skip_verify = if tls.skip_verify { true } else { !tls.verify };
         if skip_verify {
             // Matches Akvorado's SkipVerify behavior when explicitly enabled.
+            tracing::warn!(
+                "network-sources TLS certificate verification is disabled for a remote source; this is insecure"
+            );
             builder = builder.danger_accept_invalid_certs(true);
         }
 
@@ -463,6 +468,25 @@ mod tests {
                 .expect("parse prefix")
         );
         assert_eq!(rows[1].attrs.role, "route53_healthchecks");
+    }
+
+    #[test]
+    fn decode_remote_records_preserves_optional_asn_name() {
+        let transform = compile_transform(".results[]").expect("compile transform");
+        let payload = serde_json::json!({
+            "results": [
+                {
+                    "prefix": "203.0.113.0/24",
+                    "asn": 64500,
+                    "asn_name": "Example Transit"
+                }
+            ]
+        });
+
+        let rows = decode_remote_records(payload, &transform).expect("decode rows");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].attrs.asn, 64_500);
+        assert_eq!(rows[0].attrs.asn_name, "Example Transit");
     }
 
     #[test]

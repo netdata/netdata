@@ -21,7 +21,7 @@ use journal_log_writer::{Config, EntryTimestamps, Log, RetentionPolicy, Rotation
 use journal_registry::{Monitor, Origin, Registry, Source};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -415,6 +415,7 @@ impl IngestService {
                 err
             );
         }
+        Self::preload_decoder_state_namespaces(&mut decoders, &decoder_state_dir);
 
         Ok(Self {
             cfg,
@@ -1001,37 +1002,8 @@ impl IngestService {
         };
 
         if !self.decoders.is_decoder_state_namespace_loaded(&key) {
-            let path = self.decoder_state_namespace_path(&key);
-            if path.is_file() {
-                match fs::read(&path) {
-                    Ok(data) => {
-                        if let Err(err) =
-                            self.decoders
-                                .import_decoder_state_namespace(key.clone(), source, &data)
-                        {
-                            tracing::warn!(
-                                "failed to restore netflow decoder state namespace from {}: {}",
-                                path.display(),
-                                err
-                            );
-                            self.decoders
-                                .mark_decoder_state_namespace_absent(key, source);
-                        }
-                    }
-                    Err(err) => {
-                        tracing::warn!(
-                            "failed to read netflow decoder state namespace {}: {}",
-                            path.display(),
-                            err
-                        );
-                        self.decoders
-                            .mark_decoder_state_namespace_absent(key, source);
-                    }
-                }
-            } else {
-                self.decoders
-                    .mark_decoder_state_namespace_absent(key, source);
-            }
+            self.decoders
+                .mark_decoder_state_namespace_absent(key, source);
             return;
         }
 
@@ -1048,6 +1020,47 @@ impl IngestService {
                 source,
                 err
             );
+        }
+    }
+
+    fn preload_decoder_state_namespaces(decoders: &mut FlowDecoders, decoder_state_dir: &Path) {
+        let read_dir = match fs::read_dir(decoder_state_dir) {
+            Ok(entries) => entries,
+            Err(err) => {
+                tracing::warn!(
+                    "failed to read netflow decoder state directory {}: {}",
+                    decoder_state_dir.display(),
+                    err
+                );
+                return;
+            }
+        };
+
+        let mut paths = read_dir
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|path| path.is_file())
+            .collect::<Vec<_>>();
+        paths.sort();
+
+        for path in paths {
+            match fs::read(&path) {
+                Ok(data) => {
+                    if let Err(err) = decoders.preload_decoder_state_namespace(&data) {
+                        tracing::warn!(
+                            "failed to preload netflow decoder state namespace {}: {}",
+                            path.display(),
+                            err
+                        );
+                    }
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        "failed to read netflow decoder state namespace {}: {}",
+                        path.display(),
+                        err
+                    );
+                }
+            }
         }
     }
 

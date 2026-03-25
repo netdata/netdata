@@ -2831,8 +2831,9 @@ impl NetworkAttributes {
     fn merge_from(&mut self, overlay: &Self) {
         if overlay.asn != 0 {
             self.asn = overlay.asn;
+            self.asn_name = overlay.asn_name.clone();
         }
-        if !overlay.asn_name.is_empty() {
+        if overlay.asn == 0 && !overlay.asn_name.is_empty() {
             self.asn_name = overlay.asn_name.clone();
         }
         if !overlay.ip_class.is_empty() {
@@ -5342,6 +5343,28 @@ mod tests {
         );
         assert_eq!(fields.get("SRC_AS").map(String::as_str), Some("64501"));
         assert_eq!(fields.get("DST_AS").map(String::as_str), Some("64501"));
+    }
+
+    #[test]
+    fn network_attributes_asn_override_clears_stale_asn_name() {
+        let mut base = NetworkAttributes {
+            asn: 64_496,
+            asn_name: "Legacy Transit".to_string(),
+            ..NetworkAttributes::default()
+        };
+        let overlay = NetworkAttributes {
+            asn: 64_500,
+            asn_name: String::new(),
+            ..NetworkAttributes::default()
+        };
+
+        base.merge_from(&overlay);
+
+        assert_eq!(base.asn, 64_500);
+        assert!(
+            base.asn_name.is_empty(),
+            "ASN override without a replacement name must clear the previous name"
+        );
     }
 
     #[test]

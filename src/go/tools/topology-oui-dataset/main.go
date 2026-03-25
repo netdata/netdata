@@ -29,6 +29,7 @@ var ieeeSources = []ieeeSource{
 }
 
 var nonHex = regexp.MustCompile(`[^0-9A-Fa-f]`)
+var httpClient = &http.Client{Timeout: 30 * time.Second}
 
 func main() {
 	var outputPath string
@@ -98,7 +99,7 @@ func fetchCSV(url string) ([][]string, error) {
 	}
 	req.Header.Set("User-Agent", "netdata-topology-oui-dataset-updater/1.0")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
