@@ -55,6 +55,7 @@ void do_GetHardwareInfo_cleanup();
 void do_Sensors_cleanup();
 void do_GetServicesStatus_cleanup();
 void do_GetSystemCPU_cleanup();
+void do_GetPowerSupply_cleanup();
 
 enum PERFLIB_PRIO {
     PRIO_WEBSITE_IIS_REQUESTS_RATE = 21000, // PRIO selected, because APPS is using 20YYY
