@@ -157,6 +157,7 @@ struct net_framework_instances {
 };
 
 static usec_t netframework_now_ut = 0;
+static DICTIONARY *processes = NULL;
 
 static inline void initialize_net_framework_processes_keys(struct net_framework_instances *p)
 {
@@ -270,8 +271,6 @@ static inline struct net_framework_instances *netframework_process_get(const cha
     p->last_collected = netframework_now_ut;
     return p;
 }
-
-static DICTIONARY *processes = NULL;
 
 static void initialize(void)
 {
@@ -1528,7 +1527,7 @@ int do_PerflibNetFramework(int update_every, usec_t dt __maybe_unused)
         dfe_start_write(processes, p)
         {
             if (p->last_collected < netframework_now_ut)
-                dictionary_del(processes, d_dfe.name);
+                dictionary_del(processes, p_dfe.name);
         }
         dfe_done(p);
         dictionary_garbage_collect(processes);
