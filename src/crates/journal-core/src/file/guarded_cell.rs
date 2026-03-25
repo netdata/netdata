@@ -1,6 +1,6 @@
 use crate::error::{JournalError, Result};
 use crate::file::value_guard::ValueGuard;
-use std::cell::{RefCell, UnsafeCell};
+use std::cell::{Cell, UnsafeCell};
 use std::num::NonZeroU64;
 
 /// A cell type that provides interior mutability with integrated guard-based exclusion.
@@ -15,7 +15,7 @@ use std::num::NonZeroU64;
 ///
 /// # Design
 ///
-/// `GuardedCell` owns both the value and a `RefCell<bool>` guard flag. When borrowing,
+/// `GuardedCell` owns both the value and a `Cell<bool>` guard flag. When borrowing,
 /// it checks that the guard is clear (no active borrow), then returns a mutable reference.
 /// The caller is responsible for managing the guard's lifecycle, typically via a separate
 /// RAII type (like `ValueGuard`) that sets the flag and clears it on drop.
@@ -50,8 +50,7 @@ use std::num::NonZeroU64;
 /// impl Container {
 ///     fn get_slice(&self, offset: u64, size: u64) -> Result<ValueGuard<&[u8]>> {
 ///         // Check if guard is already held
-///         let mut is_in_use = self.window_manager.guard().borrow_mut();
-///         if *is_in_use {
+///         if self.window_manager.guard().get() {
 ///             return Err(Error::AlreadyBorrowed);
 ///         }
 ///
@@ -60,14 +59,14 @@ use std::num::NonZeroU64;
 ///         let slice = wm.get_slice(offset, size)?;
 ///
 ///         // Set guard and return RAII guard that clears it on drop
-///         *is_in_use = true;
+///         self.window_manager.guard().set(true);
 ///         Ok(ValueGuard::new(slice, self.window_manager.guard()))
 ///     }
 /// }
 /// ```
 pub struct GuardedCell<T> {
     value: UnsafeCell<T>,
-    guard: RefCell<bool>,
+    guard: Cell<bool>,
 }
 
 impl<T> GuardedCell<T> {
@@ -77,7 +76,7 @@ impl<T> GuardedCell<T> {
     pub fn new(value: T) -> Self {
         Self {
             value: UnsafeCell::new(value),
-            guard: RefCell::new(false),
+            guard: Cell::new(false),
         }
     }
 
@@ -86,7 +85,7 @@ impl<T> GuardedCell<T> {
     /// This allows external RAII types (like `ValueGuard`) to manage the guard's
     /// lifecycle by setting it to `true` when borrowing and `false` when done.
     #[allow(dead_code)]
-    pub fn guard(&self) -> &RefCell<bool> {
+    pub fn guard(&self) -> &Cell<bool> {
         &self.guard
     }
 
@@ -100,7 +99,7 @@ impl<T> GuardedCell<T> {
     /// # Safety Contract
     ///
     /// After calling this method successfully, the caller MUST:
-    /// 1. Set the guard to `true` (via `guard().borrow_mut()`) before using the returned reference
+    /// 1. Set the guard to `true` (via `guard().set(true)`) before using the returned reference
     /// 2. Keep the guard `true` for the entire lifetime of the returned reference
     /// 3. Set the guard back to `false` when the reference is no longer needed
     ///
@@ -112,8 +111,7 @@ impl<T> GuardedCell<T> {
     /// let cell = GuardedCell::new(WindowManager::new(...));
     ///
     /// // Check and borrow
-    /// let mut is_in_use = cell.guard().borrow_mut();
-    /// if *is_in_use {
+    /// if cell.guard().get() {
     ///     return Err(JournalError::ValueGuardInUse);
     /// }
     ///
@@ -121,7 +119,7 @@ impl<T> GuardedCell<T> {
     /// let slice = wm.get_slice(offset, size)?;
     ///
     /// // Set guard before using the reference
-    /// *is_in_use = true;
+    /// cell.guard().set(true);
     ///
     /// // Use slice...
     /// // (guard will be cleared by RAII when done)
@@ -129,11 +127,9 @@ impl<T> GuardedCell<T> {
     #[allow(clippy::mut_from_ref)]
     pub fn borrow_mut_checked(&self) -> Result<&mut T> {
         // Check the guard to ensure no other borrow is active
-        let is_in_use = self.guard.borrow();
-        if *is_in_use {
+        if self.guard.get() {
             return Err(JournalError::ValueGuardInUse);
         }
-        drop(is_in_use);
 
         // SAFETY: We've verified via the guard that no other mutable reference exists.
         // The caller is responsible for:
@@ -211,8 +207,7 @@ impl<T> GuardedCell<T> {
         F: FnOnce(&'a mut T) -> Result<R>,
     {
         // Check if the guard is already held
-        let mut is_in_use = self.guard.borrow_mut();
-        if *is_in_use {
+        if self.guard.get() {
             return Err(JournalError::ValueGuardInUse);
         }
 
@@ -225,7 +220,7 @@ impl<T> GuardedCell<T> {
         let result = f(value_ref)?;
 
         // Mark the guard as in use
-        *is_in_use = true;
+        self.guard.set(true);
 
         // Return a ValueGuard that will automatically clear the guard on drop
         Ok(ValueGuard::new(offset, result, &self.guard))
@@ -258,10 +253,7 @@ mod tests {
         // First borrow
         {
             // Check guard is not in use
-            {
-                let is_in_use = cell.guard().borrow();
-                assert!(!*is_in_use);
-            }
+            assert!(!cell.guard().get());
 
             // Borrow the data
             let data = cell.borrow_mut_checked().unwrap();
@@ -269,19 +261,16 @@ mod tests {
             assert_eq!(slice, &[1, 2, 3]);
 
             // Mark as in use
-            *cell.guard().borrow_mut() = true;
+            cell.guard().set(true);
         }
 
         // Clear guard
-        *cell.guard().borrow_mut() = false;
+        cell.guard().set(false);
 
         // Second borrow after clearing
         {
             // Check guard is not in use
-            {
-                let is_in_use = cell.guard().borrow();
-                assert!(!*is_in_use);
-            }
+            assert!(!cell.guard().get());
 
             // Borrow the data
             let data = cell.borrow_mut_checked().unwrap();
@@ -289,7 +278,7 @@ mod tests {
             assert_eq!(slice, &[3, 4, 5]);
 
             // Mark as in use
-            *cell.guard().borrow_mut() = true;
+            cell.guard().set(true);
         }
     }
 
@@ -300,7 +289,7 @@ mod tests {
         });
 
         // Set guard to true (simulating active borrow)
-        *cell.guard().borrow_mut() = true;
+        cell.guard().set(true);
 
         // Attempt to borrow while guard is held should fail
         let result = cell.borrow_mut_checked();

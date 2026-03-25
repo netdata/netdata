@@ -172,6 +172,7 @@ impl JournalWriter {
         // within the same write operation can find the newly written object.
         let header = journal_file.journal_header_mut();
         header.arena_size = self.append_offset.get() - header.header_size;
+        journal_file.set_cached_arena_end(self.append_offset.get());
     }
 
     fn entry_added(&mut self, header: &mut JournalHeader, realtime: u64, monotonic: u64) {
@@ -495,9 +496,7 @@ mod tests {
     }
 
     fn active_journal_file(dir: &TempDir) -> RepositoryFile {
-        let journal_dir = dir
-            .path()
-            .join("11111111-1111-1111-1111-111111111111");
+        let journal_dir = dir.path().join("11111111-1111-1111-1111-111111111111");
         std::fs::create_dir_all(&journal_dir).expect("create test journal directory");
         let path = journal_dir.join("system.journal");
         RepositoryFile::from_path(&path).expect("test journal path should parse")

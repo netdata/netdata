@@ -1127,28 +1127,28 @@ impl FlowQueryService {
         let mut payload_actions = FastHashMap::new();
         for (index, field) in setup.effective_group_by.iter().enumerate() {
             payload_actions
-                .entry(field.clone())
+                .entry(field.as_bytes().to_vec())
                 .or_insert_with(ProjectedPayloadAction::default)
                 .group_slot = Some(index);
         }
         for (field, field_index) in &direct_facet_positions {
             payload_actions
-                .entry(field.clone())
+                .entry(field.as_bytes().to_vec())
                 .or_insert_with(ProjectedPayloadAction::default)
                 .direct_facet_slot = Some(*field_index);
         }
         for (field, field_index) in &facet_capture_positions {
             payload_actions
-                .entry(field.clone())
+                .entry(field.as_bytes().to_vec())
                 .or_insert_with(ProjectedPayloadAction::default)
                 .capture_slot = Some(*field_index);
         }
         payload_actions
-            .entry("SRC_ADDR".to_string())
+            .entry(b"SRC_ADDR".to_vec())
             .or_insert_with(ProjectedPayloadAction::default)
             .identity = ProjectedIdentityField::Src;
         payload_actions
-            .entry("DST_ADDR".to_string())
+            .entry(b"DST_ADDR".to_vec())
             .or_insert_with(ProjectedPayloadAction::default)
             .identity = ProjectedIdentityField::Dst;
 
@@ -1184,29 +1184,29 @@ impl FlowQueryService {
                 .next()
                 .context("failed to read projected journal payload")?
             {
-                let Some((key, value_bytes)) = split_payload(payload) else {
+                let Some((key_bytes, value_bytes)) = split_payload_bytes(payload) else {
                     continue;
                 };
-                match key {
-                    "BYTES" => {
+                match key_bytes {
+                    b"BYTES" => {
                         if let Some(value) = parse_u64_ascii(value_bytes) {
                             metrics.bytes = value;
                         }
                         continue;
                     }
-                    "PACKETS" => {
+                    b"PACKETS" => {
                         if let Some(value) = parse_u64_ascii(value_bytes) {
                             metrics.packets = value;
                         }
                         continue;
                     }
-                    "RAW_BYTES" => {
+                    b"RAW_BYTES" => {
                         if let Some(value) = parse_u64_ascii(value_bytes) {
                             metrics.raw_bytes = value;
                         }
                         continue;
                     }
-                    "RAW_PACKETS" => {
+                    b"RAW_PACKETS" => {
                         if let Some(value) = parse_u64_ascii(value_bytes) {
                             metrics.raw_packets = value;
                         }
@@ -1215,7 +1215,7 @@ impl FlowQueryService {
                     _ => {}
                 }
 
-                let Some(action) = payload_actions.get(key).copied() else {
+                let Some(action) = payload_actions.get(key_bytes).copied() else {
                     continue;
                 };
 
@@ -4091,12 +4091,20 @@ fn split_payload(payload: &[u8]) -> Option<(&str, &[u8])> {
     Some((key, &payload[eq_pos + 1..]))
 }
 
+fn split_payload_bytes(payload: &[u8]) -> Option<(&[u8], &[u8])> {
+    let eq_pos = payload.iter().position(|&byte| byte == b'=')?;
+    Some((&payload[..eq_pos], &payload[eq_pos + 1..]))
+}
+
 fn parse_u64_ascii(bytes: &[u8]) -> Option<u64> {
     std::str::from_utf8(bytes).ok()?.parse::<u64>().ok()
 }
 
 fn payload_value(value_bytes: &[u8]) -> Cow<'_, str> {
-    String::from_utf8_lossy(value_bytes)
+    match std::str::from_utf8(value_bytes) {
+        Ok(value) => Cow::Borrowed(value),
+        Err(_) => String::from_utf8_lossy(value_bytes),
+    }
 }
 
 fn field_is_raw_only(field: &str) -> bool {

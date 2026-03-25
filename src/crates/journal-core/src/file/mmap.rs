@@ -113,6 +113,12 @@ pub struct WindowManager<M: MemoryMap> {
     windows: Vec<Window<M>>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WindowMatch {
+    Range(usize),
+    Position(usize),
+}
+
 impl<M: MemoryMap> WindowManager<M> {
     pub fn new(file: File, chunk_size: u64, max_windows: usize) -> Result<Self> {
         debug_assert!(chunk_size != 0 && is_multiple_of(chunk_size, PAGE_SIZE));
@@ -167,82 +173,82 @@ impl<M: MemoryMap> WindowManager<M> {
         }
     }
 
-    fn lookup_window_by_range(&self, position: u64, size_needed: u64) -> Option<usize> {
-        if let Some(idx) = self.active_window_idx {
-            if self.windows[idx].contains_range(position, size_needed) {
-                return Some(idx);
-            }
-        }
+    fn lookup_window(&self, position: u64, size_needed: u64) -> Option<WindowMatch> {
+        let mut position_match = None;
 
-        for (idx, window) in self.windows.iter().enumerate() {
+        if let Some(idx) = self.active_window_idx {
+            let window = &self.windows[idx];
             if window.contains_range(position, size_needed) {
-                return Some(idx);
+                return Some(WindowMatch::Range(idx));
             }
-        }
-
-        None
-    }
-
-    fn lookup_window_by_position(&self, position: u64) -> Option<usize> {
-        if let Some(idx) = self.active_window_idx {
-            if self.windows[idx].contains(position) {
-                return Some(idx);
+            if window.contains(position) {
+                position_match = Some(WindowMatch::Position(idx));
             }
         }
 
         for (idx, window) in self.windows.iter().enumerate() {
-            if window.contains(position) {
-                return Some(idx);
+            if self.active_window_idx == Some(idx) {
+                continue;
+            }
+
+            if window.contains_range(position, size_needed) {
+                return Some(WindowMatch::Range(idx));
+            }
+            if position_match.is_none() && window.contains(position) {
+                position_match = Some(WindowMatch::Position(idx));
             }
         }
 
-        None
+        position_match
     }
 
     fn get_window(&mut self, position: u64, size_needed: u64) -> Result<&mut Window<M>> {
-        if let Some(idx) = self.lookup_window_by_range(position, size_needed) {
-            // Use the existing window
-            Ok(&mut self.windows[idx])
-        } else if let Some(idx) = self.lookup_window_by_position(position) {
-            // Remap the window
-
-            let window = self.windows.remove(idx);
-            // Invalidate active_window_idx before removal to maintain consistency.
-            // If create_window fails, the index won't point to a non-existent window.
-            self.active_window_idx = None;
-
-            let window_start = window.offset;
-            let window_end = self.get_chunk_aligned_end(position + size_needed);
-            let num_chunks = (window_end - window_start) / self.chunk_size;
-
-            let new_window = self.create_window(window_start, num_chunks)?;
-
-            self.windows.push(new_window);
-            self.active_window_idx = Some(self.windows.len() - 1);
-            Ok(self.windows.last_mut().unwrap())
-        } else {
-            // Create a brand new window
-
-            if self.windows.len() >= self.max_windows {
-                self.windows.remove(self.find_window_to_evict());
-                // Invalidate active_window_idx after removal to maintain consistency.
-                // If create_window fails below, the index won't point to a non-existent window.
-                self.active_window_idx = None;
+        match self.lookup_window(position, size_needed) {
+            Some(WindowMatch::Range(idx)) => {
+                // Reuse the existing window and keep it hot for the next lookup.
+                self.active_window_idx = Some(idx);
+                Ok(&mut self.windows[idx])
             }
+            Some(WindowMatch::Position(idx)) => {
+                // Remap the window that already covers the starting position.
+                let window = self.windows.remove(idx);
+                // Invalidate active_window_idx before removal to maintain consistency.
+                // If create_window fails, the index won't point to a non-existent window.
+                self.active_window_idx = None;
 
-            {
-                // Calculate window start for this position
-                let window_start = self.get_chunk_aligned_start(position);
+                let window_start = window.offset;
                 let window_end = self.get_chunk_aligned_end(position + size_needed);
                 let num_chunks = (window_end - window_start) / self.chunk_size;
 
                 let new_window = self.create_window(window_start, num_chunks)?;
 
                 self.windows.push(new_window);
+                self.active_window_idx = Some(self.windows.len() - 1);
+                Ok(self.windows.last_mut().unwrap())
             }
+            None => {
+                // Create a brand new window.
+                if self.windows.len() >= self.max_windows {
+                    self.windows.remove(self.find_window_to_evict());
+                    // Invalidate active_window_idx after removal to maintain consistency.
+                    // If create_window fails below, the index won't point to a non-existent window.
+                    self.active_window_idx = None;
+                }
 
-            self.active_window_idx = Some(self.windows.len() - 1);
-            Ok(self.windows.last_mut().unwrap())
+                {
+                    // Calculate window start for this position.
+                    let window_start = self.get_chunk_aligned_start(position);
+                    let window_end = self.get_chunk_aligned_end(position + size_needed);
+                    let num_chunks = (window_end - window_start) / self.chunk_size;
+
+                    let new_window = self.create_window(window_start, num_chunks)?;
+
+                    self.windows.push(new_window);
+                }
+
+                self.active_window_idx = Some(self.windows.len() - 1);
+                Ok(self.windows.last_mut().unwrap())
+            }
         }
     }
 
@@ -468,5 +474,25 @@ mod tests {
             "Expected get_slice to succeed after recovery"
         );
         assert_eq!(wm.windows.len(), 1);
+    }
+
+    #[test]
+    fn test_range_hit_promotes_existing_window_to_active() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(&[0u8; 16384]).unwrap();
+        temp_file.flush().unwrap();
+
+        let file = File::open(temp_file.path()).unwrap();
+        let mut wm: WindowManager<Mmap> = WindowManager::new(file, PAGE_SIZE_TEST, 2).unwrap();
+
+        wm.get_slice(0, 100).unwrap();
+        assert_eq!(wm.active_window_idx, Some(0));
+
+        wm.get_slice(PAGE_SIZE_TEST, 100).unwrap();
+        assert_eq!(wm.windows.len(), 2);
+        assert_eq!(wm.active_window_idx, Some(1));
+
+        wm.get_slice(0, 100).unwrap();
+        assert_eq!(wm.active_window_idx, Some(0));
     }
 }
