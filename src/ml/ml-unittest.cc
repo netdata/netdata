@@ -33,7 +33,7 @@ static int tests_failed = 0;
 // Input: [1, 3, 6, 10, 15, 9, 9, 9, 9]
 // Expected diff (high - low with lag 1): [2, 3, 4, 5, -6, 0, 0, 0]
 // (last element zeroed)
-static int test_features_diff()
+static void test_features_diff()
 {
     fprintf(stderr, "  test_features_diff...\n");
 
@@ -56,7 +56,7 @@ static int test_features_diff()
     // After smooth with smooth_n=1 (no-op):
     //   unchanged, but last smooth_n=1 elements zeroed: src[8]=0 (already 0)
     // After lag with lag_n=1:
-    //   feature vectors: [src[i], src[i+1]] for i in 0..5
+    //   feature vectors: [src[i], src[i+1]] for i in 0..6
     //   n_vectors = 9 - 1 - 1 + 1 - 1 = 7
 
     ml_features_preprocess(&features, 1.0);
@@ -72,12 +72,10 @@ static int test_features_diff()
         ML_TEST_ASSERT_DOUBLE_EQ(pf[3](0), 5.0, 1e-9, "pf[3](0) == 5.0");
         ML_TEST_ASSERT_DOUBLE_EQ(pf[3](1), -6.0, 1e-9, "pf[3](1) == -6.0");
     }
-
-    return tests_failed == 0 ? 0 : 1;
 }
 
 // Test: diff_n=0 means no differencing
-static int test_features_no_diff()
+static void test_features_no_diff()
 {
     fprintf(stderr, "  test_features_no_diff...\n");
 
@@ -105,12 +103,10 @@ static int test_features_no_diff()
         ML_TEST_ASSERT_DOUBLE_EQ(pf[0](0), 10.0, 1e-9, "pf[0](0) == 10.0");
         ML_TEST_ASSERT_DOUBLE_EQ(pf[0](1), 20.0, 1e-9, "pf[0](1) == 20.0");
     }
-
-    return tests_failed == 0 ? 0 : 1;
 }
 
 // Test: smoothing with smooth_n=3
-static int test_features_smooth()
+static void test_features_smooth()
 {
     fprintf(stderr, "  test_features_smooth...\n");
 
@@ -150,14 +146,12 @@ static int test_features_smooth()
         ML_TEST_ASSERT_DOUBLE_EQ(pf[5](0), 7.0, 1e-9, "pf[5](0) == 7.0 (smoothed)");
         ML_TEST_ASSERT_DOUBLE_EQ(pf[5](1), 0.0, 1e-9, "pf[5](1) == 0.0 (zeroed by smooth)");
     }
-
-    return tests_failed == 0 ? 0 : 1;
 }
 
 // Test: full pipeline with default-like params (diff_n=1, smooth_n=3, lag_n=5)
 // Validates the feature vector shape and that a round-trip through
 // train + score produces sensible anomaly scores.
-static int test_full_pipeline()
+static void test_full_pipeline()
 {
     fprintf(stderr, "  test_full_pipeline...\n");
 
@@ -260,12 +254,10 @@ static int test_full_pipeline()
             ML_TEST_ASSERT(anomaly_score > normal_score, "anomalous data should score higher than normal");
         }
     }
-
-    return tests_failed == 0 ? 0 : 1;
 }
 
 // Test: kmeans anomaly_score edge cases
-static int test_kmeans_scoring()
+static void test_kmeans_scoring()
 {
     fprintf(stderr, "  test_kmeans_scoring...\n");
 
@@ -307,7 +299,7 @@ static int test_kmeans_scoring()
         far_away(i) = 100.0;
 
     calculated_number_t score_far = ml_kmeans_anomaly_score(&km, far_away);
-    ML_TEST_ASSERT(score_far == 100.0, "far away sample should be capped at 100");
+    ML_TEST_ASSERT_DOUBLE_EQ(score_far, 100.0, 1e-9, "far away sample should be capped at 100");
 
     // When min_dist == max_dist, score should be 0
     ml_kmeans_inlined_t km_equal;
@@ -322,12 +314,10 @@ static int test_kmeans_scoring()
 
     calculated_number_t score_eq = ml_kmeans_anomaly_score(&km_equal, at_mid);
     ML_TEST_ASSERT_DOUBLE_EQ(score_eq, 0.0, 1e-9, "equal min/max should return 0");
-
-    return tests_failed == 0 ? 0 : 1;
 }
 
 // Test: circular buffer linearization produces the same result as std::rotate
-static int test_circular_buffer_equivalence()
+static void test_circular_buffer_equivalence()
 {
     fprintf(stderr, "  test_circular_buffer_equivalence...\n");
 
@@ -357,7 +347,7 @@ static int test_circular_buffer_equivalence()
         cns_rotate[n - 1] = values[i];
 
         calculated_number_t src[128], dst[128];
-        memset(src, 0, n * (lag_n + 1) * sizeof(calculated_number_t));
+        memset(src, 0, sizeof(src));
         memcpy(src, cns_rotate.data(), n * sizeof(calculated_number_t));
         memcpy(dst, cns_rotate.data(), n * sizeof(calculated_number_t));
 
@@ -417,8 +407,6 @@ static int test_circular_buffer_equivalence()
             ML_TEST_ASSERT_DOUBLE_EQ(rotate_results[i](j), circ_results[i](j), 1e-12, msg);
         }
     }
-
-    return tests_failed == 0 ? 0 : 1;
 }
 
 // Test: ml_features_preprocess with a prediction-sized window produces the same
@@ -426,7 +414,7 @@ static int test_circular_buffer_equivalence()
 // This validates the preprocessing math and serves as a baseline for verifying
 // that any optimized prediction path (e.g. ml_features_preprocess_predict)
 // produces identical results.
-static int test_preprocess_predict_equivalence()
+static void test_preprocess_predict_equivalence()
 {
     fprintf(stderr, "  test_preprocess_predict_equivalence...\n");
 
@@ -539,12 +527,10 @@ static int test_preprocess_predict_equivalence()
             }
         }
     }
-
-    return tests_failed == 0 ? 0 : 1;
 }
 
 // Test: constant input values produce zero-diff features and don't cause anomalies
-static int test_constant_input()
+static void test_constant_input()
 {
     fprintf(stderr, "  test_constant_input...\n");
 
@@ -634,12 +620,10 @@ static int test_constant_input()
         bool same_value = (cns[newest_idx] == value);
         ML_TEST_ASSERT(!same_value, "different value should not detect same_value");
     }
-
-    return tests_failed == 0 ? 0 : 1;
 }
 
 // Test: various parameter combinations produce correctly sized outputs
-static int test_parameter_combinations()
+static void test_parameter_combinations()
 {
     fprintf(stderr, "  test_parameter_combinations...\n");
 
@@ -731,8 +715,6 @@ static int test_parameter_combinations()
                  diff_n, smooth_n, lag_n, expected_large);
         ML_TEST_ASSERT(pf_large.size() == expected_large, msg);
     }
-
-    return tests_failed == 0 ? 0 : 1;
 }
 
 extern "C" int ml_unittest()
