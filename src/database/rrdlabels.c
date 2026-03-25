@@ -903,11 +903,11 @@ static int label_to_buffer_callback(const RRDLABEL *lb, void *value __maybe_unus
 
     struct labels_to_buffer *t = (struct labels_to_buffer *)data;
 
-    size_t n_size = (t->name_sanitizer ) ? ( RRDLABELS_MAX_NAME_LENGTH  * 2 ) : 1;
-    size_t v_size = (t->value_sanitizer) ? ( RRDLABELS_MAX_VALUE_LENGTH * 2 ) : 1;
+    size_t n_size = (t->name_sanitizer ) ? ( RRDLABELS_MAX_NAME_LENGTH  * 2 ) : 0;
+    size_t v_size = (t->value_sanitizer) ? ( RRDLABELS_MAX_VALUE_LENGTH * 2 ) : 0;
 
-    char *n = mallocz(n_size);
-    char *v = mallocz(v_size);
+    char *n = t->name_sanitizer ? mallocz(n_size) : NULL;
+    char *v = t->value_sanitizer ? mallocz(v_size) : NULL;
 
     const char *name = string2str(lb->index.key);
 

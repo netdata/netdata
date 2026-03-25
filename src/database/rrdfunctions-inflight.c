@@ -394,10 +394,6 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
     const DICTIONARY_ITEM *host_function_acquired = NULL;
 
-    size_t sanitized_source_size = (source ? strlen(source) : 0) + 1;
-    char *sanitized_source = mallocz(sanitized_source_size);
-    rrd_functions_sanitize(sanitized_source, source ? source : "", sanitized_source_size);
-
     // ------------------------------------------------------------------------
     // check for the host
     if(!host) {
@@ -499,6 +495,10 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     // ------------------------------------------------------------------------
     // the function can only be executed in async mode
     // put the function into the inflight requests
+
+    size_t sanitized_source_size = (source ? strlen(source) : 0) + 1;
+    char *sanitized_source = mallocz(sanitized_source_size);
+    rrd_functions_sanitize(sanitized_source, source ? source : "", sanitized_source_size);
 
     struct rrd_function_inflight t = {
         .used = false,

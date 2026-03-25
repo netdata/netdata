@@ -303,6 +303,7 @@ static void log_forwarder_thread_func(void *arg) {
 
                     if (should_exit) {
                         // Expected during shutdown
+                        freez(pfds);
                         break;
                     }
 

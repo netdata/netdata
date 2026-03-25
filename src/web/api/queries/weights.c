@@ -1405,33 +1405,34 @@ static double ks_2samp(
 }
 
 static double kstwo(
+    ONEWAYALLOC *owa,
     NETDATA_DOUBLE baseline[], int baseline_points,
     NETDATA_DOUBLE highlight[], int highlight_points,
     uint32_t base_shifts) {
 
     // -1 in size, since the calculate_pairs_diffs() returns one less point
-    DIFFS_NUMBERS *baseline_diffs = mallocz((size_t)(baseline_points - 1) * sizeof(*baseline_diffs));
-    DIFFS_NUMBERS *highlight_diffs = mallocz((size_t)(highlight_points - 1) * sizeof(*highlight_diffs));
+    DIFFS_NUMBERS *baseline_diffs = onewayalloc_mallocz(owa, (size_t)(baseline_points - 1) * sizeof(*baseline_diffs));
+    DIFFS_NUMBERS *highlight_diffs = onewayalloc_mallocz(owa, (size_t)(highlight_points - 1) * sizeof(*highlight_diffs));
 
     int base_size = (int)calculate_pairs_diff(baseline_diffs, baseline, baseline_points);
     int high_size = (int)calculate_pairs_diff(highlight_diffs, highlight, highlight_points);
 
     if(unlikely(!base_size || !high_size)) {
-        freez(highlight_diffs);
-        freez(baseline_diffs);
+        onewayalloc_freez(owa, highlight_diffs);
+        onewayalloc_freez(owa, baseline_diffs);
         return NAN;
     }
 
     if(unlikely(base_size != baseline_points - 1 || high_size != highlight_points - 1)) {
         netdata_log_error("Metric correlations: internal error - calculate_pairs_diff() returns the wrong number of entries");
-        freez(highlight_diffs);
-        freez(baseline_diffs);
+        onewayalloc_freez(owa, highlight_diffs);
+        onewayalloc_freez(owa, baseline_diffs);
         return NAN;
     }
 
     double ret = ks_2samp(baseline_diffs, base_size, highlight_diffs, high_size, base_shifts);
-    freez(highlight_diffs);
-    freez(baseline_diffs);
+    onewayalloc_freez(owa, highlight_diffs);
+    onewayalloc_freez(owa, baseline_diffs);
     return ret;
 }
 
@@ -1557,7 +1558,7 @@ static void rrdset_metric_correlations_ks2(
 
     stats->binary_searches += 2 * (base_points - 1) + 2 * (high_points - 1);
 
-    double prob = kstwo(baseline, (int)base_points, highlight, (int)high_points, shifts);
+    double prob = kstwo(owa, baseline, (int)base_points, highlight, (int)high_points, shifts);
     if(!isnan(prob) && !isinf(prob)) {
 
         // these conditions should never happen, but still let's check

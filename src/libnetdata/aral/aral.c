@@ -1422,9 +1422,11 @@ static void aral_test_thread(void *ptr) {
     struct aral_unittest_config *auc = ptr;
     ARAL *ar = auc->ar;
     size_t elements = auc->elements;
+    size_t max_page_elements = aral_elements_in_page_size(ar, aral_max_allocation_size(ar));
 
     bool marked = os_random(2);
     struct aral_unittest_entry **pointers = callocz(elements, sizeof(struct aral_unittest_entry *));
+    size_t *free_list = mallocz(max_page_elements * sizeof(*free_list));
 
     size_t iterations = 0;
     do {
@@ -1479,7 +1481,6 @@ static void aral_test_thread(void *ptr) {
             pointers[i] = unittest_aral_malloc(ar, marked);
         }
 
-        size_t max_page_elements = aral_elements_in_page_size(ar, aral_max_allocation_size(ar));
         size_t increment = elements / max_page_elements;
         for (size_t all = increment; all <= elements / 2; all += increment) {
 
@@ -1489,7 +1490,6 @@ static void aral_test_thread(void *ptr) {
 
             // fprintf(stderr, "all %zu, to free %zu, step %zu\n", all, to_free, step);
 
-            size_t *free_list = callocz(to_free, sizeof(*free_list));
             for (size_t i = 0; i < to_free; i++) {
                 size_t pos = step * i;
                 aral_freez(ar, pointers[pos]);
@@ -1501,8 +1501,6 @@ static void aral_test_thread(void *ptr) {
                 size_t pos = free_list[i];
                 pointers[pos] = unittest_aral_malloc(ar, marked);
             }
-
-            freez(free_list);
         }
 
         for (size_t i = 0; i < elements; i++) {
@@ -1517,6 +1515,7 @@ static void aral_test_thread(void *ptr) {
 
     } while(!auc->single_threaded && !__atomic_load_n(&auc->stop, __ATOMIC_RELAXED));
 
+    freez(free_list);
     freez(pointers);
 }
 
