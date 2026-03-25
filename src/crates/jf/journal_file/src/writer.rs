@@ -1,15 +1,15 @@
 #![allow(unused_imports, dead_code)]
 
 use crate::{
-    journal_hash_data, CompactEntryItem, DataHashTable, DataObject, DataObjectHeader,
-    DataPayloadType, EntryObject, EntryObjectHeader, FieldHashTable, FieldObject,
-    FieldObjectHeader, HashItem, HashTable, HashTableMut, HashableObject, HashableObjectMut,
-    HeaderIncompatibleFlags, JournalFile, JournalFileOptions, JournalHeader, JournalState,
-    ObjectHeader, ObjectType, RegularEntryItem,
+    CompactEntryItem, DataHashTable, DataObject, DataObjectHeader, DataPayloadType, EntryObject,
+    EntryObjectHeader, FieldHashTable, FieldObject, FieldObjectHeader, HashItem, HashTable,
+    HashTableMut, HashableObject, HashableObjectMut, HeaderIncompatibleFlags, JournalFile,
+    JournalFileOptions, JournalHeader, JournalState, ObjectHeader, ObjectType, RegularEntryItem,
+    journal_hash_data,
 };
 use error::{JournalError, Result};
 use memmap2::MmapMut;
-use rand::{seq::IndexedRandom, Rng};
+use rand::{Rng, seq::IndexedRandom};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::path::Path;
 use window_manager::MemoryMapMut;
@@ -465,7 +465,7 @@ impl JournalWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{load_boot_id, Direction, JournalFile, JournalReader, Location};
+    use crate::{Direction, JournalFile, JournalReader, Location, load_boot_id};
     use memmap2::Mmap;
     use std::collections::HashMap;
     use tempfile::NamedTempFile;
@@ -740,11 +740,16 @@ mod tests {
             .value(&journal_file)?
             .expect("expected one entry");
 
-        let mut offsets = Vec::new();
+        let mut offsets = vec![NonZeroU64::new(123).expect("non-zero sentinel")];
         let err = journal_file
             .entry_data_object_offsets(entry_offset, &mut offsets)
             .expect_err("expected invalid entry item offset to fail");
         assert!(matches!(err, JournalError::InvalidOffset));
+        assert_eq!(
+            offsets,
+            vec![NonZeroU64::new(123).expect("non-zero sentinel")],
+            "entry_data_object_offsets() must leave the caller buffer unchanged on error"
+        );
 
         let mut reader = JournalReader::default();
         reader.set_location(Location::Head);

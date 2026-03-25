@@ -642,13 +642,20 @@ pub struct EntryObject<B: ByteSlice> {
 
 impl<B: ByteSlice> EntryObject<B> {
     pub fn collect_offsets(&self, offsets: &mut Vec<NonZeroU64>) -> Result<()> {
+        let start_len = offsets.len();
+
         match &self.items {
             EntryItemsType::Regular(items) => {
                 offsets.reserve(items.len());
 
                 for item in items.iter() {
-                    let offset =
-                        NonZeroU64::new(item.object_offset).ok_or(JournalError::InvalidOffset)?;
+                    let offset = match NonZeroU64::new(item.object_offset) {
+                        Some(offset) => offset,
+                        None => {
+                            offsets.truncate(start_len);
+                            return Err(JournalError::InvalidOffset);
+                        }
+                    };
                     offsets.push(offset);
                 }
             }
@@ -656,8 +663,13 @@ impl<B: ByteSlice> EntryObject<B> {
                 offsets.reserve(items.len());
 
                 for item in items.iter() {
-                    let offset = NonZeroU64::new(item.object_offset as u64)
-                        .ok_or(JournalError::InvalidOffset)?;
+                    let offset = match NonZeroU64::new(item.object_offset as u64) {
+                        Some(offset) => offset,
+                        None => {
+                            offsets.truncate(start_len);
+                            return Err(JournalError::InvalidOffset);
+                        }
+                    };
                     offsets.push(offset);
                 }
             }

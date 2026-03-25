@@ -444,8 +444,11 @@ impl<M: MemoryMap> JournalFile<M> {
         Ok(())
     }
 
-    // Returns the data object offsets of the entry object at the specified
-    // offset
+    // Appends the DATA object offsets of the entry object at `entry_offset`.
+    //
+    // Returns `JournalError::InvalidOffset` when the entry contains a zero or
+    // otherwise invalid object offset. On error, `offsets` is restored to its
+    // original length.
     pub fn entry_data_object_offsets(
         &self,
         entry_offset: NonZeroU64,
