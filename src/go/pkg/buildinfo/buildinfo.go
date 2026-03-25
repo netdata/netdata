@@ -34,7 +34,13 @@ var NetdataBinDir = "/usr/sbin"
 // CacheDir is the path to the Netdata cache directory.
 var CacheDir = "/var/cache/netdata"
 
-// Info returns all build information as a single line with snake_case keys.
+// Info returns all build information as a single line of space-delimited
+// key=value pairs using snake_case keys.
+//
+// This output is intended for external consumption. Callers must not assume a
+// fixed set, order, or count of keys. New keys may be added over time as more
+// build metadata becomes available, so parsers should ignore unknown keys to
+// remain forward-compatible.
 func Info() string {
 	return fmt.Sprintf(
 		"version=%s go_version=%s user_config_dir=%s stock_config_dir=%s stock_data_dir=%s plugins_dir=%s netdata_bin_dir=%s cache_dir=%s",

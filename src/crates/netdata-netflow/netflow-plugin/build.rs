@@ -1,12 +1,45 @@
 use std::path::Path;
+use std::process::Command;
+
+fn configure_protoc() -> Result<(), Box<dyn std::error::Error>> {
+    println!("cargo:rerun-if-env-changed=PROTOC");
+
+    if std::env::var_os("PROTOC").is_some() {
+        return Ok(());
+    }
+
+    match protoc_bin_vendored::protoc_bin_path() {
+        Ok(protoc) => {
+            // SAFETY: build scripts run in a single process and this process does not
+            // concurrently read `PROTOC` while we set it.
+            unsafe {
+                std::env::set_var("PROTOC", protoc);
+            }
+            Ok(())
+        }
+        Err(vendored_err) => {
+            match Command::new("protoc").arg("--version").status() {
+                Ok(status) if status.success() => {
+                    println!(
+                        "cargo:warning=vendored protoc unavailable ({vendored_err}); falling back to protoc from PATH"
+                    );
+                    Ok(())
+                }
+                Ok(status) => Err(format!(
+                    "vendored protoc unavailable ({vendored_err}) and 'protoc --version' exited with status {status}; set PROTOC or install protoc"
+                )
+                .into()),
+                Err(path_err) => Err(format!(
+                    "vendored protoc unavailable ({vendored_err}) and failed to execute 'protoc' from PATH ({path_err}); set PROTOC or install protoc"
+                )
+                .into()),
+            }
+        }
+    }
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let protoc = protoc_bin_vendored::protoc_bin_path()?;
-    // SAFETY: build scripts run in a single process and this process does not
-    // concurrently read `PROTOC` while we set it.
-    unsafe {
-        std::env::set_var("PROTOC", protoc);
-    }
+    configure_protoc()?;
 
     let proto_root = Path::new("proto");
     let proto_files = [

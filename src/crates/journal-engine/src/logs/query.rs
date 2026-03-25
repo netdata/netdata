@@ -485,7 +485,7 @@ fn merge_log_entries(
 
     // Allocate result vector with appropriate capacity — cap at actual data size
     // to avoid capacity overflow when limit is usize::MAX (no limit set).
-    let mut result = Vec::with_capacity((a.len() + b.len()).min(limit));
+    let mut result = Vec::with_capacity(a.len().saturating_add(b.len()).min(limit));
     let mut i = 0;
     let mut j = 0;
 

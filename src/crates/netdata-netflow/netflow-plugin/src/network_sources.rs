@@ -180,10 +180,11 @@ fn publish_source_records(
     match state.by_source.write() {
         Ok(mut guard) => {
             guard.insert(source_name.to_string(), records);
-            let merged = guard
-                .values()
-                .flat_map(|items| items.iter().cloned())
-                .collect::<Vec<_>>();
+            let total_len: usize = guard.values().map(|items| items.len()).sum();
+            let mut merged = Vec::with_capacity(total_len);
+            for items in guard.values() {
+                merged.extend(items.iter().cloned());
+            }
             runtime.replace_records(merged);
         }
         Err(err) => {
