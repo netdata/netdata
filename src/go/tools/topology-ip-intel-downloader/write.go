@@ -35,8 +35,8 @@ type generationMetadata struct {
 		InterestingCIDRs []string `json:"interesting_cidrs"`
 	} `json:"policy"`
 	Output struct {
-		AsnFile     string `json:"asn_file"`
-		CountryFile string `json:"country_file"`
+		AsnFile      string `json:"asn_file"`
+		CountryFile  string `json:"country_file"`
 		MetadataFile string `json:"metadata_file"`
 	} `json:"output"`
 }
