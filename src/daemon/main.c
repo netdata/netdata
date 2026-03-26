@@ -469,6 +469,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return dictionary_unittest(10000);
                         }
+                        else if(strcmp(optarg, "dicttest-benchmark") == 0) {
+                            unittest_running = true;
+                            return dictionary_unittest_benchmark();
+                        }
                         else if(strcmp(optarg, "araltest") == 0) {
                             unittest_running = true;
                             return aral_unittest(10000);
