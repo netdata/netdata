@@ -587,6 +587,7 @@ static void timer_cb(uv_timer_t *handle)
 }
 
 #define SHUTDOWN_SLEEP_INTERVAL_MS (100)
+#define ACLK_SHUTDOWN_WATCHDOG_TIMEOUT_SECONDS (15)
 #define CMD_POOL_SIZE (2048)
 
 #define ACLK_JOBS_ARE_RUNNING                                                                                          \
@@ -900,11 +901,25 @@ static void aclk_synchronization_event_loop(void *arg)
 
     size_t shutdown_wait_iterations = 0;
     const size_t log_every_iterations = (10 * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
+    const size_t watchdog_iterations = (ACLK_SHUTDOWN_WATCHDOG_TIMEOUT_SECONDS * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
 
     while (ACLK_JOBS_ARE_RUNNING) {
         (void)uv_run(loop, UV_RUN_NOWAIT);
 
         shutdown_wait_iterations++;
+
+        if (shutdown_wait_iterations >= watchdog_iterations) {
+            nd_log_daemon(
+                NDLP_ERR,
+                "ACLK: shutdown watchdog timeout (%d seconds) exceeded, abandoning outstanding libuv jobs "
+                "(queries_running=%d, alert_push_running=%d, batch_job_running=%d)",
+                ACLK_SHUTDOWN_WATCHDOG_TIMEOUT_SECONDS,
+                config->aclk_queries_running,
+                config->alert_push_running,
+                config->aclk_batch_job_is_running);
+            break;
+        }
+
         if ((shutdown_wait_iterations % log_every_iterations) == 0) {
             nd_log_daemon(
                 NDLP_WARNING,
