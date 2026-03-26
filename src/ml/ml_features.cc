@@ -69,8 +69,10 @@ static void ml_features_lag(ml_features_t *features, double sampling_ratio)
 
 void ml_features_preprocess(ml_features_t *features, double sampling_ratio)
 {
-    if (!features->preprocessed_features)
+    if (!features->preprocessed_features) {
+        netdata_log_error("ml_features_preprocess: preprocessed_features is null");
         return;
+    }
 
     ml_features_diff(features);
     ml_features_smooth(features);
