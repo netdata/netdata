@@ -134,8 +134,8 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
     spinlock_unlock(&df->users.spinlock);
 
     if(marked_pending)
-        netdata_log_info("DBENGINE: datafile %u of tier %d is pending deletion (%s)",
-                         df->fileno, datafile_ctx(df)->config.tier, is_shutdown ? "shutdown" : "runtime");
+        netdata_log_info("DBENGINE: tier %d: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " is pending deletion (%s)",
+                         datafile_ctx(df)->config.tier, datafile_ctx(df)->config.tier, df->fileno, is_shutdown ? "shutdown" : "runtime");
 
     if(can_be_deleted)
         return true;
@@ -158,8 +158,8 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
     if(!writers_running && !flushed_to_open_running) {
         if(df->users.available) {
             df->users.available = false;
-            netdata_log_info("DBENGINE: datafile %u of tier %d entered deletion phase-2 (new users blocked)",
-                             df->fileno, datafile_ctx(df)->config.tier);
+            netdata_log_info("DBENGINE: tier %d: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " entered deletion phase-2 (new users blocked)",
+                             datafile_ctx(df)->config.tier, datafile_ctx(df)->config.tier, df->fileno);
         }
 
         if(!df->users.lockers)
@@ -428,7 +428,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         ctx_fs_error(ctx);
         return ret;
     }
-    netdata_log_info("DBENGINE: found %d files in path %s", ret, ctx->config.dbfiles_path);
+    netdata_log_info("DBENGINE: tier %d: found %d files in path %s", ctx->config.tier, ret, ctx->config.dbfiles_path);
 
     Pvoid_t datafiles_JudyL = NULL;
     Pvoid_t journafile_JudyL = NULL;
@@ -533,7 +533,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     (void) JudyLFreeArray(&datafiles_JudyL, NULL);
 
 
-    netdata_log_info("DBENGINE: loading %d data/journal of tier %d...", matched_files, ctx->config.tier);
+    netdata_log_info("DBENGINE: tier %d: loading %d data/journal files...", ctx->config.tier, matched_files);
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
         uint8_t must_delete_pair = 0;
 
@@ -589,7 +589,6 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
     struct rrdengine_journalfile *journalfile;
     unsigned fileno = ctx_last_fileno_get(ctx) + 1;
     int ret;
-    char path[RRDENG_PATH_MAX];
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "DBENGINE: creating new data and journal files in path \"%s\"",
@@ -600,16 +599,14 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
     if(ret)
         goto error_after_datafile;
 
-    generate_datafilepath(datafile, path, sizeof(path));
-    nd_log(NDLS_DAEMON, NDLP_INFO, "DBENGINE: created data file \"%s\".", path);
-
     journalfile = journalfile_alloc_and_init(datafile);
     ret = journalfile_create(journalfile, datafile);
     if (ret)
         goto error_after_journalfile;
 
-    journalfile_v1_generate_path(datafile, path, sizeof(path));
-    nd_log(NDLS_DAEMON, NDLP_INFO, "DBENGINE: created journal file \"%s\".", path);
+    nd_log(NDLS_DAEMON, NDLP_INFO,
+           "DBENGINE: tier %d: created " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf).",
+           ctx->config.tier, ctx->config.tier, datafile->fileno);
 
     ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
     datafile_list_insert(ctx, datafile);

@@ -2468,7 +2468,8 @@ void pgc_open_cache_to_journal_v2(
 
     struct section_pages *sp = *section_pages_pptr;
     if(!spinlock_trylock(&sp->migration_to_v2_spinlock)) {
-        netdata_log_info("DBENGINE: migration to journal v2 for datafile %u is postponed, another jv2 indexer is already running for this section", datafile_fileno);
+        netdata_log_info("DBENGINE: migration to journal v2 for datafile %u (section %" PRIu64 ") is postponed, another jv2 indexer is already running for this section",
+                         datafile_fileno, (uint64_t)section);
         pgc_queue_unlock(cache, &cache->hot);
         return;
     }
