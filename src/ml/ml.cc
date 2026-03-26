@@ -836,11 +836,11 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     dim->cns_head = (dim->cns_head + 1) % n;
 
     // Create the sample
-    fatal_assert((n <= 128) &&
-                 "Static buffers too small to perform prediction. "
-                 "This should not be possible with the default clamping of feature extraction options");
     calculated_number_t src_cns[128];
     calculated_number_t dst_cns[128];
+    fatal_assert((n <= std::size(src_cns) && n <= std::size(dst_cns)) &&
+                 "Static buffers too small to perform prediction. "
+                 "This should not be possible with the default clamping of feature extraction options");
 
     size_t first_chunk = n - dim->cns_head;
     memcpy(src_cns, dim->cns.data() + dim->cns_head, first_chunk * sizeof(calculated_number_t));
