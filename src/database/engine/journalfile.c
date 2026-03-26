@@ -564,17 +564,18 @@ int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct
 
     // Now safe to delete the files - no threads are accessing them
     int deleted = 0;
+
     UNLINK_FILE(ctx, path_v2, ret);
     if (ret == 0)
-       deleted++;
+       deleted |= JOURNALFILE_DELETED_V2;
 
     UNLINK_FILE(ctx, path, ret);
     if (ret == 0)
-        deleted++;
+        deleted |= JOURNALFILE_DELETED_V1;
 
-    __atomic_add_fetch(&ctx->stats.journalfile_deletions, deleted, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ctx->stats.journalfile_deletions, __builtin_popcount(deleted), __ATOMIC_RELAXED);
 
-    return ret;
+    return deleted;
 }
 
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
@@ -1360,8 +1361,8 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
     journalfile_v2_generate_path(datafile, path, sizeof(path));
 
-    netdata_log_info("DBENGINE: indexing file \"%s\": extents %zu, metrics %zu, pages %zu",
-        path,
+    netdata_log_info("DBENGINE: tier %d: indexing " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL ".njfv2: extents %zu, metrics %zu, pages %zu",
+        datafile_ctx(datafile)->config.tier, datafile->tier, datafile->fileno,
         number_of_extents,
         number_of_metrics,
         number_of_pages);
@@ -1554,7 +1555,8 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
             char size_for_humans[128];
             size_snprintf(size_for_humans, sizeof(size_for_humans), total_file_size, "B", false);
-            netdata_log_info("DBENGINE: migrated journal file \"%s\", file size %zu bytes (%s)", path, total_file_size, size_for_humans);
+            netdata_log_info("DBENGINE: tier %d: migrated " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL ".njfv2, %s",
+                           ctx->config.tier, datafile->tier, datafile->fileno, size_for_humans);
 
             // msync(data_start, total_file_size, MS_SYNC);
             journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);

@@ -262,6 +262,9 @@ struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafi
 int journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, struct wal *wal);
 int journalfile_close(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_unlink(struct rrdengine_journalfile *journalfile);
+#define JOURNALFILE_DELETED_V1  (1 << 0) // .njf was deleted
+#define JOURNALFILE_DELETED_V2  (1 << 1) // .njfv2 was deleted
+#define JOURNALFILE_DELETED_ALL (JOURNALFILE_DELETED_V1 | JOURNALFILE_DELETED_V2)
 int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
