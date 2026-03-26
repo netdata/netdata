@@ -48,7 +48,7 @@ static void test_features_diff()
     ml_features_t features = {
         1, 1, 1,    // diff_n=1, smooth_n=1, lag_n=1
         dst, n, src, n,
-        pf
+        &pf
     };
 
     // ml_features_preprocess calls diff, smooth, lag in sequence.
@@ -90,7 +90,7 @@ static void test_features_no_diff()
     ml_features_t features = {
         0, 1, 1,    // diff_n=0, smooth_n=1, lag_n=1
         dst, n, src, n,
-        pf
+        &pf
     };
 
     ml_features_preprocess(&features, 1.0);
@@ -122,7 +122,7 @@ static void test_features_smooth()
     ml_features_t features = {
         0, 3, 1,    // diff_n=0, smooth_n=3, lag_n=1
         dst, n, src, n,
-        pf
+        &pf
     };
 
     ml_features_preprocess(&features, 1.0);
@@ -186,7 +186,7 @@ static void test_full_pipeline()
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
             dst, n, src, n,
-            pf
+            &pf
         };
         ml_features_preprocess(&features, 1.0);
 
@@ -211,7 +211,7 @@ static void test_full_pipeline()
     ml_features_t train_ft = {
         diff_n, smooth_n, lag_n,
         nullptr, 0, nullptr, 0,
-        training_features
+        &training_features
     };
 
     ml_kmeans_t kmeans;
@@ -247,7 +247,7 @@ static void test_full_pipeline()
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
             dst, n, src, n,
-            pf
+            &pf
         };
         ml_features_preprocess(&features, 1.0);
 
@@ -358,7 +358,7 @@ static void test_circular_buffer_equivalence()
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
             dst, n, src, n,
-            pf
+            &pf
         };
         ml_features_preprocess(&features, 1.0);
 
@@ -392,7 +392,7 @@ static void test_circular_buffer_equivalence()
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
             dst, n, src, n,
-            pf
+            &pf
         };
         ml_features_preprocess(&features, 1.0);
 
@@ -469,7 +469,7 @@ static void test_preprocess_predict_equivalence()
             ml_features_t features1 = {
                 diff_n, smooth_n, lag_n,
                 dst1, n, src1, n,
-                pf
+                &pf
             };
             ml_features_preprocess(&features1, 1.0);
 
@@ -552,7 +552,7 @@ static void test_constant_input()
     ml_features_t features = {
         diff_n, smooth_n, lag_n,
         dst, n, src, n,
-        pf
+        &pf
     };
     ml_features_preprocess(&features, 1.0);
 
@@ -578,7 +578,7 @@ static void test_constant_input()
     ml_features_t features2 = {
         0, smooth_n, lag_n,
         dst2, n, src2, n,
-        pf2
+        &pf2
     };
     ml_features_preprocess(&features2, 1.0);
 
@@ -671,7 +671,7 @@ static void test_parameter_combinations()
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
             dst, n, src, n,
-            pf
+            &pf
         };
         ml_features_preprocess(&features, 1.0);
 
@@ -709,7 +709,7 @@ static void test_parameter_combinations()
         ml_features_t features_large = {
             diff_n, smooth_n, lag_n,
             dst_large, large_n, src_large, large_n,
-            pf_large
+            &pf_large
         };
         ml_features_preprocess(&features_large, 1.0);
 
