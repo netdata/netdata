@@ -273,6 +273,42 @@ This feature is particularly valuable for managing large infrastructures where m
 
 :::
 
+## Troubleshooting
+
+### HTTP 412 Error When Editing Alert Configurations
+
+If you receive an **HTTP 412 error** with a message like "Request failed with status 412" when editing alert configurations, this indicates an **authentication issue**, not a schema validation error.
+
+:::important
+
+In Netdata, HTTP 412 specifically means "An authorization bearer token is required but was not found in the request." This is different from the generic HTTP 412 "Precondition Failed" meaning.
+
+:::
+
+**Common causes:**
+
+1. **Bearer token protection enabled** - Your agent requires Cloud authentication for API access
+2. **Cloud connection lost** - Agent disconnected from Netdata Cloud
+3. **Session expired** - Bearer token has expired (tokens expire after 24 hours)
+4. **Insufficient permissions** - User lacks Admin or Manager role in the space
+
+**Resolution steps:**
+
+1. **Verify Cloud connection**: Check `http://your-agent:19999/api/v3/info` for `cloud-available: true`
+2. **Re-authenticate**: Log out and log back into Netdata Cloud to refresh your bearer token
+3. **Check permissions**: Ensure you have Admin or Manager role in the space containing the agent
+4. **Verify bearer token protection setting**: If enabled in `netdata.conf`, ensure you're accessing via Cloud-authenticated session
+
+```ini
+# Check if bearer token protection is enabled
+[web]
+    bearer token protection = yes  # Requires Cloud authentication
+```
+
+For more information on bearer token protection, see [Secure Your Netdata Agent with Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
+
+---
+
 Experience the efficiency and power of the Dynamic Configuration Manager in Netdata today. Whether you're managing a handful of nodes or a vast infrastructure, this feature will make your monitoring and alerting tasks smoother and more intuitive.
 
 Developing with dynamic configuration? [Click here](https://learn.netdata.cloud/docs/developer-and-contributor-corner/dynamic-configuration/).
