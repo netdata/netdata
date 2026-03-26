@@ -66,7 +66,7 @@ All nodes automatically appear in the "All nodes" Room. Each Room has independen
 ### Space Configuration
 
 1. Select your Space
-2. Click the ⚙️ in the lower left corner
+2. Click the ⚙️ (above your profile icon)
 3. Access settings for room management, node configuration, integration setup, and general Space settings
 
 ### Room Configuration
