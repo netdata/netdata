@@ -163,7 +163,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
 
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "DBENGINE memory protection enabled. "
-               "Netdata will keep at least %s of system RAM free to reduce OOM risk. "
+               "Netdata will limit DBENGINE memory usage to help keep at least %s of system RAM available when possible and reduce OOM risk. "
                "System memory total: %s, currently available: %s, use all RAM for caches: %s",
                buf_oom, buf_total, buf_avail, dbengine_use_all_ram_for_caches ? "enabled" : "disabled");
     }
