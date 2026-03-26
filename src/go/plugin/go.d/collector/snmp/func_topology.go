@@ -223,11 +223,6 @@ func snmpTopologyPresentation() *topology.Presentation {
 			},
 		},
 	}
-	deviceModalTabs := []topology.PresentationModalTab{
-		{ID: "info", Label: "Info"},
-		{ID: "flows", Label: "Flows", Type: "flows"},
-	}
-
 	segmentSummaryFields := []topology.PresentationSummaryField{
 		{Key: "actor_type", Label: "Type", Sources: []string{"actor_type"}},
 		{Key: "learned_sources", Label: "Discovered By", Sources: []string{"attributes.learned_sources"}},
@@ -262,7 +257,7 @@ func snmpTopologyPresentation() *topology.Presentation {
 			ShowPortBullets: true,
 			SummaryFields:   deviceSummaryFields,
 			Tables:          deviceTables,
-			ModalTabs:       deviceModalTabs,
+			ModalTabs:       infoOnlyTabs,
 		}
 	}
 
