@@ -803,15 +803,15 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     //
     // Downstream effect: when same_value is false, we set dim->mt = METRIC_TYPE_VARIABLE.
     // This controls two things:
-    //   1. ml_dimension_train_model() skips training when mt == METRIC_TYPE_CONSTANT (line 679)
-    //   2. Statistics reporting counts constant vs variable dimensions (line 877)
+    //   1. ml_dimension_train_model() skips training when mt == METRIC_TYPE_CONSTANT.
+    //   2. Statistics reporting counts constant vs variable dimensions.
     //
     // Comparing against newest is safe (and more correct) because:
     //   - For truly constant series, all elements are equal — either comparison works.
     //   - For changing series, comparing against newest detects the transition on the
     //     first differing tick. The old oldest-comparison could miss transitions when
     //     the oldest element happened to equal the new value by coincidence.
-    //   - mt is reset to METRIC_TYPE_CONSTANT after each training cycle (line 652),
+    //   - mt is reset to METRIC_TYPE_CONSTANT after each training cycle,
     //     so a single false negative cannot cause a permanent misclassification.
     size_t newest_idx = (dim->cns_head + n - 1) % n;
     bool same_value = (dim->cns[newest_idx] == value);
