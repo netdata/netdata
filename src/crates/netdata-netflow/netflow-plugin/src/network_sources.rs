@@ -202,13 +202,7 @@ async fn fetch_source_once(
     source: &RemoteNetworkSourceConfig,
     transform: &CompiledTransform,
 ) -> Result<Vec<NetworkSourceRecord>> {
-    let method =
-        Method::from_str(&source.method.trim().to_ascii_uppercase()).with_context(|| {
-            format!(
-                "unsupported method '{}' (expected GET or POST)",
-                source.method
-            )
-        })?;
+    let method = parse_source_method(&source.method)?;
     let mut request = client
         .request(method, source.url.trim())
         .timeout(source.timeout.max(Duration::from_secs(1)))
@@ -234,6 +228,17 @@ async fn fetch_source_once(
         .await
         .with_context(|| format!("invalid JSON response from {}", source.url))?;
     decode_remote_records(payload, transform)
+}
+
+fn parse_source_method(method: &str) -> Result<Method> {
+    let method = Method::from_str(&method.trim().to_ascii_uppercase())
+        .with_context(|| format!("invalid HTTP method name '{}'", method))?;
+
+    if method != Method::GET && method != Method::POST {
+        anyhow::bail!("unsupported method '{}' (expected GET or POST)", method);
+    }
+
+    Ok(method)
 }
 
 fn decode_remote_records(
@@ -513,6 +518,21 @@ mod tests {
         );
         assert_eq!(rows[0].attrs.tenant, "identity-default");
         assert_eq!(rows[0].attrs.asn, 64_512);
+    }
+
+    #[test]
+    fn parse_source_method_accepts_get_and_post_only() {
+        assert_eq!(
+            parse_source_method("get").expect("GET should be accepted"),
+            Method::GET
+        );
+        assert_eq!(
+            parse_source_method("POST").expect("POST should be accepted"),
+            Method::POST
+        );
+
+        let err = parse_source_method("PUT").expect_err("PUT should be rejected");
+        assert!(err.to_string().contains("expected GET or POST"));
     }
 
     #[test]
