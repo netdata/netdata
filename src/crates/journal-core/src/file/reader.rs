@@ -235,25 +235,6 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
         self.entry_data_iterator = None;
     }
 
-    pub fn entry_data_enumerate(
-        &mut self,
-        journal_file: &'a JournalFile<M>,
-    ) -> Result<Option<&ValueGuard<'_, DataObject<&'a [u8]>>>> {
-        self.drop_guards();
-
-        if self.entry_data_iterator.is_none() {
-            let entry_offset = self.cursor.position()?;
-            self.entry_data_iterator = Some(journal_file.entry_data_objects(entry_offset)?);
-        }
-
-        if let Some(iter) = &mut self.entry_data_iterator {
-            self.data_guard = iter.next().transpose()?;
-            Ok(self.data_guard.as_ref())
-        } else {
-            Ok(None)
-        }
-    }
-
     pub fn entry_data_offsets(
         &self,
         journal_file: &'a JournalFile<M>,
