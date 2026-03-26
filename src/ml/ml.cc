@@ -790,6 +790,15 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     // Save the value and return if we don't have enough values for a sample
     size_t smoothing_window = ml_dimension_smoothing_window(dim);
     unsigned n = Cfg.diff_n + smoothing_window + Cfg.lag_n;
+
+    // The ring buffer modulus is derived from the current effective smoothing
+    // window. If that changes, the existing buffer/head state no longer matches
+    // the new modulus, so rebuild the history before indexing or linearizing it.
+    if (dim->cns.size() != n || dim->cns_head >= n) {
+        dim->cns.clear();
+        dim->cns_head = 0;
+    }
+
     if (dim->cns.size() < n) {
         dim->cns.push_back(value);
         spinlock_unlock(&dim->slock);
@@ -819,9 +828,9 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     dim->cns_head = (dim->cns_head + 1) % n;
 
     // Create the sample
-    assert((n * (Cfg.lag_n + 1) <= 128) &&
-           "Static buffers too small to perform prediction. "
-           "This should not be possible with the default clamping of feature extraction options");
+    fatal_assert((n <= 128) &&
+                 "Static buffers too small to perform prediction. "
+                 "This should not be possible with the default clamping of feature extraction options");
     calculated_number_t src_cns[128];
     calculated_number_t dst_cns[128];
 
