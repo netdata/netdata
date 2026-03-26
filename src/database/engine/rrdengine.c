@@ -1537,6 +1537,7 @@ void datafile_delete(
     struct rrdengine_journalfile *journal_file;
     size_t deleted_bytes, journal_file_bytes, datafile_bytes;
     uint8_t deleted_journal_files = 0;
+    uint8_t expected_journal_files = JOURNALFILE_DELETED_V1;
     bool deleted_datafile = false;
     int ret;
 
@@ -1548,6 +1549,8 @@ void datafile_delete(
     datafile_bytes = datafile->pos;
     journal_file_bytes = journalfile_current_size(journal_file);
     size_t journal_v2_bytes = journalfile_v2_data_size_get(journal_file);
+    if (journal_v2_bytes)
+        expected_journal_files |= JOURNALFILE_DELETED_V2;
     deleted_bytes = 0;
 
     // This will delete journalfile_v2 and journalfile_v1 (returns bitmask of JOURNALFILE_DELETED_V1/V2)
@@ -1578,9 +1581,14 @@ void datafile_delete(
     bool del_ndf = deleted_datafile;
     bool del_njf = deleted_journal_files & JOURNALFILE_DELETED_V1;
     bool del_njfv2 = deleted_journal_files & JOURNALFILE_DELETED_V2;
+    bool exp_njf = expected_journal_files & JOURNALFILE_DELETED_V1;
+    bool exp_njfv2 = expected_journal_files & JOURNALFILE_DELETED_V2;
 
     if (del_ndf && del_njf && del_njfv2)
         netdata_log_info("DBENGINE: tier %d: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf, .njfv2), reclaimed %s.",
+                         tier, tier, fileno, size_for_humans);
+    else if (del_ndf && del_njf && !exp_njfv2)
+        netdata_log_info("DBENGINE: tier %d: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf), reclaimed %s.",
                          tier, tier, fileno, size_for_humans);
     else if (del_ndf || del_njf || del_njfv2) {
         BUFFER *removed = buffer_create(0, NULL);
@@ -1594,13 +1602,17 @@ void datafile_delete(
 
         sep = "";
         if (!del_ndf)   { buffer_strcat(failed, sep); buffer_strcat(failed, ".ndf");   sep = ", "; }
-        if (!del_njf)   { buffer_strcat(failed, sep); buffer_strcat(failed, ".njf");   sep = ", "; }
-        if (!del_njfv2) { buffer_strcat(failed, sep); buffer_strcat(failed, ".njfv2"); }
+        if (exp_njf && !del_njf)   { buffer_strcat(failed, sep); buffer_strcat(failed, ".njf");   sep = ", "; }
+        if (exp_njfv2 && !del_njfv2) { buffer_strcat(failed, sep); buffer_strcat(failed, ".njfv2"); }
 
-        netdata_log_error("DBENGINE: tier %d: partial delete of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
-                          " - removed: %s, failed: %s, reclaimed %s.",
-                          tier, tier, fileno,
-                          buffer_tostring(removed), buffer_tostring(failed), size_for_humans);
+        if(buffer_strlen(failed))
+            netdata_log_error("DBENGINE: tier %d: partial delete of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
+                              " - removed: %s, failed: %s, reclaimed %s.",
+                              tier, tier, fileno,
+                              buffer_tostring(removed), buffer_tostring(failed), size_for_humans);
+        else
+            netdata_log_info("DBENGINE: tier %d: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (%s), reclaimed %s.",
+                             tier, tier, fileno, buffer_tostring(removed), size_for_humans);
         buffer_free(removed);
         buffer_free(failed);
     }
