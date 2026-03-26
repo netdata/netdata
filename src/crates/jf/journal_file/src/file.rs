@@ -643,20 +643,6 @@ impl<M: MemoryMap> JournalFile<M> {
         })
     }
 
-    /// Appends all DATA object offsets for a specific entry to `data_offsets`.
-    ///
-    /// Returns [`JournalError::InvalidOffset`] when the entry contains a zero or
-    /// otherwise invalid object offset. On error, `data_offsets` is restored to
-    /// its original length.
-    pub fn entry_data_object_offsets(
-        &self,
-        entry_offset: NonZeroU64,
-        data_offsets: &mut Vec<NonZeroU64>,
-    ) -> Result<()> {
-        let entry_guard = self.entry_ref(entry_offset)?;
-        entry_guard.collect_offsets(data_offsets)
-    }
-
     /// Get hash table bucket utilization statistics
     pub fn bucket_utilization(&self) -> Option<BucketUtilization> {
         let data_hash_table = self.data_hash_table_ref()?;

@@ -1,15 +1,15 @@
 #![allow(unused_imports, dead_code)]
 
 use crate::{
-    CompactEntryItem, DataHashTable, DataObject, DataObjectHeader, DataPayloadType, EntryObject,
-    EntryObjectHeader, FieldHashTable, FieldObject, FieldObjectHeader, HashItem, HashTable,
-    HashTableMut, HashableObject, HashableObjectMut, HeaderIncompatibleFlags, JournalFile,
-    JournalFileOptions, JournalHeader, JournalState, ObjectHeader, ObjectType, RegularEntryItem,
-    journal_hash_data,
+    journal_hash_data, CompactEntryItem, DataHashTable, DataObject, DataObjectHeader,
+    DataPayloadType, EntryObject, EntryObjectHeader, FieldHashTable, FieldObject,
+    FieldObjectHeader, HashItem, HashTable, HashTableMut, HashableObject, HashableObjectMut,
+    HeaderIncompatibleFlags, JournalFile, JournalFileOptions, JournalHeader, JournalState,
+    ObjectHeader, ObjectType, RegularEntryItem,
 };
 use error::{JournalError, Result};
 use memmap2::MmapMut;
-use rand::{Rng, seq::IndexedRandom};
+use rand::{seq::IndexedRandom, Rng};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::path::Path;
 use window_manager::MemoryMapMut;
@@ -465,7 +465,7 @@ impl JournalWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Direction, JournalFile, JournalReader, Location, load_boot_id};
+    use crate::{load_boot_id, Direction, JournalFile, JournalReader, Location};
     use memmap2::Mmap;
     use std::collections::HashMap;
     use tempfile::NamedTempFile;
@@ -694,71 +694,6 @@ mod tests {
                 );
             }
         }
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_entry_data_offsets_reject_zero_offset_entries() -> Result<()> {
-        let temp_file = NamedTempFile::new().map_err(JournalError::Io)?;
-        let journal_path = temp_file.path();
-        let boot_id = [1; 16];
-
-        {
-            let options = JournalFileOptions::new(
-                generate_uuid(),
-                generate_uuid(),
-                generate_uuid(),
-                generate_uuid(),
-            );
-
-            let mut journal_file = JournalFile::create(journal_path, options)?;
-            let mut writer = JournalWriter::new(&mut journal_file)?;
-            let entry_data = vec![b"MESSAGE=Test message".as_slice(), b"PRIORITY=6".as_slice()];
-
-            writer.add_entry(&mut journal_file, &entry_data, 1_000_000, 500_000, boot_id)?;
-
-            let entry_offset = journal_file
-                .entry_list()
-                .unwrap()
-                .cursor_head()
-                .value(&journal_file)?
-                .expect("expected one entry");
-
-            let mut entry_guard = journal_file.entry_mut(entry_offset, None)?;
-            match &mut entry_guard.items {
-                crate::EntryItemsType::Regular(items) => items[0].object_offset = 0,
-                crate::EntryItemsType::Compact(items) => items[0].object_offset = 0,
-            }
-        }
-
-        let journal_file = JournalFile::<Mmap>::open(journal_path, 8 * 1024)?;
-        let entry_offset = journal_file
-            .entry_list()
-            .unwrap()
-            .cursor_head()
-            .value(&journal_file)?
-            .expect("expected one entry");
-
-        let mut offsets = vec![NonZeroU64::new(123).expect("non-zero sentinel")];
-        let err = journal_file
-            .entry_data_object_offsets(entry_offset, &mut offsets)
-            .expect_err("expected invalid entry item offset to fail");
-        assert!(matches!(err, JournalError::InvalidOffset));
-        assert_eq!(
-            offsets,
-            vec![NonZeroU64::new(123).expect("non-zero sentinel")],
-            "entry_data_object_offsets() must leave the caller buffer unchanged on error"
-        );
-
-        let mut reader = JournalReader::default();
-        reader.set_location(Location::Head);
-        assert!(reader.step(&journal_file, Direction::Forward)?);
-
-        let err = reader
-            .entry_data_enumerate(&journal_file)
-            .expect_err("expected reader path to surface invalid offsets");
-        assert!(matches!(err, JournalError::InvalidOffset));
 
         Ok(())
     }

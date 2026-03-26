@@ -270,10 +270,6 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
         journal_file: &'a JournalFile<M>,
         data_offsets: &mut Vec<NonZeroU64>,
     ) -> Result<()> {
-        // This appends into `data_offsets` and now returns `InvalidOffset` when
-        // the entry contains a zero/invalid object offset instead of silently
-        // skipping it. The output buffer is restored to its original length on
-        // error.
         let entry_offset = self.cursor.position()?;
         journal_file.entry_data_object_offsets(entry_offset, data_offsets)
     }

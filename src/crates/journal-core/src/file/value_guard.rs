@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
 
 /// A guard that ensures exclusive access to objects obtained from a shared memory window.
@@ -30,11 +30,11 @@ use std::ops::{Deref, DerefMut};
 pub struct ValueGuard<'a, T> {
     offset: NonZeroU64,
     value: T,
-    in_use_flag: &'a Cell<bool>,
+    in_use_flag: &'a RefCell<bool>,
 }
 
 impl<'a, T> ValueGuard<'a, T> {
-    pub fn new(offset: NonZeroU64, value: T, in_use_flag: &'a Cell<bool>) -> Self {
+    pub fn new(offset: NonZeroU64, value: T, in_use_flag: &'a RefCell<bool>) -> Self {
         Self {
             offset,
             value,
@@ -63,7 +63,7 @@ impl<T> DerefMut for ValueGuard<'_, T> {
 
 impl<T> Drop for ValueGuard<'_, T> {
     fn drop(&mut self) {
-        self.in_use_flag.set(false);
+        *self.in_use_flag.borrow_mut() = false;
     }
 }
 

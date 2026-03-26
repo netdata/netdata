@@ -1347,6 +1347,120 @@ mod tests {
         eprintln!("stats:                   {:?}", output.stats);
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore]
+    async fn profile_fixed_raw_query_processing_against_local_journals() {
+        const FIXED_FILES: [&str; 4] = [
+            "/var/cache/netdata/flows/raw/system@92ecfa81f20440b9a0762a3a4656e37a-00000000045ab310-00064da65a07dfc3.journal",
+            "/var/cache/netdata/flows/raw/system@92ecfa81f20440b9a0762a3a4656e37a-00000000045d8ec3-00064da8006c73a9.journal",
+            "/var/cache/netdata/flows/raw/system@92ecfa81f20440b9a0762a3a4656e37a-0000000004606cfe-00064da9f3edc98c.journal",
+            "/var/cache/netdata/flows/raw/system@92ecfa81f20440b9a0762a3a4656e37a-0000000004634242-00064dabd29b631e.journal",
+        ];
+
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let journal_root = tmp.path().join("flows");
+        let raw_dir = journal_root.join("raw");
+        let minute_1_dir = journal_root.join("1m");
+        let minute_5_dir = journal_root.join("5m");
+        let hour_1_dir = journal_root.join("1h");
+        fs::create_dir_all(&raw_dir).expect("create raw dir");
+        fs::create_dir_all(&minute_1_dir).expect("create 1m dir");
+        fs::create_dir_all(&minute_5_dir).expect("create 5m dir");
+        fs::create_dir_all(&hour_1_dir).expect("create 1h dir");
+
+        for src in FIXED_FILES {
+            let src_path = Path::new(src);
+            assert!(src_path.is_file(), "expected journal file {}", src_path.display());
+            let dst_path = raw_dir.join(src_path.file_name().expect("journal filename"));
+            if let Err(err) = fs::hard_link(src_path, &dst_path) {
+                if err.raw_os_error() == Some(18) {
+                    fs::copy(src_path, &dst_path).unwrap_or_else(|copy_err| {
+                        panic!("copy {}: {}", src_path.display(), copy_err)
+                    });
+                } else {
+                    panic!("hard link {}: {}", src_path.display(), err);
+                }
+            }
+        }
+
+        let mut cfg = plugin_config::PluginConfig::default();
+        cfg.journal.journal_dir = journal_root.to_string_lossy().to_string();
+
+        let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+        let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+        let (query_service, _notify_rx) = query::FlowQueryService::new(
+            &cfg,
+            Arc::clone(&open_tiers),
+            Arc::clone(&tier_flow_indexes),
+        )
+        .await
+        .expect("create query service for fixed raw journals");
+
+        let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+        let request = query::FlowsRequest {
+            view: query::ViewMode::TableSankey,
+            after: Some(1),
+            before: Some(before),
+            group_by: vec![
+                "SRC_ADDR".to_string(),
+                "DST_ADDR".to_string(),
+                "PROTOCOL".to_string(),
+            ],
+            top_n: query::TopN::N25,
+            ..Default::default()
+        };
+
+        let cold_start = Instant::now();
+        let cold_output = query_service
+            .query_flows(&request)
+            .await
+            .expect("query fixed raw journals");
+        let cold_elapsed = cold_start.elapsed();
+
+        let warm_start = Instant::now();
+        let warm_output = query_service
+            .query_flows(&request)
+            .await
+            .expect("query fixed raw journals warm");
+        let warm_elapsed = warm_start.elapsed();
+
+        eprintln!();
+        eprintln!("=== Fixed Raw Query Processing Harness ===");
+        eprintln!("journal_dir:             {}", journal_root.display());
+        eprintln!("files:                   {}", FIXED_FILES.len());
+        eprintln!("after:                   1");
+        eprintln!("before:                  {}", before);
+        eprintln!("group_by:                {:?}", request.group_by);
+        eprintln!(
+            "cold_elapsed_ms:         {:.2}",
+            cold_elapsed.as_secs_f64() * 1_000.0
+        );
+        eprintln!(
+            "warm_elapsed_ms:         {:.2}",
+            warm_elapsed.as_secs_f64() * 1_000.0
+        );
+        eprintln!("cold_flow_rows:          {}", cold_output.flows.len());
+        eprintln!("warm_flow_rows:          {}", warm_output.flows.len());
+        eprintln!(
+            "cold_metric_bytes:       {}",
+            cold_output.metrics.get("bytes").copied().unwrap_or(0)
+        );
+        eprintln!(
+            "cold_metric_packets:     {}",
+            cold_output.metrics.get("packets").copied().unwrap_or(0)
+        );
+        eprintln!(
+            "warm_metric_bytes:       {}",
+            warm_output.metrics.get("bytes").copied().unwrap_or(0)
+        );
+        eprintln!(
+            "warm_metric_packets:     {}",
+            warm_output.metrics.get("packets").copied().unwrap_or(0)
+        );
+        eprintln!("cold_stats:              {:?}", cold_output.stats);
+        eprintln!("warm_stats:              {:?}", warm_output.stats);
+    }
+
     async fn ingest_fixture(
         fixture_name: &str,
     ) -> (
