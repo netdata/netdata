@@ -38,6 +38,7 @@ type (
 
 		parser       promTextParser
 		scrapeParser promscrapemodel.Parser
+		fastParser   scrapeFastParser
 		assembler    Assembler
 
 		buf     *bytes.Buffer
@@ -64,6 +65,7 @@ func NewWithSelector(client *http.Client, request web.RequestConfig, sr selector
 		buf:          bytes.NewBuffer(make([]byte, 0, 16000)),
 		parser:       promTextParser{sr: sr},
 		scrapeParser: promscrapemodel.NewParser(sr),
+		fastParser:   scrapeFastParser{sr: sr},
 	}
 
 	if v, err := url.Parse(request.URL); err == nil && v.Scheme == "file" {
@@ -85,15 +87,7 @@ func (p *prometheus) Scrape() (MetricFamilies, error) {
 
 	p.assembler.beginCycle()
 
-	if err := p.scrapeParser.ParseStreamWithMeta(
-		body,
-		func(name, help string) {
-			p.assembler.applyHelp(name, help)
-		},
-		func(sample promscrapemodel.Sample) error {
-			return p.assembler.ApplySample(sample)
-		},
-	); err != nil {
+	if err := p.fastParser.parseToAssembler(body, &p.assembler); err != nil {
 		return nil, err
 	}
 

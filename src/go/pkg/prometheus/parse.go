@@ -105,11 +105,7 @@ func (p *promTextParser) parseToMetricFamilies(text []byte) (MetricFamilies, err
 		case textparse.EntryHelp:
 			name, help := parser.Help()
 			p.setMetricFamilyByName(string(name))
-			p.currMF.help = string(help)
-			if strings.IndexByte(p.currMF.help, '\n') != -1 {
-				// convert multiline to one line because HELP is used as the chart title.
-				p.currMF.help = reSpace.ReplaceAllString(strings.TrimSpace(p.currMF.help), " ")
-			}
+			p.currMF.help = sanitizeHelp(string(help))
 		case textparse.EntryType:
 			name, typ := parser.Type()
 			p.setMetricFamilyByName(string(name))

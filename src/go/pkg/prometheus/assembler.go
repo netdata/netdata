@@ -16,6 +16,7 @@ type Assembler struct {
 	metrics    MetricFamilies
 	summaries  map[assemblyKey]*Summary
 	histograms map[assemblyKey]*Histogram
+	scratch    labels.Labels
 	sealed     bool
 }
 
@@ -166,7 +167,7 @@ func (a *Assembler) addScalarSample(sample promscrapemodel.Sample) {
 }
 
 func (a *Assembler) addSummarySample(sample promscrapemodel.Sample) error {
-	baseLabels, quantile, ok := stripFloatLabel(sample.Labels, quantileLabel)
+	baseLabels, quantile, ok := a.stripFloatLabel(sample.Labels, quantileLabel)
 	if !ok {
 		return nil
 	}
@@ -175,7 +176,7 @@ func (a *Assembler) addSummarySample(sample promscrapemodel.Sample) error {
 	mf.typ = model.MetricTypeSummary
 
 	key := assemblyKey{name: sample.Name, hash: labels.Labels(baseLabels).Hash()}
-	summary := a.summaryForOwnedLabels(mf, key, baseLabels)
+	summary := a.summaryFor(mf, key, baseLabels)
 	summary.quantiles = append(summary.quantiles, Quantile{quantile: quantile, value: sample.Value})
 	return nil
 }
@@ -211,7 +212,7 @@ func (a *Assembler) addSummaryCount(sample promscrapemodel.Sample) error {
 }
 
 func (a *Assembler) addHistogramBucket(sample promscrapemodel.Sample) error {
-	baseLabels, bound, ok := stripFloatLabel(sample.Labels, bucketLabel)
+	baseLabels, bound, ok := a.stripFloatLabel(sample.Labels, bucketLabel)
 	if !ok {
 		return nil
 	}
@@ -221,7 +222,7 @@ func (a *Assembler) addHistogramBucket(sample promscrapemodel.Sample) error {
 	mf.typ = model.MetricTypeHistogram
 
 	key := assemblyKey{name: familyName, hash: labels.Labels(baseLabels).Hash()}
-	histogram := a.histogramForOwnedLabels(mf, key, baseLabels)
+	histogram := a.histogramFor(mf, key, baseLabels)
 	histogram.buckets = append(histogram.buckets, Bucket{upperBound: bound, cumulativeCount: sample.Value})
 	return nil
 }
@@ -286,36 +287,6 @@ func (a *Assembler) summaryFor(mf *MetricFamily, key assemblyKey, lbs labels.Lab
 	return metric.summary
 }
 
-func (a *Assembler) summaryForOwnedLabels(mf *MetricFamily, key assemblyKey, lbs labels.Labels) *Summary {
-	if summary, ok := a.summaries[key]; ok {
-		return summary
-	}
-
-	idx := len(mf.metrics)
-	if idx == cap(mf.metrics) {
-		mf.metrics = append(mf.metrics, Metric{})
-	} else {
-		mf.metrics = mf.metrics[:idx+1]
-	}
-
-	metric := &mf.metrics[idx]
-	metric.labels = lbs
-	metric.gauge = nil
-	metric.counter = nil
-	metric.histogram = nil
-	metric.untyped = nil
-	if metric.summary == nil {
-		metric.summary = &Summary{}
-	} else {
-		metric.summary.sum = 0
-		metric.summary.count = 0
-		metric.summary.quantiles = metric.summary.quantiles[:0]
-	}
-
-	a.summaries[key] = metric.summary
-	return metric.summary
-}
-
 func (a *Assembler) histogramFor(mf *MetricFamily, key assemblyKey, lbs labels.Labels) *Histogram {
 	if histogram, ok := a.histograms[key]; ok {
 		return histogram
@@ -330,36 +301,6 @@ func (a *Assembler) histogramFor(mf *MetricFamily, key assemblyKey, lbs labels.L
 
 	metric := &mf.metrics[idx]
 	copyMetricLabels(metric, lbs)
-	metric.gauge = nil
-	metric.counter = nil
-	metric.summary = nil
-	metric.untyped = nil
-	if metric.histogram == nil {
-		metric.histogram = &Histogram{}
-	} else {
-		metric.histogram.sum = 0
-		metric.histogram.count = 0
-		metric.histogram.buckets = metric.histogram.buckets[:0]
-	}
-
-	a.histograms[key] = metric.histogram
-	return metric.histogram
-}
-
-func (a *Assembler) histogramForOwnedLabels(mf *MetricFamily, key assemblyKey, lbs labels.Labels) *Histogram {
-	if histogram, ok := a.histograms[key]; ok {
-		return histogram
-	}
-
-	idx := len(mf.metrics)
-	if idx == cap(mf.metrics) {
-		mf.metrics = append(mf.metrics, Metric{})
-	} else {
-		mf.metrics = mf.metrics[:idx+1]
-	}
-
-	metric := &mf.metrics[idx]
-	metric.labels = lbs
 	metric.gauge = nil
 	metric.counter = nil
 	metric.summary = nil
@@ -395,8 +336,8 @@ func copyMetricLabels(metric *Metric, lbs labels.Labels) {
 	metric.labels = append(metric.labels, lbs...)
 }
 
-func stripFloatLabel(lbs labels.Labels, name string) (labels.Labels, float64, bool) {
-	base := make(labels.Labels, 0, len(lbs)-1)
+func (a *Assembler) stripFloatLabel(lbs labels.Labels, name string) (labels.Labels, float64, bool) {
+	a.scratch = a.scratch[:0]
 	var (
 		value string
 		found bool
@@ -407,7 +348,7 @@ func stripFloatLabel(lbs labels.Labels, name string) (labels.Labels, float64, bo
 			found = true
 			continue
 		}
-		base = append(base, lb)
+		a.scratch = append(a.scratch, lb)
 	}
 	if !found {
 		return nil, 0, false
@@ -415,8 +356,8 @@ func stripFloatLabel(lbs labels.Labels, name string) (labels.Labels, float64, bo
 
 	v, err := strconv.ParseFloat(value, 64)
 	if err != nil {
-		return base, 0, true
+		return a.scratch, 0, true
 	}
 
-	return base, v, true
+	return a.scratch, v, true
 }
