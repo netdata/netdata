@@ -677,7 +677,7 @@ check_for_remote_file() {
     fi
   fi
 
-  if [ "${checked}" -eq 0 ]; then
+  if [ "${succeeded}" -eq 0 ]; then
     if command -v wget > /dev/null 2>&1; then
       checked=1
 
