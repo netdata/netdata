@@ -586,7 +586,6 @@ static void timer_cb(uv_timer_t *handle)
         config->run_query_batch = true;
 }
 
-#define MAX_SHUTDOWN_TIMEOUT_SECONDS (5)
 #define SHUTDOWN_SLEEP_INTERVAL_MS (100)
 #define CMD_POOL_SIZE (2048)
 
@@ -899,13 +898,24 @@ static void aclk_synchronization_event_loop(void *arg)
     uv_close((uv_handle_t *)&config->async, NULL);
     uv_walk(loop, libuv_close_callback, NULL);
 
-    size_t loop_count = (MAX_SHUTDOWN_TIMEOUT_SECONDS * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
+    size_t shutdown_wait_iterations = 0;
+    const size_t log_every_iterations = (10 * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
 
-    while (ACLK_JOBS_ARE_RUNNING && loop_count > 0) {
-        if (!uv_run(loop, UV_RUN_NOWAIT))
-            break;  // No pending callbacks
+    while (ACLK_JOBS_ARE_RUNNING) {
+        (void)uv_run(loop, UV_RUN_NOWAIT);
+
+        shutdown_wait_iterations++;
+        if ((shutdown_wait_iterations % log_every_iterations) == 0) {
+            nd_log_daemon(
+                NDLP_WARNING,
+                "ACLK: waiting for outstanding libuv jobs during shutdown "
+                "(queries_running=%d, alert_push_running=%d, batch_job_running=%d)",
+                config->aclk_queries_running,
+                config->alert_push_running,
+                config->aclk_batch_job_is_running);
+        }
+
         sleep_usec(SHUTDOWN_SLEEP_INTERVAL_MS * USEC_PER_MS);
-        loop_count--;
     }
 
     (void) uv_loop_close(loop);
