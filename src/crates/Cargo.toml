@@ -176,7 +176,7 @@ debug-assertions = true
 [profile.release]
 debug = true
 # lto = true
-opt-level = "z"
+opt-level = 3
 # strip = true
 # codegen-units = 1
 
