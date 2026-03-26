@@ -418,7 +418,11 @@ static void aclk_run_query_job(uv_work_t *req)
     struct aclk_sync_config_s *config = worker->config;
     aclk_query_t *query = (aclk_query_t *)worker->payload;
 
-    aclk_run_query(config, query);
+    // aclk_run_query() frees the query; if we're shutting down we must still free it here
+    if (unlikely(__atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED)))
+        aclk_query_free(query);
+    else
+        aclk_run_query(config, query);
     worker_is_idle();
 }
 
@@ -441,6 +445,8 @@ static void aclk_execute_batch(uv_work_t *req)
     if (!aclk_query_batch)
         return;
 
+    bool shutting_down = __atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED);
+
     Word_t Index = 0;
     bool first = true;
     Pvoid_t *Pvalue;
@@ -449,7 +455,11 @@ static void aclk_execute_batch(uv_work_t *req)
             continue;
 
         aclk_query_t *query = *Pvalue;
-        aclk_run_query(config, query);
+        // aclk_run_query() frees each query; on shutdown we must free without executing
+        if (unlikely(shutting_down))
+            aclk_query_free(query);
+        else
+            aclk_run_query(config, query);
     }
 
     (void) JudyLFreeArray(&aclk_query_batch->JudyL, PJE0);
@@ -514,9 +524,15 @@ static void after_start_alert_push(uv_work_t *req, int status __maybe_unused)
 }
 
 // Worker thread to scan hosts for pending metadata to store
-static void start_alert_push(uv_work_t *req __maybe_unused)
+static void start_alert_push(uv_work_t *req)
 {
     register_libuv_worker_jobs();
+
+    struct worker_data *worker = req->data;
+    struct aclk_sync_config_s *config = worker->config;
+
+    if (unlikely(__atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED)))
+        return;
 
     worker_is_busy(UV_EVENT_ACLK_NODE_INFO);
     aclk_check_node_info_and_collectors();
@@ -903,7 +919,7 @@ static void aclk_synchronization_event_loop(void *arg)
     const size_t log_every_iterations = (10 * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
     const size_t watchdog_iterations = (ACLK_SHUTDOWN_WATCHDOG_TIMEOUT_SECONDS * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
 
-    while (ACLK_JOBS_ARE_RUNNING) {
+    while (ACLK_JOBS_ARE_RUNNING || uv_loop_alive(loop)) {
         (void)uv_run(loop, UV_RUN_NOWAIT);
 
         shutdown_wait_iterations++;
