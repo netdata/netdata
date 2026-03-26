@@ -1477,6 +1477,9 @@ void datafile_delete(
     bool disk_time,
     bool worker)
 {
+    unsigned tier = ctx->config.tier;
+    unsigned fileno = datafile->fileno;
+
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
@@ -1497,7 +1500,7 @@ void datafile_delete(
                 netdata_log_error("DBENGINE: tier %d: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
                                   " could not be acquired for deletion after %zu attempts (%u lockers remain)"
                                   " - will retry on next rotation",
-                                  ctx->config.tier, datafile->tier, datafile->fileno, attempts, datafile->users.lockers);
+                                  tier, tier, fileno, attempts, datafile->users.lockers);
 
                 if(worker)
                     worker_is_idle();
@@ -1507,7 +1510,7 @@ void datafile_delete(
 
             netdata_log_info("DBENGINE: tier %d: waiting for " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
                          " to be available for deletion, in use by %u users.",
-                 ctx->config.tier, datafile->tier, datafile->fileno, datafile->users.lockers);
+                 tier, tier, fileno, datafile->users.lockers);
 
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_deletion_spin, 1, __ATOMIC_RELAXED);
             sleep_usec(1 * USEC_PER_SEC);
@@ -1526,16 +1529,14 @@ void datafile_delete(
 
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_deletion_started, 1, __ATOMIC_RELAXED);
     netdata_log_info("DBENGINE: tier %d: deleting " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " to maintain %s.",
-                     ctx->config.tier, datafile->tier, datafile->fileno, disk_time ? "disk quota" : "time retention");
+                     tier, tier, fileno, disk_time ? "disk quota" : "time retention");
 
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE);
 
     struct rrdengine_journalfile *journal_file;
     size_t deleted_bytes, journal_file_bytes, datafile_bytes;
-    unsigned tier = datafile->tier;
-    unsigned fileno = datafile->fileno;
-    int deleted_journal_files = 0;
+    uint8_t deleted_journal_files = 0;
     bool deleted_datafile = false;
     int ret;
 
@@ -1580,7 +1581,7 @@ void datafile_delete(
 
     if (del_ndf && del_njf && del_njfv2)
         netdata_log_info("DBENGINE: tier %d: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf, .njfv2), reclaimed %s.",
-                         ctx->config.tier, tier, fileno, size_for_humans);
+                         tier, tier, fileno, size_for_humans);
     else if (del_ndf || del_njf || del_njfv2) {
         BUFFER *removed = buffer_create(0, NULL);
         BUFFER *failed = buffer_create(0, NULL);
@@ -1598,14 +1599,14 @@ void datafile_delete(
 
         netdata_log_error("DBENGINE: tier %d: partial delete of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
                           " - removed: %s, failed: %s, reclaimed %s.",
-                          ctx->config.tier, tier, fileno,
+                          tier, tier, fileno,
                           buffer_tostring(removed), buffer_tostring(failed), size_for_humans);
         buffer_free(removed);
         buffer_free(failed);
     }
     else
         netdata_log_error("DBENGINE: tier %d: failed to delete " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " to maintain %s.",
-                          ctx->config.tier, tier, fileno, disk_time ? "disk quota" : "time retention");
+                          tier, tier, fileno, disk_time ? "disk quota" : "time retention");
 }
 
 static void *database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
@@ -1963,7 +1964,7 @@ static struct rrdengine_datafile *release_and_aquire_next_datafile_for_indexing(
             return datafile;
         }
         nd_log_daemon(NDLP_INFO, "DBENGINE: tier %d: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " cannot be locked for indexing after retries; skipping",
-                      ctx->config.tier, datafile->tier, datafile->fileno);
+                      ctx->config.tier, ctx->config.tier, datafile->fileno);
         datafile = get_next_datafile(datafile, NULL, true);
     }
     netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
@@ -1991,7 +1992,7 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
             nd_log_daemon(NDLP_NOTICE,
                    "DBENGINE: tier %d: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
                    " needs to be indexed, but it has writers working on it - skipping it for now",
-                   ctx->config.tier, datafile->tier, datafile->fileno);
+                   ctx->config.tier, ctx->config.tier, datafile->fileno);
             continue;
         }
 
@@ -2003,7 +2004,7 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
             break;
         }
         nd_log_daemon(NDLP_INFO, "DBENGINE: tier %d: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " is ready to be indexed",
-                      ctx->config.tier, datafile->tier, datafile->fileno);
+                      ctx->config.tier, ctx->config.tier, datafile->fileno);
 
         pgc_open_cache_to_journal_v2(
             open_cache,

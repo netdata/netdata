@@ -135,7 +135,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
 
     if(marked_pending)
         netdata_log_info("DBENGINE: tier %d: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " is pending deletion (%s)",
-                         datafile_ctx(df)->config.tier, df->tier, df->fileno, is_shutdown ? "shutdown" : "runtime");
+                         datafile_ctx(df)->config.tier, datafile_ctx(df)->config.tier, df->fileno, is_shutdown ? "shutdown" : "runtime");
 
     if(can_be_deleted)
         return true;
@@ -159,7 +159,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
         if(df->users.available) {
             df->users.available = false;
             netdata_log_info("DBENGINE: tier %d: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " entered deletion phase-2 (new users blocked)",
-                             datafile_ctx(df)->config.tier, df->tier, df->fileno);
+                             datafile_ctx(df)->config.tier, datafile_ctx(df)->config.tier, df->fileno);
         }
 
         if(!df->users.lockers)
@@ -606,7 +606,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
 
     nd_log(NDLS_DAEMON, NDLP_INFO,
            "DBENGINE: tier %d: created " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf).",
-           ctx->config.tier, datafile->tier, datafile->fileno);
+           ctx->config.tier, ctx->config.tier, datafile->fileno);
 
     ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
     datafile_list_insert(ctx, datafile);

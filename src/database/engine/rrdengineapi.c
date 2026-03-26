@@ -1143,6 +1143,7 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
     if(__atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED) == LONG_MAX)
         __atomic_store_n(&ctx->atomic.first_time_s, now_realtime_sec(), __ATOMIC_RELAXED);
 
+    // Keep stale errno values from leaking into this informational readiness log.
     errno_clear();
     netdata_log_info("DBENGINE: tier %d: ready for data collection and queries", ctx->config.tier);
 }
