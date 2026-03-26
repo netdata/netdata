@@ -50,7 +50,7 @@ You need **Admin** role in your Space to remove nodes. The CLI method requires a
 1. Stop the Netdata Agent on the node you want to remove
 2. In Netdata Cloud, go to **Space Settings > Nodes**
    :::note
-   To access Space Settings, click the ⚙️ (cog) icon above your profile icon.
+   To access Space Settings, click the ⚙️ (cog) icon below the spaces list.
    :::
 3. Locate the offline node in the list
 4. Select the trash icon to remove it
