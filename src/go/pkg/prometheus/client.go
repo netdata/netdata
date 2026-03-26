@@ -21,10 +21,11 @@ import (
 type (
 	// Prometheus is a helper for scrape and parse prometheus format metrics.
 	Prometheus interface {
-		// ScrapeSeries and parse prometheus format metrics
-		Scrape() (promscrapemodel.Samples, error)
+		// Scrape fetches and returns assembled metric families.
+		Scrape() (MetricFamilies, error)
+		// ScrapeStream fetches and streams final-classified samples to the callback.
+		ScrapeStream(func(promscrapemodel.Sample) error) error
 		ScrapeSeries() (Series, error)
-		ScrapeLegacy() (MetricFamilies, error)
 		HTTPClient() *http.Client
 	}
 
@@ -37,6 +38,7 @@ type (
 
 		parser       promTextParser
 		scrapeParser promscrapemodel.Parser
+		assembler    Assembler
 
 		buf     *bytes.Buffer
 		gzipr   *gzip.Reader
@@ -75,14 +77,31 @@ func (p *prometheus) HTTPClient() *http.Client {
 	return p.client
 }
 
-func (p *prometheus) Scrape() (promscrapemodel.Samples, error) {
-	p.buf.Reset()
-
-	if err := p.fetch(p.buf); err != nil {
+func (p *prometheus) Scrape() (MetricFamilies, error) {
+	body, err := p.fetchScrapeBody()
+	if err != nil {
 		return nil, err
 	}
 
-	return p.scrapeParser.Parse(p.buf.Bytes())
+	p.assembler.beginCycle()
+
+	if err := p.scrapeParser.ParseStreamWithMeta(
+		body,
+		func(name, help string) {
+			p.assembler.applyHelp(name, help)
+		},
+		func(sample promscrapemodel.Sample) error {
+			return p.assembler.ApplySample(sample)
+		},
+	); err != nil {
+		return nil, err
+	}
+
+	return p.assembler.MetricFamilies(), nil
+}
+
+func (p *prometheus) ScrapeStream(onSample func(promscrapemodel.Sample) error) error {
+	return p.scrapeStreamWithMeta(nil, onSample)
 }
 
 // ScrapeSeries scrapes metrics, parses and sorts
@@ -96,14 +115,23 @@ func (p *prometheus) ScrapeSeries() (Series, error) {
 	return p.parser.parseToSeries(p.buf.Bytes())
 }
 
-func (p *prometheus) ScrapeLegacy() (MetricFamilies, error) {
+func (p *prometheus) scrapeStreamWithMeta(onHelp func(name, help string), onSample func(promscrapemodel.Sample) error) error {
+	body, err := p.fetchScrapeBody()
+	if err != nil {
+		return err
+	}
+
+	return p.scrapeParser.ParseStreamWithMeta(body, onHelp, onSample)
+}
+
+func (p *prometheus) fetchScrapeBody() ([]byte, error) {
 	p.buf.Reset()
 
 	if err := p.fetch(p.buf); err != nil {
 		return nil, err
 	}
 
-	return p.parser.parseToMetricFamilies(p.buf.Bytes())
+	return p.buf.Bytes(), nil
 }
 
 func (p *prometheus) fetch(w io.Writer) error {

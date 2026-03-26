@@ -20,6 +20,13 @@
   - first successful schema for an exported histogram/summary metric name is the schema lock
   - later schema drift is invalid in the initial implementation
   - for Prometheus phase 1, summary quantile schema is established from the first grouped summary observation before the first quantile-bearing write
+  - shared `pkg/prometheus` currently implements:
+    - `Scrape() -> MetricFamilies`
+    - `ScrapeStream(func(promscrapemodel.Sample) error) error`
+    - `ScrapeSeries()`
+  - `ScrapeLegacy()` is no longer part of the active shared surface
+  - current implementation still buffers the full response body before parse
+  - current public streaming callback receives final-classified owned samples
 
 ## Document Authority
 
@@ -161,23 +168,21 @@ Reason:
 ### Ownership and lifetime
 
 - Specification:
-  - The parser is single-pass.
-  - Samples are exposed in scrape order exactly once.
-  - Parser-owned backing memory is scratch memory.
-  - Sample name bytes, label values, and any parser-owned scratch are only guaranteed until the next parser advance.
-  - Downstream code must copy only when it needs to retain data beyond the current iteration.
+  - The parser is single-pass internally.
+  - The public `ScrapeStream(...)` callback receives final-classified owned `Sample` values in scrape order.
+  - Internal parser scratch memory may be reused aggressively, but current public callback samples are safe to retain after callback return.
 - Facts:
-  - This matches the reuse-oriented style in the current Netdata parser.
-  - This also mirrors the lifetime style of upstream `textparse.Parser`, which invalidates returned byte slices after the next `Next()`.
+  - This differs from upstream `textparse.Parser` lifetime style because the current shared streaming API materializes owned samples before callback.
+  - This is the currently implemented behavior and should be treated as the active contract unless changed explicitly.
 
 ### Allocation and reuse
 
 - Specification:
-  - No mandatory per-sample heap allocation in steady state.
-  - The parser may grow slices or symbol tables when capacity is insufficient, but steady-state processing should reuse already allocated backing storage.
-  - The parser may use internal object reuse aggressively even if the internals are not pretty.
+  - Current implementation still copies labels into owned callback samples and then again into assembled `MetricFamilies`.
+  - Stronger no-per-sample-allocation goals remain a performance target, not a claim about the current implementation.
+  - The parser and assembler should still reuse backing storage aggressively where possible.
 - Facts:
-  - This matches the user’s stated performance requirement.
+  - The current implementation is intentionally benchmark-first from here: parser/assembler benchmarks should drive the next optimization pass.
 
 ### Label rules
 

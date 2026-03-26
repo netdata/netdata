@@ -65,7 +65,7 @@ func TestPrometheusPlain(t *testing.T) {
 	verifyTestData(t, res)
 }
 
-func TestPrometheusScrapeModel(t *testing.T) {
+func TestPrometheusScrapeStream(t *testing.T) {
 	tests := map[string]struct {
 		selectorExpr string
 		verify       func(t *testing.T, samples promscrapemodel.Samples)
@@ -111,11 +111,175 @@ func TestPrometheusScrapeModel(t *testing.T) {
 				prom = New(http.DefaultClient, req)
 			}
 
+			var res promscrapemodel.Samples
+			err := prom.ScrapeStream(func(sample promscrapemodel.Sample) error {
+				res.Add(sample)
+				return nil
+			})
+			require.NoError(t, err)
+			test.verify(t, res)
+		})
+	}
+}
+
+func TestPrometheusScrapeMetricFamilies(t *testing.T) {
+	tests := map[string]struct {
+		payload []byte
+		verify  func(t *testing.T, mfs MetricFamilies)
+	}{
+		"plain": {
+			payload: testData,
+			verify: func(t *testing.T, mfs MetricFamilies) {
+				require.NotEmpty(t, mfs)
+
+				mf := mfs.GetSummary("go_gc_duration_seconds")
+				require.NotNil(t, mf)
+				assert.NotEmpty(t, mf.Help())
+				require.NotEmpty(t, mf.Metrics())
+				assert.NotEmpty(t, mf.Metrics()[0].Summary().Quantiles())
+			},
+		},
+		"help": {
+			payload: []byte(`
+# HELP test_metric Test Metric
+# TYPE test_metric gauge
+test_metric{label="value"} 1
+`),
+			verify: func(t *testing.T, mfs MetricFamilies) {
+				require.NotEmpty(t, mfs)
+				mf := mfs.GetGauge("test_metric")
+				require.NotNil(t, mf)
+				assert.Equal(t, "Test Metric", mf.Help())
+			},
+		},
+		"keeps explicit sum and count counters": {
+			payload: []byte(`
+# TYPE handler_latency_test_sum counter
+handler_latency_test_sum{label="value"} 2
+# TYPE handler_latency_test_count counter
+handler_latency_test_count{label="value"} 3
+`),
+			verify: func(t *testing.T, mfs MetricFamilies) {
+				require.NotEmpty(t, mfs)
+
+				sum := mfs.GetCounter("handler_latency_test_sum")
+				require.NotNil(t, sum)
+				require.Len(t, sum.Metrics(), 1)
+				assert.Equal(t, 2.0, sum.Metrics()[0].Counter().Value())
+
+				count := mfs.GetCounter("handler_latency_test_count")
+				require.NotNil(t, count)
+				require.Len(t, count.Metrics(), 1)
+				assert.Equal(t, 3.0, count.Metrics()[0].Counter().Value())
+			},
+		},
+		"keeps malformed quantile and bucket labels with zero value": {
+			payload: []byte(`
+# TYPE bad_summary summary
+bad_summary{label="value",quantile="nope"} 2
+# TYPE bad_histogram histogram
+bad_histogram_bucket{label="value",le="nope"} 3
+`),
+			verify: func(t *testing.T, mfs MetricFamilies) {
+				require.NotEmpty(t, mfs)
+
+				summary := mfs.GetSummary("bad_summary")
+				require.NotNil(t, summary)
+				require.Len(t, summary.Metrics(), 1)
+				require.NotNil(t, summary.Metrics()[0].Summary())
+				assert.Equal(t, []Quantile{{quantile: 0, value: 2}}, summary.Metrics()[0].Summary().Quantiles())
+
+				histogram := mfs.GetHistogram("bad_histogram")
+				require.NotNil(t, histogram)
+				require.Len(t, histogram.Metrics(), 1)
+				require.NotNil(t, histogram.Metrics()[0].Histogram())
+				assert.Equal(t, []Bucket{{upperBound: 0, cumulativeCount: 3}}, histogram.Metrics()[0].Histogram().Buckets())
+			},
+		},
+		"keeps malformed typed summary and histogram bases structured": {
+			payload: []byte(`
+# TYPE malformed_summary summary
+malformed_summary{label="value"} 4
+# TYPE malformed_histogram histogram
+malformed_histogram{label="value"} 5
+`),
+			verify: func(t *testing.T, mfs MetricFamilies) {
+				require.NotEmpty(t, mfs)
+
+				summary := mfs.GetSummary("malformed_summary")
+				require.NotNil(t, summary)
+				require.Len(t, summary.Metrics(), 1)
+				assert.NotNil(t, summary.Metrics()[0].Summary())
+				assert.Nil(t, summary.Metrics()[0].Untyped())
+
+				histogram := mfs.GetHistogram("malformed_histogram")
+				require.NotNil(t, histogram)
+				require.Len(t, histogram.Metrics(), 1)
+				assert.NotNil(t, histogram.Metrics()[0].Histogram())
+				assert.Nil(t, histogram.Metrics()[0].Untyped())
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tsMux := http.NewServeMux()
+			tsMux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write(test.payload)
+			})
+			ts := httptest.NewServer(tsMux)
+			defer ts.Close()
+
+			req := web.RequestConfig{URL: ts.URL + "/metrics"}
+			prom := New(http.DefaultClient, req)
+
 			res, err := prom.Scrape()
 			require.NoError(t, err)
 			test.verify(t, res)
 		})
 	}
+}
+
+func TestPrometheusScrapeFetchFailurePreservesPreviousResult(t *testing.T) {
+	responses := [][]byte{
+		[]byte(`
+# TYPE test_metric gauge
+test_metric{label="value"} 1
+`),
+		nil,
+	}
+	statuses := []int{http.StatusOK, http.StatusInternalServerError}
+	idx := 0
+
+	tsMux := http.NewServeMux()
+	tsMux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		status := statuses[idx]
+		payload := responses[idx]
+		idx++
+		w.WriteHeader(status)
+		if payload != nil {
+			_, _ = w.Write(payload)
+		}
+	})
+	ts := httptest.NewServer(tsMux)
+	defer ts.Close()
+
+	req := web.RequestConfig{URL: ts.URL + "/metrics"}
+	prom := New(http.DefaultClient, req)
+
+	first, err := prom.Scrape()
+	require.NoError(t, err)
+	require.NotNil(t, first.GetGauge("test_metric"))
+	require.Len(t, first.GetGauge("test_metric").Metrics(), 1)
+	assert.Equal(t, 1.0, first.GetGauge("test_metric").Metrics()[0].Gauge().Value())
+
+	second, err := prom.Scrape()
+	require.Error(t, err)
+	assert.Nil(t, second)
+
+	require.NotNil(t, first.GetGauge("test_metric"))
+	require.Len(t, first.GetGauge("test_metric").Metrics(), 1)
+	assert.Equal(t, 1.0, first.GetGauge("test_metric").Metrics()[0].Gauge().Value())
 }
 
 func TestPrometheusPlainWithSelector(t *testing.T) {

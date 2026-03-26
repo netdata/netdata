@@ -27,9 +27,16 @@ type Parser struct {
 	samples Samples
 	sr      selector.Selector
 
-	familyTypes map[string]model.MetricType
-	pending     map[string][]pendingRef
-	currSeries  labels.Labels
+	familyTypes   map[string]model.MetricType
+	pending       map[string][]pendingRef
+	streamPending []streamPendingSample
+	currSeries    labels.Labels
+}
+
+type streamPendingSample struct {
+	baseName string
+	sample   Sample
+	role     pendingRole
 }
 
 type pendingRole uint8
@@ -98,6 +105,107 @@ func (p *Parser) Parse(text []byte) (Samples, error) {
 	return p.samples, nil
 }
 
+func (p *Parser) ParseStream(text []byte, onSample func(Sample) error) error {
+	return p.parseStream(text, nil, onSample)
+}
+
+func (p *Parser) ParseStreamWithMeta(text []byte, onHelp func(name, help string), onSample func(Sample) error) error {
+	return p.parseStream(text, onHelp, onSample)
+}
+
+func (p *Parser) parseStream(text []byte, onHelp func(name, help string), onSample func(Sample) error) error {
+	p.reset()
+
+	if onSample == nil {
+		return nil
+	}
+
+	pending := p.streamPending[:0]
+
+	parser := textparse.NewPromParser(text, labels.NewSymbolTable())
+	for {
+		entry, err := parser.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if entry == textparse.EntryInvalid && strings.HasPrefix(err.Error(), "invalid metric type") {
+				continue
+			}
+			return fmt.Errorf("failed to parse prometheus metrics: %v", err)
+		}
+
+		switch entry {
+		case textparse.EntryHelp:
+			if onHelp == nil {
+				continue
+			}
+			name, help := parser.Help()
+			onHelp(string(name), sanitizeHelp(string(help)))
+		case textparse.EntryType:
+			name, typ := parser.Type()
+			baseName := string(name)
+			p.familyTypes[baseName] = typ
+			var err error
+			pending, err = emitResolvedPendingStream(pending, baseName, typ, onSample)
+			if err != nil {
+				return err
+			}
+		case textparse.EntrySeries:
+			p.currSeries = p.currSeries[:0]
+			parser.Metric(&p.currSeries)
+
+			if p.sr != nil && !p.sr.Matches(p.currSeries) {
+				continue
+			}
+
+			_, _, value := parser.Series()
+
+			sample, baseName, role, ok := p.makeSample(value)
+			if !ok {
+				continue
+			}
+
+			switch sample.Kind {
+			case SampleKindSummaryQuantile:
+				var err error
+				pending, err = emitResolvedPendingStream(pending, sample.Name, model.MetricTypeSummary, onSample)
+				if err != nil {
+					return err
+				}
+			case SampleKindHistogramBucket:
+				var err error
+				pending, err = emitResolvedPendingStream(pending, strings.TrimSuffix(sample.Name, bucketSuffix), model.MetricTypeHistogram, onSample)
+				if err != nil {
+					return err
+				}
+			}
+
+			if role != pendingNone {
+				pending = append(pending, streamPendingSample{
+					baseName: baseName,
+					sample:   sample,
+					role:     role,
+				})
+				continue
+			}
+
+			if err := onSample(sample); err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, pendingSample := range pending {
+		if err := onSample(pendingSample.sample); err != nil {
+			return err
+		}
+	}
+	p.streamPending = pending[:0]
+
+	return nil
+}
+
 func (p *Parser) makeSample(value float64) (Sample, string, pendingRole, bool) {
 	name, ok := metricNameValue(p.currSeries)
 	if !ok {
@@ -133,6 +241,12 @@ func (p *Parser) makeSample(value float64) (Sample, string, pendingRole, bool) {
 	}
 
 	if strings.HasSuffix(name, sumSuffix) {
+		if sample.FamilyType != model.MetricTypeUnknown &&
+			sample.FamilyType != model.MetricTypeSummary &&
+			sample.FamilyType != model.MetricTypeHistogram {
+			return sample, "", pendingNone, true
+		}
+
 		baseName := strings.TrimSuffix(name, sumSuffix)
 		switch p.familyTypes[baseName] {
 		case model.MetricTypeSummary:
@@ -149,6 +263,12 @@ func (p *Parser) makeSample(value float64) (Sample, string, pendingRole, bool) {
 	}
 
 	if strings.HasSuffix(name, countSuffix) {
+		if sample.FamilyType != model.MetricTypeUnknown &&
+			sample.FamilyType != model.MetricTypeSummary &&
+			sample.FamilyType != model.MetricTypeHistogram {
+			return sample, "", pendingNone, true
+		}
+
 		baseName := strings.TrimSuffix(name, countSuffix)
 		switch p.familyTypes[baseName] {
 		case model.MetricTypeSummary:
@@ -219,6 +339,8 @@ func (p *Parser) reset() {
 	for k := range p.pending {
 		delete(p.pending, k)
 	}
+
+	p.streamPending = p.streamPending[:0]
 }
 
 func copyLabelsExcept(lbs labels.Labels, skip string) []labels.Label {
@@ -248,4 +370,51 @@ func hasLabel(lbs labels.Labels, name string) bool {
 		}
 	}
 	return false
+}
+
+func emitResolvedPendingStream(pending []streamPendingSample, baseName string, typ model.MetricType, onSample func(Sample) error) ([]streamPendingSample, error) {
+	if len(pending) == 0 {
+		return pending, nil
+	}
+
+	out := pending[:0]
+	for _, pendingSample := range pending {
+		if pendingSample.baseName != baseName {
+			out = append(out, pendingSample)
+			continue
+		}
+
+		sample := pendingSample.sample
+		sample.FamilyType = typ
+		switch typ {
+		case model.MetricTypeSummary:
+			if pendingSample.role == pendingSum {
+				sample.Kind = SampleKindSummarySum
+			} else {
+				sample.Kind = SampleKindSummaryCount
+			}
+		case model.MetricTypeHistogram:
+			if pendingSample.role == pendingSum {
+				sample.Kind = SampleKindHistogramSum
+			} else {
+				sample.Kind = SampleKindHistogramCount
+			}
+		default:
+			sample.Kind = SampleKindScalar
+			sample.FamilyType = model.MetricTypeUnknown
+		}
+
+		if err := onSample(sample); err != nil {
+			return nil, err
+		}
+	}
+
+	return out, nil
+}
+
+func sanitizeHelp(help string) string {
+	if strings.IndexByte(help, '\n') == -1 {
+		return help
+	}
+	return strings.Join(strings.Fields(help), " ")
 }
