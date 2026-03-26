@@ -45,7 +45,7 @@ jobs:
       - name: Check source files
         id: check-source-files
         if: github.event_name != 'workflow_dispatch'
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -65,7 +65,7 @@ jobs:
       - name: Check build system files
         id: check-build-files
         if: github.event_name != 'workflow_dispatch'
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -90,7 +90,7 @@ jobs:
       - name: Check Docker files
         id: check-docker-files
         if: github.event_name != 'workflow_dispatch'
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -174,7 +174,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -235,11 +235,11 @@ jobs:
       - name: Setup Buildx
         id: prepare
         if: needs.file-check.outputs.run == 'true'
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
       - name: Build Image
         id: build
         if: needs.file-check.outputs.run == 'true'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7
         with:
           platforms: ${{ matrix.platform }}
           tags: netdata/netdata:test
@@ -264,7 +264,7 @@ jobs:
           path: /tmp/build-cache/*
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -312,11 +312,13 @@ jobs:
         id: tag
         run: |
           if [ ${{ github.event_name }} = 'workflow_dispatch' ]; then
-            .github/scripts/gen-docker-tags.py ${{ github.event_name }} ${{ github.event.inputs.version }}
+            .github/scripts/gen-docker-tags.py ${{ github.event_name }} ${INPUT_VERSION}
           else
             .github/scripts/gen-docker-tags.py ${{ github.event_name }} ''
           fi
 
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
   build-images-docker-hub:
     name: Push Images to Docker Hub
     if: github.event_name == 'workflow_dispatch'
@@ -350,20 +352,20 @@ jobs:
       - name: Setup QEMU
         id: qemu
         if: matrix.qemu
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
       - name: Setup Buildx
         id: prepare
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v4
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       - name: Build Image
         id: build
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7
         with:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
@@ -390,7 +392,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -436,11 +438,11 @@ jobs:
           merge-multiple: true
       - name: Setup Buildx
         id: prepare
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v4
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
@@ -453,7 +455,7 @@ jobs:
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
         run: .github/scripts/rotate-docker-tags.sh ${{ needs.gen-tags.outputs.docker_repo }} ${{ needs.gen-tags.outputs.nightly_tag }} ${NIGHTLY_COUNT}
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -508,21 +510,21 @@ jobs:
       - name: Setup QEMU
         id: qemu
         if: matrix.qemu
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
       - name: Setup Buildx
         id: prepare
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v4
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: quay.io
           username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
           password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
       - name: Build Image
         id: build
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7
         with:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
@@ -549,7 +551,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -595,11 +597,11 @@ jobs:
           merge-multiple: true
       - name: Setup Buildx
         id: prepare
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v4
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: quay.io
           username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
@@ -613,7 +615,7 @@ jobs:
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
         run: .github/scripts/rotate-docker-tags.sh ${{ needs.gen-tags.outputs.quay_repo }} ${{ needs.gen-tags.outputs.nightly_tag }} ${NIGHTLY_COUNT}
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -668,21 +670,21 @@ jobs:
       - name: Setup QEMU
         id: qemu
         if: matrix.qemu
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
       - name: Setup Buildx
         id: prepare
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v4
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Image
         id: build
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7
         with:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
@@ -709,7 +711,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -755,11 +757,11 @@ jobs:
           merge-multiple: true
       - name: Setup Buildx
         id: prepare
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v4
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -773,7 +775,7 @@ jobs:
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
         run: .github/scripts/rotate-docker-tags.sh ${{ needs.gen-tags.outputs.ghcr_repo }} ${{ needs.gen-tags.outputs.nightly_tag }} ${NIGHTLY_COUNT}
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -811,7 +813,7 @@ jobs:
       - name: Trigger Helmchart PR
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'
         id: trigger-helmchart
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@7a027648b88c2413826b6ddd6c76114894dc5ec4 # v1
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: netdata/helmchart
@@ -821,7 +823,7 @@ jobs:
       - name: Trigger MSI build
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'
         id: trigger-msi
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@7a027648b88c2413826b6ddd6c76114894dc5ec4 # v1
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: netdata/msi-installer
@@ -829,7 +831,7 @@ jobs:
           ref: refs/heads/master
           inputs: '{"tag": "stable", "pwd": "${{ secrets.MSI_CODE_SIGNING_PASSWORD }}"}'
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

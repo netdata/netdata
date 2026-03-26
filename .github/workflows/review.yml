@@ -117,7 +117,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - name: Run actionlint
-        uses: reviewdog/action-actionlint@v1
+        uses: reviewdog/action-actionlint@0d952c597ef8459f634d7145b0b044a9699e5e43 # v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
@@ -171,7 +171,7 @@ jobs:
         with:
           python-version: "3.10"
       - name: Run flake8
-        uses: reviewdog/action-flake8@v3
+        uses: reviewdog/action-flake8@b65981e158319f08cb7d0132f28bc0081e110adc # v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
@@ -189,7 +189,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Run golangci-lint
-        uses: reviewdog/action-golangci-lint@v2
+        uses: reviewdog/action-golangci-lint@c76cceaaab89abe74e649d2e34c6c9adc26662d2 # v2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
@@ -207,7 +207,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run hadolint
-        uses: reviewdog/action-hadolint@v1
+        uses: reviewdog/action-hadolint@921946a7ebaaf08ac72607bad67209f4e52b5407 # v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
@@ -224,7 +224,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - name: Run shellcheck
-        uses: reviewdog/action-shellcheck@v1
+        uses: reviewdog/action-shellcheck@4c07458293ac342d477251099501a718ae5ef86e # v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
@@ -248,7 +248,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - name: Run yamllint
-        uses: reviewdog/action-yamllint@v1
+        uses: reviewdog/action-yamllint@f01d8a48fd8d89f89895499fca2cff09f9e9e8c0 # v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check

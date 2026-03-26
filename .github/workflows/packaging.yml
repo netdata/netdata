@@ -41,7 +41,7 @@ jobs:
           submodules: recursive
       - name: Check files
         id: check-files
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -112,7 +112,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_ICON_EMOJI: ':github-actions:'
@@ -147,10 +147,10 @@ jobs:
         id: check-version
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            case "${{ github.event.inputs.type }}" in
+            case "${INPUT_TYPE}" in
               "release")
                 echo "repo=${REPO_PREFIX}" >> "${GITHUB_OUTPUT}"
-                echo "version=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
+                echo "version=${INPUT_VERSION}" >> "${GITHUB_OUTPUT}"
                 echo "retention=365" >> "${GITHUB_OUTPUT}"
                 ;;
               "nightly")
@@ -168,8 +168,11 @@ jobs:
             echo "version=$(cut -d'-' -f 1 packaging/version | tr -d 'v')" >> "${GITHUB_OUTPUT}"
             echo "retention=0" >> "${GITHUB_OUTPUT}"
           fi
+        env:
+          INPUT_TYPE: ${{ github.event.inputs.type }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_ICON_EMOJI: ':github-actions:'
@@ -238,7 +241,7 @@ jobs:
       - name: Fetch images
         id: fetch-images
         if: needs.file-check.outputs.run == 'true'
-        uses: nick-invision/retry@v4
+        uses: nick-invision/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         with:
           max_attempts: 3
           retry_wait_seconds: 30
@@ -258,9 +261,12 @@ jobs:
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ needs.version-check.outputs.version }} \
                      -e ENABLE_SENTRY=${{ matrix.bundle_sentry }} -e RELEASE_PIPELINE=${{ env.RELEASE_PIPELINE }} \
                      -e BUILD_DESTINATION=${{ matrix.distro }}${{ matrix.version }}_${{ matrix.arch }} -e UPLOAD_SENTRY=${{ env.UPLOAD_SENTRY }} \
-                     -e SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_CLI_TOKEN }} -e NETDATA_SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
+                     -e SENTRY_AUTH_TOKEN=${SENTRY_CLI_TOKEN} -e NETDATA_SENTRY_DSN=${SENTRY_DSN} \
                      -e GOOS=$(echo ${{ matrix.platform }} | cut -f 1 -d '/') -e GOARCH=$(echo ${{ matrix.platform }} | cut -f 2 -d '/') \
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-${{ matrix.builder_rev }}
+        env:
+          SENTRY_CLI_TOKEN: ${{ secrets.SENTRY_CLI_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       - name: Save Packages
         id: artifacts
         if: needs.file-check.outputs.run == 'true'
@@ -281,7 +287,7 @@ jobs:
       - name: Import GPG Keys
         id: import-keys
         if: needs.file-check.outputs.run == 'true' && matrix.format == 'deb' && github.event_name != 'pull_request'
-        uses: crazy-max/ghaction-import-gpg@v7
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7
         with:
           gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
       - name: Sign DEB Packages
@@ -292,7 +298,7 @@ jobs:
       - name: SSH setup
         id: ssh-setup
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
-        uses: shimataro/ssh-key-action@v2
+        uses: shimataro/ssh-key-action@87a8f067114a8ce263df83e9ed5c849953548bc3 # v2
         with:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
           name: id_ecdsa
@@ -319,7 +325,7 @@ jobs:
           ${{ matrix.format }} \
           ${{ needs.version-check.outputs.repo }}
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_ICON_EMOJI: ':github-actions:'
