@@ -794,10 +794,14 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     size_t cns_size = dim->cns.size();
 
     // The ring buffer modulus is derived from the current effective smoothing
-    // window. Once the ring has been initialized/full, a later change to the
-    // effective window means the existing buffer/head state no longer matches
-    // the current modulus, so rebuild the history before indexing or linearizing it.
-    if (cns_size >= n && (cns_size != n || dim->cns_head >= cns_size)) {
+    // window. When the effective window changes, the existing history is only
+    // reusable if it is still a linear chronological prefix, which in this
+    // representation means cns_head == 0. Wrapped ring state from the old
+    // modulus must be discarded before warmup/indexing/linearization continue.
+    bool invalid_head = (cns_size > 0 && dim->cns_head >= cns_size);
+    bool size_changed_with_wrapped_state = (cns_size != n && dim->cns_head != 0);
+    bool shrunk_below_existing_history = (cns_size > n);
+    if (invalid_head || size_changed_with_wrapped_state || shrunk_below_existing_history) {
         dim->cns.clear();
         dim->cns_head = 0;
         cns_size = 0;
