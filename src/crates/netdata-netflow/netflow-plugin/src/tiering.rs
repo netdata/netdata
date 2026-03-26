@@ -43,46 +43,31 @@ pub(crate) const MATERIALIZED_TIERS: [TierKind; 3] =
 pub(crate) struct FlowMetrics {
     pub(crate) bytes: u64,
     pub(crate) packets: u64,
-    pub(crate) raw_bytes: u64,
-    pub(crate) raw_packets: u64,
 }
 
 impl FlowMetrics {
     pub(crate) fn from_fields(fields: &FlowFields) -> Self {
         let bytes = parse_u64(fields.get("BYTES"));
         let packets = parse_u64(fields.get("PACKETS"));
-        let raw_bytes = parse_u64(fields.get("RAW_BYTES"));
-        let raw_packets = parse_u64(fields.get("RAW_PACKETS"));
 
-        Self {
-            bytes,
-            packets,
-            raw_bytes,
-            raw_packets,
-        }
+        Self { bytes, packets }
     }
 
     pub(crate) fn from_record(rec: &FlowRecord) -> Self {
         Self {
             bytes: rec.bytes,
             packets: rec.packets,
-            raw_bytes: rec.raw_bytes,
-            raw_packets: rec.raw_packets,
         }
     }
 
     pub(crate) fn add(&mut self, other: FlowMetrics) {
         self.bytes = self.bytes.saturating_add(other.bytes);
         self.packets = self.packets.saturating_add(other.packets);
-        self.raw_bytes = self.raw_bytes.saturating_add(other.raw_bytes);
-        self.raw_packets = self.raw_packets.saturating_add(other.raw_packets);
     }
 
     pub(crate) fn write_fields(self, fields: &mut FlowFields) {
         fields.insert("BYTES", self.bytes.to_string());
         fields.insert("PACKETS", self.packets.to_string());
-        fields.insert("RAW_BYTES", self.raw_bytes.to_string());
-        fields.insert("RAW_PACKETS", self.raw_packets.to_string());
     }
 }
 
@@ -104,8 +89,6 @@ const INTERNAL_IN_IF_BOUNDARY_PRESENT: &str = "_IN_IF_BOUNDARY_PRESENT";
 const INTERNAL_OUT_IF_BOUNDARY_PRESENT: &str = "_OUT_IF_BOUNDARY_PRESENT";
 const INTERNAL_SRC_VLAN_PRESENT: &str = "_SRC_VLAN_PRESENT";
 const INTERNAL_DST_VLAN_PRESENT: &str = "_DST_VLAN_PRESENT";
-const INTERNAL_SAMPLING_RATE_PRESENT: &str = "_SAMPLING_RATE_PRESENT";
-
 const ROLLUP_PRESENCE_FIELDS: &[(&str, &str)] = &[
     ("DIRECTION", INTERNAL_DIRECTION_PRESENT),
     ("ETYPE", INTERNAL_ETYPE_PRESENT),
@@ -122,7 +105,6 @@ const ROLLUP_PRESENCE_FIELDS: &[(&str, &str)] = &[
     ("OUT_IF_BOUNDARY", INTERNAL_OUT_IF_BOUNDARY_PRESENT),
     ("SRC_VLAN", INTERNAL_SRC_VLAN_PRESENT),
     ("DST_VLAN", INTERNAL_DST_VLAN_PRESENT),
-    ("SAMPLING_RATE", INTERNAL_SAMPLING_RATE_PRESENT),
 ];
 
 fn rollup_presence_field(field: &str) -> Option<&'static str> {
@@ -418,10 +400,6 @@ const ROLLUP_FIELD_DEFS: &[RollupFieldDef] = &[
         kind: IndexFieldKind::U16,
     },
     RollupFieldDef {
-        name: "SAMPLING_RATE",
-        kind: IndexFieldKind::U64,
-    },
-    RollupFieldDef {
         name: INTERNAL_DIRECTION_PRESENT,
         kind: IndexFieldKind::U8,
     },
@@ -479,10 +457,6 @@ const ROLLUP_FIELD_DEFS: &[RollupFieldDef] = &[
     },
     RollupFieldDef {
         name: INTERNAL_DST_VLAN_PRESENT,
-        kind: IndexFieldKind::U8,
-    },
-    RollupFieldDef {
-        name: INTERNAL_SAMPLING_RATE_PRESENT,
         kind: IndexFieldKind::U8,
     },
 ];
@@ -883,69 +857,61 @@ fn push_rollup_field_ids(
         .push(index.get_or_insert_field_value(56, IndexFieldValue::U16(rec.src_vlan))?);
     scratch_field_ids
         .push(index.get_or_insert_field_value(57, IndexFieldValue::U16(rec.dst_vlan))?);
-    scratch_field_ids
-        .push(index.get_or_insert_field_value(58, IndexFieldValue::U64(rec.sampling_rate))?);
     scratch_field_ids.push(
-        index.get_or_insert_field_value(59, IndexFieldValue::U8(u8::from(rec.has_direction())))?,
+        index.get_or_insert_field_value(58, IndexFieldValue::U8(u8::from(rec.has_direction())))?,
     );
     scratch_field_ids
-        .push(index.get_or_insert_field_value(60, IndexFieldValue::U8(u8::from(rec.has_etype())))?);
+        .push(index.get_or_insert_field_value(59, IndexFieldValue::U8(u8::from(rec.has_etype())))?);
     scratch_field_ids.push(index.get_or_insert_field_value(
-        61,
+        60,
         IndexFieldValue::U8(u8::from(rec.has_forwarding_status())),
     )?);
     scratch_field_ids
-        .push(index.get_or_insert_field_value(62, IndexFieldValue::U8(u8::from(rec.has_iptos())))?);
+        .push(index.get_or_insert_field_value(61, IndexFieldValue::U8(u8::from(rec.has_iptos())))?);
     scratch_field_ids.push(
-        index.get_or_insert_field_value(63, IndexFieldValue::U8(u8::from(rec.has_tcp_flags())))?,
+        index.get_or_insert_field_value(62, IndexFieldValue::U8(u8::from(rec.has_tcp_flags())))?,
     );
     scratch_field_ids.push(
         index
-            .get_or_insert_field_value(64, IndexFieldValue::U8(u8::from(rec.has_icmpv4_type())))?,
+            .get_or_insert_field_value(63, IndexFieldValue::U8(u8::from(rec.has_icmpv4_type())))?,
     );
     scratch_field_ids.push(
         index
-            .get_or_insert_field_value(65, IndexFieldValue::U8(u8::from(rec.has_icmpv4_code())))?,
+            .get_or_insert_field_value(64, IndexFieldValue::U8(u8::from(rec.has_icmpv4_code())))?,
     );
     scratch_field_ids.push(
         index
-            .get_or_insert_field_value(66, IndexFieldValue::U8(u8::from(rec.has_icmpv6_type())))?,
+            .get_or_insert_field_value(65, IndexFieldValue::U8(u8::from(rec.has_icmpv6_type())))?,
     );
     scratch_field_ids.push(
         index
-            .get_or_insert_field_value(67, IndexFieldValue::U8(u8::from(rec.has_icmpv6_code())))?,
+            .get_or_insert_field_value(66, IndexFieldValue::U8(u8::from(rec.has_icmpv6_code())))?,
     );
     scratch_field_ids.push(
         index
-            .get_or_insert_field_value(68, IndexFieldValue::U8(u8::from(rec.has_in_if_speed())))?,
+            .get_or_insert_field_value(67, IndexFieldValue::U8(u8::from(rec.has_in_if_speed())))?,
     );
     scratch_field_ids.push(
         index
-            .get_or_insert_field_value(69, IndexFieldValue::U8(u8::from(rec.has_out_if_speed())))?,
+            .get_or_insert_field_value(68, IndexFieldValue::U8(u8::from(rec.has_out_if_speed())))?,
     );
     scratch_field_ids.push(
         index.get_or_insert_field_value(
-            70,
+            69,
             IndexFieldValue::U8(u8::from(rec.has_in_if_boundary())),
         )?,
     );
     scratch_field_ids.push(
         index.get_or_insert_field_value(
-            71,
+            70,
             IndexFieldValue::U8(u8::from(rec.has_out_if_boundary())),
         )?,
     );
     scratch_field_ids.push(
-        index.get_or_insert_field_value(72, IndexFieldValue::U8(u8::from(rec.has_src_vlan())))?,
+        index.get_or_insert_field_value(71, IndexFieldValue::U8(u8::from(rec.has_src_vlan())))?,
     );
     scratch_field_ids.push(
-        index.get_or_insert_field_value(73, IndexFieldValue::U8(u8::from(rec.has_dst_vlan())))?,
-    );
-    scratch_field_ids.push(
-        index.get_or_insert_field_value(
-            74,
-            IndexFieldValue::U8(u8::from(rec.has_sampling_rate())),
-        )?,
+        index.get_or_insert_field_value(72, IndexFieldValue::U8(u8::from(rec.has_dst_vlan())))?,
     );
     Ok(())
 }
@@ -1123,8 +1089,6 @@ mod tests {
         let m = FlowMetrics::from_fields(&fields);
         assert_eq!(m.bytes, 0);
         assert_eq!(m.packets, 0);
-        assert_eq!(m.raw_bytes, 0);
-        assert_eq!(m.raw_packets, 0);
     }
 
     #[test]
@@ -1132,8 +1096,6 @@ mod tests {
         let mut rec = FlowRecord::default();
         rec.bytes = 12345;
         rec.packets = 67;
-        rec.raw_bytes = 12345;
-        rec.raw_packets = 67;
 
         let fields = rec.to_fields();
         let m_fields = FlowMetrics::from_fields(&fields);
@@ -1183,7 +1145,7 @@ mod tests {
         assert_eq!(fields.get("SRC_COUNTRY").map(String::as_str), Some("US"));
         assert_eq!(fields.get("DST_COUNTRY").map(String::as_str), Some("DE"));
         assert_eq!(fields.get("DIRECTION").map(String::as_str), Some("ingress"));
-        assert_eq!(fields.get("SAMPLING_RATE").map(String::as_str), Some("100"));
+        assert!(fields.get("SAMPLING_RATE").is_none());
     }
 
     #[test]

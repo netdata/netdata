@@ -11,8 +11,9 @@ use anyhow::{Context, Result};
 use chrono::Utc;
 use hashbrown::HashMap as FastHashMap;
 use journal_common::{Seconds, load_machine_id};
-use journal_core::file::JournalFileMap;
-use journal_registry::{FileInfo, Monitor, Registry};
+use journal_core::file::{EntryItemsType, JournalFileMap, Mmap};
+use journal_core::{Direction as JournalDirection, JournalFile, JournalReader, Location};
+use journal_registry::{FileInfo, Monitor, Registry, repository::File as RegistryFile};
 use journal_session::{Direction as SessionDirection, JournalSession};
 use memchr::memchr;
 use netdata_flow_index::{
@@ -27,12 +28,11 @@ use serde_json::{Map, Value, json};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::hash::{Hash, Hasher};
+use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, RwLock};
 use std::time::Instant;
 use tokio::sync::mpsc::UnboundedReceiver;
-use twox_hash::XxHash64;
 
 const DEFAULT_QUERY_WINDOW_SECONDS: u32 = 15 * 60;
 const DEFAULT_QUERY_LIMIT: usize = 25;
@@ -64,7 +64,9 @@ fn default_group_by() -> Vec<String> {
 }
 
 fn supported_flow_field_names() -> impl Iterator<Item = &'static str> {
-    canonical_flow_field_names().chain(VIRTUAL_FLOW_FIELDS.iter().copied())
+    canonical_flow_field_names()
+        .filter(|field| !matches!(*field, "SAMPLING_RATE" | "RAW_BYTES" | "RAW_PACKETS"))
+        .chain(VIRTUAL_FLOW_FIELDS.iter().copied())
 }
 
 const FACET_EXCLUDED_FIELDS: &[&str] = &[
@@ -256,6 +258,8 @@ impl<'de> Deserialize<'de> for FlowsRequest {
                 .unwrap_or_default(),
         };
 
+        validate_selection_fields(&raw.selections).map_err(D::Error::custom)?;
+
         Ok(Self {
             view,
             after: raw.after,
@@ -268,6 +272,18 @@ impl<'de> Deserialize<'de> for FlowsRequest {
             top_n,
         })
     }
+}
+
+fn validate_selection_fields(
+    selections: &HashMap<String, Vec<String>>,
+) -> std::result::Result<(), String> {
+    for field in selections.keys() {
+        if !SELECTION_ALLOWED_FIELDS.contains(field.as_str()) {
+            return Err(format!("unsupported selection field `{field}`"));
+        }
+    }
+
+    Ok(())
 }
 
 impl TopN {
@@ -370,6 +386,9 @@ static GROUP_BY_ALLOWED_FIELDS: LazyLock<HashSet<&'static str>> = LazyLock::new(
         .filter(|field| field_is_groupable(field))
         .collect()
 });
+
+static SELECTION_ALLOWED_FIELDS: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| supported_flow_field_names().collect());
 
 static GROUP_BY_ALLOWED_OPTIONS: LazyLock<Vec<String>> = LazyLock::new(|| {
     supported_flow_field_names()
@@ -590,18 +609,63 @@ struct OpenFacetVocabularyCache {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-enum ProjectedIdentityField {
-    #[default]
-    None,
-    Src,
-    Dst,
-}
-
-#[derive(Clone, Copy, Debug, Default)]
 struct ProjectedPayloadAction {
     group_slot: Option<usize>,
     capture_slot: Option<usize>,
-    identity: ProjectedIdentityField,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ProjectedMetricField {
+    Bytes,
+    Packets,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct ProjectedFieldTargets {
+    metric: Option<ProjectedMetricField>,
+    action: ProjectedPayloadAction,
+}
+
+#[derive(Clone, Debug)]
+struct ProjectedFieldSpec {
+    prefix: u64,
+    mask: u64,
+    key: Vec<u8>,
+    targets: ProjectedFieldTargets,
+}
+
+#[derive(Clone, Debug)]
+struct ProjectedFieldMatchPlan {
+    first_byte_masks: [u64; 256],
+    all_mask: u64,
+    all_keys_fit_prefix: bool,
+}
+
+impl ProjectedFieldMatchPlan {
+    fn new(specs: &[ProjectedFieldSpec]) -> Option<Self> {
+        if specs.is_empty() || specs.len() > u64::BITS as usize {
+            return None;
+        }
+
+        let mut first_byte_masks = [0_u64; 256];
+        for (index, spec) in specs.iter().enumerate() {
+            let first = *spec.key.first()?;
+            first_byte_masks[first as usize] |= 1_u64 << index;
+        }
+
+        let all_mask = if specs.len() == u64::BITS as usize {
+            u64::MAX
+        } else {
+            (1_u64 << specs.len()) - 1
+        };
+        let all_keys_fit_prefix = specs.iter().all(|spec| spec.key.len() <= 8);
+
+        Some(Self {
+            first_byte_masks,
+            all_mask,
+            all_keys_fit_prefix,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -630,6 +694,36 @@ struct ScanCounts {
     streamed_entries: u64,
     matched_entries: usize,
     open_bucket_records: u64,
+}
+
+#[cfg(test)]
+pub(crate) struct RawScanBenchResult {
+    pub(crate) files_opened: u64,
+    pub(crate) rows_read: u64,
+    pub(crate) fields_read: u64,
+    pub(crate) elapsed_usec: u128,
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RawProjectedBenchStage {
+    MatchOnly,
+    MatchAndExtract,
+    MatchExtractAndParseMetrics,
+    GroupAndAccumulate,
+}
+
+#[cfg(test)]
+pub(crate) struct RawProjectedBenchResult {
+    pub(crate) files_opened: u64,
+    pub(crate) rows_read: u64,
+    pub(crate) fields_read: u64,
+    pub(crate) processed_fields: u64,
+    pub(crate) compressed_processed_fields: u64,
+    pub(crate) matched_entries: u64,
+    pub(crate) grouped_rows: u64,
+    pub(crate) work_checksum: u64,
+    pub(crate) elapsed_usec: u128,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
@@ -1295,7 +1389,7 @@ impl FlowQueryService {
         &self,
         setup: &QuerySetup,
         request: &FlowsRequest,
-        grouped_aggregates: &mut CompactGroupAccumulator,
+        grouped_aggregates: &mut ProjectedGroupAccumulator,
     ) -> Result<ScanCounts> {
         let mut counts = ScanCounts::default();
 
@@ -1308,16 +1402,13 @@ impl FlowQueryService {
         let mut row_missing_values = std::iter::repeat_with(|| None)
             .take(setup.effective_group_by.len())
             .collect::<Vec<Option<String>>>();
-        let mut empty_field_ids = vec![None; setup.effective_group_by.len()];
-        let mut projected_capture_fields = HashSet::new();
-        for field in request.selections.keys() {
-            projected_capture_fields.insert(field.to_ascii_uppercase());
-        }
-        for field in &setup.effective_group_by {
-            projected_capture_fields.insert(field.to_ascii_uppercase());
-        }
-        let mut captured_fields = projected_capture_fields.into_iter().collect::<Vec<_>>();
+        let mut captured_fields = request
+            .selections
+            .keys()
+            .map(|field| field.to_ascii_uppercase())
+            .collect::<Vec<_>>();
         captured_fields.sort_unstable();
+        captured_fields.dedup();
         let projected_capture_positions = captured_fields
             .iter()
             .cloned()
@@ -1325,27 +1416,51 @@ impl FlowQueryService {
             .map(|(index, field)| (field, index))
             .collect::<FastHashMap<_, _>>();
         let mut projected_captured_values = vec![None; captured_fields.len()];
-        let mut payload_actions = FastHashMap::new();
+        let mut projected_field_specs = Vec::with_capacity(
+            2 + setup.effective_group_by.len() + projected_capture_positions.len() + 2,
+        );
+        for (metric_key, metric_field) in [
+            (b"BYTES".as_slice(), ProjectedMetricField::Bytes),
+            (b"PACKETS".as_slice(), ProjectedMetricField::Packets),
+        ] {
+            let spec_index = projected_field_spec_index(&mut projected_field_specs, metric_key);
+            projected_field_specs[spec_index].targets.metric = Some(metric_field);
+        }
         for (index, field) in setup.effective_group_by.iter().enumerate() {
-            payload_actions
-                .entry(field.as_bytes().to_vec())
-                .or_insert_with(ProjectedPayloadAction::default)
-                .group_slot = Some(index);
+            let spec_index =
+                projected_field_spec_index(&mut projected_field_specs, field.as_bytes());
+            projected_field_specs[spec_index].targets.action.group_slot = Some(index);
         }
         for (field, field_index) in &projected_capture_positions {
-            payload_actions
-                .entry(field.as_bytes().to_vec())
-                .or_insert_with(ProjectedPayloadAction::default)
+            let spec_index =
+                projected_field_spec_index(&mut projected_field_specs, field.as_bytes());
+            projected_field_specs[spec_index]
+                .targets
+                .action
                 .capture_slot = Some(*field_index);
         }
-        payload_actions
-            .entry(b"SRC_ADDR".to_vec())
-            .or_insert_with(ProjectedPayloadAction::default)
-            .identity = ProjectedIdentityField::Src;
-        payload_actions
-            .entry(b"DST_ADDR".to_vec())
-            .or_insert_with(ProjectedPayloadAction::default)
-            .identity = ProjectedIdentityField::Dst;
+        let projected_match_plan = ProjectedFieldMatchPlan::new(&projected_field_specs);
+        let mut pending_spec_indexes = (0..projected_field_specs.len()).collect::<Vec<_>>();
+
+        if setup
+            .spans
+            .iter()
+            .all(|span| span.span.tier == TierKind::Raw)
+        {
+            return self.scan_matching_grouped_records_projected_raw_direct(
+                setup,
+                request,
+                grouped_aggregates,
+                &prefilter_pairs,
+                &projected_capture_positions,
+                &projected_field_specs,
+                &mut row_group_field_ids,
+                &mut row_missing_values,
+                &mut projected_captured_values,
+                &mut pending_spec_indexes,
+                projected_match_plan.as_ref(),
+            );
+        }
 
         for span in &setup.spans {
             if span.files.is_empty() {
@@ -1397,98 +1512,26 @@ impl FlowQueryService {
                     let _ = value.take();
                 }
                 let mut metrics = FlowMetrics::default();
-                let mut src_hash = None;
-                let mut dst_hash = None;
-                let mut payload_error: Option<anyhow::Error> = None;
-
+                pending_spec_indexes.clear();
+                pending_spec_indexes.extend(0..projected_field_specs.len());
+                let mut remaining = pending_spec_indexes.len();
                 cursor
                     .visit_payloads(|payload| {
-                        if payload_error.is_some() {
-                            return Ok(());
-                        }
-
-                        let result: Result<()> = (|| {
-                        let Some((key_bytes, value_bytes)) = split_payload_bytes(payload) else {
-                            return Ok(());
-                        };
-                        match key_bytes {
-                            b"BYTES" => {
-                                if let Some(value) = parse_u64_ascii(value_bytes) {
-                                    metrics.bytes = value;
-                                }
-                                return Ok(());
-                            }
-                            b"PACKETS" => {
-                                if let Some(value) = parse_u64_ascii(value_bytes) {
-                                    metrics.packets = value;
-                                }
-                                return Ok(());
-                            }
-                            b"RAW_BYTES" => {
-                                if let Some(value) = parse_u64_ascii(value_bytes) {
-                                    metrics.raw_bytes = value;
-                                }
-                                return Ok(());
-                            }
-                            b"RAW_PACKETS" => {
-                                if let Some(value) = parse_u64_ascii(value_bytes) {
-                                    metrics.raw_packets = value;
-                                }
-                                return Ok(());
-                            }
-                            _ => {}
-                        }
-
-                        let Some(action) = payload_actions.get(key_bytes).copied() else {
-                            return Ok(());
-                        };
-
-                        let value = payload_value(value_bytes);
-                        let value_ref = value.as_ref();
-
-                        if let Some(slot) = action.capture_slot {
-                            if !value_ref.is_empty() && projected_captured_values[slot].is_none() {
-                                projected_captured_values[slot] = Some(value_ref.to_string());
-                            }
-                        }
-
-                        if let Some(field_index) = action.group_slot {
-                            if !value_ref.is_empty() {
-                                match grouped_aggregates
-                                    .index
-                                    .find_field_value(field_index, IndexFieldValue::Text(value_ref))
-                                    .context("failed to resolve projected grouped field value from compact query index")?
-                                {
-                                    Some(field_id) => row_group_field_ids[field_index] = Some(field_id),
-                                    None if grouped_aggregates.grouped_total() < self.max_groups => {
-                                        row_missing_values[field_index] = Some(value_ref.to_string());
-                                    }
-                                    None => {}
-                                }
-                            }
-                        }
-
-                        if value_ref.is_empty() {
-                            return Ok(());
-                        }
-                        match action.identity {
-                            ProjectedIdentityField::Src => src_hash = Some(fingerprint_value(value_ref)),
-                            ProjectedIdentityField::Dst => dst_hash = Some(fingerprint_value(value_ref)),
-                            ProjectedIdentityField::None => {}
-                        }
-                        Ok(())
-                        })();
-
-                        if let Err(err) = result {
-                            payload_error = Some(err);
-                        }
-
+                        let _ = apply_projected_payload(
+                            payload,
+                            &projected_field_specs,
+                            &mut pending_spec_indexes,
+                            &mut remaining,
+                            &mut metrics,
+                            grouped_aggregates,
+                            &mut row_group_field_ids,
+                            &mut row_missing_values,
+                            &mut projected_captured_values,
+                            self.max_groups,
+                        );
                         Ok(())
                     })
                     .context("failed to visit projected journal payloads")?;
-                if let Some(err) = payload_error {
-                    return Err(err);
-                }
 
                 if !request.selections.is_empty()
                     && !captured_facet_matches_selections_except(
@@ -1501,7 +1544,7 @@ impl FlowQueryService {
                     continue;
                 }
 
-                accumulate_projected_compact_grouped_record(
+                grouped_aggregates.accumulate_projected(
                     &setup.effective_group_by,
                     timestamp_usec,
                     RecordHandle::JournalRealtime {
@@ -1509,16 +1552,669 @@ impl FlowQueryService {
                         timestamp_usec,
                     },
                     metrics,
-                    grouped_aggregates,
-                    self.max_groups,
                     &mut row_group_field_ids,
                     &mut row_missing_values,
-                    &mut empty_field_ids,
-                    src_hash,
-                    dst_hash,
-                    None,
+                    self.max_groups,
                 )?;
                 counts.matched_entries = counts.matched_entries.saturating_add(1);
+            }
+        }
+
+        Ok(counts)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn benchmark_projected_raw_scan_only(
+        &self,
+        request: &FlowsRequest,
+    ) -> Result<RawScanBenchResult> {
+        let setup = self.prepare_query(request)?;
+        let prefilter_pairs = cursor_prefilter_pairs(&request.selections);
+        let started = Instant::now();
+        let mut result = RawScanBenchResult {
+            files_opened: 0,
+            rows_read: 0,
+            fields_read: 0,
+            elapsed_usec: 0,
+        };
+        let mut data_offsets = Vec::new();
+
+        for span in &setup.spans {
+            if span.span.tier != TierKind::Raw || span.files.is_empty() {
+                continue;
+            }
+
+            let after_usec = (span.span.after as u64).saturating_mul(1_000_000);
+            let before_usec = (span.span.before as u64).saturating_mul(1_000_000);
+
+            for file_path in &span.files {
+                let registry_file = RegistryFile::from_path(file_path).with_context(|| {
+                    format!(
+                        "failed to parse raw journal repository metadata for {}",
+                        file_path.display()
+                    )
+                })?;
+                let journal =
+                    JournalFile::<Mmap>::open(&registry_file, FACET_CACHE_JOURNAL_WINDOW_SIZE)
+                        .with_context(|| {
+                            format!(
+                                "failed to open raw journal file {} for scan-only benchmark",
+                                file_path.display()
+                            )
+                        })?;
+                result.files_opened = result.files_opened.saturating_add(1);
+
+                let mut reader = JournalReader::default();
+                reader.set_location(Location::Head);
+                for pair in &prefilter_pairs {
+                    let match_expr = format!("{}={}", pair.0, pair.1);
+                    reader.add_match(match_expr.as_bytes());
+                }
+
+                loop {
+                    let has_entry = reader
+                        .step(&journal, JournalDirection::Forward)
+                        .with_context(|| {
+                            format!(
+                                "failed to step raw journal reader for {}",
+                                file_path.display()
+                            )
+                        })?;
+                    if !has_entry {
+                        break;
+                    }
+
+                    result.rows_read = result.rows_read.saturating_add(1);
+                    let entry_offset = reader.get_entry_offset().with_context(|| {
+                        format!(
+                            "failed to read current entry offset from {}",
+                            file_path.display()
+                        )
+                    })?;
+                    let entry_guard = journal.entry_ref(entry_offset).with_context(|| {
+                        format!("failed to read current entry from {}", file_path.display())
+                    })?;
+                    let timestamp_usec = entry_guard.header.realtime;
+                    if timestamp_usec < after_usec || timestamp_usec >= before_usec {
+                        continue;
+                    }
+
+                    data_offsets.clear();
+                    match &entry_guard.items {
+                        EntryItemsType::Regular(items) => {
+                            for item in items.iter() {
+                                if let Some(data_offset) = NonZeroU64::new(item.object_offset) {
+                                    data_offsets.push(data_offset);
+                                }
+                            }
+                        }
+                        EntryItemsType::Compact(items) => {
+                            for item in items.iter() {
+                                if let Some(data_offset) =
+                                    NonZeroU64::new(item.object_offset as u64)
+                                {
+                                    data_offsets.push(data_offset);
+                                }
+                            }
+                        }
+                    }
+                    drop(entry_guard);
+
+                    for data_offset in data_offsets.iter().copied() {
+                        let _data_guard = journal.data_ref(data_offset).with_context(|| {
+                            format!("failed to read payload object from {}", file_path.display())
+                        })?;
+                        result.fields_read = result.fields_read.saturating_add(1);
+                    }
+                }
+            }
+        }
+
+        result.elapsed_usec = started.elapsed().as_micros();
+        Ok(result)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn benchmark_projected_raw_stage(
+        &self,
+        request: &FlowsRequest,
+        stage: RawProjectedBenchStage,
+    ) -> Result<RawProjectedBenchResult> {
+        anyhow::ensure!(
+            request.selections.is_empty(),
+            "raw projected stage benchmark only supports empty selections"
+        );
+
+        let setup = self.prepare_query(request)?;
+        anyhow::ensure!(
+            grouped_query_can_use_projected_scan(request),
+            "raw projected stage benchmark requires projected raw grouped query support"
+        );
+
+        let prefilter_pairs = cursor_prefilter_pairs(&request.selections);
+        let mut grouped_aggregates = ProjectedGroupAccumulator::new(&setup.effective_group_by);
+        let mut row_group_field_ids = vec![None; setup.effective_group_by.len()];
+        let mut row_missing_values = std::iter::repeat_with(|| None)
+            .take(setup.effective_group_by.len())
+            .collect::<Vec<Option<String>>>();
+        let projected_capture_positions = FastHashMap::default();
+        let mut projected_captured_values = Vec::new();
+        let mut projected_field_specs =
+            Vec::with_capacity(2 + setup.effective_group_by.len() + 2);
+        for (metric_key, metric_field) in [
+            (b"BYTES".as_slice(), ProjectedMetricField::Bytes),
+            (b"PACKETS".as_slice(), ProjectedMetricField::Packets),
+        ] {
+            let spec_index = projected_field_spec_index(&mut projected_field_specs, metric_key);
+            projected_field_specs[spec_index].targets.metric = Some(metric_field);
+        }
+        for (index, field) in setup.effective_group_by.iter().enumerate() {
+            let spec_index =
+                projected_field_spec_index(&mut projected_field_specs, field.as_bytes());
+            projected_field_specs[spec_index].targets.action.group_slot = Some(index);
+        }
+        let projected_match_plan = ProjectedFieldMatchPlan::new(&projected_field_specs);
+        let mut pending_spec_indexes = (0..projected_field_specs.len()).collect::<Vec<_>>();
+
+        self.benchmark_scan_matching_grouped_records_projected_raw_direct(
+            &setup,
+            request,
+            &mut grouped_aggregates,
+            &prefilter_pairs,
+            &projected_capture_positions,
+            &projected_field_specs,
+            &mut row_group_field_ids,
+            &mut row_missing_values,
+            &mut projected_captured_values,
+            &mut pending_spec_indexes,
+            projected_match_plan.as_ref(),
+            stage,
+        )
+    }
+
+    #[cfg(test)]
+    #[allow(clippy::too_many_arguments)]
+    fn benchmark_scan_matching_grouped_records_projected_raw_direct(
+        &self,
+        setup: &QuerySetup,
+        request: &FlowsRequest,
+        grouped_aggregates: &mut ProjectedGroupAccumulator,
+        prefilter_pairs: &[(String, String)],
+        projected_capture_positions: &FastHashMap<String, usize>,
+        projected_field_specs: &[ProjectedFieldSpec],
+        row_group_field_ids: &mut [Option<u32>],
+        row_missing_values: &mut [Option<String>],
+        projected_captured_values: &mut [Option<String>],
+        pending_spec_indexes: &mut Vec<usize>,
+        projected_match_plan: Option<&ProjectedFieldMatchPlan>,
+        stage: RawProjectedBenchStage,
+    ) -> Result<RawProjectedBenchResult> {
+        let started = Instant::now();
+        let mut result = RawProjectedBenchResult {
+            files_opened: 0,
+            rows_read: 0,
+            fields_read: 0,
+            processed_fields: 0,
+            compressed_processed_fields: 0,
+            matched_entries: 0,
+            grouped_rows: 0,
+            work_checksum: 0,
+            elapsed_usec: 0,
+        };
+        let prefilter_matches = prefilter_pairs
+            .iter()
+            .map(|(field, value)| format!("{field}={value}").into_bytes())
+            .collect::<Vec<_>>();
+        let mut data_offsets = Vec::new();
+        let mut decompress_buf = Vec::new();
+
+        for span in &setup.spans {
+            if span.files.is_empty() {
+                continue;
+            }
+
+            let after_usec = (span.span.after as u64).saturating_mul(1_000_000);
+            let before_usec = (span.span.before as u64).saturating_mul(1_000_000);
+
+            for file_path in &span.files {
+                let registry_file = RegistryFile::from_path(file_path).with_context(|| {
+                    format!(
+                        "failed to parse raw journal repository metadata for {}",
+                        file_path.display()
+                    )
+                })?;
+                let journal =
+                    JournalFile::<Mmap>::open(&registry_file, FACET_CACHE_JOURNAL_WINDOW_SIZE)
+                        .with_context(|| {
+                            format!(
+                                "failed to open raw journal file {} for projected stage benchmark",
+                                file_path.display()
+                            )
+                        })?;
+                result.files_opened = result.files_opened.saturating_add(1);
+
+                let mut reader = JournalReader::default();
+                reader.set_location(Location::Head);
+                for pair in &prefilter_matches {
+                    reader.add_match(pair);
+                }
+
+                loop {
+                    let has_entry = reader
+                        .step(&journal, JournalDirection::Forward)
+                        .with_context(|| {
+                            format!(
+                                "failed to step raw journal reader for {}",
+                                file_path.display()
+                            )
+                        })?;
+                    if !has_entry {
+                        break;
+                    }
+
+                    result.rows_read = result.rows_read.saturating_add(1);
+                    let entry_offset = reader.get_entry_offset().with_context(|| {
+                        format!(
+                            "failed to read current entry offset from {}",
+                            file_path.display()
+                        )
+                    })?;
+                    let entry_guard = journal.entry_ref(entry_offset).with_context(|| {
+                        format!("failed to read current entry from {}", file_path.display())
+                    })?;
+                    let timestamp_usec = entry_guard.header.realtime;
+                    if timestamp_usec < after_usec || timestamp_usec >= before_usec {
+                        continue;
+                    }
+
+                    row_group_field_ids.fill(None);
+                    for value in row_missing_values.iter_mut() {
+                        let _ = value.take();
+                    }
+                    for value in projected_captured_values.iter_mut() {
+                        let _ = value.take();
+                    }
+                    let mut metrics = FlowMetrics::default();
+                    pending_spec_indexes.clear();
+                    pending_spec_indexes.extend(0..projected_field_specs.len());
+                    let mut remaining = pending_spec_indexes.len();
+                    let mut remaining_mask =
+                        projected_match_plan.map(|plan| plan.all_mask).unwrap_or_default();
+
+                    data_offsets.clear();
+                    match &entry_guard.items {
+                        EntryItemsType::Regular(items) => {
+                            for item in items.iter() {
+                                let Some(data_offset) = NonZeroU64::new(item.object_offset) else {
+                                    continue;
+                                };
+                                data_offsets.push(data_offset);
+                            }
+                        }
+                        EntryItemsType::Compact(items) => {
+                            for item in items.iter() {
+                                let Some(data_offset) = NonZeroU64::new(item.object_offset as u64)
+                                else {
+                                    continue;
+                                };
+                                data_offsets.push(data_offset);
+                            }
+                        }
+                    }
+                    drop(entry_guard);
+
+                    for (_position, data_offset) in data_offsets.iter().copied().enumerate() {
+                        let data_guard = journal.data_ref(data_offset).with_context(|| {
+                            format!("failed to read payload object from {}", file_path.display())
+                        })?;
+                        result.fields_read = result.fields_read.saturating_add(1);
+                        if projected_match_plan
+                            .map(|_| remaining_mask == 0)
+                            .unwrap_or(remaining == 0)
+                        {
+                            continue;
+                        }
+                        result.processed_fields = result.processed_fields.saturating_add(1);
+                        let payload = if data_guard.is_compressed() {
+                            result.compressed_processed_fields =
+                                result.compressed_processed_fields.saturating_add(1);
+                            data_guard.decompress(&mut decompress_buf)?;
+                            decompress_buf.as_slice()
+                        } else {
+                            data_guard.raw_payload()
+                        };
+
+                        match stage {
+                            RawProjectedBenchStage::MatchOnly => {
+                                if let Some(match_plan) = projected_match_plan {
+                                    benchmark_apply_projected_payload_planned(
+                                        payload,
+                                        match_plan,
+                                        projected_field_specs,
+                                        &mut remaining_mask,
+                                        false,
+                                        false,
+                                        &mut result.work_checksum,
+                                    );
+                                } else {
+                                    benchmark_apply_projected_payload(
+                                        payload,
+                                        projected_field_specs,
+                                        pending_spec_indexes,
+                                        &mut remaining,
+                                        false,
+                                        false,
+                                        &mut result.work_checksum,
+                                    );
+                                }
+                            }
+                            RawProjectedBenchStage::MatchAndExtract => {
+                                if let Some(match_plan) = projected_match_plan {
+                                    benchmark_apply_projected_payload_planned(
+                                        payload,
+                                        match_plan,
+                                        projected_field_specs,
+                                        &mut remaining_mask,
+                                        false,
+                                        true,
+                                        &mut result.work_checksum,
+                                    );
+                                } else {
+                                    benchmark_apply_projected_payload(
+                                        payload,
+                                        projected_field_specs,
+                                        pending_spec_indexes,
+                                        &mut remaining,
+                                        false,
+                                        true,
+                                        &mut result.work_checksum,
+                                    );
+                                }
+                            }
+                            RawProjectedBenchStage::MatchExtractAndParseMetrics => {
+                                if let Some(match_plan) = projected_match_plan {
+                                    benchmark_apply_projected_payload_planned(
+                                        payload,
+                                        match_plan,
+                                        projected_field_specs,
+                                        &mut remaining_mask,
+                                        true,
+                                        true,
+                                        &mut result.work_checksum,
+                                    );
+                                } else {
+                                    benchmark_apply_projected_payload(
+                                        payload,
+                                        projected_field_specs,
+                                        pending_spec_indexes,
+                                        &mut remaining,
+                                        true,
+                                        true,
+                                        &mut result.work_checksum,
+                                    );
+                                }
+                            }
+                            RawProjectedBenchStage::GroupAndAccumulate => {
+                                if let Some(match_plan) = projected_match_plan {
+                                    apply_projected_payload_planned(
+                                        payload,
+                                        match_plan,
+                                        projected_field_specs,
+                                        &mut remaining_mask,
+                                        &mut metrics,
+                                        grouped_aggregates,
+                                        row_group_field_ids,
+                                        row_missing_values,
+                                        projected_captured_values,
+                                        self.max_groups,
+                                    );
+                                } else {
+                                    apply_projected_payload(
+                                        payload,
+                                        projected_field_specs,
+                                        pending_spec_indexes,
+                                        &mut remaining,
+                                        &mut metrics,
+                                        grouped_aggregates,
+                                        row_group_field_ids,
+                                        row_missing_values,
+                                        projected_captured_values,
+                                        self.max_groups,
+                                    );
+                                }
+                            }
+                        }
+                    }
+
+                    match stage {
+                        RawProjectedBenchStage::MatchOnly
+                        | RawProjectedBenchStage::MatchAndExtract
+                        | RawProjectedBenchStage::MatchExtractAndParseMetrics => {
+                            result.matched_entries = result.matched_entries.saturating_add(1);
+                        }
+                        RawProjectedBenchStage::GroupAndAccumulate => {
+                            if !request.selections.is_empty()
+                                && !captured_facet_matches_selections_except(
+                                    None,
+                                    &request.selections,
+                                    projected_capture_positions,
+                                    projected_captured_values,
+                                )
+                            {
+                                continue;
+                            }
+
+                            grouped_aggregates.accumulate_projected(
+                                &setup.effective_group_by,
+                                timestamp_usec,
+                                RecordHandle::JournalRealtime {
+                                    tier: span.span.tier,
+                                    timestamp_usec,
+                                },
+                                metrics,
+                                row_group_field_ids,
+                                row_missing_values,
+                                self.max_groups,
+                            )?;
+                            result.matched_entries = result.matched_entries.saturating_add(1);
+                        }
+                    }
+                }
+            }
+        }
+
+        result.grouped_rows = grouped_aggregates.grouped_total() as u64;
+        result.elapsed_usec = started.elapsed().as_micros();
+        Ok(result)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn scan_matching_grouped_records_projected_raw_direct(
+        &self,
+        setup: &QuerySetup,
+        request: &FlowsRequest,
+        grouped_aggregates: &mut ProjectedGroupAccumulator,
+        prefilter_pairs: &[(String, String)],
+        projected_capture_positions: &FastHashMap<String, usize>,
+        projected_field_specs: &[ProjectedFieldSpec],
+        row_group_field_ids: &mut [Option<u32>],
+        row_missing_values: &mut [Option<String>],
+        projected_captured_values: &mut [Option<String>],
+        pending_spec_indexes: &mut Vec<usize>,
+        projected_match_plan: Option<&ProjectedFieldMatchPlan>,
+    ) -> Result<ScanCounts> {
+        let mut counts = ScanCounts::default();
+        let prefilter_matches = prefilter_pairs
+            .iter()
+            .map(|(field, value)| format!("{field}={value}").into_bytes())
+            .collect::<Vec<_>>();
+        let mut data_offsets = Vec::new();
+        let mut decompress_buf = Vec::new();
+
+        for span in &setup.spans {
+            if span.files.is_empty() {
+                continue;
+            }
+
+            let after_usec = (span.span.after as u64).saturating_mul(1_000_000);
+            let before_usec = (span.span.before as u64).saturating_mul(1_000_000);
+
+            for file_path in &span.files {
+                let registry_file = RegistryFile::from_path(file_path).with_context(|| {
+                    format!(
+                        "failed to parse raw journal repository metadata for {}",
+                        file_path.display()
+                    )
+                })?;
+                let journal =
+                    JournalFile::<Mmap>::open(&registry_file, FACET_CACHE_JOURNAL_WINDOW_SIZE)
+                        .with_context(|| {
+                            format!(
+                                "failed to open raw journal file {} for projected grouped query",
+                                file_path.display()
+                            )
+                        })?;
+
+                let mut reader = JournalReader::default();
+                reader.set_location(Location::Head);
+                for pair in &prefilter_matches {
+                    reader.add_match(pair);
+                }
+
+                loop {
+                    let has_entry = reader
+                        .step(&journal, JournalDirection::Forward)
+                        .with_context(|| {
+                            format!(
+                                "failed to step raw journal reader for {}",
+                                file_path.display()
+                            )
+                        })?;
+                    if !has_entry {
+                        break;
+                    }
+
+                    counts.streamed_entries = counts.streamed_entries.saturating_add(1);
+                    let entry_offset = reader.get_entry_offset().with_context(|| {
+                        format!(
+                            "failed to read current entry offset from {}",
+                            file_path.display()
+                        )
+                    })?;
+                    let entry_guard = journal.entry_ref(entry_offset).with_context(|| {
+                        format!("failed to read current entry from {}", file_path.display())
+                    })?;
+                    let timestamp_usec = entry_guard.header.realtime;
+                    if timestamp_usec < after_usec || timestamp_usec >= before_usec {
+                        continue;
+                    }
+
+                    row_group_field_ids.fill(None);
+                    for value in row_missing_values.iter_mut() {
+                        let _ = value.take();
+                    }
+                    for value in projected_captured_values.iter_mut() {
+                        let _ = value.take();
+                    }
+                    let mut metrics = FlowMetrics::default();
+                    pending_spec_indexes.clear();
+                    pending_spec_indexes.extend(0..projected_field_specs.len());
+                    let mut remaining = pending_spec_indexes.len();
+                    let mut remaining_mask =
+                        projected_match_plan.map(|plan| plan.all_mask).unwrap_or_default();
+
+                    data_offsets.clear();
+                    match &entry_guard.items {
+                        EntryItemsType::Regular(items) => {
+                            for item in items.iter() {
+                                let Some(data_offset) = NonZeroU64::new(item.object_offset) else {
+                                    continue;
+                                };
+                                data_offsets.push(data_offset);
+                            }
+                        }
+                        EntryItemsType::Compact(items) => {
+                            for item in items.iter() {
+                                let Some(data_offset) = NonZeroU64::new(item.object_offset as u64)
+                                else {
+                                    continue;
+                                };
+                                data_offsets.push(data_offset);
+                            }
+                        }
+                    }
+                    drop(entry_guard);
+
+                    for data_offset in data_offsets.iter().copied() {
+                        let data_guard = journal.data_ref(data_offset).with_context(|| {
+                            format!("failed to read payload object from {}", file_path.display())
+                        })?;
+                        if projected_match_plan
+                            .map(|_| remaining_mask == 0)
+                            .unwrap_or(remaining == 0)
+                        {
+                            continue;
+                        }
+                        let payload = if data_guard.is_compressed() {
+                            data_guard.decompress(&mut decompress_buf)?;
+                            decompress_buf.as_slice()
+                        } else {
+                            data_guard.raw_payload()
+                        };
+                        if let Some(match_plan) = projected_match_plan {
+                            let _ = apply_projected_payload_planned(
+                                payload,
+                                match_plan,
+                                projected_field_specs,
+                                &mut remaining_mask,
+                                &mut metrics,
+                                grouped_aggregates,
+                                row_group_field_ids,
+                                row_missing_values,
+                                projected_captured_values,
+                                self.max_groups,
+                            );
+                        } else {
+                            let _ = apply_projected_payload(
+                                payload,
+                                projected_field_specs,
+                                pending_spec_indexes,
+                                &mut remaining,
+                                &mut metrics,
+                                grouped_aggregates,
+                                row_group_field_ids,
+                                row_missing_values,
+                                projected_captured_values,
+                                self.max_groups,
+                            );
+                        }
+                    }
+
+                    if !request.selections.is_empty()
+                        && !captured_facet_matches_selections_except(
+                            None,
+                            &request.selections,
+                            projected_capture_positions,
+                            projected_captured_values,
+                        )
+                    {
+                        continue;
+                    }
+
+                    grouped_aggregates.accumulate_projected(
+                        &setup.effective_group_by,
+                        timestamp_usec,
+                        RecordHandle::JournalRealtime {
+                            tier: span.span.tier,
+                            timestamp_usec,
+                        },
+                        metrics,
+                        row_group_field_ids,
+                        row_missing_values,
+                        self.max_groups,
+                    )?;
+                    counts.matched_entries = counts.matched_entries.saturating_add(1);
+                }
             }
         }
 
@@ -1529,9 +2225,9 @@ impl FlowQueryService {
         let setup = self.prepare_query(request)?;
         let projected_grouped_scan = grouped_query_can_use_projected_scan(request);
 
-        let mut grouped_aggregates = CompactGroupAccumulator::new(&setup.effective_group_by)?;
         let scan_started = Instant::now();
-        let counts = if projected_grouped_scan {
+        let (counts, build_result, build_elapsed_ms) = if projected_grouped_scan {
+            let mut grouped_aggregates = ProjectedGroupAccumulator::new(&setup.effective_group_by);
             let mut counts = self.scan_matching_grouped_records_projected(
                 &setup,
                 request,
@@ -1558,10 +2254,9 @@ impl FlowQueryService {
                         if !record_matches_selections(record, &request.selections) {
                             continue;
                         }
-                        accumulate_compact_grouped_record(
+                        accumulate_projected_grouped_record_from_record(
                             record,
                             RecordHandle::OpenRowIndex(index),
-                            metrics_from_fields(&record.fields),
                             &setup.effective_group_by,
                             &mut grouped_aggregates,
                             self.max_groups,
@@ -1570,8 +2265,78 @@ impl FlowQueryService {
                     }
                 }
             }
-            counts
+            let scan_elapsed_ms = scan_started.elapsed().as_millis() as u64;
+            let facets_started = Instant::now();
+            let facet_payload = self.facet_vocabulary_payload(request)?;
+            let facets_elapsed_ms = facets_started.elapsed().as_millis() as u64;
+            let build_started = Instant::now();
+            let build_result = self.build_grouped_flows_from_projected_compact(
+                &setup,
+                grouped_aggregates,
+                setup.sort_by,
+                setup.limit,
+            )?;
+            let build_elapsed_ms = build_started.elapsed().as_millis() as u64;
+
+            let mut stats = setup.stats;
+            stats.insert(
+                "query_streamed_entries".to_string(),
+                counts.streamed_entries,
+            );
+            stats.insert("query_reader_path".to_string(), 1);
+            stats.insert(
+                "query_open_bucket_records".to_string(),
+                counts.open_bucket_records,
+            );
+
+            stats.insert(
+                "query_matched_entries".to_string(),
+                counts.matched_entries as u64,
+            );
+            stats.insert(
+                "query_grouped_rows".to_string(),
+                build_result.grouped_total as u64,
+            );
+            stats.insert(
+                "query_returned_rows".to_string(),
+                build_result.flows.len() as u64,
+            );
+            stats.insert("query_group_scan_ms".to_string(), scan_elapsed_ms);
+            stats.insert("query_facet_scan_ms".to_string(), facets_elapsed_ms);
+            stats.insert("query_build_rows_ms".to_string(), build_elapsed_ms);
+            stats.insert(
+                "query_truncated".to_string(),
+                u64::from(build_result.truncated),
+            );
+            stats.insert(
+                "query_other_aggregated".to_string(),
+                u64::from(build_result.other_count > 0),
+            );
+            stats.insert(
+                "query_other_grouped_rows".to_string(),
+                build_result.other_count as u64,
+            );
+            stats.insert(
+                "query_group_overflow_records".to_string(),
+                build_result.overflow_records,
+            );
+            stats.insert("query_facet_overflow_records".to_string(), 0);
+            stats.insert("query_facet_overflow_fields".to_string(), 0);
+
+            let warnings = build_query_warnings(build_result.overflow_records, 0, 0);
+
+            return Ok(FlowQueryOutput {
+                agent_id: self.agent_id.clone(),
+                group_by: setup.effective_group_by.clone(),
+                columns: presentation::build_table_columns(&setup.effective_group_by),
+                flows: build_result.flows,
+                stats,
+                metrics: build_result.metrics.to_map(),
+                warnings,
+                facets: Some(facet_payload),
+            });
         } else {
+            let mut grouped_aggregates = CompactGroupAccumulator::new(&setup.effective_group_by)?;
             let mut accumulate_error = None;
             let records = self.open_records_for_spans(&setup.spans);
             let counts =
@@ -1592,20 +2357,23 @@ impl FlowQueryService {
             if let Some(err) = accumulate_error {
                 return Err(err);
             }
-            counts
+            let build_started = Instant::now();
+            let build_result = self.build_grouped_flows_from_compact(
+                &setup,
+                grouped_aggregates,
+                setup.sort_by,
+                setup.limit,
+            )?;
+            (
+                counts,
+                build_result,
+                build_started.elapsed().as_millis() as u64,
+            )
         };
         let scan_elapsed_ms = scan_started.elapsed().as_millis() as u64;
         let facets_started = Instant::now();
         let facet_payload = self.facet_vocabulary_payload(request)?;
         let facets_elapsed_ms = facets_started.elapsed().as_millis() as u64;
-        let build_started = Instant::now();
-        let build_result = self.build_grouped_flows_from_compact(
-            &setup,
-            grouped_aggregates,
-            setup.sort_by,
-            setup.limit,
-        )?;
-        let build_elapsed_ms = build_started.elapsed().as_millis() as u64;
 
         let mut stats = setup.stats;
         stats.insert(
@@ -1670,7 +2438,7 @@ impl FlowQueryService {
         &self,
         setup: &QuerySetup,
         request: &FlowsRequest,
-        grouped_aggregates: &mut CompactGroupAccumulator,
+        grouped_aggregates: &mut ProjectedGroupAccumulator,
     ) -> Result<Option<(u64, usize)>> {
         if !open_tier_projected_grouped_path_supported(
             &setup.effective_group_by,
@@ -1692,7 +2460,6 @@ impl FlowQueryService {
             let mut row_missing_values = std::iter::repeat_with(|| None)
                 .take(setup.effective_group_by.len())
                 .collect::<Vec<Option<String>>>();
-            let mut empty_field_ids = vec![None; setup.effective_group_by.len()];
 
             if let Some((rows_len, matched_entries)) = self.with_open_tier_rows_for_span(
                 span.span.tier,
@@ -1710,8 +2477,6 @@ impl FlowQueryService {
                             continue;
                         }
 
-                        let representative =
-                            compact_representative_from_open_tier_row(row, tier_flow_indexes);
                         accumulate_projected_open_tier_grouped_record(
                             index,
                             row,
@@ -1721,8 +2486,6 @@ impl FlowQueryService {
                             self.max_groups,
                             &mut row_group_field_ids,
                             &mut row_missing_values,
-                            &mut empty_field_ids,
-                            representative,
                         )?;
                         matched_entries = matched_entries.saturating_add(1);
                     }
@@ -2156,21 +2919,65 @@ impl FlowQueryService {
             &index,
         )?;
 
-        let sessions = if setup.spans.iter().all(|span| span.files.is_empty()) {
-            None
-        } else {
-            Some(self.build_materialization_sessions(&setup.spans)?)
-        };
+        let mut totals = FlowMetrics::default();
+        let mut flows = Vec::with_capacity(rows.len() + usize::from(other.is_some()));
+        for agg in rows {
+            let materialized =
+                self.materialize_compact_aggregate(&setup.effective_group_by, &index, agg)?;
+            totals.add(materialized.metrics);
+            flows.push(flow_value_from_aggregate(materialized));
+        }
+
+        if let Some(other_agg) = other {
+            let materialized = synthetic_aggregate_from_compact(other_agg)?;
+            totals.add(materialized.metrics);
+            flows.push(flow_value_from_aggregate(materialized));
+        }
+
+        Ok(CompactBuildResult {
+            flows,
+            metrics: totals,
+            grouped_total,
+            truncated,
+            other_count,
+            overflow_records,
+        })
+    }
+
+    fn build_grouped_flows_from_projected_compact(
+        &self,
+        setup: &QuerySetup,
+        aggregates: ProjectedGroupAccumulator,
+        sort_by: SortBy,
+        limit: usize,
+    ) -> Result<CompactBuildResult> {
+        let overflow_records = aggregates.overflow.dropped_records;
+        let grouped_total = aggregates.grouped_total();
+        let ProjectedGroupAccumulator {
+            fields,
+            rows: aggregate_rows,
+            overflow,
+            ..
+        } = aggregates;
+        let RankedCompactAggregates {
+            rows,
+            other,
+            truncated,
+            other_count,
+        } = rank_projected_compact_aggregates(
+            aggregate_rows,
+            overflow.aggregate,
+            sort_by,
+            limit,
+            &setup.effective_group_by,
+            &fields,
+        )?;
 
         let mut totals = FlowMetrics::default();
         let mut flows = Vec::with_capacity(rows.len() + usize::from(other.is_some()));
         for agg in rows {
-            let materialized = self.materialize_compact_aggregate(
-                sessions.as_ref(),
-                &setup.effective_group_by,
-                &index,
-                agg,
-            )?;
+            let materialized =
+                self.materialize_projected_compact_aggregate(&setup.effective_group_by, &fields, agg)?;
             totals.add(materialized.metrics);
             flows.push(flow_value_from_aggregate(materialized));
         }
@@ -2193,7 +3000,6 @@ impl FlowQueryService {
 
     fn materialize_compact_aggregate(
         &self,
-        sessions: Option<&HashMap<TierKind, JournalSession>>,
         group_by: &[String],
         index: &FlowIndex,
         agg: CompactAggregatedFlow,
@@ -2202,20 +3008,6 @@ impl FlowQueryService {
             return synthetic_aggregate_from_compact(agg);
         }
 
-        let snapshot = agg.open_representative.clone();
-        let record =
-            if snapshot.is_some() && matches!(agg.representative, RecordHandle::OpenRowIndex(_)) {
-                None
-            } else {
-                self.lookup_record_by_handle(sessions, agg.representative)?
-                    .with_context(|| {
-                        format!(
-                            "failed to materialize representative netflow row for {:?}",
-                            agg.representative
-                        )
-                    })
-                    .map(Some)?
-            };
         let flow_id = agg
             .flow_id
             .context("missing compact flow id for grouped aggregate materialization")?;
@@ -2225,92 +3017,32 @@ impl FlowQueryService {
             first_ts: agg.first_ts,
             last_ts: agg.last_ts,
             metrics: agg.metrics,
-            src_ip: (!agg.src_mixed)
-                .then(|| aggregate_output_field(snapshot.as_ref(), record.as_ref(), "SRC_ADDR"))
-                .flatten(),
-            dst_ip: (!agg.dst_mixed)
-                .then(|| aggregate_output_field(snapshot.as_ref(), record.as_ref(), "DST_ADDR"))
-                .flatten(),
-            src_mixed: agg.src_mixed,
-            dst_mixed: agg.dst_mixed,
             folded_labels: None,
         })
     }
 
-    fn lookup_record_by_handle(
+    fn materialize_projected_compact_aggregate(
         &self,
-        sessions: Option<&HashMap<TierKind, JournalSession>>,
-        handle: RecordHandle,
-    ) -> Result<Option<FlowRecord>> {
-        match handle {
-            RecordHandle::JournalRealtime {
-                tier,
-                timestamp_usec,
-            } => {
-                let Some(session) = sessions.and_then(|sessions| sessions.get(&tier)) else {
-                    return Ok(None);
-                };
-
-                let mut cursor = session
-                    .cursor_builder()
-                    .direction(SessionDirection::Forward)
-                    .since(timestamp_usec)
-                    .until(timestamp_usec)
-                    .build()
-                    .context("failed to build journal cursor for compact row lookup")?;
-
-                if !cursor
-                    .step()
-                    .context("failed to step journal cursor for compact row lookup")?
-                {
-                    return Ok(None);
-                }
-
-                if cursor.realtime_usec() != timestamp_usec {
-                    return Ok(None);
-                }
-
-                let fields = fields_from_cursor_payloads(&mut cursor)
-                    .context("failed to decode compact row payloads")?;
-                Ok(Some(FlowRecord::new(timestamp_usec, fields)))
-            }
-            RecordHandle::OpenRowIndex(_) => Ok(None),
-        }
-    }
-
-    fn build_materialization_sessions(
-        &self,
-        spans: &[PreparedQuerySpan],
-    ) -> Result<HashMap<TierKind, JournalSession>> {
-        let mut files_by_tier = HashMap::<TierKind, Vec<PathBuf>>::new();
-        for span in spans {
-            if span.files.is_empty() {
-                continue;
-            }
-            files_by_tier
-                .entry(span.span.tier)
-                .or_default()
-                .extend(span.files.iter().cloned());
+        group_by: &[String],
+        fields: &ProjectedFieldTable,
+        agg: CompactAggregatedFlow,
+    ) -> Result<AggregatedFlow> {
+        if agg.bucket_label.is_some() {
+            return synthetic_aggregate_from_compact(agg);
         }
 
-        let mut sessions = HashMap::with_capacity(files_by_tier.len());
-        for (tier, mut files) in files_by_tier {
-            files.sort();
-            files.dedup();
-            let session = JournalSession::builder()
-                .files(files)
-                .load_remappings(false)
-                .build()
-                .with_context(|| {
-                    format!(
-                        "failed to open journal session for compact row materialization tier {:?}",
-                        tier
-                    )
-                })?;
-            sessions.insert(tier, session);
-        }
+        let group_field_ids = agg
+            .group_field_ids
+            .as_ref()
+            .context("missing projected compact field ids for grouped aggregate materialization")?;
 
-        Ok(sessions)
+        Ok(AggregatedFlow {
+            labels: labels_for_projected_compact_flow(fields, group_by, group_field_ids)?,
+            first_ts: agg.first_ts,
+            last_ts: agg.last_ts,
+            metrics: agg.metrics,
+            folded_labels: None,
+        })
     }
 }
 
@@ -2334,16 +3066,12 @@ impl FlowRecord {
 struct FlowMetrics {
     bytes: u64,
     packets: u64,
-    raw_bytes: u64,
-    raw_packets: u64,
 }
 
 impl FlowMetrics {
     fn add(&mut self, other: FlowMetrics) {
         self.bytes = self.bytes.saturating_add(other.bytes);
         self.packets = self.packets.saturating_add(other.packets);
-        self.raw_bytes = self.raw_bytes.saturating_add(other.raw_bytes);
-        self.raw_packets = self.raw_packets.saturating_add(other.raw_packets);
     }
 
     fn to_value(self) -> Value {
@@ -2361,12 +3089,6 @@ impl FlowMetrics {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-struct CompactRepresentativeFields {
-    src_ip: Option<String>,
-    dst_ip: Option<String>,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RecordHandle {
     JournalRealtime { tier: TierKind, timestamp_usec: u64 },
@@ -2375,18 +3097,11 @@ enum RecordHandle {
 
 #[derive(Debug, Clone)]
 struct CompactAggregatedFlow {
-    representative: RecordHandle,
     flow_id: Option<IndexedFlowId>,
+    group_field_ids: Option<Vec<u32>>,
     first_ts: u64,
     last_ts: u64,
     metrics: FlowMetrics,
-    src_hash: u64,
-    dst_hash: u64,
-    has_src: bool,
-    has_dst: bool,
-    src_mixed: bool,
-    dst_mixed: bool,
-    open_representative: Option<CompactRepresentativeFields>,
     bucket_label: Option<&'static str>,
     folded_labels: Option<FoldedGroupedLabels>,
 }
@@ -2394,33 +3109,20 @@ struct CompactAggregatedFlow {
 impl CompactAggregatedFlow {
     fn new(
         record: &FlowRecord,
-        handle: RecordHandle,
+        _handle: RecordHandle,
         metrics: FlowMetrics,
         flow_id: IndexedFlowId,
     ) -> Self {
         let mut entry = Self {
-            representative: handle,
             flow_id: Some(flow_id),
+            group_field_ids: None,
             first_ts: 0,
             last_ts: 0,
             metrics: FlowMetrics::default(),
-            src_hash: 0,
-            dst_hash: 0,
-            has_src: false,
-            has_dst: false,
-            src_mixed: false,
-            dst_mixed: false,
-            open_representative: matches!(handle, RecordHandle::OpenRowIndex(_))
-                .then(|| compact_representative_from_record(record)),
             bucket_label: None,
             folded_labels: None,
         };
-        entry.update_projected(
-            record.timestamp_usec,
-            metrics,
-            record_src_fingerprint(record),
-            record_dst_fingerprint(record),
-        );
+        entry.update_projected(record.timestamp_usec, metrics);
         entry
     }
 
@@ -2434,71 +3136,40 @@ impl CompactAggregatedFlow {
 
     fn new_synthetic_bucket(bucket_label: &'static str) -> Self {
         Self {
-            representative: RecordHandle::JournalRealtime {
-                tier: TierKind::Raw,
-                timestamp_usec: 0,
-            },
             flow_id: None,
+            group_field_ids: None,
             first_ts: 0,
             last_ts: 0,
             metrics: FlowMetrics::default(),
-            src_hash: 0,
-            dst_hash: 0,
-            has_src: false,
-            has_dst: false,
-            src_mixed: true,
-            dst_mixed: true,
-            open_representative: None,
             bucket_label: Some(bucket_label),
             folded_labels: Some(FoldedGroupedLabels::default()),
         }
     }
 
     fn new_projected(
-        handle: RecordHandle,
-        flow_id: IndexedFlowId,
+        _handle: RecordHandle,
+        group_field_ids: Vec<u32>,
         timestamp_usec: u64,
         metrics: FlowMetrics,
-        src_hash: Option<u64>,
-        dst_hash: Option<u64>,
-        open_representative: Option<CompactRepresentativeFields>,
     ) -> Self {
         let mut entry = Self {
-            representative: handle,
-            flow_id: Some(flow_id),
+            flow_id: None,
+            group_field_ids: Some(group_field_ids),
             first_ts: 0,
             last_ts: 0,
             metrics: FlowMetrics::default(),
-            src_hash: 0,
-            dst_hash: 0,
-            has_src: false,
-            has_dst: false,
-            src_mixed: false,
-            dst_mixed: false,
-            open_representative,
             bucket_label: None,
             folded_labels: None,
         };
-        entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash);
+        entry.update_projected(timestamp_usec, metrics);
         entry
     }
 
     fn update(&mut self, record: &FlowRecord, metrics: FlowMetrics) {
-        self.update_projected(
-            record.timestamp_usec,
-            metrics,
-            record_src_fingerprint(record),
-            record_dst_fingerprint(record),
-        );
+        self.update_projected(record.timestamp_usec, metrics);
     }
 
-    fn update_projected(
-        &mut self,
-        timestamp_usec: u64,
-        metrics: FlowMetrics,
-        src_hash: Option<u64>,
-        dst_hash: Option<u64>,
-    ) {
+    fn update_projected(&mut self, timestamp_usec: u64, metrics: FlowMetrics) {
         if self.first_ts == 0 || timestamp_usec < self.first_ts {
             self.first_ts = timestamp_usec;
         }
@@ -2506,19 +3177,6 @@ impl CompactAggregatedFlow {
             self.last_ts = timestamp_usec;
         }
         self.metrics.add(metrics);
-
-        merge_prehashed_fingerprint(
-            &mut self.src_hash,
-            &mut self.has_src,
-            &mut self.src_mixed,
-            src_hash,
-        );
-        merge_prehashed_fingerprint(
-            &mut self.dst_hash,
-            &mut self.has_dst,
-            &mut self.dst_mixed,
-            dst_hash,
-        );
     }
 }
 
@@ -2551,6 +3209,205 @@ impl CompactGroupAccumulator {
 
     fn grouped_total(&self) -> usize {
         self.rows.len()
+    }
+}
+
+struct ProjectedFieldTable {
+    value_ids: Vec<FastHashMap<String, u32>>,
+    values: Vec<Vec<String>>,
+}
+
+impl ProjectedFieldTable {
+    fn new(group_by: &[String]) -> Self {
+        let mut value_ids = Vec::with_capacity(group_by.len());
+        let mut values = Vec::with_capacity(group_by.len());
+        for _ in group_by {
+            value_ids.push(FastHashMap::from([(String::new(), 0)]));
+            values.push(vec![String::new()]);
+        }
+        Self { value_ids, values }
+    }
+
+    fn find_field_value(&self, field_index: usize, value: &str) -> Option<u32> {
+        self.value_ids
+            .get(field_index)
+            .and_then(|values| values.get(value).copied())
+    }
+
+    fn get_or_insert_field_value(&mut self, field_index: usize, value: &str) -> u32 {
+        if let Some(field_id) = self.find_field_value(field_index, value) {
+            return field_id;
+        }
+
+        let field_values = &mut self.values[field_index];
+        let field_id = field_values.len() as u32;
+        let owned = value.to_string();
+        field_values.push(owned.clone());
+        self.value_ids[field_index].insert(owned, field_id);
+        field_id
+    }
+
+    fn field_value(&self, field_index: usize, field_id: u32) -> Option<&str> {
+        self.values
+            .get(field_index)
+            .and_then(|values| values.get(field_id as usize))
+            .map(String::as_str)
+    }
+}
+
+struct ProjectedGroupAccumulator {
+    fields: ProjectedFieldTable,
+    rows: Vec<CompactAggregatedFlow>,
+    row_indexes: FastHashMap<Vec<u32>, usize>,
+    scratch_field_ids: Vec<u32>,
+    overflow: CompactGroupOverflow,
+}
+
+impl ProjectedGroupAccumulator {
+    fn new(group_by: &[String]) -> Self {
+        Self {
+            fields: ProjectedFieldTable::new(group_by),
+            rows: Vec::new(),
+            row_indexes: FastHashMap::default(),
+            scratch_field_ids: Vec::with_capacity(group_by.len()),
+            overflow: CompactGroupOverflow::default(),
+        }
+    }
+
+    fn grouped_total(&self) -> usize {
+        self.rows.len()
+    }
+
+    fn find_field_value(&self, field_index: usize, value: &str) -> Option<u32> {
+        self.fields.find_field_value(field_index, value)
+    }
+
+    fn accumulate_projected(
+        &mut self,
+        group_by: &[String],
+        timestamp_usec: u64,
+        handle: RecordHandle,
+        metrics: FlowMetrics,
+        row_group_field_ids: &mut [Option<u32>],
+        row_missing_values: &mut [Option<String>],
+        max_groups: usize,
+    ) -> Result<()> {
+        anyhow::ensure!(
+            row_group_field_ids.len() == row_missing_values.len(),
+            "projected grouped row buffers are misaligned"
+        );
+
+        self.scratch_field_ids.clear();
+        let mut needs_field_inserts = false;
+        for field_index in 0..row_group_field_ids.len() {
+            if let Some(field_id) = row_group_field_ids[field_index] {
+                self.scratch_field_ids.push(field_id);
+                continue;
+            }
+
+            if row_missing_values[field_index].is_some() {
+                needs_field_inserts = true;
+                break;
+            }
+
+            self.scratch_field_ids.push(0);
+        }
+
+        if !needs_field_inserts {
+            if let Some(row_index) = self.row_indexes.get(self.scratch_field_ids.as_slice()) {
+                if let Some(entry) = self.rows.get_mut(*row_index) {
+                    entry.update_projected(timestamp_usec, metrics);
+                    return Ok(());
+                }
+                anyhow::bail!(
+                    "projected grouped index returned missing row for row slot {}",
+                    row_index
+                );
+            }
+
+            if self.grouped_total() >= max_groups {
+                let entry = self
+                    .overflow
+                    .aggregate
+                    .get_or_insert_with(CompactAggregatedFlow::new_overflow);
+                self.overflow.dropped_records = self.overflow.dropped_records.saturating_add(1);
+                let labels = projected_group_labels_from_fields(
+                    &self.fields,
+                    group_by,
+                    row_group_field_ids,
+                    row_missing_values,
+                )?;
+                merge_compact_projected_labels(entry, &labels);
+                entry.update_projected(timestamp_usec, metrics);
+                return Ok(());
+            }
+
+            let row_index = self.rows.len();
+            self.row_indexes
+                .insert(self.scratch_field_ids.clone(), row_index);
+            self.rows.push(CompactAggregatedFlow::new_projected(
+                handle,
+                self.scratch_field_ids.clone(),
+                timestamp_usec,
+                metrics,
+            ));
+            return Ok(());
+        }
+
+        if self.grouped_total() >= max_groups {
+            let entry = self
+                .overflow
+                .aggregate
+                .get_or_insert_with(CompactAggregatedFlow::new_overflow);
+            self.overflow.dropped_records = self.overflow.dropped_records.saturating_add(1);
+            let labels = projected_group_labels_from_fields(
+                &self.fields,
+                group_by,
+                row_group_field_ids,
+                row_missing_values,
+            )?;
+            merge_compact_projected_labels(entry, &labels);
+            entry.update_projected(timestamp_usec, metrics);
+            return Ok(());
+        }
+
+        self.scratch_field_ids.clear();
+        for field_index in 0..row_group_field_ids.len() {
+            let field_id = if let Some(field_id) = row_group_field_ids[field_index] {
+                field_id
+            } else if let Some(value) = row_missing_values[field_index].take() {
+                let field_id = self
+                    .fields
+                    .get_or_insert_field_value(field_index, value.as_str());
+                row_group_field_ids[field_index] = Some(field_id);
+                field_id
+            } else {
+                0
+            };
+            self.scratch_field_ids.push(field_id);
+        }
+
+        if let Some(row_index) = self.row_indexes.get(self.scratch_field_ids.as_slice()) {
+            if let Some(entry) = self.rows.get_mut(*row_index) {
+                entry.update_projected(timestamp_usec, metrics);
+                return Ok(());
+            }
+            anyhow::bail!(
+                "projected grouped index returned missing row for row slot {}",
+                row_index
+            );
+        }
+
+        let row_index = self.rows.len();
+        self.row_indexes
+            .insert(self.scratch_field_ids.clone(), row_index);
+        self.rows.push(CompactAggregatedFlow::new_projected(
+            handle,
+            self.scratch_field_ids.clone(),
+            timestamp_usec,
+            metrics,
+        ));
+        Ok(())
     }
 }
 
@@ -2639,10 +3496,6 @@ struct AggregatedFlow {
     first_ts: u64,
     last_ts: u64,
     metrics: FlowMetrics,
-    src_ip: Option<String>,
-    dst_ip: Option<String>,
-    src_mixed: bool,
-    dst_mixed: bool,
     folded_labels: Option<FoldedGroupedLabels>,
 }
 
@@ -2906,212 +3759,15 @@ fn accumulate_compact_grouped_record(
     Ok(())
 }
 
-fn accumulate_projected_compact_grouped_record(
-    group_by: &[String],
-    timestamp_usec: u64,
-    handle: RecordHandle,
-    metrics: FlowMetrics,
-    aggregates: &mut CompactGroupAccumulator,
-    max_groups: usize,
-    row_group_field_ids: &mut [Option<u32>],
-    row_missing_values: &mut [Option<String>],
-    empty_field_ids: &mut [Option<u32>],
-    src_hash: Option<u64>,
-    dst_hash: Option<u64>,
-    open_representative: Option<CompactRepresentativeFields>,
-) -> Result<()> {
-    anyhow::ensure!(
-        row_group_field_ids.len() == row_missing_values.len()
-            && row_group_field_ids.len() == empty_field_ids.len(),
-        "projected grouped row buffers are misaligned"
-    );
-
-    aggregates.scratch_field_ids.clear();
-    let mut needs_field_inserts = false;
-
-    for field_index in 0..row_group_field_ids.len() {
-        if let Some(field_id) = row_group_field_ids[field_index] {
-            aggregates.scratch_field_ids.push(field_id);
-            continue;
-        }
-
-        if row_missing_values[field_index].is_some() {
-            needs_field_inserts = true;
-            break;
-        }
-
-        let field_id = match empty_field_ids[field_index] {
-            Some(field_id) => field_id,
-            None => match aggregates
-                .index
-                .find_field_value(field_index, IndexFieldValue::Text(""))
-                .context("failed to resolve empty grouped field value from compact query index")?
-            {
-                Some(field_id) => {
-                    empty_field_ids[field_index] = Some(field_id);
-                    field_id
-                }
-                None => {
-                    needs_field_inserts = true;
-                    break;
-                }
-            },
-        };
-        row_group_field_ids[field_index] = Some(field_id);
-        aggregates.scratch_field_ids.push(field_id);
-    }
-
-    if !needs_field_inserts {
-        if let Some(flow_id) = aggregates
-            .index
-            .find_flow_by_field_ids(&aggregates.scratch_field_ids)
-            .context("failed to resolve projected grouped tuple from compact query index")?
-        {
-            if let Some(entry) = aggregates.rows.get_mut(flow_id as usize) {
-                entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash);
-                return Ok(());
-            }
-            anyhow::bail!("compact query index returned missing flow row for flow id {flow_id}");
-        }
-
-        if aggregates.grouped_total() >= max_groups {
-            let entry = aggregates
-                .overflow
-                .aggregate
-                .get_or_insert_with(CompactAggregatedFlow::new_overflow);
-            aggregates.overflow.dropped_records =
-                aggregates.overflow.dropped_records.saturating_add(1);
-            let labels = projected_group_labels(
-                &aggregates.index,
-                group_by,
-                row_group_field_ids,
-                row_missing_values,
-            )?;
-            merge_compact_projected_labels(entry, &labels);
-            entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash);
-            return Ok(());
-        }
-
-        let flow_id = aggregates
-            .index
-            .insert_flow_by_field_ids(&aggregates.scratch_field_ids)
-            .context("failed to store projected grouped tuple into compact query index")?;
-        if flow_id as usize != aggregates.rows.len() {
-            anyhow::bail!(
-                "compact query index returned non-dense flow id {} for row slot {}",
-                flow_id,
-                aggregates.rows.len()
-            );
-        }
-        aggregates.rows.push(CompactAggregatedFlow::new_projected(
-            handle,
-            flow_id,
-            timestamp_usec,
-            metrics,
-            src_hash,
-            dst_hash,
-            open_representative,
-        ));
-        return Ok(());
-    }
-
-    if aggregates.grouped_total() >= max_groups {
-        let entry = aggregates
-            .overflow
-            .aggregate
-            .get_or_insert_with(CompactAggregatedFlow::new_overflow);
-        aggregates.overflow.dropped_records = aggregates.overflow.dropped_records.saturating_add(1);
-        let labels = projected_group_labels(
-            &aggregates.index,
-            group_by,
-            row_group_field_ids,
-            row_missing_values,
-        )?;
-        merge_compact_projected_labels(entry, &labels);
-        entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash);
-        return Ok(());
-    }
-
-    aggregates.scratch_field_ids.clear();
-    for field_index in 0..row_group_field_ids.len() {
-        let field_id = if let Some(field_id) = row_group_field_ids[field_index] {
-            field_id
-        } else if let Some(value) = row_missing_values[field_index].take() {
-            let field_id = aggregates
-                .index
-                .get_or_insert_field_value(field_index, IndexFieldValue::Text(value.as_str()))
-                .context(
-                    "failed to intern projected grouped field value into compact query index",
-                )?;
-            row_group_field_ids[field_index] = Some(field_id);
-            field_id
-        } else {
-            let field_id = match empty_field_ids[field_index] {
-                Some(field_id) => field_id,
-                None => {
-                    let field_id = aggregates
-                        .index
-                        .get_or_insert_field_value(field_index, IndexFieldValue::Text(""))
-                        .context(
-                            "failed to intern empty projected grouped field value into compact query index",
-                        )?;
-                    empty_field_ids[field_index] = Some(field_id);
-                    field_id
-                }
-            };
-            row_group_field_ids[field_index] = Some(field_id);
-            field_id
-        };
-        aggregates.scratch_field_ids.push(field_id);
-    }
-
-    if let Some(flow_id) = aggregates
-        .index
-        .find_flow_by_field_ids(&aggregates.scratch_field_ids)
-        .context("failed to recheck projected grouped tuple from compact query index")?
-    {
-        if let Some(entry) = aggregates.rows.get_mut(flow_id as usize) {
-            entry.update_projected(timestamp_usec, metrics, src_hash, dst_hash);
-            return Ok(());
-        }
-        anyhow::bail!("compact query index returned missing flow row for flow id {flow_id}");
-    }
-
-    let flow_id = aggregates
-        .index
-        .insert_flow_by_field_ids(&aggregates.scratch_field_ids)
-        .context("failed to store projected grouped tuple into compact query index")?;
-    if flow_id as usize != aggregates.rows.len() {
-        anyhow::bail!(
-            "compact query index returned non-dense flow id {} for row slot {}",
-            flow_id,
-            aggregates.rows.len()
-        );
-    }
-
-    aggregates.rows.push(CompactAggregatedFlow::new_projected(
-        handle,
-        flow_id,
-        timestamp_usec,
-        metrics,
-        src_hash,
-        dst_hash,
-        open_representative,
-    ));
-    Ok(())
-}
-
 fn accumulate_projected_open_tier_grouped_record(
     row_index: usize,
     row: &OpenTierRow,
     tier_flow_indexes: &TierFlowIndexStore,
     group_by: &[String],
-    aggregates: &mut CompactGroupAccumulator,
+    aggregates: &mut ProjectedGroupAccumulator,
     max_groups: usize,
     row_group_field_ids: &mut [Option<u32>],
     row_missing_values: &mut [Option<String>],
-    empty_field_ids: &mut [Option<u32>],
-    representative: CompactRepresentativeFields,
 ) -> Result<()> {
     row_group_field_ids.fill(None);
     for value in row_missing_values.iter_mut() {
@@ -3125,11 +3781,7 @@ fn accumulate_projected_open_tier_grouped_record(
             continue;
         }
 
-        match aggregates
-            .index
-            .find_field_value(field_index, IndexFieldValue::Text(value.as_str()))
-            .context("failed to resolve open-tier grouped field value from compact query index")?
-        {
+        match aggregates.find_field_value(field_index, value.as_str()) {
             Some(field_id) => row_group_field_ids[field_index] = Some(field_id),
             None if aggregates.grouped_total() < max_groups => {
                 row_missing_values[field_index] = Some(value);
@@ -3138,24 +3790,56 @@ fn accumulate_projected_open_tier_grouped_record(
         }
     }
 
-    accumulate_projected_compact_grouped_record(
+    aggregates.accumulate_projected(
         group_by,
         row.timestamp_usec,
         RecordHandle::OpenRowIndex(row_index),
         FlowMetrics {
             bytes: row.metrics.bytes,
             packets: row.metrics.packets,
-            raw_bytes: row.metrics.raw_bytes,
-            raw_packets: row.metrics.raw_packets,
         },
-        aggregates,
-        max_groups,
         row_group_field_ids,
         row_missing_values,
-        empty_field_ids,
-        None,
-        None,
-        Some(representative),
+        max_groups,
+    )
+}
+
+fn accumulate_projected_grouped_record_from_record(
+    record: &FlowRecord,
+    handle: RecordHandle,
+    group_by: &[String],
+    aggregates: &mut ProjectedGroupAccumulator,
+    max_groups: usize,
+) -> Result<()> {
+    let mut row_group_field_ids = vec![None; group_by.len()];
+    let mut row_missing_values = std::iter::repeat_with(|| None)
+        .take(group_by.len())
+        .collect::<Vec<Option<String>>>();
+
+    for (field_index, field_name) in group_by.iter().enumerate() {
+        let value = normalized_record_field_value(record, field_name);
+        let value_ref = value.as_ref();
+        if value_ref.is_empty() {
+            continue;
+        }
+
+        match aggregates.find_field_value(field_index, value_ref) {
+            Some(field_id) => row_group_field_ids[field_index] = Some(field_id),
+            None if aggregates.grouped_total() < max_groups => {
+                row_missing_values[field_index] = Some(value.into_owned());
+            }
+            None => {}
+        }
+    }
+
+    aggregates.accumulate_projected(
+        group_by,
+        record.timestamp_usec,
+        handle,
+        metrics_from_fields(&record.fields),
+        &mut row_group_field_ids,
+        &mut row_missing_values,
+        max_groups,
     )
 }
 
@@ -3166,8 +3850,6 @@ fn synthetic_bucket_labels(bucket_label: &'static str) -> BTreeMap<String, Strin
 fn new_bucket_aggregate(bucket_label: &'static str) -> AggregatedFlow {
     AggregatedFlow {
         labels: synthetic_bucket_labels(bucket_label),
-        src_mixed: true,
-        dst_mixed: true,
         folded_labels: Some(FoldedGroupedLabels::default()),
         ..AggregatedFlow::default()
     }
@@ -3185,17 +3867,6 @@ fn update_aggregate_entry(entry: &mut AggregatedFlow, record: &FlowRecord, metri
         entry.last_ts = record.timestamp_usec;
     }
     entry.metrics.add(metrics);
-
-    merge_single_value(
-        &mut entry.src_ip,
-        &mut entry.src_mixed,
-        record.fields.get("SRC_ADDR").map(String::as_str),
-    );
-    merge_single_value(
-        &mut entry.dst_ip,
-        &mut entry.dst_mixed,
-        record.fields.get("DST_ADDR").map(String::as_str),
-    );
 }
 
 fn labels_for_group(record: &FlowRecord, group_by: &[String]) -> BTreeMap<String, String> {
@@ -3232,8 +3903,26 @@ fn labels_for_compact_flow(
     Ok(labels)
 }
 
-fn projected_group_labels(
-    index: &FlowIndex,
+fn labels_for_projected_compact_flow(
+    fields: &ProjectedFieldTable,
+    group_by: &[String],
+    field_ids: &[u32],
+) -> Result<BTreeMap<String, String>> {
+    let mut labels = BTreeMap::new();
+    for (field_index, field_name) in group_by.iter().enumerate() {
+        let field_id = *field_ids
+            .get(field_index)
+            .context("missing projected compact flow field id for grouped query result")?;
+        let value = fields
+            .field_value(field_index, field_id)
+            .context("missing projected compact flow field value for grouped query result")?;
+        labels.insert(field_name.clone(), value.to_string());
+    }
+    Ok(labels)
+}
+
+fn projected_group_labels_from_fields(
+    fields: &ProjectedFieldTable,
     group_by: &[String],
     row_group_field_ids: &[Option<u32>],
     row_missing_values: &[Option<String>],
@@ -3241,10 +3930,10 @@ fn projected_group_labels(
     let mut labels = BTreeMap::new();
     for (field_index, field_name) in group_by.iter().enumerate() {
         let value = if let Some(field_id) = row_group_field_ids[field_index] {
-            index
+            fields
                 .field_value(field_index, field_id)
-                .map(compact_index_value_to_string)
-                .context("missing projected compact flow field value for grouped overflow row")?
+                .context("missing projected compact overflow field value")?
+                .to_string()
         } else if let Some(value) = row_missing_values[field_index].as_ref() {
             value.clone()
         } else {
@@ -3296,6 +3985,28 @@ fn merge_compact_grouped_labels(
     Ok(())
 }
 
+fn merge_projected_compact_grouped_labels(
+    target: &mut CompactAggregatedFlow,
+    group_by: &[String],
+    fields: &ProjectedFieldTable,
+    row: &CompactAggregatedFlow,
+) -> Result<()> {
+    let folded = target
+        .folded_labels
+        .get_or_insert_with(FoldedGroupedLabels::default);
+    if let Some(source) = &row.folded_labels {
+        folded.merge_folded(source);
+        return Ok(());
+    }
+
+    let field_ids = row.group_field_ids.as_ref().context(
+        "missing projected compact field ids while folding grouped labels into synthetic row",
+    )?;
+    let labels = labels_for_projected_compact_flow(fields, group_by, field_ids)?;
+    folded.merge_labels(&labels);
+    Ok(())
+}
+
 fn merge_compact_projected_labels(
     target: &mut CompactAggregatedFlow,
     labels: &BTreeMap<String, String>,
@@ -3334,45 +4045,6 @@ fn group_key_from_labels(labels: &BTreeMap<String, String>) -> GroupKey {
             .map(|(name, value)| (name.clone(), value.clone()))
             .collect(),
     )
-}
-
-fn merge_prehashed_fingerprint(
-    current: &mut u64,
-    initialized: &mut bool,
-    mixed: &mut bool,
-    next_hash: Option<u64>,
-) {
-    if *mixed {
-        return;
-    }
-    let Some(next_hash) = next_hash else {
-        return;
-    };
-
-    if !*initialized {
-        *current = next_hash;
-        *initialized = true;
-    } else if *current != next_hash {
-        *mixed = true;
-    }
-}
-
-fn record_src_fingerprint(record: &FlowRecord) -> Option<u64> {
-    record
-        .fields
-        .get("SRC_ADDR")
-        .map(String::as_str)
-        .filter(|value| !value.is_empty())
-        .map(fingerprint_value)
-}
-
-fn record_dst_fingerprint(record: &FlowRecord) -> Option<u64> {
-    record
-        .fields
-        .get("DST_ADDR")
-        .map(String::as_str)
-        .filter(|value| !value.is_empty())
-        .map(fingerprint_value)
 }
 
 fn accumulate_grouped_labels(
@@ -3440,18 +4112,11 @@ fn open_tier_row_labels(
 
 fn sampled_metrics_from_open_tier_row(
     row: &OpenTierRow,
-    tier_flow_indexes: &TierFlowIndexStore,
+    _: &TierFlowIndexStore,
 ) -> FlowMetrics {
-    let sampling_rate = open_tier_row_field_value(row, tier_flow_indexes, "SAMPLING_RATE")
-        .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(0)
-        .max(1);
-
     FlowMetrics {
-        bytes: row.metrics.bytes.saturating_mul(sampling_rate),
-        packets: row.metrics.packets.saturating_mul(sampling_rate),
-        raw_bytes: row.metrics.raw_bytes.saturating_mul(sampling_rate),
-        raw_packets: row.metrics.raw_packets.saturating_mul(sampling_rate),
+        bytes: row.metrics.bytes,
+        packets: row.metrics.packets,
     }
 }
 
@@ -3481,12 +4146,6 @@ fn accumulate_open_tier_timeseries_grouped_record(
         overflow,
         max_groups,
     );
-}
-
-fn fingerprint_value(value: &str) -> u64 {
-    let mut hasher = XxHash64::default();
-    value.hash(&mut hasher);
-    hasher.finish()
 }
 
 fn compare_aggregated(a: &AggregatedFlow, b: &AggregatedFlow, sort_by: SortBy) -> Ordering {
@@ -3542,6 +4201,41 @@ fn rank_compact_aggregates(
     })
 }
 
+fn rank_projected_compact_aggregates(
+    aggregates: Vec<CompactAggregatedFlow>,
+    overflow: Option<CompactAggregatedFlow>,
+    sort_by: SortBy,
+    limit: usize,
+    group_by: &[String],
+    fields: &ProjectedFieldTable,
+) -> Result<RankedCompactAggregates> {
+    let mut grouped = aggregates;
+    if let Some(overflow_row) = overflow {
+        grouped.push(overflow_row);
+    }
+    grouped.sort_by(|a, b| compare_compact_aggregated(a, b, sort_by));
+
+    let limit = sanitize_explicit_limit(limit);
+    let truncated = grouped.len() > limit;
+    let mut other_count = 0usize;
+    let mut rows = grouped;
+    let mut other = None;
+    if truncated {
+        let rest = rows.split_off(limit);
+        other_count = rest.len();
+        other = Some(merge_other_projected_compact_bucket(
+            rest, group_by, fields,
+        )?);
+    }
+
+    Ok(RankedCompactAggregates {
+        rows,
+        other,
+        truncated,
+        other_count,
+    })
+}
+
 #[cfg(test)]
 fn merge_other_bucket(rows: Vec<AggregatedFlow>) -> AggregatedFlow {
     let mut other = new_bucket_aggregate(OTHER_BUCKET_LABEL);
@@ -3578,6 +4272,25 @@ fn merge_other_compact_bucket(
     Ok(other)
 }
 
+fn merge_other_projected_compact_bucket(
+    rows: Vec<CompactAggregatedFlow>,
+    group_by: &[String],
+    fields: &ProjectedFieldTable,
+) -> Result<CompactAggregatedFlow> {
+    let mut other = CompactAggregatedFlow::new_other();
+    for row in rows {
+        merge_projected_compact_grouped_labels(&mut other, group_by, fields, &row)?;
+        if other.first_ts == 0 || row.first_ts < other.first_ts {
+            other.first_ts = row.first_ts;
+        }
+        if row.last_ts > other.last_ts {
+            other.last_ts = row.last_ts;
+        }
+        other.metrics.add(row.metrics);
+    }
+    Ok(other)
+}
+
 fn synthetic_aggregate_from_compact(agg: CompactAggregatedFlow) -> Result<AggregatedFlow> {
     let bucket_label = agg
         .bucket_label
@@ -3588,24 +4301,12 @@ fn synthetic_aggregate_from_compact(agg: CompactAggregatedFlow) -> Result<Aggreg
         first_ts: agg.first_ts,
         last_ts: agg.last_ts,
         metrics: agg.metrics,
-        src_ip: None,
-        dst_ip: None,
-        src_mixed: true,
-        dst_mixed: true,
         folded_labels: agg.folded_labels,
     })
 }
 
 fn flow_value_from_aggregate(agg: AggregatedFlow) -> Value {
     let mut flow_obj = Map::new();
-    flow_obj.insert(
-        "src".to_string(),
-        aggregated_endpoint_value(agg.src_ip.as_deref(), agg.src_mixed),
-    );
-    flow_obj.insert(
-        "dst".to_string(),
-        aggregated_endpoint_value(agg.dst_ip.as_deref(), agg.dst_mixed),
-    );
     let mut labels = agg.labels;
     if let Some(folded_labels) = &agg.folded_labels {
         folded_labels.render_into(&mut labels);
@@ -3668,6 +4369,360 @@ fn grouped_query_can_use_projected_scan(request: &FlowsRequest) -> bool {
             .all(|values| !values.is_empty() && values.iter().all(|value| !value.is_empty()))
 }
 
+#[inline(always)]
+fn projected_prefix_value(bytes: &[u8]) -> u64 {
+    if bytes.len() >= 8 {
+        return u64::from_le_bytes(bytes[..8].try_into().unwrap());
+    }
+
+    let mut padded = [0_u8; 8];
+    padded[..bytes.len()].copy_from_slice(bytes);
+    u64::from_le_bytes(padded)
+}
+
+#[inline(always)]
+fn projected_prefix_mask(bytes: &[u8]) -> u64 {
+    let prefix_len = bytes.len().min(8);
+    match prefix_len {
+        0 => 0,
+        8 => u64::MAX,
+        _ => (1_u64 << (prefix_len * 8)) - 1,
+    }
+}
+
+#[inline(always)]
+fn projected_match_value<'a>(
+    payload: &'a [u8],
+    payload_prefix: u64,
+    spec: &ProjectedFieldSpec,
+) -> Option<&'a [u8]> {
+    if payload.len() < spec.key.len() + 1 {
+        return None;
+    }
+    if (payload_prefix & spec.mask) != spec.prefix {
+        return None;
+    }
+    if payload[spec.key.len()] != b'=' || !payload.starts_with(spec.key.as_slice()) {
+        return None;
+    }
+
+    Some(&payload[spec.key.len() + 1..])
+}
+
+#[inline(always)]
+fn projected_match_value_prefix_only<'a>(
+    payload: &'a [u8],
+    payload_prefix: u64,
+    spec: &ProjectedFieldSpec,
+) -> Option<&'a [u8]> {
+    if payload.len() < spec.key.len() + 1 {
+        return None;
+    }
+    if (payload_prefix & spec.mask) != spec.prefix {
+        return None;
+    }
+    if payload[spec.key.len()] != b'=' {
+        return None;
+    }
+
+    Some(&payload[spec.key.len() + 1..])
+}
+
+fn projected_field_spec_index(specs: &mut Vec<ProjectedFieldSpec>, key: &[u8]) -> usize {
+    if let Some(index) = specs.iter().position(|spec| spec.key.as_slice() == key) {
+        return index;
+    }
+
+    let index = specs.len();
+    specs.push(ProjectedFieldSpec {
+        prefix: projected_prefix_value(key),
+        mask: projected_prefix_mask(key),
+        key: key.to_vec(),
+        targets: ProjectedFieldTargets::default(),
+    });
+    index
+}
+
+#[inline(always)]
+fn apply_projected_payload(
+    payload: &[u8],
+    projected_field_specs: &[ProjectedFieldSpec],
+    pending_spec_indexes: &mut [usize],
+    remaining: &mut usize,
+    metrics: &mut FlowMetrics,
+    grouped_aggregates: &ProjectedGroupAccumulator,
+    row_group_field_ids: &mut [Option<u32>],
+    row_missing_values: &mut [Option<String>],
+    projected_captured_values: &mut [Option<String>],
+    max_groups: usize,
+) -> Option<usize> {
+    if *remaining == 0 {
+        return None;
+    }
+
+    let payload_prefix = projected_prefix_value(payload);
+    let mut pending_index = 0_usize;
+    while pending_index < *remaining {
+        let spec_index = pending_spec_indexes[pending_index];
+        let spec = &projected_field_specs[spec_index];
+        let Some(value_bytes) = projected_match_value(payload, payload_prefix, spec) else {
+            pending_index += 1;
+            continue;
+        };
+
+        if let Some(metric_field) = spec.targets.metric {
+            match metric_field {
+                ProjectedMetricField::Bytes => {
+                    if let Some(value) = parse_u64_ascii(value_bytes) {
+                        metrics.bytes = value;
+                    }
+                }
+                ProjectedMetricField::Packets => {
+                    if let Some(value) = parse_u64_ascii(value_bytes) {
+                        metrics.packets = value;
+                    }
+                }
+            }
+        }
+
+        let action = spec.targets.action;
+        if action != ProjectedPayloadAction::default() {
+            let value = payload_value(value_bytes);
+            let value_ref = value.as_ref();
+
+            if let Some(capture_slot) = action.capture_slot {
+                if !value_ref.is_empty() && projected_captured_values[capture_slot].is_none() {
+                    projected_captured_values[capture_slot] = Some(value_ref.to_string());
+                }
+            }
+
+            if let Some(field_index) = action.group_slot {
+                if !value_ref.is_empty() {
+                    match grouped_aggregates.find_field_value(field_index, value_ref) {
+                        Some(field_id) => row_group_field_ids[field_index] = Some(field_id),
+                        None if grouped_aggregates.grouped_total() < max_groups => {
+                            row_missing_values[field_index] = Some(value_ref.to_string());
+                        }
+                        None => {}
+                    }
+                }
+            }
+        }
+
+        *remaining -= 1;
+        pending_spec_indexes.swap(pending_index, *remaining);
+        return Some(spec_index);
+    }
+
+    None
+}
+
+#[inline(always)]
+fn apply_projected_payload_planned(
+    payload: &[u8],
+    projected_match_plan: &ProjectedFieldMatchPlan,
+    projected_field_specs: &[ProjectedFieldSpec],
+    remaining_mask: &mut u64,
+    metrics: &mut FlowMetrics,
+    grouped_aggregates: &ProjectedGroupAccumulator,
+    row_group_field_ids: &mut [Option<u32>],
+    row_missing_values: &mut [Option<String>],
+    projected_captured_values: &mut [Option<String>],
+    max_groups: usize,
+) -> Option<usize> {
+    if *remaining_mask == 0 || payload.is_empty() {
+        return None;
+    }
+
+    let mut candidates = projected_match_plan.first_byte_masks[payload[0] as usize] & *remaining_mask;
+    if candidates == 0 {
+        return None;
+    }
+
+    let payload_prefix = projected_prefix_value(payload);
+    while candidates != 0 {
+        let spec_index = candidates.trailing_zeros() as usize;
+        let spec = &projected_field_specs[spec_index];
+        let value_bytes = if projected_match_plan.all_keys_fit_prefix {
+            projected_match_value_prefix_only(payload, payload_prefix, spec)
+        } else {
+            projected_match_value(payload, payload_prefix, spec)
+        };
+        let Some(value_bytes) = value_bytes else {
+            candidates &= candidates - 1;
+            continue;
+        };
+
+        if let Some(metric_field) = spec.targets.metric {
+            match metric_field {
+                ProjectedMetricField::Bytes => {
+                    if let Some(value) = parse_u64_ascii(value_bytes) {
+                        metrics.bytes = value;
+                    }
+                }
+                ProjectedMetricField::Packets => {
+                    if let Some(value) = parse_u64_ascii(value_bytes) {
+                        metrics.packets = value;
+                    }
+                }
+            }
+        }
+
+        let action = spec.targets.action;
+        if action != ProjectedPayloadAction::default() {
+            let value = payload_value(value_bytes);
+            let value_ref = value.as_ref();
+
+            if let Some(capture_slot) = action.capture_slot {
+                if !value_ref.is_empty() && projected_captured_values[capture_slot].is_none() {
+                    projected_captured_values[capture_slot] = Some(value_ref.to_string());
+                }
+            }
+
+            if let Some(field_index) = action.group_slot {
+                if !value_ref.is_empty() {
+                    match grouped_aggregates.find_field_value(field_index, value_ref) {
+                        Some(field_id) => row_group_field_ids[field_index] = Some(field_id),
+                        None if grouped_aggregates.grouped_total() < max_groups => {
+                            row_missing_values[field_index] = Some(value_ref.to_string());
+                        }
+                        None => {}
+                    }
+                }
+            }
+        }
+
+        *remaining_mask &= !(1_u64 << spec_index);
+        return Some(spec_index);
+    }
+
+    None
+}
+
+#[cfg(test)]
+#[inline(always)]
+fn benchmark_apply_projected_payload(
+    payload: &[u8],
+    projected_field_specs: &[ProjectedFieldSpec],
+    pending_spec_indexes: &mut [usize],
+    remaining: &mut usize,
+    parse_metrics: bool,
+    extract_values: bool,
+    work_checksum: &mut u64,
+) -> Option<usize> {
+    if *remaining == 0 {
+        return None;
+    }
+
+    let payload_prefix = projected_prefix_value(payload);
+    let mut pending_index = 0_usize;
+    while pending_index < *remaining {
+        let spec_index = pending_spec_indexes[pending_index];
+        let spec = &projected_field_specs[spec_index];
+        let Some(value_bytes) = projected_match_value(payload, payload_prefix, spec) else {
+            pending_index += 1;
+            continue;
+        };
+
+        *work_checksum = work_checksum
+            .wrapping_add(spec_index as u64)
+            .wrapping_add(value_bytes.len() as u64);
+
+        if parse_metrics {
+            if let Some(metric_field) = spec.targets.metric {
+                if let Some(value) = parse_u64_ascii(value_bytes) {
+                    let salt = match metric_field {
+                        ProjectedMetricField::Bytes => 0x9e37_79b9_u64,
+                        ProjectedMetricField::Packets => 0x85eb_ca6b_u64,
+                    };
+                    *work_checksum = work_checksum.wrapping_add(value ^ salt);
+                }
+            }
+        }
+
+        let action = spec.targets.action;
+        if extract_values && action != ProjectedPayloadAction::default() {
+            let value = payload_value(value_bytes);
+            let value_ref = value.as_ref();
+            *work_checksum = work_checksum
+                .wrapping_add(value_ref.len() as u64)
+                .wrapping_add(value_ref.as_bytes().first().copied().unwrap_or_default() as u64);
+        }
+
+        *remaining -= 1;
+        pending_spec_indexes.swap(pending_index, *remaining);
+        return Some(spec_index);
+    }
+
+    None
+}
+
+#[cfg(test)]
+#[inline(always)]
+fn benchmark_apply_projected_payload_planned(
+    payload: &[u8],
+    projected_match_plan: &ProjectedFieldMatchPlan,
+    projected_field_specs: &[ProjectedFieldSpec],
+    remaining_mask: &mut u64,
+    parse_metrics: bool,
+    extract_values: bool,
+    work_checksum: &mut u64,
+) -> Option<usize> {
+    if *remaining_mask == 0 || payload.is_empty() {
+        return None;
+    }
+
+    let mut candidates = projected_match_plan.first_byte_masks[payload[0] as usize] & *remaining_mask;
+    if candidates == 0 {
+        return None;
+    }
+
+    let payload_prefix = projected_prefix_value(payload);
+    while candidates != 0 {
+        let spec_index = candidates.trailing_zeros() as usize;
+        let spec = &projected_field_specs[spec_index];
+        let value_bytes = if projected_match_plan.all_keys_fit_prefix {
+            projected_match_value_prefix_only(payload, payload_prefix, spec)
+        } else {
+            projected_match_value(payload, payload_prefix, spec)
+        };
+        let Some(value_bytes) = value_bytes else {
+            candidates &= candidates - 1;
+            continue;
+        };
+
+        *work_checksum = work_checksum
+            .wrapping_add(spec_index as u64)
+            .wrapping_add(value_bytes.len() as u64);
+
+        if parse_metrics {
+            if let Some(metric_field) = spec.targets.metric {
+                if let Some(value) = parse_u64_ascii(value_bytes) {
+                    let salt = match metric_field {
+                        ProjectedMetricField::Bytes => 0x9e37_79b9_u64,
+                        ProjectedMetricField::Packets => 0x85eb_ca6b_u64,
+                    };
+                    *work_checksum = work_checksum.wrapping_add(value ^ salt);
+                }
+            }
+        }
+
+        let action = spec.targets.action;
+        if extract_values && action != ProjectedPayloadAction::default() {
+            let value = payload_value(value_bytes);
+            let value_ref = value.as_ref();
+            *work_checksum = work_checksum
+                .wrapping_add(value_ref.len() as u64)
+                .wrapping_add(value_ref.as_bytes().first().copied().unwrap_or_default() as u64);
+        }
+
+        *remaining_mask &= !(1_u64 << spec_index);
+        return Some(spec_index);
+    }
+
+    None
+}
+
 fn record_matches_selections(
     record: &FlowRecord,
     selections: &HashMap<String, Vec<String>>,
@@ -3704,39 +4759,6 @@ fn record_matches_regex(record: &FlowRecord, regex: Option<&Regex>) -> bool {
     })
 }
 
-fn compact_representative_from_record(record: &FlowRecord) -> CompactRepresentativeFields {
-    CompactRepresentativeFields {
-        src_ip: record.fields.get("SRC_ADDR").cloned(),
-        dst_ip: record.fields.get("DST_ADDR").cloned(),
-    }
-}
-
-fn compact_representative_from_open_tier_row(
-    row: &OpenTierRow,
-    tier_flow_indexes: &TierFlowIndexStore,
-) -> CompactRepresentativeFields {
-    CompactRepresentativeFields {
-        src_ip: open_tier_row_field_value(row, tier_flow_indexes, "SRC_ADDR")
-            .filter(|value| !value.is_empty()),
-        dst_ip: open_tier_row_field_value(row, tier_flow_indexes, "DST_ADDR")
-            .filter(|value| !value.is_empty()),
-    }
-}
-
-fn aggregate_output_field(
-    snapshot: Option<&CompactRepresentativeFields>,
-    record: Option<&FlowRecord>,
-    field: &str,
-) -> Option<String> {
-    snapshot
-        .and_then(|snapshot| match field {
-            "SRC_ADDR" => snapshot.src_ip.clone(),
-            "DST_ADDR" => snapshot.dst_ip.clone(),
-            _ => None,
-        })
-        .or_else(|| record.and_then(|record| record.fields.get(field).cloned()))
-}
-
 fn open_tier_projected_grouped_path_supported(
     group_by: &[String],
     selections: &HashMap<String, Vec<String>>,
@@ -3754,10 +4776,8 @@ fn open_tier_field_supported(field: &str) -> bool {
 }
 
 fn open_tier_selection_field_supported(field: &str) -> bool {
-    matches!(
-        field.to_ascii_uppercase().as_str(),
-        "BYTES" | "PACKETS" | "RAW_BYTES" | "RAW_PACKETS"
-    ) || open_tier_field_supported(field)
+    matches!(field.to_ascii_uppercase().as_str(), "BYTES" | "PACKETS" | "FLOWS")
+        || open_tier_field_supported(field)
 }
 
 fn facet_field_requires_protocol_scan(field: &str) -> bool {
@@ -3978,8 +4998,6 @@ fn open_tier_row_field_value(
     match field.to_ascii_uppercase().as_str() {
         "BYTES" => Some(row.metrics.bytes.to_string()),
         "PACKETS" => Some(row.metrics.packets.to_string()),
-        "RAW_BYTES" => Some(row.metrics.raw_bytes.to_string()),
-        "RAW_PACKETS" => Some(row.metrics.raw_packets.to_string()),
         "ICMPV4" => presentation::icmp_virtual_value(
             "ICMPV4",
             tier_flow_indexes
@@ -4149,7 +5167,7 @@ fn field_is_groupable(field: &str) -> bool {
     let normalized = field.to_ascii_uppercase();
     !matches!(
         normalized.as_str(),
-        "BYTES" | "PACKETS" | "RAW_BYTES" | "RAW_PACKETS" | "FLOWS"
+        "BYTES" | "PACKETS" | "RAW_BYTES" | "RAW_PACKETS" | "FLOWS" | "SAMPLING_RATE"
     ) && !normalized.starts_with('_')
         && !normalized.starts_with("V9_")
         && !normalized.starts_with("IPFIX_")
@@ -4737,29 +5755,12 @@ fn build_query_warnings(
 fn metrics_from_fields(fields: &BTreeMap<String, String>) -> FlowMetrics {
     let bytes = parse_u64(fields.get("BYTES"));
     let packets = parse_u64(fields.get("PACKETS"));
-    let raw_bytes = parse_u64(fields.get("RAW_BYTES"));
-    let raw_packets = parse_u64(fields.get("RAW_PACKETS"));
 
-    FlowMetrics {
-        bytes,
-        packets,
-        raw_bytes,
-        raw_packets,
-    }
-}
-
-fn effective_sampling_rate(fields: &BTreeMap<String, String>) -> u64 {
-    parse_u64(fields.get("SAMPLING_RATE")).max(1)
+    FlowMetrics { bytes, packets }
 }
 
 fn sampled_metrics_from_fields(fields: &BTreeMap<String, String>) -> FlowMetrics {
-    let sampling_rate = effective_sampling_rate(fields);
-    let mut metrics = metrics_from_fields(fields);
-    metrics.bytes = metrics.bytes.saturating_mul(sampling_rate);
-    metrics.packets = metrics.packets.saturating_mul(sampling_rate);
-    metrics.raw_bytes = metrics.raw_bytes.saturating_mul(sampling_rate);
-    metrics.raw_packets = metrics.raw_packets.saturating_mul(sampling_rate);
-    metrics
+    metrics_from_fields(fields)
 }
 
 fn sampled_metric_value(sort_by: SortBy, fields: &BTreeMap<String, String>) -> u64 {
@@ -4773,47 +5774,6 @@ fn chart_timestamp_usec(record: &FlowRecord) -> u64 {
 #[cfg(test)]
 fn dimensions_from_fields(fields: &crate::decoder::FlowFields) -> crate::decoder::FlowFields {
     dimensions_for_rollup(fields)
-}
-
-fn aggregated_endpoint_value(ip: Option<&str>, mixed: bool) -> Value {
-    let mut endpoint = Map::new();
-    let mut match_obj = Map::new();
-    if !mixed {
-        if let Some(ipv) = ip {
-            match_obj.insert("ip_addresses".to_string(), json!([ipv]));
-        }
-    }
-    endpoint.insert("match".to_string(), Value::Object(match_obj));
-
-    if mixed {
-        endpoint.insert(
-            "attributes".to_string(),
-            json!({
-                "aggregated": true,
-                "cardinality": "multiple",
-            }),
-        );
-    }
-
-    Value::Object(endpoint)
-}
-
-fn merge_single_value(current: &mut Option<String>, mixed: &mut bool, next: Option<&str>) {
-    if *mixed {
-        return;
-    }
-    let Some(next_value) = next else {
-        return;
-    };
-    if next_value.is_empty() {
-        return;
-    }
-
-    match current {
-        None => *current = Some(next_value.to_string()),
-        Some(existing) if existing == next_value => {}
-        Some(_) => *mixed = true,
-    }
 }
 
 fn parse_u64(value: Option<&String>) -> u64 {
@@ -4847,28 +5807,6 @@ fn populate_virtual_fields(fields: &mut BTreeMap<String, String>) {
             }
         }
     }
-}
-
-fn fields_from_cursor_payloads(
-    cursor: &mut journal_session::Cursor,
-) -> Result<BTreeMap<String, String>> {
-    let mut fields = BTreeMap::new();
-    let mut payloads = cursor
-        .payloads()
-        .context("failed to open payload iterator for journal entry")?;
-    while let Some(payload) = payloads
-        .next()
-        .context("failed to read journal entry payload")?
-    {
-        if let Some(eq_pos) = payload.iter().position(|&b| b == b'=') {
-            let key = &payload[..eq_pos];
-            let value = &payload[eq_pos + 1..];
-            if let Ok(key) = std::str::from_utf8(key) {
-                fields.insert(key.to_string(), String::from_utf8_lossy(value).into_owned());
-            }
-        }
-    }
-    Ok(fields)
 }
 
 #[cfg(test)]
@@ -4913,12 +5851,10 @@ mod tests {
         let metrics = metrics_from_fields(&fields);
         assert_eq!(metrics.bytes, 0);
         assert_eq!(metrics.packets, 0);
-        assert_eq!(metrics.raw_bytes, 0);
-        assert_eq!(metrics.raw_packets, 0);
     }
 
     #[test]
-    fn aggregated_flow_marks_mixed_endpoints() {
+    fn aggregated_flow_does_not_expose_top_level_endpoints() {
         let records = vec![
             super::FlowRecord {
                 timestamp_usec: 100,
@@ -4950,8 +5886,8 @@ mod tests {
         assert_eq!(result.flows.len(), 1);
         let flow = &result.flows[0];
         assert_eq!(flow["metrics"]["bytes"], 150);
-        assert_eq!(flow["src"]["attributes"]["cardinality"], "multiple");
-        assert_eq!(flow["dst"]["attributes"]["cardinality"], "multiple");
+        assert!(flow.get("src").is_none());
+        assert!(flow.get("dst").is_none());
     }
 
     #[test]
@@ -6030,8 +6966,6 @@ mod tests {
             .aggregate
             .expect("compact overflow aggregate");
         assert_eq!(overflow.metrics.bytes, 123);
-        assert!(overflow.src_mixed);
-        assert!(overflow.dst_mixed);
     }
 
     #[test]
@@ -6508,7 +7442,7 @@ mod tests {
     }
 
     #[test]
-    fn sampled_metrics_use_effective_sampling_rate() {
+    fn query_metrics_ignore_sampling_rate() {
         let fields = BTreeMap::from([
             ("BYTES".to_string(), "10".to_string()),
             ("PACKETS".to_string(), "2".to_string()),
@@ -6516,12 +7450,12 @@ mod tests {
         ]);
 
         let metrics = super::sampled_metrics_from_fields(&fields);
-        assert_eq!(metrics.bytes, 1_000);
-        assert_eq!(metrics.packets, 200);
+        assert_eq!(metrics.bytes, 10);
+        assert_eq!(metrics.packets, 2);
     }
 
     #[test]
-    fn zero_sampling_rate_falls_back_to_one() {
+    fn query_metrics_ignore_zero_sampling_rate() {
         let fields = BTreeMap::from([
             ("BYTES".to_string(), "10".to_string()),
             ("PACKETS".to_string(), "2".to_string()),

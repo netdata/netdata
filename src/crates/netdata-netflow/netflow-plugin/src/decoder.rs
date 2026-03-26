@@ -58,8 +58,14 @@ const IPFIX_FIELD_IP_VERSION: u16 = 60;
 const IPFIX_FIELD_FORWARDING_STATUS: u16 = 89;
 const IPFIX_FIELD_FLOW_START_MILLISECONDS: u16 = 152;
 const IPFIX_FIELD_FLOW_END_MILLISECONDS: u16 = 153;
+const IPFIX_FIELD_SAMPLING_INTERVAL: u16 = 34;
+const IPFIX_FIELD_SAMPLER_ID: u16 = 48;
+const IPFIX_FIELD_SAMPLER_RANDOM_INTERVAL: u16 = 50;
 const IPFIX_FIELD_DATALINK_FRAME_SIZE: u16 = 312;
 const IPFIX_FIELD_DATALINK_FRAME_SECTION: u16 = 315;
+const IPFIX_FIELD_SELECTOR_ID: u16 = 302;
+const IPFIX_FIELD_SAMPLING_PACKET_INTERVAL: u16 = 305;
+const IPFIX_FIELD_SAMPLING_PACKET_SPACE: u16 = 306;
 const IPFIX_FIELD_MPLS_LABEL_1: u16 = 70;
 const IPFIX_FIELD_MPLS_LABEL_10: u16 = 79;
 const V9_FIELD_LAYER2_PACKET_SECTION_DATA: u16 = 104;
@@ -1165,18 +1171,11 @@ impl FlowRecord {
         push_str!("EXPORTER_SITE", &self.exporter_site);
         push_str!("EXPORTER_REGION", &self.exporter_region);
         push_str!("EXPORTER_TENANT", &self.exporter_tenant);
-        push_u64_when!(
-            self.has_sampling_rate(),
-            "SAMPLING_RATE",
-            self.sampling_rate
-        );
         push_u16_when!(self.has_etype(), "ETYPE", self.etype);
         push_u8!("PROTOCOL", self.protocol);
         push_u64!("BYTES", self.bytes);
         push_u64!("PACKETS", self.packets);
         push_u64!("FLOWS", self.flows);
-        push_u64!("RAW_BYTES", self.raw_bytes);
-        push_u64!("RAW_PACKETS", self.raw_packets);
         push_u8_when!(
             self.has_forwarding_status(),
             "FORWARDING_STATUS",
@@ -1289,6 +1288,13 @@ impl FlowRecord {
         push_u8_when!(self.has_icmpv6_type(), "ICMPV6_TYPE", self.icmpv6_type);
         push_u8_when!(self.has_icmpv6_code(), "ICMPV6_CODE", self.icmpv6_code);
         push_str!("MPLS_LABELS", &self.mpls_labels);
+        push_u64!("RAW_BYTES", self.raw_bytes);
+        push_u64!("RAW_PACKETS", self.raw_packets);
+        push_u64_when!(
+            self.has_sampling_rate(),
+            "SAMPLING_RATE",
+            self.sampling_rate
+        );
     }
 }
 
@@ -2856,6 +2862,8 @@ fn flow_identity_hash(flow: &DecodedFlow) -> u64 {
     use std::hash::Hasher;
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     let r = &flow.record;
+    let identity_bytes = identity_counter_value(r.raw_bytes, r.bytes);
+    let identity_packets = identity_counter_value(r.raw_packets, r.packets);
     r.flow_version.hash(&mut hasher);
     r.exporter_ip.hash(&mut hasher);
     r.exporter_port.hash(&mut hasher);
@@ -2866,8 +2874,8 @@ fn flow_identity_hash(flow: &DecodedFlow) -> u64 {
     r.dst_port.hash(&mut hasher);
     r.in_if.hash(&mut hasher);
     r.out_if.hash(&mut hasher);
-    r.bytes.hash(&mut hasher);
-    r.packets.hash(&mut hasher);
+    identity_bytes.hash(&mut hasher);
+    identity_packets.hash(&mut hasher);
     r.flow_start_usec.hash(&mut hasher);
     r.flow_end_usec.hash(&mut hasher);
     r.direction.hash(&mut hasher);
@@ -2877,6 +2885,10 @@ fn flow_identity_hash(flow: &DecodedFlow) -> u64 {
 fn same_flow_identity(existing: &DecodedFlow, incoming: &DecodedFlow) -> bool {
     let a = &existing.record;
     let b = &incoming.record;
+    let a_bytes = identity_counter_value(a.raw_bytes, a.bytes);
+    let a_packets = identity_counter_value(a.raw_packets, a.packets);
+    let b_bytes = identity_counter_value(b.raw_bytes, b.bytes);
+    let b_packets = identity_counter_value(b.raw_packets, b.packets);
     a.flow_version == b.flow_version
         && a.exporter_ip == b.exporter_ip
         && a.exporter_port == b.exporter_port
@@ -2887,11 +2899,15 @@ fn same_flow_identity(existing: &DecodedFlow, incoming: &DecodedFlow) -> bool {
         && a.dst_port == b.dst_port
         && a.in_if == b.in_if
         && a.out_if == b.out_if
-        && a.bytes == b.bytes
-        && a.packets == b.packets
+        && a_bytes == b_bytes
+        && a_packets == b_packets
         && a.flow_start_usec == b.flow_start_usec
         && a.flow_end_usec == b.flow_end_usec
         && a.direction == b.direction
+}
+
+fn identity_counter_value(raw: u64, scaled: u64) -> u64 {
+    if raw != 0 { raw } else { scaled }
 }
 
 /// Merge non-default field values from incoming record into existing record.
@@ -3421,6 +3437,9 @@ fn decode_ipfix_special_from_raw_payload(
                     timestamp_source,
                     input_realtime_usec,
                     packet_realtime_usec,
+                    sampling,
+                    &exporter_ip,
+                    observation_domain_id,
                     &template,
                     &record_values,
                     decapsulation_mode,
@@ -3492,6 +3511,9 @@ fn decode_v9_special_from_raw_payload(
                     packet_realtime_usec,
                     export_time,
                     sys_uptime_millis,
+                    sampling,
+                    &exporter_ip,
+                    observation_domain_id,
                     &template,
                     &record_values,
                     decapsulation_mode,
@@ -3536,6 +3558,9 @@ fn decode_v9_special_record(
     packet_realtime_usec: Option<u64>,
     export_time_seconds: u64,
     sys_uptime_millis: u64,
+    sampling: &SamplingState,
+    exporter_ip: &str,
+    observation_domain_id: u32,
     template: &V9DataLinkTemplate,
     values: &[&[u8]],
     decapsulation_mode: DecapsulationMode,
@@ -3545,6 +3570,8 @@ fn decode_v9_special_record(
     let mut has_decoded_datalink = false;
     let mut flow_start_usec: Option<u64> = None;
     let mut flow_end_usec: Option<u64> = None;
+    let mut sampler_id: Option<u64> = None;
+    let mut observed_sampling_rate: Option<u64> = None;
     let system_init_usec = netflow_v9_system_init_usec(export_time_seconds, sys_uptime_millis);
 
     for (template_field, raw_value) in template.fields.iter().zip(values.iter()) {
@@ -3584,6 +3611,15 @@ fn decode_v9_special_record(
         };
 
         apply_v9_special_mappings(&mut fields, field, &value);
+        match field {
+            V9Field::FlowSamplerId => {
+                sampler_id = value.parse::<u64>().ok();
+            }
+            V9Field::SamplingInterval | V9Field::FlowSamplerRandomInterval => {
+                observed_sampling_rate = value.parse::<u64>().ok();
+            }
+            _ => {}
+        }
         if let Some(canonical) = v9_canonical_key(field) {
             if should_skip_zero_ip(canonical, &value) {
                 continue;
@@ -3616,6 +3652,15 @@ fn decode_v9_special_record(
     }
 
     fields.entry("FLOWS").or_insert_with(|| "1".to_string());
+    apply_sampling_state_fields(
+        &mut fields,
+        exporter_ip,
+        9,
+        observation_domain_id,
+        sampler_id,
+        observed_sampling_rate,
+        sampling,
+    );
     if let Some(start_usec) = flow_start_usec {
         fields.insert("FLOW_START_USEC", start_usec.to_string());
     }
@@ -3677,6 +3722,9 @@ fn decode_ipfix_special_record(
     timestamp_source: TimestampSource,
     input_realtime_usec: u64,
     packet_realtime_usec: Option<u64>,
+    sampling: &SamplingState,
+    exporter_ip: &str,
+    observation_domain_id: u32,
     template: &IPFixDataLinkTemplate,
     values: &[&[u8]],
     decapsulation_mode: DecapsulationMode,
@@ -3686,6 +3734,10 @@ fn decode_ipfix_special_record(
     let mut has_decoded_datalink = false;
     let mut has_mpls_labels = false;
     let mut flow_start_usec: Option<u64> = None;
+    let mut sampler_id: Option<u64> = None;
+    let mut observed_sampling_rate: Option<u64> = None;
+    let mut sampling_packet_interval: Option<u64> = None;
+    let mut sampling_packet_space: Option<u64> = None;
 
     for (template_field, raw_value) in template.fields.iter().zip(values.iter()) {
         if let Some(pen) = template_field.enterprise_number {
@@ -3713,6 +3765,18 @@ fn decode_ipfix_special_record(
             }
             IPFIX_FIELD_PROTOCOL_IDENTIFIER => {
                 fields.insert("PROTOCOL", decode_akvorado_unsigned(raw_value).to_string());
+            }
+            IPFIX_FIELD_SAMPLER_ID | IPFIX_FIELD_SELECTOR_ID => {
+                sampler_id = Some(decode_akvorado_unsigned(raw_value));
+            }
+            IPFIX_FIELD_SAMPLING_INTERVAL | IPFIX_FIELD_SAMPLER_RANDOM_INTERVAL => {
+                observed_sampling_rate = Some(decode_akvorado_unsigned(raw_value));
+            }
+            IPFIX_FIELD_SAMPLING_PACKET_INTERVAL => {
+                sampling_packet_interval = Some(decode_akvorado_unsigned(raw_value));
+            }
+            IPFIX_FIELD_SAMPLING_PACKET_SPACE => {
+                sampling_packet_space = Some(decode_akvorado_unsigned(raw_value));
             }
             IPFIX_FIELD_SOURCE_TRANSPORT_PORT => {
                 fields.insert("SRC_PORT", decode_akvorado_unsigned(raw_value).to_string());
@@ -3801,6 +3865,12 @@ fn decode_ipfix_special_record(
         }
     }
 
+    if let (Some(interval), Some(space)) = (sampling_packet_interval, sampling_packet_space)
+        && interval > 0
+    {
+        observed_sampling_rate = Some((interval.saturating_add(space)) / interval);
+    }
+
     if has_datalink_section && !has_decoded_datalink {
         return None;
     }
@@ -3809,6 +3879,15 @@ fn decode_ipfix_special_record(
     }
 
     fields.entry("FLOWS").or_insert_with(|| "1".to_string());
+    apply_sampling_state_fields(
+        &mut fields,
+        exporter_ip,
+        10,
+        observation_domain_id,
+        sampler_id,
+        observed_sampling_rate,
+        sampling,
+    );
     finalize_canonical_flow_fields(&mut fields);
 
     Some(DecodedFlow {
@@ -5255,6 +5334,26 @@ fn finalize_canonical_flow_fields(fields: &mut FlowFields) {
             .or_insert_with(|| default_value.to_string());
     }
 
+    let sampling_rate = fields
+        .get("SAMPLING_RATE")
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(0)
+        .max(1);
+    if let Some(bytes) = fields.get_mut("BYTES") {
+        let scaled = bytes
+            .parse::<u64>()
+            .unwrap_or(0)
+            .saturating_mul(sampling_rate);
+        *bytes = scaled.to_string();
+    }
+    if let Some(packets) = fields.get_mut("PACKETS") {
+        let scaled = packets
+            .parse::<u64>()
+            .unwrap_or(0)
+            .saturating_mul(sampling_rate);
+        *packets = scaled.to_string();
+    }
+
     let exporter_name_missing = fields
         .get("EXPORTER_NAME")
         .map(String::is_empty)
@@ -5335,6 +5434,10 @@ fn finalize_record(rec: &mut FlowRecord) {
     if rec.raw_packets == 0 {
         rec.raw_packets = rec.packets;
     }
+
+    let sampling_rate = rec.sampling_rate.max(1);
+    rec.bytes = rec.bytes.saturating_mul(sampling_rate);
+    rec.packets = rec.packets.saturating_mul(sampling_rate);
 
     // Default flows to 1
     if rec.flows == 0 {
@@ -6150,6 +6253,36 @@ fn apply_sampling_state_record(
         if let Some(rate) = sampling.get(exporter_ip, version, observation_domain_id, 0) {
             rec.set_sampling_rate(rate);
         }
+    }
+}
+
+fn apply_sampling_state_fields(
+    fields: &mut FlowFields,
+    exporter_ip: &str,
+    version: u16,
+    observation_domain_id: u32,
+    sampler_id: Option<u64>,
+    observed_sampling_rate: Option<u64>,
+    sampling: &SamplingState,
+) {
+    if let Some(rate) = observed_sampling_rate.filter(|rate| *rate > 0) {
+        fields.insert("SAMPLING_RATE", rate.to_string());
+        return;
+    }
+
+    if fields.contains_key("SAMPLING_RATE") {
+        return;
+    }
+
+    if let Some(id) = sampler_id
+        && let Some(rate) = sampling.get(exporter_ip, version, observation_domain_id, id)
+    {
+        fields.insert("SAMPLING_RATE", rate.to_string());
+        return;
+    }
+
+    if let Some(rate) = sampling.get(exporter_ip, version, observation_domain_id, 0) {
+        fields.insert("SAMPLING_RATE", rate.to_string());
     }
 }
 
@@ -7361,8 +7494,8 @@ mod tests {
         assert_eq!(first.get("OUT_IF").map(String::as_str), Some("450"));
         assert_eq!(first.get("SRC_MASK").map(String::as_str), Some("24"));
         assert_eq!(first.get("DST_MASK").map(String::as_str), Some("14"));
-        assert_eq!(first.get("BYTES").map(String::as_str), Some("1500"));
-        assert_eq!(first.get("PACKETS").map(String::as_str), Some("1"));
+        assert_eq!(first.get("BYTES").map(String::as_str), Some("45000000"));
+        assert_eq!(first.get("PACKETS").map(String::as_str), Some("30000"));
         assert_eq!(first.get("ETYPE").map(String::as_str), Some("2048"));
         assert_eq!(first.get("PROTOCOL").map(String::as_str), Some("6"));
         assert_eq!(first.get("SRC_PORT").map(String::as_str), Some("443"));
@@ -7909,6 +8042,43 @@ mod tests {
     }
 
     #[test]
+    fn merge_enrichment_matches_on_raw_counters_when_visible_counters_are_scaled() {
+        let mut dst = vec![canonical_test_flow(&[
+            ("SAMPLING_RATE", "10"),
+            ("BYTES", "890"),
+            ("PACKETS", "10"),
+            ("RAW_BYTES", "89"),
+            ("RAW_PACKETS", "1"),
+            ("IPTOS", "0"),
+            ("TCP_FLAGS", "0"),
+            ("ICMPV6_TYPE", "0"),
+            ("ICMPV6_CODE", "0"),
+            ("MPLS_LABELS", ""),
+        ])];
+        let incoming = canonical_test_flow(&[
+            ("BYTES", "89"),
+            ("PACKETS", "1"),
+            ("RAW_BYTES", "89"),
+            ("RAW_PACKETS", "1"),
+            ("IPTTL", "255"),
+            ("MPLS_LABELS", "20005,524250"),
+        ]);
+
+        append_unique_flows(&mut dst, vec![incoming]);
+
+        assert_eq!(dst.len(), 1);
+        let fields = dst[0].record.to_fields();
+        assert_eq!(fields.get("BYTES").map(String::as_str), Some("890"));
+        assert_eq!(fields.get("PACKETS").map(String::as_str), Some("10"));
+        assert_eq!(fields.get("RAW_BYTES").map(String::as_str), Some("89"));
+        assert_eq!(fields.get("RAW_PACKETS").map(String::as_str), Some("1"));
+        assert_eq!(
+            fields.get("MPLS_LABELS").map(String::as_str),
+            Some("20005,524250")
+        );
+    }
+
+    #[test]
     fn akvorado_samplingrate_fixture_matches_expected_flow() {
         let flows =
             decode_fixture_sequence(&["samplingrate-template.pcap", "samplingrate-data.pcap"]);
@@ -7928,8 +8098,8 @@ mod tests {
             ],
         );
         assert_eq!(flow.get("SAMPLING_RATE").map(String::as_str), Some("2048"));
-        assert_eq!(flow.get("BYTES").map(String::as_str), Some("160"));
-        assert_eq!(flow.get("PACKETS").map(String::as_str), Some("1"));
+        assert_eq!(flow.get("BYTES").map(String::as_str), Some("327680"));
+        assert_eq!(flow.get("PACKETS").map(String::as_str), Some("2048"));
         assert_eq!(flow.get("ETYPE").map(String::as_str), Some("2048"));
         assert_eq!(flow.get("DIRECTION").map(String::as_str), Some("ingress"));
         assert_eq!(flow.get("IN_IF").map(String::as_str), Some("13"));
@@ -8006,8 +8176,8 @@ mod tests {
             ],
         );
         assert_eq!(first.get("SAMPLING_RATE").map(String::as_str), Some("4000"));
-        assert_eq!(first.get("BYTES").map(String::as_str), Some("1348"));
-        assert_eq!(first.get("PACKETS").map(String::as_str), Some("18"));
+        assert_eq!(first.get("BYTES").map(String::as_str), Some("5392000"));
+        assert_eq!(first.get("PACKETS").map(String::as_str), Some("72000"));
         assert_eq!(
             first.get("FORWARDING_STATUS").map(String::as_str),
             Some("64")
@@ -8033,8 +8203,8 @@ mod tests {
             second.get("SAMPLING_RATE").map(String::as_str),
             Some("2000")
         );
-        assert_eq!(second.get("BYTES").map(String::as_str), Some("579"));
-        assert_eq!(second.get("PACKETS").map(String::as_str), Some("4"));
+        assert_eq!(second.get("BYTES").map(String::as_str), Some("1158000"));
+        assert_eq!(second.get("PACKETS").map(String::as_str), Some("8000"));
         assert_eq!(
             second.get("FORWARDING_STATUS").map(String::as_str),
             Some("64")
@@ -9265,8 +9435,8 @@ mod tests {
             ],
         );
         assert_eq!(flow.get("SAMPLING_RATE").map(String::as_str), Some("30000"));
-        assert_eq!(flow.get("BYTES").map(String::as_str), Some("1500"));
-        assert_eq!(flow.get("PACKETS").map(String::as_str), Some("1"));
+        assert_eq!(flow.get("BYTES").map(String::as_str), Some("45000000"));
+        assert_eq!(flow.get("PACKETS").map(String::as_str), Some("30000"));
     }
 
     #[test]
@@ -9551,7 +9721,9 @@ mod tests {
     }
 
     fn expected_projection(values: &[(&'static str, &str)]) -> FlowFields {
-        values.iter().map(|(k, v)| (*k, (*v).to_string())).collect()
+        let mut row = values.iter().map(|(k, v)| (*k, (*v).to_string())).collect();
+        apply_expected_visible_counter_semantics(&mut row);
+        row
     }
 
     fn expected_full_flow(
@@ -9594,6 +9766,8 @@ mod tests {
         {
             row.insert("RAW_PACKETS", packets);
         }
+
+        apply_expected_counter_semantics(&mut row);
 
         row
     }
@@ -9646,14 +9820,84 @@ mod tests {
             })
     }
 
-    fn assert_fields(fields: &FlowFields, expectations: &[(&str, &str)]) {
-        for (key, expected) in expectations {
+    fn assert_fields(fields: &FlowFields, expectations: &[(&'static str, &str)]) {
+        let mut normalized = expectations
+            .iter()
+            .map(|(key, value)| (*key, (*value).to_string()))
+            .collect::<FlowFields>();
+        if !normalized.contains_key("SAMPLING_RATE")
+            && let Some(sampling_rate) = fields.get("SAMPLING_RATE").cloned()
+        {
+            normalized.insert("SAMPLING_RATE", sampling_rate);
+        }
+        apply_expected_visible_counter_semantics(&mut normalized);
+
+        for (key, expected) in &normalized {
             let actual = fields.get(*key).map(String::as_str);
             assert_eq!(
                 actual,
-                Some(*expected),
+                Some(expected.as_str()),
                 "field mismatch for {key}: expected {expected}, got {actual:?}"
             );
+        }
+    }
+
+    fn apply_expected_counter_semantics(fields: &mut FlowFields) {
+        let sampling_rate = fields
+            .get("SAMPLING_RATE")
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(0)
+            .max(1);
+
+        if !fields.contains_key("RAW_BYTES")
+            && let Some(bytes) = fields.get("BYTES").cloned()
+            && bytes != "0"
+        {
+            fields.insert("RAW_BYTES", bytes);
+        }
+        if !fields.contains_key("RAW_PACKETS")
+            && let Some(packets) = fields.get("PACKETS").cloned()
+            && packets != "0"
+        {
+            fields.insert("RAW_PACKETS", packets);
+        }
+
+        if let Some(bytes) = fields.get_mut("BYTES") {
+            let scaled = bytes
+                .parse::<u64>()
+                .unwrap_or(0)
+                .saturating_mul(sampling_rate);
+            *bytes = scaled.to_string();
+        }
+        if let Some(packets) = fields.get_mut("PACKETS") {
+            let scaled = packets
+                .parse::<u64>()
+                .unwrap_or(0)
+                .saturating_mul(sampling_rate);
+            *packets = scaled.to_string();
+        }
+    }
+
+    fn apply_expected_visible_counter_semantics(fields: &mut FlowFields) {
+        let sampling_rate = fields
+            .get("SAMPLING_RATE")
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(0)
+            .max(1);
+
+        if let Some(bytes) = fields.get_mut("BYTES") {
+            let scaled = bytes
+                .parse::<u64>()
+                .unwrap_or(0)
+                .saturating_mul(sampling_rate);
+            *bytes = scaled.to_string();
+        }
+        if let Some(packets) = fields.get_mut("PACKETS") {
+            let scaled = packets
+                .parse::<u64>()
+                .unwrap_or(0)
+                .saturating_mul(sampling_rate);
+            *packets = scaled.to_string();
         }
     }
 

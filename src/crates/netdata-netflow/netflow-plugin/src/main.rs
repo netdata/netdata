@@ -636,10 +636,14 @@ mod tests {
     };
     use chrono::Utc;
     use etherparse::{SlicedPacket, TransportSlice};
+    use journal_core::file::Mmap;
+    use journal_core::repository::File as RepoFile;
+    use journal_core::{Direction, JournalFile, JournalReader, Location};
     use pcap_file::pcap::PcapReader;
     use std::collections::HashMap;
     use std::fs;
     use std::net::UdpSocket as StdUdpSocket;
+    use std::num::NonZeroU64;
     use std::path::{Path, PathBuf};
     use std::sync::atomic::Ordering;
     use std::sync::{Arc, RwLock};
@@ -1349,12 +1353,73 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[ignore]
-    async fn profile_fixed_raw_query_processing_against_local_journals() {
+    async fn profile_fixed_raw_direct_journal_core_against_local_journals() {
         const FIXED_FILES: [&str; 4] = [
-            "/var/cache/netdata/flows/raw/system@92ecfa81f20440b9a0762a3a4656e37a-00000000045ab310-00064da65a07dfc3.journal",
-            "/var/cache/netdata/flows/raw/system@92ecfa81f20440b9a0762a3a4656e37a-00000000045d8ec3-00064da8006c73a9.journal",
-            "/var/cache/netdata/flows/raw/system@92ecfa81f20440b9a0762a3a4656e37a-0000000004606cfe-00064da9f3edc98c.journal",
-            "/var/cache/netdata/flows/raw/system@92ecfa81f20440b9a0762a3a4656e37a-0000000004634242-00064dabd29b631e.journal",
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-00000000045ab310-00064da65a07dfc3.journal",
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-00000000045d8ec3-00064da8006c73a9.journal",
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-0000000004606cfe-00064da9f3edc98c.journal",
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-0000000004634242-00064dabd29b631e.journal",
+        ];
+
+        let started = Instant::now();
+        let mut rows_read = 0usize;
+        let mut fields_read = 0usize;
+        let mut files_opened = 0usize;
+        let mut data_offsets = Vec::<NonZeroU64>::new();
+
+        for src in FIXED_FILES {
+            let src_path = Path::new(src);
+            let repo_file =
+                RepoFile::from_path(src_path).expect("parse journal repository metadata");
+
+            let journal =
+                JournalFile::<Mmap>::open(&repo_file, 8 * 1024 * 1024).expect("open journal");
+            files_opened += 1;
+
+            let mut reader = JournalReader::default();
+            reader.set_location(Location::Head);
+
+            while reader
+                .step(&journal, Direction::Forward)
+                .expect("step journal reader")
+            {
+                rows_read += 1;
+                data_offsets.clear();
+                reader
+                    .entry_data_offsets(&journal, &mut data_offsets)
+                    .expect("enumerate entry data offsets");
+                for data_offset in data_offsets.iter().copied() {
+                    let _data_guard = journal.data_ref(data_offset).expect("read payload object");
+                    fields_read += 1;
+                }
+            }
+        }
+
+        let elapsed_usec = started.elapsed().as_micros();
+        eprintln!();
+        eprintln!("=== Fixed Raw Direct Journal-Core Harness ===");
+        eprintln!("files_opened:            {}", files_opened);
+        eprintln!("rows_read:               {}", rows_read);
+        eprintln!("fields_read:             {}", fields_read);
+        eprintln!(
+            "fields_per_row:          {:.4}",
+            fields_read as f64 / rows_read as f64
+        );
+        eprintln!("time_usec:               {}", elapsed_usec);
+        eprintln!(
+            "usec_per_row:            {:.6}",
+            elapsed_usec as f64 / rows_read as f64
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore]
+    async fn profile_fixed_raw_plugin_scan_only_against_local_journals() {
+        const FIXED_FILES: [&str; 4] = [
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-00000000045ab310-00064da65a07dfc3.journal",
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-00000000045d8ec3-00064da8006c73a9.journal",
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-0000000004606cfe-00064da9f3edc98c.journal",
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-0000000004634242-00064dabd29b631e.journal",
         ];
 
         let tmp = tempfile::tempdir().expect("create temp dir");
@@ -1370,7 +1435,248 @@ mod tests {
 
         for src in FIXED_FILES {
             let src_path = Path::new(src);
-            assert!(src_path.is_file(), "expected journal file {}", src_path.display());
+            assert!(
+                src_path.is_file(),
+                "expected journal file {}",
+                src_path.display()
+            );
+            let dst_path = raw_dir.join(src_path.file_name().expect("journal filename"));
+            if let Err(err) = fs::hard_link(src_path, &dst_path) {
+                if err.raw_os_error() == Some(18) {
+                    fs::copy(src_path, &dst_path).unwrap_or_else(|copy_err| {
+                        panic!("copy {}: {}", src_path.display(), copy_err)
+                    });
+                } else {
+                    panic!("hard link {}: {}", src_path.display(), err);
+                }
+            }
+        }
+
+        let mut cfg = plugin_config::PluginConfig::default();
+        cfg.journal.journal_dir = journal_root.to_string_lossy().to_string();
+
+        let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+        let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+        let (query_service, _notify_rx) = query::FlowQueryService::new(
+            &cfg,
+            Arc::clone(&open_tiers),
+            Arc::clone(&tier_flow_indexes),
+        )
+        .await
+        .expect("create query service for fixed raw journals");
+
+        let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+        let request = query::FlowsRequest {
+            view: query::ViewMode::TableSankey,
+            after: Some(1),
+            before: Some(before),
+            group_by: vec![
+                "SRC_ADDR".to_string(),
+                "DST_ADDR".to_string(),
+                "PROTOCOL".to_string(),
+            ],
+            top_n: query::TopN::N25,
+            ..Default::default()
+        };
+
+        let result = query_service
+            .benchmark_projected_raw_scan_only(&request)
+            .expect("scan-only benchmark should succeed");
+
+        eprintln!();
+        eprintln!("=== Fixed Raw Plugin Scan-Only Harness ===");
+        eprintln!("journal_dir:             {}", journal_root.display());
+        eprintln!("files_opened:            {}", result.files_opened);
+        eprintln!("rows_read:               {}", result.rows_read);
+        eprintln!("fields_read:             {}", result.fields_read);
+        eprintln!(
+            "fields_per_row:          {:.4}",
+            result.fields_read as f64 / result.rows_read as f64
+        );
+        eprintln!("time_usec:               {}", result.elapsed_usec);
+        eprintln!(
+            "usec_per_row:            {:.6}",
+            result.elapsed_usec as f64 / result.rows_read as f64
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore]
+    async fn profile_fixed_raw_plugin_stage_breakdown_against_local_journals() {
+        const FIXED_FILES: [&str; 4] = [
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-00000000045ab310-00064da65a07dfc3.journal",
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-00000000045d8ec3-00064da8006c73a9.journal",
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-0000000004606cfe-00064da9f3edc98c.journal",
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-0000000004634242-00064dabd29b631e.journal",
+        ];
+
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let journal_root = tmp.path().join("flows");
+        let raw_dir = journal_root.join("raw");
+        let minute_1_dir = journal_root.join("1m");
+        let minute_5_dir = journal_root.join("5m");
+        let hour_1_dir = journal_root.join("1h");
+        fs::create_dir_all(&raw_dir).expect("create raw dir");
+        fs::create_dir_all(&minute_1_dir).expect("create 1m dir");
+        fs::create_dir_all(&minute_5_dir).expect("create 5m dir");
+        fs::create_dir_all(&hour_1_dir).expect("create 1h dir");
+
+        for src in FIXED_FILES {
+            let src_path = Path::new(src);
+            assert!(
+                src_path.is_file(),
+                "expected journal file {}",
+                src_path.display()
+            );
+            let dst_path = raw_dir.join(src_path.file_name().expect("journal filename"));
+            if let Err(err) = fs::hard_link(src_path, &dst_path) {
+                if err.raw_os_error() == Some(18) {
+                    fs::copy(src_path, &dst_path).unwrap_or_else(|copy_err| {
+                        panic!("copy {}: {}", src_path.display(), copy_err)
+                    });
+                } else {
+                    panic!("hard link {}: {}", src_path.display(), err);
+                }
+            }
+        }
+
+        let mut cfg = plugin_config::PluginConfig::default();
+        cfg.journal.journal_dir = journal_root.to_string_lossy().to_string();
+
+        let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+        let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+        let (query_service, _notify_rx) = query::FlowQueryService::new(
+            &cfg,
+            Arc::clone(&open_tiers),
+            Arc::clone(&tier_flow_indexes),
+        )
+        .await
+        .expect("create query service for fixed raw journals");
+
+        let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+        let request = query::FlowsRequest {
+            view: query::ViewMode::TableSankey,
+            after: Some(1),
+            before: Some(before),
+            group_by: vec![
+                "SRC_ADDR".to_string(),
+                "DST_ADDR".to_string(),
+                "PROTOCOL".to_string(),
+            ],
+            top_n: query::TopN::N25,
+            ..Default::default()
+        };
+
+        let stage4_match_only = query_service
+            .benchmark_projected_raw_stage(&request, query::RawProjectedBenchStage::MatchOnly)
+            .expect("stage4 match-only benchmark should succeed");
+        let stage4 = query_service
+            .benchmark_projected_raw_stage(&request, query::RawProjectedBenchStage::MatchAndExtract)
+            .expect("stage4 benchmark should succeed");
+        let stage5 = query_service
+            .benchmark_projected_raw_stage(
+                &request,
+                query::RawProjectedBenchStage::MatchExtractAndParseMetrics,
+            )
+            .expect("stage5 benchmark should succeed");
+        let stage6 = query_service
+            .benchmark_projected_raw_stage(
+                &request,
+                query::RawProjectedBenchStage::GroupAndAccumulate,
+            )
+            .expect("stage6 benchmark should succeed");
+
+        eprintln!();
+        eprintln!("=== Fixed Raw Plugin Stage Breakdown Harness ===");
+        eprintln!("journal_dir:             {}", journal_root.display());
+        eprintln!("group_by:                {:?}", request.group_by);
+        eprintln!("match_rows_read:         {}", stage4_match_only.rows_read);
+        eprintln!("match_fields_read:       {}", stage4_match_only.fields_read);
+        eprintln!("match_processed_fields:  {}", stage4_match_only.processed_fields);
+        eprintln!(
+            "match_compressed_fields: {}",
+            stage4_match_only.compressed_processed_fields
+        );
+        eprintln!("match_matched_entries:   {}", stage4_match_only.matched_entries);
+        eprintln!("match_checksum:          {}", stage4_match_only.work_checksum);
+        eprintln!("match_time_usec:         {}", stage4_match_only.elapsed_usec);
+        eprintln!(
+            "match_usec_per_row:      {:.6}",
+            stage4_match_only.elapsed_usec as f64 / stage4_match_only.rows_read as f64
+        );
+        eprintln!("stage4_rows_read:        {}", stage4.rows_read);
+        eprintln!("stage4_fields_read:      {}", stage4.fields_read);
+        eprintln!("stage4_processed_fields: {}", stage4.processed_fields);
+        eprintln!(
+            "stage4_compressed_fields:{}",
+            stage4.compressed_processed_fields
+        );
+        eprintln!("stage4_matched_entries:  {}", stage4.matched_entries);
+        eprintln!("stage4_checksum:         {}", stage4.work_checksum);
+        eprintln!("stage4_time_usec:        {}", stage4.elapsed_usec);
+        eprintln!(
+            "stage4_usec_per_row:     {:.6}",
+            stage4.elapsed_usec as f64 / stage4.rows_read as f64
+        );
+        eprintln!("stage5_rows_read:        {}", stage5.rows_read);
+        eprintln!("stage5_fields_read:      {}", stage5.fields_read);
+        eprintln!("stage5_processed_fields: {}", stage5.processed_fields);
+        eprintln!(
+            "stage5_compressed_fields:{}",
+            stage5.compressed_processed_fields
+        );
+        eprintln!("stage5_matched_entries:  {}", stage5.matched_entries);
+        eprintln!("stage5_checksum:         {}", stage5.work_checksum);
+        eprintln!("stage5_time_usec:        {}", stage5.elapsed_usec);
+        eprintln!(
+            "stage5_usec_per_row:     {:.6}",
+            stage5.elapsed_usec as f64 / stage5.rows_read as f64
+        );
+        eprintln!("stage6_rows_read:        {}", stage6.rows_read);
+        eprintln!("stage6_fields_read:      {}", stage6.fields_read);
+        eprintln!("stage6_processed_fields: {}", stage6.processed_fields);
+        eprintln!(
+            "stage6_compressed_fields:{}",
+            stage6.compressed_processed_fields
+        );
+        eprintln!("stage6_matched_entries:  {}", stage6.matched_entries);
+        eprintln!("stage6_grouped_rows:     {}", stage6.grouped_rows);
+        eprintln!("stage6_checksum:         {}", stage6.work_checksum);
+        eprintln!("stage6_time_usec:        {}", stage6.elapsed_usec);
+        eprintln!(
+            "stage6_usec_per_row:     {:.6}",
+            stage6.elapsed_usec as f64 / stage6.rows_read as f64
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore]
+    async fn profile_fixed_raw_query_processing_against_local_journals() {
+        const FIXED_FILES: [&str; 4] = [
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-00000000045ab310-00064da65a07dfc3.journal",
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-00000000045d8ec3-00064da8006c73a9.journal",
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-0000000004606cfe-00064da9f3edc98c.journal",
+            "/tmp/netdata-raw-snapshot-1774481723/system@92ecfa81f20440b9a0762a3a4656e37a-0000000004634242-00064dabd29b631e.journal",
+        ];
+
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let journal_root = tmp.path().join("flows");
+        let raw_dir = journal_root.join("raw");
+        let minute_1_dir = journal_root.join("1m");
+        let minute_5_dir = journal_root.join("5m");
+        let hour_1_dir = journal_root.join("1h");
+        fs::create_dir_all(&raw_dir).expect("create raw dir");
+        fs::create_dir_all(&minute_1_dir).expect("create 1m dir");
+        fs::create_dir_all(&minute_5_dir).expect("create 5m dir");
+        fs::create_dir_all(&hour_1_dir).expect("create 1h dir");
+
+        for src in FIXED_FILES {
+            let src_path = Path::new(src);
+            assert!(
+                src_path.is_file(),
+                "expected journal file {}",
+                src_path.display()
+            );
             let dst_path = raw_dir.join(src_path.file_name().expect("journal filename"));
             if let Err(err) = fs::hard_link(src_path, &dst_path) {
                 if err.raw_os_error() == Some(18) {

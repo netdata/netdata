@@ -1314,8 +1314,8 @@ mod tests {
             v9_flow.get("SAMPLING_RATE").map(String::as_str),
             Some("30000")
         );
-        assert_eq!(v9_flow.get("BYTES").map(String::as_str), Some("1500"));
-        assert_eq!(v9_flow.get("PACKETS").map(String::as_str), Some("1"));
+        assert_eq!(v9_flow.get("BYTES").map(String::as_str), Some("45000000"));
+        assert_eq!(v9_flow.get("PACKETS").map(String::as_str), Some("30000"));
 
         let ipfix_flows = decode_fixture_sequence(&mut second, &["ipfixprobe-data.pcap"]);
         assert_eq!(
