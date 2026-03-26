@@ -69,6 +69,9 @@ static void ml_features_lag(ml_features_t *features, double sampling_ratio)
 
 void ml_features_preprocess(ml_features_t *features, double sampling_ratio)
 {
+    if (!features->preprocessed_features)
+        return;
+
     ml_features_diff(features);
     ml_features_smooth(features);
     ml_features_lag(features, sampling_ratio);
@@ -79,6 +82,7 @@ void ml_features_preprocess_predict(ml_features_t *features, DSample *sample)
     ml_features_diff(features);
     ml_features_smooth(features);
 
+    sample->set_size(features->lag_n + 1);
     for (size_t feature_idx = 0; feature_idx != features->lag_n + 1; feature_idx++)
         (*sample)(feature_idx) = features->src[feature_idx];
 }

@@ -786,8 +786,7 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     }
 
     // Push the value and check if it's different from the last one
-    size_t newest_idx = (dim->cns_head + n - 1) % n;
-    bool same_value = (dim->cns[newest_idx] == value);
+    bool same_value = (dim->cns[dim->cns_head] == value);
     dim->cns[dim->cns_head] = value;
     dim->cns_head = (dim->cns_head + 1) % n;
 
