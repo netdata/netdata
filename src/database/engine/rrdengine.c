@@ -1539,6 +1539,7 @@ void datafile_delete(
     uint8_t deleted_journal_files = 0;
     uint8_t expected_journal_files = JOURNALFILE_DELETED_V1;
     bool deleted_datafile = false;
+    unsigned datafile_tier = datafile->tier;
     int ret;
 
     netdata_rwlock_wrlock(&ctx->datafiles.rwlock);
@@ -1586,10 +1587,10 @@ void datafile_delete(
 
     if (del_ndf && del_njf && del_njfv2)
         netdata_log_info("DBENGINE: tier %d: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf, .njfv2), reclaimed %s.",
-                         tier, datafile->tier, fileno, size_for_humans);
+                         tier, datafile_tier, fileno, size_for_humans);
     else if (del_ndf && del_njf && !exp_njfv2)
         netdata_log_info("DBENGINE: tier %d: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf), reclaimed %s.",
-                         tier, datafile->tier, fileno, size_for_humans);
+                         tier, datafile_tier, fileno, size_for_humans);
     else if (del_ndf || del_njf || del_njfv2) {
         BUFFER *removed = buffer_create(0, NULL);
         BUFFER *failed = buffer_create(0, NULL);
@@ -1608,17 +1609,17 @@ void datafile_delete(
         if(buffer_strlen(failed))
             netdata_log_error("DBENGINE: tier %d: partial delete of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
                               " - removed: %s, failed: %s, reclaimed %s.",
-                              tier, datafile->tier, fileno,
+                              tier, datafile_tier, fileno,
                               buffer_tostring(removed), buffer_tostring(failed), size_for_humans);
         else
             netdata_log_info("DBENGINE: tier %d: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (%s), reclaimed %s.",
-                             tier, datafile->tier, fileno, buffer_tostring(removed), size_for_humans);
+                             tier, datafile_tier, fileno, buffer_tostring(removed), size_for_humans);
         buffer_free(removed);
         buffer_free(failed);
     }
     else
         netdata_log_error("DBENGINE: tier %d: failed to delete " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " to maintain %s.",
-                          tier, datafile->tier, fileno, disk_time ? "disk quota" : "time retention");
+                          tier, datafile_tier, fileno, disk_time ? "disk quota" : "time retention");
 }
 
 static void *database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
