@@ -166,10 +166,9 @@ debug-assertions = true
 
 [profile.release]
 debug = true
-# lto = true
-opt-level = "z"
-# strip = true
-# codegen-units = 1
+lto = "fat"
+opt-level = 3
+codegen-units = 1
 
 [profile.release-min]
 inherits = "release"
