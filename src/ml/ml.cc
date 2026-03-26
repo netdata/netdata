@@ -791,15 +791,19 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     size_t smoothing_window = ml_dimension_smoothing_window(dim);
     unsigned n = Cfg.diff_n + smoothing_window + Cfg.lag_n;
 
+    size_t cns_size = dim->cns.size();
+
     // The ring buffer modulus is derived from the current effective smoothing
-    // window. If that changes, the existing buffer/head state no longer matches
-    // the new modulus, so rebuild the history before indexing or linearizing it.
-    if (dim->cns.size() != n || dim->cns_head >= n) {
+    // window. Once the ring has been initialized/full, a later change to the
+    // effective window means the existing buffer/head state no longer matches
+    // the current modulus, so rebuild the history before indexing or linearizing it.
+    if (cns_size >= n && (cns_size != n || dim->cns_head >= cns_size)) {
         dim->cns.clear();
         dim->cns_head = 0;
+        cns_size = 0;
     }
 
-    if (dim->cns.size() < n) {
+    if (cns_size < n) {
         dim->cns.push_back(value);
         spinlock_unlock(&dim->slock);
         return false;
