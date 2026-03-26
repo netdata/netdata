@@ -1456,7 +1456,8 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         goto done;
 
     internal_error(zero_disk_retention,
-                   "DBENGINE: tier %d: deleted %zu metrics, zero retention but referenced %zu (out of %zu total, of which %zu have main cache retention) zero on-disk retention metrics from metrics registry",
+                   "DBENGINE: tier %d: deleted %zu metrics from metrics registry; %zu still had zero retention but were referenced "
+                   "(out of %zu total zero on-disk retention metrics, of which %zu have main cache retention)",
                    ctx->config.tier, deleted_metrics, zero_retention_referenced, zero_disk_retention, zero_disk_but_live);
 
     if(global_first_time_s != LONG_MAX)
