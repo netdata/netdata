@@ -499,33 +499,18 @@ impl Cursor {
             .ok_or(SessionError::CursorNotPositioned)?;
         let buf = &mut self.decompress_buf;
         let data_offsets = &mut self.entry_data_offsets;
-        let mut visitor_error = None;
+        data_offsets.clear();
+        jf.entry_data_object_offsets(entry_offset, data_offsets)?;
 
-        jf.visit_entry_payloads(entry_offset, data_offsets, |payload| {
-            if visitor_error.is_some() {
-                return Ok(());
-            }
+        for data_offset in data_offsets.iter().copied() {
+            let guard = jf.data_ref(data_offset)?;
 
-            let result = if payload.is_compressed() {
-                if let Err(err) = payload.decompress(buf) {
-                    visitor_error = Some(SessionError::from(err));
-                    return Ok(());
-                }
-                visitor(buf)
+            if guard.is_compressed() {
+                guard.decompress(buf)?;
+                visitor(buf)?;
             } else {
-                visitor(payload.raw_payload())
-            };
-
-            if let Err(err) = result {
-                visitor_error = Some(err);
+                visitor(guard.raw_payload())?;
             }
-
-            Ok(())
-        })
-        .map_err(SessionError::from)?;
-
-        if let Some(err) = visitor_error {
-            return Err(err);
         }
 
         Ok(())
