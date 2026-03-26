@@ -548,7 +548,8 @@ uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, st
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
     int ret;
-    uv_fs_t req;
+    uv_fs_t req_v2 = { 0 };
+    uv_fs_t req_v1 = { 0 };
     char path[RRDENG_PATH_MAX];
     char path_v2[RRDENG_PATH_MAX];
 
@@ -566,23 +567,23 @@ uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, st
     // Now safe to delete the files - no threads are accessing them
     uint8_t deleted = 0;
 
-    ret = uv_fs_unlink(NULL, &req, path_v2, NULL);
+    ret = uv_fs_unlink(NULL, &req_v2, path_v2, NULL);
     if (ret == 0)
         deleted |= JOURNALFILE_DELETED_V2;
     else if (ret != UV_ENOENT) {
         netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path_v2, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
-    uv_fs_req_cleanup(&req);
+    uv_fs_req_cleanup(&req_v2);
 
-    ret = uv_fs_unlink(NULL, &req, path, NULL);
+    ret = uv_fs_unlink(NULL, &req_v1, path, NULL);
     if (ret == 0)
         deleted |= JOURNALFILE_DELETED_V1;
     else if (ret != UV_ENOENT) {
         netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
-    uv_fs_req_cleanup(&req);
+    uv_fs_req_cleanup(&req_v1);
 
     __atomic_add_fetch(&ctx->stats.journalfile_deletions, __builtin_popcount(deleted), __ATOMIC_RELAXED);
 

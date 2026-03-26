@@ -1549,7 +1549,7 @@ void datafile_delete(
     datafile_bytes = datafile->pos;
     journal_file_bytes = journalfile_current_size(journal_file);
     size_t journal_v2_bytes = journalfile_v2_data_size_get(journal_file);
-    if (journal_v2_bytes)
+    if (journalfile_v2_data_available(journal_file))
         expected_journal_files |= JOURNALFILE_DELETED_V2;
     deleted_bytes = 0;
 
