@@ -40,13 +40,17 @@ jobs:
           .github/scripts/prepare-release-base.sh \
               ${{ github.repository }} \
               ${{ github.event_name }} \
-              ${{ github.event.inputs.type }} \
-              ${{ github.event.inputs.version }} \
-              ${{ secrets.NETDATA_RELEASE_TEST }}
+              ${INPUT_TYPE} \
+              ${INPUT_VERSION} \
+              ${NETDATA_RELEASE_TEST}
+        env:
+          NETDATA_RELEASE_TEST: ${{ secrets.NETDATA_RELEASE_TEST }}
+          INPUT_TYPE: ${{ github.event.inputs.type }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
       - name: Set up git-cliff
         id: setup-git-cliff
         if: steps.target.outputs.run == 'true'
-        uses: kenji-miyake/setup-git-cliff@v2
+        uses: kenji-miyake/setup-git-cliff@2778609c643a39a2576c4bae2e493b855eb4aee8 # v2
       - name: Generate Release Changelog
         id: release-changelog
         if: steps.target.outputs.run == 'true'
@@ -56,13 +60,14 @@ jobs:
         if: steps.target.outputs.run == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           git config user.name "netdatabot"
           git config user.email "bot@netdata.cloud"
           git add packaging/version CHANGELOG.md
           git commit -m "[ci skip] ${{ steps.target.outputs.message }}"
           if [ "${{ steps.target.outputs.type }}" != "nightly" ]; then
-            git tag -a "${{ github.event.inputs.version }}" -m "${{ steps.target.outputs.message }}"
+            git tag -a "${INPUT_VERSION}" -m "${{ steps.target.outputs.message }}"
           fi
           if [ -n "${{ steps.target.outputs.new-branch }}" ]; then
             git branch "${{ steps.target.outputs.new-branch }}"
@@ -72,7 +77,7 @@ jobs:
             git push origin "${{ steps.target.outputs.new-branch }}"
           fi
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -102,7 +107,7 @@ jobs:
           ref: ${{ needs.update-changelogs.outputs.ref }}
       - name: Trigger build
         id: trigger
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@7a027648b88c2413826b6ddd6c76114894dc5ec4 # v1
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: ${{ github.repository }}
@@ -110,7 +115,7 @@ jobs:
           ref: ${{ needs.update-changelogs.outputs.ref }}
           inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ needs.update-changelogs.outputs.type }}"}'
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -137,7 +142,7 @@ jobs:
           ref: ${{ needs.update-changelogs.outputs.ref }}
       - name: Trigger build
         id: trigger
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@7a027648b88c2413826b6ddd6c76114894dc5ec4 # v1
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: ${{ github.repository }}
@@ -145,7 +150,7 @@ jobs:
           ref: ${{ needs.update-changelogs.outputs.ref }}
           inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}"}'
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -172,7 +177,7 @@ jobs:
           ref: ${{ needs.update-changelogs.outputs.ref }}
       - name: Trigger build
         id: trigger
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@7a027648b88c2413826b6ddd6c76114894dc5ec4 # v1
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: ${{ github.repository }}
@@ -180,7 +185,7 @@ jobs:
           ref: ${{ needs.update-changelogs.outputs.ref }}
           inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ needs.update-changelogs.outputs.type }}"}'
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

@@ -40,7 +40,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_ICON_EMOJI: ':github-actions:'
@@ -82,7 +82,7 @@ jobs:
         # Unlike normally, we do not need a deep clone or submodules for this.
       - name: Fetch base image
         id: fetch-images
-        uses: nick-invision/retry@v4
+        uses: nick-invision/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         with:
           max_attempts: 3
           retry_wait_seconds: 30
@@ -112,7 +112,7 @@ jobs:
       - name: SSH setup
         id: ssh-setup
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
-        uses: shimataro/ssh-key-action@v2
+        uses: shimataro/ssh-key-action@87a8f067114a8ce263df83e9ed5c849953548bc3 # v2
         with:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
           name: id_ecdsa
@@ -135,7 +135,7 @@ jobs:
       - name: Import GPG Keys
         id: import-keys
         if: matrix.format == 'deb' && github.event_name != 'pull_request'
-        uses: crazy-max/ghaction-import-gpg@v7
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7
         with:
           gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
       - name: Sign DEB Packages
@@ -159,7 +159,7 @@ jobs:
           done
       - name: Failure Notification
         if: ${{ failure() && github.repository == 'netdata/netdata' }}
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

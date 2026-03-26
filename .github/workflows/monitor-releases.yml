@@ -30,10 +30,12 @@ jobs:
         id: ow-defaults
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "RELEASE_CHANNEL=${{ github.event.inputs.channel }}" >> "${GITHUB_ENV}"
+            echo "RELEASE_CHANNEL=${INPUT_CHANNEL}" >> "${GITHUB_ENV}"
           else
             echo "RELEASE_CHANNEL=stable" >> "${GITHUB_ENV}"
           fi
+        env:
+          INPUT_CHANNEL: ${{ github.event.inputs.channel }}
       - name: Init Python environment
         uses: actions/setup-python@v6
         id: init-python
@@ -50,7 +52,7 @@ jobs:
       - name: SSH setup
         id: ssh-setup
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-newer-releases.outputs.versions_needs_update == 'true'
-        uses: shimataro/ssh-key-action@v2
+        uses: shimataro/ssh-key-action@87a8f067114a8ce263df83e9ed5c849953548bc3 # v2
         with:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
           name: id_ecdsa
@@ -67,7 +69,7 @@ jobs:
         run: |
           .github/scripts/upload-new-version-tags.sh packages2.netdata.cloud
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

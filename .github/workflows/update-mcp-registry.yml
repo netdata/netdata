@@ -23,8 +23,10 @@ jobs:
           !startsWith(github.ref, 'refs/tags/v')
         run: |
           echo "❌ This workflow can only be run manually on a tag starting with 'v'."
-          echo "Ref: ${{ github.ref }}"
+          echo "Ref: ${GIT_REF}"
           exit 1
+        env:
+          GIT_REF: ${{ github.ref }}
       - name: Checkout
         id: checkout
         uses: actions/checkout@v6
@@ -66,7 +68,7 @@ jobs:
         run: mcp-publisher publish server.json
 
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         if: failure()
         env:
           SLACK_COLOR: 'danger'

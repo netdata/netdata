@@ -38,7 +38,7 @@ jobs:
           submodules: recursive
       - name: Check source files
         id: check-source-files
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -57,7 +57,7 @@ jobs:
             **/*.md
       - name: Check build files
         id: check-build-files
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -83,7 +83,7 @@ jobs:
             packaging/repoconfig/
       - name: Check static build files
         id: check-static-build-files
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -188,7 +188,7 @@ jobs:
           path: artifacts/*.tar.gz
           retention-days: 30
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -235,7 +235,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -319,7 +319,7 @@ jobs:
           path: artifacts/*.gz.run
           retention-days: 30
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -380,7 +380,7 @@ jobs:
       - name: Sign Agent Code
         id: sign-agent
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: azure/artifact-signing-action@v1.1.0
+        uses: azure/artifact-signing-action@87c2e83e6868da99d3380aa309851b32ed9a8346 # v1.1.0
         with:
           azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
           azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
@@ -403,7 +403,7 @@ jobs:
       - name: Sign Installer
         id: sign-installer
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: azure/artifact-signing-action@v1.1.0
+        uses: azure/artifact-signing-action@87c2e83e6868da99d3380aa309851b32ed9a8346 # v1.1.0
         with:
           azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
           azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
@@ -424,7 +424,7 @@ jobs:
           path: packaging\windows\netdata*.msi
           retention-days: 30
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -471,7 +471,7 @@ jobs:
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -496,7 +496,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: ./.github/scripts/windows-linker-check.ps1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -543,7 +543,7 @@ jobs:
       - name: Retrieve Build Artifacts
         id: fetch-dist
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -555,7 +555,7 @@ jobs:
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -583,7 +583,7 @@ jobs:
           path: artifacts/*
           retention-days: 30
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -633,7 +633,7 @@ jobs:
       - name: Fetch artifacts
         id: fetch
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -655,7 +655,7 @@ jobs:
           NETDATA_TARBALL_BASEURL: http://localhost:8080/
         run: sh -x packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -702,7 +702,7 @@ jobs:
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -724,7 +724,7 @@ jobs:
           NETDATA_TARBALL_BASEURL: http://localhost:8080/
         run: sh -x packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -771,7 +771,7 @@ jobs:
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -794,7 +794,7 @@ jobs:
                  -v $PWD:/netdata -w /netdata \
                  ubuntu:latest /bin/sh -x /netdata/.github/scripts/run-updater-check.sh
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -841,7 +841,7 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Retrieve Artifacts
         id: fetch
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -858,7 +858,7 @@ jobs:
           echo "date=$(date +%F)" >> "${GITHUB_OUTPUT}"
       - name: Create Release
         id: create-release
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
@@ -891,7 +891,7 @@ jobs:
       - name: SSH setup
         id: ssh-setup
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-latest-version.outputs.versions_needs_update == 'true'
-        uses: shimataro/ssh-key-action@v2
+        uses: shimataro/ssh-key-action@87a8f067114a8ce263df83e9ed5c849953548bc3 # v2
         with:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
           name: id_ecdsa
@@ -908,7 +908,7 @@ jobs:
         run: |
           .github/scripts/upload-new-version-tags.sh packages.netdata.cloud
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -946,12 +946,14 @@ jobs:
       - name: Normalize Tag
         id: tag
         run: |
-          if echo ${{ github.event.inputs.version }} | grep -qE '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'; then
-            echo "tag=v${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
+          if echo ${INPUT_VERSION} | grep -qE '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'; then
+            echo "tag=v${INPUT_VERSION}" >> "${GITHUB_OUTPUT}"
           else
-            echo "tag=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
+            echo "tag=${INPUT_VERSION}" >> "${GITHUB_OUTPUT}"
           fi
 
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
   upload-release: # Create the draft release and upload the build artifacts.
     name: Create Release Draft
     runs-on: ubuntu-latest
@@ -967,7 +969,7 @@ jobs:
         uses: actions/checkout@v6
       - name: Retrieve Artifacts
         id: fetch
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -977,7 +979,7 @@ jobs:
           attempt_delay: 2000
       - name: Create Release
         id: create-release
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
@@ -986,7 +988,7 @@ jobs:
           tag: ${{ needs.normalize-tag.outputs.tag }}
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1005,7 +1007,7 @@ jobs:
             && github.event_name == 'workflow_dispatch'
           }}
       - name: Success Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'good'
           SLACK_FOOTER: ''
@@ -1044,7 +1046,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1089,10 +1091,10 @@ jobs:
           submodules: recursive
       - name: Setup Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
       - name: Build test environment
         id: build
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
           action: docker/build-push-action@v6
           with: |
@@ -1113,7 +1115,7 @@ jobs:
           docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
               /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --one-time-build ${{ needs.file-check.outputs.skip-go }}'
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1188,7 +1190,7 @@ jobs:
           /usr/local/netdata/usr/sbin/netdata -D > ./netdata.log 2>&1 &
           ./packaging/runtime-check.sh
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

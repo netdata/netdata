@@ -35,7 +35,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -117,7 +117,7 @@ jobs:
       - name: Create EOL Issue
         id: create-issue
         if: steps.check.outputs.pending == 'true' && steps.existing.outputs.exists == 'false'
-        uses: imjohnbo/issue-bot@v3
+        uses: imjohnbo/issue-bot@572eed14422c4d6ca37e870f97e7da209422f5bd # v3
         with:
           assignees: Ferroin
           labels: area/packaging, needs triage
@@ -131,7 +131,7 @@ jobs:
             - [ ] Verify any other platform support code that needs to be cleaned up.
       # Send a notification to Slack if a job failed.
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

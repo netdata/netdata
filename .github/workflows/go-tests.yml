@@ -24,7 +24,7 @@ jobs:
           submodules: recursive
       - name: Check files
         id: check-files
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -122,7 +122,7 @@ jobs:
         working-directory: ${{ matrix.module }}
       - name: Set up gotestfmt
         if: needs.file-check.outputs.run == 'true'
-        uses: GoTestTools/gotestfmt-action@v2
+        uses: GoTestTools/gotestfmt-action@7dd37bbcc925453b6d7465164cf3bcbd87bc691d # v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: v2.2.0

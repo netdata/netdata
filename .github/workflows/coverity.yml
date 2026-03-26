@@ -44,7 +44,7 @@ jobs:
         run: |
           bash -x ./packaging/utils/coverity-scan.sh --with-install
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
