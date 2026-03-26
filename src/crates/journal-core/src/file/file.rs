@@ -267,76 +267,6 @@ fn map_hash_table<M: MemoryMap>(
 }
 
 impl<M: MemoryMap> JournalFile<M> {
-    fn object_bytes_in_window<'a>(
-        &'a self,
-        wm: &'a mut WindowManager<M>,
-        offset: NonZeroU64,
-    ) -> Result<&'a [u8]> {
-        const OBJECT_HEADER_SIZE: u64 = std::mem::size_of::<ObjectHeader>() as u64;
-        const OBJECT_SIZE_OFFSET: usize = 8;
-
-        validate_offset_alignment(offset)?;
-
-        let journal_header = self.journal_header_ref();
-        let header_size = journal_header.header_size;
-        let arena_end = header_size + journal_header.arena_size;
-
-        if offset.get() < header_size {
-            return Err(JournalError::ObjectExceedsFileBounds);
-        }
-
-        let size_needed = {
-            let header_slice = wm.get_slice(offset.get(), OBJECT_HEADER_SIZE)?;
-            let size = u64::from_le_bytes(
-                header_slice[OBJECT_SIZE_OFFSET..OBJECT_SIZE_OFFSET + std::mem::size_of::<u64>()]
-                    .try_into()
-                    .map_err(|_| JournalError::ZerocopyFailure)?,
-            );
-            if size < OBJECT_HEADER_SIZE {
-                return Err(JournalError::InvalidObjectSize(size));
-            }
-            size
-        };
-
-        let end_offset = offset
-            .get()
-            .checked_add(size_needed)
-            .ok_or(JournalError::ObjectExceedsFileBounds)?;
-        if end_offset > arena_end {
-            return Err(JournalError::ObjectExceedsFileBounds);
-        }
-
-        wm.get_slice(offset.get(), size_needed)
-    }
-
-    fn parse_object_in_window<'a, T>(
-        &'a self,
-        wm: &'a mut WindowManager<M>,
-        offset: NonZeroU64,
-    ) -> Result<T>
-    where
-        T: JournalObject<&'a [u8]>,
-    {
-        let data = self.object_bytes_in_window(wm, offset)?;
-        let is_compact = self
-            .journal_header_ref()
-            .has_incompatible_flag(HeaderIncompatibleFlags::Compact);
-        T::from_data(data, is_compact).ok_or(JournalError::ZerocopyFailure)
-    }
-
-    fn data_payload_in_window<'a>(
-        &'a self,
-        wm: &'a mut WindowManager<M>,
-        offset: NonZeroU64,
-    ) -> Result<DataPayloadRef<'a>> {
-        let data = self.object_bytes_in_window(wm, offset)?;
-        let is_compact = self
-            .journal_header_ref()
-            .has_incompatible_flag(HeaderIncompatibleFlags::Compact);
-        DataPayloadRef::from_object_bytes(data, is_compact)
-            .ok_or(JournalError::ZerocopyFailure)
-    }
-
     pub fn visit_bucket<'a, H, V>(
         &'a self,
         hash_table: Option<H>,
@@ -488,8 +418,45 @@ impl<M: MemoryMap> JournalFile<M> {
     where
         T: JournalObject<&'a [u8]>,
     {
-        self.window_manager
-            .with_guarded(offset, |wm| self.parse_object_in_window(wm, offset))
+        validate_offset_alignment(offset)?;
+
+        let journal_header = self.journal_header_ref();
+        let is_compact = journal_header.has_incompatible_flag(HeaderIncompatibleFlags::Compact);
+        let header_size = journal_header.header_size;
+        let arena_end = header_size + journal_header.arena_size;
+
+        // Objects cannot be located in the file header
+        if offset.get() < header_size {
+            return Err(JournalError::ObjectExceedsFileBounds);
+        }
+
+        self.window_manager.with_guarded(offset, |wm| {
+            // Get the object header to determine size
+            let size_needed = {
+                let header_slice =
+                    wm.get_slice(offset.get(), std::mem::size_of::<ObjectHeader>() as u64)?;
+                let header = ObjectHeader::ref_from_bytes(header_slice)
+                    .map_err(|_| JournalError::ZerocopyFailure)?;
+                header.validated_size()?
+            };
+
+            // Validate that the object doesn't exceed the journal's arena bounds
+            let end_offset = offset
+                .get()
+                .checked_add(size_needed)
+                .ok_or(JournalError::ObjectExceedsFileBounds)?;
+            if end_offset > arena_end {
+                return Err(JournalError::ObjectExceedsFileBounds);
+            }
+
+            // Get the full object data
+            let data = wm.get_slice(offset.get(), size_needed)?;
+
+            // Parse the object
+            let value = T::from_data(data, is_compact).ok_or(JournalError::ZerocopyFailure)?;
+
+            Ok(value)
+        })
     }
 
     pub fn offset_array_ref(
@@ -675,34 +642,6 @@ impl<M: MemoryMap> JournalFile<M> {
             current_index: 0,
             total_items,
         })
-    }
-
-    pub fn visit_entry_payloads<F>(
-        &self,
-        entry_offset: NonZeroU64,
-        data_offsets: &mut Vec<NonZeroU64>,
-        mut visitor: F,
-    ) -> Result<()>
-    where
-        F: for<'a> FnMut(DataPayloadRef<'a>) -> Result<()>,
-    {
-        data_offsets.clear();
-
-        self.window_manager.with_guarded(entry_offset, |wm| {
-            {
-                let entry: EntryObject<&[u8]> = self.parse_object_in_window(wm, entry_offset)?;
-                entry.collect_offsets(data_offsets)?;
-            }
-
-            for data_offset in data_offsets.iter().copied() {
-                let payload = self.data_payload_in_window(wm, data_offset)?;
-                visitor(payload)?;
-            }
-
-            Ok(())
-        })?;
-
-        Ok(())
     }
 
     /// Get hash table bucket utilization statistics
@@ -1218,10 +1157,12 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
     fn next(&mut self) -> Option<Self::Item> {
         let entry_offset = self.entry_offset?;
 
+        // If we've reached the end of the data indices, return None
         if self.current_index >= self.total_items {
             return None;
         }
 
+        // Get the entry object to access the data offset
         match self.journal.entry_ref(entry_offset) {
             Ok(entry_guard) => {
                 let idx = self.current_index;
@@ -1244,17 +1185,21 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
 
                 let data_offset = NonZeroU64::new(data_offset)?;
 
+                // Drop the entry guard before obtaining the data object
                 drop(entry_guard);
 
+                // Try to get the data object
                 match self.journal.data_ref(data_offset) {
                     Ok(data_guard) => Some(Ok(data_guard)),
                     Err(e) => {
+                        // If we can't read the data, return the error and stop iteration
                         self.current_index = self.total_items;
                         Some(Err(e))
                     }
                 }
             }
             Err(e) => {
+                // If we can't read the entry, return the error and stop iteration
                 self.current_index = self.total_items;
                 Some(Err(e))
             }

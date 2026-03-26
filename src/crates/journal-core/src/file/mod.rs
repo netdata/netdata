@@ -38,6 +38,6 @@ pub use crate::file::hash::journal_hash_data;
 pub(crate) use object::*;
 
 // Re-export DataObject for journal-index
-pub use object::{DataObject, DataPayloadRef};
+pub use object::DataObject;
 
 pub type JournalFileMap = JournalFile<Mmap>;
