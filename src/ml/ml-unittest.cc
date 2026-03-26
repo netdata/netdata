@@ -549,53 +549,25 @@ static void test_preprocess_predict_equivalence()
             ML_TEST_ASSERT(pf.size() == 1, msg);
             if (pf.size() != 1) continue;
 
-            // Path 2: manual extraction matching what ml_features_preprocess_predict does:
-            // diff + smooth, then read first lag_n+1 values from src.
-            // This validates the logic without depending on the branch function existing.
+            // Path 2: ml_features_preprocess_predict should produce the same
+            // prediction-sized feature vector as the training preprocess path.
             calculated_number_t src2[128], dst2[128];
             memset(src2, 0, sizeof(src2));
             memcpy(src2, input, n * sizeof(calculated_number_t));
             memcpy(dst2, src2, n * sizeof(calculated_number_t));
 
-            // Replicate diff
-            if (diff_n > 0) {
-                for (size_t idx = 0; idx != (n - diff_n); idx++) {
-                    size_t high = (n - 1) - idx;
-                    size_t low = high - diff_n;
-                    dst2[low] = src2[high] - src2[low];
-                }
-                memcpy(src2, dst2, (n - diff_n) * sizeof(calculated_number_t));
-                for (size_t idx = n - diff_n; idx != n; idx++)
-                    src2[idx] = 0.0;
-            }
+            ml_features_t features2 = {
+                diff_n, smooth_n, lag_n,
+                dst2, n, src2, n
+            };
+            DSample predicted_feature;
+            ml_features_preprocess_predict(&features2, predicted_feature);
 
-            // Replicate smooth
-            {
-                calculated_number_t sum = 0.0;
-                size_t idx = 0;
-                for (; idx != smooth_n - 1; idx++)
-                    sum += src2[idx];
-                for (; idx != (n - diff_n); idx++) {
-                    sum += src2[idx];
-                    calculated_number_t prev = src2[idx - (smooth_n - 1)];
-                    src2[idx - (smooth_n - 1)] = sum / smooth_n;
-                    sum -= prev;
-                }
-                for (idx = 0; idx != smooth_n; idx++)
-                    src2[(n - 1) - idx] = 0.0;
-            }
-
-            // Extract feature: first lag_n+1 values (what preprocess_predict does)
-            DSample direct_feature;
-            direct_feature.set_size(lag_n + 1);
-            for (size_t fi = 0; fi != lag_n + 1; fi++)
-                direct_feature(fi) = src2[fi];
-
-            // Compare: pf[0] from full pipeline must match direct extraction
+            // Compare: pf[0] from full pipeline must match the direct prediction path.
             for (size_t fi = 0; fi < lag_n + 1; fi++) {
-                snprintf(msg, sizeof(msg), "params(%zu,%zu,%zu) %s: feature[%zu] preprocess vs direct",
+                snprintf(msg, sizeof(msg), "params(%zu,%zu,%zu) %s: feature[%zu] preprocess vs predict",
                          diff_n, smooth_n, lag_n, filler_names[f], fi);
-                ML_TEST_ASSERT_DOUBLE_EQ(pf[0](fi), direct_feature(fi), 1e-12, msg);
+                ML_TEST_ASSERT_DOUBLE_EQ(pf[0](fi), predicted_feature(fi), 1e-12, msg);
             }
         }
     }

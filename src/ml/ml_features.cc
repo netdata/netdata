@@ -10,6 +10,19 @@ static inline size_t ml_effective_smooth_n(const ml_features_t *features)
     return features->smooth_n == 0 ? 1 : features->smooth_n;
 }
 
+static inline void ml_validate_features_input(const ml_features_t *features, bool prediction_path)
+{
+    size_t smooth_n = ml_effective_smooth_n(features);
+    size_t min_required_samples = features->diff_n + smooth_n + features->lag_n;
+
+    fatal_assert(features->dst_n >= features->src_n &&
+                 "ml_features: dst buffer must be at least as large as src buffer");
+    fatal_assert(features->src_n >= min_required_samples &&
+                 (prediction_path
+                      ? "ml_features_preprocess_predict: src buffer is smaller than diff_n + effective_smooth_n + lag_n"
+                      : "ml_features_preprocess: src buffer is smaller than diff_n + effective_smooth_n + lag_n"));
+}
+
 static void ml_features_diff(ml_features_t *features)
 {
     if (features->diff_n == 0)
@@ -77,6 +90,7 @@ static void ml_features_lag(ml_features_t *features, std::vector<DSample> &prepr
 
 void ml_features_preprocess(ml_features_t *features, std::vector<DSample> &preprocessed_features, double sampling_ratio)
 {
+    ml_validate_features_input(features, false);
     ml_features_diff(features);
     ml_features_smooth(features);
     ml_features_lag(features, preprocessed_features, sampling_ratio);
@@ -84,6 +98,7 @@ void ml_features_preprocess(ml_features_t *features, std::vector<DSample> &prepr
 
 void ml_features_preprocess_predict(ml_features_t *features, DSample &sample)
 {
+    ml_validate_features_input(features, true);
     ml_features_diff(features);
     ml_features_smooth(features);
 
