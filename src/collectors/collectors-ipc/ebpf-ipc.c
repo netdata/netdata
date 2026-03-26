@@ -9,21 +9,29 @@ sem_t *shm_mutex_ebpf_integration = SEM_FAILED;
 static Pvoid_t ebpf_ipc_JudyL = NULL;
 ebpf_user_mem_stat_t ebpf_stat_values;
 
-static uint32_t *ebpf_shm_find_index_unsafe(uint32_t pid)
+// Judy stores index+1 directly in the pointer slot to avoid heap allocation.
+// 0 means "not found" (Judy returns NULL for missing keys),
+// so we offset by 1: stored = index+1, retrieved = stored-1.
+#define IDX_TO_JVALUE(idx) ((Pvoid_t)((Word_t)(idx) + 1))
+#define JVALUE_TO_IDX(pv)  ((uint32_t)((Word_t)(pv) - 1))
+#define JVALUE_IS_VALID(pv) ((pv) != NULL)
+
+static bool ebpf_shm_find_index_unsafe(uint32_t pid, uint32_t *result)
 {
     Pvoid_t *Pvalue = JudyLGet(ebpf_ipc_JudyL, (Word_t)pid, PJE0);
-    if (Pvalue)
-        return *Pvalue;
-    return NULL;
+    if (Pvalue && JVALUE_IS_VALID(*Pvalue)) {
+        *result = JVALUE_TO_IDX(*Pvalue);
+        return true;
+    }
+    return false;
 }
 
 static bool ebpf_find_pid_shm_del_unsafe(uint32_t pid, enum ebpf_pids_index shm_idx)
 {
-    uint32_t *lpid = ebpf_shm_find_index_unsafe(pid);
-    if (!lpid)
+    uint32_t idx;
+    if (!ebpf_shm_find_index_unsafe(pid, &idx))
         return false;
 
-    uint32_t idx = *lpid;
     if (idx >= ebpf_stat_values.current)
         return false;
 
@@ -35,17 +43,17 @@ static bool ebpf_find_pid_shm_del_unsafe(uint32_t pid, enum ebpf_pids_index shm_
     if (ptr->threads)
         return true;
 
-    freez(lpid);
     (void)JudyLDel(&ebpf_ipc_JudyL, (Word_t)pid, PJE0);
     ebpf_stat_values.current--;
 
     if (idx == ebpf_stat_values.current)
         return false;
 
+    // Compact: move last entry into the freed slot
     uint32_t last_pid = integration_shm[ebpf_stat_values.current].pid;
-    uint32_t *last_lpid = ebpf_shm_find_index_unsafe(last_pid);
-    if (last_lpid) {
-        *last_lpid = idx;
+    Pvoid_t *Pvalue = JudyLGet(ebpf_ipc_JudyL, (Word_t)last_pid, PJE0);
+    if (Pvalue && JVALUE_IS_VALID(*Pvalue)) {
+        *Pvalue = IDX_TO_JVALUE(idx);
         memcpy(ptr, &integration_shm[ebpf_stat_values.current], sizeof(*ptr));
     }
 
@@ -54,9 +62,9 @@ static bool ebpf_find_pid_shm_del_unsafe(uint32_t pid, enum ebpf_pids_index shm_
 
 static uint32_t ebpf_find_or_create_index_pid(uint32_t pid)
 {
-    uint32_t *idx = ebpf_shm_find_index_unsafe(pid);
-    if (idx)
-        return *idx;
+    uint32_t idx;
+    if (ebpf_shm_find_index_unsafe(pid, &idx))
+        return idx;
 
     if (ebpf_stat_values.current >= ebpf_stat_values.total)
         return UINT32_MAX;
@@ -65,9 +73,7 @@ static uint32_t ebpf_find_or_create_index_pid(uint32_t pid)
     internal_fatal(!Pvalue || Pvalue == PJERR, "EBPF: pid judy index");
 
     uint32_t new_idx = ebpf_stat_values.current++;
-    uint32_t *stored_idx = callocz(1, sizeof(uint32_t));
-    *stored_idx = new_idx;
-    *Pvalue = stored_idx;
+    *Pvalue = IDX_TO_JVALUE(new_idx);
 
     return new_idx;
 }
@@ -108,16 +114,8 @@ void netdata_integration_cleanup_shm()
         integration_shm = NULL;
     }
 
-    Word_t index = 0;
-    Word_t next_index;
-    PPvoid_t pid_ptr;
-    while ((pid_ptr = JudyLFirst(ebpf_ipc_JudyL, &index, PJE0)) != NULL) {
-        uint32_t *pid = *(uint32_t **)pid_ptr;
-        next_index = index;
-        freez(pid);
-        JudyLDel(&ebpf_ipc_JudyL, next_index, PJE0);
-        index = next_index;
-    }
+    // Values are stored inline (no heap allocation), just free the Judy array
+    (void)JudyLFreeArray(&ebpf_ipc_JudyL, PJE0);
     ebpf_ipc_JudyL = NULL;
 
     if (shm_fd_ebpf_integration > 0) {
