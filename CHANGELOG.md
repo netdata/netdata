@@ -190,6 +190,8 @@
 - Regenerate integrations docs ([#22032](https://github.com/netdata/netdata/issues/22032))
 - Docs(integrations): reorder collector README sections for better onboarding ([#22033](https://github.com/netdata/netdata/issues/22033))
 - Regenerate integrations docs ([#22034](https://github.com/netdata/netdata/issues/22034))
+- Fix cache (SIGSEGV) ([#22026](https://github.com/netdata/netdata/issues/22026))
+- Windows.plugin (improvements and fixes) ([#22039](https://github.com/netdata/netdata/issues/22039))
 
 ## [2.9.0] - 2026-02-16
 

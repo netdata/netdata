@@ -998,6 +998,11 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
     bool marked;
     ARAL_PAGE *page = aral_get_page_pointer_after_element___do_NOT_have_aral_lock(ar, ptr, &marked);
 
+    // Clear the embedded trailer before publishing the slot back to the free lists.
+    // This makes stale/double frees fail through the null-page check instead of
+    // dereferencing a stale ARAL_PAGE pointer while the slot is idle.
+    aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ar, NULL, ptr, false);
+
     size_t idx = mark_to_idx(marked);
     __atomic_add_fetch(&ar->ops[idx].atomic.deallocators, 1, __ATOMIC_RELAXED);
 
