@@ -13,7 +13,6 @@ pub mod writer;
 pub use file::{load_boot_id, BucketUtilization, JournalFile, JournalFileOptions};
 pub use reader::JournalReader;
 pub use writer::JournalWriter;
-pub use error::JournalError;
 
 // Essential types for working with readers
 pub use cursor::Location;
