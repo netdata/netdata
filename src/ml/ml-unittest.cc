@@ -47,8 +47,7 @@ static void test_features_diff()
     std::vector<DSample> pf;
     ml_features_t features = {
         1, 1, 1,    // diff_n=1, smooth_n=1, lag_n=1
-        dst, n, src, n,
-        &pf
+        dst, n, src, n
     };
 
     // ml_features_preprocess calls diff, smooth, lag in sequence.
@@ -62,7 +61,7 @@ static void test_features_diff()
     //   feature vectors: [src[i], src[i+1]] for i in 0..6
     //   n_vectors = 9 - 1 - 1 + 1 - 1 = 7
 
-    ml_features_preprocess(&features, 1.0);
+    ml_features_preprocess(&features, pf, 1.0);
 
     ML_TEST_ASSERT(pf.size() == 7, "lag should produce 7 feature vectors");
     if (pf.size() >= 1) {
@@ -89,11 +88,10 @@ static void test_features_no_diff()
     std::vector<DSample> pf;
     ml_features_t features = {
         0, 1, 1,    // diff_n=0, smooth_n=1, lag_n=1
-        dst, n, src, n,
-        &pf
+        dst, n, src, n
     };
 
-    ml_features_preprocess(&features, 1.0);
+    ml_features_preprocess(&features, pf, 1.0);
 
     // With diff_n=0, smooth_n=1 (no-op), lag_n=1:
     // n_vectors = 6 - 0 - 1 + 1 - 1 = 5
@@ -121,11 +119,10 @@ static void test_features_smooth()
     std::vector<DSample> pf;
     ml_features_t features = {
         0, 3, 1,    // diff_n=0, smooth_n=3, lag_n=1
-        dst, n, src, n,
-        &pf
+        dst, n, src, n
     };
 
-    ml_features_preprocess(&features, 1.0);
+    ml_features_preprocess(&features, pf, 1.0);
 
     // With diff_n=0: no diff
     // Smooth with smooth_n=3, operating on src_n - diff_n = 9 elements:
@@ -185,10 +182,9 @@ static void test_full_pipeline()
         std::vector<DSample> pf;
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
-            dst, n, src, n,
-            &pf
+            dst, n, src, n
         };
-        ml_features_preprocess(&features, 1.0);
+        ml_features_preprocess(&features, pf, 1.0);
 
         // With these params:
         // n_vectors = n - diff_n - smooth_n + 1 - lag_n = 9 - 1 - 3 + 1 - 5 = 1
@@ -208,15 +204,10 @@ static void test_full_pipeline()
 
     // Train a kmeans model on the normal data
     std::vector<DSample> training_features = std::move(all_features);
-    ml_features_t train_ft = {
-        diff_n, smooth_n, lag_n,
-        nullptr, 0, nullptr, 0,
-        &training_features
-    };
 
     ml_kmeans_t kmeans;
     ml_kmeans_init(&kmeans);
-    ml_kmeans_train(&kmeans, &train_ft, 1000, 0, 100);
+    ml_kmeans_train(&kmeans, training_features, 1000, 0, 100);
 
     ML_TEST_ASSERT(kmeans.cluster_centers.size() == 2, "kmeans should have 2 cluster centers");
     ML_TEST_ASSERT(kmeans.min_dist < kmeans.max_dist, "min_dist < max_dist after training");
@@ -246,10 +237,9 @@ static void test_full_pipeline()
         std::vector<DSample> pf;
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
-            dst, n, src, n,
-            &pf
+            dst, n, src, n
         };
-        ml_features_preprocess(&features, 1.0);
+        ml_features_preprocess(&features, pf, 1.0);
 
         if (pf.size() >= 1) {
             calculated_number_t anomaly_score = ml_kmeans_anomaly_score(&inlined_km, pf[0]);
@@ -357,10 +347,9 @@ static void test_circular_buffer_equivalence()
         std::vector<DSample> pf;
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
-            dst, n, src, n,
-            &pf
+            dst, n, src, n
         };
-        ml_features_preprocess(&features, 1.0);
+        ml_features_preprocess(&features, pf, 1.0);
 
         if (pf.size() >= 1)
             rotate_results.push_back(pf[0]);
@@ -391,10 +380,9 @@ static void test_circular_buffer_equivalence()
         std::vector<DSample> pf;
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
-            dst, n, src, n,
-            &pf
+            dst, n, src, n
         };
-        ml_features_preprocess(&features, 1.0);
+        ml_features_preprocess(&features, pf, 1.0);
 
         if (pf.size() >= 1)
             circ_results.push_back(pf[0]);
@@ -410,6 +398,33 @@ static void test_circular_buffer_equivalence()
             ML_TEST_ASSERT_DOUBLE_EQ(rotate_results[i](j), circ_results[i](j), 1e-12, msg);
         }
     }
+}
+
+// Test: same_value must compare against the previous newest sample, not the
+// oldest slot being overwritten. This locks in the intentional semantic change
+// in ml_dimension_predict().
+static void test_same_value_uses_newest_sample()
+{
+    fprintf(stderr, "  test_same_value_uses_newest_sample...\n");
+
+    const size_t n = 5;
+    std::vector<calculated_number_t> cns = {7.0, 2.0, 3.0, 4.0, 5.0};
+    size_t cns_head = 0;
+    calculated_number_t incoming = 7.0;
+
+    // Circular buffer state:
+    //   oldest slot being overwritten = cns[cns_head] = 7.0
+    //   previous newest sample        = cns[(cns_head + n - 1) % n] = 5.0
+    // If we compared against the oldest slot, same_value would be true and we'd
+    // miss the transition from 5.0 -> 7.0. Comparing against newest is correct.
+    bool old_rotate_equivalent = (cns[cns_head] == incoming);
+    size_t newest_idx = (cns_head + n - 1) % n;
+    bool new_ring_semantics = (cns[newest_idx] == incoming);
+
+    ML_TEST_ASSERT(old_rotate_equivalent,
+                   "oldest-slot comparison should report same_value for this edge case");
+    ML_TEST_ASSERT(!new_ring_semantics,
+                   "newest-sample comparison should detect the changed incoming value");
 }
 
 // Test: ml_features_preprocess with a prediction-sized window produces the same
@@ -468,10 +483,9 @@ static void test_preprocess_predict_equivalence()
             std::vector<DSample> pf;
             ml_features_t features1 = {
                 diff_n, smooth_n, lag_n,
-                dst1, n, src1, n,
-                &pf
+                dst1, n, src1, n
             };
-            ml_features_preprocess(&features1, 1.0);
+            ml_features_preprocess(&features1, pf, 1.0);
 
             // With prediction-sized window: n_vectors = n - diff_n - smooth_n + 1 - lag_n = 1
             char msg[256];
@@ -551,10 +565,9 @@ static void test_constant_input()
     std::vector<DSample> pf;
     ml_features_t features = {
         diff_n, smooth_n, lag_n,
-        dst, n, src, n,
-        &pf
+        dst, n, src, n
     };
-    ml_features_preprocess(&features, 1.0);
+    ml_features_preprocess(&features, pf, 1.0);
 
     ML_TEST_ASSERT(pf.size() == 1, "constant input should produce 1 feature vector");
 
@@ -577,10 +590,9 @@ static void test_constant_input()
     std::vector<DSample> pf2;
     ml_features_t features2 = {
         0, smooth_n, lag_n,
-        dst2, n, src2, n,
-        &pf2
+        dst2, n, src2, n
     };
-    ml_features_preprocess(&features2, 1.0);
+    ml_features_preprocess(&features2, pf2, 1.0);
 
     // With diff_n=0, smooth on constant values gives the same constant.
     // Feature vector should be all 42.0.
@@ -670,10 +682,9 @@ static void test_parameter_combinations()
         std::vector<DSample> pf;
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
-            dst, n, src, n,
-            &pf
+            dst, n, src, n
         };
-        ml_features_preprocess(&features, 1.0);
+        ml_features_preprocess(&features, pf, 1.0);
 
         char msg[256];
         snprintf(msg, sizeof(msg), "params(%zu,%zu,%zu): expected %zu vectors, got %zu",
@@ -708,10 +719,9 @@ static void test_parameter_combinations()
         std::vector<DSample> pf_large;
         ml_features_t features_large = {
             diff_n, smooth_n, lag_n,
-            dst_large, large_n, src_large, large_n,
-            &pf_large
+            dst_large, large_n, src_large, large_n
         };
-        ml_features_preprocess(&features_large, 1.0);
+        ml_features_preprocess(&features_large, pf_large, 1.0);
 
         size_t expected_large = large_n - diff_n - smooth_n + 1 - lag_n;
         snprintf(msg, sizeof(msg), "params(%zu,%zu,%zu) large window: expected %zu vectors",
@@ -739,6 +749,7 @@ extern "C" int ml_unittest()
     test_kmeans_scoring();
     test_full_pipeline();
     test_circular_buffer_equivalence();
+    test_same_value_uses_newest_sample();
     test_preprocess_predict_equivalence();
     test_constant_input();
     test_parameter_combinations();

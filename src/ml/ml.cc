@@ -729,8 +729,7 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         ml_features_t features = {
             Cfg.diff_n, smoothing_window, Cfg.lag_n,
             worker->scratch_training_cns, training_response.total_values,
-            worker->training_cns, training_response.total_values,
-            &worker->training_samples
+            worker->training_cns, training_response.total_values
         };
         
         // Calculate dynamic sampling ratio based on expected output size
@@ -746,10 +745,10 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         }
 
         // Apply sampling during lag feature extraction
-        ml_features_preprocess(&features, sampling_ratio);
+        ml_features_preprocess(&features, worker->training_samples, sampling_ratio);
 
         ml_kmeans_init(&dim->kmeans);
-        ml_kmeans_train(&dim->kmeans, &features,  Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
+        ml_kmeans_train(&dim->kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
     }
 
     // update models
@@ -822,8 +821,7 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
 
     ml_features_t features = {
         Cfg.diff_n, Cfg.max_samples_to_smooth, Cfg.lag_n,
-        dst_cns, n, src_cns, n,
-        nullptr // prediction path: preprocessed_features not used
+        dst_cns, n, src_cns, n
     };
     ml_features_preprocess_predict(&features, &dim->feature);
 
