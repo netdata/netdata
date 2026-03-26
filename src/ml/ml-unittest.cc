@@ -148,6 +148,61 @@ static void test_features_smooth()
     }
 }
 
+// Test: smooth_n=0 should behave like disabled smoothing, i.e. the same
+// effective feature extraction as smooth_n=1, for both training and prediction.
+static void test_features_zero_smooth_matches_one()
+{
+    fprintf(stderr, "  test_features_zero_smooth_matches_one...\n");
+
+    const size_t n = 6;
+    calculated_number_t input[16] = {10, 20, 30, 40, 50, 60};
+
+    calculated_number_t src0[16], dst0[16];
+    memcpy(src0, input, n * sizeof(calculated_number_t));
+    memcpy(dst0, input, n * sizeof(calculated_number_t));
+    std::vector<DSample> pf0;
+    ml_features_t features0 = {
+        0, 0, 1,
+        dst0, n, src0, n
+    };
+    ml_features_preprocess(&features0, pf0, 1.0);
+
+    calculated_number_t src1[16], dst1[16];
+    memcpy(src1, input, n * sizeof(calculated_number_t));
+    memcpy(dst1, input, n * sizeof(calculated_number_t));
+    std::vector<DSample> pf1;
+    ml_features_t features1 = {
+        0, 1, 1,
+        dst1, n, src1, n
+    };
+    ml_features_preprocess(&features1, pf1, 1.0);
+
+    ML_TEST_ASSERT(pf0.size() == pf1.size(), "smooth_n=0 and smooth_n=1 should produce the same number of vectors");
+    for (size_t i = 0; i < pf0.size() && i < pf1.size(); i++) {
+        for (long j = 0; j < pf0[i].size(); j++) {
+            char msg[128];
+            snprintf(msg, sizeof(msg), "smooth_n=0 should match smooth_n=1 at feature[%zu](%ld)", i, j);
+            ML_TEST_ASSERT_DOUBLE_EQ(pf0[i](j), pf1[i](j), 1e-12, msg);
+        }
+    }
+
+    DSample sample0, sample1;
+    memcpy(src0, input, n * sizeof(calculated_number_t));
+    memcpy(dst0, input, n * sizeof(calculated_number_t));
+    ml_features_preprocess_predict(&features0, &sample0);
+
+    memcpy(src1, input, n * sizeof(calculated_number_t));
+    memcpy(dst1, input, n * sizeof(calculated_number_t));
+    ml_features_preprocess_predict(&features1, &sample1);
+
+    ML_TEST_ASSERT(sample0.size() == sample1.size(), "prediction sample size should match for smooth_n=0 and smooth_n=1");
+    for (size_t i = 0; i < features0.lag_n + 1; i++) {
+        char msg[128];
+        snprintf(msg, sizeof(msg), "prediction smooth_n=0 should match smooth_n=1 at sample(%zu)", i);
+        ML_TEST_ASSERT_DOUBLE_EQ(sample0(i), sample1(i), 1e-12, msg);
+    }
+}
+
 // Test: full pipeline with default-like params (diff_n=1, smooth_n=3, lag_n=5)
 // Validates the feature vector shape and that a round-trip through
 // train + score produces sensible anomaly scores.
@@ -746,6 +801,7 @@ extern "C" int ml_unittest()
     test_features_diff();
     test_features_no_diff();
     test_features_smooth();
+    test_features_zero_smooth_matches_one();
     test_kmeans_scoring();
     test_full_pipeline();
     test_circular_buffer_equivalence();

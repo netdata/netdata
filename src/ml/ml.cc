@@ -28,6 +28,17 @@ static void __attribute__((destructor)) destroy_mutex(void) {
     netdata_mutex_destroy(&db_mutex);
 }
 
+static inline size_t ml_dimension_smoothing_window(const ml_dimension_t *dim)
+{
+    unsigned chart_update_every = dim->rd->rrdset->update_every;
+    if (chart_update_every > nd_profile.update_every)
+        return 1;
+
+    // max_samples_to_smooth == 0 is allowed and means "no smoothing", which is
+    // equivalent to an effective smoothing window of 1 for feature extraction.
+    return std::max<size_t>(Cfg.max_samples_to_smooth, 1);
+}
+
 typedef struct {
     // First/last entry of the dimension in DB when generating the response
     time_t first_entry_on_response;
@@ -57,7 +68,7 @@ ml_dimension_calculated_numbers(ml_worker_t *worker, ml_dimension_t *dim)
     training_response.last_entry_on_response = rrddim_last_entry_s_of_tier(dim->rd, 0);
 
     unsigned chart_update_every = dim->rd->rrdset->update_every;
-    size_t smoothing_window = (chart_update_every > nd_profile.update_every) ? 1 : Cfg.max_samples_to_smooth;
+    size_t smoothing_window = ml_dimension_smoothing_window(dim);
     size_t min_required_samples = Cfg.diff_n + smoothing_window + Cfg.lag_n;
 
     auto round_up_div = [](time_t window, unsigned step) -> size_t {
@@ -724,7 +735,7 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         memcpy(worker->scratch_training_cns, worker->training_cns,
                training_response.total_values * sizeof(calculated_number_t));
 
-        size_t smoothing_window = (dim->rd->rrdset->update_every > nd_profile.update_every) ? 1 : Cfg.max_samples_to_smooth;
+        size_t smoothing_window = ml_dimension_smoothing_window(dim);
 
         ml_features_t features = {
             Cfg.diff_n, smoothing_window, Cfg.lag_n,
@@ -777,7 +788,8 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     }
 
     // Save the value and return if we don't have enough values for a sample
-    unsigned n = Cfg.diff_n + Cfg.max_samples_to_smooth + Cfg.lag_n;
+    size_t smoothing_window = ml_dimension_smoothing_window(dim);
+    unsigned n = Cfg.diff_n + smoothing_window + Cfg.lag_n;
     if (dim->cns.size() < n) {
         dim->cns.push_back(value);
         spinlock_unlock(&dim->slock);
@@ -820,7 +832,7 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     memcpy(dst_cns, src_cns, n * sizeof(calculated_number_t));
 
     ml_features_t features = {
-        Cfg.diff_n, Cfg.max_samples_to_smooth, Cfg.lag_n,
+        Cfg.diff_n, smoothing_window, Cfg.lag_n,
         dst_cns, n, src_cns, n
     };
     ml_features_preprocess_predict(&features, &dim->feature);

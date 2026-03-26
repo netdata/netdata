@@ -3,6 +3,12 @@
 #include "ml_config.h"
 #include "ml_features.h"
 
+static inline size_t ml_effective_smooth_n(const ml_features_t *features)
+{
+    // smooth_n == 0 is allowed by config and should behave like disabled smoothing.
+    return features->smooth_n == 0 ? 1 : features->smooth_n;
+}
+
 static void ml_features_diff(ml_features_t *features)
 {
     if (features->diff_n == 0)
@@ -24,26 +30,27 @@ static void ml_features_diff(ml_features_t *features)
 
 static void ml_features_smooth(ml_features_t *features)
 {
+    size_t smooth_n = ml_effective_smooth_n(features);
     calculated_number_t sum = 0.0;
 
     size_t idx = 0;
-    for (; idx != features->smooth_n - 1; idx++)
+    for (; idx != smooth_n - 1; idx++)
         sum += features->src[idx];
 
     for (; idx != (features->src_n - features->diff_n); idx++) {
         sum += features->src[idx];
-        calculated_number_t prev_cn = features->src[idx - (features->smooth_n - 1)];
-        features->src[idx - (features->smooth_n - 1)] = sum / features->smooth_n;
+        calculated_number_t prev_cn = features->src[idx - (smooth_n - 1)];
+        features->src[idx - (smooth_n - 1)] = sum / smooth_n;
         sum -= prev_cn;
     }
 
-    for (idx = 0; idx != features->smooth_n; idx++)
+    for (idx = 0; idx != smooth_n; idx++)
         features->src[(features->src_n - 1) - idx] = 0.0;
 }
 
 static void ml_features_lag(ml_features_t *features, std::vector<DSample> &preprocessed_features, double sampling_ratio)
 {
-    size_t n = features->src_n - features->diff_n - features->smooth_n + 1 - features->lag_n;
+    size_t n = features->src_n - features->diff_n - ml_effective_smooth_n(features) + 1 - features->lag_n;
     preprocessed_features.resize(n);
 
     uint32_t max_mt = std::numeric_limits<uint32_t>::max();
