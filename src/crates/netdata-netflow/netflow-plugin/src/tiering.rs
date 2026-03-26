@@ -140,17 +140,6 @@ pub(crate) struct OpenTierState {
     pub(crate) hour_1: Vec<OpenTierRow>,
 }
 
-impl OpenTierState {
-    pub(crate) fn rows_for_tier(&self, tier: TierKind) -> &[OpenTierRow] {
-        match tier {
-            TierKind::Raw => &[],
-            TierKind::Minute1 => &self.minute_1,
-            TierKind::Minute5 => &self.minute_5,
-            TierKind::Hour1 => &self.hour_1,
-        }
-    }
-}
-
 type MetricBucket = HashMap<TierFlowRef, FlowMetrics>;
 
 #[derive(Default)]
@@ -981,10 +970,6 @@ fn materialize_rollup_fields(index: &FlowIndex, flow_id: IndexedFlowId) -> Optio
     }
 
     Some(fields)
-}
-
-pub(crate) fn rollup_field_supported(field: &str) -> bool {
-    rollup_field_index(field).is_some()
 }
 
 fn rollup_field_index(field: &str) -> Option<usize> {

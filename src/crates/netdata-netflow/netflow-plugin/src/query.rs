@@ -3,10 +3,7 @@ use crate::plugin_config::PluginConfig;
 use crate::presentation;
 #[cfg(test)]
 use crate::tiering::dimensions_for_rollup;
-use crate::tiering::{
-    MATERIALIZED_TIERS, OpenTierRow, OpenTierState, TierFlowIndexStore, TierKind,
-    rollup_field_supported,
-};
+use crate::tiering::{OpenTierRow, TierFlowIndexStore, TierKind};
 use anyhow::{Context, Result};
 use chrono::Utc;
 use hashbrown::HashMap as FastHashMap;
@@ -602,12 +599,6 @@ struct ClosedFacetVocabularyCache {
     values: BTreeMap<String, Vec<String>>,
 }
 
-#[derive(Debug)]
-struct OpenFacetVocabularyCache {
-    generation: u64,
-    values: BTreeMap<String, Vec<String>>,
-}
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct ProjectedPayloadAction {
     group_slot: Option<usize>,
@@ -754,19 +745,12 @@ pub(crate) struct FlowQueryService {
     registry: Registry,
     agent_id: String,
     tier_dirs: HashMap<TierKind, PathBuf>,
-    open_tiers: Arc<RwLock<OpenTierState>>,
-    tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
     max_groups: usize,
     closed_facet_cache: RwLock<Option<Arc<ClosedFacetVocabularyCache>>>,
-    open_facet_cache: RwLock<Option<Arc<OpenFacetVocabularyCache>>>,
 }
 
 impl FlowQueryService {
-    pub(crate) async fn new(
-        cfg: &PluginConfig,
-        open_tiers: Arc<RwLock<OpenTierState>>,
-        tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
-    ) -> Result<(Self, UnboundedReceiver<Event>)> {
+    pub(crate) async fn new(cfg: &PluginConfig) -> Result<(Self, UnboundedReceiver<Event>)> {
         let tier_dirs = HashMap::from([
             (TierKind::Raw, cfg.journal.raw_tier_dir()),
             (TierKind::Minute1, cfg.journal.minute_1_tier_dir()),
@@ -799,11 +783,8 @@ impl FlowQueryService {
                 registry,
                 agent_id,
                 tier_dirs,
-                open_tiers,
-                tier_flow_indexes,
                 max_groups,
                 closed_facet_cache: RwLock::new(None),
-                open_facet_cache: RwLock::new(None),
             },
             notify_rx,
         ))
@@ -815,76 +796,54 @@ impl FlowQueryService {
         }
     }
 
-    fn open_records_for_tier(&self, tier: TierKind, after: u32, before: u32) -> Vec<FlowRecord> {
-        let after_usec = (after as u64).saturating_mul(1_000_000);
-        let before_usec = (before as u64).saturating_mul(1_000_000);
-        for _ in 0..3 {
-            let (generation, rows) = {
-                let Ok(state) = self.open_tiers.read() else {
-                    return Vec::new();
-                };
-                let rows = state
-                    .rows_for_tier(tier)
-                    .iter()
-                    .copied()
-                    .filter(|row| {
-                        row.timestamp_usec >= after_usec && row.timestamp_usec < before_usec
-                    })
-                    .collect::<Vec<_>>();
-                (state.generation, rows)
-            };
-
-            let Ok(tier_flow_indexes) = self.tier_flow_indexes.read() else {
-                return Vec::new();
-            };
-            if tier_flow_indexes.generation() != generation {
-                continue;
-            }
-
-            return rows
-                .into_iter()
-                .filter_map(|row| {
-                    let mut fields = tier_flow_indexes.materialize_fields(row.flow_ref)?;
-                    row.metrics.write_fields(&mut fields);
-                    Some(FlowRecord::new(
-                        row.timestamp_usec,
-                        fields
-                            .into_iter()
-                            .map(|(key, value)| (key.to_string(), value))
-                            .collect(),
-                    ))
-                })
-                .collect();
-        }
-
-        Vec::new()
+    fn files_for_query_span(&self, span: QueryTierSpan) -> Result<Vec<PathBuf>> {
+        let tier_dir = self
+            .tier_dirs
+            .get(&span.tier)
+            .context("missing selected tier directory")?;
+        Ok(self
+            .registry
+            .find_files_in_range(Seconds(span.after), Seconds(span.before))
+            .context("failed to locate netflow journal files in time range")?
+            .into_iter()
+            .filter(|file_info| Path::new(file_info.file.path()).starts_with(tier_dir.as_path()))
+            .map(|file_info| PathBuf::from(file_info.file.path()))
+            .collect())
     }
 
-    fn open_records_for_spans(&self, spans: &[PreparedQuerySpan]) -> Vec<FlowRecord> {
-        let mut records = Vec::new();
-        for span in spans {
-            if span.span.tier == TierKind::Raw {
-                continue;
-            }
-            records.extend(self.open_records_for_tier(
-                span.span.tier,
-                span.span.after,
-                span.span.before,
-            ));
+    fn prepare_query_span_with_fallback(
+        &self,
+        span: QueryTierSpan,
+        prepared: &mut Vec<PreparedQuerySpan>,
+    ) -> Result<()> {
+        let files = self.files_for_query_span(span)?;
+        if span.tier == TierKind::Raw || !files.is_empty() {
+            prepared.push(PreparedQuerySpan { span, files });
+            return Ok(());
         }
-        records
+
+        for fallback_span in plan_query_tier_spans(
+            span.after,
+            span.before,
+            lower_fallback_candidate_tiers(span.tier),
+            false,
+        ) {
+            self.prepare_query_span_with_fallback(fallback_span, prepared)?;
+        }
+
+        Ok(())
     }
 
     fn facet_vocabulary_payload(&self, request: &FlowsRequest) -> Result<Value> {
         let requested_fields = requested_facet_fields(request);
         let closed_values = self.closed_facet_vocabulary()?;
-        let open_values = self.open_facet_vocabulary()?;
+        let active_values = self.active_facet_vocabulary()?;
 
         Ok(build_facet_vocabulary_payload(
             &requested_fields,
             &request.selections,
             &closed_values.values,
-            &open_values.values,
+            &active_values,
         ))
     }
 
@@ -1017,90 +976,15 @@ impl FlowQueryService {
         Ok(finalize_facet_vocabulary(values, &requested_set))
     }
 
-    fn open_facet_vocabulary(&self) -> Result<Arc<OpenFacetVocabularyCache>> {
-        let generation = self
-            .open_tiers
-            .read()
-            .map(|state| state.generation)
-            .unwrap_or_default();
-
-        if let Ok(cache) = self.open_facet_cache.read() {
-            if let Some(cache) = cache.as_ref() {
-                if cache.generation == generation {
-                    return Ok(Arc::clone(cache));
-                }
-            }
-        }
-
-        let rebuilt = Arc::new(OpenFacetVocabularyCache {
-            generation,
-            values: self.build_open_facet_vocabulary(generation),
-        });
-
-        let mut cache = self
-            .open_facet_cache
-            .write()
-            .map_err(|_| anyhow::anyhow!("open facet cache lock poisoned"))?;
-        if let Some(existing) = cache.as_ref() {
-            if existing.generation == generation {
-                return Ok(Arc::clone(existing));
-            }
-        }
-        *cache = Some(Arc::clone(&rebuilt));
-
-        Ok(rebuilt)
-    }
-
-    fn build_open_facet_vocabulary(
-        &self,
-        expected_generation: u64,
-    ) -> BTreeMap<String, Vec<String>> {
-        let requested_fields = FACET_ALLOWED_OPTIONS
-            .iter()
-            .filter(|field| open_tier_field_supported(field))
-            .cloned()
+    fn active_facet_vocabulary(&self) -> Result<BTreeMap<String, Vec<String>>> {
+        let active_files = self
+            .registry
+            .find_files_in_range(Seconds(0), Seconds(u32::MAX))
+            .context("failed to enumerate active netflow journal files for facet vocabulary")?
+            .into_iter()
+            .filter(|file_info| file_info.file.is_active())
             .collect::<Vec<_>>();
-        let requested_set = requested_fields.iter().cloned().collect::<HashSet<_>>();
-
-        for _ in 0..3 {
-            let (generation, rows_by_tier) = {
-                let Ok(state) = self.open_tiers.read() else {
-                    return BTreeMap::new();
-                };
-                (
-                    state.generation,
-                    MATERIALIZED_TIERS
-                        .iter()
-                        .map(|tier| (*tier, state.rows_for_tier(*tier).to_vec()))
-                        .collect::<Vec<_>>(),
-                )
-            };
-
-            if generation != expected_generation {
-                continue;
-            }
-
-            let Ok(tier_flow_indexes) = self.tier_flow_indexes.read() else {
-                return BTreeMap::new();
-            };
-            if tier_flow_indexes.generation() != generation {
-                continue;
-            }
-
-            let mut values = BTreeMap::new();
-            for (_, rows) in &rows_by_tier {
-                accumulate_open_tier_facet_vocabulary(
-                    rows,
-                    &tier_flow_indexes,
-                    &requested_fields,
-                    &mut values,
-                );
-            }
-
-            return finalize_facet_vocabulary(values, &requested_set);
-        }
-
-        BTreeMap::new()
+        self.build_closed_facet_vocabulary(&active_files)
     }
 
     fn prepare_query(&self, request: &FlowsRequest) -> Result<QuerySetup> {
@@ -1109,26 +993,18 @@ impl FlowQueryService {
         let effective_group_by = resolve_effective_group_by(request);
         let force_raw_tier =
             requires_raw_tier_for_fields(&effective_group_by, &request.selections, &request.query);
-        let (selected_tier, timeseries_layout, after, before, planned_spans) = if request
-            .is_timeseries_view()
-        {
-            let selected_tier =
+        let (timeseries_layout, after, before, planned_spans) = if request.is_timeseries_view() {
+            let source_tier =
                 select_timeseries_source_tier(requested_after, requested_before, force_raw_tier);
             let layout =
-                init_timeseries_layout_for_tier(requested_after, requested_before, selected_tier);
+                init_timeseries_layout_for_tier(requested_after, requested_before, source_tier);
             let planned_spans = plan_query_tier_spans(
                 layout.after,
                 layout.before,
-                timeseries_candidate_tiers(selected_tier),
+                timeseries_candidate_tiers(source_tier),
                 force_raw_tier,
             );
-            (
-                selected_tier,
-                Some(layout),
-                layout.after,
-                layout.before,
-                planned_spans,
-            )
+            (Some(layout), layout.after, layout.before, planned_spans)
         } else {
             let planned_spans = plan_query_tier_spans(
                 requested_after,
@@ -1136,33 +1012,15 @@ impl FlowQueryService {
                 &[TierKind::Hour1, TierKind::Minute5, TierKind::Minute1],
                 force_raw_tier,
             );
-            (
-                summary_query_tier(&planned_spans),
-                None,
-                requested_after,
-                requested_before,
-                planned_spans,
-            )
+            (None, requested_after, requested_before, planned_spans)
         };
 
         let mut spans = Vec::with_capacity(planned_spans.len());
         for span in planned_spans {
-            let tier_dir = self
-                .tier_dirs
-                .get(&span.tier)
-                .context("missing selected tier directory")?;
-            let files = self
-                .registry
-                .find_files_in_range(Seconds(span.after), Seconds(span.before))
-                .context("failed to locate netflow journal files in time range")?
-                .into_iter()
-                .filter(|file_info| {
-                    Path::new(file_info.file.path()).starts_with(tier_dir.as_path())
-                })
-                .map(|file_info| PathBuf::from(file_info.file.path()))
-                .collect::<Vec<_>>();
-            spans.push(PreparedQuerySpan { span, files });
+            self.prepare_query_span_with_fallback(span, &mut spans)?;
         }
+        let selected_tier =
+            summary_query_tier(&spans.iter().map(|prepared| prepared.span).collect::<Vec<_>>());
 
         let limit = sanitize_limit(request.top_n);
         let mut stats = HashMap::new();
@@ -1257,7 +1115,6 @@ impl FlowQueryService {
         &self,
         setup: &QuerySetup,
         request: &FlowsRequest,
-        open_records: &[FlowRecord],
         mut on_record: F,
     ) -> Result<ScanCounts>
     where
@@ -1363,21 +1220,6 @@ impl FlowQueryService {
                         timestamp_usec,
                     },
                 );
-                counts.matched_entries = counts.matched_entries.saturating_add(1);
-            }
-        }
-
-        counts.open_bucket_records = open_records.len() as u64;
-        if !open_records.is_empty() {
-            for (index, record) in open_records.iter().enumerate() {
-                if !record_matches_selections(&record, &request.selections) {
-                    continue;
-                }
-                if !record_matches_regex(&record, query_regex.as_ref()) {
-                    continue;
-                }
-
-                on_record(record, RecordHandle::OpenRowIndex(index));
                 counts.matched_entries = counts.matched_entries.saturating_add(1);
             }
         }
@@ -2228,43 +2070,11 @@ impl FlowQueryService {
         let scan_started = Instant::now();
         let (counts, build_result, build_elapsed_ms) = if projected_grouped_scan {
             let mut grouped_aggregates = ProjectedGroupAccumulator::new(&setup.effective_group_by);
-            let mut counts = self.scan_matching_grouped_records_projected(
+            let counts = self.scan_matching_grouped_records_projected(
                 &setup,
                 request,
                 &mut grouped_aggregates,
             )?;
-            if setup
-                .spans
-                .iter()
-                .any(|span| span.span.tier != TierKind::Raw)
-            {
-                if let Some((open_bucket_records, matched_entries)) = self
-                    .scan_matching_open_tier_grouped_records_projected(
-                        &setup,
-                        request,
-                        &mut grouped_aggregates,
-                    )?
-                {
-                    counts.open_bucket_records = open_bucket_records;
-                    counts.matched_entries = counts.matched_entries.saturating_add(matched_entries);
-                } else {
-                    let records = self.open_records_for_spans(&setup.spans);
-                    counts.open_bucket_records = records.len() as u64;
-                    for (index, record) in records.iter().enumerate() {
-                        if !record_matches_selections(record, &request.selections) {
-                            continue;
-                        }
-                        accumulate_projected_grouped_record_from_record(
-                            record,
-                            RecordHandle::OpenRowIndex(index),
-                            &setup.effective_group_by,
-                            &mut grouped_aggregates,
-                            self.max_groups,
-                        )?;
-                        counts.matched_entries = counts.matched_entries.saturating_add(1);
-                    }
-                }
-            }
             let scan_elapsed_ms = scan_started.elapsed().as_millis() as u64;
             let facets_started = Instant::now();
             let facet_payload = self.facet_vocabulary_payload(request)?;
@@ -2338,22 +2148,20 @@ impl FlowQueryService {
         } else {
             let mut grouped_aggregates = CompactGroupAccumulator::new(&setup.effective_group_by)?;
             let mut accumulate_error = None;
-            let records = self.open_records_for_spans(&setup.spans);
-            let counts =
-                self.scan_matching_records(&setup, request, &records, |record, handle| {
-                    if accumulate_error.is_some() {
-                        return;
-                    }
-                    accumulate_compact_grouped_record(
-                        record,
-                        handle,
-                        metrics_from_fields(&record.fields),
-                        &setup.effective_group_by,
-                        &mut grouped_aggregates,
-                        self.max_groups,
-                    )
-                    .unwrap_or_else(|err| accumulate_error = Some(err));
-                })?;
+            let counts = self.scan_matching_records(&setup, request, |record, handle| {
+                if accumulate_error.is_some() {
+                    return;
+                }
+                accumulate_compact_grouped_record(
+                    record,
+                    handle,
+                    metrics_from_fields(&record.fields),
+                    &setup.effective_group_by,
+                    &mut grouped_aggregates,
+                    self.max_groups,
+                )
+                .unwrap_or_else(|err| accumulate_error = Some(err));
+            })?;
             if let Some(err) = accumulate_error {
                 return Err(err);
             }
@@ -2434,254 +2242,6 @@ impl FlowQueryService {
         })
     }
 
-    fn scan_matching_open_tier_grouped_records_projected(
-        &self,
-        setup: &QuerySetup,
-        request: &FlowsRequest,
-        grouped_aggregates: &mut ProjectedGroupAccumulator,
-    ) -> Result<Option<(u64, usize)>> {
-        if !open_tier_projected_grouped_path_supported(
-            &setup.effective_group_by,
-            &request.selections,
-        ) {
-            return Ok(None);
-        }
-
-        let mut total_rows = 0u64;
-        let mut total_matched = 0usize;
-        let mut used_any = false;
-
-        for span in &setup.spans {
-            if span.span.tier == TierKind::Raw {
-                continue;
-            }
-
-            let mut row_group_field_ids = vec![None; setup.effective_group_by.len()];
-            let mut row_missing_values = std::iter::repeat_with(|| None)
-                .take(setup.effective_group_by.len())
-                .collect::<Vec<Option<String>>>();
-
-            if let Some((rows_len, matched_entries)) = self.with_open_tier_rows_for_span(
-                span.span.tier,
-                span.span.after,
-                span.span.before,
-                |rows, tier_flow_indexes| {
-                    let mut matched_entries = 0usize;
-                    for (index, row) in rows.iter().enumerate() {
-                        if !open_tier_row_matches_selections_except(
-                            row,
-                            tier_flow_indexes,
-                            &request.selections,
-                            None,
-                        ) {
-                            continue;
-                        }
-
-                        accumulate_projected_open_tier_grouped_record(
-                            index,
-                            row,
-                            tier_flow_indexes,
-                            &setup.effective_group_by,
-                            grouped_aggregates,
-                            self.max_groups,
-                            &mut row_group_field_ids,
-                            &mut row_missing_values,
-                        )?;
-                        matched_entries = matched_entries.saturating_add(1);
-                    }
-                    Ok((rows.len() as u64, matched_entries))
-                },
-            )? {
-                used_any = true;
-                total_rows = total_rows.saturating_add(rows_len);
-                total_matched = total_matched.saturating_add(matched_entries);
-            }
-        }
-
-        if used_any {
-            Ok(Some((total_rows, total_matched)))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn scan_matching_open_tier_timeseries_records_projected_pass1(
-        &self,
-        setup: &QuerySetup,
-        request: &FlowsRequest,
-        grouped_aggregates: &mut HashMap<GroupKey, AggregatedFlow>,
-        group_overflow: &mut GroupOverflow,
-    ) -> Result<Option<(u64, usize)>> {
-        let mut total_rows = 0u64;
-        let mut total_matched = 0usize;
-        let mut used_any = false;
-
-        for span in &setup.spans {
-            if span.span.tier == TierKind::Raw {
-                continue;
-            }
-
-            if let Some((rows_len, matched_entries)) = self.with_open_tier_rows_for_span(
-                span.span.tier,
-                span.span.after,
-                span.span.before,
-                |rows, tier_flow_indexes| {
-                    let mut matched_entries = 0usize;
-                    for row in rows {
-                        if !open_tier_row_matches_selections_except(
-                            row,
-                            tier_flow_indexes,
-                            &request.selections,
-                            None,
-                        ) {
-                            continue;
-                        }
-                        accumulate_open_tier_timeseries_grouped_record(
-                            row,
-                            tier_flow_indexes,
-                            &setup.effective_group_by,
-                            grouped_aggregates,
-                            group_overflow,
-                            self.max_groups,
-                        );
-                        matched_entries = matched_entries.saturating_add(1);
-                    }
-                    Ok((rows.len() as u64, matched_entries))
-                },
-            )? {
-                used_any = true;
-                total_rows = total_rows.saturating_add(rows_len);
-                total_matched = total_matched.saturating_add(matched_entries);
-            }
-        }
-
-        if used_any {
-            Ok(Some((total_rows, total_matched)))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn scan_matching_open_tier_timeseries_records_projected_pass2(
-        &self,
-        setup: &QuerySetup,
-        request: &FlowsRequest,
-        top_keys: &HashMap<GroupKey, usize>,
-        series_buckets: &mut [Vec<u64>],
-        after: u32,
-        before: u32,
-        bucket_seconds: u32,
-        sort_by: SortBy,
-    ) -> Result<Option<(u64, usize)>> {
-        let mut total_rows = 0u64;
-        let mut total_matched = 0usize;
-        let mut used_any = false;
-
-        for span in &setup.spans {
-            if span.span.tier == TierKind::Raw {
-                continue;
-            }
-
-            if let Some((rows_len, matched_entries)) = self.with_open_tier_rows_for_span(
-                span.span.tier,
-                span.span.after,
-                span.span.before,
-                |rows, tier_flow_indexes| {
-                    let mut matched_entries = 0usize;
-                    for row in rows {
-                        if !open_tier_row_matches_selections_except(
-                            row,
-                            tier_flow_indexes,
-                            &request.selections,
-                            None,
-                        ) {
-                            continue;
-                        }
-
-                        let labels =
-                            open_tier_row_labels(row, tier_flow_indexes, &setup.effective_group_by);
-                        let key = group_key_from_labels(&labels);
-                        let Some(index) = top_keys.get(&key).copied() else {
-                            continue;
-                        };
-
-                        accumulate_series_bucket(
-                            series_buckets,
-                            row.timestamp_usec,
-                            after,
-                            before,
-                            bucket_seconds,
-                            index,
-                            sampled_metric_value_from_open_tier_row(
-                                sort_by,
-                                row,
-                                tier_flow_indexes,
-                            ),
-                        );
-                        matched_entries = matched_entries.saturating_add(1);
-                    }
-                    Ok((rows.len() as u64, matched_entries))
-                },
-            )? {
-                used_any = true;
-                total_rows = total_rows.saturating_add(rows_len);
-                total_matched = total_matched.saturating_add(matched_entries);
-            }
-        }
-
-        if used_any {
-            Ok(Some((total_rows, total_matched)))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn with_open_tier_rows_for_span<R, F>(
-        &self,
-        tier: TierKind,
-        after: u32,
-        before: u32,
-        mut f: F,
-    ) -> Result<Option<R>>
-    where
-        F: FnMut(&[OpenTierRow], &TierFlowIndexStore) -> Result<R>,
-    {
-        if tier == TierKind::Raw {
-            return Ok(None);
-        }
-
-        let after_usec = (after as u64).saturating_mul(1_000_000);
-        let before_usec = (before as u64).saturating_mul(1_000_000);
-
-        for _ in 0..3 {
-            let (generation, rows) = {
-                let Ok(state) = self.open_tiers.read() else {
-                    return Ok(None);
-                };
-                let rows = state
-                    .rows_for_tier(tier)
-                    .iter()
-                    .copied()
-                    .filter(|row| {
-                        row.timestamp_usec >= after_usec && row.timestamp_usec < before_usec
-                    })
-                    .collect::<Vec<_>>();
-                (state.generation, rows)
-            };
-
-            let Ok(tier_flow_indexes) = self.tier_flow_indexes.read() else {
-                return Ok(None);
-            };
-            if tier_flow_indexes.generation() != generation {
-                continue;
-            }
-
-            return f(&rows, &tier_flow_indexes).map(Some);
-        }
-
-        Ok(None)
-    }
-
     pub(crate) async fn query_flow_metrics(
         &self,
         request: &FlowsRequest,
@@ -2690,61 +2250,20 @@ impl FlowQueryService {
         let layout = setup
             .timeseries_layout
             .context("timeseries query missing aligned layout")?;
-        let open_tier_projected = setup
-            .spans
-            .iter()
-            .any(|span| span.span.tier != TierKind::Raw)
-            && request.query.is_empty()
-            && open_tier_projected_grouped_path_supported(
-                &setup.effective_group_by,
-                &request.selections,
-            );
-        let mut open_records: Option<Vec<FlowRecord>> = None;
 
         let mut grouped_aggregates: HashMap<GroupKey, AggregatedFlow> = HashMap::new();
         let mut group_overflow = GroupOverflow::default();
-        let mut pass1_counts = if open_tier_projected {
-            self.scan_matching_records(&setup, request, &[], |record, _| {
-                let metrics = sampled_metrics_from_fields(&record.fields);
-                accumulate_grouped_record(
-                    record,
-                    metrics,
-                    &setup.effective_group_by,
-                    &mut grouped_aggregates,
-                    &mut group_overflow,
-                    self.max_groups,
-                );
-            })?
-        } else {
-            let records = self.open_records_for_spans(&setup.spans);
-            let counts = self.scan_matching_records(&setup, request, &records, |record, _| {
-                let metrics = sampled_metrics_from_fields(&record.fields);
-                accumulate_grouped_record(
-                    record,
-                    metrics,
-                    &setup.effective_group_by,
-                    &mut grouped_aggregates,
-                    &mut group_overflow,
-                    self.max_groups,
-                );
-            })?;
-            open_records = Some(records);
-            counts
-        };
-        if open_tier_projected {
-            if let Some((open_bucket_records, matched_entries)) = self
-                .scan_matching_open_tier_timeseries_records_projected_pass1(
-                    &setup,
-                    request,
-                    &mut grouped_aggregates,
-                    &mut group_overflow,
-                )?
-            {
-                pass1_counts.open_bucket_records = open_bucket_records;
-                pass1_counts.matched_entries =
-                    pass1_counts.matched_entries.saturating_add(matched_entries);
-            }
-        }
+        let pass1_counts = self.scan_matching_records(&setup, request, |record, _| {
+            let metrics = sampled_metrics_from_fields(&record.fields);
+            accumulate_grouped_record(
+                record,
+                metrics,
+                &setup.effective_group_by,
+                &mut grouped_aggregates,
+                &mut group_overflow,
+                self.max_groups,
+            );
+        })?;
 
         let ranked = rank_aggregates(
             grouped_aggregates,
@@ -2760,10 +2279,10 @@ impl FlowQueryService {
             .map(|(idx, row)| (group_key_from_labels(&row.labels), idx))
             .collect();
 
-        let mut pass2_counts = if top_keys.is_empty() {
+        let pass2_counts = if top_keys.is_empty() {
             ScanCounts::default()
-        } else if open_tier_projected {
-            self.scan_matching_records(&setup, request, &[], |record, _| {
+        } else {
+            self.scan_matching_records(&setup, request, |record, _| {
                 let labels = labels_for_group(record, &setup.effective_group_by);
                 let key = group_key_from_labels(&labels);
                 let Some(index) = top_keys.get(&key).copied() else {
@@ -2781,49 +2300,7 @@ impl FlowQueryService {
                     metric_value,
                 );
             })?
-        } else {
-            self.scan_matching_records(
-                &setup,
-                request,
-                open_records.as_deref().unwrap_or(&[]),
-                |record, _| {
-                    let labels = labels_for_group(record, &setup.effective_group_by);
-                    let key = group_key_from_labels(&labels);
-                    let Some(index) = top_keys.get(&key).copied() else {
-                        return;
-                    };
-
-                    let metric_value = sampled_metric_value(setup.sort_by, &record.fields);
-                    accumulate_series_bucket(
-                        &mut series_buckets,
-                        chart_timestamp_usec(record),
-                        layout.after,
-                        layout.before,
-                        layout.bucket_seconds,
-                        index,
-                        metric_value,
-                    );
-                },
-            )?
         };
-        if open_tier_projected && !top_keys.is_empty() {
-            if let Some((open_bucket_records, matched_entries)) = self
-                .scan_matching_open_tier_timeseries_records_projected_pass2(
-                    &setup,
-                    request,
-                    &top_keys,
-                    &mut series_buckets,
-                    layout.after,
-                    layout.before,
-                    layout.bucket_seconds,
-                    setup.sort_by,
-                )?
-            {
-                pass2_counts.open_bucket_records = open_bucket_records;
-                pass2_counts.matched_entries =
-                    pass2_counts.matched_entries.saturating_add(matched_entries);
-            }
-        }
 
         let mut stats = setup.stats;
         stats.insert("query_reader_path".to_string(), 1);
@@ -3092,7 +2569,6 @@ impl FlowMetrics {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RecordHandle {
     JournalRealtime { tier: TierKind, timestamp_usec: u64 },
-    OpenRowIndex(usize),
 }
 
 #[derive(Debug, Clone)]
@@ -3757,90 +3233,6 @@ fn accumulate_compact_grouped_record(
         .rows
         .push(CompactAggregatedFlow::new(record, handle, metrics, flow_id));
     Ok(())
-}
-
-fn accumulate_projected_open_tier_grouped_record(
-    row_index: usize,
-    row: &OpenTierRow,
-    tier_flow_indexes: &TierFlowIndexStore,
-    group_by: &[String],
-    aggregates: &mut ProjectedGroupAccumulator,
-    max_groups: usize,
-    row_group_field_ids: &mut [Option<u32>],
-    row_missing_values: &mut [Option<String>],
-) -> Result<()> {
-    row_group_field_ids.fill(None);
-    for value in row_missing_values.iter_mut() {
-        let _ = value.take();
-    }
-
-    for (field_index, field_name) in group_by.iter().enumerate() {
-        let value =
-            open_tier_row_field_value(row, tier_flow_indexes, field_name).unwrap_or_default();
-        if value.is_empty() {
-            continue;
-        }
-
-        match aggregates.find_field_value(field_index, value.as_str()) {
-            Some(field_id) => row_group_field_ids[field_index] = Some(field_id),
-            None if aggregates.grouped_total() < max_groups => {
-                row_missing_values[field_index] = Some(value);
-            }
-            None => {}
-        }
-    }
-
-    aggregates.accumulate_projected(
-        group_by,
-        row.timestamp_usec,
-        RecordHandle::OpenRowIndex(row_index),
-        FlowMetrics {
-            bytes: row.metrics.bytes,
-            packets: row.metrics.packets,
-        },
-        row_group_field_ids,
-        row_missing_values,
-        max_groups,
-    )
-}
-
-fn accumulate_projected_grouped_record_from_record(
-    record: &FlowRecord,
-    handle: RecordHandle,
-    group_by: &[String],
-    aggregates: &mut ProjectedGroupAccumulator,
-    max_groups: usize,
-) -> Result<()> {
-    let mut row_group_field_ids = vec![None; group_by.len()];
-    let mut row_missing_values = std::iter::repeat_with(|| None)
-        .take(group_by.len())
-        .collect::<Vec<Option<String>>>();
-
-    for (field_index, field_name) in group_by.iter().enumerate() {
-        let value = normalized_record_field_value(record, field_name);
-        let value_ref = value.as_ref();
-        if value_ref.is_empty() {
-            continue;
-        }
-
-        match aggregates.find_field_value(field_index, value_ref) {
-            Some(field_id) => row_group_field_ids[field_index] = Some(field_id),
-            None if aggregates.grouped_total() < max_groups => {
-                row_missing_values[field_index] = Some(value.into_owned());
-            }
-            None => {}
-        }
-    }
-
-    aggregates.accumulate_projected(
-        group_by,
-        record.timestamp_usec,
-        handle,
-        metrics_from_fields(&record.fields),
-        &mut row_group_field_ids,
-        &mut row_missing_values,
-        max_groups,
-    )
 }
 
 fn synthetic_bucket_labels(bucket_label: &'static str) -> BTreeMap<String, String> {
@@ -4748,38 +4140,6 @@ fn record_matches_selections_except(
     })
 }
 
-fn record_matches_regex(record: &FlowRecord, regex: Option<&Regex>) -> bool {
-    let Some(regex) = regex else {
-        return true;
-    };
-
-    record.fields.iter().any(|(key, value)| {
-        let pair = format!("{key}={value}");
-        regex.is_match(&pair)
-    })
-}
-
-fn open_tier_projected_grouped_path_supported(
-    group_by: &[String],
-    selections: &HashMap<String, Vec<String>>,
-) -> bool {
-    group_by
-        .iter()
-        .all(|field| open_tier_field_supported(field))
-        && selections
-            .keys()
-            .all(|field| open_tier_selection_field_supported(field))
-}
-
-fn open_tier_field_supported(field: &str) -> bool {
-    is_virtual_flow_field(field) || rollup_field_supported(field)
-}
-
-fn open_tier_selection_field_supported(field: &str) -> bool {
-    matches!(field.to_ascii_uppercase().as_str(), "BYTES" | "PACKETS" | "FLOWS")
-        || open_tier_field_supported(field)
-}
-
 fn facet_field_requires_protocol_scan(field: &str) -> bool {
     matches!(field.to_ascii_uppercase().as_str(), "ICMPV4" | "ICMPV6")
 }
@@ -4968,26 +4328,6 @@ fn merge_facet_vocabulary_values(
     }
 
     merged
-}
-
-fn open_tier_row_matches_selections_except(
-    row: &OpenTierRow,
-    tier_flow_indexes: &TierFlowIndexStore,
-    selections: &HashMap<String, Vec<String>>,
-    ignored_field: Option<&str>,
-) -> bool {
-    selections.iter().all(|(field, values)| {
-        if ignored_field.is_some_and(|ignored| field.eq_ignore_ascii_case(ignored)) {
-            return true;
-        }
-        if values.is_empty() {
-            return true;
-        }
-        let Some(record_value) = open_tier_row_field_value(row, tier_flow_indexes, field) else {
-            return false;
-        };
-        values.iter().any(|value| value == record_value.as_str())
-    })
 }
 
 fn open_tier_row_field_value(
@@ -5569,6 +4909,14 @@ fn timeseries_candidate_tiers(source_tier: TierKind) -> &'static [TierKind] {
         TierKind::Hour1 => &[TierKind::Hour1, TierKind::Minute5, TierKind::Minute1],
         TierKind::Minute5 => &[TierKind::Minute5, TierKind::Minute1],
         TierKind::Minute1 | TierKind::Raw => &[TierKind::Minute1],
+    }
+}
+
+fn lower_fallback_candidate_tiers(tier: TierKind) -> &'static [TierKind] {
+    match tier {
+        TierKind::Hour1 => &[TierKind::Minute5, TierKind::Minute1],
+        TierKind::Minute5 => &[TierKind::Minute1],
+        TierKind::Minute1 | TierKind::Raw => &[],
     }
 }
 

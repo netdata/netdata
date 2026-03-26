@@ -411,13 +411,7 @@ async fn main() {
     let metrics = Arc::new(ingest::IngestMetrics::default());
     let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
     let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
-    let (query_service, notify_rx) = match query::FlowQueryService::new(
-        &config,
-        Arc::clone(&open_tiers),
-        Arc::clone(&tier_flow_indexes),
-    )
-    .await
-    {
+    let (query_service, notify_rx) = match query::FlowQueryService::new(&config).await {
         Ok(service) => service,
         Err(err) => {
             tracing::error!("failed to initialize query service: {err:#}");
@@ -654,20 +648,17 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn e2e_ingest_writes_journals_and_query_reads_flows() {
-        let (cfg, metrics, open_tiers, tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
+        let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) =
+            ingest_fixture("nfv5.pcap").await;
 
         assert_tier_has_files(&cfg.journal.raw_tier_dir(), "raw");
         assert_tier_dir_exists(&cfg.journal.minute_1_tier_dir(), "1m");
         assert_tier_dir_exists(&cfg.journal.minute_5_tier_dir(), "5m");
         assert_tier_dir_exists(&cfg.journal.hour_1_tier_dir(), "1h");
 
-        let (query_service, _notify_rx) = query::FlowQueryService::new(
-            &cfg,
-            Arc::clone(&open_tiers),
-            Arc::clone(&tier_flow_indexes),
-        )
-        .await
-        .expect("create query service");
+        let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+            .await
+            .expect("create query service");
         let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
         let request = query::FlowsRequest {
             view: query::ViewMode::TableSankey,
@@ -738,14 +729,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn e2e_flows_function_returns_expected_response_sections() {
-        let (cfg, metrics, open_tiers, tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
-        let (query_service, _notify_rx) = query::FlowQueryService::new(
-            &cfg,
-            Arc::clone(&open_tiers),
-            Arc::clone(&tier_flow_indexes),
-        )
-        .await
-        .expect("create query service");
+        let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) =
+            ingest_fixture("nfv5.pcap").await;
+        let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+            .await
+            .expect("create query service");
         let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
         let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
 
@@ -864,18 +852,18 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn e2e_flows_metrics_function_returns_top_n_chart() {
-        let (cfg, metrics, open_tiers, tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
-        let (query_service, _notify_rx) = query::FlowQueryService::new(
-            &cfg,
-            Arc::clone(&open_tiers),
-            Arc::clone(&tier_flow_indexes),
-        )
-        .await
-        .expect("create query service");
+    async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallback() {
+        let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) =
+            ingest_fixture("nfv5.pcap").await;
+        let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+            .await
+            .expect("create query service");
         let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
         let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
         let after = before.saturating_sub(3600);
+        let materialized_tier_files = tier_file_count(&cfg.journal.hour_1_tier_dir())
+            + tier_file_count(&cfg.journal.minute_5_tier_dir())
+            + tier_file_count(&cfg.journal.minute_1_tier_dir());
 
         let response = handler
             .handle_request(query::FlowsRequest {
@@ -903,9 +891,10 @@ mod tests {
         assert_eq!(response.data.group_by, vec!["PROTOCOL".to_string()]);
         assert_eq!(response.data.columns["PROTOCOL"]["name"], "Protocol");
         assert_eq!(response.data.chart["view"]["units"], "bytes/s");
-        assert!(
+        assert_eq!(
             response.data.stats.get("query_tier").copied().unwrap_or(0) > 0,
-            "expected timeseries query to use a materialized tier when raw-only fields are absent"
+            materialized_tier_files > 0,
+            "expected timeseries query tier to reflect on-disk materialized-tier availability"
         );
         assert_eq!(
             response.data.stats.get("query_bucket_seconds").copied(),
@@ -951,30 +940,20 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn e2e_aggregated_safe_group_by_reads_from_materialized_rollup_tier() {
-        let (cfg, metrics, open_tiers, tier_flow_indexes, _tmp) =
+    async fn e2e_aggregated_safe_group_by_falls_back_to_on_disk_lower_tiers() {
+        let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) =
             ingest_fixture_with_timestamp_source(
                 "nfv5.pcap",
                 plugin_config::TimestampSource::Input,
             )
             .await;
-        assert!(
-            tier_file_count(&cfg.journal.hour_1_tier_dir()) > 0
-                || !open_tiers
-                    .read()
-                    .expect("read open tiers")
-                    .hour_1
-                    .is_empty(),
-            "expected hour_1 rollup data to exist for deterministic non-raw query"
-        );
+        let materialized_tier_files = tier_file_count(&cfg.journal.hour_1_tier_dir())
+            + tier_file_count(&cfg.journal.minute_5_tier_dir())
+            + tier_file_count(&cfg.journal.minute_1_tier_dir());
 
-        let (query_service, _notify_rx) = query::FlowQueryService::new(
-            &cfg,
-            Arc::clone(&open_tiers),
-            Arc::clone(&tier_flow_indexes),
-        )
-        .await
-        .expect("create query service");
+        let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+            .await
+            .expect("create query service");
         let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
         let request = query::FlowsRequest {
             view: query::ViewMode::TableSankey,
@@ -994,11 +973,12 @@ mod tests {
             .expect("query aggregated-safe flows");
         assert!(
             !output.flows.is_empty(),
-            "expected non-empty aggregated-safe flows from materialized tier"
+            "expected non-empty aggregated-safe flows from on-disk tiers"
         );
-        assert!(
+        assert_eq!(
             output.stats.get("query_tier").copied().unwrap_or(0) > 0,
-            "expected aggregated-safe query to use non-raw tier"
+            materialized_tier_files > 0,
+            "expected grouped query tier to reflect on-disk materialized-tier availability"
         );
 
         let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
@@ -1027,22 +1007,20 @@ mod tests {
             "Source AS Name"
         );
         assert_eq!(response.data.columns["PROTOCOL"]["name"], "Protocol");
-        assert!(
+        assert_eq!(
             response.data.stats.get("query_tier").copied().unwrap_or(0) > 0,
-            "expected function response to report non-raw query tier"
+            materialized_tier_files > 0,
+            "expected function response query tier to reflect on-disk materialized-tier availability"
         );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn e2e_country_map_reuses_tuple_table_shape_with_country_keys() {
-        let (cfg, metrics, open_tiers, tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
-        let (query_service, _notify_rx) = query::FlowQueryService::new(
-            &cfg,
-            Arc::clone(&open_tiers),
-            Arc::clone(&tier_flow_indexes),
-        )
-        .await
-        .expect("create query service");
+        let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) =
+            ingest_fixture("nfv5.pcap").await;
+        let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+            .await
+            .expect("create query service");
         let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
         let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
 
@@ -1106,15 +1084,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn e2e_selection_filter_uses_streaming_reader_path() {
-        let (cfg, _metrics, open_tiers, tier_flow_indexes, _tmp) =
+        let (cfg, _metrics, _open_tiers, _tier_flow_indexes, _tmp) =
             ingest_fixture("nfv5.pcap").await;
-        let (query_service, _notify_rx) = query::FlowQueryService::new(
-            &cfg,
-            Arc::clone(&open_tiers),
-            Arc::clone(&tier_flow_indexes),
-        )
-        .await
-        .expect("create query service");
+        let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+            .await
+            .expect("create query service");
         let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
 
         let request_base = query::FlowsRequest {
@@ -1230,15 +1204,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn e2e_post_style_nested_required_controls_still_filter_correctly() {
-        let (cfg, _metrics, open_tiers, tier_flow_indexes, _tmp) =
+        let (cfg, _metrics, _open_tiers, _tier_flow_indexes, _tmp) =
             ingest_fixture("nfv5.pcap").await;
-        let (query_service, _notify_rx) = query::FlowQueryService::new(
-            &cfg,
-            Arc::clone(&open_tiers),
-            Arc::clone(&tier_flow_indexes),
-        )
-        .await
-        .expect("create query service");
+        let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+            .await
+            .expect("create query service");
         let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
         let payload = format!(
             r#"{{
@@ -1297,15 +1267,11 @@ mod tests {
         let mut cfg = plugin_config::PluginConfig::default();
         cfg.journal.journal_dir = journal_dir.to_string_lossy().to_string();
 
-        let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
-        let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
-        let (query_service, _notify_rx) = query::FlowQueryService::new(
-            &cfg,
-            Arc::clone(&open_tiers),
-            Arc::clone(&tier_flow_indexes),
-        )
-        .await
-        .expect("create query service for live journals");
+        let _open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+        let _tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+        let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+            .await
+            .expect("create query service for live journals");
 
         let before = Utc::now().timestamp().max(1) as u32;
         let after = before.saturating_sub(24 * 60 * 60);
@@ -1455,15 +1421,11 @@ mod tests {
         let mut cfg = plugin_config::PluginConfig::default();
         cfg.journal.journal_dir = journal_root.to_string_lossy().to_string();
 
-        let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
-        let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
-        let (query_service, _notify_rx) = query::FlowQueryService::new(
-            &cfg,
-            Arc::clone(&open_tiers),
-            Arc::clone(&tier_flow_indexes),
-        )
-        .await
-        .expect("create query service for fixed raw journals");
+        let _open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+        let _tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+        let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+            .await
+            .expect("create query service for fixed raw journals");
 
         let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
         let request = query::FlowsRequest {
@@ -1543,15 +1505,11 @@ mod tests {
         let mut cfg = plugin_config::PluginConfig::default();
         cfg.journal.journal_dir = journal_root.to_string_lossy().to_string();
 
-        let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
-        let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
-        let (query_service, _notify_rx) = query::FlowQueryService::new(
-            &cfg,
-            Arc::clone(&open_tiers),
-            Arc::clone(&tier_flow_indexes),
-        )
-        .await
-        .expect("create query service for fixed raw journals");
+        let _open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+        let _tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+        let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+            .await
+            .expect("create query service for fixed raw journals");
 
         let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
         let request = query::FlowsRequest {
@@ -1692,15 +1650,11 @@ mod tests {
         let mut cfg = plugin_config::PluginConfig::default();
         cfg.journal.journal_dir = journal_root.to_string_lossy().to_string();
 
-        let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
-        let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
-        let (query_service, _notify_rx) = query::FlowQueryService::new(
-            &cfg,
-            Arc::clone(&open_tiers),
-            Arc::clone(&tier_flow_indexes),
-        )
-        .await
-        .expect("create query service for fixed raw journals");
+        let _open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
+        let _tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
+        let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+            .await
+            .expect("create query service for fixed raw journals");
 
         let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
         let request = query::FlowsRequest {
