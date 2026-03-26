@@ -659,14 +659,21 @@ impl<M: MemoryMap> JournalFile<M> {
 
     /// Creates an iterator over all DATA objects for a specific entry
     pub fn entry_data_objects(&self, entry_offset: NonZeroU64) -> Result<EntryDataIterator<'_, M>> {
-        let mut data_offsets = Vec::new();
-        self.entry_data_object_offsets(entry_offset, &mut data_offsets)?;
+        // Get the entry object to determine how many data items it has
+        let entry_guard = self.entry_ref(entry_offset)?;
+
+        // Get the total number of items
+        let total_items = match &entry_guard.items {
+            EntryItemsType::Regular(items) => items.len(),
+            EntryItemsType::Compact(items) => items.len(),
+        };
 
         // Create the iterator
         Ok(EntryDataIterator {
             journal: self,
-            data_offsets,
+            entry_offset: Some(entry_offset),
             current_index: 0,
+            total_items,
         })
     }
 
@@ -1200,25 +1207,55 @@ impl<'a, M: MemoryMap> Iterator for FieldDataIterator<'a, M> {
 /// Iterator that walks through all DATA objects for a specific entry
 pub struct EntryDataIterator<'a, M: MemoryMap> {
     journal: &'a JournalFile<M>,
-    data_offsets: Vec<NonZeroU64>,
+    entry_offset: Option<NonZeroU64>,
     current_index: usize,
+    total_items: usize,
 }
 
 impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
     type Item = Result<ValueGuard<'a, DataObject<&'a [u8]>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current_index >= self.data_offsets.len() {
+        let entry_offset = self.entry_offset?;
+
+        if self.current_index >= self.total_items {
             return None;
         }
 
-        let data_offset = self.data_offsets[self.current_index];
-        self.current_index += 1;
+        match self.journal.entry_ref(entry_offset) {
+            Ok(entry_guard) => {
+                let idx = self.current_index;
+                self.current_index += 1;
 
-        match self.journal.data_ref(data_offset) {
-            Ok(data_guard) => Some(Ok(data_guard)),
+                let data_offset = match &entry_guard.items {
+                    EntryItemsType::Regular(items) => {
+                        if idx >= items.len() {
+                            return None;
+                        }
+                        items[idx].object_offset
+                    }
+                    EntryItemsType::Compact(items) => {
+                        if idx >= items.len() {
+                            return None;
+                        }
+                        items[idx].object_offset as u64
+                    }
+                };
+
+                let data_offset = NonZeroU64::new(data_offset)?;
+
+                drop(entry_guard);
+
+                match self.journal.data_ref(data_offset) {
+                    Ok(data_guard) => Some(Ok(data_guard)),
+                    Err(e) => {
+                        self.current_index = self.total_items;
+                        Some(Err(e))
+                    }
+                }
+            }
             Err(e) => {
-                self.current_index = self.data_offsets.len();
+                self.current_index = self.total_items;
                 Some(Err(e))
             }
         }

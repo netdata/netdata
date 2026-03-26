@@ -40,7 +40,4 @@ pub(crate) use object::*;
 // Re-export DataObject for journal-index
 pub use object::{DataObject, DataPayloadRef};
 
-// Re-export for external field iteration
-pub use file::EntryDataIterator;
-
 pub type JournalFileMap = JournalFile<Mmap>;

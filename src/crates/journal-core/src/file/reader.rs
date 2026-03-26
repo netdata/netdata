@@ -2,8 +2,9 @@ use super::mmap::MemoryMap;
 use crate::error::Result;
 use crate::field_map::{FieldMap, REMAPPING_MARKER, extract_field_name};
 use crate::file::{
+    EntryItemsType,
     cursor::{JournalCursor, Location},
-    file::{FieldDataIterator, FieldIterator, JournalFile},
+    file::{EntryDataIterator, FieldDataIterator, FieldIterator, JournalFile},
     filter::{FilterExpr, JournalFilter, LogicalOp},
     object::{DataObject, FieldObject, HashableObject},
     offset_array::Direction,
@@ -17,9 +18,7 @@ pub struct JournalReader<'a, M: MemoryMap> {
     filter: Option<JournalFilter>,
     field_iterator: Option<FieldIterator<'a, M>>,
     field_data_iterator: Option<FieldDataIterator<'a, M>>,
-    entry_data_offsets: Vec<NonZeroU64>,
-    entry_data_index: usize,
-    entry_data_ready: bool,
+    entry_data_iterator: Option<EntryDataIterator<'a, M>>,
 
     field_guard: Option<ValueGuard<'a, FieldObject<&'a [u8]>>>,
     data_guard: Option<ValueGuard<'a, DataObject<&'a [u8]>>>,
@@ -45,9 +44,7 @@ impl<M: MemoryMap> Default for JournalReader<'_, M> {
             filter: None,
             field_iterator: None,
             field_data_iterator: None,
-            entry_data_offsets: Vec::new(),
-            entry_data_index: 0,
-            entry_data_ready: false,
+            entry_data_iterator: None,
             field_guard: None,
             data_guard: None,
             remapping_registry: FieldMap::new(),
@@ -235,9 +232,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
 
     pub fn entry_data_restart(&mut self) {
         self.drop_guards();
-        self.entry_data_offsets.clear();
-        self.entry_data_index = 0;
-        self.entry_data_ready = false;
+        self.entry_data_iterator = None;
     }
 
     pub fn entry_data_enumerate(
@@ -246,23 +241,17 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     ) -> Result<Option<&ValueGuard<'_, DataObject<&'a [u8]>>>> {
         self.drop_guards();
 
-        if !self.entry_data_ready {
+        if self.entry_data_iterator.is_none() {
             let entry_offset = self.cursor.position()?;
-            self.entry_data_offsets.clear();
-            journal_file.entry_data_object_offsets(entry_offset, &mut self.entry_data_offsets)?;
-            self.entry_data_index = 0;
-            self.entry_data_ready = true;
+            self.entry_data_iterator = Some(journal_file.entry_data_objects(entry_offset)?);
         }
 
-        if self.entry_data_index >= self.entry_data_offsets.len() {
-            return Ok(None);
+        if let Some(iter) = &mut self.entry_data_iterator {
+            self.data_guard = iter.next().transpose()?;
+            Ok(self.data_guard.as_ref())
+        } else {
+            Ok(None)
         }
-
-        let data_offset = self.entry_data_offsets[self.entry_data_index];
-        self.entry_data_index += 1;
-
-        self.data_guard = Some(journal_file.data_ref(data_offset)?);
-        Ok(self.data_guard.as_ref())
     }
 
     pub fn entry_data_offsets(
@@ -271,7 +260,26 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
         data_offsets: &mut Vec<NonZeroU64>,
     ) -> Result<()> {
         let entry_offset = self.cursor.position()?;
-        journal_file.entry_data_object_offsets(entry_offset, data_offsets)
+        let entry_guard = journal_file.entry_ref(entry_offset)?;
+
+        match &entry_guard.items {
+            EntryItemsType::Regular(items) => {
+                for item in items.iter() {
+                    if let Some(offset) = NonZeroU64::new(item.object_offset) {
+                        data_offsets.push(offset);
+                    }
+                }
+            }
+            EntryItemsType::Compact(items) => {
+                for item in items.iter() {
+                    if let Some(offset) = NonZeroU64::new(item.object_offset as u64) {
+                        data_offsets.push(offset);
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Loads field name remappings from the journal file.
