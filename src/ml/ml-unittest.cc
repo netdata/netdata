@@ -148,8 +148,8 @@ static void test_features_smooth()
     }
 }
 
-// Test: smooth_n=0 should behave like disabled smoothing, i.e. the same
-// effective feature extraction as smooth_n=1, for both training and prediction.
+// Test: smooth_n=0 is normalized to the same effective smoothing window as
+// smooth_n=1, for both training and prediction.
 static void test_features_zero_smooth_matches_one()
 {
     fprintf(stderr, "  test_features_zero_smooth_matches_one...\n");
@@ -189,11 +189,11 @@ static void test_features_zero_smooth_matches_one()
     DSample sample0, sample1;
     memcpy(src0, input, n * sizeof(calculated_number_t));
     memcpy(dst0, input, n * sizeof(calculated_number_t));
-    ml_features_preprocess_predict(&features0, &sample0);
+    ml_features_preprocess_predict(&features0, sample0);
 
     memcpy(src1, input, n * sizeof(calculated_number_t));
     memcpy(dst1, input, n * sizeof(calculated_number_t));
-    ml_features_preprocess_predict(&features1, &sample1);
+    ml_features_preprocess_predict(&features1, sample1);
 
     ML_TEST_ASSERT(sample0.size() == sample1.size(), "prediction sample size should match for smooth_n=0 and smooth_n=1");
     for (size_t i = 0; i < features0.lag_n + 1; i++) {

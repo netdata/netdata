@@ -34,8 +34,8 @@ static inline size_t ml_dimension_smoothing_window(const ml_dimension_t *dim)
     if (chart_update_every > nd_profile.update_every)
         return 1;
 
-    // max_samples_to_smooth == 0 is allowed and means "no smoothing", which is
-    // equivalent to an effective smoothing window of 1 for feature extraction.
+    // max_samples_to_smooth == 0 is normalized to an effective smoothing window
+    // of 1 for feature extraction.
     return std::max<size_t>(Cfg.max_samples_to_smooth, 1);
 }
 
@@ -835,7 +835,7 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
         Cfg.diff_n, smoothing_window, Cfg.lag_n,
         dst_cns, n, src_cns, n
     };
-    ml_features_preprocess_predict(&features, &dim->feature);
+    ml_features_preprocess_predict(&features, dim->feature);
 
     // Mark the metric time as variable if we received different values
     if (!same_value)

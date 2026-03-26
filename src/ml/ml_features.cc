@@ -5,7 +5,8 @@
 
 static inline size_t ml_effective_smooth_n(const ml_features_t *features)
 {
-    // smooth_n == 0 is allowed by config and should behave like disabled smoothing.
+    // smooth_n == 0 is normalized to an effective window of 1, preserving the
+    // existing feature-extraction shape without introducing a separate no-op path.
     return features->smooth_n == 0 ? 1 : features->smooth_n;
 }
 
@@ -81,12 +82,12 @@ void ml_features_preprocess(ml_features_t *features, std::vector<DSample> &prepr
     ml_features_lag(features, preprocessed_features, sampling_ratio);
 }
 
-void ml_features_preprocess_predict(ml_features_t *features, DSample *sample)
+void ml_features_preprocess_predict(ml_features_t *features, DSample &sample)
 {
     ml_features_diff(features);
     ml_features_smooth(features);
 
-    sample->set_size(features->lag_n + 1);
+    sample.set_size(features->lag_n + 1);
     for (size_t feature_idx = 0; feature_idx != features->lag_n + 1; feature_idx++)
-        (*sample)(feature_idx) = features->src[feature_idx];
+        sample(feature_idx) = features->src[feature_idx];
 }

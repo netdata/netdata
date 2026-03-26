@@ -23,6 +23,6 @@ typedef struct {
 void ml_features_preprocess(ml_features_t *features, std::vector<DSample> &preprocessed_features, double sampling_ratio);
 
 // Prediction path: diff + smooth, then fill a single DSample from the first lag_n+1 values.
-void ml_features_preprocess_predict(ml_features_t *features, DSample *sample);
+void ml_features_preprocess_predict(ml_features_t *features, DSample &sample);
 
 #endif /* ML_FEATURES_H */
