@@ -656,11 +656,11 @@ static void aclk_synchronization_event_loop(void *arg)
     Pvoid_t *Pvalue;
     worker_data_t  *worker;
 
-    config->shutdown_requested = false;
+    __atomic_store_n(&config->shutdown_requested, false, __ATOMIC_RELAXED);
     config->initialized = true;
     completion_mark_complete(&config->start_stop_complete);
 
-    while (likely(config->shutdown_requested == false))  {
+    while (likely(!__atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED)))  {
         enum aclk_database_opcode opcode;
         RRDHOST *host;
         struct aclk_sync_cfg_t *aclk_host_config;
@@ -894,7 +894,7 @@ static void aclk_synchronization_event_loop(void *arg)
                     }
                     break;
                 case ACLK_SYNC_SHUTDOWN:
-                    config->shutdown_requested = true;
+                    __atomic_store_n(&config->shutdown_requested, true, __ATOMIC_RELAXED);
                     mark_pending_req_cancel_all();
                     break;
                 default:
