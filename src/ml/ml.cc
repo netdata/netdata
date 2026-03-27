@@ -669,7 +669,7 @@ static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
     model_info.inlined_kmeans = dim->km_contexts.back();
     worker->pending_model_info.push_back(model_info);
 
-        ml_dimension_stream_kmeans(worker, dim);
+    ml_dimension_stream_kmeans(worker, dim);
 
     // Clear the training in progress flag
     dim->training_in_progress = false;
