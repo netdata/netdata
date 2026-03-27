@@ -107,6 +107,7 @@ const ROLLUP_PRESENCE_FIELDS: &[(&str, &str)] = &[
     ("DST_VLAN", INTERNAL_DST_VLAN_PRESENT),
 ];
 
+#[cfg(test)]
 fn rollup_presence_field(field: &str) -> Option<&'static str> {
     ROLLUP_PRESENCE_FIELDS
         .iter()
@@ -504,6 +505,7 @@ impl TierFlowIndexStore {
         materialize_rollup_fields(index, flow_ref.flow_id)
     }
 
+    #[cfg(test)]
     pub(crate) fn field_value_string(&self, flow_ref: TierFlowRef, field: &str) -> Option<String> {
         let normalized = field.to_ascii_uppercase();
         let index = self.indexes.get(&flow_ref.hour_start_usec)?;
