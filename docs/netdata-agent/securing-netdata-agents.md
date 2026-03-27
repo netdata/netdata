@@ -47,6 +47,18 @@ Edit the `[web]` section in `netdata.conf` using the [`edit-config`](/docs/netda
 
 Restart your Agent to apply changes. After restart, the local dashboard (http://NODE:19999) will no longer be accessible, but all metrics remain available through Netdata Cloud.
 
+:::warning
+
+Setting `mode = none` disables the entire web server on port `19999`, including streaming capability. This means:
+
+- Parent-child streaming architectures will **not work** with this setting
+- Streaming from child agents to parent nodes uses the same web server infrastructure
+- This setting should only be used for agents connecting directly to Netdata Cloud via [ACLK](/src/aclk/README.md)
+
+If you need streaming functionality, use [bearer token protection](#recommended-methods) or [restrict access to private networks](#alternative-methods) instead.
+
+:::
+
 :::tip
 
 For Docker deployments, set `NETDATA_HEALTHCHECK_TARGET=cli` in your environment variables.
