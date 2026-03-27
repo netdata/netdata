@@ -1307,6 +1307,150 @@ template: ml_5min_node
 
 **Next Steps:** Having trouble with your alerts? Continue to [Troubleshooting](#troubleshooting) for debugging techniques.
 
+## Alert Notification Field Reference
+
+:::tip
+
+**What You'll Learn**
+
+Understanding the fields included in alert notifications sent by Netdata. Essential for interpreting alert messages and integrating with notification systems.
+
+:::
+
+When an alert triggers, Netdata sends notifications containing various fields that describe the alert state and transition. This section documents the fields you'll receive in JSON notifications, webhook payloads, and custom notification integrations.
+
+### Core Alert Fields
+
+The following table describes the primary fields included in all alert notifications:
+
+| Field | Description |
+|:------|:------------|
+| `host` | The hostname of the node that generated this alert |
+| `chart` | The chart name (type.id) associated with this alert |
+| `name` | The alert name as defined in the health configuration |
+| `status` | The current alert status: `REMOVED`, `UNINITIALIZED`, `UNDEFINED`, `CLEAR`, `WARNING`, or `CRITICAL` |
+| `old_status` | The previous alert status before this transition |
+| `when` | Unix timestamp when this alert event occurred |
+| `value` | The current value of the alert |
+| `old_value` | The previous value of the alert |
+| `units` | The units of the value (e.g., `%`, `seconds`, `bytes`) |
+| `info` | The description text from the alert's `info:` configuration line |
+
+### Duration Fields
+
+:::important
+
+Understanding the difference between `duration` and `non_clear_duration` is critical for interpreting alert timelines correctly.
+
+:::
+
+| Field | Description |
+|:------|:------------|
+| `duration` | The duration in seconds the alert was in the **previous state** before transitioning to the current state. For example, if an alert transitions from CLEAR to WARNING with `duration: 3600`, it means the alert was in the CLEAR state for 1 hour (3600 seconds) before becoming WARNING. |
+| `duration_txt` | Human-readable representation of `duration` (e.g., "1 hour", "45 minutes") |
+| `non_clear_duration` | The total duration in seconds the alert has been in a **non-clear state** (WARNING or CRITICAL). This field tracks the cumulative time the alert has been active, regardless of transitions between WARNING and CRITICAL. |
+| `non_clear_duration_txt` | Human-readable representation of `non_clear_duration` |
+| `raised_for` | Human-readable text indicating how long the alert has been raised, typically shown as "(alarm was raised for X minutes)" |
+
+#### Duration Field Examples
+
+**Example 1: New Alert Transition**
+
+```json
+{
+  "status": "WARNING",
+  "old_status": "CLEAR",
+  "duration": "2700",
+  "non_clear_duration": "0"
+}
+```
+
+Interpretation: The alert was in CLEAR state for 2700 seconds (45 minutes) before transitioning to WARNING. The `non_clear_duration` is 0 because this is the first time entering a non-clear state.
+
+**Example 2: Escalating Alert**
+
+```json
+{
+  "status": "CRITICAL",
+  "old_status": "WARNING",
+  "duration": "600",
+  "non_clear_duration": "3600"
+}
+```
+
+Interpretation: The alert was in WARNING state for 600 seconds (10 minutes) before escalating to CRITICAL. The total time in non-clear state (WARNING + CRITICAL) is 3600 seconds (1 hour).
+
+**Example 3: Recovering Alert**
+
+```json
+{
+  "status": "CLEAR",
+  "old_status": "WARNING",
+  "duration": "1800",
+  "non_clear_duration": "0"
+}
+```
+
+Interpretation: The alert was in WARNING state for 1800 seconds (30 minutes) before returning to CLEAR. The `non_clear_duration` resets to 0 when entering CLEAR state.
+
+### Identification Fields
+
+| Field | Description |
+|:------|:------------|
+| `unique_id` | A unique identifier for this specific alert event |
+| `alarm_id` | The unique identifier of the alarm that generated this event |
+| `event_id` | An incremental counter of events for this alarm |
+| `transition_id` | A unique identifier for this state transition |
+
+### Context Fields
+
+| Field | Description |
+|:------|:------------|
+| `context` | The chart context associated with this alert |
+| `family` | The family (instance) of the chart, such as a specific disk or network interface |
+| `classification` | The alert's class (e.g., `Latency`, `Utilization`, `Errors`) |
+| `src` | The source file and line number where the alert is configured |
+
+### Navigation Fields
+
+| Field | Description |
+|:------|:------------|
+| `goto_url` | A URL to view the Netdata dashboard for this alert |
+| `chart_url` | URL-encoded chart name for use in URLs |
+
+### Summary Fields
+
+| Field | Description |
+|:------|:------------|
+| `summary` | Brief title of the alert (from `summary:` configuration line) |
+| `severity` | Human-readable severity message (e.g., "Escalated to CRITICAL", "Recovered from WARNING") |
+| `status_message` | Human-readable status (e.g., "needs attention", "recovered", "is critical") |
+
+### Aggregate Fields
+
+| Field | Description |
+|:------|:------------|
+| `total_warnings` | Total number of alerts in WARNING state on this host |
+| `total_critical` | Total number of alerts in CRITICAL state on this host |
+
+### Using These Fields
+
+These fields are available in:
+
+- **JSON notifications**: Sent via webhook integrations
+- **Custom notifications**: Available as variables in custom notification scripts (e.g., `${duration}`, `${non_clear_duration}`)
+- **Email notifications**: Used to populate notification content
+
+For implementing custom notification integrations, see the [Custom notification integration documentation](/src/health/notifications/custom/README.md) for examples of how to use these variables in your notification scripts.
+
+:::note
+
+The exact field names may vary slightly depending on the notification method. For webhook integrations, fields are typically in snake_case (e.g., `non_clear_duration`). For custom scripts, fields are accessed as variables with `${}` syntax (e.g., `${non_clear_duration}`).
+
+:::
+
+**Next Steps:** Having trouble with your alerts? Continue to [Troubleshooting](#troubleshooting) for debugging techniques.
+
 ## Troubleshooting
 
 :::tip
