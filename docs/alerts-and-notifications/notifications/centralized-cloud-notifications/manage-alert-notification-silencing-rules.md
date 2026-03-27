@@ -96,7 +96,7 @@ You can also create silencing rules directly from the Alerts tab or Nodes tab:
 
 ## Steps to Configure Silencing Rules
 
-1. Click the **Space settings** cog (below the spaces list)
+1. Click **Space Settings** (⚙️)
 2. Click the **Alert & Notification** tab on the left-hand side
 3. Click the **Notification Silencing Rules** tab
 

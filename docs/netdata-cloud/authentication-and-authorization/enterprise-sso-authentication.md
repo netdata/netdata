@@ -23,7 +23,7 @@ Enterprise SSO handles authentication only. You must configure user and role man
 
 To configure SSO in your Netdata Cloud space:
 
-1. Navigate to Space Settings (⚙️ below the spaces list)
+1. Navigate to **Space Settings** (⚙️)
 2. Select User Management → Authentication & Authorization
 3. Locate your desired SSO integration
 4. Click "Configure" and fill in the required integration attributes

@@ -69,7 +69,7 @@ Once logged into Netdata Cloud, you'll see connection instructions. There are th
 <details>
 <summary><strong>Method 1: Through the Cloud Interface</strong></summary><br/>
 
-1. Navigate to **Space Settings** (cogwheel icon below the spaces list)
+1. Navigate to **Space Settings** (⚙️)
 2. Select **Nodes** tab
 3. Click the **"+"** button to add a new node
 4. Copy and run the generated connection command

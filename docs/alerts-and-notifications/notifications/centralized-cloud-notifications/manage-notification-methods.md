@@ -41,7 +41,7 @@ To manage Space notification settings, you will need the following:
 
 ### Steps to Configure Space Notifications
 
-1. Click on the **Space settings** cog (below the spaces list).
+1. Click **Space Settings** (⚙️).
 2. Click on the **Alerts & Notifications** tab on the left-hand side.
 3. Click on the **Notification Methods** tab.
 

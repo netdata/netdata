@@ -58,7 +58,7 @@ Please refer to the [Netdata Cloud Pricing](https://netdata.cloud/pricing) page 
 
 #### View Current Plan, Billing Options, and Invoices
 
-1. Navigate to **Space settings** (the cog below the spaces list).
+1. Navigate to **Space Settings** (⚙️).
 2. Select the **Plan & Billing** tab.
 3. You'll see:
     - **Credit** amount, if applicable, usable for future invoices or subscription changes. More on this at [Plan changes and credit balance](/docs/netdata-cloud/view-plan-and-billing.md#plan-changes-and-credit-balance).
