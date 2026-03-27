@@ -192,6 +192,13 @@
 - Regenerate integrations docs ([#22034](https://github.com/netdata/netdata/issues/22034))
 - Fix cache (SIGSEGV) ([#22026](https://github.com/netdata/netdata/issues/22026))
 - Windows.plugin (improvements and fixes) ([#22039](https://github.com/netdata/netdata/issues/22039))
+- Add ML unit tests ([#22043](https://github.com/netdata/netdata/issues/22043))
+- Add dictionary benchmark ([#22041](https://github.com/netdata/netdata/issues/22041))
+- Make release profile optimize for speed vs. size ([#22046](https://github.com/netdata/netdata/issues/22046))
+- Fix SIGSEGV (contexts) ([#22025](https://github.com/netdata/netdata/issues/22025))
+- Docs: user-oriented charttpl README rewrite ([#22049](https://github.com/netdata/netdata/issues/22049))
+- Improve DBENGINE log messages for datafile rotation and startup ([#22047](https://github.com/netdata/netdata/issues/22047))
+- Fix wrong DBENGINE file names in logs ([#22053](https://github.com/netdata/netdata/issues/22053))
 
 ## [2.9.0] - 2026-02-16
 
