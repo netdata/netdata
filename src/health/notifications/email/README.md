@@ -55,7 +55,7 @@ The following options can be defined for this notification
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | EMAIL_SENDER | You can change `EMAIL_SENDER` to the email address sending the notifications. | netdata | no |
-| SEND_EMAIL | Set `SEND_EMAIL` to YES | YES | yes |
+| SEND_EMAIL | Set `SEND_EMAIL` to YES, NO, or AUTO (enables email when sendmail is available). | AUTO | yes |
 | [DEFAULT_RECIPIENT_EMAIL](#option-default-recipient-email) | Set `DEFAULT_RECIPIENT_EMAIL` to the email address you want the email to be sent by default. You can define multiple email addresses like this: `alarms@example.com` `systems@example.com`. | root | yes |
 
 <a id="option-default-recipient-email"></a>
