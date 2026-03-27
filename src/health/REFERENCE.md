@@ -1202,7 +1202,7 @@ lookup: average -1m of user
  every: 10s
   warn: $this > 80
   crit: $this > 90
-   info: CPU user usage with 1-hour baseline context
+   info: Current CPU user: $this%, 1-hour average: $cpu_user_1h_average%
 ```
 
 **How Cross-Alert References Work:**
@@ -1218,6 +1218,9 @@ lookup: average -1m of user
 In Alert 2, you can reference Alert 1's value using `$cpu_user_1h_average` in expressions like:
 - `calc: $this - $cpu_user_1h_average` (difference from baseline)
 - `warn: $this > $cpu_user_1h_average * 1.5` (50% above baseline)
+- `info: Current CPU user: $this%, 1-hour average: $cpu_user_1h_average%` (display both values in notifications)
+
+The `info` line supports variable interpolation using `$this` (current alert value) and `$alert_name` (value from another alert). This allows you to include dynamic values in alert notifications, making it clear why an alert triggered.
 
 **Key Points:**
 
