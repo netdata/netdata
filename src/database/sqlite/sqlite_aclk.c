@@ -445,8 +445,6 @@ static void aclk_execute_batch(uv_work_t *req)
     if (!aclk_query_batch)
         return;
 
-    bool shutting_down = __atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED);
-
     Word_t Index = 0;
     bool first = true;
     Pvoid_t *Pvalue;
@@ -455,8 +453,9 @@ static void aclk_execute_batch(uv_work_t *req)
             continue;
 
         aclk_query_t *query = *Pvalue;
-        // aclk_run_query() frees each query; on shutdown we must free without executing
-        if (unlikely(shutting_down))
+        // Shutdown may be requested while this batch is already running, so
+        // re-check before each query instead of relying on a stale snapshot.
+        if (unlikely(__atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED)))
             aclk_query_free(query);
         else
             aclk_run_query(config, query);
