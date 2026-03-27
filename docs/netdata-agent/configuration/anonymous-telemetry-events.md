@@ -167,6 +167,12 @@ environment:
   - DISABLE_TELEMETRY=1
 ```
 
+:::note
+
+You can also use `DO_NOT_TRACK=1` as an alternative to `DISABLE_TELEMETRY=1`. The `DO_NOT_TRACK` environment variable is an industry-standard opt-out variable that Netdata also supports.
+
+:::
+
 See the [Docker installation guide](/packaging/docker/README.md#create-a-new-netdata-agent-container) for complete configuration.
 
 </details>
@@ -189,6 +195,12 @@ export DISABLE_TELEMETRY=1
 ./kickstart.sh
 ```
 
+:::note
+
+You can also use `DO_NOT_TRACK=1` as an alternative to `DISABLE_TELEMETRY=1`. The `DO_NOT_TRACK` environment variable is an industry-standard opt-out variable that Netdata also supports.
+
+:::
+
 See the [installation documentation](/packaging/installer/README.md) for available installer scripts.
 
 </details>
@@ -209,7 +221,7 @@ See the [installation documentation](/packaging/installer/README.md) for availab
 To confirm that telemetry is disabled:
 
 1. Check that the `.opt-out-from-anonymous-statistics` file exists in your config directory, **OR**
-2. Verify that the `DISABLE_TELEMETRY` environment variable is set
+2. Verify that the `DISABLE_TELEMETRY` or `DO_NOT_TRACK` environment variable is set
 
 The Agent dashboard will no longer send PostHog events, and the backend statistics script will not execute.
 
