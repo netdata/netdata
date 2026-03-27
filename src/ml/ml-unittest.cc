@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <utility>
 #include <vector>
 
 static constexpr double ML_PI = 3.14159265358979323846;
@@ -206,7 +207,7 @@ static void test_full_pipeline()
     }
 
     // Train a kmeans model on the normal data
-    std::vector<DSample> training_features = all_features;
+    std::vector<DSample> training_features = std::move(all_features);
     ml_features_t train_ft = {
         diff_n, smooth_n, lag_n,
         nullptr, 0, nullptr, 0,
@@ -701,7 +702,7 @@ static void test_parameter_combinations()
         calculated_number_t src_large[128], dst_large[128];
         memset(src_large, 0, sizeof(src_large));
         for (size_t i = 0; i < large_n; i++)
-            src_large[i] = 10.0 + 5.0 * std::sin(2.0 * ML_PI * (double)i / (double)n);
+            src_large[i] = 10.0 + 5.0 * std::sin(2.0 * ML_PI * (double)i / (double)large_n);
         memcpy(dst_large, src_large, large_n * sizeof(calculated_number_t));
 
         std::vector<DSample> pf_large;
