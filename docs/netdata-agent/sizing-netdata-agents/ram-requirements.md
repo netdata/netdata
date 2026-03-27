@@ -62,7 +62,7 @@ CONFIGURED_CACHES = 32MiB
 (UNIQUE_METRICS * 16KiB / 1024 in MiB) + CONFIGURED_CACHES =
 ( 1000000       * 16KiB / 1024 in MiB) + 32 MiB            =
 15657 MiB =
- about 16 GiB
+about 16 GiB
 ```
 
 ## How to Find Your Metric Count
