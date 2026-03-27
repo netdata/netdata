@@ -62,8 +62,45 @@ CONFIGURED_CACHES = 32MiB
 (UNIQUE_METRICS * 16KiB / 1024 in MiB) + CONFIGURED_CACHES =
 ( 1000000       * 16KiB / 1024 in MiB) + 32 MiB            =
 15657 MiB =
-about 16 GiB
+ about 16 GiB
 ```
+
+## How to Find Your Metric Count
+
+To use the memory formula above, you need to know the value of `UNIQUE_METRICS` for your system. Here are practical ways to discover this value.
+
+### Using Netdata Cloud
+
+In Netdata Cloud, navigate to the **Metrics** tab in the node's overview. The total number of currently collected metrics is displayed at the top of the metrics list.
+
+### Using the Local Dashboard API
+
+Access the `/api/v1/info` endpoint on your Netdata Agent to retrieve the metrics count:
+
+```bash
+curl http://localhost:19999/api/v1/info | grep metrics_count
+```
+
+This returns the `metrics_count` field showing the number of unique time-series currently being collected.
+
+### Typical Baseline Estimates
+
+The number of metrics a Netdata Agent collects varies based on your infrastructure and enabled collectors. Use these ranges as rough estimates for planning:
+
+| Infrastructure Type       | Typical Metrics Range |
+|---------------------------|----------------------:|
+| Bare metal server         |        1,000 - 3,000  |
+| Virtual machine           |        1,500 - 5,000  |
+| Container host            |          500 - 2,000  |
+| Kubernetes node           |        8,000 - 12,000 |
+
+:::note
+
+These are planning estimates only. Actual metrics counts depend on enabled collectors, applications running, and configured monitoring scope. Always verify with the methods above for accurate sizing.
+
+:::
+
+For more information about how Netdata handles metrics over time (current vs. archived metrics), see [Extreme Cardinality Protection](/docs/extreme-cardinality-protection.md).
 
 ## Parents that also act as `systemd-journal` Logs centralization points
 
