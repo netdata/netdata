@@ -292,6 +292,15 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                 if(message_len > WEBSOCKET_OUT_BUFFER_MAX_SIZE) {
                     netdata_log_error("WEBSOCKET[%zu]: Broadcast message_len (%u) exceeds max allowed (%zu)",
                                       wth->id, message_len, WEBSOCKET_OUT_BUFFER_MAX_SIZE);
+                    // Drain the rejected payload to keep the pipe in sync for subsequent commands.
+                    char drain_buf[4096];
+                    uint32_t remaining = message_len;
+                    while(remaining > 0) {
+                        uint32_t to_read = (uint32_t)MIN(remaining, sizeof(drain_buf));
+                        bytes = read_pipe_block(wth->cmd.pipe[PIPE_READ], drain_buf, to_read);
+                        if(bytes != (ssize_t)to_read) break;
+                        remaining -= to_read;
+                    }
                     continue;
                 }
 
