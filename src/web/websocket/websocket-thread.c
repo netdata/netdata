@@ -298,7 +298,13 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                     while(remaining > 0) {
                         uint32_t to_read = (uint32_t)MIN(remaining, sizeof(drain_buf));
                         bytes = read_pipe_block(wth->cmd.pipe[PIPE_READ], drain_buf, to_read);
-                        if(bytes != (ssize_t)to_read) break;
+                        if(bytes != (ssize_t)to_read) {
+                            // Partial drain means the pipe is desynchronized; remaining payload
+                            // bytes would be misread as the next command header.
+                            netdata_log_error("WEBSOCKET[%zu]: Short read draining oversized broadcast — pipe desynchronized, stopping command processing",
+                                              wth->id);
+                            goto stop_processing;
+                        }
                         remaining -= to_read;
                     }
                     continue;
@@ -341,6 +347,7 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                 break;
         }
     }
+stop_processing:;
 }
 
 // Thread main function
