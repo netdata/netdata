@@ -2829,7 +2829,7 @@ static void metadata_event_loop(void *arg)
     // are we waiting for callbacks?
     bool callbacks_pending = (config->metadata_running || config->ctx_load_running);
 
-    while ((config->metadata_running || config->ctx_load_running) && loop_count > 0) {
+    while (((config->metadata_running || config->ctx_load_running) || uv_loop_alive(loop)) && loop_count > 0) {
         callbacks_pending = uv_run(loop, UV_RUN_NOWAIT);
         if (!callbacks_pending)
             break;  // No pending callbacks
