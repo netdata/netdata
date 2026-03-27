@@ -316,7 +316,8 @@ static STRING *string_strdupz_source(const char *s, const char *e, size_t max_le
     if (!max_len)
         return string_strdupz("");
 
-    char *buf = mallocz(max_len);
+    size_t buf_size = max_len; // preserve original allocation size for sentinel null
+    char *buf = mallocz(buf_size);
     size_t len;
     char *dst = buf;
 
@@ -324,7 +325,7 @@ static STRING *string_strdupz_source(const char *s, const char *e, size_t max_le
         len = strlen(prefix);
         memcpy(buf, prefix, len);
         dst = &buf[len];
-        max_len -= len;
+        max_len -= len; // remaining capacity for the source string
     }
 
     len = e - s;
@@ -332,7 +333,7 @@ static STRING *string_strdupz_source(const char *s, const char *e, size_t max_le
         len = max_len - 1;
     memcpy(dst, s, len);
     dst[len] = '\0';
-    buf[max_len - 1] = '\0';
+    buf[buf_size - 1] = '\0'; // sentinel: always terminates at the real end of buf
 
     for (size_t i = 0; buf[i]; i++)
         if (!is_netdata_api_valid_character(buf[i]))
