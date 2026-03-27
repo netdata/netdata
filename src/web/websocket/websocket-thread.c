@@ -293,19 +293,37 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                     netdata_log_error("WEBSOCKET[%zu]: Broadcast message_len (%u) exceeds max allowed (%zu)",
                                       wth->id, message_len, WEBSOCKET_OUT_BUFFER_MAX_SIZE);
                     // Drain the rejected payload to keep the pipe in sync for subsequent commands.
+                    // Use direct read() with bounded EAGAIN retries: the writer sends the payload in
+                    // three separate write() calls under a spinlock, so the reader may race ahead and
+                    // see EAGAIN before all bytes are in the pipe.  Yielding lets the writer make
+                    // progress; resetting the counter on each successful read avoids a false timeout
+                    // while draining a large payload through a small pipe buffer.
                     char drain_buf[4096];
                     uint32_t remaining = message_len;
+                    int drain_retries = 0;
                     while(remaining > 0) {
                         uint32_t to_read = (uint32_t)MIN(remaining, sizeof(drain_buf));
-                        bytes = read_pipe_block(wth->cmd.pipe[PIPE_READ], drain_buf, to_read);
-                        if(bytes != (ssize_t)to_read) {
-                            // Partial drain means the pipe is desynchronized; remaining payload
-                            // bytes would be misread as the next command header.
-                            netdata_log_error("WEBSOCKET[%zu]: Short read draining oversized broadcast — pipe desynchronized, stopping command processing",
+                        ssize_t n = read(wth->cmd.pipe[PIPE_READ], drain_buf, to_read);
+                        if(n > 0) {
+                            remaining -= (uint32_t)n;
+                            drain_retries = 0;
+                        } else if(n == 0) {
+                            netdata_log_error("WEBSOCKET[%zu]: Pipe closed while draining oversized broadcast — stopping command processing",
+                                              wth->id);
+                            goto stop_processing;
+                        } else if(errno == EAGAIN || errno == EWOULDBLOCK) {
+                            if(++drain_retries > 1000) {
+                                // Writer stalled: remaining bytes would be misread as the next command header.
+                                netdata_log_error("WEBSOCKET[%zu]: Writer stalled draining oversized broadcast — pipe desynchronized, stopping command processing",
+                                                  wth->id);
+                                goto stop_processing;
+                            }
+                            sched_yield();
+                        } else {
+                            netdata_log_error("WEBSOCKET[%zu]: Read error draining oversized broadcast — pipe desynchronized, stopping command processing",
                                               wth->id);
                             goto stop_processing;
                         }
-                        remaining -= to_read;
                     }
                     continue;
                 }
