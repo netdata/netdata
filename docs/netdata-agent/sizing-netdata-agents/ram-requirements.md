@@ -83,20 +83,13 @@ curl http://localhost:19999/api/v1/info | grep metrics_count
 
 This returns the `metrics_count` field showing the number of unique time-series currently being collected.
 
-### Typical Baseline Estimates
+### Baseline Estimates
 
-The number of metrics a Netdata Agent collects varies based on your infrastructure and enabled collectors. Use these ranges as rough estimates for planning:
-
-| Infrastructure Type       | Typical Metrics Range |
-|---------------------------|----------------------:|
-| Bare metal server         |        1,000 - 3,000  |
-| Virtual machine           |        1,500 - 5,000  |
-| Container host            |          500 - 2,000  |
-| Kubernetes node           |        8,000 - 12,000 |
+The number of metrics a Netdata Agent collects varies based on enabled collectors and monitoring scope. According to our [Scalability documentation](/docs/scalability.md), agents typically collect **3,000 to 20,000 metrics per second per node**.
 
 :::note
 
-These are planning estimates only. Actual metrics counts depend on enabled collectors, applications running, and configured monitoring scope. Always verify with the methods above for accurate sizing.
+This is a planning estimate only. Actual metrics counts depend on enabled collectors, applications running, and configured monitoring scope. Always verify with the methods above for accurate sizing.
 
 :::
 
