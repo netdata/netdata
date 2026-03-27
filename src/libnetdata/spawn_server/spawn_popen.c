@@ -106,7 +106,7 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
 //#if defined(OS_WINDOWS)
 //    if(strncmp(cmd, "exec ", 5) == 0) {
 //        size_t len = strlen(cmd);
-//        char cmd_copy[strlen(cmd) + 1];
+//        char *cmd_copy = mallocz(len + 1);
 //        memcpy(cmd_copy, cmd, len + 1);
 //        char *words[100];
 //        size_t num_words = quoted_strings_splitter(cmd_copy, words, 100, isspace_map_pluginsd);
@@ -117,15 +117,19 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
 //            strendswith(prog, ".plugin") &&
 //            !strendswith(prog, "charts.d.plugin") &&
 //            !strendswith(prog, "ioping.plugin")) {
-//            const char *argv[num_words - 1 + 1]; // remove exec, add terminator
+//            const char **argv = mallocz((num_words) * sizeof(const char *)); // remove exec, add terminator
 //
 //            size_t dst = 0;
 //            for (size_t i = 1; i < num_words; i++)
 //                argv[dst++] = get_word(words, num_words, i);
 //
 //            argv[dst] = NULL;
-//            return spawn_popen_run_argv(argv);
+//            POPEN_INSTANCE *pi = spawn_popen_run_argv(argv);
+//            freez(argv);
+//            freez(cmd_copy);
+//            return pi;
 //        }
+//        freez(cmd_copy);
 //    }
 //#endif
 

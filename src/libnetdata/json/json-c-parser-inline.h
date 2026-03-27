@@ -525,11 +525,13 @@
             }                                                                                                   \
         }                                                                                                       \
         else {                                                                                                  \
-            char _new_path[sizeof(path)];                                                                       \
-            snprintfz(_new_path, sizeof(_new_path), "%s%s%s", path, *path?".":"", member);                      \
-            if (!callback(_j, _new_path, dst, error, flags)) {                                                  \
+            size_t _new_path_len = strlen(path) + strlen(member) + 2; /* dot + NUL */                          \
+            char *_new_path = mallocz(_new_path_len);                                                          \
+            snprintfz(_new_path, _new_path_len, "%s%s%s", path, *path ? "." : "", member);                     \
+            bool _cb_result = callback(_j, _new_path, dst, error, flags);                                      \
+            freez(_new_path);                                                                                   \
+            if (!_cb_result)                                                                                    \
                 return false;                                                                                   \
-            }                                                                                                   \
         }                                                                                                       \
     } else if((flags) & JSONC_REQUIRED) {                                                                       \
         buffer_sprintf(error, "missing '%s.%s' object", path, member);                                          \
