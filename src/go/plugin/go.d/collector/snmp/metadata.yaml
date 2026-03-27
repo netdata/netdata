@@ -54,6 +54,7 @@ modules:
         - barracuda
         - bluecat
         - brocade
+        - cumulus
         - brother
         - chatsworth
         - checkpoint
@@ -117,6 +118,7 @@ modules:
         - linksys
         - mcafee
         - mikrotik
+        - mellanox
         - nasuni
         - nec
         - net-snmp
