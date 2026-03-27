@@ -1123,7 +1123,7 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx)
     if(cpus < 1)
         cpus = 1;
 
-    netdata_log_info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using a shared pool of %zd threads...", datafiles, ctx->config.tier, cpus);
+    netdata_log_info("DBENGINE: tier %d: populating retention to MRG from %zu journal files, using a shared pool of %zd threads...", ctx->config.tier, datafiles, cpus);
 
     completion_init(&ctx->loading.load_mrg);
     rrdeng_enq_cmd(
@@ -1143,7 +1143,11 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
     if(__atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED) == LONG_MAX)
         __atomic_store_n(&ctx->atomic.first_time_s, now_realtime_sec(), __ATOMIC_RELAXED);
 
-    netdata_log_info("DBENGINE: tier %d is ready for data collection and queries", ctx->config.tier);
+    // Preserve the caller's errno while avoiding stale errno values in this informational readiness log.
+    int saved_errno = errno;
+    errno_clear();
+    netdata_log_info("DBENGINE: tier %d: ready for data collection and queries", ctx->config.tier);
+    errno = saved_errno;
 }
 
 /*

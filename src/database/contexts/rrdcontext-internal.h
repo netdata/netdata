@@ -227,6 +227,42 @@ typedef struct rrdmetric {
     struct rrdinstance *ri;
 } RRDMETRIC;
 
+static ALWAYS_INLINE RRDDIM *rrdmetric_rrddim_atomic_load(RRDMETRIC *rm) {
+    return __atomic_load_n(&rm->rrddim, __ATOMIC_ACQUIRE);
+}
+
+static ALWAYS_INLINE void rrdmetric_rrddim_atomic_store(RRDMETRIC *rm, RRDDIM *rd) {
+    __atomic_store_n(&rm->rrddim, rd, __ATOMIC_RELEASE);
+}
+
+static ALWAYS_INLINE RRDDIM *rrdmetric_rrddim_get_and_lock(RRDMETRIC *rm) {
+    for(size_t retries = 0; retries < 5; retries++) {
+        RRDDIM *rd = rrdmetric_rrddim_atomic_load(rm);
+        if(unlikely(!rd))
+            return NULL;
+
+        if(unlikely(!spinlock_trylock(&rd->destroy_lock))) {
+            if(retries + 1 < 5)
+                microsleep(1 * USEC_PER_MS);
+            continue;
+        }
+
+        if(unlikely(rrdmetric_rrddim_atomic_load(rm) != rd)) {
+            spinlock_unlock(&rd->destroy_lock);
+            continue;
+        }
+
+        return rd;
+    }
+
+    return NULL;
+}
+
+static ALWAYS_INLINE void rrdmetric_rrddim_unlock(RRDDIM *rd) {
+    if(likely(rd))
+        spinlock_unlock(&rd->destroy_lock);
+}
+
 typedef struct rrdinstance {
     UUIDMAP_ID uuid;
     int update_every_s;                 // data collection frequency
@@ -311,8 +347,9 @@ static ALWAYS_INLINE void rrdmetric_set_collected(RRDMETRIC *rm) {
     if(!(old & RRD_FLAG_COLLECTED))
         __atomic_add_fetch(&rm->ri->rc->rrdhost->collected.metrics_count, 1, __ATOMIC_RELAXED);
 
-    if(likely(rm->rrddim))
-        rm->rrddim->rrdcontexts.collected = true;
+    RRDDIM *rd = rrdmetric_rrddim_atomic_load(rm);
+    if(likely(rd))
+        rd->rrdcontexts.collected = true;
 }
 
 static ALWAYS_INLINE void rrdmetric_set_archived(RRDMETRIC *rm) {
