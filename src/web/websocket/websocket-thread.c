@@ -152,9 +152,9 @@ bool websocket_thread_send_broadcast(WEBSOCKET_THREAD *wth, WEBSOCKET_OPCODE opc
     // Lock command pipe for writing
     spinlock_lock(&wth->spinlock);
 
-    // Write command header
-    ssize_t bytes = write(wth->cmd.pipe[PIPE_WRITE], &header, sizeof(header.cmd));
-    if(bytes != sizeof(header.cmd)) {
+    // Write command header (must include the full struct so the reader gets header.len)
+    ssize_t bytes = write(wth->cmd.pipe[PIPE_WRITE], &header, sizeof(header));
+    if(bytes != sizeof(header)) {
         netdata_log_error("WEBSOCKET[%zu]: Failed to write command header to pipe", wth->id);
         spinlock_unlock(&wth->spinlock);
         return false;
@@ -281,7 +281,20 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                     continue;
                 }
 
+                if(header.len < sizeof(opcode)) {
+                    netdata_log_error("WEBSOCKET[%zu]: Broadcast header.len (%u) smaller than opcode size (%zu) — pipe data corrupted",
+                                      wth->id, header.len, sizeof(opcode));
+                    continue;
+                }
+
                 uint32_t message_len = header.len - sizeof(opcode);
+
+                if(message_len > WEBSOCKET_OUT_BUFFER_MAX_SIZE) {
+                    netdata_log_error("WEBSOCKET[%zu]: Broadcast message_len (%u) exceeds max allowed (%zu)",
+                                      wth->id, message_len, WEBSOCKET_OUT_BUFFER_MAX_SIZE);
+                    continue;
+                }
+
                 char *message = mallocz((size_t)message_len + 1);
                 bytes = read_pipe_block(wth->cmd.pipe[PIPE_READ], message, message_len);
                 if(bytes != message_len) {
