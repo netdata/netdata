@@ -5,7 +5,7 @@
 //! - File rotation (size-based, count-based)
 //! - Retention policies
 
-use journal_common::load_machine_id;
+use journal_common::{Microseconds, load_machine_id};
 use journal_log_writer::{
     Config, EntryTimestamps, Log, LogLifecycleEvent, LogLifecycleObserver, RetentionPolicy,
     RotationPolicy,
@@ -595,6 +595,56 @@ fn test_monotonic_override_remains_strict_after_restart() {
         second_seen,
         first_seen
     );
+}
+
+#[test]
+fn test_remapping_entry_respects_timestamp_overrides() {
+    if !journalctl_available() {
+        eprintln!(
+            "journalctl not available; skipping test_remapping_entry_respects_timestamp_overrides"
+        );
+        return;
+    }
+
+    let dir = TempDir::new().unwrap();
+    let config = test_config();
+    let mut log = Log::new(dir.path(), config).unwrap();
+
+    let entry = [
+        b"MESSAGE=remap-ts" as &[u8],
+        b"PRIORITY=6",
+        b"foo.bar=value",
+    ];
+    let realtime_override = Microseconds::now().get().saturating_add(1_000_000);
+    let monotonic_override = 123_456_u64;
+    let ts = EntryTimestamps::default()
+        .with_entry_realtime_usec(realtime_override)
+        .with_entry_monotonic_usec(monotonic_override);
+    log.write_entry_with_timestamps(&entry, ts).unwrap();
+    log.sync().unwrap();
+
+    let rows = read_journal_json(&journal_file_path(&dir));
+    let remap_row = rows
+        .iter()
+        .find(|row| row.get("ND_REMAPPING").and_then(|v| v.as_str()) == Some("1"))
+        .expect("missing remapping row");
+    let data_row = rows
+        .iter()
+        .find(|row| row.get("MESSAGE").and_then(|v| v.as_str()) == Some("remap-ts"))
+        .expect("missing data row");
+
+    let remap_rt =
+        parse_u64_field(remap_row, "__REALTIME_TIMESTAMP").expect("missing remap realtime");
+    let data_rt = parse_u64_field(data_row, "__REALTIME_TIMESTAMP").expect("missing data realtime");
+    let remap_mono =
+        parse_u64_field(remap_row, "__MONOTONIC_TIMESTAMP").expect("missing remap monotonic");
+    let data_mono =
+        parse_u64_field(data_row, "__MONOTONIC_TIMESTAMP").expect("missing data monotonic");
+
+    assert_eq!(remap_rt, realtime_override);
+    assert_eq!(data_rt, realtime_override + 1);
+    assert_eq!(remap_mono, monotonic_override);
+    assert_eq!(data_mono, monotonic_override + 1);
 }
 
 #[test]

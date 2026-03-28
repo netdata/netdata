@@ -1,5 +1,9 @@
 use super::*;
 
+fn bounded_ipfix_options_field_capacity(field_count: usize, remaining_bytes: usize) -> usize {
+    field_count.min(remaining_bytes / 4)
+}
+
 pub(crate) fn observe_ipfix_options_templates(
     body: &[u8],
     namespace: &mut DecoderStateNamespace,
@@ -12,7 +16,10 @@ pub(crate) fn observe_ipfix_options_templates(
         let scope_field_count = u16::from_be_bytes([cursor[4], cursor[5]]);
         cursor = &cursor[6..];
 
-        let mut fields = Vec::with_capacity(field_count);
+        let mut fields = Vec::with_capacity(bounded_ipfix_options_field_capacity(
+            field_count,
+            cursor.len(),
+        ));
         for _ in 0..field_count {
             if cursor.len() < 4 {
                 return changed;
@@ -46,4 +53,26 @@ pub(crate) fn observe_ipfix_options_templates(
     }
 
     changed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ipfix_options_template_capacity_is_bounded_by_remaining_bytes() {
+        assert_eq!(bounded_ipfix_options_field_capacity(16, 8), 2);
+        assert_eq!(bounded_ipfix_options_field_capacity(2, 64), 2);
+    }
+
+    #[test]
+    fn ipfix_options_templates_ignore_truncated_huge_field_counts() {
+        let mut namespace = DecoderStateNamespace::default();
+        let body = [0x01, 0x00, 0xff, 0xff, 0x00, 0x00];
+
+        let changed = observe_ipfix_options_templates(&body, &mut namespace);
+
+        assert!(!changed);
+        assert!(namespace.ipfix_options_templates.is_empty());
+    }
 }

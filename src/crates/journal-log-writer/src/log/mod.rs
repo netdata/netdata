@@ -356,7 +356,7 @@ impl Log {
 
         // Write remapping entry if we have new mappings
         if !new_mappings.is_empty() {
-            self.write_remapping_entry(&new_mappings)?;
+            self.write_remapping_entry(&new_mappings, &timestamps)?;
 
             // Update registry
             for (otel_name, systemd_name) in new_mappings.iter() {
@@ -425,7 +425,11 @@ impl Log {
     /// ND_<md5_1>=<otel_key_1>
     /// ND_<md5_2>=<otel_key_2>
     /// ...
-    fn write_remapping_entry(&mut self, mappings: &[(Vec<u8>, String)]) -> Result<()> {
+    fn write_remapping_entry(
+        &mut self,
+        mappings: &[(Vec<u8>, String)],
+        timestamps: &EntryTimestamps,
+    ) -> Result<()> {
         let mut remapping_items: Vec<Vec<u8>> = Vec::with_capacity(mappings.len() + 2);
 
         // Inject _BOOT_ID field first
@@ -447,7 +451,7 @@ impl Log {
         // Build references
         let items_refs: Vec<&[u8]> = remapping_items.iter().map(|v| v.as_slice()).collect();
 
-        let (realtime, monotonic) = self.capture_dual_timestamp(None)?;
+        let (realtime, monotonic) = self.capture_dual_timestamp(Some(timestamps))?;
 
         let active_file = self.active_file.as_mut().unwrap();
         active_file.write_entry(&items_refs, realtime, monotonic)?;

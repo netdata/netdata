@@ -45,7 +45,7 @@ fn netflow_parser_fixtures_matrix() {
         },
         NetflowFixture {
             name: "datalink-data.pcap",
-            version: "v9",
+            version: "ipfix",
             templates: &["datalink-template.pcap"],
             allow_empty: true,
         },
@@ -57,13 +57,13 @@ fn netflow_parser_fixtures_matrix() {
         },
         NetflowFixture {
             name: "juniper-cpid-data.pcap",
-            version: "v9",
+            version: "ipfix",
             templates: &["juniper-cpid-template.pcap"],
             allow_empty: true,
         },
         NetflowFixture {
             name: "mpls.pcap",
-            version: "v9",
+            version: "ipfix",
             templates: &[],
             allow_empty: true,
         },
@@ -81,7 +81,7 @@ fn netflow_parser_fixtures_matrix() {
         },
         NetflowFixture {
             name: "physicalinterfaces.pcap",
-            version: "v9",
+            version: "ipfix",
             templates: &[],
             allow_empty: true,
         },
@@ -111,7 +111,7 @@ fn netflow_parser_fixtures_matrix() {
         },
         NetflowFixture {
             name: "datalink-template.pcap",
-            version: "v9",
+            version: "ipfix",
             templates: &[],
             allow_empty: true,
         },
@@ -123,7 +123,7 @@ fn netflow_parser_fixtures_matrix() {
         },
         NetflowFixture {
             name: "juniper-cpid-template.pcap",
-            version: "v9",
+            version: "ipfix",
             templates: &[],
             allow_empty: true,
         },
@@ -191,11 +191,7 @@ fn netflow_parser_fixtures_matrix() {
             _ => false,
         };
 
-        let pass = if fixture.allow_empty {
-            true
-        } else {
-            stats.parsed_packets > 0 && version_ok
-        };
+        let pass = version_ok && (fixture.allow_empty || stats.parsed_packets > 0);
 
         assert!(
             pass,

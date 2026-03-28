@@ -14,6 +14,7 @@ message Path {
     enum Type {
         Static = 0;
         BGP = 1;
+        GRP = 2;
     }
     enum HiddenReason {
         HiddenReasonNone = 0;

@@ -48,6 +48,9 @@ pub(crate) fn observe_ipfix_v9_options_templates(
         let template_id = u16::from_be_bytes([cursor[0], cursor[1]]);
         let scope_length = u16::from_be_bytes([cursor[2], cursor[3]]) as usize;
         let option_length = u16::from_be_bytes([cursor[4], cursor[5]]) as usize;
+        if scope_length % 4 != 0 || option_length % 4 != 0 {
+            return changed;
+        }
         let scope_count = scope_length / 4;
         let option_count = option_length / 4;
         let fields_block_len = scope_count.saturating_add(option_count).saturating_mul(4);
@@ -81,4 +84,20 @@ pub(crate) fn observe_ipfix_v9_options_templates(
     }
 
     changed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn v9_options_templates_require_4_byte_alignment() {
+        let mut namespace = DecoderStateNamespace::default();
+        let body = [0x01, 0x00, 0x00, 0x02, 0x00, 0x04, 0, 1, 0, 4];
+
+        let changed = observe_ipfix_v9_options_templates(&body, &mut namespace);
+
+        assert!(!changed);
+        assert!(namespace.ipfix_v9_options_templates.is_empty());
+    }
 }
