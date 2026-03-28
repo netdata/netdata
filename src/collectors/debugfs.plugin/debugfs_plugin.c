@@ -45,6 +45,12 @@ static struct debugfs_module {
      .enabled = CONFIG_BOOLEAN_YES,
      .func = do_module_libsensors
     },
+    {
+        // Linux audit subsystem status via netlink
+        .name = "audit",
+        .enabled = CONFIG_BOOLEAN_YES,
+        .func = do_module_audit
+    },
 
     // The terminator
     {.name = NULL, .enabled = CONFIG_BOOLEAN_NO, .func = NULL}

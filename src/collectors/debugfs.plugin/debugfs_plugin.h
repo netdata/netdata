@@ -15,6 +15,7 @@ int do_module_numa_extfrag(int update_every, const char *name);
 int do_module_zswap(int update_every, const char *name);
 int do_module_devices_powercap(int update_every, const char *name);
 int do_module_libsensors(int update_every, const char *name);
+int do_module_audit(int update_every, const char *name);
 
 void module_libsensors_cleanup(void);
 

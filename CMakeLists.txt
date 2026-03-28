@@ -2544,6 +2544,7 @@ if(ENABLE_PLUGIN_DEBUGFS)
             src/collectors/debugfs.plugin/module-zswap.c
             src/collectors/debugfs.plugin/module-devices-powercap.c
             src/collectors/debugfs.plugin/module-libsensors.c
+            src/collectors/debugfs.plugin/module-audit.c
     )
 
     # Add executable for debugfs.plugin
