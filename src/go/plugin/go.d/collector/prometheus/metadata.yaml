@@ -96,6 +96,29 @@ modules:
                     - pattern4
                 ```
 
+            - name: profile_selection_mode
+              description: Curated Prometheus profile selection mode.
+              default_value: auto
+              required: false
+              group: Curated Profiles
+              detailed_description: |
+                This option controls how curated Prometheus profiles are selected.
+
+                - `auto`: use only auto-matched curated profiles and keep `profiles` empty.
+                - `exact`: use only the explicitly listed `profiles`.
+                - `combined`: keep explicit `profiles` first, then append auto-matched curated profiles that were not already selected.
+
+            - name: profiles
+              description: Explicit curated Prometheus profile ids.
+              default_value: ""
+              required: false
+              group: Curated Profiles
+              detailed_description: |
+                This option lists explicit curated Prometheus profile ids.
+
+                - Must be empty when `profile_selection_mode: auto`.
+                - Required when `profile_selection_mode: exact` or `combined`.
+
             - name: max_time_series
               description: Global time series limit. If an endpoint returns more time series than this, the data is not processed.
               default_value: 2000

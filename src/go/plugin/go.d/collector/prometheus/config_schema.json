@@ -92,6 +92,30 @@
           }
         }
       },
+      "profile_selection_mode": {
+        "title": "Profile selection mode",
+        "description": "How curated Prometheus profiles are selected. `auto` keeps the current generic behavior and expects no explicit profile ids. `exact` uses only the listed profiles. `combined` keeps explicit profiles first and later appends auto-matched curated profiles.",
+        "type": "string",
+        "enum": [
+          "auto",
+          "exact",
+          "combined"
+        ],
+        "default": "auto"
+      },
+      "profiles": {
+        "title": "Profiles",
+        "description": "Explicit curated Prometheus profile ids. Must be empty in `auto` mode, and is required in `exact` and `combined` modes.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Profile ID",
+          "type": "string"
+        },
+        "uniqueItems": true
+      },
       "max_time_series": {
         "title": "Time series limit",
         "description": "If an endpoint returns more time series than this limit, the data is not processed. Set to 0 for no limit.",
@@ -252,6 +276,13 @@
           "title": "Selectors",
           "fields": [
             "selector"
+          ]
+        },
+        {
+          "title": "Profiles",
+          "fields": [
+            "profile_selection_mode",
+            "profiles"
           ]
         },
         {

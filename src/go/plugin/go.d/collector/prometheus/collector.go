@@ -16,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 )
 
 //go:embed "config_schema.json"
@@ -47,25 +48,28 @@ func New() *Collector {
 			MaxTS:          2000,
 			MaxTSPerMetric: 200,
 		},
-		store:  store,
-		charts: &collectorapi.Charts{},
-		cache:  newCache(),
+		store:              store,
+		charts:             &collectorapi.Charts{},
+		cache:              newCache(),
+		loadProfileCatalog: promprofiles.DefaultCatalog,
 	}
 }
 
 type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	web.HTTPConfig     `yaml:",inline" json:""`
-	Name               string        `yaml:"name,omitempty" json:"name"`
-	Application        string        `yaml:"app,omitempty" json:"app"`
-	LabelPrefix        string        `yaml:"label_prefix,omitempty" json:"label_prefix"`
-	Selector           selector.Expr `yaml:"selector,omitempty" json:"selector"`
-	ExpectedPrefix     string        `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
-	MaxTS              int           `yaml:"max_time_series" json:"max_time_series"`
-	MaxTSPerMetric     int           `yaml:"max_time_series_per_metric" json:"max_time_series_per_metric"`
-	FallbackType       struct {
+	Vnode                string `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery          int    `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry   int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	web.HTTPConfig       `yaml:",inline" json:""`
+	Name                 string        `yaml:"name,omitempty" json:"name"`
+	Application          string        `yaml:"app,omitempty" json:"app"`
+	LabelPrefix          string        `yaml:"label_prefix,omitempty" json:"label_prefix"`
+	Selector             selector.Expr `yaml:"selector,omitempty" json:"selector"`
+	ProfileSelectionMode string        `yaml:"profile_selection_mode,omitempty" json:"profile_selection_mode,omitempty"`
+	Profiles             []string      `yaml:"profiles,omitempty" json:"profiles,omitempty"`
+	ExpectedPrefix       string        `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
+	MaxTS                int           `yaml:"max_time_series" json:"max_time_series"`
+	MaxTSPerMetric       int           `yaml:"max_time_series_per_metric" json:"max_time_series_per_metric"`
+	FallbackType         struct {
 		Gauge   []string `yaml:"gauge,omitempty" json:"gauge"`
 		Counter []string `yaml:"counter,omitempty" json:"counter"`
 	} `yaml:"fallback_type,omitempty" json:"fallback_type"`
@@ -82,11 +86,14 @@ type Collector struct {
 	pipe *pipeline
 	mw   *metricFamilyWriter
 
-	cache        *cache
-	fallbackType struct {
+	cache          *cache
+	runtime        *collectorRuntime
+	profileCatalog promprofiles.Catalog
+	fallbackType   struct {
 		counter matcher.Matcher
 		gauge   matcher.Matcher
 	}
+	loadProfileCatalog func() (promprofiles.Catalog, error)
 }
 
 func (c *Collector) Configuration() any {
@@ -97,6 +104,12 @@ func (c *Collector) Init(context.Context) error {
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("validating config: %v", err)
 	}
+
+	catalog, err := c.loadProfilesCatalog()
+	if err != nil {
+		return fmt.Errorf("load profiles catalog: %v", err)
+	}
+	c.profileCatalog = catalog
 
 	prom, err := c.initPrometheusClient()
 	if err != nil {
@@ -140,7 +153,12 @@ func (c *Collector) Collect(ctx context.Context) error { return c.collectV2(ctx)
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
-func (c *Collector) ChartTemplateYAML() string { return chartTemplateYAML }
+func (c *Collector) ChartTemplateYAML() string {
+	if c.runtime != nil && c.runtime.ChartTemplateYAML != "" {
+		return c.runtime.ChartTemplateYAML
+	}
+	return chartTemplateYAML
+}
 
 func (c *Collector) Cleanup(context.Context) {
 	if c.prom != nil && c.prom.HTTPClient() != nil {

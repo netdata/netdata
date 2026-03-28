@@ -5,16 +5,45 @@ package prometheus
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
+)
+
+const (
+	profileSelectionModeAuto     = "auto"
+	profileSelectionModeExact    = "exact"
+	profileSelectionModeCombined = "combined"
 )
 
 func (c *Collector) validateConfig() error {
 	if c.URL == "" {
 		return errors.New("'url' can not be empty")
 	}
+
+	c.ProfileSelectionMode = normalizeProfileSelectionMode(c.ProfileSelectionMode)
+	profiles, err := normalizeConfiguredProfiles(c.Profiles)
+	if err != nil {
+		return err
+	}
+	c.Profiles = profiles
+
+	switch c.ProfileSelectionMode {
+	case profileSelectionModeAuto:
+		if len(c.Profiles) != 0 {
+			return errors.New("'profiles' must be empty when 'profile_selection_mode' is 'auto'")
+		}
+	case profileSelectionModeExact, profileSelectionModeCombined:
+		if len(c.Profiles) == 0 {
+			return fmt.Errorf("'profiles' is required when 'profile_selection_mode' is %q", c.ProfileSelectionMode)
+		}
+	default:
+		return fmt.Errorf("unsupported 'profile_selection_mode' %q", c.ProfileSelectionMode)
+	}
+
 	return nil
 }
 
@@ -37,6 +66,18 @@ func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
 	return prometheus.New(httpClient, req), nil
 }
 
+func (c *Collector) loadProfilesCatalog() (promprofiles.Catalog, error) {
+	if c.loadProfileCatalog == nil {
+		c.loadProfileCatalog = promprofiles.DefaultCatalog
+	}
+
+	catalog, err := c.loadProfileCatalog()
+	if err != nil {
+		return promprofiles.Catalog{}, err
+	}
+	return catalog, nil
+}
+
 func (c *Collector) initFallbackTypeMatcher(expr []string) (matcher.Matcher, error) {
 	if len(expr) == 0 {
 		return nil, nil
@@ -53,4 +94,36 @@ func (c *Collector) initFallbackTypeMatcher(expr []string) (matcher.Matcher, err
 	}
 
 	return m, nil
+}
+
+func normalizeProfileSelectionMode(mode string) string {
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	if mode == "" {
+		return profileSelectionModeAuto
+	}
+	return mode
+}
+
+func normalizeConfiguredProfiles(ids []string) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	seen := make(map[string]struct{}, len(ids))
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return nil, errors.New("'profiles' must not contain empty values")
+		}
+
+		key := strings.ToLower(id)
+		if _, ok := seen[key]; ok {
+			return nil, fmt.Errorf("duplicate profile id %q in 'profiles'", id)
+		}
+		seen[key] = struct{}{}
+		out = append(out, id)
+	}
+
+	return out, nil
 }
