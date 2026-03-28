@@ -171,7 +171,9 @@ const char *db_models_load =
     "SELECT after, before, min_dist, max_dist, "
     "c00, c01, c02, c03, c04, c05, "
     "c10, c11, c12, c13, c14, c15 FROM ("
-    "SELECT * FROM models "
+    "SELECT after, before, min_dist, max_dist, "
+    "c00, c01, c02, c03, c04, c05, "
+    "c10, c11, c12, c13, c14, c15 FROM models "
     "WHERE dim_id = @dim_id AND after >= @after "
     "ORDER BY before DESC, after DESC LIMIT @n"
     ") ORDER BY before ASC, after ASC;";
