@@ -1,5 +1,6 @@
 use super::super::*;
 use super::{FlowsRequest, RawFlowsRequest};
+use crate::facet_catalog::facet_field_enabled;
 
 impl<'de> Deserialize<'de> for FlowsRequest {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
@@ -47,10 +48,29 @@ impl<'de> Deserialize<'de> for FlowsRequest {
                 .map_err(D::Error::custom)?
                 .unwrap_or_default(),
         };
+        let mode = raw.mode.unwrap_or_default();
+        let field = raw.field.as_mut().and_then(|field| {
+            let normalized = field.trim().to_ascii_uppercase();
+            (!normalized.is_empty()).then_some(normalized)
+        });
+
+        if matches!(mode, super::RequestMode::Autocomplete) {
+            let Some(field) = field.as_deref() else {
+                return Err(D::Error::custom(
+                    "autocomplete mode requires a supported `field` parameter",
+                ));
+            };
+            if !facet_field_enabled(field) {
+                return Err(D::Error::custom(format!(
+                    "unsupported autocomplete field `{field}`"
+                )));
+            }
+        }
 
         validate_selection_fields(&raw.selections).map_err(D::Error::custom)?;
 
         Ok(Self {
+            mode,
             view,
             after: raw.after,
             before: raw.before,
@@ -60,6 +80,8 @@ impl<'de> Deserialize<'de> for FlowsRequest {
             group_by,
             sort_by,
             top_n,
+            field,
+            term: raw.term.trim().to_string(),
         })
     }
 }

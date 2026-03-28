@@ -1,4 +1,5 @@
 use super::*;
+use journal_log_writer::{LogLifecycleEvent, LogLifecycleObserver};
 
 mod init;
 mod runtime;
@@ -8,6 +9,31 @@ struct MaterializedTierWriters {
     minute_1: Log,
     minute_5: Log,
     hour_1: Log,
+}
+
+#[derive(Clone)]
+struct FacetLifecycleObserver {
+    runtime: Arc<crate::facet_runtime::FacetRuntime>,
+}
+
+impl LogLifecycleObserver for FacetLifecycleObserver {
+    fn on_event(&self, event: &LogLifecycleEvent) {
+        match event {
+            LogLifecycleEvent::Rotated {
+                archived_path,
+                active_path,
+            } => {
+                if let Err(err) = self.runtime.observe_rotation(archived_path, active_path) {
+                    tracing::warn!("facet runtime rotation update failed: {}", err);
+                }
+            }
+            LogLifecycleEvent::RetainedDeleted { paths } => {
+                if let Err(err) = self.runtime.observe_deleted_paths(paths) {
+                    tracing::warn!("facet runtime retention update failed: {}", err);
+                }
+            }
+        }
+    }
 }
 
 impl MaterializedTierWriters {
@@ -39,6 +65,7 @@ pub(crate) struct IngestService {
     pub(super) tier_accumulators: HashMap<TierKind, TierAccumulator>,
     pub(super) open_tiers: Arc<RwLock<OpenTierState>>,
     pub(super) tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
+    pub(super) facet_runtime: Arc<crate::facet_runtime::FacetRuntime>,
     pub(super) routing_runtime: Option<DynamicRoutingRuntime>,
     pub(super) network_sources_runtime: Option<NetworkSourcesRuntime>,
     pub(super) encode_buf: JournalEncodeBuffer,

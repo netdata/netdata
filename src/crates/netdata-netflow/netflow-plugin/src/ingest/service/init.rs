@@ -1,5 +1,5 @@
 use super::super::*;
-use super::{IngestService, MaterializedTierWriters};
+use super::{FacetLifecycleObserver, IngestService, MaterializedTierWriters};
 
 impl IngestService {
     pub(crate) fn new(
@@ -8,7 +8,24 @@ impl IngestService {
         open_tiers: Arc<RwLock<OpenTierState>>,
         tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
     ) -> Result<Self> {
+        let facet_runtime = Arc::new(crate::facet_runtime::FacetRuntime::new(
+            &cfg.journal.base_dir(),
+        ));
+        Self::new_with_facet_runtime(cfg, metrics, open_tiers, tier_flow_indexes, facet_runtime)
+    }
+
+    pub(crate) fn new_with_facet_runtime(
+        cfg: PluginConfig,
+        metrics: Arc<IngestMetrics>,
+        open_tiers: Arc<RwLock<OpenTierState>>,
+        tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
+        facet_runtime: Arc<crate::facet_runtime::FacetRuntime>,
+    ) -> Result<Self> {
         let machine_id = load_machine_id().context("failed to load machine id")?;
+        let lifecycle_observer: Arc<dyn journal_log_writer::LogLifecycleObserver> =
+            Arc::new(FacetLifecycleObserver {
+                runtime: Arc::clone(&facet_runtime),
+            });
         let build_journal_cfg = |tier: TierKind| {
             let origin = Origin {
                 machine_id: Some(machine_id),
@@ -25,8 +42,13 @@ impl IngestService {
                 .with_duration_of_journal_files(retention.duration_of_journal_files);
             Config::new(origin, rotation_policy, retention_policy).with_machine_id_suffix(false)
         };
-        let raw_journal = Self::build_raw_journal(&cfg, &build_journal_cfg)?;
-        let tier_writers = Self::build_materialized_tier_writers(&cfg, &build_journal_cfg)?;
+        let raw_journal =
+            Self::build_raw_journal(&cfg, &build_journal_cfg, Arc::clone(&lifecycle_observer))?;
+        let tier_writers = Self::build_materialized_tier_writers(
+            &cfg,
+            &build_journal_cfg,
+            Arc::clone(&lifecycle_observer),
+        )?;
         let tier_accumulators = Self::build_tier_accumulators();
         let (mut decoders, routing_runtime, network_sources_runtime) =
             Self::build_decoder_stack(&cfg)?;
@@ -52,6 +74,7 @@ impl IngestService {
             tier_accumulators,
             open_tiers,
             tier_flow_indexes,
+            facet_runtime,
             routing_runtime,
             network_sources_runtime,
             encode_buf: JournalEncodeBuffer::new(),
@@ -69,49 +92,53 @@ impl IngestService {
     fn build_raw_journal(
         cfg: &PluginConfig,
         build_journal_cfg: &impl Fn(TierKind) -> Config,
+        lifecycle_observer: Arc<dyn journal_log_writer::LogLifecycleObserver>,
     ) -> Result<Log> {
         let raw_dir = cfg.journal.raw_tier_dir();
-        Log::new(&raw_dir, build_journal_cfg(TierKind::Raw)).with_context(|| {
-            format!(
-                "failed to create journal writer in directory {}",
-                raw_dir.display()
-            )
-        })
+        Log::new(&raw_dir, build_journal_cfg(TierKind::Raw))
+            .map(|log| log.with_lifecycle_observer(lifecycle_observer))
+            .with_context(|| {
+                format!(
+                    "failed to create journal writer in directory {}",
+                    raw_dir.display()
+                )
+            })
     }
 
     fn build_materialized_tier_writers(
         cfg: &PluginConfig,
         build_journal_cfg: &impl Fn(TierKind) -> Config,
+        lifecycle_observer: Arc<dyn journal_log_writer::LogLifecycleObserver>,
     ) -> Result<MaterializedTierWriters> {
         let minute_1_dir = cfg.journal.minute_1_tier_dir();
         let minute_5_dir = cfg.journal.minute_5_tier_dir();
         let hour_1_dir = cfg.journal.hour_1_tier_dir();
 
         Ok(MaterializedTierWriters {
-            minute_1: Log::new(&minute_1_dir, build_journal_cfg(TierKind::Minute1)).with_context(
-                || {
+            minute_1: Log::new(&minute_1_dir, build_journal_cfg(TierKind::Minute1))
+                .map(|log| log.with_lifecycle_observer(Arc::clone(&lifecycle_observer)))
+                .with_context(|| {
                     format!(
                         "failed to create 1m tier writer in directory {}",
                         minute_1_dir.display()
                     )
-                },
-            )?,
-            minute_5: Log::new(&minute_5_dir, build_journal_cfg(TierKind::Minute5)).with_context(
-                || {
+                })?,
+            minute_5: Log::new(&minute_5_dir, build_journal_cfg(TierKind::Minute5))
+                .map(|log| log.with_lifecycle_observer(Arc::clone(&lifecycle_observer)))
+                .with_context(|| {
                     format!(
                         "failed to create 5m tier writer in directory {}",
                         minute_5_dir.display()
                     )
-                },
-            )?,
-            hour_1: Log::new(&hour_1_dir, build_journal_cfg(TierKind::Hour1)).with_context(
-                || {
+                })?,
+            hour_1: Log::new(&hour_1_dir, build_journal_cfg(TierKind::Hour1))
+                .map(|log| log.with_lifecycle_observer(Arc::clone(&lifecycle_observer)))
+                .with_context(|| {
                     format!(
                         "failed to create 1h tier writer in directory {}",
                         hour_1_dir.display()
                     )
-                },
-            )?,
+                })?,
         })
     }
 

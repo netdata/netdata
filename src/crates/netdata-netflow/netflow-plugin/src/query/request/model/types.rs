@@ -2,6 +2,7 @@ use super::super::*;
 
 #[derive(Debug, Clone)]
 pub(crate) struct FlowsRequest {
+    pub(crate) mode: RequestMode,
     pub(crate) view: ViewMode,
     pub(crate) after: Option<u32>,
     pub(crate) before: Option<u32>,
@@ -11,10 +12,14 @@ pub(crate) struct FlowsRequest {
     pub(crate) group_by: Vec<String>,
     pub(crate) sort_by: SortBy,
     pub(crate) top_n: TopN,
+    pub(crate) field: Option<String>,
+    pub(crate) term: String,
 }
 
 #[derive(Debug, Deserialize, Default)]
 pub(crate) struct RawFlowsRequest {
+    #[serde(default)]
+    pub(crate) mode: Option<RequestMode>,
     #[serde(default)]
     pub(crate) view: Option<ViewMode>,
     #[serde(default)]
@@ -33,6 +38,18 @@ pub(crate) struct RawFlowsRequest {
     pub(crate) sort_by: Option<SortBy>,
     #[serde(default)]
     pub(crate) top_n: Option<TopN>,
+    #[serde(default)]
+    pub(crate) field: Option<String>,
+    #[serde(default)]
+    pub(crate) term: String,
+}
+
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum RequestMode {
+    #[default]
+    Flows,
+    Autocomplete,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
@@ -72,6 +89,7 @@ pub(crate) enum SortBy {
 impl Default for FlowsRequest {
     fn default() -> Self {
         Self {
+            mode: RequestMode::Flows,
             view: ViewMode::TableSankey,
             after: None,
             before: None,
@@ -84,6 +102,8 @@ impl Default for FlowsRequest {
                 .collect(),
             sort_by: SortBy::Bytes,
             top_n: TopN::N25,
+            field: None,
+            term: String::new(),
         }
     }
 }

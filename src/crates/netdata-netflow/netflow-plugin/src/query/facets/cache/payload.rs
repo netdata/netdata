@@ -3,26 +3,24 @@ use super::*;
 pub(crate) fn build_facet_vocabulary_payload(
     requested_fields: &[String],
     selections: &HashMap<String, Vec<String>>,
-    closed_values: &BTreeMap<String, Vec<String>>,
-    open_values: &BTreeMap<String, Vec<String>>,
+    snapshot_fields: &BTreeMap<String, crate::facet_runtime::FacetPublishedField>,
 ) -> Value {
     let mut fields = Vec::with_capacity(requested_fields.len());
 
     for field in requested_fields {
-        let mut merged_values = BTreeSet::new();
-        if let Some(values) = closed_values.get(field) {
-            merged_values.extend(values.iter().cloned());
+        let selected_values = selections.get(field).cloned().unwrap_or_default();
+        let published = snapshot_fields.get(field).cloned().unwrap_or_default();
+        let mut rows = published.values.clone();
+        for selected in &selected_values {
+            if !rows.iter().any(|value| value == selected) {
+                rows.push(selected.clone());
+            }
         }
-        if let Some(values) = open_values.get(field) {
-            merged_values.extend(values.iter().cloned());
-        }
-
-        let mut rows = merged_values.into_iter().collect::<Vec<_>>();
         let selected_values = selections.get(field).cloned().unwrap_or_default();
         rows.sort_by(|a, b| compare_distinct_facet_values(field, a, b, &selected_values));
 
-        let total_values = rows.len();
-        let truncated = total_values > FACET_VALUE_LIMIT;
+        let total_values = published.total_values.max(rows.len());
+        let truncated = published.autocomplete || total_values > FACET_VALUE_LIMIT;
         if truncated {
             rows.truncate(FACET_VALUE_LIMIT);
         }
@@ -42,6 +40,7 @@ pub(crate) fn build_facet_vocabulary_payload(
             "name": presentation::field_display_name(field),
             "total_values": total_values,
             "truncated": truncated,
+            "autocomplete": published.autocomplete,
             "overflowed": false,
             "overflow_records": 0,
             "values": values,

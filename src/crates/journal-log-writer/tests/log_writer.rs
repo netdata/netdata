@@ -6,12 +6,15 @@
 //! - Retention policies
 
 use journal_common::load_machine_id;
-use journal_log_writer::{Config, EntryTimestamps, Log, RetentionPolicy, RotationPolicy};
+use journal_log_writer::{
+    Config, EntryTimestamps, Log, LogLifecycleEvent, LogLifecycleObserver, RetentionPolicy,
+    RotationPolicy,
+};
 use journal_registry::Origin;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 use tempfile::TempDir;
 
 /// Helper to create a default test config
@@ -122,6 +125,20 @@ fn journalctl_available() -> bool {
             .map(|output| output.status.success())
             .unwrap_or(false)
     })
+}
+
+#[derive(Default)]
+struct RecordingObserver {
+    events: Mutex<Vec<LogLifecycleEvent>>,
+}
+
+impl LogLifecycleObserver for RecordingObserver {
+    fn on_event(&self, event: &LogLifecycleEvent) {
+        self.events
+            .lock()
+            .expect("lock observer events")
+            .push(event.clone());
+    }
 }
 
 fn parse_u64_field(row: &serde_json::Value, key: &str) -> Option<u64> {
@@ -577,5 +594,58 @@ fn test_monotonic_override_remains_strict_after_restart() {
         "second monotonic timestamp must be strictly greater after restart ({} !> {})",
         second_seen,
         first_seen
+    );
+}
+
+#[test]
+fn test_lifecycle_observer_reports_rotation_and_retention_deletion() {
+    let dir = tempfile::tempdir().expect("create temp dir");
+    let config = Config::new(
+        Origin {
+            machine_id: None,
+            namespace: None,
+            source: journal_registry::Source::System,
+        },
+        RotationPolicy::default().with_number_of_entries(1),
+        RetentionPolicy::default().with_number_of_journal_files(1),
+    );
+    let observer = Arc::new(RecordingObserver::default());
+    let mut log = Log::new(dir.path(), config)
+        .expect("create log")
+        .with_lifecycle_observer(observer.clone());
+
+    log.write_entry(&[b"MESSAGE=one"], None)
+        .expect("write first entry");
+    log.write_entry(&[b"MESSAGE=two"], None)
+        .expect("write second entry");
+    log.write_entry(&[b"MESSAGE=three"], None)
+        .expect("write third entry");
+
+    let events = observer
+        .events
+        .lock()
+        .expect("lock observer events")
+        .clone();
+    let rotation_count = events
+        .iter()
+        .filter(|event| matches!(event, LogLifecycleEvent::Rotated { .. }))
+        .count();
+    let deleted_paths = events
+        .iter()
+        .find_map(|event| match event {
+            LogLifecycleEvent::RetainedDeleted { paths } => Some(paths.clone()),
+            _ => None,
+        })
+        .unwrap_or_default();
+
+    assert_eq!(
+        rotation_count, 2,
+        "expected two rotations after three writes"
+    );
+    assert_eq!(deleted_paths.len(), 1, "expected one retained deletion");
+    assert!(
+        !deleted_paths[0].exists(),
+        "retained file should be gone from disk: {}",
+        deleted_paths[0].display()
     );
 }

@@ -21,6 +21,15 @@ pub(crate) struct FlowMetricsQueryOutput {
     pub(crate) warnings: Option<Value>,
 }
 
+pub(crate) struct FlowAutocompleteQueryOutput {
+    pub(crate) agent_id: String,
+    pub(crate) field: String,
+    pub(crate) term: String,
+    pub(crate) values: Vec<Value>,
+    pub(crate) stats: HashMap<String, u64>,
+    pub(crate) warnings: Option<Value>,
+}
+
 pub(crate) struct QuerySetup {
     pub(crate) sort_by: SortBy,
     pub(crate) timeseries_layout: Option<TimeseriesLayout>,
@@ -28,12 +37,6 @@ pub(crate) struct QuerySetup {
     pub(crate) limit: usize,
     pub(crate) spans: Vec<PreparedQuerySpan>,
     pub(crate) stats: HashMap<String, u64>,
-}
-
-#[derive(Debug)]
-pub(crate) struct ClosedFacetVocabularyCache {
-    pub(crate) archived_paths: BTreeSet<String>,
-    pub(crate) values: BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Clone, Copy)]

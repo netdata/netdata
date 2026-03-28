@@ -98,6 +98,16 @@ impl IngestService {
                 continue;
             }
 
+            if let Some(active_path) = self.raw_journal.active_path() {
+                let contribution = self.encode_buf.facet_contribution();
+                if let Err(err) = self
+                    .facet_runtime
+                    .observe_active_contribution(active_path, contribution)
+                {
+                    tracing::warn!("facet runtime raw write update failed: {}", err);
+                }
+            }
+
             self.metrics
                 .journal_entries_written
                 .fetch_add(1, Ordering::Relaxed);
@@ -151,6 +161,10 @@ impl IngestService {
             tracing::warn!("journal sync failed: {}", err);
         }
 
+        if let Err(err) = self.facet_runtime.persist_if_dirty() {
+            tracing::warn!("facet runtime persist failed: {}", err);
+        }
+
         0
     }
 
@@ -167,6 +181,9 @@ impl IngestService {
                 .fetch_add(1, Ordering::Relaxed);
             tracing::warn!("tier journal sync failed: {}", err);
             return 1;
+        }
+        if let Err(err) = self.facet_runtime.persist_if_dirty() {
+            tracing::warn!("facet runtime persist failed: {}", err);
         }
         0
     }

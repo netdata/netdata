@@ -168,13 +168,20 @@ impl OwnedChain {
 
     /// Retains the files that satisfy retention policy limits.
     #[tracing::instrument(skip_all, fields(reason))]
-    pub(super) fn retain(&mut self, retention_policy: &RetentionPolicy) -> Result<()> {
+    pub(super) fn retain(
+        &mut self,
+        retention_policy: &RetentionPolicy,
+    ) -> Result<Vec<std::path::PathBuf>> {
+        let mut deleted_paths = Vec::new();
+
         // Remove by file count limit
         if let Some(max_files) = retention_policy.number_of_journal_files {
             while self.inner.len() > max_files {
                 let reason = format!("num_files({}) > max_files({})", self.inner.len(), max_files);
                 tracing::Span::current().record("reason", reason);
-                self.delete_oldest_file()?;
+                if let Some(path) = self.delete_oldest_file()? {
+                    deleted_paths.push(path);
+                }
             }
         }
 
@@ -186,26 +193,29 @@ impl OwnedChain {
                     self.total_size, max_total_size
                 );
                 tracing::Span::current().record("reason", reason);
-                self.delete_oldest_file()?;
+                if let Some(path) = self.delete_oldest_file()? {
+                    deleted_paths.push(path);
+                }
             }
         }
 
         // Remove by entry age limit
         if let Some(max_entry_age) = retention_policy.duration_of_journal_files {
-            self.delete_files_older_than(max_entry_age)?;
+            deleted_paths.extend(self.delete_files_older_than(max_entry_age)?);
         }
 
-        Ok(())
+        Ok(deleted_paths)
     }
 
     /// Remove the oldest file
     #[tracing::instrument(skip_all)]
-    fn delete_oldest_file(&mut self) -> Result<()> {
+    fn delete_oldest_file(&mut self) -> Result<Option<std::path::PathBuf>> {
         let Some(file) = self.inner.pop_front() else {
-            return Ok(());
+            return Ok(None);
         };
 
         info!("deleting {}", file.path());
+        let deleted_path = std::path::PathBuf::from(file.path());
 
         let file_size = self.file_sizes.get(&file).copied().unwrap_or(0);
 
@@ -217,18 +227,23 @@ impl OwnedChain {
 
         self.file_sizes.remove(&file);
         self.total_size = self.total_size.saturating_sub(file_size);
-        Ok(())
+        Ok(Some(deleted_path))
     }
 
     /// Remove files older than the specified cutoff time
     #[tracing::instrument(skip(self))]
-    fn delete_files_older_than(&mut self, max_entry_age: std::time::Duration) -> Result<()> {
+    fn delete_files_older_than(
+        &mut self,
+        max_entry_age: std::time::Duration,
+    ) -> Result<Vec<std::path::PathBuf>> {
         let cutoff_time = Microseconds::now()
             .get()
             .saturating_sub(max_entry_age.as_micros() as u64);
+        let mut deleted_paths = Vec::new();
 
         for file in self.inner.drain(cutoff_time) {
             info!("deleting {}", file.path());
+            deleted_paths.push(std::path::PathBuf::from(file.path()));
             let file_size = self.file_sizes.get(&file).copied().unwrap_or(0);
 
             if let Err(e) = std::fs::remove_file(file.path()) {
@@ -240,6 +255,6 @@ impl OwnedChain {
             self.total_size = self.total_size.saturating_sub(file_size);
         }
 
-        Ok(())
+        Ok(deleted_paths)
     }
 }

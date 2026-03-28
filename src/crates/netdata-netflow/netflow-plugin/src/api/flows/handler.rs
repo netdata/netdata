@@ -7,8 +7,9 @@ use rt::{FunctionCallContext, FunctionHandler};
 use std::sync::Arc;
 
 use super::model::{
-    FLOWS_FUNCTION_VERSION, FLOWS_SCHEMA_VERSION, FLOWS_UPDATE_EVERY_SECONDS, FlowMetricsData,
-    FlowMetricsResponse, FlowsData, FlowsFunctionResponse, FlowsResponse,
+    FLOWS_FUNCTION_VERSION, FLOWS_SCHEMA_VERSION, FLOWS_UPDATE_EVERY_SECONDS, FlowAutocompleteData,
+    FlowAutocompleteResponse, FlowMetricsData, FlowMetricsResponse, FlowsData,
+    FlowsFunctionResponse, FlowsResponse,
 };
 use super::params::{accepted_params, flows_required_params};
 
@@ -29,7 +30,42 @@ impl NetflowFlowsHandler {
         &self,
         request: query::FlowsRequest,
     ) -> Result<FlowsFunctionResponse> {
-        if request.is_timeseries_view() {
+        if request.is_autocomplete_mode() {
+            let query_output = self
+                .query
+                .autocomplete_field_values(&request)
+                .map_err(|err| NetdataPluginError::Other {
+                    message: format!("failed to autocomplete facet values: {err:#}"),
+                })?;
+            let mut stats = self.metrics.snapshot();
+            stats.extend(query_output.stats);
+
+            Ok(FlowsFunctionResponse::Autocomplete(
+                FlowAutocompleteResponse {
+                    status: 200,
+                    version: FLOWS_FUNCTION_VERSION,
+                    response_type: "flows".to_string(),
+                    data: FlowAutocompleteData {
+                        schema_version: FLOWS_SCHEMA_VERSION.to_string(),
+                        source: "netflow".to_string(),
+                        layer: "3".to_string(),
+                        agent_id: query_output.agent_id,
+                        collected_at: Utc::now().to_rfc3339(),
+                        mode: "autocomplete".to_string(),
+                        field: query_output.field,
+                        term: query_output.term,
+                        values: query_output.values,
+                        stats,
+                        warnings: query_output.warnings,
+                    },
+                    has_history: true,
+                    update_every: FLOWS_UPDATE_EVERY_SECONDS,
+                    accepted_params: accepted_params(),
+                    required_params: Vec::new(),
+                    help: "NetFlow/IPFIX/sFlow facet autocomplete values".to_string(),
+                },
+            ))
+        } else if request.is_timeseries_view() {
             let query_output = self
                 .query
                 .query_flow_metrics(&request)

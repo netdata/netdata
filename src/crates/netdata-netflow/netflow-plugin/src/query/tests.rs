@@ -155,7 +155,7 @@ fn grouped_other_bucket_preserves_single_group_values_and_summarizes_mixed_field
 }
 
 #[test]
-fn facets_exclude_ip_and_port_fields() {
+fn facets_include_ip_and_port_fields_when_present() {
     let records = vec![super::QueryFlowRecord {
         timestamp_usec: 100,
         fields: BTreeMap::from([
@@ -176,8 +176,8 @@ fn facets_exclude_ip_and_port_fields() {
 
     let fields = facets["fields"].as_array().expect("fields array");
     assert!(fields.iter().any(|entry| entry["field"] == "PROTOCOL"));
-    assert!(!fields.iter().any(|entry| entry["field"] == "SRC_ADDR"));
-    assert!(!fields.iter().any(|entry| entry["field"] == "DST_PORT"));
+    assert!(fields.iter().any(|entry| entry["field"] == "SRC_ADDR"));
+    assert!(fields.iter().any(|entry| entry["field"] == "DST_PORT"));
 }
 
 #[test]
@@ -422,6 +422,25 @@ fn request_deserialization_prefers_top_level_controls_over_selections() {
 }
 
 #[test]
+fn request_deserialization_supports_autocomplete_mode() {
+    let request = serde_json::from_str::<FlowsRequest>(
+        r#"{
+            "mode":"autocomplete",
+            "field":"src_addr",
+            "term":"10.0."
+        }"#,
+    )
+    .expect("autocomplete request should deserialize");
+
+    assert!(request.is_autocomplete_mode());
+    assert_eq!(
+        request.normalized_autocomplete_field().as_deref(),
+        Some("SRC_ADDR")
+    );
+    assert_eq!(request.normalized_autocomplete_term(), "10.0.");
+}
+
+#[test]
 fn request_deserialization_accepts_and_normalizes_requested_facets() {
     let request = serde_json::from_str::<FlowsRequest>(
         r#"{
@@ -640,14 +659,21 @@ fn facet_vocabularies_ignore_active_filters_and_do_not_return_metrics() {
         &BTreeMap::from([
             (
                 "PROTOCOL".to_string(),
-                vec!["6".to_string(), "17".to_string()],
+                crate::facet_runtime::FacetPublishedField {
+                    total_values: 2,
+                    autocomplete: false,
+                    values: vec!["6".to_string(), "17".to_string()],
+                },
             ),
             (
                 "SRC_AS_NAME".to_string(),
-                vec!["AS15169 GOOGLE".to_string(), "AS4333 NETDATA".to_string()],
+                crate::facet_runtime::FacetPublishedField {
+                    total_values: 2,
+                    autocomplete: false,
+                    values: vec!["AS15169 GOOGLE".to_string(), "AS4333 NETDATA".to_string()],
+                },
             ),
         ]),
-        &BTreeMap::new(),
     );
 
     let fields = facets["fields"].as_array().expect("fields array");
@@ -791,8 +817,20 @@ fn open_tier_facet_vocabularies_are_non_contextual_for_stored_as_name_values() {
     let facets = super::build_facet_vocabulary_payload(
         &requested_fields,
         &selections,
-        &BTreeMap::new(),
-        &super::finalize_facet_vocabulary(by_field, &requested_set),
+        &super::finalize_facet_vocabulary(by_field, &requested_set)
+            .into_iter()
+            .map(|(field, values)| {
+                let total_values = values.len();
+                (
+                    field,
+                    crate::facet_runtime::FacetPublishedField {
+                        total_values,
+                        autocomplete: false,
+                        values,
+                    },
+                )
+            })
+            .collect(),
     );
 
     let fields = facets["fields"].as_array().expect("fields array");

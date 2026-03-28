@@ -1,7 +1,11 @@
 use super::super::*;
-use super::{FlowsRequest, SortBy, ViewMode};
+use super::{FlowsRequest, RequestMode, SortBy, ViewMode};
 
 impl FlowsRequest {
+    pub(crate) fn is_autocomplete_mode(&self) -> bool {
+        matches!(self.mode, RequestMode::Autocomplete)
+    }
+
     pub(crate) fn normalized_view(&self) -> &'static str {
         match self.view {
             ViewMode::TableSankey => "table-sankey",
@@ -46,5 +50,16 @@ impl FlowsRequest {
 
     pub(crate) fn normalized_top_n(&self) -> usize {
         self.top_n.as_usize()
+    }
+
+    pub(crate) fn normalized_autocomplete_field(&self) -> Option<String> {
+        self.field
+            .as_ref()
+            .map(|field| field.trim().to_ascii_uppercase())
+            .filter(|field| !field.is_empty())
+    }
+
+    pub(crate) fn normalized_autocomplete_term(&self) -> &str {
+        self.term.as_str()
     }
 }

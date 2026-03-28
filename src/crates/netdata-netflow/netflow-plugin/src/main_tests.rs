@@ -127,6 +127,7 @@ async fn e2e_flows_function_returns_expected_response_sections() {
     let response = match response {
         FlowsFunctionResponse::Table(response) => response,
         FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
+        FlowsFunctionResponse::Autocomplete(_) => panic!("expected table response"),
     };
 
     assert_eq!(response.status, 200);
@@ -224,6 +225,46 @@ async fn e2e_flows_function_returns_expected_response_sections() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_flows_function_supports_autocomplete_mode() {
+    let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
+    let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+        .await
+        .expect("create query service");
+    let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
+
+    let response = handler
+        .handle_request(query::FlowsRequest {
+            mode: query::RequestMode::Autocomplete,
+            field: Some("PROTOCOL".to_string()),
+            term: "6".to_string(),
+            ..Default::default()
+        })
+        .await
+        .expect("autocomplete function call");
+
+    let response = match response {
+        FlowsFunctionResponse::Autocomplete(response) => response,
+        FlowsFunctionResponse::Table(_) => panic!("expected autocomplete response"),
+        FlowsFunctionResponse::Metrics(_) => panic!("expected autocomplete response"),
+    };
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.version, FLOWS_FUNCTION_VERSION);
+    assert_eq!(response.response_type, "flows");
+    assert_eq!(response.data.mode, "autocomplete");
+    assert_eq!(response.data.field, "PROTOCOL");
+    assert_eq!(response.data.term, "6");
+    assert!(
+        response
+            .data
+            .values
+            .iter()
+            .any(|entry| entry["value"] == "6"),
+        "expected autocomplete values to contain protocol 6"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallback() {
     let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
@@ -251,6 +292,7 @@ async fn e2e_flows_metrics_function_returns_top_n_chart_with_on_disk_tier_fallba
     let response = match response {
         FlowsFunctionResponse::Metrics(response) => response,
         FlowsFunctionResponse::Table(_) => panic!("expected metrics response"),
+        FlowsFunctionResponse::Autocomplete(_) => panic!("expected metrics response"),
     };
 
     assert_eq!(response.status, 200);
@@ -357,6 +399,7 @@ async fn e2e_aggregated_safe_group_by_falls_back_to_on_disk_lower_tiers() {
     let response = match response {
         FlowsFunctionResponse::Table(response) => response,
         FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
+        FlowsFunctionResponse::Autocomplete(_) => panic!("expected table response"),
     };
     assert!(
         !response.data.flows.is_empty(),
@@ -405,6 +448,7 @@ async fn e2e_country_map_reuses_tuple_table_shape_with_country_keys() {
     let response = match response {
         FlowsFunctionResponse::Table(response) => response,
         FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
+        FlowsFunctionResponse::Autocomplete(_) => panic!("expected table response"),
     };
 
     assert_eq!(response.status, 200);

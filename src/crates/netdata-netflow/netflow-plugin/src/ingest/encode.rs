@@ -50,6 +50,12 @@ impl JournalEncodeBuffer {
         self.refs.iter().map(|r| &self.data[r.clone()]).collect()
     }
 
+    pub(super) fn facet_contribution(&self) -> crate::facet_runtime::FacetFileContribution {
+        crate::facet_runtime::facet_contribution_from_encoded_fields(
+            self.refs.iter().map(|r| &self.data[r.clone()]),
+        )
+    }
+
     pub(super) fn encoded_len(&self) -> u64 {
         self.data.len() as u64
     }

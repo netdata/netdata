@@ -26,7 +26,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, RwLock};
+use std::sync::{Arc, LazyLock};
 use std::time::Instant;
 use tokio::sync::mpsc::UnboundedReceiver;
 

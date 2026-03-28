@@ -4,6 +4,8 @@ mod api;
 mod charts;
 mod decoder;
 mod enrichment;
+mod facet_catalog;
+mod facet_runtime;
 mod flow;
 mod ingest;
 mod network_sources;
@@ -60,20 +62,29 @@ async fn main() {
     let metrics = Arc::new(ingest::IngestMetrics::default());
     let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
     let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
-    let (query_service, notify_rx) = match query::FlowQueryService::new(&config).await {
-        Ok(service) => service,
-        Err(err) => {
-            tracing::error!("failed to initialize query service: {err:#}");
-            std::process::exit(1);
-        }
-    };
+    let facet_runtime = Arc::new(facet_runtime::FacetRuntime::new(&config.journal.base_dir()));
+    let (query_service, notify_rx) =
+        match query::FlowQueryService::new_with_facet_runtime(&config, Arc::clone(&facet_runtime))
+            .await
+        {
+            Ok(service) => service,
+            Err(err) => {
+                tracing::error!("failed to initialize query service: {err:#}");
+                std::process::exit(1);
+            }
+        };
     let query_service = Arc::new(query_service);
+    if let Err(err) = query_service.initialize_facets().await {
+        tracing::error!("failed to initialize facet runtime: {err:#}");
+        std::process::exit(1);
+    }
 
-    let ingest_service = match ingest::IngestService::new(
+    let ingest_service = match ingest::IngestService::new_with_facet_runtime(
         config.clone(),
         Arc::clone(&metrics),
         Arc::clone(&open_tiers),
         Arc::clone(&tier_flow_indexes),
+        Arc::clone(&facet_runtime),
     ) {
         Ok(service) => service,
         Err(err) => {
@@ -99,7 +110,16 @@ async fn main() {
     tokio::spawn(async move {
         let mut notify_rx = notify_rx;
         while let Some(event) = notify_rx.recv().await {
-            query_service_for_events.process_notify_event(event);
+            let mut reconcile_required = query_service_for_events.process_notify_event(event);
+            while let Ok(event) = notify_rx.try_recv() {
+                reconcile_required |= query_service_for_events.process_notify_event(event);
+            }
+
+            if reconcile_required
+                && let Err(err) = query_service_for_events.initialize_facets().await
+            {
+                tracing::warn!("netflow facet reconcile after file notification failed: {err:#}");
+            }
         }
         tracing::info!("netflow journal notify event task terminated");
     });

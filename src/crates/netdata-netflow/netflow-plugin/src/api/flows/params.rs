@@ -4,11 +4,15 @@ use super::model::{RequiredParam, RequiredParamOption};
 
 fn flows_accepted_params() -> Vec<String> {
     vec![
+        "mode".to_string(),
         "view".to_string(),
         "after".to_string(),
         "before".to_string(),
         "query".to_string(),
+        "term".to_string(),
+        "field".to_string(),
         "selections".to_string(),
+        "facets".to_string(),
         "group_by".to_string(),
         "sort_by".to_string(),
         "top_n".to_string(),

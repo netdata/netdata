@@ -13,6 +13,7 @@ use journal_core::file::mmap::MmapMut;
 use journal_core::file::{JournalFile, JournalFileOptions, JournalWriter};
 use journal_registry::repository;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument, span, warn};
@@ -180,6 +181,22 @@ pub struct Log {
     remapping_registry: FieldMap,
     clock: RealtimeClock,
     last_monotonic_usec: u64,
+    lifecycle_observer: Option<Arc<dyn LogLifecycleObserver>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LogLifecycleEvent {
+    Rotated {
+        archived_path: PathBuf,
+        active_path: PathBuf,
+    },
+    RetainedDeleted {
+        paths: Vec<PathBuf>,
+    },
+}
+
+pub trait LogLifecycleObserver: Send + Sync {
+    fn on_event(&self, event: &LogLifecycleEvent);
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -269,7 +286,13 @@ impl Log {
             remapping_registry: FieldMap::new(),
             clock,
             last_monotonic_usec,
+            lifecycle_observer: None,
         })
+    }
+
+    pub fn with_lifecycle_observer(mut self, observer: Arc<dyn LogLifecycleObserver>) -> Self {
+        self.lifecycle_observer = Some(observer);
+        self
     }
 
     /// Writes a journal entry.
@@ -446,6 +469,12 @@ impl Log {
         Ok(())
     }
 
+    pub fn active_path(&self) -> Option<&Path> {
+        self.active_file
+            .as_ref()
+            .map(|active_file| Path::new(active_file.repository_file.path()))
+    }
+
     fn should_rotate(&self) -> bool {
         self.active_file.is_none() || self.rotation_state.should_rotate()
     }
@@ -463,32 +492,55 @@ impl Log {
         }
 
         // Respect retention policy
-        self.chain.retain(&self.config.retention_policy)?;
+        let deleted_paths = self.chain.retain(&self.config.retention_policy)?;
+        if !deleted_paths.is_empty()
+            && let Some(observer) = &self.lifecycle_observer
+        {
+            observer.on_event(&LogLifecycleEvent::RetainedDeleted {
+                paths: deleted_paths,
+            });
+        }
 
         // Create new file (either initial or rotated)
         let max_file_size = self.config.rotation_policy.size_of_journal_file;
         let head_realtime = self.clock.now().get();
-        let new_file = if let Some(mut old_file) = self.active_file.take() {
+        let (new_file, rotation_event) = if let Some(mut old_file) = self.active_file.take() {
             // Set the old file's state to ARCHIVED before creating successor
             old_file.journal_file.journal_header_mut().state = JournalState::Archived as u8;
             old_file.journal_file.sync()?;
-
-            old_file.rotate(&mut self.chain, max_file_size, head_realtime)?
+            let archived_path = PathBuf::from(old_file.repository_file.path());
+            let new_file = old_file.rotate(&mut self.chain, max_file_size, head_realtime)?;
+            let active_path = PathBuf::from(new_file.repository_file.path());
+            (
+                new_file,
+                Some(LogLifecycleEvent::Rotated {
+                    archived_path,
+                    active_path,
+                }),
+            )
         } else {
-            ActiveFile::create(
-                &mut self.chain,
-                self.seqnum_id,
-                self.boot_id,
-                self.current_seqnum + 1,
-                max_file_size,
-                head_realtime,
-            )?
+            (
+                ActiveFile::create(
+                    &mut self.chain,
+                    self.seqnum_id,
+                    self.boot_id,
+                    self.current_seqnum + 1,
+                    max_file_size,
+                    head_realtime,
+                )?,
+                None,
+            )
         };
 
         tracing::Span::current().record("new_file", new_file.repository_file.path());
 
         self.active_file = Some(new_file);
         self.rotation_state.reset();
+        if let Some(event) = rotation_event
+            && let Some(observer) = &self.lifecycle_observer
+        {
+            observer.on_event(&event);
+        }
 
         Ok(())
     }

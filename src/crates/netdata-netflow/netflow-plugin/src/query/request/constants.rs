@@ -1,4 +1,5 @@
 use super::super::*;
+use crate::facet_catalog::FACET_ALLOWED_OPTIONS as FACET_CATALOG_ALLOWED_OPTIONS;
 
 pub(crate) const DEFAULT_QUERY_WINDOW_SECONDS: u32 = 15 * 60;
 pub(crate) const DEFAULT_QUERY_LIMIT: usize = 25;
@@ -21,20 +22,6 @@ pub(crate) const DEFAULT_GROUP_BY_FIELDS: &[&str] = &["SRC_AS_NAME", "PROTOCOL",
 pub(crate) const COUNTRY_MAP_GROUP_BY_FIELDS: &[&str] = &["SRC_COUNTRY", "DST_COUNTRY"];
 
 pub(crate) const RAW_ONLY_FIELDS: &[&str] = &["SRC_ADDR", "DST_ADDR", "SRC_PORT", "DST_PORT"];
-
-pub(crate) const FACET_EXCLUDED_FIELDS: &[&str] = &[
-    "_BOOT_ID",
-    "_SOURCE_REALTIME_TIMESTAMP",
-    "SRC_ADDR",
-    "DST_ADDR",
-    "SRC_PORT",
-    "DST_PORT",
-    "BYTES",
-    "PACKETS",
-    "FLOWS",
-    "RAW_BYTES",
-    "RAW_PACKETS",
-];
 
 pub(crate) fn default_group_by() -> Vec<String> {
     DEFAULT_GROUP_BY_FIELDS
@@ -65,12 +52,8 @@ pub(crate) static GROUP_BY_ALLOWED_OPTIONS: LazyLock<Vec<String>> = LazyLock::ne
         .collect()
 });
 
-pub(crate) static FACET_ALLOWED_OPTIONS: LazyLock<Vec<String>> = LazyLock::new(|| {
-    supported_flow_field_names()
-        .filter(|field| facet_field_requested(field))
-        .map(str::to_string)
-        .collect()
-});
+pub(crate) static FACET_ALLOWED_OPTIONS: LazyLock<Vec<String>> =
+    LazyLock::new(|| FACET_CATALOG_ALLOWED_OPTIONS.clone());
 
 pub(crate) fn supported_group_by_fields() -> &'static [String] {
     GROUP_BY_ALLOWED_OPTIONS.as_slice()

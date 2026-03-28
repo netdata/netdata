@@ -16,6 +16,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true }
 bitflags = { workspace = true }
+bitvec = { workspace = true }
 bytesize = { workspace = true }
 bytesize-serde = { workspace = true }
 chrono = { workspace = true }
@@ -39,10 +40,12 @@ jaq-std = "1.5.0"
 jaq-syn = "1.6.0"
 maxminddb = "0.25.0"
 memchr = { workspace = true }
+memmap2 = { workspace = true }
 netflow_parser = "0.9.0"
 netgauze-bgp-pkt = "0.9.0"
 netgauze-bmp-pkt = { version = "0.9.0", features = ["codec"] }
 notify = { workspace = true }
+roaring = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
@@ -60,6 +63,7 @@ tonic = { workspace = true, features = ["transport", "tls-native-roots"] }
 tonic-prost = "0.14"
 prost = "0.14"
 netdata-flow-index = { path = "../flow-index" }
+fst = "0.4.7"
 
 rt = { workspace = true }
 netdata-plugin-error = { workspace = true }

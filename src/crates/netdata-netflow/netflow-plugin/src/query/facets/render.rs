@@ -1,4 +1,5 @@
 use super::super::*;
+use crate::facet_catalog::facet_field_enabled;
 
 #[cfg(test)]
 pub(crate) fn build_facets(
@@ -27,10 +28,7 @@ pub(crate) fn build_facets(
 }
 
 pub(crate) fn facet_field_allowed(field: &str) -> bool {
-    !FACET_EXCLUDED_FIELDS.contains(&field)
-        && !field.starts_with("V9_")
-        && !field.starts_with("IPFIX_")
-        && !field.starts_with('_')
+    facet_field_enabled(field)
 }
 
 #[cfg(test)]

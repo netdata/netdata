@@ -1,4 +1,5 @@
-use crate::query::{RAW_ONLY_FIELDS, facet_field_allowed};
+use crate::facet_catalog::facet_field_enabled;
+use crate::query::RAW_ONLY_FIELDS;
 use std::collections::HashMap;
 
 pub(crate) fn field_is_raw_only(field: &str) -> bool {
@@ -22,7 +23,7 @@ pub(crate) fn journal_projected_selection_field_supported(field: &str) -> bool {
 }
 
 pub(crate) fn facet_field_requested(field: &str) -> bool {
-    field_is_groupable(field) && facet_field_allowed(field)
+    facet_field_enabled(field)
 }
 
 pub(crate) fn field_is_groupable(field: &str) -> bool {
