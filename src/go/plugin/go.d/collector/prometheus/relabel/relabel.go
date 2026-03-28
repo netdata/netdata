@@ -550,6 +550,10 @@ func parseAction(s string) (Action, error) {
 	}
 }
 
+func NormalizeConfig(cfg Config) Config {
+	return withDefaults(cfg)
+}
+
 func withDefaults(cfg Config) Config {
 	cfg.NameScheme = withNameScheme(cfg.NameScheme)
 	if cfg.Action == "" {

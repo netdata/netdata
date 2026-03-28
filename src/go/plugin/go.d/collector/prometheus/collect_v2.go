@@ -17,10 +17,11 @@ import (
 )
 
 func (c *Collector) checkV2() (int, error) {
-	mfs, err := c.scrapeMetricFamilies()
+	mfs, runtime, err := c.scrapeMetricFamiliesWithRuntime(true)
 	if err != nil {
 		return 0, err
 	}
+	c.runtime = runtime
 
 	if mfs.Len() == 0 {
 		c.Warningf("endpoint '%s' returned 0 metric families", c.URL)
@@ -53,30 +54,40 @@ func (c *Collector) collectV2(context.Context) error {
 }
 
 func (c *Collector) scrapeMetricFamilies() (prompkg.MetricFamilies, error) {
+	mfs, _, err := c.scrapeMetricFamiliesWithRuntime(false)
+	return mfs, err
+}
+
+func (c *Collector) scrapeMetricFamiliesWithRuntime(checking bool) (prompkg.MetricFamilies, *collectorRuntime, error) {
 	if c.pipe == nil {
-		return nil, fmt.Errorf("prometheus pipeline is not initialized")
+		return nil, nil, fmt.Errorf("prometheus pipeline is not initialized")
 	}
 
-	mfs, err := c.pipe.CollectMetricFamilies()
+	batch, err := c.pipe.CollectSamples()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	mfs, runtime, err := c.processScrapeBatch(batch, checking)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	if c.ExpectedPrefix != "" {
 		if !hasPrefix(mfs, c.ExpectedPrefix) {
-			return nil, fmt.Errorf("'%s' metrics have no expected prefix (%s)", c.URL, c.ExpectedPrefix)
+			return nil, nil, fmt.Errorf("'%s' metrics have no expected prefix (%s)", c.URL, c.ExpectedPrefix)
 		}
 		c.ExpectedPrefix = ""
 	}
 
 	if c.MaxTS > 0 {
 		if n := calcMetrics(mfs); n > c.MaxTS {
-			return nil, fmt.Errorf("'%s' num of time series (%d) > limit (%d)", c.URL, n, c.MaxTS)
+			return nil, nil, fmt.Errorf("'%s' num of time series (%d) > limit (%d)", c.URL, n, c.MaxTS)
 		}
 		c.MaxTS = 0
 	}
 
-	return mfs, nil
+	return mfs, runtime, nil
 }
 
 type metricFamilyWriter struct {

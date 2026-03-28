@@ -11,13 +11,13 @@ import (
 	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
+	commonmodel "github.com/prometheus/common/model"
 )
 
-var validProfileID = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+var validProfileName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
 
 type Profile struct {
-	ID                string                   `yaml:"id" json:"id"`
-	Name              string                   `yaml:"name,omitempty" json:"name,omitempty"`
+	Name              string                   `yaml:"name" json:"name"`
 	Match             string                   `yaml:"match" json:"match"`
 	MetricsRelabeling []MetricsRelabelingBlock `yaml:"metrics_relabeling,omitempty" json:"metrics_relabeling,omitempty"`
 	Template          charttpl.Group           `yaml:"template" json:"template"`
@@ -29,15 +29,12 @@ type MetricsRelabelingBlock struct {
 }
 
 func (p Profile) Validate(path string) error {
-	id := strings.TrimSpace(p.ID)
-	if id == "" {
-		return fmt.Errorf("%s.id: must not be empty", path)
+	name := strings.TrimSpace(p.Name)
+	if name == "" {
+		return fmt.Errorf("%s.name: must not be empty", path)
 	}
-	if !validProfileID.MatchString(id) {
-		return fmt.Errorf("%s.id: %q does not match ^[a-z][a-z0-9_]*$", path, p.ID)
-	}
-	if p.Name != "" && strings.TrimSpace(p.Name) == "" {
-		return fmt.Errorf("%s.name: must not be whitespace-only", path)
+	if !validProfileName.MatchString(name) {
+		return fmt.Errorf("%s.name: %q does not match ^[A-Za-z][A-Za-z0-9_]*$", path, p.Name)
 	}
 	if strings.TrimSpace(p.Match) == "" {
 		return fmt.Errorf("%s.match: must not be empty", path)
@@ -59,6 +56,11 @@ func (p Profile) Validate(path string) error {
 		if _, err := relabel.New(block.Rules); err != nil {
 			return fmt.Errorf("%s.metrics_relabeling[%d].rules: %w", path, i, err)
 		}
+		for j, rule := range block.Rules {
+			if err := validateCuratedRule(relabel.NormalizeConfig(rule)); err != nil {
+				return fmt.Errorf("%s.metrics_relabeling[%d].rules[%d]: %w", path, i, j, err)
+			}
+		}
 	}
 
 	if !groupHasChart(p.Template) {
@@ -76,6 +78,66 @@ func (p Profile) Validate(path string) error {
 	return nil
 }
 
+func validateCuratedRule(cfg relabel.Config) error {
+	switch cfg.Action {
+	case relabel.Replace:
+		if containsTemplateVar(cfg.TargetLabel) {
+			return fmt.Errorf("dynamic 'target_label' is not allowed in curated mode")
+		}
+		switch cfg.TargetLabel {
+		case commonmodel.MetricNameLabel:
+			if containsTemplateVar(cfg.Replacement) {
+				return fmt.Errorf("capture-based or dynamic __name__ replacement is not allowed in curated mode")
+			}
+			if !cfg.NameScheme.IsValidMetricName(cfg.Replacement) {
+				return fmt.Errorf("%q is not a valid constant final metric name in curated mode", cfg.Replacement)
+			}
+		case bucketLabel, quantileLabel:
+			return fmt.Errorf("%q is immutable in curated mode", cfg.TargetLabel)
+		}
+	case relabel.Lowercase, relabel.Uppercase, relabel.HashMod:
+		if isProtectedTargetLabel(cfg.TargetLabel) {
+			return fmt.Errorf("%q must not be targeted by %s in curated mode", cfg.TargetLabel, cfg.Action)
+		}
+	case relabel.LabelMap:
+		if containsTemplateVar(cfg.Replacement) {
+			return fmt.Errorf("dynamic 'replacement' is not allowed for labelmap in curated mode")
+		}
+		if matchesProtectedLabel(cfg.Regex, commonmodel.MetricNameLabel) {
+			return fmt.Errorf("__name__ must not be targeted by labelmap in curated mode")
+		}
+		if matchesProtectedLabel(cfg.Regex, bucketLabel) || matchesProtectedLabel(cfg.Regex, quantileLabel) {
+			return fmt.Errorf("structural labels must not be targeted by labelmap in curated mode")
+		}
+		if isProtectedTargetLabel(cfg.Replacement) {
+			return fmt.Errorf("%q must not be created by labelmap in curated mode", cfg.Replacement)
+		}
+	case relabel.LabelDrop:
+		if matchesProtectedLabel(cfg.Regex, commonmodel.MetricNameLabel) {
+			return fmt.Errorf("__name__ must not be targeted by labeldrop in curated mode")
+		}
+		if matchesProtectedLabel(cfg.Regex, bucketLabel) || matchesProtectedLabel(cfg.Regex, quantileLabel) {
+			return fmt.Errorf("structural labels must not be targeted by labeldrop in curated mode")
+		}
+	case relabel.LabelKeep:
+		return fmt.Errorf("labelkeep is not allowed in curated mode because it necessarily affects protected labels")
+	}
+
+	return nil
+}
+
+func containsTemplateVar(v string) bool {
+	return strings.Contains(v, "$")
+}
+
+func isProtectedTargetLabel(name string) bool {
+	return name == commonmodel.MetricNameLabel || name == bucketLabel || name == quantileLabel
+}
+
+func matchesProtectedLabel(re relabel.Regexp, label string) bool {
+	return re.MatchString(label)
+}
+
 func groupHasChart(group charttpl.Group) bool {
 	if len(group.Charts) > 0 {
 		return true
@@ -87,3 +149,8 @@ func groupHasChart(group charttpl.Group) bool {
 	}
 	return false
 }
+
+const (
+	bucketLabel   = "le"
+	quantileLabel = "quantile"
+)

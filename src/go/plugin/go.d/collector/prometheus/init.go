@@ -117,9 +117,9 @@ func normalizeConfiguredProfiles(ids []string) ([]string, error) {
 			return nil, errors.New("'profiles' must not contain empty values")
 		}
 
-		key := strings.ToLower(id)
+		key := promprofiles.NormalizeProfileKey(id)
 		if _, ok := seen[key]; ok {
-			return nil, fmt.Errorf("duplicate profile id %q in 'profiles'", id)
+			return nil, fmt.Errorf("duplicate profile name %q in 'profiles'", id)
 		}
 		seen[key] = struct{}{}
 		out = append(out, id)

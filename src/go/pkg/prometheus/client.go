@@ -25,6 +25,8 @@ type (
 		Scrape() (MetricFamilies, error)
 		// ScrapeStream fetches and streams final-classified samples to the callback.
 		ScrapeStream(func(promscrapemodel.Sample) error) error
+		// ScrapeStreamWithMeta fetches and streams HELP metadata and final-classified samples.
+		ScrapeStreamWithMeta(func(name, help string), func(promscrapemodel.Sample) error) error
 		ScrapeSeries() (Series, error)
 		HTTPClient() *http.Client
 	}
@@ -96,6 +98,10 @@ func (p *prometheus) Scrape() (MetricFamilies, error) {
 
 func (p *prometheus) ScrapeStream(onSample func(promscrapemodel.Sample) error) error {
 	return p.scrapeStreamWithMeta(nil, onSample)
+}
+
+func (p *prometheus) ScrapeStreamWithMeta(onHelp func(name, help string), onSample func(promscrapemodel.Sample) error) error {
+	return p.scrapeStreamWithMeta(onHelp, onSample)
 }
 
 // ScrapeSeries scrapes metrics, parses and sorts

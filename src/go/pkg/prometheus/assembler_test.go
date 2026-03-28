@@ -152,6 +152,88 @@ func TestAssembler_MetricFamilies(t *testing.T) {
 				assert.Equal(t, 2.0, second.Metrics()[0].Gauge().Value())
 			},
 		},
+		"drops malformed and incomplete typed groups": {
+			apply: func(a *Assembler) error {
+				a.beginCycle()
+
+				for _, sample := range []promscrapemodel.Sample{
+					{
+						Name: "bad_summary",
+						Labels: labels.Labels{
+							{Name: "label1", Value: "value1"},
+							{Name: "quantile", Value: "nope"},
+						},
+						Value:      1,
+						Kind:       promscrapemodel.SampleKindSummaryQuantile,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name:       "bad_summary_sum",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      2,
+						Kind:       promscrapemodel.SampleKindSummarySum,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name:       "bad_summary_count",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      3,
+						Kind:       promscrapemodel.SampleKindSummaryCount,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name: "bad_histogram_bucket",
+						Labels: labels.Labels{
+							{Name: "label1", Value: "value1"},
+							{Name: "le", Value: "nope"},
+						},
+						Value:      4,
+						Kind:       promscrapemodel.SampleKindHistogramBucket,
+						FamilyType: model.MetricTypeHistogram,
+					},
+					{
+						Name:       "bad_histogram_sum",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      5,
+						Kind:       promscrapemodel.SampleKindHistogramSum,
+						FamilyType: model.MetricTypeHistogram,
+					},
+					{
+						Name:       "bad_histogram_count",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      6,
+						Kind:       promscrapemodel.SampleKindHistogramCount,
+						FamilyType: model.MetricTypeHistogram,
+					},
+					{
+						Name:       "incomplete_summary",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      7,
+						Kind:       promscrapemodel.SampleKindScalar,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name:       "incomplete_histogram",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      8,
+						Kind:       promscrapemodel.SampleKindScalar,
+						FamilyType: model.MetricTypeHistogram,
+					},
+				} {
+					if err := a.ApplySample(sample); err != nil {
+						return err
+					}
+				}
+
+				return nil
+			},
+			verify: func(t *testing.T, mfs MetricFamilies) {
+				assert.Nil(t, mfs.Get("bad_summary"))
+				assert.Nil(t, mfs.Get("bad_histogram"))
+				assert.Nil(t, mfs.Get("incomplete_summary"))
+				assert.Nil(t, mfs.Get("incomplete_histogram"))
+			},
+		},
 	}
 
 	for name, test := range tests {

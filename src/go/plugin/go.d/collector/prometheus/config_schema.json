@@ -94,7 +94,7 @@
       },
       "profile_selection_mode": {
         "title": "Profile selection mode",
-        "description": "How curated Prometheus profiles are selected. `auto` keeps the current generic behavior and expects no explicit profile ids. `exact` uses only the listed profiles. `combined` keeps explicit profiles first and later appends auto-matched curated profiles.",
+        "description": "How curated Prometheus profiles are selected. `auto` keeps the current generic behavior and expects no explicit profile names. `exact` uses only the listed profiles. `combined` keeps explicit profiles first and later appends auto-matched curated profiles.",
         "type": "string",
         "enum": [
           "auto",
@@ -105,13 +105,13 @@
       },
       "profiles": {
         "title": "Profiles",
-        "description": "Explicit curated Prometheus profile ids. Must be empty in `auto` mode, and is required in `exact` and `combined` modes.",
+        "description": "Explicit curated Prometheus profile names. Must be empty in `auto` mode, and is required in `exact` and `combined` modes.",
         "type": [
           "array",
           "null"
         ],
         "items": {
-          "title": "Profile ID",
+          "title": "Profile Name",
           "type": "string"
         },
         "uniqueItems": true

@@ -122,6 +122,37 @@ func TestPrometheusScrapeStream(t *testing.T) {
 	}
 }
 
+func TestPrometheusScrapeStreamWithMeta(t *testing.T) {
+	tsMux := http.NewServeMux()
+	tsMux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+# HELP test_metric Test Metric
+# TYPE test_metric gauge
+test_metric{label="value"} 1
+`))
+	})
+	ts := httptest.NewServer(tsMux)
+	defer ts.Close()
+
+	req := web.RequestConfig{URL: ts.URL + "/metrics"}
+	prom := New(http.DefaultClient, req)
+
+	help := make(map[string]string)
+	var samples promscrapemodel.Samples
+	err := prom.ScrapeStreamWithMeta(
+		func(name, text string) {
+			help[name] = text
+		},
+		func(sample promscrapemodel.Sample) error {
+			samples.Add(sample)
+			return nil
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, samples, 1)
+	assert.Equal(t, "Test Metric", help["test_metric"])
+}
+
 func TestPrometheusScrapeMetricFamilies(t *testing.T) {
 	tests := map[string]struct {
 		payload []byte
@@ -173,7 +204,7 @@ handler_latency_test_count{label="value"} 3
 				assert.Equal(t, 3.0, count.Metrics()[0].Counter().Value())
 			},
 		},
-		"keeps malformed quantile and bucket labels with zero value": {
+		"drops malformed quantile and bucket groups": {
 			payload: []byte(`
 # TYPE bad_summary summary
 bad_summary{label="value",quantile="nope"} 2
@@ -181,22 +212,12 @@ bad_summary{label="value",quantile="nope"} 2
 bad_histogram_bucket{label="value",le="nope"} 3
 `),
 			verify: func(t *testing.T, mfs MetricFamilies) {
-				require.NotEmpty(t, mfs)
-
-				summary := mfs.GetSummary("bad_summary")
-				require.NotNil(t, summary)
-				require.Len(t, summary.Metrics(), 1)
-				require.NotNil(t, summary.Metrics()[0].Summary())
-				assert.Equal(t, []Quantile{{quantile: 0, value: 2}}, summary.Metrics()[0].Summary().Quantiles())
-
-				histogram := mfs.GetHistogram("bad_histogram")
-				require.NotNil(t, histogram)
-				require.Len(t, histogram.Metrics(), 1)
-				require.NotNil(t, histogram.Metrics()[0].Histogram())
-				assert.Equal(t, []Bucket{{upperBound: 0, cumulativeCount: 3}}, histogram.Metrics()[0].Histogram().Buckets())
+				assert.Empty(t, mfs)
+				assert.Nil(t, mfs.Get("bad_summary"))
+				assert.Nil(t, mfs.Get("bad_histogram"))
 			},
 		},
-		"keeps malformed typed summary and histogram bases structured": {
+		"drops incomplete typed summary and histogram bases": {
 			payload: []byte(`
 # TYPE malformed_summary summary
 malformed_summary{label="value"} 4
@@ -204,19 +225,9 @@ malformed_summary{label="value"} 4
 malformed_histogram{label="value"} 5
 `),
 			verify: func(t *testing.T, mfs MetricFamilies) {
-				require.NotEmpty(t, mfs)
-
-				summary := mfs.GetSummary("malformed_summary")
-				require.NotNil(t, summary)
-				require.Len(t, summary.Metrics(), 1)
-				assert.NotNil(t, summary.Metrics()[0].Summary())
-				assert.Nil(t, summary.Metrics()[0].Untyped())
-
-				histogram := mfs.GetHistogram("malformed_histogram")
-				require.NotNil(t, histogram)
-				require.Len(t, histogram.Metrics(), 1)
-				assert.NotNil(t, histogram.Metrics()[0].Histogram())
-				assert.Nil(t, histogram.Metrics()[0].Untyped())
+				assert.Empty(t, mfs)
+				assert.Nil(t, mfs.Get("malformed_summary"))
+				assert.Nil(t, mfs.Get("malformed_histogram"))
 			},
 		},
 	}

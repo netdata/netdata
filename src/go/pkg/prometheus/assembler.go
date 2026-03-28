@@ -3,6 +3,8 @@
 package prometheus
 
 import (
+	"math"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -14,8 +16,8 @@ import (
 
 type Assembler struct {
 	metrics    MetricFamilies
-	summaries  map[assemblyKey]*Summary
-	histograms map[assemblyKey]*Histogram
+	summaries  map[assemblyKey]*summaryState
+	histograms map[assemblyKey]*histogramState
 	scratch    labels.Labels
 	sealed     bool
 }
@@ -23,6 +25,24 @@ type Assembler struct {
 type assemblyKey struct {
 	name string
 	hash uint64
+}
+
+type summaryState struct {
+	family   *MetricFamily
+	index    int
+	summary  *Summary
+	hasSum   bool
+	hasCount bool
+	invalid  bool
+}
+
+type histogramState struct {
+	family    *MetricFamily
+	index     int
+	histogram *Histogram
+	hasSum    bool
+	hasCount  bool
+	invalid   bool
 }
 
 func NewAssembler() *Assembler {
@@ -68,6 +88,7 @@ func (a *Assembler) MetricFamilies() MetricFamilies {
 	}
 
 	if !a.sealed {
+		a.pruneInvalidTypedFamilies()
 		for name, mf := range a.metrics {
 			if len(mf.metrics) == 0 {
 				delete(a.metrics, name)
@@ -77,6 +98,10 @@ func (a *Assembler) MetricFamilies() MetricFamilies {
 	}
 
 	return a.metrics
+}
+
+func (a *Assembler) ApplyHelp(name, help string) {
+	a.applyHelp(name, help)
 }
 
 func (a *Assembler) applyHelp(name, help string) {
@@ -104,14 +129,14 @@ func (a *Assembler) reset() {
 	}
 
 	if a.summaries == nil {
-		a.summaries = make(map[assemblyKey]*Summary)
+		a.summaries = make(map[assemblyKey]*summaryState)
 	}
 	for key := range a.summaries {
 		delete(a.summaries, key)
 	}
 
 	if a.histograms == nil {
-		a.histograms = make(map[assemblyKey]*Histogram)
+		a.histograms = make(map[assemblyKey]*histogramState)
 	}
 	for key := range a.histograms {
 		delete(a.histograms, key)
@@ -167,17 +192,33 @@ func (a *Assembler) addScalarSample(sample promscrapemodel.Sample) {
 }
 
 func (a *Assembler) addSummarySample(sample promscrapemodel.Sample) error {
-	baseLabels, quantile, ok := a.stripFloatLabel(sample.Labels, quantileLabel)
+	mf := a.ensureMetricFamily(sample.Name)
+	mf.typ = model.MetricTypeSummary
+	baseLabels, value, ok := a.stripLabel(sample.Labels, quantileLabel)
+	key := assemblyKey{name: sample.Name}
+	if ok {
+		key.hash = labels.Labels(baseLabels).Hash()
+	} else {
+		baseLabels = sample.Labels
+		key.hash = sample.Labels.Hash()
+	}
+
+	state := a.summaryStateFor(mf, key, baseLabels)
 	if !ok {
+		state.invalid = true
 		return nil
 	}
 
-	mf := a.ensureMetricFamily(sample.Name)
-	mf.typ = model.MetricTypeSummary
+	quantile, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		state.invalid = true
+		return nil
+	}
+	if state.invalid {
+		return nil
+	}
 
-	key := assemblyKey{name: sample.Name, hash: labels.Labels(baseLabels).Hash()}
-	summary := a.summaryFor(mf, key, baseLabels)
-	summary.quantiles = append(summary.quantiles, Quantile{quantile: quantile, value: sample.Value})
+	state.summary.quantiles = append(state.summary.quantiles, Quantile{quantile: quantile, value: sample.Value})
 	return nil
 }
 
@@ -186,7 +227,7 @@ func (a *Assembler) addSummaryBase(sample promscrapemodel.Sample) {
 	mf.typ = model.MetricTypeSummary
 
 	key := assemblyKey{name: sample.Name, hash: sample.Labels.Hash()}
-	_ = a.summaryFor(mf, key, sample.Labels)
+	_ = a.summaryStateFor(mf, key, sample.Labels)
 }
 
 func (a *Assembler) addSummarySum(sample promscrapemodel.Sample) error {
@@ -195,8 +236,16 @@ func (a *Assembler) addSummarySum(sample promscrapemodel.Sample) error {
 	mf.typ = model.MetricTypeSummary
 
 	key := assemblyKey{name: familyName, hash: sample.Labels.Hash()}
-	summary := a.summaryFor(mf, key, sample.Labels)
-	summary.sum = sample.Value
+	state := a.summaryStateFor(mf, key, sample.Labels)
+	if state.invalid {
+		return nil
+	}
+	if state.hasSum {
+		state.invalid = true
+		return nil
+	}
+	state.summary.sum = sample.Value
+	state.hasSum = true
 	return nil
 }
 
@@ -206,24 +255,47 @@ func (a *Assembler) addSummaryCount(sample promscrapemodel.Sample) error {
 	mf.typ = model.MetricTypeSummary
 
 	key := assemblyKey{name: familyName, hash: sample.Labels.Hash()}
-	summary := a.summaryFor(mf, key, sample.Labels)
-	summary.count = sample.Value
+	state := a.summaryStateFor(mf, key, sample.Labels)
+	if state.invalid {
+		return nil
+	}
+	if state.hasCount {
+		state.invalid = true
+		return nil
+	}
+	state.summary.count = sample.Value
+	state.hasCount = true
 	return nil
 }
 
 func (a *Assembler) addHistogramBucket(sample promscrapemodel.Sample) error {
-	baseLabels, bound, ok := a.stripFloatLabel(sample.Labels, bucketLabel)
-	if !ok {
-		return nil
-	}
-
 	familyName := strings.TrimSuffix(sample.Name, bucketSuffix)
 	mf := a.ensureMetricFamily(familyName)
 	mf.typ = model.MetricTypeHistogram
+	baseLabels, value, ok := a.stripLabel(sample.Labels, bucketLabel)
+	key := assemblyKey{name: familyName}
+	if ok {
+		key.hash = labels.Labels(baseLabels).Hash()
+	} else {
+		baseLabels = sample.Labels
+		key.hash = sample.Labels.Hash()
+	}
 
-	key := assemblyKey{name: familyName, hash: labels.Labels(baseLabels).Hash()}
-	histogram := a.histogramFor(mf, key, baseLabels)
-	histogram.buckets = append(histogram.buckets, Bucket{upperBound: bound, cumulativeCount: sample.Value})
+	state := a.histogramStateFor(mf, key, baseLabels)
+	if !ok {
+		state.invalid = true
+		return nil
+	}
+
+	bound, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		state.invalid = true
+		return nil
+	}
+	if state.invalid {
+		return nil
+	}
+	state.histogram.buckets = append(state.histogram.buckets, Bucket{upperBound: bound, cumulativeCount: sample.Value})
 	return nil
 }
 
@@ -232,7 +304,7 @@ func (a *Assembler) addHistogramBase(sample promscrapemodel.Sample) {
 	mf.typ = model.MetricTypeHistogram
 
 	key := assemblyKey{name: sample.Name, hash: sample.Labels.Hash()}
-	_ = a.histogramFor(mf, key, sample.Labels)
+	_ = a.histogramStateFor(mf, key, sample.Labels)
 }
 
 func (a *Assembler) addHistogramSum(sample promscrapemodel.Sample) error {
@@ -241,8 +313,16 @@ func (a *Assembler) addHistogramSum(sample promscrapemodel.Sample) error {
 	mf.typ = model.MetricTypeHistogram
 
 	key := assemblyKey{name: familyName, hash: sample.Labels.Hash()}
-	histogram := a.histogramFor(mf, key, sample.Labels)
-	histogram.sum = sample.Value
+	state := a.histogramStateFor(mf, key, sample.Labels)
+	if state.invalid {
+		return nil
+	}
+	if state.hasSum {
+		state.invalid = true
+		return nil
+	}
+	state.histogram.sum = sample.Value
+	state.hasSum = true
 	return nil
 }
 
@@ -252,14 +332,22 @@ func (a *Assembler) addHistogramCount(sample promscrapemodel.Sample) error {
 	mf.typ = model.MetricTypeHistogram
 
 	key := assemblyKey{name: familyName, hash: sample.Labels.Hash()}
-	histogram := a.histogramFor(mf, key, sample.Labels)
-	histogram.count = sample.Value
+	state := a.histogramStateFor(mf, key, sample.Labels)
+	if state.invalid {
+		return nil
+	}
+	if state.hasCount {
+		state.invalid = true
+		return nil
+	}
+	state.histogram.count = sample.Value
+	state.hasCount = true
 	return nil
 }
 
-func (a *Assembler) summaryFor(mf *MetricFamily, key assemblyKey, lbs labels.Labels) *Summary {
-	if summary, ok := a.summaries[key]; ok {
-		return summary
+func (a *Assembler) summaryStateFor(mf *MetricFamily, key assemblyKey, lbs labels.Labels) *summaryState {
+	if state, ok := a.summaries[key]; ok {
+		return state
 	}
 
 	idx := len(mf.metrics)
@@ -283,13 +371,18 @@ func (a *Assembler) summaryFor(mf *MetricFamily, key assemblyKey, lbs labels.Lab
 		metric.summary.quantiles = metric.summary.quantiles[:0]
 	}
 
-	a.summaries[key] = metric.summary
-	return metric.summary
+	state := &summaryState{
+		family:  mf,
+		index:   idx,
+		summary: metric.summary,
+	}
+	a.summaries[key] = state
+	return state
 }
 
-func (a *Assembler) histogramFor(mf *MetricFamily, key assemblyKey, lbs labels.Labels) *Histogram {
-	if histogram, ok := a.histograms[key]; ok {
-		return histogram
+func (a *Assembler) histogramStateFor(mf *MetricFamily, key assemblyKey, lbs labels.Labels) *histogramState {
+	if state, ok := a.histograms[key]; ok {
+		return state
 	}
 
 	idx := len(mf.metrics)
@@ -313,8 +406,13 @@ func (a *Assembler) histogramFor(mf *MetricFamily, key assemblyKey, lbs labels.L
 		metric.histogram.buckets = metric.histogram.buckets[:0]
 	}
 
-	a.histograms[key] = metric.histogram
-	return metric.histogram
+	state := &histogramState{
+		family:    mf,
+		index:     idx,
+		histogram: metric.histogram,
+	}
+	a.histograms[key] = state
+	return state
 }
 
 func (a *Assembler) ensureMetricFamily(name string) *MetricFamily {
@@ -336,7 +434,7 @@ func copyMetricLabels(metric *Metric, lbs labels.Labels) {
 	metric.labels = append(metric.labels, lbs...)
 }
 
-func (a *Assembler) stripFloatLabel(lbs labels.Labels, name string) (labels.Labels, float64, bool) {
+func (a *Assembler) stripLabel(lbs labels.Labels, name string) (labels.Labels, string, bool) {
 	a.scratch = a.scratch[:0]
 	var (
 		value string
@@ -351,13 +449,120 @@ func (a *Assembler) stripFloatLabel(lbs labels.Labels, name string) (labels.Labe
 		a.scratch = append(a.scratch, lb)
 	}
 	if !found {
-		return nil, 0, false
+		return nil, "", false
 	}
 
-	v, err := strconv.ParseFloat(value, 64)
-	if err != nil {
-		return a.scratch, 0, true
+	return a.scratch, value, true
+}
+
+func (a *Assembler) pruneInvalidTypedFamilies() {
+	drops := make(map[*MetricFamily]map[int]struct{})
+
+	for _, state := range a.summaries {
+		if validSummaryState(state) {
+			continue
+		}
+		markMetricForDrop(drops, state.family, state.index)
+	}
+	for _, state := range a.histograms {
+		if validHistogramState(state) {
+			continue
+		}
+		markMetricForDrop(drops, state.family, state.index)
 	}
 
-	return a.scratch, v, true
+	for mf, indexes := range drops {
+		dst := mf.metrics[:0]
+		for i := range mf.metrics {
+			if _, drop := indexes[i]; drop {
+				continue
+			}
+			dst = append(dst, mf.metrics[i])
+		}
+		mf.metrics = dst
+	}
+}
+
+func markMetricForDrop(drops map[*MetricFamily]map[int]struct{}, mf *MetricFamily, idx int) {
+	if mf == nil {
+		return
+	}
+	if drops[mf] == nil {
+		drops[mf] = make(map[int]struct{})
+	}
+	drops[mf][idx] = struct{}{}
+}
+
+func validSummaryState(state *summaryState) bool {
+	if state == nil || state.invalid || state.summary == nil || !state.hasSum || !state.hasCount {
+		return false
+	}
+	if len(state.summary.quantiles) == 0 {
+		return false
+	}
+	if !isFiniteValue(state.summary.count) || !isFiniteValue(state.summary.sum) || state.summary.count < 0 {
+		return false
+	}
+
+	qs := make([]float64, 0, len(state.summary.quantiles))
+	for _, q := range state.summary.quantiles {
+		if !isFiniteValue(q.quantile) || q.quantile < 0 || q.quantile > 1 || !isFiniteValue(q.value) {
+			return false
+		}
+		qs = append(qs, q.quantile)
+	}
+
+	sort.Float64s(qs)
+	for i := 1; i < len(qs); i++ {
+		if qs[i] <= qs[i-1] {
+			return false
+		}
+	}
+
+	return true
+}
+
+func validHistogramState(state *histogramState) bool {
+	if state == nil || state.invalid || state.histogram == nil || !state.hasSum || !state.hasCount {
+		return false
+	}
+	if len(state.histogram.buckets) == 0 {
+		return false
+	}
+	if !isFiniteValue(state.histogram.count) || !isFiniteValue(state.histogram.sum) || state.histogram.count < 0 {
+		return false
+	}
+
+	buckets := append([]Bucket(nil), state.histogram.buckets...)
+	for _, b := range buckets {
+		if math.IsNaN(b.upperBound) || math.IsInf(b.upperBound, -1) || !isFiniteValue(b.cumulativeCount) || b.cumulativeCount < 0 {
+			return false
+		}
+	}
+
+	sort.Slice(buckets, func(i, j int) bool { return buckets[i].upperBound < buckets[j].upperBound })
+	for i := 1; i < len(buckets); i++ {
+		if buckets[i].upperBound <= buckets[i-1].upperBound {
+			return false
+		}
+		if buckets[i].cumulativeCount < buckets[i-1].cumulativeCount {
+			return false
+		}
+	}
+
+	for i := len(buckets) - 1; i >= 0; i-- {
+		if math.IsInf(buckets[i].upperBound, +1) {
+			continue
+		}
+		if buckets[i].cumulativeCount > state.histogram.count {
+			return false
+		}
+		break
+	}
+
+	return true
+}
+
+func isFiniteValue(v float64) bool {
+	return !math.IsNaN(v) && !math.IsInf(v, 0)
 }

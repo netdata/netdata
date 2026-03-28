@@ -5,6 +5,10 @@ package prometheus
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -108,10 +112,82 @@ func TestCollector_ChartTemplateYAML_RuntimeOverride(t *testing.T) {
 	assert.Contains(t, templateYAML, "enabled: true")
 }
 
+func TestCollector_CheckFailsWhenExactProfileMatchesNothing(t *testing.T) {
+	collr := New()
+	collr.URL = newMetricsServer(t, `# TYPE other_metric gauge
+other_metric 1
+`)
+	collr.ProfileSelectionMode = profileSelectionModeExact
+	collr.Profiles = []string{"demo"}
+	collr.loadProfileCatalog = func() (promprofiles.Catalog, error) {
+		return loadTestCatalog(t, map[string]string{
+			"demo.yaml": testProfileYAML("Demo", "demo_*", "", "demo_metric_total", "demo_chart", "Demo Metric"),
+		})
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+	err := collr.Check(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `selected profile "Demo" matches nothing during probe`)
+}
+
+func TestCollector_CheckAppliesProfileRelabelAndRemapsHelp(t *testing.T) {
+	collr := New()
+	collr.URL = newMetricsServer(t, `
+# HELP demo_metric Original Help
+# TYPE demo_metric gauge
+demo_metric 1
+`)
+	collr.ProfileSelectionMode = profileSelectionModeExact
+	collr.Profiles = []string{"demo"}
+	collr.loadProfileCatalog = func() (promprofiles.Catalog, error) {
+		return loadTestCatalog(t, map[string]string{
+			"demo.yaml": testProfileYAML("Demo", "demo_metric", `
+metrics_relabeling:
+  - selector: demo_metric
+    rules:
+      - action: replace
+        target_label: __name__
+        replacement: renamed_metric
+`, "renamed_metric", "demo_chart", "Demo Metric"),
+		})
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+
+	mfs, err := collr.scrapeMetricFamilies()
+	require.NoError(t, err)
+
+	assert.Nil(t, mfs.GetGauge("demo_metric"))
+	mf := mfs.GetGauge("renamed_metric")
+	require.NotNil(t, mf)
+	assert.Equal(t, "Original Help", mf.Help())
+}
+
+func TestCollector_CheckFailsOnSelectedProfileOverlap(t *testing.T) {
+	collr := New()
+	collr.URL = newMetricsServer(t, `# TYPE demo_metric gauge
+demo_metric 1
+`)
+	collr.ProfileSelectionMode = profileSelectionModeExact
+	collr.Profiles = []string{"demo_a", "demo_b"}
+	collr.loadProfileCatalog = func() (promprofiles.Catalog, error) {
+		return loadTestCatalog(t, map[string]string{
+			"demo-a.yaml": testProfileYAML("Demo_A", "demo_*", "", "demo_metric", "demo_a_chart", "Demo A"),
+			"demo-b.yaml": testProfileYAML("Demo_B", "demo_*", "", "demo_metric", "demo_b_chart", "Demo B"),
+		})
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+	err := collr.Check(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `matches multiple selected profiles`)
+}
+
 func testPromProfile(id string) promprofiles.Profile {
 	return promprofiles.Profile{
-		ID:    id,
-		Name:  "Demo",
+		Name:  id,
 		Match: "demo_*",
 		Template: charttpl.Group{
 			Family:  "prometheus_curated",
@@ -129,4 +205,45 @@ func testPromProfile(id string) promprofiles.Profile {
 			},
 		},
 	}
+}
+
+func newMetricsServer(t *testing.T, body string) string {
+	t.Helper()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL
+}
+
+func loadTestCatalog(t *testing.T, files map[string]string) (promprofiles.Catalog, error) {
+	t.Helper()
+
+	root := t.TempDir()
+	stock := filepath.Join(root, "stock")
+	require.NoError(t, os.MkdirAll(stock, 0o755))
+	for name, body := range files {
+		require.NoError(t, os.WriteFile(filepath.Join(stock, name), []byte(body), 0o644))
+	}
+
+	return promprofiles.LoadFromDirs([]promprofiles.DirSpec{{Path: stock, IsStock: true}})
+}
+
+func testProfileYAML(name, match, extra, metric, chartID, title string) string {
+	return `
+name: ` + name + `
+match: ` + match + `
+` + extra + `template:
+  family: prometheus_curated
+  metrics: [` + metric + `]
+  charts:
+    - id: ` + chartID + `
+      title: ` + title + `
+      context: prometheus.demo.metric
+      units: events
+      dimensions:
+        - selector: ` + metric + `
+          name: value
+`
 }

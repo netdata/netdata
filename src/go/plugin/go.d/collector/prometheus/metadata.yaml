@@ -109,12 +109,12 @@ modules:
                 - `combined`: keep explicit `profiles` first, then append auto-matched curated profiles that were not already selected.
 
             - name: profiles
-              description: Explicit curated Prometheus profile ids.
+              description: Explicit curated Prometheus profile names.
               default_value: ""
               required: false
               group: Curated Profiles
               detailed_description: |
-                This option lists explicit curated Prometheus profile ids.
+                This option lists explicit curated Prometheus profile names.
 
                 - Must be empty when `profile_selection_mode: auto`.
                 - Required when `profile_selection_mode: exact` or `combined`.

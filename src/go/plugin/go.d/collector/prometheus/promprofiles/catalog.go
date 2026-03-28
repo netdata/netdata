@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -21,8 +20,8 @@ import (
 const profilesDirName = "prometheus.profiles"
 
 type Catalog struct {
-	byID            map[string]Profile
-	stockProfileIDs map[string]struct{}
+	byName      map[string]Profile
+	orderedKeys []string
 }
 
 type catalogEntry struct {
@@ -42,8 +41,7 @@ func DefaultCatalog() (Catalog, error) {
 
 func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 	catalog := Catalog{
-		byID:            make(map[string]Profile),
-		stockProfileIDs: make(map[string]struct{}),
+		byName: make(map[string]Profile),
 	}
 	if len(specs) == 0 {
 		return catalog, nil
@@ -83,17 +81,15 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 				return err
 			}
 
-			id := normalizeKey(cfg.ID)
-			if id == "" {
-				return fmt.Errorf("profile %q: decoded empty id", path)
-			}
-			if spec.IsStock {
-				catalog.stockProfileIDs[id] = struct{}{}
+			key := normalizeKey(cfg.Name)
+			if key == "" {
+				return fmt.Errorf("profile %q: decoded empty name", path)
 			}
 
-			prev, exists := seen[id]
+			prev, exists := seen[key]
 			if !exists {
-				seen[id] = catalogEntry{Config: cfg, Path: path, IsStock: spec.IsStock}
+				seen[key] = catalogEntry{Config: cfg, Path: path, IsStock: spec.IsStock}
+				catalog.orderedKeys = append(catalog.orderedKeys, key)
 				return nil
 			}
 
@@ -103,9 +99,9 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 				if spec.IsStock {
 					scope = "stock"
 				}
-				return fmt.Errorf("duplicate %s profile id %q in %q and %q", scope, id, prev.Path, path)
+				return fmt.Errorf("duplicate %s profile name %q in %q and %q", scope, cfg.Name, prev.Path, path)
 			case prev.IsStock && !spec.IsStock:
-				seen[id] = catalogEntry{Config: cfg, Path: path, IsStock: false}
+				seen[key] = catalogEntry{Config: cfg, Path: path, IsStock: false}
 			case !prev.IsStock && spec.IsStock:
 				// User override wins.
 			}
@@ -117,39 +113,38 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 		}
 	}
 
-	for id, entry := range seen {
-		catalog.byID[id] = entry.Config
+	for _, key := range catalog.orderedKeys {
+		catalog.byName[key] = seen[key].Config
 	}
 
 	return catalog, nil
 }
 
-func (c Catalog) Empty() bool { return len(c.byID) == 0 }
+func (c Catalog) Empty() bool { return len(c.byName) == 0 }
 
-func (c Catalog) DefaultProfileIDs() []string {
-	if len(c.stockProfileIDs) == 0 {
+func (c Catalog) OrderedProfiles() []Profile {
+	if len(c.orderedKeys) == 0 {
 		return nil
 	}
 
-	ids := make([]string, 0, len(c.stockProfileIDs))
-	for id := range c.stockProfileIDs {
-		ids = append(ids, id)
+	profiles := make([]Profile, 0, len(c.orderedKeys))
+	for _, key := range c.orderedKeys {
+		profiles = append(profiles, c.byName[key])
 	}
-	sort.Strings(ids)
-	return ids
+	return profiles
 }
 
-func (c Catalog) Resolve(profileIDs []string) ([]Profile, error) {
-	if len(profileIDs) == 0 {
+func (c Catalog) Resolve(profileNames []string) ([]Profile, error) {
+	if len(profileNames) == 0 {
 		return nil, fmt.Errorf("no Prometheus profiles selected")
 	}
 
-	profiles := make([]Profile, 0, len(profileIDs))
-	for _, id := range profileIDs {
-		normalizedID := normalizeKey(id)
-		prof, ok := c.byID[normalizedID]
+	profiles := make([]Profile, 0, len(profileNames))
+	for _, name := range profileNames {
+		normalizedName := normalizeKey(name)
+		prof, ok := c.byName[normalizedName]
 		if !ok {
-			return nil, fmt.Errorf("unknown profile %q", id)
+			return nil, fmt.Errorf("unknown profile %q", name)
 		}
 		profiles = append(profiles, prof)
 	}
@@ -169,11 +164,11 @@ func loadProfileFile(path string) (Profile, error) {
 		return Profile{}, fmt.Errorf("unmarshal profile %q: %w", path, err)
 	}
 
-	profileID := strings.TrimSpace(cfg.ID)
-	if profileID == "" {
-		return Profile{}, fmt.Errorf("validate profile %q: missing required field 'id'", path)
+	profileName := strings.TrimSpace(cfg.Name)
+	if profileName == "" {
+		return Profile{}, fmt.Errorf("validate profile %q: missing required field 'name'", path)
 	}
-	if err := cfg.Validate(fmt.Sprintf("profile %q", profileID)); err != nil {
+	if err := cfg.Validate(fmt.Sprintf("profile %q", profileName)); err != nil {
 		return Profile{}, fmt.Errorf("validate profile %q: %w", path, err)
 	}
 
@@ -233,6 +228,6 @@ func isDirExists(dir string) bool {
 	return fi.Mode().IsDir()
 }
 
-func normalizeKey(v string) string {
-	return strings.ToLower(strings.TrimSpace(v))
-}
+func NormalizeProfileKey(v string) string { return strings.ToLower(strings.TrimSpace(v)) }
+
+func normalizeKey(v string) string { return NormalizeProfileKey(v) }

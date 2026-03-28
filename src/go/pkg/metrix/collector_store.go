@@ -110,9 +110,10 @@ type committedSeries struct {
 }
 
 type readSnapshot struct {
-	collectMeta CollectMeta
-	series      map[string]*committedSeries   // key => series
-	byName      map[string][]*committedSeries // metric name => stable ordered series list
+	collectMeta       CollectMeta
+	series            map[string]*committedSeries   // key => series
+	byName            map[string][]*committedSeries // metric name => stable ordered series list
+	flattenSuppressed map[string]struct{}
 	// runtimeBase links runtime snapshots in overlay mode (nil for materialized snapshots).
 	runtimeBase *readSnapshot
 	// runtimeDepth tracks overlay chain depth for runtime compaction heuristics.

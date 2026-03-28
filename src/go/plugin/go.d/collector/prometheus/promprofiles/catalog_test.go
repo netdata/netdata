@@ -30,10 +30,12 @@ func TestLoadFromDirs_UserOverridesStock(t *testing.T) {
 	profiles, err := catalog.Resolve([]string{"demo"})
 	require.NoError(t, err)
 	require.Len(t, profiles, 1)
-	assert.Equal(t, "User", profiles[0].Name)
+	assert.Equal(t, "demo", profiles[0].Name)
+	require.Len(t, profiles[0].Template.Charts, 1)
+	assert.Equal(t, "User", profiles[0].Template.Charts[0].Title)
 }
 
-func TestLoadFromDirs_DuplicateStockIDFails(t *testing.T) {
+func TestLoadFromDirs_DuplicateStockNameFails(t *testing.T) {
 	root := t.TempDir()
 	stock := filepath.Join(root, "stock")
 	require.NoError(t, os.MkdirAll(stock, 0o755))
@@ -43,7 +45,7 @@ func TestLoadFromDirs_DuplicateStockIDFails(t *testing.T) {
 
 	_, err := LoadFromDirs([]DirSpec{{Path: stock, IsStock: true}})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "duplicate stock profile id")
+	assert.Contains(t, err.Error(), "duplicate stock profile name")
 }
 
 func TestLoadFromDirs_StrictDecodeFailsOnUnknownField(t *testing.T) {
@@ -52,7 +54,7 @@ func TestLoadFromDirs_StrictDecodeFailsOnUnknownField(t *testing.T) {
 	require.NoError(t, os.MkdirAll(stock, 0o755))
 
 	writeProfileFile(t, filepath.Join(stock, "demo.yaml"), `
-id: demo
+name: demo
 match: demo_*
 unknown_field: true
 template:
@@ -85,22 +87,48 @@ func TestLoadFromDirs_IgnoresUnderscoredFiles(t *testing.T) {
 	assert.True(t, catalog.Empty())
 }
 
+func TestLoadFromDirs_OrderedProfilesPreserveMergedLoadOrder(t *testing.T) {
+	root := t.TempDir()
+	stock := filepath.Join(root, "stock")
+	user := filepath.Join(root, "user")
+	require.NoError(t, os.MkdirAll(stock, 0o755))
+	require.NoError(t, os.MkdirAll(user, 0o755))
+
+	writeProfileFile(t, filepath.Join(stock, "01-alpha.yaml"), validProfileYAML("Alpha", "Stock Alpha"))
+	writeProfileFile(t, filepath.Join(stock, "02-beta.yaml"), validProfileYAML("Beta", "Stock Beta"))
+	writeProfileFile(t, filepath.Join(user, "01-alpha.yaml"), validProfileYAML("Alpha", "User Alpha"))
+	writeProfileFile(t, filepath.Join(user, "02-gamma.yaml"), validProfileYAML("Gamma", "User Gamma"))
+
+	catalog, err := LoadFromDirs([]DirSpec{
+		{Path: stock, IsStock: true},
+		{Path: user, IsStock: false},
+	})
+	require.NoError(t, err)
+
+	profiles := catalog.OrderedProfiles()
+	require.Len(t, profiles, 3)
+	assert.Equal(t, "Alpha", profiles[0].Name)
+	require.Len(t, profiles[0].Template.Charts, 1)
+	assert.Equal(t, "User Alpha", profiles[0].Template.Charts[0].Title)
+	assert.Equal(t, "Beta", profiles[1].Name)
+	assert.Equal(t, "Gamma", profiles[2].Name)
+}
+
 func writeProfileFile(t *testing.T, path, body string) {
 	t.Helper()
 	require.NoError(t, os.WriteFile(path, []byte(body), 0o644))
 }
 
-func validProfileYAML(id, name string) string {
+func validProfileYAML(name string, title string) string {
 	return `
-id: ` + id + `
 name: ` + name + `
 match: demo_*
 template:
   family: prometheus_curated
   metrics: [demo_metric_total]
   charts:
-    - id: ` + id + `_chart
-      title: Demo Metric
+    - id: ` + name + `_chart
+      title: ` + title + `
       context: prometheus.demo.metric
       units: events
       dimensions:
