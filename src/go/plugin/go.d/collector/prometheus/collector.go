@@ -49,8 +49,6 @@ func New() *Collector {
 			MaxTSPerMetric: 200,
 		},
 		store:              store,
-		charts:             &collectorapi.Charts{},
-		cache:              newCache(),
 		loadProfileCatalog: promprofiles.DefaultCatalog,
 	}
 }
@@ -79,14 +77,12 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts *collectorapi.Charts
-	store  metrix.CollectorStore
+	store metrix.CollectorStore
 
 	prom prometheus.Prometheus
 	pipe *pipeline
 	mw   *metricFamilyWriter
 
-	cache          *cache
 	runtime        *collectorRuntime
 	profileCatalog promprofiles.Catalog
 	fallbackType   struct {
@@ -135,7 +131,7 @@ func (c *Collector) Init(context.Context) error {
 }
 
 func (c *Collector) Check(context.Context) error {
-	count, err := c.checkV2()
+	count, err := c.check()
 	if err != nil {
 		return err
 	}
@@ -145,11 +141,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *collectorapi.Charts {
-	return c.charts
-}
-
-func (c *Collector) Collect(ctx context.Context) error { return c.collectV2(ctx) }
+func (c *Collector) Collect(ctx context.Context) error { return c.collect(ctx) }
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
