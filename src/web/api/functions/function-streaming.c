@@ -1022,10 +1022,10 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                                 // non-observer parent: derive outbound from streaming paths
                                 // find this parent's outbound destination (next hop in its own path)
                                 const char *dst_hostname = NULL;
-                                char dst_actor_id[256] = "";
 
                                 buffer_json_member_add_array(wb, "outbound");
                                 {
+                                    char dst_actor_id[256] = "";
                                     char dst_hostname_fallback[UUID_STR_LEN] = "";
                                     ND_UUID host_path[128];
                                     uint16_t host_pn = streaming_topology_get_path_ids(host, 0, host_path, 128);

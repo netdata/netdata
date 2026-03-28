@@ -1,4 +1,4 @@
-<!-- markdownlint-disable-file MD013 MD032 MD043 -->
+<!-- markdownlint-disable-file MD013 MD032 MD034 MD043 -->
 
 # SNMP topology test data attribution
 
