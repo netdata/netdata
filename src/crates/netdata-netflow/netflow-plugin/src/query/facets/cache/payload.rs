@@ -49,7 +49,6 @@ pub(crate) fn build_facet_vocabulary_payload(
 
     json!({
         "value_limit": FACET_VALUE_LIMIT,
-        "excluded_fields": RAW_ONLY_FIELDS,
         "overflowed_fields": 0,
         "overflowed_records": 0,
         "fields": fields,

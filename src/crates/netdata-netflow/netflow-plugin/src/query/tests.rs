@@ -711,6 +711,10 @@ fn facet_vocabularies_ignore_active_filters_and_do_not_return_metrics() {
             .iter()
             .all(|entry| entry.get("metrics").is_none())
     );
+    assert!(
+        facets.get("excluded_fields").is_none(),
+        "facet payload should not advertise exposed raw-only fields as excluded"
+    );
 }
 
 #[test]

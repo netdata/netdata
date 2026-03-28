@@ -139,7 +139,6 @@ pub(crate) fn build_facets_from_accumulator(
     json!({
         "value_limit": FACET_VALUE_LIMIT,
         "accumulator_value_limit": facet_max_values_per_field,
-        "excluded_fields": RAW_ONLY_FIELDS,
         "overflowed_fields": overflowed_fields,
         "overflowed_records": overflowed_records,
         "fields": fields,
