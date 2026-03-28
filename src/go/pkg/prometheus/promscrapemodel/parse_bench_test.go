@@ -11,25 +11,10 @@ import (
 
 // Baseline on 2026-03-26 before parser/assembler optimization work
 // (Apple M4 Pro, go test -run '^$' -bench 'BenchmarkParser_' -benchmem):
-// BenchmarkParser_Parse-14           10010    117015 ns/op   94520 B/op   1536 allocs/op
 // BenchmarkParser_ParseStream-14     10000    117591 ns/op   93053 B/op   1506 allocs/op
 //
 // Current result after the first safe optimization pass on 2026-03-26:
-// BenchmarkParser_Parse-14           11371    110036 ns/op   94518 B/op   1536 allocs/op
 // BenchmarkParser_ParseStream-14      9807    156266 ns/op   93054 B/op   1506 allocs/op
-
-func BenchmarkParser_Parse(b *testing.B) {
-	data := mustReadBenchData(b)
-	var p Parser
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		_, err := p.Parse(data)
-		require.NoError(b, err)
-	}
-}
 
 func BenchmarkParser_ParseStream(b *testing.B) {
 	data := mustReadBenchData(b)

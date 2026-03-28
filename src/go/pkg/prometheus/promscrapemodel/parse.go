@@ -24,11 +24,9 @@ const (
 )
 
 type Parser struct {
-	samples Samples
-	sr      selector.Selector
+	sr selector.Selector
 
 	familyTypes   map[string]model.MetricType
-	pending       map[string][]pendingRef
 	streamPending []streamPendingSample
 	currSeries    labels.Labels
 }
@@ -47,62 +45,8 @@ const (
 	pendingCount
 )
 
-type pendingRef struct {
-	index int
-	role  pendingRole
-}
-
 func NewParser(sr selector.Selector) Parser {
 	return Parser{sr: sr}
-}
-
-func (p *Parser) Parse(text []byte) (Samples, error) {
-	p.reset()
-
-	parser := textparse.NewPromParser(text, labels.NewSymbolTable())
-	for {
-		entry, err := parser.Next()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			if entry == textparse.EntryInvalid && strings.HasPrefix(err.Error(), "invalid metric type") {
-				continue
-			}
-			return nil, fmt.Errorf("failed to parse prometheus metrics: %v", err)
-		}
-
-		switch entry {
-		case textparse.EntryType:
-			name, typ := parser.Type()
-			p.familyTypes[string(name)] = typ
-			p.resolvePending(string(name), typ)
-		case textparse.EntrySeries:
-			p.currSeries = p.currSeries[:0]
-			parser.Metric(&p.currSeries)
-
-			if p.sr != nil && !p.sr.Matches(p.currSeries) {
-				continue
-			}
-
-			_, _, value := parser.Series()
-
-			sample, baseName, role, ok := p.makeSample(value)
-			if !ok {
-				continue
-			}
-
-			p.samples.Add(sample)
-			if role != pendingNone {
-				p.pending[baseName] = append(p.pending[baseName], pendingRef{
-					index: len(p.samples) - 1,
-					role:  role,
-				})
-			}
-		}
-	}
-
-	return p.samples, nil
 }
 
 func (p *Parser) ParseStream(text []byte, onSample func(Sample) error) error {
@@ -227,7 +171,6 @@ func (p *Parser) makeSample(value float64) (Sample, string, pendingRole, bool) {
 		sample.Kind = SampleKindSummaryQuantile
 		sample.FamilyType = model.MetricTypeSummary
 		p.familyTypes[name] = model.MetricTypeSummary
-		p.resolvePending(name, model.MetricTypeSummary)
 		return sample, "", pendingNone, true
 	}
 
@@ -236,7 +179,6 @@ func (p *Parser) makeSample(value float64) (Sample, string, pendingRole, bool) {
 		sample.Kind = SampleKindHistogramBucket
 		sample.FamilyType = model.MetricTypeHistogram
 		p.familyTypes[baseName] = model.MetricTypeHistogram
-		p.resolvePending(baseName, model.MetricTypeHistogram)
 		return sample, "", pendingNone, true
 	}
 
@@ -287,43 +229,7 @@ func (p *Parser) makeSample(value float64) (Sample, string, pendingRole, bool) {
 	return sample, "", pendingNone, true
 }
 
-func (p *Parser) resolvePending(baseName string, typ model.MetricType) {
-	if typ != model.MetricTypeSummary && typ != model.MetricTypeHistogram {
-		return
-	}
-
-	refs, ok := p.pending[baseName]
-	if !ok {
-		return
-	}
-
-	for _, ref := range refs {
-		if ref.index < 0 || ref.index >= len(p.samples) {
-			continue
-		}
-		sample := &p.samples[ref.index]
-		sample.FamilyType = typ
-		switch typ {
-		case model.MetricTypeSummary:
-			if ref.role == pendingSum {
-				sample.Kind = SampleKindSummarySum
-			} else if ref.role == pendingCount {
-				sample.Kind = SampleKindSummaryCount
-			}
-		case model.MetricTypeHistogram:
-			if ref.role == pendingSum {
-				sample.Kind = SampleKindHistogramSum
-			} else if ref.role == pendingCount {
-				sample.Kind = SampleKindHistogramCount
-			}
-		}
-	}
-
-	delete(p.pending, baseName)
-}
-
 func (p *Parser) reset() {
-	p.samples.Reset()
 	p.currSeries = p.currSeries[:0]
 
 	if p.familyTypes == nil {
@@ -331,13 +237,6 @@ func (p *Parser) reset() {
 	}
 	for k := range p.familyTypes {
 		delete(p.familyTypes, k)
-	}
-
-	if p.pending == nil {
-		p.pending = make(map[string][]pendingRef)
-	}
-	for k := range p.pending {
-		delete(p.pending, k)
 	}
 
 	p.streamPending = p.streamPending[:0]

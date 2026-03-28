@@ -13,7 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 )
 
-func TestParser_Parse(t *testing.T) {
+func TestParser_ParseStreamSamples(t *testing.T) {
 	tests := map[string]struct {
 		selector string
 		input    []byte
@@ -211,7 +211,11 @@ test_other{label1="value2"} 3
 				p = NewParser(sr)
 			}
 
-			samples, err := p.Parse(test.input)
+			var samples Samples
+			err := p.ParseStream(test.input, func(sample Sample) error {
+				samples.Add(sample)
+				return nil
+			})
 			require.NoError(t, err)
 			assert.Equal(t, test.want, samples)
 		})

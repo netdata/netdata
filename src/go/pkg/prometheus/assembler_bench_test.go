@@ -17,9 +17,8 @@ import (
 // Current result after the 2026-03-26 fast-path and scratch-label work:
 // BenchmarkAssembler_ApplySample-14  19768     61165 ns/op     498 B/op     62 allocs/op
 //
-// Legacy vs new assembled MetricFamilies comparison on 2026-03-26
+// Parse + assemble comparison on 2026-03-26
 // (Apple M4 Pro, go test -run '^$' -bench 'Benchmark(MetricFamilies_|Assembler_)' -benchmem):
-// BenchmarkMetricFamilies_LegacyParse-14          9070   118245 ns/op    66914 B/op   1214 allocs/op
 // BenchmarkMetricFamilies_NewParseAndAssemble-14  8748   141640 ns/op    99051 B/op   1686 allocs/op
 // BenchmarkMetricFamilies_FastParseAndAssemble-14 8972   131566 ns/op    67444 B/op   1276 allocs/op
 
@@ -36,18 +35,6 @@ func BenchmarkAssembler_ApplySample(b *testing.B) {
 			require.NoError(b, a.ApplySample(sample))
 		}
 		_ = a.MetricFamilies()
-	}
-}
-
-func BenchmarkMetricFamilies_LegacyParse(b *testing.B) {
-	var p promTextParser
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		_, err := p.parseToMetricFamilies(testData)
-		require.NoError(b, err)
 	}
 }
 
@@ -97,7 +84,11 @@ func mustParseBenchSamples(b *testing.B) promscrapemodel.Samples {
 	b.Helper()
 
 	p := promscrapemodel.NewParser(nil)
-	samples, err := p.Parse(testData)
+	var samples promscrapemodel.Samples
+	err := p.ParseStream(testData, func(sample promscrapemodel.Sample) error {
+		samples.Add(sample)
+		return nil
+	})
 	require.NoError(b, err)
 	return samples
 }
