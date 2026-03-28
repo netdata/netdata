@@ -54,9 +54,9 @@ pub(super) fn build_client(use_proxy: bool, tls: &RemoteNetworkSourceTlsConfig) 
     };
 
     if tls.enable {
-        let skip_verify = if tls.skip_verify { true } else { !tls.verify };
+        let skip_verify = !tls.verify && tls.skip_verify;
         if skip_verify {
-            // Matches Akvorado's SkipVerify behavior when explicitly enabled.
+            // Only disable peer verification when the config explicitly opts out.
             tracing::warn!(
                 "network-sources TLS certificate verification is disabled for a remote source; this is insecure"
             );

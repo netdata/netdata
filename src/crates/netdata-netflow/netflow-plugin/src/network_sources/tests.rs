@@ -169,3 +169,14 @@ fn build_client_fails_on_missing_ca_file_when_tls_enabled() {
     let err = build_client(true, &tls).expect_err("expected missing CA file error");
     assert!(err.to_string().contains("network source CA file"));
 }
+
+#[test]
+fn build_client_accepts_explicit_insecure_tls_opt_out() {
+    let tls = RemoteNetworkSourceTlsConfig {
+        enable: true,
+        verify: false,
+        skip_verify: true,
+        ..Default::default()
+    };
+    build_client(true, &tls).expect("explicit insecure client should initialize");
+}

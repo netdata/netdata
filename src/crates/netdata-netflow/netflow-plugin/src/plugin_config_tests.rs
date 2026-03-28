@@ -58,6 +58,74 @@ fn validate_accepts_enabled_bioris_with_instance() {
 }
 
 #[test]
+fn validate_rejects_network_source_verify_false_without_explicit_skip_verify() {
+    let mut cfg = PluginConfig::default();
+    cfg.enrichment.network_sources.insert(
+        "source".to_string(),
+        RemoteNetworkSourceConfig {
+            url: "https://example.com/source.json".to_string(),
+            tls: RemoteNetworkSourceTlsConfig {
+                enable: true,
+                verify: false,
+                skip_verify: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    );
+
+    let err = cfg.validate().expect_err("expected validation error");
+    assert!(
+        err.to_string()
+            .contains("tls.skip_verify must be true when tls.verify is false")
+    );
+}
+
+#[test]
+fn validate_rejects_network_source_skip_verify_without_verify_false() {
+    let mut cfg = PluginConfig::default();
+    cfg.enrichment.network_sources.insert(
+        "source".to_string(),
+        RemoteNetworkSourceConfig {
+            url: "https://example.com/source.json".to_string(),
+            tls: RemoteNetworkSourceTlsConfig {
+                enable: true,
+                verify: true,
+                skip_verify: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    );
+
+    let err = cfg.validate().expect_err("expected validation error");
+    assert!(
+        err.to_string()
+            .contains("tls.verify must be false when tls.skip_verify is true")
+    );
+}
+
+#[test]
+fn validate_accepts_network_source_explicit_insecure_tls_opt_out() {
+    let mut cfg = PluginConfig::default();
+    cfg.enrichment.network_sources.insert(
+        "source".to_string(),
+        RemoteNetworkSourceConfig {
+            url: "https://example.com/source.json".to_string(),
+            tls: RemoteNetworkSourceTlsConfig {
+                enable: true,
+                verify: false,
+                skip_verify: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    );
+
+    cfg.validate().expect("configuration should be valid");
+}
+
+#[test]
 fn validate_rejects_zero_query_max_groups() {
     let mut cfg = PluginConfig::default();
     cfg.journal.query_max_groups = 0;

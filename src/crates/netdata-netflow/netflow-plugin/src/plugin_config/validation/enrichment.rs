@@ -172,5 +172,15 @@ fn validate_network_source_tls(
             "enrichment.network_sources.{source_name}.tls.cert_file must be set when tls.key_file is set"
         );
     }
+    if !tls.verify && !tls.skip_verify {
+        anyhow::bail!(
+            "enrichment.network_sources.{source_name}.tls.skip_verify must be true when tls.verify is false to explicitly disable certificate verification"
+        );
+    }
+    if tls.skip_verify && tls.verify {
+        anyhow::bail!(
+            "enrichment.network_sources.{source_name}.tls.verify must be false when tls.skip_verify is true"
+        );
+    }
     Ok(())
 }
