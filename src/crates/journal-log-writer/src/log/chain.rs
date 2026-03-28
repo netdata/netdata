@@ -220,14 +220,18 @@ impl OwnedChain {
         let file_size = self.file_sizes.get(&file).copied().unwrap_or(0);
 
         // Remove from filesystem
-        if let Err(e) = std::fs::remove_file(file.path()) {
-            // Log error but continue cleanup - file might already be deleted
-            error!("failed to remove journal file {:?}: {}", file.path(), e);
-        }
+        let removed = match std::fs::remove_file(file.path()) {
+            Ok(()) => true,
+            Err(e) => {
+                // Log error but continue cleanup - file might already be deleted
+                error!("failed to remove journal file {:?}: {}", file.path(), e);
+                false
+            }
+        };
 
         self.file_sizes.remove(&file);
         self.total_size = self.total_size.saturating_sub(file_size);
-        Ok(Some(deleted_path))
+        Ok(removed.then_some(deleted_path))
     }
 
     /// Remove files older than the specified cutoff time
@@ -243,7 +247,7 @@ impl OwnedChain {
 
         for file in self.inner.drain(cutoff_time) {
             info!("deleting {}", file.path());
-            deleted_paths.push(std::path::PathBuf::from(file.path()));
+            let deleted_path = std::path::PathBuf::from(file.path());
             let file_size = self.file_sizes.get(&file).copied().unwrap_or(0);
 
             if let Err(e) = std::fs::remove_file(file.path()) {
@@ -251,6 +255,7 @@ impl OwnedChain {
                 continue;
             }
 
+            deleted_paths.push(deleted_path);
             self.file_sizes.remove(&file);
             self.total_size = self.total_size.saturating_sub(file_size);
         }

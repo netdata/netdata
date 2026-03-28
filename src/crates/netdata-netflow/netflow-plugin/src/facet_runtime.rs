@@ -23,7 +23,7 @@ use tokio::sync::Notify;
 use sidecar::{delete_sidecar_files, search_sidecar, write_sidecar_files};
 use store::{FacetStore, PersistedFacetStore};
 
-const FACET_STATE_VERSION: u32 = 2;
+const FACET_STATE_VERSION: u32 = 3;
 const FACET_STATE_FILE_NAME: &str = "facet-state.bin";
 const FACET_AUTOCOMPLETE_LIMIT: usize = 100;
 
@@ -45,23 +45,26 @@ pub(crate) struct FacetPublishedSnapshot {
 struct PersistedFacetState {
     version: u32,
     indexed_archived_paths: BTreeSet<String>,
+    archived_fields: BTreeMap<String, PersistedFacetStore>,
     fields: BTreeMap<String, PersistedFacetStore>,
 }
 
 #[derive(Debug, Clone)]
 struct FacetState {
     indexed_archived_paths: BTreeSet<String>,
+    archived_fields: BTreeMap<String, FacetStore>,
     fields: BTreeMap<String, FacetStore>,
-    active_autocomplete: BTreeMap<String, FacetFileContribution>,
+    active_contributions: BTreeMap<String, FacetFileContribution>,
     dirty: bool,
+    rebuild_archived: bool,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct FacetReconcilePlan {
     pub(crate) current_archived_paths: BTreeSet<String>,
-    pub(crate) current_active_paths: BTreeSet<String>,
     pub(crate) archived_files_to_scan: Vec<FileInfo>,
     pub(crate) active_files_to_scan: Vec<FileInfo>,
+    pub(crate) rebuild_archived: bool,
 }
 
 pub(crate) struct FacetRuntime {
@@ -108,7 +111,7 @@ impl FacetRuntime {
             .filter(|file_info| file_info.file.is_archived())
             .map(|file_info| file_info.file.path().to_string())
             .collect::<BTreeSet<_>>();
-        let current_active_paths = registry_files
+        let _current_active_paths = registry_files
             .iter()
             .filter(|file_info| file_info.file.is_active())
             .map(|file_info| file_info.file.path().to_string())
@@ -117,7 +120,6 @@ impl FacetRuntime {
         let Some(state) = self.state.lock().ok() else {
             return FacetReconcilePlan {
                 current_archived_paths,
-                current_active_paths,
                 archived_files_to_scan: registry_files
                     .iter()
                     .filter(|file_info| file_info.file.is_archived())
@@ -128,14 +130,20 @@ impl FacetRuntime {
                     .filter(|file_info| file_info.file.is_active())
                     .cloned()
                     .collect(),
+                rebuild_archived: true,
             };
         };
 
+        let rebuild_archived = state.rebuild_archived
+            || !state
+                .indexed_archived_paths
+                .is_subset(&current_archived_paths);
         let archived_files_to_scan = registry_files
             .iter()
             .filter(|file_info| {
                 file_info.file.is_archived()
-                    && !state.indexed_archived_paths.contains(file_info.file.path())
+                    && (rebuild_archived
+                        || !state.indexed_archived_paths.contains(file_info.file.path()))
             })
             .cloned()
             .collect::<Vec<_>>();
@@ -147,9 +155,9 @@ impl FacetRuntime {
 
         FacetReconcilePlan {
             current_archived_paths,
-            current_active_paths,
             archived_files_to_scan,
             active_files_to_scan,
+            rebuild_archived,
         }
     }
 
@@ -173,37 +181,30 @@ impl FacetRuntime {
         for path in removed_archived {
             state.indexed_archived_paths.remove(&path);
             delete_sidecar_files(Path::new(&path));
+            state.rebuild_archived = true;
             state.dirty = true;
         }
-
-        let removed_active = state
-            .active_autocomplete
-            .keys()
-            .filter(|path| !plan.current_active_paths.contains(*path))
-            .cloned()
-            .collect::<Vec<_>>();
-        for path in removed_active {
-            state.active_autocomplete.remove(&path);
+        if plan.rebuild_archived {
+            state.archived_fields = empty_field_stores();
+            state.indexed_archived_paths.clear();
             state.dirty = true;
         }
 
         for (path, contribution) in archived_scans {
-            merge_global_contribution(&mut state.fields, &contribution);
+            merge_global_contribution(&mut state.archived_fields, &contribution);
             write_sidecar_files(Path::new(&path), &contribution)?;
             if state.indexed_archived_paths.insert(path) {
                 state.dirty = true;
             }
         }
 
-        state.active_autocomplete.clear();
+        state.active_contributions.clear();
         for (path, contribution) in active_scans {
-            merge_global_contribution(&mut state.fields, &contribution);
-            let filtered = filter_sidecar_contribution(&contribution);
-            if !filtered.is_empty() {
-                state.active_autocomplete.insert(path, filtered);
-            }
+            state.active_contributions.insert(path, contribution);
             state.dirty = true;
         }
+        rebuild_combined_fields(&mut state);
+        state.rebuild_archived = false;
 
         publish_locked(&self.snapshot, &state);
         persist_state_locked(&self.state_path, &mut state)?;
@@ -226,15 +227,12 @@ impl FacetRuntime {
             .lock()
             .map_err(|_| anyhow::anyhow!("facet runtime lock poisoned"))?;
         let changed = merge_global_contribution(&mut state.fields, &contribution);
-        let filtered = filter_sidecar_contribution(&contribution);
-        if !filtered.is_empty() {
-            let entry = state
-                .active_autocomplete
-                .entry(path_str.to_string())
-                .or_default();
-            merge_file_contribution(entry, filtered);
-            state.dirty = true;
-        }
+        let entry = state
+            .active_contributions
+            .entry(path_str.to_string())
+            .or_default();
+        merge_file_contribution(entry, contribution);
+        state.dirty = true;
         if changed {
             state.dirty = true;
             publish_locked(&self.snapshot, &state);
@@ -252,10 +250,11 @@ impl FacetRuntime {
             .map_err(|_| anyhow::anyhow!("facet runtime lock poisoned"))?;
 
         let contribution = state
-            .active_autocomplete
+            .active_contributions
             .remove(&archived_path_str)
-            .or_else(|| state.active_autocomplete.remove(&active_path_str));
+            .or_else(|| state.active_contributions.remove(&active_path_str));
         if let Some(contribution) = contribution {
+            merge_global_contribution(&mut state.archived_fields, &contribution);
             write_sidecar_files(archived_path, &contribution)?;
             state.indexed_archived_paths.insert(archived_path_str);
             state.dirty = true;
@@ -276,16 +275,21 @@ impl FacetRuntime {
             let Some(path_str) = path.to_str() else {
                 continue;
             };
-            if state.active_autocomplete.remove(path_str).is_some() {
+            if state.active_contributions.remove(path_str).is_some() {
                 changed = true;
             }
             if state.indexed_archived_paths.remove(path_str) {
+                state.rebuild_archived = true;
                 changed = true;
             }
             delete_sidecar_files(path);
         }
 
         if changed {
+            if !state.rebuild_archived {
+                rebuild_combined_fields(&mut state);
+                publish_locked(&self.snapshot, &state);
+            }
             state.dirty = true;
             persist_state_locked(&self.state_path, &mut state)?;
         }
@@ -309,7 +313,7 @@ impl FacetRuntime {
             };
             let promoted = spec.supports_autocomplete && store.len() > FACET_VALUE_LIMIT;
             let active_matches = collect_active_prefix_matches(
-                &state.active_autocomplete,
+                &state.active_contributions,
                 normalized.as_str(),
                 term,
                 FACET_AUTOCOMPLETE_LIMIT,
@@ -369,13 +373,25 @@ impl FacetState {
     fn new() -> Self {
         Self {
             indexed_archived_paths: BTreeSet::new(),
+            archived_fields: empty_field_stores(),
             fields: empty_field_stores(),
-            active_autocomplete: BTreeMap::new(),
+            active_contributions: BTreeMap::new(),
             dirty: false,
+            rebuild_archived: false,
         }
     }
 
     fn from_persisted(persisted: PersistedFacetState) -> Self {
+        let mut archived_fields = empty_field_stores();
+        for spec in FACET_FIELD_SPECS.iter() {
+            if let Some(saved) = persisted.archived_fields.get(spec.name) {
+                archived_fields.insert(
+                    spec.name.to_string(),
+                    FacetStore::from_persisted(spec.kind, saved.clone()),
+                );
+            }
+        }
+
         let mut fields = empty_field_stores();
         for spec in FACET_FIELD_SPECS.iter() {
             if let Some(saved) = persisted.fields.get(spec.name) {
@@ -388,9 +404,11 @@ impl FacetState {
 
         Self {
             indexed_archived_paths: persisted.indexed_archived_paths,
+            archived_fields,
             fields,
-            active_autocomplete: BTreeMap::new(),
+            active_contributions: BTreeMap::new(),
             dirty: false,
+            rebuild_archived: false,
         }
     }
 }
@@ -574,15 +592,11 @@ fn merge_file_contribution(target: &mut FacetFileContribution, source: FacetFile
     }
 }
 
-fn filter_sidecar_contribution(contribution: &FacetFileContribution) -> FacetFileContribution {
-    contribution
-        .iter()
-        .filter_map(|(field, values)| {
-            facet_field_spec(field)
-                .filter(|spec| spec.uses_sidecar)
-                .map(|_| (field.clone(), values.clone()))
-        })
-        .collect()
+fn rebuild_combined_fields(state: &mut FacetState) {
+    state.fields = state.archived_fields.clone();
+    for contribution in state.active_contributions.values() {
+        merge_global_contribution(&mut state.fields, contribution);
+    }
 }
 
 fn snapshot_from_state(state: &FacetState) -> FacetPublishedSnapshot {
@@ -636,6 +650,12 @@ fn persist_state_locked(state_path: &Path, state: &mut FacetState) -> Result<()>
     let persisted = PersistedFacetState {
         version: FACET_STATE_VERSION,
         indexed_archived_paths: state.indexed_archived_paths.clone(),
+        archived_fields: state
+            .archived_fields
+            .iter()
+            .filter(|(_, store)| store.len() > 0)
+            .map(|(field, store)| (field.clone(), store.persist()))
+            .collect(),
         fields: state
             .fields
             .iter()
@@ -740,9 +760,10 @@ mod tests {
     }
 
     #[test]
-    fn runtime_keeps_compact_global_values_and_drops_deleted_file_metadata() {
+    fn runtime_rebuilds_global_values_after_archived_deletion() {
         let tmp = tempfile::tempdir().expect("create temp dir");
         let runtime = FacetRuntime::new(tmp.path());
+        let retained = facet_contribution_from_flow_fields(&fields_with_protocol("17"));
 
         runtime
             .observe_active_contribution(
@@ -751,10 +772,7 @@ mod tests {
             )
             .expect("observe first contribution");
         runtime
-            .observe_active_contribution(
-                Path::new("/tmp/flows-b.journal"),
-                facet_contribution_from_flow_fields(&fields_with_protocol("17")),
-            )
+            .observe_active_contribution(Path::new("/tmp/flows-b.journal"), retained.clone())
             .expect("observe second contribution");
         runtime
             .observe_rotation(
@@ -765,10 +783,22 @@ mod tests {
         runtime
             .observe_deleted_paths(&[PathBuf::from("/tmp/flows-a.journal")])
             .expect("delete first file");
+        runtime
+            .apply_reconcile_plan(
+                FacetReconcilePlan {
+                    current_archived_paths: BTreeSet::new(),
+                    archived_files_to_scan: Vec::new(),
+                    active_files_to_scan: Vec::new(),
+                    rebuild_archived: true,
+                },
+                BTreeMap::new(),
+                BTreeMap::from([(String::from("/tmp/flows-b.journal"), retained)]),
+            )
+            .expect("rebuild after deletion");
 
         let snapshot = runtime.snapshot();
         let protocol = snapshot.fields.get("PROTOCOL").expect("protocol field");
-        assert_eq!(protocol.total_values, 2);
+        assert_eq!(protocol.total_values, 1);
         assert!(
             !protocol.autocomplete,
             "small protocol domains should stay inline"
