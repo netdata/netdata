@@ -1,4 +1,4 @@
-use crate::decoder::FlowFields;
+use crate::flow::FlowFields;
 
 const EXCLUDED_DIMENSIONS: [&str; 4] = ["SRC_ADDR", "DST_ADDR", "SRC_PORT", "DST_PORT"];
 

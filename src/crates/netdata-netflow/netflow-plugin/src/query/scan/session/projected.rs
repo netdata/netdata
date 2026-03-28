@@ -1,0 +1,181 @@
+use super::*;
+
+impl FlowQueryService {
+    pub(crate) fn scan_matching_grouped_records_projected(
+        &self,
+        setup: &QuerySetup,
+        request: &FlowsRequest,
+        grouped_aggregates: &mut ProjectedGroupAccumulator,
+    ) -> Result<ScanCounts> {
+        let mut counts = ScanCounts::default();
+
+        if setup.spans.iter().all(|span| span.files.is_empty()) {
+            return Ok(counts);
+        }
+        let prefilter_pairs = cursor_prefilter_pairs(&request.selections);
+
+        let mut row_group_field_ids = vec![None; setup.effective_group_by.len()];
+        let mut row_missing_values = std::iter::repeat_with(|| None)
+            .take(setup.effective_group_by.len())
+            .collect::<Vec<Option<String>>>();
+        let mut captured_fields = request
+            .selections
+            .keys()
+            .map(|field| field.to_ascii_uppercase())
+            .collect::<Vec<_>>();
+        captured_fields.sort_unstable();
+        captured_fields.dedup();
+        let projected_capture_positions = captured_fields
+            .iter()
+            .cloned()
+            .enumerate()
+            .map(|(index, field)| (field, index))
+            .collect::<FastHashMap<_, _>>();
+        let mut projected_captured_values = vec![None; captured_fields.len()];
+        let mut projected_field_specs = Vec::with_capacity(
+            2 + setup.effective_group_by.len() + projected_capture_positions.len() + 2,
+        );
+        for (metric_key, metric_field) in [
+            (b"BYTES".as_slice(), ProjectedMetricField::Bytes),
+            (b"PACKETS".as_slice(), ProjectedMetricField::Packets),
+        ] {
+            let spec_index = projected_field_spec_index(&mut projected_field_specs, metric_key);
+            projected_field_specs[spec_index].targets.metric = Some(metric_field);
+        }
+        for (index, field) in setup.effective_group_by.iter().enumerate() {
+            let spec_index =
+                projected_field_spec_index(&mut projected_field_specs, field.as_bytes());
+            projected_field_specs[spec_index].targets.action.group_slot = Some(index);
+        }
+        for (field, field_index) in &projected_capture_positions {
+            let spec_index =
+                projected_field_spec_index(&mut projected_field_specs, field.as_bytes());
+            projected_field_specs[spec_index]
+                .targets
+                .action
+                .capture_slot = Some(*field_index);
+        }
+        let projected_match_plan = ProjectedFieldMatchPlan::new(&projected_field_specs);
+        let mut pending_spec_indexes = (0..projected_field_specs.len()).collect::<Vec<_>>();
+
+        if setup
+            .spans
+            .iter()
+            .all(|span| span.span.tier == TierKind::Raw)
+        {
+            return self.scan_matching_grouped_records_projected_raw_direct(
+                setup,
+                request,
+                grouped_aggregates,
+                &prefilter_pairs,
+                &projected_capture_positions,
+                &projected_field_specs,
+                &mut row_group_field_ids,
+                &mut row_missing_values,
+                &mut projected_captured_values,
+                &mut pending_spec_indexes,
+                projected_match_plan.as_ref(),
+            );
+        }
+
+        for span in &setup.spans {
+            if span.files.is_empty() {
+                continue;
+            }
+
+            let after_usec = (span.span.after as u64).saturating_mul(1_000_000);
+            let before_usec = (span.span.before as u64).saturating_mul(1_000_000);
+            let until_usec = before_usec.saturating_sub(1);
+
+            let session = JournalSession::builder()
+                .files(span.files.clone())
+                .load_remappings(false)
+                .build()
+                .context("failed to open journal session for projected grouped query")?;
+
+            let mut cursor_builder = session
+                .cursor_builder()
+                .direction(SessionDirection::Forward)
+                .since(after_usec)
+                .until(until_usec);
+            for (field, value) in &prefilter_pairs {
+                let pair = format!("{}={}", field, value);
+                cursor_builder = cursor_builder.add_match(pair.as_bytes());
+            }
+            let mut cursor = cursor_builder
+                .build()
+                .context("failed to build journal session cursor for projected grouped query")?;
+
+            loop {
+                let has_entry = cursor
+                    .step()
+                    .context("failed to step projected grouped query cursor")?;
+                if !has_entry {
+                    break;
+                }
+
+                counts.streamed_entries = counts.streamed_entries.saturating_add(1);
+                let timestamp_usec = cursor.realtime_usec();
+                if timestamp_usec < after_usec || timestamp_usec >= before_usec {
+                    continue;
+                }
+
+                row_group_field_ids.fill(None);
+                for value in &mut row_missing_values {
+                    let _ = value.take();
+                }
+                for value in &mut projected_captured_values {
+                    let _ = value.take();
+                }
+                let mut metrics = QueryFlowMetrics::default();
+                pending_spec_indexes.clear();
+                pending_spec_indexes.extend(0..projected_field_specs.len());
+                let mut remaining = pending_spec_indexes.len();
+                cursor
+                    .visit_payloads(|payload| {
+                        let _ = apply_projected_payload(
+                            payload,
+                            &projected_field_specs,
+                            &mut pending_spec_indexes,
+                            &mut remaining,
+                            &mut metrics,
+                            grouped_aggregates,
+                            &mut row_group_field_ids,
+                            &mut row_missing_values,
+                            &mut projected_captured_values,
+                            self.max_groups,
+                        );
+                        Ok(())
+                    })
+                    .context("failed to visit projected journal payloads")?;
+
+                if !request.selections.is_empty()
+                    && !captured_facet_matches_selections_except(
+                        None,
+                        &request.selections,
+                        &projected_capture_positions,
+                        &projected_captured_values,
+                    )
+                {
+                    continue;
+                }
+
+                grouped_aggregates.accumulate_projected(
+                    &setup.effective_group_by,
+                    timestamp_usec,
+                    RecordHandle::JournalRealtime {
+                        tier: span.span.tier,
+                        timestamp_usec,
+                    },
+                    metrics,
+                    &mut row_group_field_ids,
+                    &mut row_missing_values,
+                    self.max_groups,
+                )?;
+                counts.matched_entries = counts.matched_entries.saturating_add(1);
+            }
+        }
+
+        Ok(counts)
+    }
+}

@@ -1,0 +1,300 @@
+# TODO: NetFlow Plugin Refactor
+
+## Purpose
+
+- Fit for purpose: make the Rust NetFlow/IPFIX/sFlow plugin maintainable for ongoing Netdata flow work without changing runtime behavior.
+- Scope approved by Costa:
+  - no logic changes
+  - eliminate dead code
+  - split very large source files into smaller single-purpose modules
+  - decompose oversized functions into smaller focused helpers
+
+## TL;DR
+
+- The current Rust netflow plugin has several oversized modules:
+  - `src/crates/netdata-netflow/netflow-plugin/src/decoder.rs` (`10,426` lines)
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs` (`6,965` lines)
+  - `src/crates/netdata-netflow/netflow-plugin/src/enrichment.rs` (`5,872` lines)
+  - `src/crates/netdata-netflow/netflow-plugin/src/main.rs` (`1,882` lines)
+  - `src/crates/netdata-netflow/netflow-plugin/src/ingest.rs` (`1,750` lines)
+  - `src/crates/netdata-netflow/netflow-plugin/src/plugin_config.rs` (`1,650` lines)
+- Initial evidence already shows oversized functions, especially in `decoder.rs`, including:
+  - `set_record_field()` at `src/crates/netdata-netflow/netflow-plugin/src/decoder.rs:5532`
+  - `merge_enriched_records()` at `src/crates/netdata-netflow/netflow-plugin/src/decoder.rs:2915`
+  - `finalize_canonical_flow_fields()` at `src/crates/netdata-netflow/netflow-plugin/src/decoder.rs:5309`
+  - `parse_action()` at `src/crates/netdata-netflow/netflow-plugin/src/enrichment.rs:2123`
+  - `parse_rule_term()` at `src/crates/netdata-netflow/netflow-plugin/src/enrichment.rs:2035`
+- The current top-level crate layout is flat from `main.rs`:
+  - `charts`
+  - `decoder`
+  - `enrichment`
+  - `ingest`
+  - `network_sources`
+  - `plugin_config`
+  - `presentation`
+  - `query`
+  - `routing_bioris`
+  - `routing_bmp`
+  - `tiering`
+- The requested refactor is structural only. It must preserve tests and behavior.
+
+## Analysis
+
+- Facts gathered so far:
+  - The plugin lives under `src/crates/netdata-netflow/netflow-plugin/`.
+  - The crate is currently organized as a single binary crate with large flat modules declared from `src/main.rs`.
+  - The largest source concentration is in `decoder.rs`, `query.rs`, and `enrichment.rs`.
+  - The current repository worktree is dirty in unrelated areas, so the refactor must stay tightly scoped to the netflow plugin and this TODO.
+- Concrete file-size evidence:
+  - `src/crates/netdata-netflow/netflow-plugin/src/decoder.rs`
+    - total: `10,426`
+    - production before `mod tests`: `7,065`
+    - in-file tests: `3,361`
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs`
+    - total: `6,965`
+    - production before `mod tests`: `5,160`
+    - in-file tests: `1,805`
+  - `src/crates/netdata-netflow/netflow-plugin/src/enrichment.rs`
+    - total: `5,872`
+    - production before `mod tests`: `3,730`
+    - in-file tests: `2,142`
+  - `src/crates/netdata-netflow/netflow-plugin/src/main.rs`
+    - total: `1,882`
+    - production before `mod tests`: `625`
+    - in-file tests: `1,257`
+  - `src/crates/netdata-netflow/netflow-plugin/src/ingest.rs`
+    - total: `1,750`
+    - production before `mod tests`: `1,162`
+    - in-file tests: `588`
+  - `src/crates/netdata-netflow/netflow-plugin/src/plugin_config.rs`
+    - total: `1,650`
+    - production before `mod tests`: `1,299`
+    - in-file tests: `351`
+- Build/test baseline:
+  - `cargo test -p netflow-plugin --no-run`
+    - result: success
+  - `cargo check -p netflow-plugin --all-targets`
+    - result: success with `11` dead-code warnings
+- Confirmed dead-code / dead-in-production evidence from compiler:
+  - `src/crates/netdata-netflow/netflow-plugin/src/decoder.rs:2174`
+    - `import_decoder_state_namespace()`
+    - only referenced from tests inside `decoder.rs`
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs:3442`
+    - `accumulate_grouped_labels()`
+    - used only by other test-only open-tier helper functions
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs:3476`
+    - `update_aggregate_entry_from_metrics()`
+    - used only by other test-only open-tier helper functions
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs:3490`
+    - `open_tier_row_labels()`
+    - only used by test helpers and tests
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs:3505`
+    - `sampled_metrics_from_open_tier_row()`
+    - only used by test helpers and tests
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs:3515`
+    - `sampled_metric_value_from_open_tier_row()`
+    - only used by tests
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs:3523`
+    - `accumulate_open_tier_timeseries_grouped_record()`
+    - only used by tests
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs:4277`
+    - `accumulate_open_tier_facet_vocabulary()`
+    - only used by tests
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs:4333`
+    - `open_tier_row_field_value()`
+    - only used by test-only open-tier helpers
+  - `src/crates/netdata-netflow/netflow-plugin/src/tiering.rs:110`
+    - `rollup_presence_field()`
+    - only used by `field_value_string()`, which is itself dead in production
+  - `src/crates/netdata-netflow/netflow-plugin/src/tiering.rs:507`
+    - `field_value_string()`
+    - only used by test-only query helpers and tiering tests
+- Hidden dead-code evidence currently masked by `#[allow(dead_code)]`:
+  - `src/crates/netdata-netflow/netflow-plugin/src/decoder.rs:443-456`
+    - the `presence_field_methods!` macro marks generated methods with `#[allow(dead_code)]`
+  - explicit usage search shows several generated clearers are not used outside their own definitions:
+    - `clear_sampling_rate`
+    - `clear_etype`
+    - `clear_forwarding_status`
+    - `clear_src_vlan`
+    - `clear_dst_vlan`
+    - `clear_iptos`
+    - `clear_tcp_flags`
+    - `clear_icmpv4_type`
+    - `clear_icmpv4_code`
+    - `clear_icmpv6_type`
+    - `clear_icmpv6_code`
+  - implication:
+    - the current code intentionally suppresses at least some dead-code detection in `decoder.rs`
+- Largest production functions by rough line span:
+  - `src/crates/netdata-netflow/netflow-plugin/src/decoder.rs:4693`
+    - `append_ipfix_records()` about `314` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/decoder.rs:5532`
+    - `set_record_field()` about `287` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/decoder.rs:2382`
+    - `build_namespace_restore_packets()` about `256` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/decoder.rs:2915`
+    - `merge_enriched_records()` about `161` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs:1874`
+    - `scan_matching_grouped_records_projected_raw_direct()` about `191` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs:2066`
+    - `query_flows()` about `178` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs:1230`
+    - `scan_matching_grouped_records_projected()` about `177` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs:2761`
+    - `accumulate_projected()` about `127` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/query.rs:2245`
+    - `query_flow_metrics()` about `124` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/enrichment.rs:1303`
+    - `eval_with_context()` about `209` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/enrichment.rs:562`
+    - `enrich_record()` about `197` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/enrichment.rs:370`
+    - `enrich_fields()` about `189` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/enrichment.rs:2123`
+    - `parse_action()` about `116` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/main.rs:383`
+    - `main()` about `241` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/ingest.rs:607`
+    - `rebuild_materialized_from_raw()` about `121` lines
+  - `src/crates/netdata-netflow/netflow-plugin/src/plugin_config.rs:1047`
+    - `validate()` about `169` lines
+- Natural domain seams already visible in source:
+  - `decoder.rs`
+    - flow field and typed `FlowRecord` model
+    - decoder state / namespace persistence
+    - NetFlow/IPFIX template observation
+    - NetFlow/IPFIX protocol decode
+    - sFlow decode
+    - packet parsing for datalink/IP/transport
+    - canonical-field mapping / special-field mapping / timestamp helpers
+  - `query.rs`
+    - request parsing + normalization
+    - query service / registry access
+    - raw projected scan path
+    - grouped accumulator types
+    - facets
+    - time-series layout and tier planning
+    - large test/benchmark support helpers
+  - `enrichment.rs`
+    - runtime orchestration
+    - classifier parser/evaluator
+    - geoip loader/reloader
+    - static metadata
+    - static/dynamic routing
+    - network attribute + prefix-map helpers
+    - FlowRecord-native write helpers
+- External research:
+  - official Rust docs:
+    - Rust Book, “Managing Growing Projects with Packages, Crates, and Modules”
+      - https://doc.rust-lang.org/book/ch07-00-managing-growing-projects-with-packages-crates-and-modules.html
+    - Rust Book, “Separating Modules into Different Files”
+      - https://doc.rust-lang.org/book/ch07-05-separating-modules-into-different-files.html
+    - Rust Reference, modules
+      - https://doc.rust-lang.org/reference/items/modules.html
+  - similar open-source flow collectors inspected in `/tmp`:
+    - `akvorado`
+      - `outlet/flow/root.go`
+      - `outlet/flow/decoder.go`
+      - `outlet/flow/persist.go`
+      - `outlet/flow/decoder/` subpackages for protocol-specific decoders
+    - `NetGauze`
+      - `crates/flow-pkt/src/lib.rs`
+      - `crates/flow-pkt/src/netflow.rs`
+      - `crates/flow-pkt/src/ipfix.rs`
+      - `crates/flow-pkt/src/codec.rs`
+      - `crates/flow-pkt/src/ie.rs`
+  - consistent structural pattern from both:
+    - keep a thin entry/root module
+    - split protocol-specific logic into dedicated files/modules
+    - isolate persistence/state from decode logic
+    - keep packet/data models separate from service/runtime orchestration
+
+## Decisions
+
+- 2026-03-27 (Costa): `decoder.rs` split strategy = `B` full domain split.
+- 2026-03-27 (Costa): whole-plugin refactor execution strategy = `B` coordinated staged sweep.
+- 2026-03-27 (Costa): dead-code handling policy = `A` remove true production dead code and move test-only helpers behind `#[cfg(test)]`.
+- Implemented structure choices:
+  - moved inline tests into sibling `_tests.rs` files for `decoder`, `query`, `enrichment`, `main`, `ingest`, and `plugin_config`
+  - split `decoder.rs` into:
+    - `decoder.rs` root/model entry (`1,411` lines)
+    - `decoder_state.rs` (`1,252` lines)
+    - `decoder_protocol.rs` (`2,741` lines)
+    - `decoder_record.rs` (`1,884` lines)
+    - `decoder_tests.rs` (`3,346` lines)
+  - split `query.rs` into:
+    - `query.rs` root/service (`1,832` lines)
+    - `query_request.rs` (`709` lines)
+    - `query_grouping.rs` (`1,186` lines)
+    - `query_timeseries.rs` (`1,452` lines)
+    - `query_tests.rs` (`1,791` lines)
+  - split `enrichment.rs` into:
+    - `enrichment.rs` runtime/orchestration (`1,081` lines)
+    - `enrichment_classifiers.rs` (`1,672` lines)
+    - `enrichment_data.rs` (`980` lines)
+    - `enrichment_tests.rs` (`2,134` lines)
+- Implemented dead-code cleanup:
+  - gated test-only decoder/query/tiering helpers behind `#[cfg(test)]`
+  - removed `#[allow(dead_code)]` from the `presence_field_methods!` macro
+  - kept only the five live `FlowRecord::clear_*()` methods as explicit implementations:
+    - `clear_direction`
+    - `clear_in_if_speed`
+    - `clear_out_if_speed`
+    - `clear_in_if_boundary`
+    - `clear_out_if_boundary`
+- Implemented large-function decomposition:
+  - `decoder_record.rs`
+    - `set_record_field()` is now a short dispatcher over focused helpers:
+      - `set_record_exporter_field()`
+      - `set_record_counter_field()`
+      - `set_record_network_field()`
+      - `set_record_interface_field()`
+      - `set_record_transport_field()`
+  - `decoder_protocol.rs`
+    - `append_ipfix_records()` is now a short orchestrator over focused helpers:
+      - `IPFixRecordBuildState`
+      - `track_reverse_ipfix_time()`
+      - `observe_ipfix_record_value()`
+      - `apply_ipfix_record_field()`
+      - `build_reverse_ipfix_flow()`
+      - `finalize_ipfix_record()`
+
+## Plan
+
+- Completed:
+  - moved test modules out of production files
+  - split the three largest production modules along actual domain seams
+  - eliminated the known dead production code and test-only warning paths
+  - decomposed the two largest decoder functions without changing observable behavior
+- Not intentionally done in this pass:
+  - convert flat modules into nested `decoder/`, `query/`, `enrichment/` directory trees
+  - further split `main.rs`, `ingest.rs`, or `plugin_config.rs`
+  - further decompose medium-sized functions such as `query_flows()` or `validate()`
+- Rationale:
+  - the include-based split kept symbol visibility stable and made the refactor mechanically safe
+  - the remaining medium-sized files are no longer in the same risk category as the original `decoder.rs`, `query.rs`, and `enrichment.rs`
+
+## Implied Decisions
+
+- Keep public behavior, configuration schema, IPC schema, and on-disk formats unchanged unless a change is required just to preserve compilation after moving code.
+- Prefer moving existing code into new modules over rewriting logic.
+- Prefer private helper extraction over changing public signatures unless the split requires visibility adjustments.
+- Prefer preserving the existing top-level module names (`decoder`, `query`, `enrichment`, `ingest`, `plugin_config`) and turning them into module directories, so the rest of the crate needs fewer invasive import changes.
+
+## Testing Requirements
+
+- Verified:
+  - `cargo fmt -p netflow-plugin`
+  - `cargo check -p netflow-plugin --all-targets`
+  - `cargo test -p netflow-plugin --no-run`
+  - `cargo test -p netflow-plugin`
+- Current result:
+  - `257` tests passed
+  - `7` tests ignored
+  - `0` failures
+
+## Documentation Updates Required
+
+- Likely none for end-user docs if behavior remains unchanged.
+- If module/file layout changes affect developer-facing documentation or comments, update inline crate/module comments only where needed.
