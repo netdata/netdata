@@ -1,3 +1,5 @@
+<!-- markdownlint-disable-file MD013 MD043 -->
+
 # `netflow-plugin`
 
 Rust NetFlow/IPFIX/sFlow ingestion and query plugin.

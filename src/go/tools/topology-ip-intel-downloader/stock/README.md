@@ -1,3 +1,5 @@
+<!-- markdownlint-disable-file MD043 -->
+
 # Stock IP Intelligence Payload
 
 This directory holds the source-controlled stock MMDB payload shipped by

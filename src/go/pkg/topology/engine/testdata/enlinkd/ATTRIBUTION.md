@@ -1,3 +1,5 @@
+<!-- markdownlint-disable-file MD013 MD043 -->
+
 # Enlinkd topology parity test data attribution
 
 Source: https://github.com/opennms/opennms

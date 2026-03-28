@@ -567,11 +567,11 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
             dfe_done(host);
         }
 
-        size_t actors_total = 0;
-        size_t links_total = 0;
-
         buffer_json_member_add_object(wb, "data");
         {
+            size_t actors_total = 0;
+            size_t links_total = 0;
+
             buffer_json_member_add_string(wb, "schema_version", "2.0");
             buffer_json_member_add_string(wb, "source", "streaming");
             buffer_json_member_add_string(wb, "layer", "infra");
@@ -721,7 +721,7 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
 
                                 const char *rn_type = NULL;
 
-                                if(!rn_type && rrdhost_is_virtual(rn_host)) {
+                                if(rrdhost_is_virtual(rn_host)) {
                                     ND_UUID origin_id[1];
                                     uint16_t on = streaming_topology_get_path_ids(rn_host, 0, origin_id, 1);
                                     if(on >= 1 && UUIDeq(origin_id[0], host->host_id))
@@ -1023,8 +1023,10 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                                 // find this parent's outbound destination (next hop in its own path)
                                 const char *dst_hostname = NULL;
                                 char dst_actor_id[256] = "";
-                                char dst_hostname_fallback[UUID_STR_LEN] = "";
+
+                                buffer_json_member_add_array(wb, "outbound");
                                 {
+                                    char dst_hostname_fallback[UUID_STR_LEN] = "";
                                     ND_UUID host_path[128];
                                     uint16_t host_pn = streaming_topology_get_path_ids(host, 0, host_path, 128);
                                     for(uint16_t pi = 0; pi < host_pn; pi++) {
@@ -1036,10 +1038,7 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                                             break;
                                         }
                                     }
-                                }
 
-                                buffer_json_member_add_array(wb, "outbound");
-                                {
                                     RRDHOST *oh;
                                     dfe_start_read(rrdhost_root_index, oh) {
                                         bool found = false;

@@ -1,3 +1,5 @@
+<!-- markdownlint-disable-file MD013 MD043 -->
+
 # topology-ip-intel-downloader
 
 Downloads and converts IP intelligence datasets into MaxMind DB files used by Netdata topology and flow features.

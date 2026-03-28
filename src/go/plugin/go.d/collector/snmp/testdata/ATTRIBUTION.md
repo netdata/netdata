@@ -1,3 +1,5 @@
+<!-- markdownlint-disable-file MD013 MD032 MD043 -->
+
 # SNMP topology test data attribution
 
 Source: https://github.com/librenms/librenms

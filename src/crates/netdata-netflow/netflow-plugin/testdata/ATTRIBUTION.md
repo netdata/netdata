@@ -1,3 +1,5 @@
+<!-- markdownlint-disable-file MD013 MD032 MD034 MD043 -->
+
 # NetFlow/IPFIX/sFlow test data attribution
 
 Source: https://github.com/akvorado/akvorado
