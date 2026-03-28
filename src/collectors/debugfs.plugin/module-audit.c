@@ -205,29 +205,6 @@ static void audit_send_data(struct audit_reply *r) {
     netdata_mutex_unlock(&stdout_mutex);
 }
 
-static void audit_send_obsolete(int update_every, const char *name) {
-    netdata_mutex_lock(&stdout_mutex);
-
-    printf(PLUGINSD_KEYWORD_CHART
-        " audit.backlog '' 'Audit Backlog' 'events' 'audit' 'audit.backlog' line 1340 %d 'obsolete' 'debugfs.plugin' '%s'\n",
-        update_every, name);
-    printf(PLUGINSD_KEYWORD_CHART
-        " audit.backlog_utilization '' 'Audit Backlog Utilization' '%%' 'audit' 'audit.backlog_utilization' area 1341 %d 'obsolete' 'debugfs.plugin' '%s'\n",
-        update_every, name);
-    printf(PLUGINSD_KEYWORD_CHART
-        " audit.backlog_limit '' 'Audit Backlog Limit' 'events' 'audit' 'audit.backlog_limit' line 1342 %d 'obsolete' 'debugfs.plugin' '%s'\n",
-        update_every, name);
-    printf(PLUGINSD_KEYWORD_CHART
-        " audit.lost '' 'Audit Lost Events' 'events/s' 'audit' 'audit.lost' area 1343 %d 'obsolete' 'debugfs.plugin' '%s'\n",
-        update_every, name);
-    printf(PLUGINSD_KEYWORD_CHART
-        " audit.status '' 'Audit Status' 'state' 'audit' 'audit.status' line 1344 %d 'obsolete' 'debugfs.plugin' '%s'\n",
-        update_every, name);
-
-    fflush(stdout);
-    netdata_mutex_unlock(&stdout_mutex);
-}
-
 // -----------------------------------------------------------------------
 // module entry point
 
