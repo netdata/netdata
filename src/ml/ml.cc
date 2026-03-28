@@ -173,8 +173,8 @@ const char *db_models_load =
     "c10, c11, c12, c13, c14, c15 FROM ("
     "SELECT * FROM models "
     "WHERE dim_id = @dim_id AND after >= @after "
-    "ORDER BY after DESC LIMIT @n"
-    ") ORDER BY after ASC;";
+    "ORDER BY before DESC, after DESC LIMIT @n"
+    ") ORDER BY before ASC, after ASC;";
 
 const char *db_models_delete =
     "DELETE FROM models "
