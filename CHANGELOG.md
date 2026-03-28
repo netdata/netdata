@@ -199,6 +199,14 @@
 - Docs: user-oriented charttpl README rewrite ([#22049](https://github.com/netdata/netdata/issues/22049))
 - Improve DBENGINE log messages for datafile rotation and startup ([#22047](https://github.com/netdata/netdata/issues/22047))
 - Fix wrong DBENGINE file names in logs ([#22053](https://github.com/netdata/netdata/issues/22053))
+- Docs: add Space Settings navigation guidance to remove-node.md ([#22035](https://github.com/netdata/netdata/issues/22035))
+- Fix coverity issues ([#22054](https://github.com/netdata/netdata/issues/22054))
+- Docs: correct SEND_EMAIL default value from YES to AUTO ([#22057](https://github.com/netdata/netdata/issues/22057))
+- Docs: clarify streaming protocol architecture - not HTTP/HTTPS ([#22055](https://github.com/netdata/netdata/issues/22055))
+- Regenerate integrations docs ([#22061](https://github.com/netdata/netdata/issues/22061))
+- Fix ACLK ([#22051](https://github.com/netdata/netdata/issues/22051))
+- Docs: add NVIDIA/Cumulus/Mellanox to SNMP collector vendor list ([#22063](https://github.com/netdata/netdata/issues/22063))
+- Improve dbengine memory protection message on startup ([#22045](https://github.com/netdata/netdata/issues/22045))
 
 ## [2.9.0] - 2026-02-16
 
