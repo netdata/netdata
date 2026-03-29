@@ -393,49 +393,109 @@ static void netdata_ad_directory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
     rrdset_done(st_directory_operation_total);
 }
 
-static void netdata_ad_search_scope(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void netdata_ad_search_scope_base(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA baseSearchesPerSec = {.key = "Base searches/sec"};
-    static COUNTER_DATA subtreeSearchesPerSec = {.key = "Subtree searches/sec"};
-    static COUNTER_DATA oneLevelSearchesPerSec = {.key = "Onelevel searches/sec"};
+    static RRDSET *st_search_scope_base = NULL;
+    static RRDDIM *rd_search_scope_base = NULL;
 
-    static RRDSET *st_searches_total = NULL;
-    static RRDDIM *rd_searches_total_base = NULL;
-    static RRDDIM *rd_searches_total_subtree = NULL;
-    static RRDDIM *rd_searches_total_one_level = NULL;
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &baseSearchesPerSec))
+        return;
 
-    perflibGetObjectCounter(pDataBlock, pObjectType, &baseSearchesPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &subtreeSearchesPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &oneLevelSearchesPerSec);
-
-    if (unlikely(!st_searches_total)) {
-        st_searches_total = rrdset_create_localhost(
+    if (unlikely(!st_search_scope_base)) {
+        st_search_scope_base = rrdset_create_localhost(
             "ad",
-            "searches",
+            "searches_base",
             NULL,
             "search",
-            "ad.searches",
-            "Directory searches by scope",
+            "ad.searches_base",
+            "Directory base searches",
             "searches/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
-            PRIO_AD_SEARCHES_SCOPE_TOTAL,
+            PRIO_AD_SEARCHES_SCOPE_BASE,
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_searches_total_base = rrddim_add(st_searches_total, "base", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_searches_total_subtree =
-            rrddim_add(st_searches_total, "subtree", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_searches_total_one_level =
-            rrddim_add(st_searches_total, "one_level", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_search_scope_base = rrddim_add(st_search_scope_base, "base", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(st_searches_total, rd_searches_total_base, (collected_number)baseSearchesPerSec.current.Data);
+    rrddim_set_by_pointer(st_search_scope_base, rd_search_scope_base, (collected_number)baseSearchesPerSec.current.Data);
+    rrdset_done(st_search_scope_base);
+}
+
+static void netdata_ad_search_scope_subtree(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA subtreeSearchesPerSec = {.key = "Subtree searches/sec"};
+    static RRDSET *st_search_scope_subtree = NULL;
+    static RRDDIM *rd_search_scope_subtree = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &subtreeSearchesPerSec))
+        return;
+
+    if (unlikely(!st_search_scope_subtree)) {
+        st_search_scope_subtree = rrdset_create_localhost(
+            "ad",
+            "searches_subtree",
+            NULL,
+            "search",
+            "ad.searches_subtree",
+            "Directory subtree searches",
+            "searches/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SEARCHES_SCOPE_SUBTREE,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_search_scope_subtree =
+            rrddim_add(st_search_scope_subtree, "subtree", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
     rrddim_set_by_pointer(
-        st_searches_total, rd_searches_total_subtree, (collected_number)subtreeSearchesPerSec.current.Data);
+        st_search_scope_subtree, rd_search_scope_subtree, (collected_number)subtreeSearchesPerSec.current.Data);
+    rrdset_done(st_search_scope_subtree);
+}
+
+static void netdata_ad_search_scope_one_level(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA oneLevelSearchesPerSec = {.key = "Onelevel searches/sec"};
+    static RRDSET *st_search_scope_one_level = NULL;
+    static RRDDIM *rd_search_scope_one_level = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &oneLevelSearchesPerSec))
+        return;
+
+    if (unlikely(!st_search_scope_one_level)) {
+        st_search_scope_one_level = rrdset_create_localhost(
+            "ad",
+            "searches_one_level",
+            NULL,
+            "search",
+            "ad.searches_one_level",
+            "Directory one-level searches",
+            "searches/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SEARCHES_SCOPE_ONE_LEVEL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_search_scope_one_level =
+            rrddim_add(st_search_scope_one_level, "one_level", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
     rrddim_set_by_pointer(
-        st_searches_total, rd_searches_total_one_level, (collected_number)oneLevelSearchesPerSec.current.Data);
-    rrdset_done(st_searches_total);
+        st_search_scope_one_level, rd_search_scope_one_level, (collected_number)oneLevelSearchesPerSec.current.Data);
+    rrdset_done(st_search_scope_one_level);
+}
+
+static void netdata_ad_search_scope(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    netdata_ad_search_scope_base(pDataBlock, pObjectType, update_every);
+    netdata_ad_search_scope_subtree(pDataBlock, pObjectType, update_every);
+    netdata_ad_search_scope_one_level(pDataBlock, pObjectType, update_every);
 }
 
 static void netdata_ad_cache_lookups(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
