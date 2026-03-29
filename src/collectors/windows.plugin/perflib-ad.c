@@ -1192,48 +1192,82 @@ static void netdata_ad_sync_result(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE
     netdata_ad_sync_result_schema_mismatch_failure(pDataBlock, pObjectType, update_every);
 }
 
-static void netdata_ad_name_translations(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void netdata_ad_name_translations_client(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA clientNameTranslationsPerSec = {.key = "DS Client Name Translations/sec"};
-    static COUNTER_DATA serverNameTranslationsPerSec = {.key = "DS Server Name Translations/sec"};
+    static RRDSET *st_name_translations_client = NULL;
+    static RRDDIM *rd_name_translations_client = NULL;
 
-    static RRDSET *st_name_translations_total = NULL;
-    static RRDDIM *rd_name_translations_total_client = NULL;
-    static RRDDIM *rd_name_translations_total_server = NULL;
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &clientNameTranslationsPerSec))
+        return;
 
-    perflibGetObjectCounter(pDataBlock, pObjectType, &clientNameTranslationsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &serverNameTranslationsPerSec);
-
-    if (unlikely(!st_name_translations_total)) {
-        st_name_translations_total = rrdset_create_localhost(
+    if (unlikely(!st_name_translations_client)) {
+        st_name_translations_client = rrdset_create_localhost(
             "ad",
-            "name_translations",
+            "name_translations_client",
             NULL,
             "directory",
-            "ad.name_translations",
-            "Name translations",
+            "ad.name_translations_client",
+            "Client name translations",
             "translations/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
-            PRIO_AD_NAME_TRANSLATIONS_TOTAL,
+            PRIO_AD_NAME_TRANSLATIONS_CLIENT,
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_name_translations_total_client =
-            rrddim_add(st_name_translations_total, "client", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_name_translations_total_server =
-            rrddim_add(st_name_translations_total, "server", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_name_translations_client =
+            rrddim_add(st_name_translations_client, "client", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-        st_name_translations_total,
-        rd_name_translations_total_client,
+        st_name_translations_client,
+        rd_name_translations_client,
         (collected_number)clientNameTranslationsPerSec.current.Data);
+    rrdset_done(st_name_translations_client);
+}
+
+static void netdata_ad_name_translations_server(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA serverNameTranslationsPerSec = {.key = "DS Server Name Translations/sec"};
+    static RRDSET *st_name_translations_server = NULL;
+    static RRDDIM *rd_name_translations_server = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &serverNameTranslationsPerSec))
+        return;
+
+    if (unlikely(!st_name_translations_server)) {
+        st_name_translations_server = rrdset_create_localhost(
+            "ad",
+            "name_translations_server",
+            NULL,
+            "directory",
+            "ad.name_translations_server",
+            "Server name translations",
+            "translations/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_NAME_TRANSLATIONS_SERVER,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_name_translations_server =
+            rrddim_add(st_name_translations_server, "server", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
     rrddim_set_by_pointer(
-        st_name_translations_total,
-        rd_name_translations_total_server,
+        st_name_translations_server,
+        rd_name_translations_server,
         (collected_number)serverNameTranslationsPerSec.current.Data);
-    rrdset_done(st_name_translations_total);
+    rrdset_done(st_name_translations_server);
+}
+
+static void netdata_ad_name_translations(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    netdata_ad_name_translations_client(pDataBlock, pObjectType, update_every);
+    netdata_ad_name_translations_server(pDataBlock, pObjectType, update_every);
 }
 
 static void netdata_ad_change_monitors(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
