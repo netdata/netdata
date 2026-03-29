@@ -25,9 +25,9 @@ type Catalog struct {
 }
 
 type catalogEntry struct {
-	Config  Profile
-	Path    string
-	IsStock bool
+	config  Profile
+	path    string
+	isStock bool
 }
 
 type DirSpec struct {
@@ -35,7 +35,7 @@ type DirSpec struct {
 	IsStock bool
 }
 
-func DefaultCatalog() (Catalog, error) {
+func loadFromDefaultDirs() (Catalog, error) {
 	return LoadFromDirs(defaultDirSpecs())
 }
 
@@ -88,21 +88,21 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 
 			prev, exists := seen[key]
 			if !exists {
-				seen[key] = catalogEntry{Config: cfg, Path: path, IsStock: spec.IsStock}
+				seen[key] = catalogEntry{config: cfg, path: path, isStock: spec.IsStock}
 				catalog.orderedKeys = append(catalog.orderedKeys, key)
 				return nil
 			}
 
 			switch {
-			case prev.IsStock == spec.IsStock:
+			case prev.isStock == spec.IsStock:
 				scope := "user"
 				if spec.IsStock {
 					scope = "stock"
 				}
-				return fmt.Errorf("duplicate %s profile name %q in %q and %q", scope, cfg.Name, prev.Path, path)
-			case prev.IsStock && !spec.IsStock:
-				seen[key] = catalogEntry{Config: cfg, Path: path, IsStock: false}
-			case !prev.IsStock && spec.IsStock:
+				return fmt.Errorf("duplicate %s profile name %q in %q and %q", scope, cfg.Name, prev.path, path)
+			case prev.isStock && !spec.IsStock:
+				seen[key] = catalogEntry{config: cfg, path: path, isStock: false}
+			case !prev.isStock && spec.IsStock:
 				// User override wins.
 			}
 
@@ -114,7 +114,7 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 	}
 
 	for _, key := range catalog.orderedKeys {
-		catalog.byName[key] = seen[key].Config
+		catalog.byName[key] = seen[key].config
 	}
 
 	return catalog, nil
@@ -168,7 +168,7 @@ func loadProfileFile(path string) (Profile, error) {
 	if profileName == "" {
 		return Profile{}, fmt.Errorf("validate profile %q: missing required field 'name'", path)
 	}
-	if err := cfg.Validate(fmt.Sprintf("profile %q", profileName)); err != nil {
+	if err := cfg.validate(fmt.Sprintf("profile %q", profileName)); err != nil {
 		return Profile{}, fmt.Errorf("validate profile %q: %w", path, err)
 	}
 

@@ -24,25 +24,29 @@ func (c *Collector) validateConfig() error {
 		return errors.New("'url' can not be empty")
 	}
 
-	c.ProfileSelectionMode = normalizeProfileSelectionMode(c.ProfileSelectionMode)
+	mode := normalizeProfileSelectionMode(c.ProfileSelectionMode)
 	profiles, err := normalizeConfiguredProfiles(c.Profiles)
 	if err != nil {
 		return err
 	}
-	c.Profiles = profiles
 
-	switch c.ProfileSelectionMode {
+	switch mode {
 	case profileSelectionModeAuto:
-		if len(c.Profiles) != 0 {
+		if len(profiles) != 0 {
 			return errors.New("'profiles' must be empty when 'profile_selection_mode' is 'auto'")
 		}
 	case profileSelectionModeExact, profileSelectionModeCombined:
-		if len(c.Profiles) == 0 {
-			return fmt.Errorf("'profiles' is required when 'profile_selection_mode' is %q", c.ProfileSelectionMode)
+		if len(profiles) == 0 {
+			return fmt.Errorf("'profiles' is required when 'profile_selection_mode' is %q", mode)
 		}
 	default:
-		return fmt.Errorf("unsupported 'profile_selection_mode' %q", c.ProfileSelectionMode)
+		return fmt.Errorf("unsupported 'profile_selection_mode' %q", mode)
 	}
+
+	c.cfgState.profileSelectionMode = mode
+	c.cfgState.profiles = profiles
+	c.probeState.expectedPrefix = c.ExpectedPrefix
+	c.probeState.maxTS = c.MaxTS
 
 	return nil
 }

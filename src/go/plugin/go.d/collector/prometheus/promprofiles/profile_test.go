@@ -105,7 +105,7 @@ func TestProfileValidate_CuratedRelabelRules(t *testing.T) {
 				Template:          testProfileTemplate(),
 			}
 
-			err := profile.Validate(`profile "Demo"`)
+			err := profile.validate(`profile "Demo"`)
 			if test.wantErrText == "" {
 				require.NoError(t, err)
 				return

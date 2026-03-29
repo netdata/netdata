@@ -21,7 +21,7 @@ import (
 var (
 	relabelTargetLegacy = regexp.MustCompile(`^(?:(?:[a-zA-Z_]|\$(?:\{\w+\}|\w+))+\w*)+$`)
 
-	DefaultConfig = Config{
+	defaultConfig = Config{
 		Action:      Replace,
 		Separator:   ";",
 		Regex:       MustNewRegexp("(.*)"),
@@ -116,7 +116,7 @@ func (c *Config) UnmarshalYAML(unmarshal func(any) error) error {
 		Action       *Action   `yaml:"action,omitempty"`
 	}
 
-	*c = DefaultConfig
+	*c = defaultConfig
 	c.NameScheme = defaultNameValidationScheme
 
 	var raw rawConfig
@@ -163,7 +163,7 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 		Action       *Action   `json:"action,omitempty"`
 	}
 
-	*c = DefaultConfig
+	*c = defaultConfig
 	c.NameScheme = defaultNameValidationScheme
 
 	var raw rawConfig
@@ -250,7 +250,7 @@ func (re Regexp) MarshalJSON() ([]byte, error) {
 }
 
 func (re Regexp) IsZero() bool {
-	return re.Regexp == DefaultConfig.Regex.Regexp
+	return re.Regexp == defaultConfig.Regex.Regexp
 }
 
 func (re Regexp) String() string {
@@ -263,13 +263,9 @@ func (re Regexp) String() string {
 }
 
 func New(cfgs []Config) (*Processor, error) {
-	compiled := make([]Config, 0, len(cfgs))
-	for i, cfg := range cfgs {
-		cfg = withDefaults(cfg)
-		if err := cfg.Validate(); err != nil {
-			return nil, fmt.Errorf("rule %d: %w", i, err)
-		}
-		compiled = append(compiled, cfg)
+	compiled, err := normalizeAndValidateConfigs(cfgs)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Processor{
@@ -278,7 +274,24 @@ func New(cfgs []Config) (*Processor, error) {
 	}, nil
 }
 
-func (c Config) Validate() error {
+func ValidateConfigs(cfgs []Config) error {
+	_, err := normalizeAndValidateConfigs(cfgs)
+	return err
+}
+
+func normalizeAndValidateConfigs(cfgs []Config) ([]Config, error) {
+	compiled := make([]Config, 0, len(cfgs))
+	for i, cfg := range cfgs {
+		cfg = withDefaults(cfg)
+		if err := cfg.validate(); err != nil {
+			return nil, fmt.Errorf("rule %d: %w", i, err)
+		}
+		compiled = append(compiled, cfg)
+	}
+	return compiled, nil
+}
+
+func (c Config) validate() error {
 	c = withDefaults(c)
 
 	if _, err := parseAction(string(c.Action)); err != nil {
@@ -312,7 +325,7 @@ func (c Config) Validate() error {
 		return fmt.Errorf("%q is invalid 'target_label' for %s action", c.TargetLabel, c.Action)
 	}
 	if (c.Action == Lowercase || c.Action == Uppercase || c.Action == KeepEqual || c.Action == DropEqual) &&
-		c.Replacement != DefaultConfig.Replacement {
+		c.Replacement != defaultConfig.Replacement {
 		return fmt.Errorf("'replacement' can not be set for %s action", c.Action)
 	}
 	if c.Action == LabelMap && !isValidLabelNameWithRegexVar(c.Replacement, scheme) {
@@ -322,20 +335,20 @@ func (c Config) Validate() error {
 		return fmt.Errorf("%q is invalid 'target_label' for %s action", c.TargetLabel, c.Action)
 	}
 	if c.Action == DropEqual || c.Action == KeepEqual {
-		if c.Regex.String() != DefaultConfig.Regex.String() ||
-			c.Modulus != DefaultConfig.Modulus ||
-			c.Separator != DefaultConfig.Separator ||
-			c.Replacement != DefaultConfig.Replacement {
+		if c.Regex.String() != defaultConfig.Regex.String() ||
+			c.Modulus != defaultConfig.Modulus ||
+			c.Separator != defaultConfig.Separator ||
+			c.Replacement != defaultConfig.Replacement {
 			return fmt.Errorf("%s action requires only 'source_labels' and `target_label`, and no other fields", c.Action)
 		}
 	}
 	if c.Action == LabelDrop || c.Action == LabelKeep {
 		if c.sourceLabelsSet ||
 			len(c.SourceLabels) > 0 ||
-			c.TargetLabel != DefaultConfig.TargetLabel ||
-			c.Modulus != DefaultConfig.Modulus ||
-			c.Separator != DefaultConfig.Separator ||
-			c.Replacement != DefaultConfig.Replacement {
+			c.TargetLabel != defaultConfig.TargetLabel ||
+			c.Modulus != defaultConfig.Modulus ||
+			c.Separator != defaultConfig.Separator ||
+			c.Replacement != defaultConfig.Replacement {
 			return fmt.Errorf("%s action requires only 'regex', and no other fields", c.Action)
 		}
 	}
@@ -424,7 +437,7 @@ func (p *Processor) applyConfig(cfg *Config) bool {
 
 func (p *Processor) applyReplace(cfg *Config, val string) bool {
 	if val == "" &&
-		cfg.Regex.String() == DefaultConfig.Regex.String() &&
+		cfg.Regex.String() == defaultConfig.Regex.String() &&
 		!varInRegexTemplate(cfg.TargetLabel) &&
 		!varInRegexTemplate(cfg.Replacement) {
 		p.setLabel(cfg.TargetLabel, cfg.Replacement, cfg.NameScheme)
@@ -557,16 +570,16 @@ func NormalizeConfig(cfg Config) Config {
 func withDefaults(cfg Config) Config {
 	cfg.NameScheme = withNameScheme(cfg.NameScheme)
 	if cfg.Action == "" {
-		cfg.Action = DefaultConfig.Action
+		cfg.Action = defaultConfig.Action
 	}
 	if !cfg.separatorSet && cfg.Separator == "" {
-		cfg.Separator = DefaultConfig.Separator
+		cfg.Separator = defaultConfig.Separator
 	}
 	if cfg.Regex.Regexp == nil {
-		cfg.Regex = DefaultConfig.Regex
+		cfg.Regex = defaultConfig.Regex
 	}
 	if !cfg.replacementSet && cfg.Replacement == "" {
-		cfg.Replacement = DefaultConfig.Replacement
+		cfg.Replacement = defaultConfig.Replacement
 	}
 	return cfg
 }

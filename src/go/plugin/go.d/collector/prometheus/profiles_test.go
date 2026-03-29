@@ -25,6 +25,7 @@ func TestCollector_validateConfigProfiles(t *testing.T) {
 		mode     string
 		profiles []string
 		wantMode string
+		wantIDs  []string
 		wantErr  bool
 	}{
 		"default mode is auto": {
@@ -47,11 +48,13 @@ func TestCollector_validateConfigProfiles(t *testing.T) {
 			mode:     profileSelectionModeExact,
 			profiles: []string{"demo"},
 			wantMode: profileSelectionModeExact,
+			wantIDs:  []string{"demo"},
 		},
 		"combined accepts explicit profiles": {
 			mode:     profileSelectionModeCombined,
 			profiles: []string{"demo"},
 			wantMode: profileSelectionModeCombined,
+			wantIDs:  []string{"demo"},
 		},
 		"duplicate explicit profiles fail": {
 			mode:     profileSelectionModeExact,
@@ -83,21 +86,63 @@ func TestCollector_validateConfigProfiles(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, test.wantMode, collr.ProfileSelectionMode)
+			assert.Equal(t, test.mode, collr.ProfileSelectionMode)
+			assert.Equal(t, test.profiles, collr.Profiles)
+			assert.Equal(t, test.wantMode, collr.cfgState.profileSelectionMode)
+			assert.Equal(t, test.wantIDs, collr.cfgState.profiles)
 		})
 	}
 }
 
-func TestCollector_InitLoadProfileCatalogError(t *testing.T) {
+func TestCollector_CheckKeepsProbeLimitsInInternalState(t *testing.T) {
+	collr := New()
+	collr.URL = newMetricsServer(t, `
+# TYPE demo_metric gauge
+demo_metric 1
+`)
+	collr.ExpectedPrefix = "demo_"
+	collr.MaxTS = 5
+
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+
+	assert.Equal(t, "demo_", collr.ExpectedPrefix)
+	assert.Equal(t, 5, collr.MaxTS)
+	assert.Empty(t, collr.probeState.expectedPrefix)
+	assert.Zero(t, collr.probeState.maxTS)
+}
+
+func TestCollector_InitDoesNotLoadProfileCatalog(t *testing.T) {
 	collr := New()
 	collr.URL = "http://127.0.0.1:9090/metrics"
+	called := false
 	collr.loadProfileCatalog = func() (promprofiles.Catalog, error) {
+		called = true
 		return promprofiles.Catalog{}, errors.New("boom")
 	}
 
-	err := collr.Init(context.Background())
+	require.NoError(t, collr.Init(context.Background()))
+	assert.False(t, called)
+}
+
+func TestCollector_CheckLoadProfileCatalogError(t *testing.T) {
+	collr := New()
+	collr.URL = newMetricsServer(t, `
+# TYPE demo_metric gauge
+demo_metric 1
+`)
+	called := false
+	collr.loadProfileCatalog = func() (promprofiles.Catalog, error) {
+		called = true
+		return promprofiles.Catalog{}, errors.New("boom")
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+
+	err := collr.Check(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "load profiles catalog")
+	assert.True(t, called)
 }
 
 func TestCollector_InitDefaultCatalogMissingStockDirDoesNotFailGenericJob(t *testing.T) {
@@ -115,7 +160,6 @@ func TestCollector_InitDefaultCatalogMissingStockDirDoesNotFailGenericJob(t *tes
 	collr.loadProfileCatalog = nil
 
 	require.NoError(t, collr.Init(context.Background()))
-	assert.True(t, collr.profileCatalog.Empty())
 }
 
 func TestCollector_ChartTemplateYAML_RuntimeOverride(t *testing.T) {
@@ -176,9 +220,9 @@ func TestBuildCollectorRuntimeFromProfiles_DerivesMissingChartIDFromEffectiveCon
 	runtime, err := buildCollectorRuntimeFromProfiles(profiles)
 	require.NoError(t, err)
 	require.NotNil(t, runtime)
-	assert.Contains(t, runtime.ChartTemplateYAML, "context_namespace: prometheus")
-	assert.Contains(t, runtime.ChartTemplateYAML, "context_namespace: alpha")
-	assert.Contains(t, runtime.ChartTemplateYAML, "context_namespace: beta")
+	assert.Contains(t, runtime.chartTemplateYAML, "context_namespace: prometheus")
+	assert.Contains(t, runtime.chartTemplateYAML, "context_namespace: alpha")
+	assert.Contains(t, runtime.chartTemplateYAML, "context_namespace: beta")
 }
 
 func TestCollector_CheckFailsWhenExactProfileMatchesNothing(t *testing.T) {

@@ -28,7 +28,7 @@ type MetricsRelabelingBlock struct {
 	Rules    []relabel.Config `yaml:"rules" json:"rules"`
 }
 
-func (p Profile) Validate(path string) error {
+func (p Profile) validate(path string) error {
 	name := strings.TrimSpace(p.Name)
 	if name == "" {
 		return fmt.Errorf("%s.name: must not be empty", path)
@@ -53,7 +53,7 @@ func (p Profile) Validate(path string) error {
 		if len(block.Rules) == 0 {
 			return fmt.Errorf("%s.metrics_relabeling[%d].rules: must contain at least one rule", path, i)
 		}
-		if _, err := relabel.New(block.Rules); err != nil {
+		if err := relabel.ValidateConfigs(block.Rules); err != nil {
 			return fmt.Errorf("%s.metrics_relabeling[%d].rules: %w", path, i, err)
 		}
 		for j, rule := range block.Rules {

@@ -79,13 +79,21 @@ type Collector struct {
 
 	store metrix.CollectorStore
 
-	prom prometheus.Prometheus
-	pipe *pipeline
-	mw   *metricFamilyWriter
+	prom    prometheus.Prometheus
+	scraper *sampleScraper
+	mw      *metricFamilyWriter
 
-	runtime        *collectorRuntime
-	profileCatalog promprofiles.Catalog
-	fallbackType   struct {
+	cfgState struct {
+		profileSelectionMode string
+		profiles             []string
+	}
+	probeState struct {
+		expectedPrefix string
+		maxTS          int
+	}
+
+	runtime      *collectorRuntime
+	fallbackType struct {
 		counter matcher.Matcher
 		gauge   matcher.Matcher
 	}
@@ -101,19 +109,17 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("validating config: %v", err)
 	}
 
-	catalog, err := c.loadProfilesCatalog()
-	if err != nil {
-		return fmt.Errorf("load profiles catalog: %v", err)
-	}
-	c.profileCatalog = catalog
-
 	prom, err := c.initPrometheusClient()
 	if err != nil {
 		return fmt.Errorf("init prometheus client: %v", err)
 	}
 	c.prom = prom
-	c.pipe = newPipeline(prom)
-	c.mw = newMetricFamilyWriter(c.store, c)
+	c.scraper = newSampleScraper(prom)
+	c.mw = newMetricFamilyWriter(c.store, metricFamilyWriterPolicy{
+		maxTSPerMetric:        c.MaxTSPerMetric,
+		isFallbackTypeGauge:   c.isFallbackTypeGauge,
+		isFallbackTypeCounter: c.isFallbackTypeCounter,
+	}, c.Logger)
 
 	m, err := c.initFallbackTypeMatcher(c.FallbackType.Counter)
 	if err != nil {
@@ -146,8 +152,8 @@ func (c *Collector) Collect(ctx context.Context) error { return c.collect(ctx) }
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
 func (c *Collector) ChartTemplateYAML() string {
-	if c.runtime != nil && c.runtime.ChartTemplateYAML != "" {
-		return c.runtime.ChartTemplateYAML
+	if c.runtime != nil && c.runtime.chartTemplateYAML != "" {
+		return c.runtime.chartTemplateYAML
 	}
 	return chartTemplateYAML
 }

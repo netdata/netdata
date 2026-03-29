@@ -7,10 +7,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 )
 
-type pipeline struct {
-	prom prompkg.Prometheus
-}
-
 type helpEntry struct {
 	name string
 	help string
@@ -21,11 +17,15 @@ type scrapeBatch struct {
 	samples promscrapemodel.Samples
 }
 
-func newPipeline(prom prompkg.Prometheus) *pipeline {
-	return &pipeline{prom: prom}
+type sampleScraper struct {
+	prom prompkg.Prometheus
 }
 
-func (p *pipeline) CollectSamples() (*scrapeBatch, error) {
+func newSampleScraper(prom prompkg.Prometheus) *sampleScraper {
+	return &sampleScraper{prom: prom}
+}
+
+func (p *sampleScraper) collectSamples() (*scrapeBatch, error) {
 	batch := &scrapeBatch{}
 
 	err := p.prom.ScrapeStreamWithMeta(
@@ -42,15 +42,6 @@ func (p *pipeline) CollectSamples() (*scrapeBatch, error) {
 	}
 
 	return batch, nil
-}
-
-func (p *pipeline) CollectMetricFamilies() (promscrapemodel.MetricFamilies, error) {
-	batch, err := p.CollectSamples()
-	if err != nil {
-		return nil, err
-	}
-
-	return assembleMetricFamilies(batch)
 }
 
 func assembleMetricFamilies(batch *scrapeBatch) (promscrapemodel.MetricFamilies, error) {
