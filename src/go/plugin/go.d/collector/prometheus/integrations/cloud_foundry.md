@@ -47,6 +47,35 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
+## Metrics
+
+This collector has built-in grouping logic based on the [type of metrics](https://prometheus.io/docs/concepts/metric_types/).
+
+| Metric                    | Chart                                     | Dimension(s)         | Algorithm   |
+|---------------------------|-------------------------------------------|----------------------|-------------|
+| Gauge                     | for each label set                        | one, the metric name | absolute    |
+| Counter                   | for each label set                        | one, the metric name | incremental |
+| Summary (quantiles)       | for each label set (excluding 'quantile') | for each quantile    | absolute    |
+| Summary (sum and count)   | for each label set                        | the metric name      | incremental |
+| Histogram (buckets)       | for each label set (excluding 'le')       | for each bucket      | incremental |
+| Histogram (sum and count) | for each label set                        | the metric name      | incremental |
+
+Untyped metrics (have no '# TYPE') processing:
+
+- As Counter or Gauge depending on pattern match when 'fallback_type' is used.
+- As Counter if it has suffix '_total'.
+- As Summary if it has 'quantile' label.
+- As Histogram if it has 'le' label.
+
+**The rest are ignored**.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
 ## Setup
 
 
@@ -117,7 +146,7 @@ The following options can be defined globally: update_every, autodetection_retry
 This option allows you to filter out unwanted time series. Only metrics matching the selector will be collected.
 
 - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
-- Pattern syntax: [selector](https://github.com/netdata/netdata/blob/master/src/go/pkg/prometheus/promselector/README.md).
+- Pattern syntax: [selector](https://github.com/netdata/netdata/blob/master/src/go/pkg/prometheus/selector/README.md).
 - Option syntax:
 
 ```yaml
@@ -276,35 +305,6 @@ jobs:
 
 ```
 </details>
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
-## Metrics
-
-This collector has built-in grouping logic based on the [type of metrics](https://prometheus.io/docs/concepts/metric_types/).
-
-| Metric                    | Chart                                     | Dimension(s)         | Algorithm   |
-|---------------------------|-------------------------------------------|----------------------|-------------|
-| Gauge                     | for each label set                        | one, the metric name | absolute    |
-| Counter                   | for each label set                        | one, the metric name | incremental |
-| Summary (quantiles)       | for each label set (excluding 'quantile') | for each quantile    | absolute    |
-| Summary (sum and count)   | for each label set                        | the metric name      | incremental |
-| Histogram (buckets)       | for each label set (excluding 'le')       | for each bucket      | incremental |
-| Histogram (sum and count) | for each label set                        | the metric name      | incremental |
-
-Untyped metrics (have no '# TYPE') processing:
-
-- As Counter or Gauge depending on pattern match when 'fallback_type' is used.
-- As Counter if it has suffix '_total'.
-- As Summary if it has 'quantile' label.
-- As Histogram if it has 'le' label.
-
-**The rest are ignored**.
 
 
 
