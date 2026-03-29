@@ -138,7 +138,7 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
                 running += rrdeng_collectors_running(multidb_ctx[tier]);
 
             if (running) {
-                nd_log_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
+                nd_log_limit_static_thread_var(erl, 1, 0);
                 nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE, "waiting for %zu collectors to finish", running);
                 sleep_usec(100 * USEC_PER_MS);
             }
