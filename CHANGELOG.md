@@ -207,6 +207,7 @@
 - Fix ACLK ([#22051](https://github.com/netdata/netdata/issues/22051))
 - Docs: add NVIDIA/Cumulus/Mellanox to SNMP collector vendor list ([#22063](https://github.com/netdata/netdata/issues/22063))
 - Improve dbengine memory protection message on startup ([#22045](https://github.com/netdata/netdata/issues/22045))
+- Regenerate integrations docs ([#22070](https://github.com/netdata/netdata/issues/22070))
 
 ## [2.9.0] - 2026-02-16
 
