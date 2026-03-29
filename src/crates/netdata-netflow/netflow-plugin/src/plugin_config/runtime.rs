@@ -43,7 +43,7 @@ impl PluginConfig {
             }
 
             if geoip.geo_database.is_empty() {
-                let geo_db = intel_dir.join(TOPOLOGY_IP_COUNTRY_MMDB);
+                let geo_db = intel_dir.join(TOPOLOGY_IP_GEO_MMDB);
                 if geo_db.is_file() {
                     geoip
                         .geo_database

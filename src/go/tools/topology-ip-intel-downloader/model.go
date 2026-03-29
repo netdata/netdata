@@ -27,10 +27,17 @@ type asnRange struct {
 	org   string
 }
 
-type countryRange struct {
-	start   netip.Addr
-	end     netip.Addr
+type geoRange struct {
+	start netip.Addr
+	end   netip.Addr
+
 	country string
+	state   string
+	city    string
+
+	latitude    float64
+	longitude   float64
+	hasLocation bool
 }
 
 type classification struct {
@@ -51,7 +58,7 @@ func (r asnRange) validate() error {
 	return nil
 }
 
-func (r countryRange) validate() error {
+func (r geoRange) validate() error {
 	if !r.start.IsValid() || !r.end.IsValid() {
 		return errors.New("invalid range address")
 	}

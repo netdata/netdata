@@ -60,6 +60,13 @@ add_cmake_option ENABLE_LIBBACKTRACE On
 add_cmake_option BUILD_FOR_PACKAGING On
 
 [ -d "${SOURCE_DIR}/tmp/ibm_mq" ] && add_cmake_option FETCHCONTENT_SOURCE_DIR_IBM_MQ "${SOURCE_DIR}/tmp/ibm_mq"
+if [ -n "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}" ]; then
+    if [ ! -d "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}" ]; then
+        echo "Missing topology IP intelligence stock directory: ${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}"
+        exit 1
+    fi
+    add_cmake_option NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}"
+fi
 
 case "${PKG_TYPE}" in
     DEB)

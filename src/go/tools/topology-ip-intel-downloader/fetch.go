@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -26,72 +27,163 @@ func newDownloader(httpCfg httpConfig) *downloader {
 	}
 }
 
-func (d *downloader) readDataset(spec datasetSpec) ([]byte, error) {
-	raw, err := d.readRaw(spec)
+func (d *downloader) readDataset(source sourceEntry) (generationDatasetRef, []byte, error) {
+	resolved, err := d.resolveSource(source)
 	if err != nil {
-		return nil, err
+		return generationDatasetRef{}, nil, err
 	}
-	compression := strings.ToLower(strings.TrimSpace(spec.compression))
-	if compression == "" {
-		compression = compressionAuto
+
+	raw, err := d.readRaw(resolved.fetchPath, resolved.fetchURL)
+	if err != nil {
+		return generationDatasetRef{}, nil, err
 	}
-	return decodePayload(raw, compression)
+	payload, err := decodePayload(raw)
+	if err != nil {
+		return generationDatasetRef{}, nil, err
+	}
+	return resolved.ref, payload, nil
 }
 
-func (d *downloader) readRaw(spec datasetSpec) ([]byte, error) {
-	if path := strings.TrimSpace(spec.path); path != "" {
+type resolvedSource struct {
+	ref       generationDatasetRef
+	fetchURL  string
+	fetchPath string
+}
+
+func (d *downloader) resolveSource(source sourceEntry) (resolvedSource, error) {
+	spec, ok := builtInSource(source.provider, source.artifact)
+	if !ok {
+		return resolvedSource{}, fmt.Errorf(
+			"unsupported provider/artifact %q/%q",
+			source.provider,
+			source.artifact,
+		)
+	}
+
+	ref := generationDatasetRef{
+		Name:     source.name,
+		Family:   source.family,
+		Provider: source.provider,
+		Artifact: source.artifact,
+		Format:   source.format,
+	}
+
+	switch {
+	case source.path != "":
+		ref.Source = "path"
+		ref.Path = source.path
+		return resolvedSource{
+			ref:       ref,
+			fetchPath: source.path,
+		}, nil
+	case source.url != "":
+		ref.Source = "url"
+		ref.URL = source.url
+		return resolvedSource{
+			ref:      ref,
+			fetchURL: source.url,
+		}, nil
+	case spec.directURL != "":
+		ref.Source = "builtin"
+		ref.URL = spec.directURL
+		return resolvedSource{
+			ref:      ref,
+			fetchURL: spec.directURL,
+		}, nil
+	case spec.pageURL != "":
+		resolvedURL, err := d.resolveDBIPArtifactURL(spec.pageURL, source.artifact, source.format)
+		if err != nil {
+			return resolvedSource{}, err
+		}
+		ref.Source = "builtin"
+		ref.DownloadPage = spec.pageURL
+		ref.ResolvedURL = resolvedURL
+		return resolvedSource{
+			ref:      ref,
+			fetchURL: resolvedURL,
+		}, nil
+	default:
+		return resolvedSource{}, fmt.Errorf(
+			"provider/artifact %q/%q has no usable locator",
+			source.provider,
+			source.artifact,
+		)
+	}
+}
+
+func (d *downloader) resolveDBIPArtifactURL(pageURL, artifact, format string) (string, error) {
+	page, err := d.readHTTP(pageURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch DB-IP landing page %s: %w", pageURL, err)
+	}
+
+	ext := format
+	if format == formatTSV {
+		return "", fmt.Errorf("dbip artifact %q does not support format %q", artifact, format)
+	}
+	pattern := fmt.Sprintf(
+		`https://download\.db-ip\.com/free/dbip-%s-\d{4}-\d{2}\.%s\.gz`,
+		regexp.QuoteMeta(strings.ToLower(strings.TrimSpace(artifact))),
+		regexp.QuoteMeta(ext),
+	)
+	re := regexp.MustCompile(pattern)
+	match := re.Find(page)
+	if len(match) == 0 {
+		return "", fmt.Errorf(
+			"failed to resolve DB-IP %s/%s download from %s",
+			artifact,
+			format,
+			pageURL,
+		)
+	}
+	return string(match), nil
+}
+
+func (d *downloader) readRaw(path, rawURL string) ([]byte, error) {
+	if path != "" {
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read %s: %w", path, err)
 		}
 		return content, nil
 	}
+	return d.readHTTP(rawURL)
+}
 
-	url := strings.TrimSpace(spec.url)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+func (d *downloader) readHTTP(rawURL string) ([]byte, error) {
+	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build request %s: %w", url, err)
+		return nil, fmt.Errorf("failed to build request %s: %w", rawURL, err)
 	}
 	req.Header.Set("User-Agent", d.userAgent)
 
 	start := time.Now()
 	resp, err := d.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch %s: %w", url, err)
+		return nil, fmt.Errorf("failed to fetch %s: %w", rawURL, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch %s: unexpected status %d", url, resp.StatusCode)
+		return nil, fmt.Errorf("failed to fetch %s: unexpected status %d", rawURL, resp.StatusCode)
 	}
 
 	content, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read %s: %w", url, err)
+		return nil, fmt.Errorf("failed to read %s: %w", rawURL, err)
 	}
 	_ = start
 	return content, nil
 }
 
-func decodePayload(raw []byte, compression string) ([]byte, error) {
-	switch compression {
-	case compressionNone:
-		return raw, nil
-	case compressionGzip:
+func decodePayload(raw []byte) ([]byte, error) {
+	if len(raw) >= 2 && raw[0] == 0x1f && raw[1] == 0x8b {
 		return decodeGzip(raw)
-	case compressionZip:
-		return decodeZip(raw)
-	case compressionAuto:
-		if len(raw) >= 2 && raw[0] == 0x1f && raw[1] == 0x8b {
-			return decodeGzip(raw)
-		}
-		if len(raw) >= 4 && bytes.Equal(raw[:4], []byte{'P', 'K', 0x03, 0x04}) {
-			return decodeZip(raw)
-		}
-		return raw, nil
-	default:
-		return nil, fmt.Errorf("unsupported compression mode %q", compression)
 	}
+	if len(raw) >= 4 && bytes.Equal(raw[:4], []byte{'P', 'K', 0x03, 0x04}) {
+		return decodeZip(raw)
+	}
+	return raw, nil
 }
 
 func decodeGzip(raw []byte) ([]byte, error) {

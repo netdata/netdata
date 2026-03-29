@@ -9,132 +9,164 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net"
 	"net/netip"
 	"strconv"
 	"strings"
+
+	"github.com/oschwald/maxminddb-golang"
+	"go4.org/netipx"
 )
 
-func loadRanges(cfg config, dl *downloader) ([]asnRange, []countryRange, error) {
-	source := cfg.source
-	switch source.provider {
-	case providerIPToASN:
-		spec := source.combined
-		if spec.format == "" {
-			spec.format = formatIPToASNCombinedTSV
-		}
-		if spec.compression == "" {
-			spec.compression = compressionAuto
-		}
-		content, err := dl.readDataset(spec)
+type dbipAsnMMDBRecord struct {
+	AutonomousSystemNumber       *uint32 `maxminddb:"autonomous_system_number"`
+	AutonomousSystemOrganization string  `maxminddb:"autonomous_system_organization"`
+}
+
+type dbipCountryMMDBValue struct {
+	ISOCode string `maxminddb:"iso_code"`
+}
+
+type dbipCityMMDBValue struct {
+	Names map[string]string `maxminddb:"names"`
+}
+
+type dbipSubdivisionMMDBValue struct {
+	ISOCode string            `maxminddb:"iso_code"`
+	Names   map[string]string `maxminddb:"names"`
+}
+
+type dbipLocationMMDBValue struct {
+	Latitude  float64 `maxminddb:"latitude"`
+	Longitude float64 `maxminddb:"longitude"`
+}
+
+type dbipGeoMMDBRecord struct {
+	Country      *dbipCountryMMDBValue      `maxminddb:"country"`
+	City         *dbipCityMMDBValue         `maxminddb:"city"`
+	Subdivisions []dbipSubdivisionMMDBValue `maxminddb:"subdivisions"`
+	Region       string                     `maxminddb:"region"`
+	Location     *dbipLocationMMDBValue     `maxminddb:"location"`
+}
+
+func loadRanges(
+	cfg config,
+	dl *downloader,
+) ([]asnRange, []geoRange, []generationDatasetRef, error) {
+	asnSources := make([][]asnRange, 0)
+	geoSources := make([][]geoRange, 0)
+	sourceRefs := make([]generationDatasetRef, 0, len(cfg.sources))
+
+	for i, source := range cfg.sources {
+		ref, content, err := dl.readDataset(source)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, fmt.Errorf("source %d (%s): %w", i, sourceLabel(source, i), err)
 		}
-		return parseDataset(spec.format, content)
-	case providerDBIP:
-		asnSpec := source.asn
-		if asnSpec.format == "" {
-			asnSpec.format = formatDBIPAsnCSV
-		}
-		if asnSpec.compression == "" {
-			asnSpec.compression = compressionAuto
-		}
-		countrySpec := source.country
-		if countrySpec.format == "" {
-			countrySpec.format = formatDBIPCountryCSV
-		}
-		if countrySpec.compression == "" {
-			countrySpec.compression = compressionAuto
-		}
-		asnContent, err := dl.readDataset(asnSpec)
-		if err != nil {
-			return nil, nil, err
-		}
-		countryContent, err := dl.readDataset(countrySpec)
-		if err != nil {
-			return nil, nil, err
-		}
-		asnRanges, _, err := parseDataset(asnSpec.format, asnContent)
-		if err != nil {
-			return nil, nil, err
-		}
-		_, countryRanges, err := parseDataset(countrySpec.format, countryContent)
-		if err != nil {
-			return nil, nil, err
-		}
-		return asnRanges, countryRanges, nil
-	case providerCustom:
-		var outASN []asnRange
-		var outCountry []countryRange
-		if source.combined.path != "" || source.combined.url != "" {
-			spec := source.combined
-			if spec.compression == "" {
-				spec.compression = compressionAuto
-			}
-			content, err := dl.readDataset(spec)
+		sourceRefs = append(sourceRefs, ref)
+
+		switch source.family {
+		case sourceFamilyASN:
+			asnRanges, err := parseASNSource(source, content)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, fmt.Errorf("source %d (%s): %w", i, sourceLabel(source, i), err)
 			}
-			asnRanges, countryRanges, err := parseDataset(spec.format, content)
+			asnSources = append(asnSources, asnRanges)
+		case sourceFamilyGeo:
+			geoRanges, err := parseGeoSource(source, content)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, fmt.Errorf("source %d (%s): %w", i, sourceLabel(source, i), err)
 			}
-			outASN = append(outASN, asnRanges...)
-			outCountry = append(outCountry, countryRanges...)
+			geoSources = append(geoSources, geoRanges)
+		default:
+			return nil, nil, nil, fmt.Errorf(
+				"source %d (%s): unsupported family %q",
+				i,
+				sourceLabel(source, i),
+				source.family,
+			)
 		}
-		if source.asn.path != "" || source.asn.url != "" {
-			spec := source.asn
-			if spec.compression == "" {
-				spec.compression = compressionAuto
-			}
-			content, err := dl.readDataset(spec)
-			if err != nil {
-				return nil, nil, err
-			}
-			asnRanges, _, err := parseDataset(spec.format, content)
-			if err != nil {
-				return nil, nil, err
-			}
-			outASN = append(outASN, asnRanges...)
+	}
+
+	mergedASN, err := mergeAsnSources(asnSources)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	mergedGeo, err := mergeGeoSources(geoSources)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return mergedASN, mergedGeo, sourceRefs, nil
+}
+
+func sourceLabel(source sourceEntry, index int) string {
+	if source.name != "" {
+		return source.name
+	}
+	return fmt.Sprintf("%s-%d", source.family, index)
+}
+
+func parseASNSource(source sourceEntry, payload []byte) ([]asnRange, error) {
+	switch {
+	case source.provider == providerIPToASN && source.artifact == artifactIPToASNCombined:
+		if source.format != formatTSV {
+			return nil, fmt.Errorf("iptoasn combined requires tsv format, got %q", source.format)
 		}
-		if source.country.path != "" || source.country.url != "" {
-			spec := source.country
-			if spec.compression == "" {
-				spec.compression = compressionAuto
-			}
-			content, err := dl.readDataset(spec)
-			if err != nil {
-				return nil, nil, err
-			}
-			_, countryRanges, err := parseDataset(spec.format, content)
-			if err != nil {
-				return nil, nil, err
-			}
-			outCountry = append(outCountry, countryRanges...)
+		return parseIPToASNCombinedTSVAsn(payload)
+	case source.provider == providerDBIP && source.artifact == artifactDBIPASNLite:
+		switch source.format {
+		case formatCSV:
+			return parseDBIPAsnCSV(payload)
+		case formatMMDB:
+			return parseDBIPAsnMMDB(payload)
+		default:
+			return nil, fmt.Errorf("unsupported dbip ASN format %q", source.format)
 		}
-		return outASN, outCountry, nil
 	default:
-		return nil, nil, fmt.Errorf("unsupported provider %q", source.provider)
+		return nil, fmt.Errorf(
+			"unsupported ASN source %q/%q",
+			source.provider,
+			source.artifact,
+		)
 	}
 }
 
-func parseDataset(format string, payload []byte) ([]asnRange, []countryRange, error) {
-	switch strings.ToLower(strings.TrimSpace(format)) {
-	case formatIPToASNCombinedTSV:
-		return parseIPToASNCombinedTSV(payload)
-	case formatDBIPAsnCSV:
-		asnRanges, err := parseDBIPAsnCSV(payload)
-		return asnRanges, nil, err
-	case formatDBIPCountryCSV:
-		countryRanges, err := parseDBIPCountryCSV(payload)
-		return nil, countryRanges, err
+func parseGeoSource(source sourceEntry, payload []byte) ([]geoRange, error) {
+	switch {
+	case source.provider == providerIPToASN && source.artifact == artifactIPToASNCombined:
+		if source.format != formatTSV {
+			return nil, fmt.Errorf("iptoasn combined requires tsv format, got %q", source.format)
+		}
+		return parseIPToASNCombinedTSVGeo(payload)
+	case source.provider == providerDBIP && source.artifact == artifactDBIPCountryLite:
+		switch source.format {
+		case formatCSV:
+			return parseDBIPCountryCSV(payload)
+		case formatMMDB:
+			return parseDBIPGeoMMDB(payload)
+		default:
+			return nil, fmt.Errorf("unsupported dbip GEO format %q", source.format)
+		}
+	case source.provider == providerDBIP && source.artifact == artifactDBIPCityLite:
+		switch source.format {
+		case formatCSV:
+			return parseDBIPCityCSV(payload)
+		case formatMMDB:
+			return parseDBIPGeoMMDB(payload)
+		default:
+			return nil, fmt.Errorf("unsupported dbip GEO format %q", source.format)
+		}
 	default:
-		return nil, nil, fmt.Errorf("unsupported dataset format %q", format)
+		return nil, fmt.Errorf(
+			"unsupported GEO source %q/%q",
+			source.provider,
+			source.artifact,
+		)
 	}
 }
 
-func parseIPToASNCombinedTSV(payload []byte) ([]asnRange, []countryRange, error) {
+func parseIPToASNCombinedTSVAsn(payload []byte) ([]asnRange, error) {
 	asnRanges := make([]asnRange, 0, 1<<20)
-	countryRanges := make([]countryRange, 0, 1<<20)
 
 	scanner := bufio.NewScanner(bytes.NewReader(payload))
 	lineNo := 0
@@ -146,37 +178,63 @@ func parseIPToASNCombinedTSV(payload []byte) ([]asnRange, []countryRange, error)
 		}
 		parts := strings.Split(line, "\t")
 		if len(parts) < 5 {
-			return nil, nil, fmt.Errorf("iptoasn line %d: expected at least 5 columns", lineNo)
+			return nil, fmt.Errorf("iptoasn line %d: expected at least 5 columns", lineNo)
 		}
 		start, end, err := parseRangeEndpoints(parts[0], parts[1])
 		if err != nil {
-			return nil, nil, fmt.Errorf("iptoasn line %d: %w", lineNo, err)
+			return nil, fmt.Errorf("iptoasn line %d: %w", lineNo, err)
 		}
 		asn, err := parseASN(parts[2])
 		if err != nil {
-			return nil, nil, fmt.Errorf("iptoasn line %d: %w", lineNo, err)
+			return nil, fmt.Errorf("iptoasn line %d: %w", lineNo, err)
 		}
-		country := normalizeCountry(parts[3])
 		org := strings.TrimSpace(parts[4])
 
 		asnRange := asnRange{start: start, end: end, asn: asn, org: org}
 		if err := asnRange.validate(); err != nil {
-			return nil, nil, fmt.Errorf("iptoasn line %d: %w", lineNo, err)
+			return nil, fmt.Errorf("iptoasn line %d: %w", lineNo, err)
 		}
 		asnRanges = append(asnRanges, asnRange)
-
-		if country != "" {
-			countryRange := countryRange{start: start, end: end, country: country}
-			if err := countryRange.validate(); err != nil {
-				return nil, nil, fmt.Errorf("iptoasn line %d: %w", lineNo, err)
-			}
-			countryRanges = append(countryRanges, countryRange)
-		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, nil, fmt.Errorf("failed to scan iptoasn payload: %w", err)
+		return nil, fmt.Errorf("failed to scan iptoasn payload: %w", err)
 	}
-	return asnRanges, countryRanges, nil
+	return asnRanges, nil
+}
+
+func parseIPToASNCombinedTSVGeo(payload []byte) ([]geoRange, error) {
+	geoRanges := make([]geoRange, 0, 1<<20)
+
+	scanner := bufio.NewScanner(bytes.NewReader(payload))
+	lineNo := 0
+	for scanner.Scan() {
+		lineNo++
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.Split(line, "\t")
+		if len(parts) < 5 {
+			return nil, fmt.Errorf("iptoasn line %d: expected at least 5 columns", lineNo)
+		}
+		start, end, err := parseRangeEndpoints(parts[0], parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("iptoasn line %d: %w", lineNo, err)
+		}
+		country := normalizeCountry(parts[3])
+		if country == "" {
+			continue
+		}
+		rec := geoRange{start: start, end: end, country: country}
+		if err := rec.validate(); err != nil {
+			return nil, fmt.Errorf("iptoasn line %d: %w", lineNo, err)
+		}
+		geoRanges = append(geoRanges, rec)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to scan iptoasn payload: %w", err)
+	}
+	return geoRanges, nil
 }
 
 func parseDBIPAsnCSV(payload []byte) ([]asnRange, error) {
@@ -225,12 +283,12 @@ func parseDBIPAsnCSV(payload []byte) ([]asnRange, error) {
 	return out, nil
 }
 
-func parseDBIPCountryCSV(payload []byte) ([]countryRange, error) {
+func parseDBIPCountryCSV(payload []byte) ([]geoRange, error) {
 	reader := csv.NewReader(strings.NewReader(string(payload)))
 	reader.FieldsPerRecord = -1
 	reader.TrimLeadingSpace = true
 
-	out := make([]countryRange, 0, 1<<18)
+	out := make([]geoRange, 0, 1<<18)
 	lineNo := 0
 	for {
 		row, err := reader.Read()
@@ -258,13 +316,222 @@ func parseDBIPCountryCSV(payload []byte) ([]countryRange, error) {
 		if country == "" {
 			continue
 		}
-		rec := countryRange{start: start, end: end, country: country}
+		rec := geoRange{start: start, end: end, country: country}
 		if err := rec.validate(); err != nil {
 			return nil, fmt.Errorf("dbip country line %d: %w", lineNo, err)
 		}
 		out = append(out, rec)
 	}
 	return out, nil
+}
+
+func parseDBIPCityCSV(payload []byte) ([]geoRange, error) {
+	reader := csv.NewReader(strings.NewReader(string(payload)))
+	reader.FieldsPerRecord = -1
+	reader.TrimLeadingSpace = true
+
+	out := make([]geoRange, 0, 1<<18)
+	lineNo := 0
+	for {
+		row, err := reader.Read()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, fmt.Errorf("dbip city line %d: %w", lineNo+1, err)
+		}
+		lineNo++
+		if len(row) == 0 {
+			continue
+		}
+		if strings.HasPrefix(strings.TrimSpace(row[0]), "#") {
+			continue
+		}
+		if len(row) < 8 {
+			return nil, fmt.Errorf("dbip city line %d: expected >= 8 columns", lineNo)
+		}
+
+		start, end, err := parseRangeEndpoints(row[0], row[1])
+		if err != nil {
+			return nil, fmt.Errorf("dbip city line %d: %w", lineNo, err)
+		}
+
+		country := normalizeCountry(row[3])
+		state := strings.TrimSpace(row[4])
+		city := strings.TrimSpace(row[5])
+
+		rec := geoRange{
+			start:   start,
+			end:     end,
+			country: country,
+			state:   state,
+			city:    city,
+		}
+
+		if latRaw := strings.TrimSpace(row[6]); latRaw != "" {
+			lat, err := strconv.ParseFloat(latRaw, 64)
+			if err != nil {
+				return nil, fmt.Errorf("dbip city line %d: invalid latitude %q: %w", lineNo, latRaw, err)
+			}
+			rec.latitude = lat
+			rec.hasLocation = true
+		}
+		if lonRaw := strings.TrimSpace(row[7]); lonRaw != "" {
+			lon, err := strconv.ParseFloat(lonRaw, 64)
+			if err != nil {
+				return nil, fmt.Errorf("dbip city line %d: invalid longitude %q: %w", lineNo, lonRaw, err)
+			}
+			rec.longitude = lon
+			rec.hasLocation = true
+		}
+
+		if err := rec.validate(); err != nil {
+			return nil, fmt.Errorf("dbip city line %d: %w", lineNo, err)
+		}
+		out = append(out, rec)
+	}
+	return out, nil
+}
+
+func parseDBIPAsnMMDB(payload []byte) ([]asnRange, error) {
+	reader, err := maxminddb.FromBytes(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open dbip ASN mmdb: %w", err)
+	}
+
+	out := make([]asnRange, 0, 1<<18)
+	networks := reader.Networks(maxminddb.SkipAliasedNetworks)
+	for networks.Next() {
+		var record dbipAsnMMDBRecord
+		network, err := networks.Network(&record)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode dbip ASN network: %w", err)
+		}
+		start, end, err := rangeFromIPNet(network)
+		if err != nil {
+			return nil, err
+		}
+		asn := uint32(0)
+		if record.AutonomousSystemNumber != nil {
+			asn = *record.AutonomousSystemNumber
+		}
+		rec := asnRange{
+			start: start,
+			end:   end,
+			asn:   asn,
+			org:   strings.TrimSpace(record.AutonomousSystemOrganization),
+		}
+		if rec.asn == 0 && rec.org == "" {
+			continue
+		}
+		if err := rec.validate(); err != nil {
+			return nil, err
+		}
+		out = append(out, rec)
+	}
+	if err := networks.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate dbip ASN mmdb: %w", err)
+	}
+	return out, nil
+}
+
+func parseDBIPGeoMMDB(payload []byte) ([]geoRange, error) {
+	reader, err := maxminddb.FromBytes(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open dbip GEO mmdb: %w", err)
+	}
+
+	out := make([]geoRange, 0, 1<<18)
+	networks := reader.Networks(maxminddb.SkipAliasedNetworks)
+	for networks.Next() {
+		var record dbipGeoMMDBRecord
+		network, err := networks.Network(&record)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode dbip GEO network: %w", err)
+		}
+		start, end, err := rangeFromIPNet(network)
+		if err != nil {
+			return nil, err
+		}
+
+		rec := geoRange{
+			start:   start,
+			end:     end,
+			country: dbipCountryCode(record.Country),
+			state:   dbipStateName(record),
+			city:    dbipCityName(record.City),
+		}
+		if record.Location != nil {
+			rec.latitude = record.Location.Latitude
+			rec.longitude = record.Location.Longitude
+			rec.hasLocation = true
+		}
+		if rec.country == "" && rec.state == "" && rec.city == "" && !rec.hasLocation {
+			continue
+		}
+		if err := rec.validate(); err != nil {
+			return nil, err
+		}
+		out = append(out, rec)
+	}
+	if err := networks.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate dbip GEO mmdb: %w", err)
+	}
+	return out, nil
+}
+
+func dbipCountryCode(value *dbipCountryMMDBValue) string {
+	if value == nil {
+		return ""
+	}
+	return normalizeCountry(value.ISOCode)
+}
+
+func dbipCityName(value *dbipCityMMDBValue) string {
+	if value == nil {
+		return ""
+	}
+	if name := strings.TrimSpace(value.Names["en"]); name != "" {
+		return name
+	}
+	for _, name := range value.Names {
+		name = strings.TrimSpace(name)
+		if name != "" {
+			return name
+		}
+	}
+	return ""
+}
+
+func dbipStateName(record dbipGeoMMDBRecord) string {
+	if len(record.Subdivisions) > 0 {
+		if name := strings.TrimSpace(record.Subdivisions[0].Names["en"]); name != "" {
+			return name
+		}
+		for _, name := range record.Subdivisions[0].Names {
+			name = strings.TrimSpace(name)
+			if name != "" {
+				return name
+			}
+		}
+		if code := strings.TrimSpace(record.Subdivisions[0].ISOCode); code != "" {
+			return code
+		}
+	}
+	return strings.TrimSpace(record.Region)
+}
+
+func rangeFromIPNet(network *net.IPNet) (netip.Addr, netip.Addr, error) {
+	prefix, err := netip.ParsePrefix(network.String())
+	if err != nil {
+		return netip.Addr{}, netip.Addr{}, fmt.Errorf(
+			"failed to parse mmdb network %s: %w",
+			network.String(),
+			err,
+		)
+	}
+	rng := netipx.RangeOfPrefix(prefix.Masked())
+	return rng.From(), rng.To(), nil
 }
 
 func parseRangeEndpoints(startRaw, endRaw string) (netip.Addr, netip.Addr, error) {
@@ -294,7 +561,6 @@ func parseIP(raw string) (netip.Addr, error) {
 		return addr.Unmap(), nil
 	}
 
-	// Some providers encode IPv4 as decimal integers.
 	if num, ok := new(big.Int).SetString(value, 10); ok {
 		if num.Sign() < 0 {
 			return netip.Addr{}, fmt.Errorf("negative integer address")

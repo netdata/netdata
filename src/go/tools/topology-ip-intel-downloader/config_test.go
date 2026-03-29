@@ -16,18 +16,22 @@ func TestLoadConfigCustomFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	cfgPath := filepath.Join(tmpDir, "topology-ip-intel.yaml")
 	err := os.WriteFile(cfgPath, []byte(`
-source:
-  provider: custom
-  asn:
-    path: /tmp/asn.csv
-    format: dbip_asn_csv
-  country:
-    path: /tmp/country.csv
-    format: dbip_country_csv
+sources:
+  - name: primary-asn
+    family: asn
+    provider: dbip
+    artifact: asn-lite
+    path: /tmp/asn.mmdb
+  - name: fallback-geo
+    family: geo
+    provider: dbip
+    artifact: city-lite
+    url: https://example.test/city.mmdb.gz
+    format: mmdb
 output:
   directory: /tmp/netdata-ip-intel
   asn_file: asn.mmdb
-  country_file: country.mmdb
+  geo_file: geo.mmdb
   metadata_file: meta.json
 policy:
   localhost_cidrs: ["127.0.0.0/8"]
@@ -42,14 +46,25 @@ http:
 	cfg, loadedPath, err := loadConfig(cfgPath)
 	require.NoError(t, err)
 	require.Equal(t, cfgPath, loadedPath)
-	require.Equal(t, providerCustom, cfg.source.provider)
-	require.Equal(t, "", cfg.source.combined.url)
-	require.Equal(t, "/tmp/asn.csv", cfg.source.asn.path)
-	require.Equal(t, formatDBIPAsnCSV, cfg.source.asn.format)
-	require.Equal(t, "/tmp/country.csv", cfg.source.country.path)
+	require.Len(t, cfg.sources, 2)
+
+	require.Equal(t, "primary-asn", cfg.sources[0].name)
+	require.Equal(t, sourceFamilyASN, cfg.sources[0].family)
+	require.Equal(t, providerDBIP, cfg.sources[0].provider)
+	require.Equal(t, artifactDBIPASNLite, cfg.sources[0].artifact)
+	require.Equal(t, formatMMDB, cfg.sources[0].format)
+	require.Equal(t, "/tmp/asn.mmdb", cfg.sources[0].path)
+
+	require.Equal(t, "fallback-geo", cfg.sources[1].name)
+	require.Equal(t, sourceFamilyGeo, cfg.sources[1].family)
+	require.Equal(t, providerDBIP, cfg.sources[1].provider)
+	require.Equal(t, artifactDBIPCityLite, cfg.sources[1].artifact)
+	require.Equal(t, formatMMDB, cfg.sources[1].format)
+	require.Equal(t, "https://example.test/city.mmdb.gz", cfg.sources[1].url)
+
 	require.Equal(t, "/tmp/netdata-ip-intel", cfg.output.directory)
 	require.Equal(t, "asn.mmdb", cfg.output.asnFile)
-	require.Equal(t, "country.mmdb", cfg.output.countryFile)
+	require.Equal(t, "geo.mmdb", cfg.output.geoFile)
 	require.Equal(t, "meta.json", cfg.output.metadataFile)
 	require.Equal(t, []string{"127.0.0.0/8"}, cfg.policy.localhostCIDRs)
 	require.Equal(t, []string{"10.0.0.0/8"}, cfg.policy.privateCIDRs)
@@ -61,6 +76,10 @@ http:
 func TestDefaultConfigValidation(t *testing.T) {
 	cfg := defaultConfig()
 	require.NoError(t, cfg.validate())
+	require.Len(t, cfg.familySources(sourceFamilyASN), 1)
+	require.Len(t, cfg.familySources(sourceFamilyGeo), 1)
+	require.True(t, cfg.hasFamily(sourceFamilyASN))
+	require.True(t, cfg.hasFamily(sourceFamilyGeo))
 }
 
 func TestDefaultConfigUsesBuildInfoCacheDir(t *testing.T) {
@@ -107,4 +126,16 @@ func TestInvalidOutputNamesRejected(t *testing.T) {
 	err := cfg.validate()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "output.asn_file")
+}
+
+func TestNormalizeSourceEntryInfersFormatFromPath(t *testing.T) {
+	source := sourceEntry{
+		family:   sourceFamilyGeo,
+		provider: providerDBIP,
+		artifact: artifactDBIPCityLite,
+		path:     "/tmp/dbip-city-lite.mmdb.gz",
+	}
+	require.NoError(t, normalizeSourceEntry(&source))
+	require.Equal(t, formatMMDB, source.format)
+	require.Equal(t, "dbip-city-lite", source.name)
 }

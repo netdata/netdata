@@ -1,38 +1,31 @@
 # Shared Topology IP intelligence configuration.
 #
-# Lookup order used by downloader and future consumers:
+# Lookup order used by downloader and consumers:
 # 1. /etc/netdata/topology-ip-intel.yaml
 # 2. /usr/lib/netdata/conf.d/topology-ip-intel.yaml
+#
+# Source ordering is per family:
+# - earlier ASN sources win over later ASN sources
+# - earlier GEO sources win over later GEO sources
 
-source:
-  # one of: iptoasn, dbip_lite, custom
-  provider: iptoasn
+sources:
+  - name: dbip-asn
+    family: asn
+    provider: dbip
+    artifact: asn-lite
+    format: mmdb
 
-  # Used by provider=iptoasn and by provider=custom when populated.
-  combined:
-    url: "https://iptoasn.com/data/ip2asn-combined.tsv.gz"
-    format: iptoasn_combined_tsv
-    compression: auto
-
-  # Used by provider=dbip_lite and provider=custom.
-  asn:
-    url: ""
-    path: ""
-    format: dbip_asn_csv
-    compression: auto
-
-  # Used by provider=dbip_lite and provider=custom.
-  country:
-    url: ""
-    path: ""
-    format: dbip_country_csv
-    compression: auto
+  - name: dbip-geo
+    family: geo
+    provider: dbip
+    artifact: city-lite
+    format: mmdb
 
 output:
   # Destination directory for generated databases.
   directory: /var/cache/netdata/topology-ip-intel
   asn_file: topology-ip-asn.mmdb
-  country_file: topology-ip-country.mmdb
+  geo_file: topology-ip-geo.mmdb
   metadata_file: topology-ip-intel.json
 
 policy:

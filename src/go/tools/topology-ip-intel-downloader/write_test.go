@@ -19,7 +19,7 @@ func TestWriteOutputsAndClassifications(t *testing.T) {
 	cfg := defaultConfig()
 	cfg.output.directory = t.TempDir()
 	cfg.output.asnFile = "asn.mmdb"
-	cfg.output.countryFile = "country.mmdb"
+	cfg.output.geoFile = "geo.mmdb"
 	cfg.output.metadataFile = "meta.json"
 	cfg.policy.localhostCIDRs = []string{"127.0.0.0/8"}
 	cfg.policy.privateCIDRs = []string{"10.0.0.0/8"}
@@ -31,19 +31,44 @@ func TestWriteOutputsAndClassifications(t *testing.T) {
 		asn:   13335,
 		org:   "Cloudflare",
 	}}
-	countryRanges := []countryRange{{
-		start:   mustParseAddr(t, "1.0.0.0"),
-		end:     mustParseAddr(t, "1.0.0.255"),
-		country: "US",
+	geoRanges := []geoRange{{
+		start:       mustParseAddr(t, "1.0.0.0"),
+		end:         mustParseAddr(t, "1.0.0.255"),
+		country:     "US",
+		state:       "California",
+		city:        "Los Angeles",
+		latitude:    34.0522,
+		longitude:   -118.2437,
+		hasLocation: true,
 	}}
+	sources := []generationDatasetRef{
+		{
+			Name:        "dbip-asn",
+			Family:      sourceFamilyASN,
+			Provider:    providerDBIP,
+			Artifact:    artifactDBIPASNLite,
+			Source:      "builtin",
+			Format:      formatMMDB,
+			ResolvedURL: "https://download.db-ip.com/free/dbip-asn-lite-2026-03.mmdb.gz",
+		},
+		{
+			Name:        "dbip-geo",
+			Family:      sourceFamilyGeo,
+			Provider:    providerDBIP,
+			Artifact:    artifactDBIPCityLite,
+			Source:      "builtin",
+			Format:      formatMMDB,
+			ResolvedURL: "https://download.db-ip.com/free/dbip-city-lite-2026-03.mmdb.gz",
+		},
+	}
 
-	require.NoError(t, writeOutputs(cfg, asnRanges, countryRanges))
+	require.NoError(t, writeOutputs(cfg, asnRanges, geoRanges, sources))
 
 	loadOpts := mmdbwriter.Options{IncludeReservedNetworks: true, DisableIPv4Aliasing: true}
 	asnDB, err := mmdbwriter.Load(filepath.Join(cfg.output.directory, cfg.output.asnFile), loadOpts)
 	require.NoError(t, err)
 
-	countryDB, err := mmdbwriter.Load(filepath.Join(cfg.output.directory, cfg.output.countryFile), loadOpts)
+	geoDB, err := mmdbwriter.Load(filepath.Join(cfg.output.directory, cfg.output.geoFile), loadOpts)
 	require.NoError(t, err)
 
 	publicRec := mustLookupMap(t, asnDB, "1.0.0.1")
@@ -62,10 +87,21 @@ func TestWriteOutputsAndClassifications(t *testing.T) {
 	require.Equal(t, "interesting", netdataClass(interestingRec))
 	require.True(t, netdataTrackIndividual(interestingRec))
 
-	countryRec := mustLookupMap(t, countryDB, "1.0.0.8")
-	countryMap, ok := countryRec["country"].(mmdbtype.Map)
+	geoRec := mustLookupMap(t, geoDB, "1.0.0.8")
+	countryMap, ok := geoRec["country"].(mmdbtype.Map)
 	require.True(t, ok)
 	require.Equal(t, "US", string(countryMap["iso_code"].(mmdbtype.String)))
+	require.Equal(t, "California", string(geoRec["region"].(mmdbtype.String)))
+
+	cityMap, ok := geoRec["city"].(mmdbtype.Map)
+	require.True(t, ok)
+	cityNames := cityMap["names"].(mmdbtype.Map)
+	require.Equal(t, "Los Angeles", string(cityNames["en"].(mmdbtype.String)))
+
+	locationMap, ok := geoRec["location"].(mmdbtype.Map)
+	require.True(t, ok)
+	require.Equal(t, float64(34.0522), float64(locationMap["latitude"].(mmdbtype.Float64)))
+	require.Equal(t, float64(-118.2437), float64(locationMap["longitude"].(mmdbtype.Float64)))
 
 	metaPath := filepath.Join(cfg.output.directory, cfg.output.metadataFile)
 	metaBlob, err := os.ReadFile(metaPath)
@@ -74,36 +110,75 @@ func TestWriteOutputsAndClassifications(t *testing.T) {
 	var meta generationMetadata
 	require.NoError(t, json.Unmarshal(metaBlob, &meta))
 	require.Equal(t, "topology-ip-intel-downloader", meta.GeneratedBy)
-	require.Equal(t, cfg.source.provider, meta.Source.Provider)
-	require.NotNil(t, meta.Source.Combined)
-	require.Nil(t, meta.Source.Asn)
-	require.Nil(t, meta.Source.Country)
-	require.Equal(t, cfg.source.combined.url, meta.Source.Combined.URL)
-	require.Equal(t, cfg.source.combined.format, meta.Source.Combined.Format)
+	require.Len(t, meta.Sources, 2)
+	require.Equal(t, cfg.output.asnFile, meta.Output.AsnFile)
+	require.Equal(t, cfg.output.geoFile, meta.Output.GeoFile)
 	require.Equal(t, cfg.output.metadataFile, meta.Output.MetadataFile)
+	require.Equal(t, 1, meta.Counts.AsnRanges)
+	require.Equal(t, 1, meta.Counts.GeoRanges)
 }
 
-func TestAtomicReplaceExistingFile(t *testing.T) {
+func TestWriteOutputsRemovesDisabledGeoFile(t *testing.T) {
 	cfg := defaultConfig()
 	cfg.output.directory = t.TempDir()
 	cfg.output.asnFile = "asn.mmdb"
-	cfg.output.countryFile = "country.mmdb"
+	cfg.output.geoFile = "geo.mmdb"
+	cfg.output.metadataFile = "meta.json"
+	cfg.sources = []sourceEntry{
+		{
+			family:   sourceFamilyASN,
+			provider: providerDBIP,
+			artifact: artifactDBIPASNLite,
+			format:   formatMMDB,
+		},
+	}
+
+	geoPath := filepath.Join(cfg.output.directory, cfg.output.geoFile)
+	require.NoError(t, os.WriteFile(geoPath, []byte("stale"), 0o644))
+
+	require.NoError(t, writeOutputs(cfg, nil, nil, nil))
+
+	_, err := os.Stat(geoPath)
+	require.ErrorIs(t, err, os.ErrNotExist)
+
+	metaBlob, err := os.ReadFile(filepath.Join(cfg.output.directory, cfg.output.metadataFile))
+	require.NoError(t, err)
+	var meta generationMetadata
+	require.NoError(t, json.Unmarshal(metaBlob, &meta))
+	require.Equal(t, cfg.output.asnFile, meta.Output.AsnFile)
+	require.Empty(t, meta.Output.GeoFile)
+}
+
+func TestWriteOutputsDoesNotPublishHalfBuiltState(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.output.directory = t.TempDir()
+	cfg.output.asnFile = "asn.mmdb"
+	cfg.output.geoFile = "geo.mmdb"
 	cfg.output.metadataFile = "meta.json"
 
 	asnPath := filepath.Join(cfg.output.directory, cfg.output.asnFile)
-	countryPath := filepath.Join(cfg.output.directory, cfg.output.countryFile)
-	require.NoError(t, os.WriteFile(asnPath, []byte("stale"), 0o644))
-	require.NoError(t, os.WriteFile(countryPath, []byte("stale"), 0o644))
+	geoPath := filepath.Join(cfg.output.directory, cfg.output.geoFile)
+	require.NoError(t, writeOutputs(cfg, nil, nil, nil))
 
-	require.NoError(t, writeOutputs(cfg, nil, nil))
-
-	loadOpts := mmdbwriter.Options{IncludeReservedNetworks: true, DisableIPv4Aliasing: true}
-	asnDB, err := mmdbwriter.Load(asnPath, loadOpts)
+	asnBefore, err := os.ReadFile(asnPath)
+	require.NoError(t, err)
+	geoBefore, err := os.ReadFile(geoPath)
 	require.NoError(t, err)
 
-	countryDB, err := mmdbwriter.Load(countryPath, loadOpts)
+	invalidGeo := []geoRange{{
+		start: mustParseAddr(t, "1.0.0.0"),
+		end:   mustParseAddr(t, "2001:db8::1"),
+	}}
+
+	err = writeOutputs(cfg, nil, invalidGeo, nil)
+	require.Error(t, err)
+
+	asnAfter, err := os.ReadFile(asnPath)
 	require.NoError(t, err)
-	_, _ = asnDB, countryDB
+	geoAfter, err := os.ReadFile(geoPath)
+	require.NoError(t, err)
+	require.Equal(t, asnBefore, asnAfter)
+	require.Equal(t, geoBefore, geoAfter)
 }
 
 func mustParseAddr(t *testing.T, value string) netip.Addr {

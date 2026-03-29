@@ -108,6 +108,8 @@ set(STOCK_DATA_DEST "usr/share/netdata")
 set(STOCK_DATA_DIR "${NETDATA_RUNTIME_PREFIX}/${STOCK_DATA_DEST}")
 set(VARLIB_DIR "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 set(NETDATA_BIN_DIR "${NETDATA_RUNTIME_PREFIX}/${BINDIR}")
+set(NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR ""
+    CACHE PATH "Staged topology IP intelligence stock payload for package builds")
 
 # A non-default value is only used when building Debian packages (/var/lib/netdata/www)
 if(NOT DEFINED WEB_DIR)
@@ -3415,13 +3417,28 @@ if(ENABLE_PLUGIN_NETFLOW)
     install(FILES src/go/tools/topology-ip-intel-downloader/configs/topology-ip-intel.yaml
             COMPONENT plugin-netflow
             DESTINATION usr/lib/netdata/conf.d)
-    install(FILES
-            src/go/tools/topology-ip-intel-downloader/stock/README.md
-            src/go/tools/topology-ip-intel-downloader/stock/topology-ip-intel/topology-ip-asn.mmdb
-            src/go/tools/topology-ip-intel-downloader/stock/topology-ip-intel/topology-ip-country.mmdb
-            src/go/tools/topology-ip-intel-downloader/stock/topology-ip-intel/topology-ip-intel.json
-            COMPONENT plugin-netflow
-            DESTINATION ${STOCK_DATA_DEST}/topology-ip-intel)
+
+    if(NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR)
+        set(TOPOLOGY_IP_INTEL_STOCK_PAYLOAD
+                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/README.md"
+                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-asn.mmdb"
+                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-geo.mmdb"
+                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-intel.json")
+        foreach(stock_file IN LISTS TOPOLOGY_IP_INTEL_STOCK_PAYLOAD)
+            if(NOT EXISTS "${stock_file}")
+                message(FATAL_ERROR
+                        "Missing topology IP intelligence stock payload file: ${stock_file}")
+            endif()
+        endforeach()
+        install(FILES
+                ${TOPOLOGY_IP_INTEL_STOCK_PAYLOAD}
+                COMPONENT plugin-netflow
+                DESTINATION ${STOCK_DATA_DEST}/topology-ip-intel)
+    else()
+        message(STATUS
+                "plugin-netflow: no staged topology IP intelligence stock payload provided; "
+                "skipping stock topology-ip-intel install")
+    endif()
 endif()
 
 #

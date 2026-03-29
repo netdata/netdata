@@ -17,17 +17,12 @@ import (
 )
 
 type generationMetadata struct {
-	GeneratedAt string `json:"generated_at"`
-	GeneratedBy string `json:"generated_by"`
-	Source      struct {
-		Provider string                `json:"provider"`
-		Combined *generationDatasetRef `json:"combined,omitempty"`
-		Asn      *generationDatasetRef `json:"asn,omitempty"`
-		Country  *generationDatasetRef `json:"country,omitempty"`
-	} `json:"source"`
-	Counts struct {
-		AsnRanges     int `json:"asn_ranges"`
-		CountryRanges int `json:"country_ranges"`
+	GeneratedAt string                 `json:"generated_at"`
+	GeneratedBy string                 `json:"generated_by"`
+	Sources     []generationDatasetRef `json:"sources"`
+	Counts      struct {
+		AsnRanges int `json:"asn_ranges"`
+		GeoRanges int `json:"geo_ranges"`
 	} `json:"counts"`
 	Policy struct {
 		LocalhostCIDRs   []string `json:"localhost_cidrs"`
@@ -35,20 +30,31 @@ type generationMetadata struct {
 		InterestingCIDRs []string `json:"interesting_cidrs"`
 	} `json:"policy"`
 	Output struct {
-		AsnFile      string `json:"asn_file"`
-		CountryFile  string `json:"country_file"`
+		AsnFile      string `json:"asn_file,omitempty"`
+		GeoFile      string `json:"geo_file,omitempty"`
 		MetadataFile string `json:"metadata_file"`
 	} `json:"output"`
 }
 
 type generationDatasetRef struct {
-	URL         string `json:"url,omitempty"`
-	Path        string `json:"path,omitempty"`
-	Format      string `json:"format,omitempty"`
-	Compression string `json:"compression,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Family       string `json:"family"`
+	Provider     string `json:"provider,omitempty"`
+	Artifact     string `json:"artifact,omitempty"`
+	Source       string `json:"source,omitempty"`
+	Format       string `json:"format,omitempty"`
+	URL          string `json:"url,omitempty"`
+	Path         string `json:"path,omitempty"`
+	DownloadPage string `json:"download_page,omitempty"`
+	ResolvedURL  string `json:"resolved_url,omitempty"`
 }
 
-func writeOutputs(cfg config, asnRanges []asnRange, countryRanges []countryRange) error {
+func writeOutputs(
+	cfg config,
+	asnRanges []asnRange,
+	geoRanges []geoRange,
+	sources []generationDatasetRef,
+) error {
 	if err := os.MkdirAll(cfg.output.directory, 0o755); err != nil {
 		return fmt.Errorf("failed to create output dir %s: %w", cfg.output.directory, err)
 	}
@@ -59,89 +65,78 @@ func writeOutputs(cfg config, asnRanges []asnRange, countryRanges []countryRange
 	}
 
 	asnPath := filepath.Join(cfg.output.directory, cfg.output.asnFile)
-	countryPath := filepath.Join(cfg.output.directory, cfg.output.countryFile)
+	geoPath := filepath.Join(cfg.output.directory, cfg.output.geoFile)
 	metadataPath := filepath.Join(cfg.output.directory, cfg.output.metadataFile)
 
-	if err := writeAsnDatabase(asnPath, asnRanges, classes); err != nil {
-		return fmt.Errorf("asn database generation failed: %w", err)
+	stageDir, err := os.MkdirTemp(cfg.output.directory, ".tmp-topology-ip-intel-stage-*")
+	if err != nil {
+		return fmt.Errorf("failed to create staging dir in %s: %w", cfg.output.directory, err)
 	}
-	if err := writeCountryDatabase(countryPath, countryRanges, classes); err != nil {
-		return fmt.Errorf("country database generation failed: %w", err)
+	defer os.RemoveAll(stageDir)
+
+	stagedASNPath := filepath.Join(stageDir, cfg.output.asnFile)
+	stagedGeoPath := filepath.Join(stageDir, cfg.output.geoFile)
+	stagedMetadataPath := filepath.Join(stageDir, cfg.output.metadataFile)
+
+	asnEnabled := cfg.hasFamily(sourceFamilyASN)
+	geoEnabled := cfg.hasFamily(sourceFamilyGeo)
+
+	if asnEnabled {
+		if err := writeAsnDatabase(stagedASNPath, asnRanges, classes); err != nil {
+			return fmt.Errorf("asn database generation failed: %w", err)
+		}
+	}
+	if geoEnabled {
+		if err := writeGeoDatabase(stagedGeoPath, geoRanges, classes); err != nil {
+			return fmt.Errorf("geo database generation failed: %w", err)
+		}
 	}
 
 	md := generationMetadata{}
 	md.GeneratedAt = time.Now().UTC().Format(time.RFC3339)
 	md.GeneratedBy = "topology-ip-intel-downloader"
-	md.Source = metadataSource(cfg.source)
+	md.Sources = append([]generationDatasetRef(nil), sources...)
 	md.Counts.AsnRanges = len(asnRanges)
-	md.Counts.CountryRanges = len(countryRanges)
+	md.Counts.GeoRanges = len(geoRanges)
 	md.Policy.LocalhostCIDRs = append([]string{}, cfg.policy.localhostCIDRs...)
 	md.Policy.PrivateCIDRs = append([]string{}, cfg.policy.privateCIDRs...)
 	md.Policy.InterestingCIDRs = append([]string{}, cfg.policy.interestingCIDRs...)
-	md.Output.AsnFile = cfg.output.asnFile
-	md.Output.CountryFile = cfg.output.countryFile
+	if asnEnabled {
+		md.Output.AsnFile = cfg.output.asnFile
+	}
+	if geoEnabled {
+		md.Output.GeoFile = cfg.output.geoFile
+	}
 	md.Output.MetadataFile = cfg.output.metadataFile
 
 	blob, err := json.MarshalIndent(md, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to encode metadata json: %w", err)
 	}
-	if err := atomicWriteFile(metadataPath, blob, 0o644); err != nil {
+	if err := os.WriteFile(stagedMetadataPath, blob, 0o644); err != nil {
+		return fmt.Errorf("failed to write staged metadata %s: %w", stagedMetadataPath, err)
+	}
+
+	if asnEnabled {
+		if err := renameFileAtomic(stagedASNPath, asnPath); err != nil {
+			return err
+		}
+	} else if err := removeIfExists(asnPath); err != nil {
+		return err
+	}
+
+	if geoEnabled {
+		if err := renameFileAtomic(stagedGeoPath, geoPath); err != nil {
+			return err
+		}
+	} else if err := removeIfExists(geoPath); err != nil {
+		return err
+	}
+
+	if err := renameFileAtomic(stagedMetadataPath, metadataPath); err != nil {
 		return err
 	}
 	return nil
-}
-
-func metadataDatasetSpec(spec datasetSpec) *generationDatasetRef {
-	if spec.url == "" && spec.path == "" && spec.format == "" && spec.compression == "" {
-		return nil
-	}
-	return &generationDatasetRef{
-		URL:         spec.url,
-		Path:        spec.path,
-		Format:      spec.format,
-		Compression: spec.compression,
-	}
-}
-
-func metadataSource(src sourceConfig) struct {
-	Provider string                `json:"provider"`
-	Combined *generationDatasetRef `json:"combined,omitempty"`
-	Asn      *generationDatasetRef `json:"asn,omitempty"`
-	Country  *generationDatasetRef `json:"country,omitempty"`
-} {
-	md := struct {
-		Provider string                `json:"provider"`
-		Combined *generationDatasetRef `json:"combined,omitempty"`
-		Asn      *generationDatasetRef `json:"asn,omitempty"`
-		Country  *generationDatasetRef `json:"country,omitempty"`
-	}{
-		Provider: src.provider,
-	}
-
-	switch src.provider {
-	case providerIPToASN:
-		md.Combined = metadataDatasetSpec(src.combined)
-	case providerDBIP:
-		md.Asn = metadataDatasetSpec(src.asn)
-		md.Country = metadataDatasetSpec(src.country)
-	case providerCustom:
-		combinedConfigured := src.combined.url != "" || src.combined.path != ""
-		asnConfigured := src.asn.url != "" || src.asn.path != ""
-		countryConfigured := src.country.url != "" || src.country.path != ""
-
-		if combinedConfigured {
-			md.Combined = metadataDatasetSpec(src.combined)
-		}
-		if asnConfigured {
-			md.Asn = metadataDatasetSpec(src.asn)
-		}
-		if countryConfigured {
-			md.Country = metadataDatasetSpec(src.country)
-		}
-	}
-
-	return md
 }
 
 func writeAsnDatabase(path string, ranges []asnRange, classes []classification) error {
@@ -176,27 +171,51 @@ func writeAsnDatabase(path string, ranges []asnRange, classes []classification) 
 	return writeMMDBAtomic(path, writer)
 }
 
-func writeCountryDatabase(path string, ranges []countryRange, classes []classification) error {
+func writeGeoDatabase(path string, ranges []geoRange, classes []classification) error {
 	writer, err := mmdbwriter.New(mmdbwriter.Options{
-		DatabaseType:            "Netdata-Topology-Country",
-		Description:             map[string]string{"en": "Netdata topology country mapping"},
+		DatabaseType:            "Netdata-Topology-GEO",
+		Description:             map[string]string{"en": "Netdata topology geographic mapping"},
 		IPVersion:               6,
 		RecordSize:              28,
 		DisableIPv4Aliasing:     true,
 		IncludeReservedNetworks: true,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create country MMDB writer: %w", err)
+		return fmt.Errorf("failed to create GEO MMDB writer: %w", err)
 	}
 
 	for idx, rec := range ranges {
-		record := mmdbtype.Map{
-			"country": mmdbtype.Map{
+		record := mmdbtype.Map{}
+		if rec.country != "" {
+			record["country"] = mmdbtype.Map{
 				"iso_code": mmdbtype.String(rec.country),
-			},
+			}
+		}
+		if rec.city != "" {
+			record["city"] = mmdbtype.Map{
+				"names": mmdbtype.Map{
+					"en": mmdbtype.String(rec.city),
+				},
+			}
+		}
+		if rec.state != "" {
+			record["region"] = mmdbtype.String(rec.state)
+			record["subdivisions"] = mmdbtype.Slice{
+				mmdbtype.Map{
+					"names": mmdbtype.Map{
+						"en": mmdbtype.String(rec.state),
+					},
+				},
+			}
+		}
+		if rec.hasLocation {
+			record["location"] = mmdbtype.Map{
+				"latitude":  mmdbtype.Float64(rec.latitude),
+				"longitude": mmdbtype.Float64(rec.longitude),
+			}
 		}
 		if err := insertRange(writer, rec.start, rec.end, record); err != nil {
-			return fmt.Errorf("country range %d (%s-%s): %w", idx, rec.start, rec.end, err)
+			return fmt.Errorf("geo range %d (%s-%s): %w", idx, rec.start, rec.end, err)
 		}
 	}
 
@@ -277,32 +296,16 @@ func writeMMDBAtomic(path string, writer *mmdbwriter.Tree) error {
 	return nil
 }
 
-func atomicWriteFile(path string, data []byte, mode os.FileMode) error {
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".tmp-topology-ip-intel-*.json")
-	if err != nil {
-		return fmt.Errorf("failed to create temporary file in %s: %w", dir, err)
+func removeIfExists(path string) error {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove stale output %s: %w", path, err)
 	}
-	tmpPath := tmp.Name()
-	cleanup := func() {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
-	}
-	if _, err := tmp.Write(data); err != nil {
-		cleanup()
-		return fmt.Errorf("failed to write temporary file %s: %w", tmpPath, err)
-	}
-	if err := tmp.Chmod(mode); err != nil {
-		cleanup()
-		return fmt.Errorf("failed to chmod temporary file %s: %w", tmpPath, err)
-	}
-	if err := tmp.Close(); err != nil {
-		cleanup()
-		return fmt.Errorf("failed to close temporary file %s: %w", tmpPath, err)
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		cleanup()
-		return fmt.Errorf("failed to atomically replace %s: %w", path, err)
+	return nil
+}
+
+func renameFileAtomic(from, to string) error {
+	if err := os.Rename(from, to); err != nil {
+		return fmt.Errorf("failed to atomically replace %s: %w", to, err)
 	}
 	return nil
 }

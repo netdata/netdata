@@ -28,9 +28,9 @@ run() {
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../../../.." && pwd)"
-OUTPUT_DIR="${SCRIPT_DIR}/stock/topology-ip-intel"
-CONFIG_PATH="${SCRIPT_DIR}/configs/topology-ip-intel.yaml"
+OUTPUT_DIR="${1:-${REPO_ROOT}/artifacts/topology-ip-intel-stock}"
+PREPARE_SCRIPT="${REPO_ROOT}/.github/scripts/prepare-topology-ip-intel-stock.sh"
 
 run mkdir -p "${OUTPUT_DIR}"
-cd "${REPO_ROOT}/src/go"
-run go run ./tools/topology-ip-intel-downloader --config "${CONFIG_PATH}" --output-dir "${OUTPUT_DIR}"
+cd "${REPO_ROOT}"
+run "${PREPARE_SCRIPT}" --mode release --output-dir "${OUTPUT_DIR}"

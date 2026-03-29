@@ -253,7 +253,7 @@ fn auto_detect_geoip_databases_uses_absolute_journal_parent() {
     let intel_dir = cache_dir.join(TOPOLOGY_IP_INTEL_DIR);
     fs::create_dir_all(&intel_dir).expect("create intel dir");
     fs::write(intel_dir.join(TOPOLOGY_IP_ASN_MMDB), b"asn").expect("write asn db");
-    fs::write(intel_dir.join(TOPOLOGY_IP_COUNTRY_MMDB), b"geo").expect("write geo db");
+    fs::write(intel_dir.join(TOPOLOGY_IP_GEO_MMDB), b"geo").expect("write geo db");
 
     let mut cfg = PluginConfig::default();
     cfg.journal.journal_dir = cache_dir.join("flows").to_string_lossy().to_string();
@@ -273,7 +273,7 @@ fn auto_detect_geoip_databases_uses_absolute_journal_parent() {
         cfg.enrichment.geoip.geo_database,
         vec![
             intel_dir
-                .join(TOPOLOGY_IP_COUNTRY_MMDB)
+                .join(TOPOLOGY_IP_GEO_MMDB)
                 .to_string_lossy()
                 .to_string()
         ]
@@ -318,7 +318,7 @@ fn auto_detect_geoip_databases_does_not_override_explicit_config() {
     let intel_dir = cache_dir.join(TOPOLOGY_IP_INTEL_DIR);
     fs::create_dir_all(&intel_dir).expect("create intel dir");
     fs::write(intel_dir.join(TOPOLOGY_IP_ASN_MMDB), b"asn").expect("write asn db");
-    fs::write(intel_dir.join(TOPOLOGY_IP_COUNTRY_MMDB), b"geo").expect("write geo db");
+    fs::write(intel_dir.join(TOPOLOGY_IP_GEO_MMDB), b"geo").expect("write geo db");
 
     let mut cfg = PluginConfig::default();
     cfg.journal.journal_dir = cache_dir.join("flows").to_string_lossy().to_string();
@@ -340,7 +340,7 @@ fn auto_detect_geoip_databases_falls_back_to_stock_data_dir() {
     let intel_dir = stock_data_dir.join(TOPOLOGY_IP_INTEL_DIR);
     fs::create_dir_all(&intel_dir).expect("create intel dir");
     fs::write(intel_dir.join(TOPOLOGY_IP_ASN_MMDB), b"asn").expect("write asn db");
-    fs::write(intel_dir.join(TOPOLOGY_IP_COUNTRY_MMDB), b"geo").expect("write geo db");
+    fs::write(intel_dir.join(TOPOLOGY_IP_GEO_MMDB), b"geo").expect("write geo db");
 
     let mut cfg = PluginConfig::default();
     cfg._netdata_env.cache_dir = Some(cache_dir);
@@ -362,7 +362,7 @@ fn auto_detect_geoip_databases_falls_back_to_stock_data_dir() {
         cfg.enrichment.geoip.geo_database,
         vec![
             intel_dir
-                .join(TOPOLOGY_IP_COUNTRY_MMDB)
+                .join(TOPOLOGY_IP_GEO_MMDB)
                 .to_string_lossy()
                 .to_string()
         ]
@@ -382,11 +382,11 @@ fn auto_detect_geoip_databases_prefers_cache_over_stock_data_dir() {
 
     fs::write(cache_intel_dir.join(TOPOLOGY_IP_ASN_MMDB), b"cache-asn")
         .expect("write cache asn db");
-    fs::write(cache_intel_dir.join(TOPOLOGY_IP_COUNTRY_MMDB), b"cache-geo")
+    fs::write(cache_intel_dir.join(TOPOLOGY_IP_GEO_MMDB), b"cache-geo")
         .expect("write cache geo db");
     fs::write(stock_intel_dir.join(TOPOLOGY_IP_ASN_MMDB), b"stock-asn")
         .expect("write stock asn db");
-    fs::write(stock_intel_dir.join(TOPOLOGY_IP_COUNTRY_MMDB), b"stock-geo")
+    fs::write(stock_intel_dir.join(TOPOLOGY_IP_GEO_MMDB), b"stock-geo")
         .expect("write stock geo db");
 
     let mut cfg = PluginConfig::default();
@@ -409,7 +409,7 @@ fn auto_detect_geoip_databases_prefers_cache_over_stock_data_dir() {
         cfg.enrichment.geoip.geo_database,
         vec![
             cache_intel_dir
-                .join(TOPOLOGY_IP_COUNTRY_MMDB)
+                .join(TOPOLOGY_IP_GEO_MMDB)
                 .to_string_lossy()
                 .to_string()
         ]

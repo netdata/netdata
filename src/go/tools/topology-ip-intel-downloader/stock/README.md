@@ -2,8 +2,11 @@
 
 # Stock IP Intelligence Payload
 
-This directory holds the source-controlled stock MMDB payload shipped by
+This directory documents the stock MMDB payload shipped by
 `netdata-plugin-netflow`.
+
+The generated stock databases are not stored in Git. Package/release builds
+stage them into the build workspace from CI/release tooling.
 
 Installed destination:
 
@@ -11,22 +14,27 @@ Installed destination:
 
 Current stock source policy:
 
-- provider: `iptoasn`
-- source family: combined ASN + country dataset
-- license intent: PDDL v1.0, per the product decisions recorded in the local
-  topology TODO files
+- ASN source: `dbip:asn-lite@mmdb`
+- GEO source: `dbip:city-lite@mmdb`
+- output model:
+  - `topology-ip-asn.mmdb`
+  - `topology-ip-geo.mmdb`
+  - `topology-ip-intel.json`
 
-Maintainer refresh command from the repository root:
+Redistribution note:
+
+- DB-IP Lite downloads are distributed by DB-IP under CC BY 4.0
+- Netdata must keep the matching attribution in `REDISTRIBUTED.md`
+
+Maintainer helper command from the repository root:
 
 ```bash
 ./src/go/tools/topology-ip-intel-downloader/refresh-stock.sh
 ```
 
-Generated files:
+This creates a local staging directory at:
 
-- `topology-ip-asn.mmdb`
-- `topology-ip-country.mmdb`
-- `topology-ip-intel.json`
+- `./artifacts/topology-ip-intel-stock`
 
-The JSON metadata file records the exact provider, dataset reference, and
-generation timestamp used for the checked-in payload.
+The staged JSON metadata file records the exact source list, resolved download
+references, range counts, and generation timestamp used for that payload.

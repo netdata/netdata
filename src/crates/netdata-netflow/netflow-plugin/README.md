@@ -37,6 +37,12 @@ packaged databases in this order:
 `topology-ip-intel-downloader` stays in `${NETDATA_CACHE_DIR}/topology-ip-intel` and
 overrides the stock copy automatically.
 
+Important:
+
+- packaged installs ship the stock MMDB payload
+- source installs from a Git checkout do not include the generated stock MMDBs by default
+- local/source installs should run `topology-ip-intel-downloader` if they want a local cache copy
+
 ### `protocols.decapsulation_mode`
 
 Controls packet decapsulation for datalink payload parsing:

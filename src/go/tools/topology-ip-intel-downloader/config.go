@@ -5,6 +5,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,8 +17,19 @@ import (
 
 const (
 	providerIPToASN = "iptoasn"
-	providerDBIP    = "dbip_lite"
-	providerCustom  = "custom"
+	providerDBIP    = "dbip"
+)
+
+const (
+	sourceFamilyASN = "asn"
+	sourceFamilyGeo = "geo"
+)
+
+const (
+	artifactIPToASNCombined = "combined"
+	artifactDBIPASNLite     = "asn-lite"
+	artifactDBIPCountryLite = "country-lite"
+	artifactDBIPCityLite    = "city-lite"
 )
 
 const (
@@ -27,44 +39,34 @@ const (
 )
 
 const (
-	formatIPToASNCombinedTSV = "iptoasn_combined_tsv"
-	formatDBIPAsnCSV         = "dbip_asn_csv"
-	formatDBIPCountryCSV     = "dbip_country_csv"
-)
-
-const (
-	compressionAuto = "auto"
-	compressionNone = "none"
-	compressionGzip = "gzip"
-	compressionZip  = "zip"
+	formatMMDB = "mmdb"
+	formatCSV  = "csv"
+	formatTSV  = "tsv"
 )
 
 type config struct {
-	source sourceConfig
-	output outputConfig
-	policy policyConfig
-	http   httpConfig
+	sources []sourceEntry
+	output  outputConfig
+	policy  policyConfig
+	http    httpConfig
 }
 
-type sourceConfig struct {
+type sourceEntry struct {
+	name string
+
+	family   string
 	provider string
+	artifact string
+	format   string
 
-	combined datasetSpec
-	asn      datasetSpec
-	country  datasetSpec
-}
-
-type datasetSpec struct {
-	url         string
-	path        string
-	format      string
-	compression string
+	url  string
+	path string
 }
 
 type outputConfig struct {
 	directory    string
 	asnFile      string
-	countryFile  string
+	geoFile      string
 	metadataFile string
 }
 
@@ -80,30 +82,26 @@ type httpConfig struct {
 }
 
 type fileConfig struct {
-	Source *yamlSourceConfig `yaml:"source"`
-	Output *yamlOutputConfig `yaml:"output"`
-	Policy *yamlPolicyConfig `yaml:"policy"`
-	HTTP   *yamlHTTPConfig   `yaml:"http"`
+	Sources []yamlSourceEntry `yaml:"sources"`
+	Output  *yamlOutputConfig `yaml:"output"`
+	Policy  *yamlPolicyConfig `yaml:"policy"`
+	HTTP    *yamlHTTPConfig   `yaml:"http"`
 }
 
-type yamlSourceConfig struct {
-	Provider string          `yaml:"provider"`
-	Combined yamlDatasetSpec `yaml:"combined"`
-	Asn      yamlDatasetSpec `yaml:"asn"`
-	Country  yamlDatasetSpec `yaml:"country"`
-}
-
-type yamlDatasetSpec struct {
-	URL         string `yaml:"url"`
-	Path        string `yaml:"path"`
-	Format      string `yaml:"format"`
-	Compression string `yaml:"compression"`
+type yamlSourceEntry struct {
+	Name     string `yaml:"name"`
+	Family   string `yaml:"family"`
+	Provider string `yaml:"provider"`
+	Artifact string `yaml:"artifact"`
+	Format   string `yaml:"format"`
+	URL      string `yaml:"url"`
+	Path     string `yaml:"path"`
 }
 
 type yamlOutputConfig struct {
 	Directory    string `yaml:"directory"`
 	AsnFile      string `yaml:"asn_file"`
-	CountryFile  string `yaml:"country_file"`
+	GeoFile      string `yaml:"geo_file"`
 	MetadataFile string `yaml:"metadata_file"`
 }
 
@@ -118,20 +116,34 @@ type yamlHTTPConfig struct {
 	UserAgent string `yaml:"user_agent"`
 }
 
+type builtInSourceSpec struct {
+	pageURL       string
+	directURL     string
+	defaultFormat string
+	allowedFamily map[string]struct{}
+	allowedFormat map[string]struct{}
+}
+
 func defaultConfig() config {
 	return config{
-		source: sourceConfig{
-			provider: providerIPToASN,
-			combined: datasetSpec{
-				url:         "https://iptoasn.com/data/ip2asn-combined.tsv.gz",
-				format:      formatIPToASNCombinedTSV,
-				compression: compressionAuto,
+		sources: []sourceEntry{
+			{
+				family:   sourceFamilyASN,
+				provider: providerDBIP,
+				artifact: artifactDBIPASNLite,
+				format:   formatMMDB,
+			},
+			{
+				family:   sourceFamilyGeo,
+				provider: providerDBIP,
+				artifact: artifactDBIPCityLite,
+				format:   formatMMDB,
 			},
 		},
 		output: outputConfig{
 			directory:    filepath.Join(defaultCacheRoot(), "topology-ip-intel"),
 			asnFile:      "topology-ip-asn.mmdb",
-			countryFile:  "topology-ip-country.mmdb",
+			geoFile:      "topology-ip-geo.mmdb",
 			metadataFile: "topology-ip-intel.json",
 		},
 		policy: policyConfig{
@@ -153,6 +165,61 @@ func defaultConfig() config {
 			timeout:   2 * time.Minute,
 			userAgent: "netdata-topology-ip-intel-downloader/1.0",
 		},
+	}
+}
+
+func builtInSource(provider, artifact string) (builtInSourceSpec, bool) {
+	switch {
+	case provider == providerIPToASN && artifact == artifactIPToASNCombined:
+		return builtInSourceSpec{
+			directURL:     "https://iptoasn.com/data/ip2asn-combined.tsv.gz",
+			defaultFormat: formatTSV,
+			allowedFamily: map[string]struct{}{
+				sourceFamilyASN: {},
+				sourceFamilyGeo: {},
+			},
+			allowedFormat: map[string]struct{}{
+				formatTSV: {},
+			},
+		}, true
+	case provider == providerDBIP && artifact == artifactDBIPASNLite:
+		return builtInSourceSpec{
+			pageURL:       "https://db-ip.com/db/download/ip-to-asn-lite",
+			defaultFormat: formatMMDB,
+			allowedFamily: map[string]struct{}{
+				sourceFamilyASN: {},
+			},
+			allowedFormat: map[string]struct{}{
+				formatMMDB: {},
+				formatCSV:  {},
+			},
+		}, true
+	case provider == providerDBIP && artifact == artifactDBIPCountryLite:
+		return builtInSourceSpec{
+			pageURL:       "https://db-ip.com/db/download/ip-to-country-lite",
+			defaultFormat: formatMMDB,
+			allowedFamily: map[string]struct{}{
+				sourceFamilyGeo: {},
+			},
+			allowedFormat: map[string]struct{}{
+				formatMMDB: {},
+				formatCSV:  {},
+			},
+		}, true
+	case provider == providerDBIP && artifact == artifactDBIPCityLite:
+		return builtInSourceSpec{
+			pageURL:       "https://db-ip.com/db/download/ip-to-city-lite",
+			defaultFormat: formatMMDB,
+			allowedFamily: map[string]struct{}{
+				sourceFamilyGeo: {},
+			},
+			allowedFormat: map[string]struct{}{
+				formatMMDB: {},
+				formatCSV:  {},
+			},
+		}, true
+	default:
+		return builtInSourceSpec{}, false
 	}
 }
 
@@ -231,8 +298,12 @@ func defaultCacheRoot() string {
 }
 
 func (cfg *config) apply(fc fileConfig) error {
-	if fc.Source != nil {
-		cfg.source = mergeSourceConfig(cfg.source, *fc.Source)
+	if len(fc.Sources) > 0 {
+		sources, err := yamlSourceEntries(fc.Sources)
+		if err != nil {
+			return err
+		}
+		cfg.sources = sources
 	}
 	if fc.Output != nil {
 		cfg.output = mergeOutputConfig(cfg.output, *fc.Output)
@@ -250,34 +321,24 @@ func (cfg *config) apply(fc fileConfig) error {
 	return nil
 }
 
-func mergeSourceConfig(dst sourceConfig, src yamlSourceConfig) sourceConfig {
-	if src.Provider != "" {
-		nextProvider := strings.ToLower(strings.TrimSpace(src.Provider))
-		if nextProvider != dst.provider {
-			dst = sourceConfig{provider: nextProvider}
+func yamlSourceEntries(values []yamlSourceEntry) ([]sourceEntry, error) {
+	out := make([]sourceEntry, 0, len(values))
+	for i, value := range values {
+		source := sourceEntry{
+			name:     strings.TrimSpace(value.Name),
+			family:   strings.ToLower(strings.TrimSpace(value.Family)),
+			provider: strings.ToLower(strings.TrimSpace(value.Provider)),
+			artifact: strings.ToLower(strings.TrimSpace(value.Artifact)),
+			format:   strings.ToLower(strings.TrimSpace(value.Format)),
+			url:      strings.TrimSpace(value.URL),
+			path:     strings.TrimSpace(value.Path),
 		}
-		dst.provider = nextProvider
+		if source.family == "" {
+			return nil, fmt.Errorf("sources[%d].family is required", i)
+		}
+		out = append(out, source)
 	}
-	dst.combined = mergeDatasetSpec(dst.combined, src.Combined)
-	dst.asn = mergeDatasetSpec(dst.asn, src.Asn)
-	dst.country = mergeDatasetSpec(dst.country, src.Country)
-	return dst
-}
-
-func mergeDatasetSpec(dst datasetSpec, src yamlDatasetSpec) datasetSpec {
-	if src.URL != "" {
-		dst.url = strings.TrimSpace(src.URL)
-	}
-	if src.Path != "" {
-		dst.path = strings.TrimSpace(src.Path)
-	}
-	if src.Format != "" {
-		dst.format = strings.ToLower(strings.TrimSpace(src.Format))
-	}
-	if src.Compression != "" {
-		dst.compression = strings.ToLower(strings.TrimSpace(src.Compression))
-	}
-	return dst
+	return out, nil
 }
 
 func mergeOutputConfig(dst outputConfig, src yamlOutputConfig) outputConfig {
@@ -287,8 +348,8 @@ func mergeOutputConfig(dst outputConfig, src yamlOutputConfig) outputConfig {
 	if src.AsnFile != "" {
 		dst.asnFile = strings.TrimSpace(src.AsnFile)
 	}
-	if src.CountryFile != "" {
-		dst.countryFile = strings.TrimSpace(src.CountryFile)
+	if src.GeoFile != "" {
+		dst.geoFile = strings.TrimSpace(src.GeoFile)
 	}
 	if src.MetadataFile != "" {
 		dst.metadataFile = strings.TrimSpace(src.MetadataFile)
@@ -335,111 +396,162 @@ func cloneTrimmedList(values []string) []string {
 	return out
 }
 
-func (cfg *config) normalizeAndValidate() error {
-	cfg.source.provider = strings.ToLower(strings.TrimSpace(cfg.source.provider))
-	if cfg.source.combined.compression == "" {
-		cfg.source.combined.compression = compressionAuto
+func defaultSourceName(source sourceEntry) string {
+	return fmt.Sprintf("%s-%s", source.provider, source.artifact)
+}
+
+func inferFormatFromLocation(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
 	}
-	if cfg.source.asn.compression == "" {
-		cfg.source.asn.compression = compressionAuto
+	if parsed, err := url.Parse(raw); err == nil && parsed.Path != "" {
+		raw = parsed.Path
 	}
-	if cfg.source.country.compression == "" {
-		cfg.source.country.compression = compressionAuto
+	lower := strings.ToLower(raw)
+	switch {
+	case strings.HasSuffix(lower, ".mmdb"),
+		strings.HasSuffix(lower, ".mmdb.gz"),
+		strings.HasSuffix(lower, ".mmdb.zip"):
+		return formatMMDB
+	case strings.HasSuffix(lower, ".csv"),
+		strings.HasSuffix(lower, ".csv.gz"),
+		strings.HasSuffix(lower, ".csv.zip"):
+		return formatCSV
+	case strings.HasSuffix(lower, ".tsv"),
+		strings.HasSuffix(lower, ".tsv.gz"),
+		strings.HasSuffix(lower, ".tsv.zip"):
+		return formatTSV
+	default:
+		return ""
+	}
+}
+
+func normalizeSourceEntry(source *sourceEntry) error {
+	source.name = strings.TrimSpace(source.name)
+	source.family = strings.ToLower(strings.TrimSpace(source.family))
+	source.provider = strings.ToLower(strings.TrimSpace(source.provider))
+	source.artifact = strings.ToLower(strings.TrimSpace(source.artifact))
+	source.format = strings.ToLower(strings.TrimSpace(source.format))
+	source.url = strings.TrimSpace(source.url)
+	source.path = strings.TrimSpace(source.path)
+
+	if source.name == "" && source.provider != "" && source.artifact != "" {
+		source.name = defaultSourceName(*source)
 	}
 
-	switch cfg.source.provider {
-	case providerIPToASN:
-		if cfg.source.combined.format == "" {
-			cfg.source.combined.format = formatIPToASNCombinedTSV
+	if source.format == "" {
+		if inferred := inferFormatFromLocation(source.url); inferred != "" {
+			source.format = inferred
+		} else if inferred := inferFormatFromLocation(source.path); inferred != "" {
+			source.format = inferred
+		} else if spec, ok := builtInSource(source.provider, source.artifact); ok {
+			source.format = spec.defaultFormat
 		}
-	case providerDBIP:
-		if cfg.source.asn.format == "" {
-			cfg.source.asn.format = formatDBIPAsnCSV
-		}
-		if cfg.source.country.format == "" {
-			cfg.source.country.format = formatDBIPCountryCSV
-		}
-	case providerCustom:
-		// no-op
-	default:
-		return fmt.Errorf("unsupported source.provider %q", cfg.source.provider)
 	}
+	return nil
+}
+
+func (cfg *config) normalizeAndValidate() error {
+	for i := range cfg.sources {
+		if err := normalizeSourceEntry(&cfg.sources[i]); err != nil {
+			return err
+		}
+	}
+
+	cfg.output.directory = strings.TrimSpace(cfg.output.directory)
+	cfg.output.asnFile = strings.TrimSpace(cfg.output.asnFile)
+	cfg.output.geoFile = strings.TrimSpace(cfg.output.geoFile)
+	cfg.output.metadataFile = strings.TrimSpace(cfg.output.metadataFile)
+	cfg.http.userAgent = strings.TrimSpace(cfg.http.userAgent)
 
 	return cfg.validate()
 }
 
-func (cfg config) validate() error {
-	switch cfg.source.provider {
-	case providerIPToASN:
-		if err := validateDatasetSpec("source.combined", cfg.source.combined); err != nil {
-			return err
-		}
-		if cfg.source.combined.format != formatIPToASNCombinedTSV {
-			return fmt.Errorf("source.combined.format must be %q for provider %q", formatIPToASNCombinedTSV, providerIPToASN)
-		}
-	case providerDBIP:
-		if err := validateDatasetSpec("source.asn", cfg.source.asn); err != nil {
-			return err
-		}
-		if err := validateDatasetSpec("source.country", cfg.source.country); err != nil {
-			return err
-		}
-		if cfg.source.asn.format != formatDBIPAsnCSV {
-			return fmt.Errorf("source.asn.format must be %q for provider %q", formatDBIPAsnCSV, providerDBIP)
-		}
-		if cfg.source.country.format != formatDBIPCountryCSV {
-			return fmt.Errorf("source.country.format must be %q for provider %q", formatDBIPCountryCSV, providerDBIP)
-		}
-	case providerCustom:
-		combinedConfigured := cfg.source.combined.path != "" || cfg.source.combined.url != ""
-		asnConfigured := cfg.source.asn.path != "" || cfg.source.asn.url != ""
-		countryConfigured := cfg.source.country.path != "" || cfg.source.country.url != ""
+func validateSourceEntry(source sourceEntry, scope string) error {
+	if source.family != sourceFamilyASN && source.family != sourceFamilyGeo {
+		return fmt.Errorf("%s.family must be one of asn|geo", scope)
+	}
+	if source.provider == "" {
+		return fmt.Errorf("%s.provider is required", scope)
+	}
+	if source.artifact == "" {
+		return fmt.Errorf("%s.artifact is required", scope)
+	}
 
-		if combinedConfigured {
-			if err := validateDatasetSpec("source.combined", cfg.source.combined); err != nil {
-				return err
-			}
-		}
-		if asnConfigured {
-			if err := validateDatasetSpec("source.asn", cfg.source.asn); err != nil {
-				return err
-			}
-		}
-		if countryConfigured {
-			if err := validateDatasetSpec("source.country", cfg.source.country); err != nil {
-				return err
-			}
-		}
-		if !combinedConfigured && !asnConfigured && !countryConfigured {
-			return errors.New("source: provider custom requires at least one configured dataset")
+	spec, ok := builtInSource(source.provider, source.artifact)
+	if !ok {
+		return fmt.Errorf(
+			"%s references unsupported provider/artifact %q/%q",
+			scope,
+			source.provider,
+			source.artifact,
+		)
+	}
+
+	if _, ok := spec.allowedFamily[source.family]; !ok {
+		return fmt.Errorf(
+			"%s provider/artifact %q/%q is not compatible with family %q",
+			scope,
+			source.provider,
+			source.artifact,
+			source.family,
+		)
+	}
+
+	if source.url != "" && source.path != "" {
+		return fmt.Errorf("%s must define at most one of url or path", scope)
+	}
+
+	if source.format == "" {
+		return fmt.Errorf("%s.format could not be determined", scope)
+	}
+	if _, ok := spec.allowedFormat[source.format]; !ok {
+		return fmt.Errorf(
+			"%s.format %q is not supported for provider/artifact %q/%q",
+			scope,
+			source.format,
+			source.provider,
+			source.artifact,
+		)
+	}
+	return nil
+}
+
+func (cfg config) validate() error {
+	if len(cfg.sources) == 0 {
+		return errors.New("at least one source is required")
+	}
+
+	for i, source := range cfg.sources {
+		if err := validateSourceEntry(source, fmt.Sprintf("sources[%d]", i)); err != nil {
+			return err
 		}
 	}
 
-	if strings.TrimSpace(cfg.output.directory) == "" {
+	if cfg.output.directory == "" {
 		return errors.New("output.directory is required")
 	}
-	if strings.TrimSpace(cfg.output.asnFile) == "" {
+	if cfg.output.asnFile == "" {
 		return errors.New("output.asn_file is required")
 	}
-	if strings.TrimSpace(cfg.output.countryFile) == "" {
-		return errors.New("output.country_file is required")
+	if cfg.output.geoFile == "" {
+		return errors.New("output.geo_file is required")
 	}
-	if strings.TrimSpace(cfg.output.metadataFile) == "" {
+	if cfg.output.metadataFile == "" {
 		return errors.New("output.metadata_file is required")
 	}
-
 	if cfg.http.timeout <= 0 {
 		return errors.New("http.timeout must be > 0")
 	}
-	if strings.TrimSpace(cfg.http.userAgent) == "" {
+	if cfg.http.userAgent == "" {
 		return errors.New("http.user_agent is required")
 	}
-
 	if filepath.Base(cfg.output.asnFile) != cfg.output.asnFile {
 		return errors.New("output.asn_file must be a file name, not a path")
 	}
-	if filepath.Base(cfg.output.countryFile) != cfg.output.countryFile {
-		return errors.New("output.country_file must be a file name, not a path")
+	if filepath.Base(cfg.output.geoFile) != cfg.output.geoFile {
+		return errors.New("output.geo_file must be a file name, not a path")
 	}
 	if filepath.Base(cfg.output.metadataFile) != cfg.output.metadataFile {
 		return errors.New("output.metadata_file must be a file name, not a path")
@@ -448,20 +560,21 @@ func (cfg config) validate() error {
 	return nil
 }
 
-func validateDatasetSpec(scope string, spec datasetSpec) error {
-	if strings.TrimSpace(spec.path) == "" && strings.TrimSpace(spec.url) == "" {
-		return fmt.Errorf("%s requires either path or url", scope)
+func (cfg config) familySources(family string) []sourceEntry {
+	out := make([]sourceEntry, 0, len(cfg.sources))
+	for _, source := range cfg.sources {
+		if source.family == family {
+			out = append(out, source)
+		}
 	}
-	if strings.TrimSpace(spec.path) != "" && strings.TrimSpace(spec.url) != "" {
-		return fmt.Errorf("%s must define only one of path or url", scope)
+	return out
+}
+
+func (cfg config) hasFamily(family string) bool {
+	for _, source := range cfg.sources {
+		if source.family == family {
+			return true
+		}
 	}
-	if strings.TrimSpace(spec.format) == "" {
-		return fmt.Errorf("%s.format is required", scope)
-	}
-	switch strings.ToLower(strings.TrimSpace(spec.compression)) {
-	case "", compressionAuto, compressionNone, compressionGzip, compressionZip:
-	default:
-		return fmt.Errorf("%s.compression must be one of auto|none|gzip|zip", scope)
-	}
-	return nil
+	return false
 }
