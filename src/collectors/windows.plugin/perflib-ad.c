@@ -1114,19 +1114,14 @@ static void netdata_ad_replication_pending_operations(
     rrdset_done(st_replication_pending_operations);
 }
 
-static void netdata_ad_sync_result(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void netdata_ad_sync_result_success(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA replicationSyncRequestsSuccessTotal = {.key = "DRA Sync Requests Successful"};
-    static COUNTER_DATA replicationSyncRequestsSchemaMismatchFailureTotal = {
-        .key = "DRA Sync Failures on Schema Mismatch"};
-
     static RRDSET *st_replication_sync_requests_success = NULL;
     static RRDDIM *rd_replication_sync_requests_success = NULL;
-    static RRDSET *st_replication_sync_requests_schema_mismatch_failure = NULL;
-    static RRDDIM *rd_replication_sync_requests_schema_mismatch_failure = NULL;
 
-    perflibGetObjectCounter(pDataBlock, pObjectType, &replicationSyncRequestsSuccessTotal);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &replicationSyncRequestsSchemaMismatchFailureTotal);
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationSyncRequestsSuccessTotal))
+        return;
 
     if (unlikely(!st_replication_sync_requests_success)) {
         st_replication_sync_requests_success = rrdset_create_localhost(
@@ -1152,6 +1147,18 @@ static void netdata_ad_sync_result(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE
         rd_replication_sync_requests_success,
         (collected_number)replicationSyncRequestsSuccessTotal.current.Data);
     rrdset_done(st_replication_sync_requests_success);
+}
+
+static void netdata_ad_sync_result_schema_mismatch_failure(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA replicationSyncRequestsSchemaMismatchFailureTotal = {
+        .key = "DRA Sync Failures on Schema Mismatch"};
+    static RRDSET *st_replication_sync_requests_schema_mismatch_failure = NULL;
+    static RRDDIM *rd_replication_sync_requests_schema_mismatch_failure = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationSyncRequestsSchemaMismatchFailureTotal))
+        return;
 
     if (unlikely(!st_replication_sync_requests_schema_mismatch_failure)) {
         st_replication_sync_requests_schema_mismatch_failure = rrdset_create_localhost(
@@ -1177,6 +1184,12 @@ static void netdata_ad_sync_result(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE
         rd_replication_sync_requests_schema_mismatch_failure,
         (collected_number)replicationSyncRequestsSchemaMismatchFailureTotal.current.Data);
     rrdset_done(st_replication_sync_requests_schema_mismatch_failure);
+}
+
+static void netdata_ad_sync_result(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    netdata_ad_sync_result_success(pDataBlock, pObjectType, update_every);
+    netdata_ad_sync_result_schema_mismatch_failure(pDataBlock, pObjectType, update_every);
 }
 
 static void netdata_ad_name_translations(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
