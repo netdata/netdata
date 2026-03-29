@@ -3,82 +3,219 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
-static void netdata_ad_address_book(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void netdata_ad_address_book_ambiguous_name_resolution(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA addressBookANRPerSec = {.key = "AB ANR/sec"};
-    static COUNTER_DATA addressBookBrowsesPerSec = {.key = "AB Browses/sec"};
-    static COUNTER_DATA addressBookMatchesPerSec = {.key = "AB Matches/sec"};
-    static COUNTER_DATA addressBookPropertyReadsPerSec = {.key = "AB Property Reads/sec"};
-    static COUNTER_DATA addressBookSearchesPerSec = {.key = "AB Searches/sec"};
-    static COUNTER_DATA addressBookProxyLookupsPerSec = {.key = "AB Proxy Lookups/sec"};
-    static COUNTER_DATA addressBookClientSessions = {.key = "AB Client Sessions"};
-
-    static RRDSET *st_address_book_operations = NULL;
+    static RRDSET *st_address_book_ambiguous_name_resolution = NULL;
     static RRDDIM *rd_address_book_ambiguous_name_resolution = NULL;
-    static RRDDIM *rd_address_book_browse = NULL;
-    static RRDDIM *rd_address_book_find = NULL;
-    static RRDDIM *rd_address_book_property_read = NULL;
-    static RRDDIM *rd_address_book_search = NULL;
-    static RRDDIM *rd_address_book_proxy_search = NULL;
 
-    static RRDSET *st_address_book_client_sessions = NULL;
-    static RRDDIM *rd_address_book_client_sessions = NULL;
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &addressBookANRPerSec))
+        return;
 
-    perflibGetObjectCounter(pDataBlock, pObjectType, &addressBookANRPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &addressBookBrowsesPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &addressBookMatchesPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &addressBookPropertyReadsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &addressBookSearchesPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &addressBookProxyLookupsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &addressBookClientSessions);
-
-    if (unlikely(!st_address_book_operations)) {
-        st_address_book_operations = rrdset_create_localhost(
+    if (unlikely(!st_address_book_ambiguous_name_resolution)) {
+        st_address_book_ambiguous_name_resolution = rrdset_create_localhost(
             "ad",
-            "address_book_operations",
+            "address_book_ambiguous_name_resolution",
             NULL,
             "address_book",
-            "ad.address_book_operations",
-            "Address book operations",
+            "ad.address_book_ambiguous_name_resolution",
+            "Address book ambiguous name resolution",
             "operations/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
-            PRIO_AD_ADDRESS_BOOK_OPERATIONS_TOTAL,
+            PRIO_AD_ADDRESS_BOOK_AMBIGUOUS_NAME_RESOLUTION,
             update_every,
             RRDSET_TYPE_LINE);
 
         rd_address_book_ambiguous_name_resolution = rrddim_add(
-            st_address_book_operations, "ambiguous_name_resolution", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_address_book_browse =
-            rrddim_add(st_address_book_operations, "browse", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_address_book_find = rrddim_add(st_address_book_operations, "find", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_address_book_property_read =
-            rrddim_add(st_address_book_operations, "property_read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_address_book_search =
-            rrddim_add(st_address_book_operations, "search", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_address_book_proxy_search =
-            rrddim_add(st_address_book_operations, "proxy_search", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            st_address_book_ambiguous_name_resolution,
+            "ambiguous_name_resolution",
+            NULL,
+            1,
+            1,
+            RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-        st_address_book_operations,
+        st_address_book_ambiguous_name_resolution,
         rd_address_book_ambiguous_name_resolution,
         (collected_number)addressBookANRPerSec.current.Data);
+    rrdset_done(st_address_book_ambiguous_name_resolution);
+}
+
+static void netdata_ad_address_book_browse(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA addressBookBrowsesPerSec = {.key = "AB Browses/sec"};
+    static RRDSET *st_address_book_browse = NULL;
+    static RRDDIM *rd_address_book_browse = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &addressBookBrowsesPerSec))
+        return;
+
+    if (unlikely(!st_address_book_browse)) {
+        st_address_book_browse = rrdset_create_localhost(
+            "ad",
+            "address_book_browse",
+            NULL,
+            "address_book",
+            "ad.address_book_browse",
+            "Address book browse operations",
+            "operations/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_ADDRESS_BOOK_BROWSE,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_address_book_browse = rrddim_add(st_address_book_browse, "browse", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_address_book_browse, rd_address_book_browse, (collected_number)addressBookBrowsesPerSec.current.Data);
+    rrdset_done(st_address_book_browse);
+}
+
+static void netdata_ad_address_book_find(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA addressBookMatchesPerSec = {.key = "AB Matches/sec"};
+    static RRDSET *st_address_book_find = NULL;
+    static RRDDIM *rd_address_book_find = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &addressBookMatchesPerSec))
+        return;
+
+    if (unlikely(!st_address_book_find)) {
+        st_address_book_find = rrdset_create_localhost(
+            "ad",
+            "address_book_find",
+            NULL,
+            "address_book",
+            "ad.address_book_find",
+            "Address book matches",
+            "operations/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_ADDRESS_BOOK_FIND,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_address_book_find = rrddim_add(st_address_book_find, "find", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_address_book_find, rd_address_book_find, (collected_number)addressBookMatchesPerSec.current.Data);
+    rrdset_done(st_address_book_find);
+}
+
+static void netdata_ad_address_book_property_read(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA addressBookPropertyReadsPerSec = {.key = "AB Property Reads/sec"};
+    static RRDSET *st_address_book_property_read = NULL;
+    static RRDDIM *rd_address_book_property_read = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &addressBookPropertyReadsPerSec))
+        return;
+
+    if (unlikely(!st_address_book_property_read)) {
+        st_address_book_property_read = rrdset_create_localhost(
+            "ad",
+            "address_book_property_read",
+            NULL,
+            "address_book",
+            "ad.address_book_property_read",
+            "Address book property reads",
+            "operations/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_ADDRESS_BOOK_PROPERTY_READ,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_address_book_property_read = rrddim_add(
+            st_address_book_property_read, "property_read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
     rrddim_set_by_pointer(
-        st_address_book_operations, rd_address_book_browse, (collected_number)addressBookBrowsesPerSec.current.Data);
-    rrddim_set_by_pointer(
-        st_address_book_operations, rd_address_book_find, (collected_number)addressBookMatchesPerSec.current.Data);
-    rrddim_set_by_pointer(
-        st_address_book_operations,
+        st_address_book_property_read,
         rd_address_book_property_read,
         (collected_number)addressBookPropertyReadsPerSec.current.Data);
+    rrdset_done(st_address_book_property_read);
+}
+
+static void netdata_ad_address_book_search(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA addressBookSearchesPerSec = {.key = "AB Searches/sec"};
+    static RRDSET *st_address_book_search = NULL;
+    static RRDDIM *rd_address_book_search = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &addressBookSearchesPerSec))
+        return;
+
+    if (unlikely(!st_address_book_search)) {
+        st_address_book_search = rrdset_create_localhost(
+            "ad",
+            "address_book_search",
+            NULL,
+            "address_book",
+            "ad.address_book_search",
+            "Address book searches",
+            "operations/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_ADDRESS_BOOK_SEARCH,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_address_book_search = rrddim_add(st_address_book_search, "search", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_address_book_search, rd_address_book_search, (collected_number)addressBookSearchesPerSec.current.Data);
+    rrdset_done(st_address_book_search);
+}
+
+static void netdata_ad_address_book_proxy_search(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA addressBookProxyLookupsPerSec = {.key = "AB Proxy Lookups/sec"};
+    static RRDSET *st_address_book_proxy_search = NULL;
+    static RRDDIM *rd_address_book_proxy_search = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &addressBookProxyLookupsPerSec))
+        return;
+
+    if (unlikely(!st_address_book_proxy_search)) {
+        st_address_book_proxy_search = rrdset_create_localhost(
+            "ad",
+            "address_book_proxy_search",
+            NULL,
+            "address_book",
+            "ad.address_book_proxy_search",
+            "Address book proxy searches",
+            "operations/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_ADDRESS_BOOK_PROXY_SEARCH,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_address_book_proxy_search =
+            rrddim_add(st_address_book_proxy_search, "proxy_search", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
     rrddim_set_by_pointer(
-        st_address_book_operations, rd_address_book_search, (collected_number)addressBookSearchesPerSec.current.Data);
-    rrddim_set_by_pointer(
-        st_address_book_operations,
-        rd_address_book_proxy_search,
-        (collected_number)addressBookProxyLookupsPerSec.current.Data);
-    rrdset_done(st_address_book_operations);
+        st_address_book_proxy_search, rd_address_book_proxy_search, (collected_number)addressBookProxyLookupsPerSec.current.Data);
+    rrdset_done(st_address_book_proxy_search);
+}
+
+static void netdata_ad_address_book_client_sessions(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA addressBookClientSessions = {.key = "AB Client Sessions"};
+    static RRDSET *st_address_book_client_sessions = NULL;
+    static RRDDIM *rd_address_book_client_sessions = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &addressBookClientSessions))
+        return;
 
     if (unlikely(!st_address_book_client_sessions)) {
         st_address_book_client_sessions = rrdset_create_localhost(
@@ -104,6 +241,17 @@ static void netdata_ad_address_book(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYP
         rd_address_book_client_sessions,
         (collected_number)addressBookClientSessions.current.Data);
     rrdset_done(st_address_book_client_sessions);
+}
+
+static void netdata_ad_address_book(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    netdata_ad_address_book_ambiguous_name_resolution(pDataBlock, pObjectType, update_every);
+    netdata_ad_address_book_browse(pDataBlock, pObjectType, update_every);
+    netdata_ad_address_book_find(pDataBlock, pObjectType, update_every);
+    netdata_ad_address_book_property_read(pDataBlock, pObjectType, update_every);
+    netdata_ad_address_book_search(pDataBlock, pObjectType, update_every);
+    netdata_ad_address_book_proxy_search(pDataBlock, pObjectType, update_every);
+    netdata_ad_address_book_client_sessions(pDataBlock, pObjectType, update_every);
 }
 
 static void netdata_ad_approximate_highest_dnt(
