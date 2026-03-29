@@ -2005,37 +2005,14 @@ static void netdata_ad_op_total(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
     rrdset_done(st_database_operation_total);
 }
 
-static void netdata_ad_ldap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void netdata_ad_ldap_closed_connections(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA ldapClosedConnectionsPerSec = {.key = "LDAP Closed Connections/sec"};
-    static COUNTER_DATA ldapNewConnectionsPerSec = {.key = "LDAP New Connections/sec"};
-    static COUNTER_DATA ldapNewSSLConnectionsPerSec = {.key = "LDAP New SSL Connections/sec"};
-    static COUNTER_DATA ldapActiveThreads = {.key = "LDAP Active Threads"};
-    static COUNTER_DATA ldapUDPOperationsPerSec = {.key = "LDAP UDP operations/sec"};
-    static COUNTER_DATA ldapWritesPerSec = {.key = "LDAP Writes/sec"};
-    static COUNTER_DATA ldapClientSessions = {.key = "LDAP Client Sessions"};
-
     static RRDSET *st_ldap_closed_connections_total = NULL;
     static RRDDIM *rd_ldap_closed_connections_total = NULL;
-    static RRDSET *st_ldap_opened_connections_total = NULL;
-    static RRDDIM *rd_ldap_opened_connections_total_ldap = NULL;
-    static RRDDIM *rd_ldap_opened_connections_total_ldaps = NULL;
-    static RRDSET *st_ldap_active_threads = NULL;
-    static RRDDIM *rd_ldap_active_threads = NULL;
-    static RRDSET *st_ldap_udp_operations_total = NULL;
-    static RRDDIM *rd_ldap_udp_operations_total = NULL;
-    static RRDSET *st_ldap_writes_total = NULL;
-    static RRDDIM *rd_ldap_writes_total = NULL;
-    static RRDSET *st_ldap_client_sessions = NULL;
-    static RRDDIM *rd_ldap_client_sessions = NULL;
 
-    perflibGetObjectCounter(pDataBlock, pObjectType, &ldapClosedConnectionsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &ldapNewConnectionsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &ldapNewSSLConnectionsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &ldapActiveThreads);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &ldapUDPOperationsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &ldapWritesPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &ldapClientSessions);
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ldapClosedConnectionsPerSec))
+        return;
 
     if (unlikely(!st_ldap_closed_connections_total)) {
         st_ldap_closed_connections_total = rrdset_create_localhost(
@@ -2061,37 +2038,88 @@ static void netdata_ad_ldap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
         rd_ldap_closed_connections_total,
         (collected_number)ldapClosedConnectionsPerSec.current.Data);
     rrdset_done(st_ldap_closed_connections_total);
+}
 
-    if (unlikely(!st_ldap_opened_connections_total)) {
-        st_ldap_opened_connections_total = rrdset_create_localhost(
+static void netdata_ad_ldap_opened_connections_ldap(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA ldapNewConnectionsPerSec = {.key = "LDAP New Connections/sec"};
+    static RRDSET *st_ldap_opened_connections_ldap = NULL;
+    static RRDDIM *rd_ldap_opened_connections_ldap = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ldapNewConnectionsPerSec))
+        return;
+
+    if (unlikely(!st_ldap_opened_connections_ldap)) {
+        st_ldap_opened_connections_ldap = rrdset_create_localhost(
             "ad",
-            "ldap_opened_connections",
+            "ldap_opened_connections_ldap",
             NULL,
             "ldap",
-            "ad.ldap_opened_connections",
+            "ad.ldap_opened_connections_ldap",
             "LDAP opened connections",
             "connections/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
-            PRIO_AD_LDAP_OPENED_CONNECTIONS_TOTAL,
+            PRIO_AD_LDAP_OPENED_CONNECTIONS_LDAP,
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_ldap_opened_connections_total_ldap =
-            rrddim_add(st_ldap_opened_connections_total, "ldap", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_ldap_opened_connections_total_ldaps =
-            rrddim_add(st_ldap_opened_connections_total, "ldaps", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_ldap_opened_connections_ldap =
+            rrddim_add(st_ldap_opened_connections_ldap, "ldap", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-        st_ldap_opened_connections_total,
-        rd_ldap_opened_connections_total_ldap,
+        st_ldap_opened_connections_ldap,
+        rd_ldap_opened_connections_ldap,
         (collected_number)ldapNewConnectionsPerSec.current.Data);
+    rrdset_done(st_ldap_opened_connections_ldap);
+}
+
+static void netdata_ad_ldap_opened_connections_ldaps(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA ldapNewSSLConnectionsPerSec = {.key = "LDAP New SSL Connections/sec"};
+    static RRDSET *st_ldap_opened_connections_ldaps = NULL;
+    static RRDDIM *rd_ldap_opened_connections_ldaps = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ldapNewSSLConnectionsPerSec))
+        return;
+
+    if (unlikely(!st_ldap_opened_connections_ldaps)) {
+        st_ldap_opened_connections_ldaps = rrdset_create_localhost(
+            "ad",
+            "ldap_opened_connections_ldaps",
+            NULL,
+            "ldap",
+            "ad.ldap_opened_connections_ldaps",
+            "LDAPS opened connections",
+            "connections/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_LDAP_OPENED_CONNECTIONS_LDAPS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_ldap_opened_connections_ldaps =
+            rrddim_add(st_ldap_opened_connections_ldaps, "ldaps", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
     rrddim_set_by_pointer(
-        st_ldap_opened_connections_total,
-        rd_ldap_opened_connections_total_ldaps,
+        st_ldap_opened_connections_ldaps,
+        rd_ldap_opened_connections_ldaps,
         (collected_number)ldapNewSSLConnectionsPerSec.current.Data);
-    rrdset_done(st_ldap_opened_connections_total);
+    rrdset_done(st_ldap_opened_connections_ldaps);
+}
+
+static void netdata_ad_ldap_active_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA ldapActiveThreads = {.key = "LDAP Active Threads"};
+    static RRDSET *st_ldap_active_threads = NULL;
+    static RRDDIM *rd_ldap_active_threads = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ldapActiveThreads))
+        return;
 
     if (unlikely(!st_ldap_active_threads)) {
         st_ldap_active_threads = rrdset_create_localhost(
@@ -2113,6 +2141,16 @@ static void netdata_ad_ldap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
 
     rrddim_set_by_pointer(st_ldap_active_threads, rd_ldap_active_threads, (collected_number)ldapActiveThreads.current.Data);
     rrdset_done(st_ldap_active_threads);
+}
+
+static void netdata_ad_ldap_udp_operations(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA ldapUDPOperationsPerSec = {.key = "LDAP UDP operations/sec"};
+    static RRDSET *st_ldap_udp_operations_total = NULL;
+    static RRDDIM *rd_ldap_udp_operations_total = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ldapUDPOperationsPerSec))
+        return;
 
     if (unlikely(!st_ldap_udp_operations_total)) {
         st_ldap_udp_operations_total = rrdset_create_localhost(
@@ -2138,6 +2176,16 @@ static void netdata_ad_ldap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
         rd_ldap_udp_operations_total,
         (collected_number)ldapUDPOperationsPerSec.current.Data);
     rrdset_done(st_ldap_udp_operations_total);
+}
+
+static void netdata_ad_ldap_writes(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA ldapWritesPerSec = {.key = "LDAP Writes/sec"};
+    static RRDSET *st_ldap_writes_total = NULL;
+    static RRDDIM *rd_ldap_writes_total = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ldapWritesPerSec))
+        return;
 
     if (unlikely(!st_ldap_writes_total)) {
         st_ldap_writes_total = rrdset_create_localhost(
@@ -2159,6 +2207,16 @@ static void netdata_ad_ldap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
 
     rrddim_set_by_pointer(st_ldap_writes_total, rd_ldap_writes_total, (collected_number)ldapWritesPerSec.current.Data);
     rrdset_done(st_ldap_writes_total);
+}
+
+static void netdata_ad_ldap_client_sessions(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA ldapClientSessions = {.key = "LDAP Client Sessions"};
+    static RRDSET *st_ldap_client_sessions = NULL;
+    static RRDDIM *rd_ldap_client_sessions = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ldapClientSessions))
+        return;
 
     if (unlikely(!st_ldap_client_sessions)) {
         st_ldap_client_sessions = rrdset_create_localhost(
@@ -2182,6 +2240,17 @@ static void netdata_ad_ldap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
     rrddim_set_by_pointer(
         st_ldap_client_sessions, rd_ldap_client_sessions, (collected_number)ldapClientSessions.current.Data);
     rrdset_done(st_ldap_client_sessions);
+}
+
+static void netdata_ad_ldap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    netdata_ad_ldap_closed_connections(pDataBlock, pObjectType, update_every);
+    netdata_ad_ldap_opened_connections_ldap(pDataBlock, pObjectType, update_every);
+    netdata_ad_ldap_opened_connections_ldaps(pDataBlock, pObjectType, update_every);
+    netdata_ad_ldap_active_threads(pDataBlock, pObjectType, update_every);
+    netdata_ad_ldap_udp_operations(pDataBlock, pObjectType, update_every);
+    netdata_ad_ldap_writes(pDataBlock, pObjectType, update_every);
+    netdata_ad_ldap_client_sessions(pDataBlock, pObjectType, update_every);
 }
 
 static void netdata_ad_cleanup_metrics(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
