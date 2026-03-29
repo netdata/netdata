@@ -239,6 +239,7 @@ jobs:
         with:
           name: topology-ip-intel-stock
           path: ${{ github.workspace }}/.topology-ip-intel-stock/
+          include-hidden-files: true
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:

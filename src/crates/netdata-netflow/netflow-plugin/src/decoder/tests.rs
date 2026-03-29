@@ -3199,6 +3199,10 @@ fn flow_record_round_trip_all_fields() {
     assert_eq!(rec.dst_geo_city, rec2.dst_geo_city);
     assert_eq!(rec.src_geo_state, rec2.src_geo_state);
     assert_eq!(rec.dst_geo_state, rec2.dst_geo_state);
+    assert_eq!(rec.src_geo_latitude, rec2.src_geo_latitude);
+    assert_eq!(rec.dst_geo_latitude, rec2.dst_geo_latitude);
+    assert_eq!(rec.src_geo_longitude, rec2.src_geo_longitude);
+    assert_eq!(rec.dst_geo_longitude, rec2.dst_geo_longitude);
     assert_eq!(rec.dst_as_path, rec2.dst_as_path);
     assert_eq!(rec.dst_communities, rec2.dst_communities);
     assert_eq!(rec.dst_large_communities, rec2.dst_large_communities);

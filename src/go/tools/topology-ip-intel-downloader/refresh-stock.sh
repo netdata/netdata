@@ -30,6 +30,9 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../../../.." && pwd)"
 OUTPUT_DIR="${1:-${REPO_ROOT}/artifacts/topology-ip-intel-stock}"
 PREPARE_SCRIPT="${REPO_ROOT}/.github/scripts/prepare-topology-ip-intel-stock.sh"
+if [[ "${OUTPUT_DIR}" != /* ]]; then
+  OUTPUT_DIR="$(pwd)/${OUTPUT_DIR}"
+fi
 
 run mkdir -p "${OUTPUT_DIR}"
 cd "${REPO_ROOT}"

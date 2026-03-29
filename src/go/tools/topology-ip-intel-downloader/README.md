@@ -99,7 +99,7 @@ topology-ip-intel-downloader \
   --geo dbip:city-lite
 ```
 
-Disable city-level GEO output entirely for one run:
+Disable GEO output entirely for one run:
 
 ```bash
 topology-ip-intel-downloader --no-geo

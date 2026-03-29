@@ -82,6 +82,14 @@ func TestDefaultConfigValidation(t *testing.T) {
 	require.True(t, cfg.hasFamily(sourceFamilyGeo))
 }
 
+func TestConfigValidationAllowsAllFamiliesDisabled(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.sources = nil
+	require.NoError(t, cfg.validate())
+	require.False(t, cfg.hasFamily(sourceFamilyASN))
+	require.False(t, cfg.hasFamily(sourceFamilyGeo))
+}
+
 func TestDefaultConfigUsesBuildInfoCacheDir(t *testing.T) {
 	oldCacheDir := buildinfo.CacheDir
 	t.Cleanup(func() {

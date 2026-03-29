@@ -5,6 +5,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -144,7 +145,15 @@ func sourceDisplayName(source sourceEntry) string {
 		return fmt.Sprintf("%s path=%s", base, source.path)
 	}
 	if source.url != "" {
-		return fmt.Sprintf("%s url=%s", base, source.url)
+		return fmt.Sprintf("%s url=%s", base, redactURLForDisplay(source.url))
 	}
 	return base
+}
+
+func redactURLForDisplay(raw string) string {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" {
+		return "<redacted>"
+	}
+	return fmt.Sprintf("%s://%s/<redacted>", parsed.Scheme, parsed.Host)
 }

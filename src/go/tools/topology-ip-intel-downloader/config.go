@@ -519,10 +519,6 @@ func validateSourceEntry(source sourceEntry, scope string) error {
 }
 
 func (cfg config) validate() error {
-	if len(cfg.sources) == 0 {
-		return errors.New("at least one source is required")
-	}
-
 	for i, source := range cfg.sources {
 		if err := validateSourceEntry(source, fmt.Sprintf("sources[%d]", i)); err != nil {
 			return err

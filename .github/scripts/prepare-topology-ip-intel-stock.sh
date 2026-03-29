@@ -15,15 +15,15 @@ run() {
 
   if "$@"; then
     return 0
+  else
+    local exit_code=$?
+    echo -e >&2 "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e >&2 "${RED}[ERROR]${NC} Command failed with exit code ${exit_code}: ${YELLOW}$1${NC}"
+    echo -e >&2 "${RED}        Full command:${NC} $*"
+    echo -e >&2 "${RED}        Working dir:${NC} $(pwd)"
+    echo -e >&2 "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    return "${exit_code}"
   fi
-
-  local exit_code=$?
-  echo -e >&2 "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e >&2 "${RED}[ERROR]${NC} Command failed with exit code ${exit_code}: ${YELLOW}$1${NC}"
-  echo -e >&2 "${RED}        Full command:${NC} $*"
-  echo -e >&2 "${RED}        Working dir:${NC} $(pwd)"
-  echo -e >&2 "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  return "${exit_code}"
 }
 
 usage() {
