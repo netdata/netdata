@@ -44,7 +44,7 @@ func (p *pipeline) CollectSamples() (*scrapeBatch, error) {
 	return batch, nil
 }
 
-func (p *pipeline) CollectMetricFamilies() (prompkg.MetricFamilies, error) {
+func (p *pipeline) CollectMetricFamilies() (promscrapemodel.MetricFamilies, error) {
 	batch, err := p.CollectSamples()
 	if err != nil {
 		return nil, err
@@ -53,8 +53,8 @@ func (p *pipeline) CollectMetricFamilies() (prompkg.MetricFamilies, error) {
 	return assembleMetricFamilies(batch)
 }
 
-func assembleMetricFamilies(batch *scrapeBatch) (prompkg.MetricFamilies, error) {
-	asm := prompkg.NewAssembler()
+func assembleMetricFamilies(batch *scrapeBatch) (promscrapemodel.MetricFamilies, error) {
+	asm := promscrapemodel.NewAssembler()
 	for _, entry := range batch.help {
 		asm.ApplyHelp(entry.name, entry.help)
 	}

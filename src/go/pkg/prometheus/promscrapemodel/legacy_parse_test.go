@@ -1,4 +1,4 @@
-package prometheus
+package promscrapemodel
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 )
 
 func TestPromTextParser_parseToSeries(t *testing.T) {
@@ -97,7 +97,7 @@ test_histogram_count{label="d"} 8
 }
 
 func TestPromTextParser_parseToSeriesWithSelector(t *testing.T) {
-	sr, err := selector.Parse(`test_metric{label="value2"}`)
+	sr, err := promselector.Parse(`test_metric{label="value2"}`)
 	require.NoError(t, err)
 
 	p := promTextParser{sr: sr}

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package selector
+package promselector
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/selectorcore"

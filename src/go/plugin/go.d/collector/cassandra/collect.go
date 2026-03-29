@@ -6,7 +6,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 )
 
 const (
@@ -138,7 +138,7 @@ func (c *Collector) processMetric(mx map[string]int64) {
 	}
 }
 
-func (c *Collector) collectMetrics(pms prometheus.Series) {
+func (c *Collector) collectMetrics(pms promscrapemodel.Series) {
 	c.collectClientRequestMetrics(pms)
 	c.collectDroppedMessagesMetrics(pms)
 	c.collectThreadPoolsMetrics(pms)
@@ -148,7 +148,7 @@ func (c *Collector) collectMetrics(pms prometheus.Series) {
 	c.collectCompactionMetrics(pms)
 }
 
-func (c *Collector) collectClientRequestMetrics(pms prometheus.Series) {
+func (c *Collector) collectClientRequestMetrics(pms promscrapemodel.Series) {
 	const metric = "org_apache_cassandra_metrics_clientrequest"
 
 	var rw struct{ read, write *metricValue }
@@ -222,7 +222,7 @@ func (c *Collector) collectClientRequestMetrics(pms prometheus.Series) {
 	}
 }
 
-func (c *Collector) collectCacheMetrics(pms prometheus.Series) {
+func (c *Collector) collectCacheMetrics(pms promscrapemodel.Series) {
 	const metric = "org_apache_cassandra_metrics_cache"
 
 	var hm struct{ hits, misses *metricValue }
@@ -270,7 +270,7 @@ func (c *Collector) collectCacheMetrics(pms prometheus.Series) {
 	}
 }
 
-func (c *Collector) collectThreadPoolsMetrics(pms prometheus.Series) {
+func (c *Collector) collectThreadPoolsMetrics(pms promscrapemodel.Series) {
 	const metric = "org_apache_cassandra_metrics_threadpools"
 
 	for _, pm := range pms.FindByName(metric + suffixValue) {
@@ -301,7 +301,7 @@ func (c *Collector) collectThreadPoolsMetrics(pms prometheus.Series) {
 	}
 }
 
-func (c *Collector) collectStorageMetrics(pms prometheus.Series) {
+func (c *Collector) collectStorageMetrics(pms promscrapemodel.Series) {
 	const metric = "org_apache_cassandra_metrics_storage"
 
 	for _, pm := range pms.FindByName(metric + suffixCount) {
@@ -316,7 +316,7 @@ func (c *Collector) collectStorageMetrics(pms prometheus.Series) {
 	}
 }
 
-func (c *Collector) collectDroppedMessagesMetrics(pms prometheus.Series) {
+func (c *Collector) collectDroppedMessagesMetrics(pms promscrapemodel.Series) {
 	const metric = "org_apache_cassandra_metrics_droppedmessage"
 
 	for _, pm := range pms.FindByName(metric + suffixCount) {
@@ -324,7 +324,7 @@ func (c *Collector) collectDroppedMessagesMetrics(pms prometheus.Series) {
 	}
 }
 
-func (c *Collector) collectJVMMetrics(pms prometheus.Series) {
+func (c *Collector) collectJVMMetrics(pms promscrapemodel.Series) {
 	const metricMemUsed = "jvm_memory_bytes_used"
 	const metricGC = "jvm_gc_collection_seconds"
 
@@ -362,7 +362,7 @@ func (c *Collector) collectJVMMetrics(pms prometheus.Series) {
 	}
 }
 
-func (c *Collector) collectCompactionMetrics(pms prometheus.Series) {
+func (c *Collector) collectCompactionMetrics(pms promscrapemodel.Series) {
 	const metric = "org_apache_cassandra_metrics_compaction"
 
 	for _, pm := range pms.FindByName(metric + suffixValue) {
@@ -394,7 +394,7 @@ func (c *Collector) getThreadPoolMetrics(name string) *threadPoolMetrics {
 	return pool
 }
 
-func isCassandraMetrics(pms prometheus.Series) bool {
+func isCassandraMetrics(pms promscrapemodel.Series) bool {
 	for _, pm := range pms {
 		if strings.HasPrefix(pm.Name(), "org_apache_cassandra_metrics") {
 			return true

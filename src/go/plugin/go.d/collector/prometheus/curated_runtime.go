@@ -10,7 +10,6 @@ import (
 	commonmodel "github.com/prometheus/common/model"
 	promlabels "github.com/prometheus/prometheus/model/labels"
 
-	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 )
@@ -20,7 +19,7 @@ type typedFamilyKey struct {
 	hash uint64
 }
 
-func (c *Collector) processScrapeBatch(batch *scrapeBatch, checking bool) (prompkg.MetricFamilies, *collectorRuntime, error) {
+func (c *Collector) processScrapeBatch(batch *scrapeBatch, checking bool) (promscrapemodel.MetricFamilies, *collectorRuntime, error) {
 	runtime := c.runtime
 	if checking {
 		var err error

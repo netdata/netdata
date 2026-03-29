@@ -11,9 +11,12 @@
 
 ## Status
 
+- Historical / superseded focused note.
+- The clean latest-state parser/relabel/assembly contract now lives in:
+  - [PROMETHEUS_RELABEL_PARSER_MODEL-LATEST.md](/Users/ilyam/Projects/github/ilyam8/netdata/src/go/plugin/go.d/PROMETHEUS_RELABEL_PARSER_MODEL-LATEST.md)
 - Synchronized revision after round-3 adversarial review.
 - Purpose of this revision:
-  - align this parser/relabel note with the locked decisions in `TODO-PROMETHEUS-V2-MIGRATION.md`
+  - align this parser/relabel note with the then-current migration decisions
   - remove stale “still open” wording for decisions that are already locked
   - make the collector-to-`metrix` bridge explicit enough for implementation review
 - Current alignment:
@@ -32,9 +35,10 @@
 
 - This file is a derived implementation-contract note.
 - The authoritative source of truth is:
-  - `/Users/ilyam/Projects/github/ilyam8/netdata/src/go/plugin/go.d/TODO-PROMETHEUS-V2-MIGRATION.md`
+  - [TODO-PROMETHEUS-V2-MIGRATION-LATEST.md](/Users/ilyam/Projects/github/ilyam8/netdata/src/go/plugin/go.d/TODO-PROMETHEUS-V2-MIGRATION-LATEST.md)
+  - [PROMETHEUS_RELABEL_PARSER_MODEL-LATEST.md](/Users/ilyam/Projects/github/ilyam8/netdata/src/go/plugin/go.d/PROMETHEUS_RELABEL_PARSER_MODEL-LATEST.md)
 - If this file and the TODO disagree:
-  - the TODO wins
+  - the latest-state files win
 - This file exists to restate the parser/relabel/assembly/bridge contract in one focused place.
 
 ## Facts And Constraints

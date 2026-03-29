@@ -6,7 +6,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
@@ -21,7 +21,7 @@ const (
 	metricBackendBytesOutTotal              = "haproxy_backend_bytes_out_total"
 )
 
-func isHaproxyMetrics(pms prometheus.Series) bool {
+func isHaproxyMetrics(pms promscrapemodel.Series) bool {
 	for _, pm := range pms {
 		if strings.HasPrefix(pm.Name(), "haproxy_") {
 			return true
@@ -105,7 +105,7 @@ func (c *Collector) addDimToChart(chartID string, dim *collectorapi.Dim) {
 	chart.MarkNotCreated()
 }
 
-func multiplier(pm prometheus.SeriesSample) float64 {
+func multiplier(pm promscrapemodel.SeriesSample) float64 {
 	switch pm.Name() {
 	case metricBackendResponseTimeAverageSeconds,
 		metricBackendQueueTimeAverageSeconds:
@@ -115,7 +115,7 @@ func multiplier(pm prometheus.SeriesSample) float64 {
 	return 1
 }
 
-func dimID(pm prometheus.SeriesSample) string {
+func dimID(pm promscrapemodel.SeriesSample) string {
 	proxy := pm.Labels.Get("proxy")
 	if proxy == "" {
 		return ""

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package prometheus
+package promscrapemodel
 
 import (
 	"github.com/prometheus/common/model"

@@ -13,13 +13,13 @@ import (
 	"sync/atomic"
 	"testing"
 
+	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	promlabels "github.com/prometheus/prometheus/model/labels"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -56,7 +56,7 @@ func TestCollector_Init(t *testing.T) {
 			wantFail: true,
 			config: Config{
 				HTTPConfig: web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
-				Selector:   selector.Expr{Allow: []string{`name{label=#"value"}`}},
+				Selector:   promselector.Expr{Allow: []string{`name{label=#"value"}`}},
 			},
 		},
 		"default": {
@@ -247,7 +247,7 @@ test_untyped_metric{label1="value2"} 12.5
 		},
 		"selector keeps only matching metric": {
 			configure: func(c *Collector) {
-				c.Selector = selector.Expr{Allow: []string{`allowed_metric{job="demo"}`}}
+				c.Selector = promselector.Expr{Allow: []string{`allowed_metric{job="demo"}`}}
 			},
 			input: `
 # TYPE allowed_metric gauge

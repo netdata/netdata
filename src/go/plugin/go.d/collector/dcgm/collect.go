@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/prometheus/common/model"
 	promlabels "github.com/prometheus/prometheus/model/labels"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
@@ -261,7 +261,7 @@ func isNVLinkThroughputContext(contextID string) bool {
 		strings.HasPrefix(contextID, "dcgm.nvlink.") && strings.HasSuffix(contextID, ".interconnect.throughput")
 }
 
-func metricFamilyKind(mf *prometheus.MetricFamily) sampleKind {
+func metricFamilyKind(mf *promscrapemodel.MetricFamily) sampleKind {
 	switch mf.Type() {
 	case model.MetricTypeCounter:
 		return sampleCounter
@@ -277,7 +277,7 @@ func metricFamilyKind(mf *prometheus.MetricFamily) sampleKind {
 	}
 }
 
-func metricValue(metric prometheus.Metric, typ sampleKind) (float64, bool) {
+func metricValue(metric promscrapemodel.Metric, typ sampleKind) (float64, bool) {
 	if typ == sampleCounter {
 		if c := metric.Counter(); c != nil {
 			return c.Value(), true
@@ -304,7 +304,7 @@ func metricValue(metric prometheus.Metric, typ sampleKind) (float64, bool) {
 	return 0, false
 }
 
-func hasDCGMMetricFamilies(mfs prometheus.MetricFamilies) bool {
+func hasDCGMMetricFamilies(mfs promscrapemodel.MetricFamilies) bool {
 	for name := range mfs {
 		if isDCGMMetricName(name) {
 			return true
@@ -317,7 +317,7 @@ func isDCGMMetricName(name string) bool {
 	return strings.HasPrefix(name, "DCGM_") || strings.HasPrefix(strings.ToLower(name), "dcgm_")
 }
 
-func calcDCGMMetricSeries(mfs prometheus.MetricFamilies) int {
+func calcDCGMMetricSeries(mfs promscrapemodel.MetricFamilies) int {
 	var total int
 	for name, mf := range mfs {
 		if !isDCGMMetricName(name) {

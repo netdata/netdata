@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 )
 
 func TestParser_ParseStreamSamples(t *testing.T) {
@@ -206,7 +206,7 @@ test_other{label1="value2"} 3
 		t.Run(name, func(t *testing.T) {
 			var p Parser
 			if test.selector != "" {
-				sr, err := selector.Parse(test.selector)
+				sr, err := promselector.Parse(test.selector)
 				require.NoError(t, err)
 				p = NewParser(sr)
 			}

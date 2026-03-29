@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package prometheus
+package promscrapemodel
 
 import (
 	"testing"
@@ -9,8 +9,6 @@ import (
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 )
 
 func TestAssembler_MetricFamilies(t *testing.T) {
@@ -25,12 +23,12 @@ func TestAssembler_MetricFamilies(t *testing.T) {
 				a.applyHelp("test_summary", "Test Summary")
 				a.applyHelp("test_histogram", "Test Histogram")
 
-				for _, sample := range []promscrapemodel.Sample{
+				for _, sample := range []Sample{
 					{
 						Name:       "test_gauge",
 						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
 						Value:      11,
-						Kind:       promscrapemodel.SampleKindScalar,
+						Kind:       SampleKindScalar,
 						FamilyType: model.MetricTypeGauge,
 					},
 					{
@@ -40,21 +38,21 @@ func TestAssembler_MetricFamilies(t *testing.T) {
 							{Name: "quantile", Value: "0.5"},
 						},
 						Value:      1,
-						Kind:       promscrapemodel.SampleKindSummaryQuantile,
+						Kind:       SampleKindSummaryQuantile,
 						FamilyType: model.MetricTypeSummary,
 					},
 					{
 						Name:       "test_summary_sum",
 						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
 						Value:      2,
-						Kind:       promscrapemodel.SampleKindSummarySum,
+						Kind:       SampleKindSummarySum,
 						FamilyType: model.MetricTypeSummary,
 					},
 					{
 						Name:       "test_summary_count",
 						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
 						Value:      3,
-						Kind:       promscrapemodel.SampleKindSummaryCount,
+						Kind:       SampleKindSummaryCount,
 						FamilyType: model.MetricTypeSummary,
 					},
 					{
@@ -64,21 +62,21 @@ func TestAssembler_MetricFamilies(t *testing.T) {
 							{Name: "le", Value: "0.5"},
 						},
 						Value:      4,
-						Kind:       promscrapemodel.SampleKindHistogramBucket,
+						Kind:       SampleKindHistogramBucket,
 						FamilyType: model.MetricTypeHistogram,
 					},
 					{
 						Name:       "test_histogram_sum",
 						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
 						Value:      5,
-						Kind:       promscrapemodel.SampleKindHistogramSum,
+						Kind:       SampleKindHistogramSum,
 						FamilyType: model.MetricTypeHistogram,
 					},
 					{
 						Name:       "test_histogram_count",
 						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
 						Value:      6,
-						Kind:       promscrapemodel.SampleKindHistogramCount,
+						Kind:       SampleKindHistogramCount,
 						FamilyType: model.MetricTypeHistogram,
 					},
 				} {
@@ -118,11 +116,11 @@ func TestAssembler_MetricFamilies(t *testing.T) {
 		"sealed readout is idempotent and next sample starts new cycle": {
 			apply: func(a *Assembler) error {
 				a.beginCycle()
-				if err := a.ApplySample(promscrapemodel.Sample{
+				if err := a.ApplySample(Sample{
 					Name:       "first_metric",
 					Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
 					Value:      1,
-					Kind:       promscrapemodel.SampleKindScalar,
+					Kind:       SampleKindScalar,
 					FamilyType: model.MetricTypeGauge,
 				}); err != nil {
 					return err
@@ -135,11 +133,11 @@ func TestAssembler_MetricFamilies(t *testing.T) {
 				secondRead := a.MetricFamilies()
 				assert.Equal(t, first, secondRead)
 
-				return a.ApplySample(promscrapemodel.Sample{
+				return a.ApplySample(Sample{
 					Name:       "second_metric",
 					Labels:     labels.Labels{{Name: "label1", Value: "value2"}},
 					Value:      2,
-					Kind:       promscrapemodel.SampleKindScalar,
+					Kind:       SampleKindScalar,
 					FamilyType: model.MetricTypeGauge,
 				})
 			},
@@ -156,7 +154,7 @@ func TestAssembler_MetricFamilies(t *testing.T) {
 			apply: func(a *Assembler) error {
 				a.beginCycle()
 
-				for _, sample := range []promscrapemodel.Sample{
+				for _, sample := range []Sample{
 					{
 						Name: "bad_summary",
 						Labels: labels.Labels{
@@ -164,21 +162,21 @@ func TestAssembler_MetricFamilies(t *testing.T) {
 							{Name: "quantile", Value: "nope"},
 						},
 						Value:      1,
-						Kind:       promscrapemodel.SampleKindSummaryQuantile,
+						Kind:       SampleKindSummaryQuantile,
 						FamilyType: model.MetricTypeSummary,
 					},
 					{
 						Name:       "bad_summary_sum",
 						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
 						Value:      2,
-						Kind:       promscrapemodel.SampleKindSummarySum,
+						Kind:       SampleKindSummarySum,
 						FamilyType: model.MetricTypeSummary,
 					},
 					{
 						Name:       "bad_summary_count",
 						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
 						Value:      3,
-						Kind:       promscrapemodel.SampleKindSummaryCount,
+						Kind:       SampleKindSummaryCount,
 						FamilyType: model.MetricTypeSummary,
 					},
 					{
@@ -188,35 +186,35 @@ func TestAssembler_MetricFamilies(t *testing.T) {
 							{Name: "le", Value: "nope"},
 						},
 						Value:      4,
-						Kind:       promscrapemodel.SampleKindHistogramBucket,
+						Kind:       SampleKindHistogramBucket,
 						FamilyType: model.MetricTypeHistogram,
 					},
 					{
 						Name:       "bad_histogram_sum",
 						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
 						Value:      5,
-						Kind:       promscrapemodel.SampleKindHistogramSum,
+						Kind:       SampleKindHistogramSum,
 						FamilyType: model.MetricTypeHistogram,
 					},
 					{
 						Name:       "bad_histogram_count",
 						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
 						Value:      6,
-						Kind:       promscrapemodel.SampleKindHistogramCount,
+						Kind:       SampleKindHistogramCount,
 						FamilyType: model.MetricTypeHistogram,
 					},
 					{
 						Name:       "incomplete_summary",
 						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
 						Value:      7,
-						Kind:       promscrapemodel.SampleKindScalar,
+						Kind:       SampleKindScalar,
 						FamilyType: model.MetricTypeSummary,
 					},
 					{
 						Name:       "incomplete_histogram",
 						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
 						Value:      8,
-						Kind:       promscrapemodel.SampleKindScalar,
+						Kind:       SampleKindScalar,
 						FamilyType: model.MetricTypeHistogram,
 					},
 				} {

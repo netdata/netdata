@@ -4,7 +4,7 @@ package prometheus
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )

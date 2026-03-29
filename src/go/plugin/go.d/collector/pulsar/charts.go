@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
@@ -473,7 +473,7 @@ var (
 	}
 )
 
-func (c *Collector) adjustCharts(pms prometheus.Series) {
+func (c *Collector) adjustCharts(pms promscrapemodel.Series) {
 	if pms := pms.FindByName(metricPulsarStorageReadRate); pms.Len() == 0 || pms[0].Labels.Get("namespace") == "" {
 		c.removeSummaryChart(sumStorageOperationsRateChart.ID)
 		c.removeNamespaceChart(nsStorageOperationsChart.ID)

@@ -6,11 +6,11 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 )
 
-func isValidPulsarMetrics(pms prometheus.Series) bool {
+func isValidPulsarMetrics(pms promscrapemodel.Series) bool {
 	return pms.FindByName(metricPulsarTopicsCount).Len() > 0
 }
 
@@ -44,13 +44,13 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return stm.ToMap(mx), nil
 }
 
-func (c *Collector) collectMetrics(pms prometheus.Series) map[string]float64 {
+func (c *Collector) collectMetrics(pms promscrapemodel.Series) map[string]float64 {
 	mx := make(map[string]float64)
 	c.collectBroker(mx, pms)
 	return mx
 }
 
-func (c *Collector) collectBroker(mx map[string]float64, pms prometheus.Series) {
+func (c *Collector) collectBroker(mx map[string]float64, pms promscrapemodel.Series) {
 	pms = findPulsarMetrics(pms)
 	for _, pm := range pms {
 		ns, top := newNamespace(pm), newTopic(pm)
@@ -74,21 +74,21 @@ func (c *Collector) collectBroker(mx map[string]float64, pms prometheus.Series) 
 	mx["pulsar_namespaces_count"] = float64(len(c.curCache.namespaces))
 }
 
-func newNamespace(pm prometheus.SeriesSample) namespace {
+func newNamespace(pm promscrapemodel.SeriesSample) namespace {
 	return namespace{
 		name: pm.Labels.Get("namespace"),
 	}
 }
 
-func newTopic(pm prometheus.SeriesSample) topic {
+func newTopic(pm promscrapemodel.SeriesSample) topic {
 	return topic{
 		namespace: pm.Labels.Get("namespace"),
 		name:      pm.Labels.Get("topic"),
 	}
 }
 
-func findPulsarMetrics(pms prometheus.Series) prometheus.Series {
-	var ms prometheus.Series
+func findPulsarMetrics(pms promscrapemodel.Series) promscrapemodel.Series {
+	var ms promscrapemodel.Series
 	for _, pm := range pms {
 		if isPulsarHistogram(pm) {
 			ms = append(ms, pm)
@@ -114,7 +114,7 @@ func findPulsarMetrics(pms prometheus.Series) prometheus.Series {
 	return append(ms, pms...)
 }
 
-func isPulsarHistogram(pm prometheus.SeriesSample) bool {
+func isPulsarHistogram(pm promscrapemodel.SeriesSample) bool {
 	s := pm.Name()
 	return strings.HasPrefix(s, "pulsar_storage_write_latency") || strings.HasPrefix(s, "pulsar_entry_size")
 }

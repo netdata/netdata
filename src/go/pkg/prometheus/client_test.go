@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -104,7 +104,7 @@ func TestPrometheusScrapeStream(t *testing.T) {
 
 			var prom Prometheus
 			if test.selectorExpr != "" {
-				sr, err := selector.Parse(test.selectorExpr)
+				sr, err := promselector.Parse(test.selectorExpr)
 				require.NoError(t, err)
 				prom = NewWithSelector(http.DefaultClient, req, sr)
 			} else {
@@ -156,11 +156,11 @@ test_metric{label="value"} 1
 func TestPrometheusScrapeMetricFamilies(t *testing.T) {
 	tests := map[string]struct {
 		payload []byte
-		verify  func(t *testing.T, mfs MetricFamilies)
+		verify  func(t *testing.T, mfs promscrapemodel.MetricFamilies)
 	}{
 		"plain": {
 			payload: testData,
-			verify: func(t *testing.T, mfs MetricFamilies) {
+			verify: func(t *testing.T, mfs promscrapemodel.MetricFamilies) {
 				require.NotEmpty(t, mfs)
 
 				mf := mfs.GetSummary("go_gc_duration_seconds")
@@ -176,7 +176,7 @@ func TestPrometheusScrapeMetricFamilies(t *testing.T) {
 # TYPE test_metric gauge
 test_metric{label="value"} 1
 `),
-			verify: func(t *testing.T, mfs MetricFamilies) {
+			verify: func(t *testing.T, mfs promscrapemodel.MetricFamilies) {
 				require.NotEmpty(t, mfs)
 				mf := mfs.GetGauge("test_metric")
 				require.NotNil(t, mf)
@@ -190,7 +190,7 @@ handler_latency_test_sum{label="value"} 2
 # TYPE handler_latency_test_count counter
 handler_latency_test_count{label="value"} 3
 `),
-			verify: func(t *testing.T, mfs MetricFamilies) {
+			verify: func(t *testing.T, mfs promscrapemodel.MetricFamilies) {
 				require.NotEmpty(t, mfs)
 
 				sum := mfs.GetCounter("handler_latency_test_sum")
@@ -211,7 +211,7 @@ bad_summary{label="value",quantile="nope"} 2
 # TYPE bad_histogram histogram
 bad_histogram_bucket{label="value",le="nope"} 3
 `),
-			verify: func(t *testing.T, mfs MetricFamilies) {
+			verify: func(t *testing.T, mfs promscrapemodel.MetricFamilies) {
 				assert.Empty(t, mfs)
 				assert.Nil(t, mfs.Get("bad_summary"))
 				assert.Nil(t, mfs.Get("bad_histogram"))
@@ -224,7 +224,7 @@ malformed_summary{label="value"} 4
 # TYPE malformed_histogram histogram
 malformed_histogram{label="value"} 5
 `),
-			verify: func(t *testing.T, mfs MetricFamilies) {
+			verify: func(t *testing.T, mfs promscrapemodel.MetricFamilies) {
 				assert.Empty(t, mfs)
 				assert.Nil(t, mfs.Get("malformed_summary"))
 				assert.Nil(t, mfs.Get("malformed_histogram"))
@@ -302,7 +302,7 @@ func TestPrometheusPlainWithSelector(t *testing.T) {
 	defer ts.Close()
 
 	req := web.RequestConfig{URL: ts.URL + "/metrics"}
-	sr, err := selector.Parse("go_gc*")
+	sr, err := promselector.Parse("go_gc*")
 	require.NoError(t, err)
 	prom := NewWithSelector(http.DefaultClient, req, sr)
 
@@ -361,7 +361,7 @@ func TestPrometheusReadFromFile(t *testing.T) {
 	}
 }
 
-func verifyTestData(t *testing.T, ms Series) {
+func verifyTestData(t *testing.T, ms promscrapemodel.Series) {
 	assert.Equal(t, 410, len(ms))
 	assert.Equal(t, "go_gc_duration_seconds", ms[0].Labels.Get("__name__"))
 	assert.Equal(t, "0.25", ms[0].Labels.Get("quantile"))

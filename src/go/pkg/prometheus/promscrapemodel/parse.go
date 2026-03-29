@@ -12,7 +12,7 @@ import (
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/model/textparse"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 )
 
 const (
@@ -24,7 +24,7 @@ const (
 )
 
 type Parser struct {
-	sr selector.Selector
+	sr promselector.Selector
 
 	familyTypes   map[string]model.MetricType
 	streamPending []streamPendingSample
@@ -45,7 +45,7 @@ const (
 	pendingCount
 )
 
-func NewParser(sr selector.Selector) Parser {
+func NewParser(sr promselector.Selector) Parser {
 	return Parser{sr: sr}
 }
 

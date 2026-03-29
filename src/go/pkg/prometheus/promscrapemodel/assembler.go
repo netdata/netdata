@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package prometheus
+package promscrapemodel
 
 import (
 	"math"
@@ -10,8 +10,6 @@ import (
 
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
-
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 )
 
 type Assembler struct {
@@ -49,23 +47,28 @@ func NewAssembler() *Assembler {
 	return &Assembler{sealed: true}
 }
 
-func (a *Assembler) ApplySample(sample promscrapemodel.Sample) error {
+// BeginCycle resets the assembler for a new scrape/assembly cycle.
+func (a *Assembler) BeginCycle() {
+	a.beginCycle()
+}
+
+func (a *Assembler) ApplySample(sample Sample) error {
 	if a.sealed {
 		a.beginCycle()
 	}
 
 	switch sample.Kind {
-	case promscrapemodel.SampleKindSummaryQuantile:
+	case SampleKindSummaryQuantile:
 		return a.addSummarySample(sample)
-	case promscrapemodel.SampleKindSummarySum:
+	case SampleKindSummarySum:
 		return a.addSummarySum(sample)
-	case promscrapemodel.SampleKindSummaryCount:
+	case SampleKindSummaryCount:
 		return a.addSummaryCount(sample)
-	case promscrapemodel.SampleKindHistogramBucket:
+	case SampleKindHistogramBucket:
 		return a.addHistogramBucket(sample)
-	case promscrapemodel.SampleKindHistogramSum:
+	case SampleKindHistogramSum:
 		return a.addHistogramSum(sample)
-	case promscrapemodel.SampleKindHistogramCount:
+	case SampleKindHistogramCount:
 		return a.addHistogramCount(sample)
 	default:
 		switch sample.FamilyType {
@@ -143,7 +146,7 @@ func (a *Assembler) reset() {
 	}
 }
 
-func (a *Assembler) addScalarSample(sample promscrapemodel.Sample) {
+func (a *Assembler) addScalarSample(sample Sample) {
 	familyName := sample.Name
 	typ := sample.FamilyType
 	if typ == "" {
@@ -191,7 +194,7 @@ func (a *Assembler) addScalarSample(sample promscrapemodel.Sample) {
 	}
 }
 
-func (a *Assembler) addSummarySample(sample promscrapemodel.Sample) error {
+func (a *Assembler) addSummarySample(sample Sample) error {
 	mf := a.ensureMetricFamily(sample.Name)
 	mf.typ = model.MetricTypeSummary
 	baseLabels, value, ok := a.stripLabel(sample.Labels, quantileLabel)
@@ -222,7 +225,7 @@ func (a *Assembler) addSummarySample(sample promscrapemodel.Sample) error {
 	return nil
 }
 
-func (a *Assembler) addSummaryBase(sample promscrapemodel.Sample) {
+func (a *Assembler) addSummaryBase(sample Sample) {
 	mf := a.ensureMetricFamily(sample.Name)
 	mf.typ = model.MetricTypeSummary
 
@@ -230,7 +233,7 @@ func (a *Assembler) addSummaryBase(sample promscrapemodel.Sample) {
 	_ = a.summaryStateFor(mf, key, sample.Labels)
 }
 
-func (a *Assembler) addSummarySum(sample promscrapemodel.Sample) error {
+func (a *Assembler) addSummarySum(sample Sample) error {
 	familyName := strings.TrimSuffix(sample.Name, sumSuffix)
 	mf := a.ensureMetricFamily(familyName)
 	mf.typ = model.MetricTypeSummary
@@ -249,7 +252,7 @@ func (a *Assembler) addSummarySum(sample promscrapemodel.Sample) error {
 	return nil
 }
 
-func (a *Assembler) addSummaryCount(sample promscrapemodel.Sample) error {
+func (a *Assembler) addSummaryCount(sample Sample) error {
 	familyName := strings.TrimSuffix(sample.Name, countSuffix)
 	mf := a.ensureMetricFamily(familyName)
 	mf.typ = model.MetricTypeSummary
@@ -268,7 +271,7 @@ func (a *Assembler) addSummaryCount(sample promscrapemodel.Sample) error {
 	return nil
 }
 
-func (a *Assembler) addHistogramBucket(sample promscrapemodel.Sample) error {
+func (a *Assembler) addHistogramBucket(sample Sample) error {
 	familyName := strings.TrimSuffix(sample.Name, bucketSuffix)
 	mf := a.ensureMetricFamily(familyName)
 	mf.typ = model.MetricTypeHistogram
@@ -299,7 +302,7 @@ func (a *Assembler) addHistogramBucket(sample promscrapemodel.Sample) error {
 	return nil
 }
 
-func (a *Assembler) addHistogramBase(sample promscrapemodel.Sample) {
+func (a *Assembler) addHistogramBase(sample Sample) {
 	mf := a.ensureMetricFamily(sample.Name)
 	mf.typ = model.MetricTypeHistogram
 
@@ -307,7 +310,7 @@ func (a *Assembler) addHistogramBase(sample promscrapemodel.Sample) {
 	_ = a.histogramStateFor(mf, key, sample.Labels)
 }
 
-func (a *Assembler) addHistogramSum(sample promscrapemodel.Sample) error {
+func (a *Assembler) addHistogramSum(sample Sample) error {
 	familyName := strings.TrimSuffix(sample.Name, sumSuffix)
 	mf := a.ensureMetricFamily(familyName)
 	mf.typ = model.MetricTypeHistogram
@@ -326,7 +329,7 @@ func (a *Assembler) addHistogramSum(sample promscrapemodel.Sample) error {
 	return nil
 }
 
-func (a *Assembler) addHistogramCount(sample promscrapemodel.Sample) error {
+func (a *Assembler) addHistogramCount(sample Sample) error {
 	familyName := strings.TrimSuffix(sample.Name, countSuffix)
 	mf := a.ensureMetricFamily(familyName)
 	mf.typ = model.MetricTypeHistogram

@@ -6,7 +6,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	mtx "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
@@ -28,13 +28,13 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return stm.ToMap(mx), nil
 }
 
-func (c *Collector) collectSyncProxyRules(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectSyncProxyRules(raw promscrapemodel.Series, mx *metrics) {
 	m := raw.FindByName("kubeproxy_sync_proxy_rules_latency_microseconds_count")
 	mx.SyncProxyRules.Count.Set(m.Max())
 	c.collectSyncProxyRulesLatency(raw, mx)
 }
 
-func (c *Collector) collectSyncProxyRulesLatency(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectSyncProxyRulesLatency(raw promscrapemodel.Series, mx *metrics) {
 	metricName := "kubeproxy_sync_proxy_rules_latency_microseconds_bucket"
 	latency := &mx.SyncProxyRules.Latency
 
@@ -94,7 +94,7 @@ func (c *Collector) collectSyncProxyRulesLatency(raw prometheus.Series, mx *metr
 	latency.LE2000.Sub(latency.LE1000.Value())
 }
 
-func (c *Collector) collectRESTClientHTTPRequests(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectRESTClientHTTPRequests(raw promscrapemodel.Series, mx *metrics) {
 	metricName := "rest_client_requests_total"
 	chart := c.charts.Get("rest_client_requests_by_code")
 
@@ -127,7 +127,7 @@ func (c *Collector) collectRESTClientHTTPRequests(raw prometheus.Series, mx *met
 	}
 }
 
-func (c *Collector) collectHTTPRequestDuration(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectHTTPRequestDuration(raw promscrapemodel.Series, mx *metrics) {
 	// Summary
 	for _, metric := range raw.FindByName("http_request_duration_microseconds") {
 		if math.IsNaN(metric.Value) {

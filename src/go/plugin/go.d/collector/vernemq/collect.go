@@ -6,10 +6,9 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
-
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
@@ -34,7 +33,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) collectMetrics(mx map[string]int64, mfs prometheus.MetricFamilies) {
+func (c *Collector) collectMetrics(mx map[string]int64, mfs promscrapemodel.MetricFamilies) {
 	nodes := c.getNodesStats(mfs)
 
 	for node, st := range nodes {
@@ -71,7 +70,7 @@ func (c *Collector) collectMetrics(mx map[string]int64, mfs prometheus.MetricFam
 
 }
 
-func (c *Collector) getNodesStats(mfs prometheus.MetricFamilies) map[string]*nodeStats {
+func (c *Collector) getNodesStats(mfs promscrapemodel.MetricFamilies) map[string]*nodeStats {
 	nodes := make(map[string]*nodeStats)
 
 	for _, mf := range mfs {
@@ -134,7 +133,7 @@ func (c *Collector) getNodesStats(mfs prometheus.MetricFamilies) map[string]*nod
 	return nodes
 }
 
-func (c *Collector) getMetricNamespace(mfs prometheus.MetricFamilies) (string, error) {
+func (c *Collector) getMetricNamespace(mfs promscrapemodel.MetricFamilies) (string, error) {
 	want := metricPUBLISHError
 	for _, mf := range mfs {
 		if strings.HasSuffix(mf.Name(), want) {

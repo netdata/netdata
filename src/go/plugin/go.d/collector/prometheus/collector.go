@@ -13,7 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
@@ -58,15 +58,15 @@ type Config struct {
 	UpdateEvery          int    `yaml:"update_every,omitempty" json:"update_every"`
 	AutoDetectionRetry   int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	web.HTTPConfig       `yaml:",inline" json:""`
-	Name                 string        `yaml:"name,omitempty" json:"name"`
-	Application          string        `yaml:"app,omitempty" json:"app"`
-	LabelPrefix          string        `yaml:"label_prefix,omitempty" json:"label_prefix"`
-	Selector             selector.Expr `yaml:"selector,omitempty" json:"selector"`
-	ProfileSelectionMode string        `yaml:"profile_selection_mode,omitempty" json:"profile_selection_mode,omitempty"`
-	Profiles             []string      `yaml:"profiles,omitempty" json:"profiles,omitempty"`
-	ExpectedPrefix       string        `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
-	MaxTS                int           `yaml:"max_time_series" json:"max_time_series"`
-	MaxTSPerMetric       int           `yaml:"max_time_series_per_metric" json:"max_time_series_per_metric"`
+	Name                 string            `yaml:"name,omitempty" json:"name"`
+	Application          string            `yaml:"app,omitempty" json:"app"`
+	LabelPrefix          string            `yaml:"label_prefix,omitempty" json:"label_prefix"`
+	Selector             promselector.Expr `yaml:"selector,omitempty" json:"selector"`
+	ProfileSelectionMode string            `yaml:"profile_selection_mode,omitempty" json:"profile_selection_mode,omitempty"`
+	Profiles             []string          `yaml:"profiles,omitempty" json:"profiles,omitempty"`
+	ExpectedPrefix       string            `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
+	MaxTS                int               `yaml:"max_time_series" json:"max_time_series"`
+	MaxTSPerMetric       int               `yaml:"max_time_series_per_metric" json:"max_time_series_per_metric"`
 	FallbackType         struct {
 		Gauge   []string `yaml:"gauge,omitempty" json:"gauge"`
 		Counter []string `yaml:"counter,omitempty" json:"counter"`

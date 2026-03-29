@@ -5,11 +5,11 @@ package docker_engine
 import (
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 )
 
-func isDockerEngineMetrics(pms prometheus.Series) bool {
+func isDockerEngineMetrics(pms promscrapemodel.Series) bool {
 	return pms.FindByName("engine_daemon_engine_info").Len() > 0
 }
 
@@ -27,7 +27,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return stm.ToMap(mx), nil
 }
 
-func (c *Collector) collectMetrics(pms prometheus.Series) metrics {
+func (c *Collector) collectMetrics(pms promscrapemodel.Series) metrics {
 	var mx metrics
 	collectHealthChecks(&mx, pms)
 	collectContainerActions(&mx, pms)
@@ -45,20 +45,20 @@ func (c *Collector) collectMetrics(pms prometheus.Series) metrics {
 	return mx
 }
 
-func isSwarmManager(pms prometheus.Series) bool {
+func isSwarmManager(pms promscrapemodel.Series) bool {
 	return pms.FindByName("swarm_node_manager").Max() == 1
 }
 
-func hasContainerStates(pms prometheus.Series) bool {
+func hasContainerStates(pms promscrapemodel.Series) bool {
 	return pms.FindByName("engine_daemon_container_states_containers").Len() > 0
 }
 
-func collectHealthChecks(mx *metrics, raw prometheus.Series) {
+func collectHealthChecks(mx *metrics, raw promscrapemodel.Series) {
 	v := raw.FindByName("engine_daemon_health_checks_failed_total").Max()
 	mx.HealthChecks.Failed = v
 }
 
-func collectContainerActions(mx *metrics, raw prometheus.Series) {
+func collectContainerActions(mx *metrics, raw promscrapemodel.Series) {
 	for _, metric := range raw.FindByName("engine_daemon_container_actions_seconds_count") {
 		action := metric.Labels.Get("action")
 		if action == "" {
@@ -82,7 +82,7 @@ func collectContainerActions(mx *metrics, raw prometheus.Series) {
 	}
 }
 
-func collectContainerStates(mx *metrics, raw prometheus.Series) {
+func collectContainerStates(mx *metrics, raw promscrapemodel.Series) {
 	for _, metric := range raw.FindByName("engine_daemon_container_states_containers") {
 		state := metric.Labels.Get("state")
 		if state == "" {
@@ -102,7 +102,7 @@ func collectContainerStates(mx *metrics, raw prometheus.Series) {
 	}
 }
 
-func collectBuilderBuildsFails(mx *metrics, raw prometheus.Series) {
+func collectBuilderBuildsFails(mx *metrics, raw promscrapemodel.Series) {
 	for _, metric := range raw.FindByName("builder_builds_failed_total") {
 		reason := metric.Labels.Get("reason")
 		if reason == "" {
@@ -132,7 +132,7 @@ func collectBuilderBuildsFails(mx *metrics, raw prometheus.Series) {
 	}
 }
 
-func collectSwarmManager(mx *metrics, raw prometheus.Series) {
+func collectSwarmManager(mx *metrics, raw promscrapemodel.Series) {
 	v := raw.FindByName("swarm_manager_configs_total").Max()
 	mx.SwarmManager.Configs = v
 

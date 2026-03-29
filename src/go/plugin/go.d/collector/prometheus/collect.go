@@ -9,11 +9,11 @@ import (
 	"sort"
 	"strings"
 
+	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	commonmodel "github.com/prometheus/common/model"
 	promlabels "github.com/prometheus/prometheus/model/labels"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 

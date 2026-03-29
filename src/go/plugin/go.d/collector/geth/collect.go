@@ -3,7 +3,7 @@
 package geth
 
 import (
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 )
 
@@ -17,7 +17,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return stm.ToMap(mx), nil
 }
 
-func (c *Collector) collectGeth(pms prometheus.Series) map[string]float64 {
+func (c *Collector) collectGeth(pms promscrapemodel.Series) map[string]float64 {
 	mx := make(map[string]float64)
 	c.collectChainData(mx, pms)
 	c.collectP2P(mx, pms)
@@ -26,7 +26,7 @@ func (c *Collector) collectGeth(pms prometheus.Series) map[string]float64 {
 	return mx
 }
 
-func (c *Collector) collectChainData(mx map[string]float64, pms prometheus.Series) {
+func (c *Collector) collectChainData(mx map[string]float64, pms promscrapemodel.Series) {
 	pms = pms.FindByNames(
 		chainValidation,
 		chainWrite,
@@ -48,7 +48,7 @@ func (c *Collector) collectChainData(mx map[string]float64, pms prometheus.Serie
 
 }
 
-func (c *Collector) collectRpc(mx map[string]float64, pms prometheus.Series) {
+func (c *Collector) collectRpc(mx map[string]float64, pms promscrapemodel.Series) {
 	pms = pms.FindByNames(
 		rpcRequests,
 		rpcSuccess,
@@ -57,7 +57,7 @@ func (c *Collector) collectRpc(mx map[string]float64, pms prometheus.Series) {
 	c.collectEth(mx, pms)
 }
 
-func (c *Collector) collectTxPool(mx map[string]float64, pms prometheus.Series) {
+func (c *Collector) collectTxPool(mx map[string]float64, pms promscrapemodel.Series) {
 	pms = pms.FindByNames(
 		txPoolInvalid,
 		txPoolPending,
@@ -74,7 +74,7 @@ func (c *Collector) collectTxPool(mx map[string]float64, pms prometheus.Series) 
 	c.collectEth(mx, pms)
 }
 
-func (c *Collector) collectP2P(mx map[string]float64, pms prometheus.Series) {
+func (c *Collector) collectP2P(mx map[string]float64, pms promscrapemodel.Series) {
 	pms = pms.FindByNames(
 		p2pDials,
 		p2pEgress,
@@ -85,7 +85,7 @@ func (c *Collector) collectP2P(mx map[string]float64, pms prometheus.Series) {
 	c.collectEth(mx, pms)
 }
 
-func (c *Collector) collectEth(mx map[string]float64, pms prometheus.Series) {
+func (c *Collector) collectEth(mx map[string]float64, pms promscrapemodel.Series) {
 	for _, pm := range pms {
 		mx[pm.Name()] += pm.Value
 	}

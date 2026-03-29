@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 )
 
 const (
@@ -36,7 +36,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) getSrvType(mfs prometheus.MetricFamilies) string {
+func (c *Collector) getSrvType(mfs promscrapemodel.MetricFamilies) string {
 	for _, mf := range mfs {
 		for _, m := range mf.Metrics() {
 			switch m.Labels().Get("metric_id") {
@@ -54,7 +54,7 @@ func (c *Collector) getSrvType(mfs prometheus.MetricFamilies) string {
 	return ""
 }
 
-func (c *Collector) collectMetrics(mx map[string]int64, mfs prometheus.MetricFamilies) {
+func (c *Collector) collectMetrics(mx map[string]int64, mfs promscrapemodel.MetricFamilies) {
 	var maxConn float64
 	var usedConn float64
 

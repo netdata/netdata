@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/websphere/common"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/websphere/mp/contexts"
@@ -133,7 +133,7 @@ func normalizeMetricName(name, scope string) string {
 	return name
 }
 
-func detectMetricsVersion(series prometheus.Series) string {
+func detectMetricsVersion(series promscrapemodel.Series) string {
 	hasLabelScope := false
 	hasPrefix := false
 	hasVendor := false

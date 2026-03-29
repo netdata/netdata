@@ -1,4 +1,4 @@
-package prometheus
+package promscrapemodel
 
 import (
 	"errors"
@@ -10,24 +10,25 @@ import (
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/model/textparse"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
-)
-
-const (
-	quantileLabel = "quantile"
-	bucketLabel   = "le"
-)
-
-const (
-	countSuffix  = "_count"
-	sumSuffix    = "_sum"
-	bucketSuffix = "_bucket"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 )
 
 type promTextParser struct {
 	series     Series
-	sr         selector.Selector
+	sr         promselector.Selector
 	currSeries labels.Labels
+}
+
+type SeriesParser struct {
+	parser promTextParser
+}
+
+func NewSeriesParser(sr promselector.Selector) SeriesParser {
+	return SeriesParser{parser: promTextParser{sr: sr}}
+}
+
+func (p *SeriesParser) Parse(text []byte) (Series, error) {
+	return p.parser.parseToSeries(text)
 }
 
 func (p *promTextParser) parseToSeries(text []byte) (Series, error) {
@@ -79,13 +80,4 @@ func removeLabel(lbs labels.Labels, name string) (labels.Labels, string, bool) {
 		}
 	}
 	return lbs, "", false
-}
-
-func metricNameValue(lbs labels.Labels) (string, bool) {
-	for _, v := range lbs {
-		if v.Name == labels.MetricName {
-			return v.Value, true
-		}
-	}
-	return "", false
 }

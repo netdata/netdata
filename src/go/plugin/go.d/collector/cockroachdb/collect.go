@@ -5,11 +5,11 @@ package cockroachdb
 import (
 	"errors"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 )
 
-func validCockroachDBMetrics(scraped prometheus.Series) bool {
+func validCockroachDBMetrics(scraped promscrapemodel.Series) bool {
 	return scraped.FindByName("sql_restart_savepoint_count_internal").Len() > 0
 }
 
@@ -37,7 +37,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 const precision = 1000
 
-func collectScraped(scraped prometheus.Series, metricList []string) map[string]float64 {
+func collectScraped(scraped promscrapemodel.Series, metricList []string) map[string]float64 {
 	mx := make(map[string]float64)
 	for _, name := range metricList {
 		for _, m := range scraped.FindByName(name) {

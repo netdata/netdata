@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -61,7 +61,7 @@ func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
 
 // Selector to filter only the metrics we need, reducing memory usage
 // Parse() is called at package init time; if it fails, sr will be nil and all metrics will be collected
-var sr, srParseErr = selector.Expr{
+var sr, srParseErr = promselector.Expr{
 	Allow: []string{
 		// Request metrics
 		"apiserver_request_total",

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package prometheus
+package promscrapemodel
 
 import (
 	"errors"
@@ -12,12 +12,11 @@ import (
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/model/textparse"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 )
 
 type scrapeFastParser struct {
-	sr selector.Selector
+	sr promselector.Selector
 
 	familyTypes map[string]model.MetricType
 	pending     []fastPendingSample
@@ -25,7 +24,7 @@ type scrapeFastParser struct {
 }
 
 type fastPendingSample struct {
-	sample   promscrapemodel.Sample
+	sample   Sample
 	baseName string
 	role     fastPendingRole
 }
@@ -37,6 +36,18 @@ const (
 	fastPendingSum
 	fastPendingCount
 )
+
+type FastParser struct {
+	parser scrapeFastParser
+}
+
+func NewFastParser(sr promselector.Selector) FastParser {
+	return FastParser{parser: scrapeFastParser{sr: sr}}
+}
+
+func (p *FastParser) ParseToAssembler(text []byte, asm *Assembler) error {
+	return p.parser.parseToAssembler(text, asm)
+}
 
 func (p *scrapeFastParser) parseToAssembler(text []byte, asm *Assembler) error {
 	p.reset()
@@ -81,11 +92,11 @@ func (p *scrapeFastParser) parseToAssembler(text []byte, asm *Assembler) error {
 			}
 
 			switch sample.Kind {
-			case promscrapemodel.SampleKindSummaryQuantile:
+			case SampleKindSummaryQuantile:
 				if err := p.emitResolvedPending(sample.Name, model.MetricTypeSummary, asm); err != nil {
 					return err
 				}
-			case promscrapemodel.SampleKindHistogramBucket:
+			case SampleKindHistogramBucket:
 				if err := p.emitResolvedPending(strings.TrimSuffix(sample.Name, bucketSuffix), model.MetricTypeHistogram, asm); err != nil {
 					return err
 				}
@@ -116,18 +127,18 @@ func (p *scrapeFastParser) parseToAssembler(text []byte, asm *Assembler) error {
 	return nil
 }
 
-func (p *scrapeFastParser) makeScratchSample(value float64) (promscrapemodel.Sample, string, fastPendingRole, bool) {
+func (p *scrapeFastParser) makeScratchSample(value float64) (Sample, string, fastPendingRole, bool) {
 	name, ok := metricNameValue(p.currSeries)
 	if !ok {
-		return promscrapemodel.Sample{}, "", fastPendingNone, false
+		return Sample{}, "", fastPendingNone, false
 	}
 
 	lbs, _, _ := removeLabel(p.currSeries, labels.MetricName)
-	sample := promscrapemodel.Sample{
+	sample := Sample{
 		Name:       name,
 		Labels:     lbs,
 		Value:      value,
-		Kind:       promscrapemodel.SampleKindScalar,
+		Kind:       SampleKindScalar,
 		FamilyType: p.familyTypes[name],
 	}
 	if sample.FamilyType == "" {
@@ -135,7 +146,7 @@ func (p *scrapeFastParser) makeScratchSample(value float64) (promscrapemodel.Sam
 	}
 
 	if lbs.Has(quantileLabel) {
-		sample.Kind = promscrapemodel.SampleKindSummaryQuantile
+		sample.Kind = SampleKindSummaryQuantile
 		sample.FamilyType = model.MetricTypeSummary
 		p.familyTypes[name] = model.MetricTypeSummary
 		return sample, "", fastPendingNone, true
@@ -144,7 +155,7 @@ func (p *scrapeFastParser) makeScratchSample(value float64) (promscrapemodel.Sam
 	if strings.HasSuffix(name, bucketSuffix) {
 		baseName := strings.TrimSuffix(name, bucketSuffix)
 		if lbs.Has(bucketLabel) {
-			sample.Kind = promscrapemodel.SampleKindHistogramBucket
+			sample.Kind = SampleKindHistogramBucket
 			sample.FamilyType = model.MetricTypeHistogram
 			p.familyTypes[baseName] = model.MetricTypeHistogram
 			return sample, "", fastPendingNone, true
@@ -161,11 +172,11 @@ func (p *scrapeFastParser) makeScratchSample(value float64) (promscrapemodel.Sam
 		baseName := strings.TrimSuffix(name, sumSuffix)
 		switch p.familyTypes[baseName] {
 		case model.MetricTypeSummary:
-			sample.Kind = promscrapemodel.SampleKindSummarySum
+			sample.Kind = SampleKindSummarySum
 			sample.FamilyType = model.MetricTypeSummary
 			return sample, "", fastPendingNone, true
 		case model.MetricTypeHistogram:
-			sample.Kind = promscrapemodel.SampleKindHistogramSum
+			sample.Kind = SampleKindHistogramSum
 			sample.FamilyType = model.MetricTypeHistogram
 			return sample, "", fastPendingNone, true
 		default:
@@ -183,11 +194,11 @@ func (p *scrapeFastParser) makeScratchSample(value float64) (promscrapemodel.Sam
 		baseName := strings.TrimSuffix(name, countSuffix)
 		switch p.familyTypes[baseName] {
 		case model.MetricTypeSummary:
-			sample.Kind = promscrapemodel.SampleKindSummaryCount
+			sample.Kind = SampleKindSummaryCount
 			sample.FamilyType = model.MetricTypeSummary
 			return sample, "", fastPendingNone, true
 		case model.MetricTypeHistogram:
-			sample.Kind = promscrapemodel.SampleKindHistogramCount
+			sample.Kind = SampleKindHistogramCount
 			sample.FamilyType = model.MetricTypeHistogram
 			return sample, "", fastPendingNone, true
 		default:
@@ -215,18 +226,18 @@ func (p *scrapeFastParser) emitResolvedPending(baseName string, typ model.Metric
 		switch typ {
 		case model.MetricTypeSummary:
 			if pendingSample.role == fastPendingSum {
-				sample.Kind = promscrapemodel.SampleKindSummarySum
+				sample.Kind = SampleKindSummarySum
 			} else {
-				sample.Kind = promscrapemodel.SampleKindSummaryCount
+				sample.Kind = SampleKindSummaryCount
 			}
 		case model.MetricTypeHistogram:
 			if pendingSample.role == fastPendingSum {
-				sample.Kind = promscrapemodel.SampleKindHistogramSum
+				sample.Kind = SampleKindHistogramSum
 			} else {
-				sample.Kind = promscrapemodel.SampleKindHistogramCount
+				sample.Kind = SampleKindHistogramCount
 			}
 		default:
-			sample.Kind = promscrapemodel.SampleKindScalar
+			sample.Kind = SampleKindScalar
 			sample.FamilyType = model.MetricTypeUnknown
 		}
 
@@ -250,11 +261,4 @@ func (p *scrapeFastParser) reset() {
 	}
 
 	p.pending = p.pending[:0]
-}
-
-func sanitizeHelp(help string) string {
-	if strings.IndexByte(help, '\n') == -1 {
-		return help
-	}
-	return reSpace.ReplaceAllString(strings.TrimSpace(help), " ")
 }

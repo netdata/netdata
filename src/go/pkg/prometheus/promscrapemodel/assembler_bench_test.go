@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package prometheus
+package promscrapemodel
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 )
 
 // Baseline on 2026-03-26 before parser/assembler optimization work
@@ -40,9 +39,10 @@ func BenchmarkAssembler_ApplySample(b *testing.B) {
 
 func BenchmarkMetricFamilies_NewParseAndAssemble(b *testing.B) {
 	var (
-		p promscrapemodel.Parser
+		p Parser
 		a Assembler
 	)
+	data := mustReadBenchFixture(b)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -50,11 +50,11 @@ func BenchmarkMetricFamilies_NewParseAndAssemble(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		a.beginCycle()
 		err := p.ParseStreamWithMeta(
-			testData,
+			data,
 			func(name, help string) {
 				a.applyHelp(name, help)
 			},
-			func(sample promscrapemodel.Sample) error {
+			func(sample Sample) error {
 				return a.ApplySample(sample)
 			},
 		)
@@ -68,27 +68,36 @@ func BenchmarkMetricFamilies_FastParseAndAssemble(b *testing.B) {
 		p scrapeFastParser
 		a Assembler
 	)
+	data := mustReadBenchFixture(b)
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		a.beginCycle()
-		err := p.parseToAssembler(testData, &a)
+		err := p.parseToAssembler(data, &a)
 		require.NoError(b, err)
 		_ = a.MetricFamilies()
 	}
 }
 
-func mustParseBenchSamples(b *testing.B) promscrapemodel.Samples {
+func mustParseBenchSamples(b *testing.B) Samples {
 	b.Helper()
 
-	p := promscrapemodel.NewParser(nil)
-	var samples promscrapemodel.Samples
-	err := p.ParseStream(testData, func(sample promscrapemodel.Sample) error {
+	p := NewParser(nil)
+	var samples Samples
+	err := p.ParseStream(mustReadBenchFixture(b), func(sample Sample) error {
 		samples.Add(sample)
 		return nil
 	})
 	require.NoError(b, err)
 	return samples
+}
+
+func mustReadBenchFixture(b *testing.B) []byte {
+	b.Helper()
+
+	data, err := os.ReadFile("../testdata/testdata.txt")
+	require.NoError(b, err)
+	return data
 }

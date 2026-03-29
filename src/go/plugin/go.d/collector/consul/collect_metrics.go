@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
@@ -85,8 +85,8 @@ func (c *Collector) collectMetricsPrometheus(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) isLeader(mfs prometheus.MetricFamilies) (bool, bool) {
-	var mf *prometheus.MetricFamily
+func (c *Collector) isLeader(mfs promscrapemodel.MetricFamilies) (bool, bool) {
+	var mf *promscrapemodel.MetricFamily
 	for _, v := range []string{"server_isLeader_isLeader", "server_isLeader"} {
 		if mf = mfs.GetGauge(c.promMetricNameWithHostname(v)); mf != nil {
 			break
@@ -103,8 +103,8 @@ func (c *Collector) isLeader(mfs prometheus.MetricFamilies) (bool, bool) {
 	return mf.Metrics()[0].Gauge().Value() == 1, true
 }
 
-func (c *Collector) collectGauge(mx map[string]int64, mfs prometheus.MetricFamilies, name string, mul float64, aliases ...string) {
-	var mf *prometheus.MetricFamily
+func (c *Collector) collectGauge(mx map[string]int64, mfs promscrapemodel.MetricFamilies, name string, mul float64, aliases ...string) {
+	var mf *promscrapemodel.MetricFamily
 	for _, v := range append(aliases, name) {
 		if mf = mfs.GetGauge(c.promMetricNameWithHostname(v)); mf != nil {
 			break
@@ -125,8 +125,8 @@ func (c *Collector) collectGauge(mx map[string]int64, mfs prometheus.MetricFamil
 	}
 }
 
-func (c *Collector) collectGaugeBool(mx map[string]int64, mfs prometheus.MetricFamilies, name string, aliases ...string) {
-	var mf *prometheus.MetricFamily
+func (c *Collector) collectGaugeBool(mx map[string]int64, mfs promscrapemodel.MetricFamilies, name string, aliases ...string) {
+	var mf *promscrapemodel.MetricFamily
 	for _, v := range append(aliases, name) {
 		if mf = mfs.GetGauge(c.promMetricNameWithHostname(v)); mf != nil {
 			break
@@ -148,7 +148,7 @@ func (c *Collector) collectGaugeBool(mx map[string]int64, mfs prometheus.MetricF
 	}
 }
 
-func (c *Collector) collectCounter(mx map[string]int64, mfs prometheus.MetricFamilies, name string, mul float64) {
+func (c *Collector) collectCounter(mx map[string]int64, mfs promscrapemodel.MetricFamilies, name string, mul float64) {
 	mf := mfs.GetCounter(c.promMetricName(name))
 	if mf == nil {
 		return
@@ -161,7 +161,7 @@ func (c *Collector) collectCounter(mx map[string]int64, mfs prometheus.MetricFam
 	}
 }
 
-func (c *Collector) collectSummary(mx map[string]int64, mfs prometheus.MetricFamilies, name string) {
+func (c *Collector) collectSummary(mx map[string]int64, mfs promscrapemodel.MetricFamilies, name string) {
 	mf := mfs.GetSummary(c.promMetricName(name))
 	if mf == nil {
 		return
