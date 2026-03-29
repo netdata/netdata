@@ -5,6 +5,7 @@ use netdata_plugin_error::{NetdataPluginError, Result};
 use netdata_plugin_protocol::{FunctionDeclaration, HttpAccess};
 use rt::{FunctionCallContext, FunctionHandler};
 use std::sync::Arc;
+use tokio::task;
 
 use super::model::{
     FLOWS_FUNCTION_VERSION, FLOWS_SCHEMA_VERSION, FLOWS_UPDATE_EVERY_SECONDS, FlowAutocompleteData,
@@ -28,6 +29,14 @@ impl NetflowFlowsHandler {
 
     pub(crate) async fn handle_request(
         &self,
+        request: query::FlowsRequest,
+    ) -> Result<FlowsFunctionResponse> {
+        self.handle_request_with_execution(None, request).await
+    }
+
+    pub(crate) async fn handle_request_with_execution(
+        &self,
+        execution: Option<query::QueryExecutionContext>,
         request: query::FlowsRequest,
     ) -> Result<FlowsFunctionResponse> {
         if request.is_autocomplete_mode() {
@@ -66,13 +75,18 @@ impl NetflowFlowsHandler {
                 },
             ))
         } else if request.is_timeseries_view() {
-            let query_output = self
-                .query
-                .query_flow_metrics(&request)
-                .await
-                .map_err(|err| NetdataPluginError::Other {
-                    message: format!("failed to query flow metrics: {err:#}"),
-                })?;
+            let request_for_query = request.clone();
+            let query = Arc::clone(&self.query);
+            let query_output = task::spawn_blocking(move || {
+                query.query_flow_metrics_blocking(&request_for_query, execution)
+            })
+            .await
+            .map_err(|err| NetdataPluginError::Other {
+                message: format!("flow metrics task join failed: {err}"),
+            })?
+            .map_err(|err| NetdataPluginError::Other {
+                message: format!("failed to query flow metrics: {err:#}"),
+            })?;
             let view = request.normalized_view().to_string();
             let mut stats = self.metrics.snapshot();
             stats.extend(query_output.stats);
@@ -107,10 +121,17 @@ impl NetflowFlowsHandler {
                 help: "NetFlow/IPFIX/sFlow Top-N time-series for grouped flow tuples".to_string(),
             }))
         } else {
-            let query_output = self.query.query_flows(&request).await.map_err(|err| {
-                NetdataPluginError::Other {
-                    message: format!("failed to query flows: {err:#}"),
-                }
+            let request_for_query = request.clone();
+            let query = Arc::clone(&self.query);
+            let query_output = task::spawn_blocking(move || {
+                query.query_flows_blocking(&request_for_query, execution)
+            })
+            .await
+            .map_err(|err| NetdataPluginError::Other {
+                message: format!("flows task join failed: {err}"),
+            })?
+            .map_err(|err| NetdataPluginError::Other {
+                message: format!("failed to query flows: {err:#}"),
             })?;
             let view = request.normalized_view().to_string();
             let mut stats = self.metrics.snapshot();
@@ -158,10 +179,18 @@ impl FunctionHandler for NetflowFlowsHandler {
 
     async fn on_call(
         &self,
-        _ctx: FunctionCallContext,
+        ctx: FunctionCallContext,
         request: Self::Request,
     ) -> Result<Self::Response> {
-        self.handle_request(request).await
+        let execution = if request.is_autocomplete_mode() {
+            None
+        } else {
+            Some(query::QueryExecutionContext::new(
+                ctx.progress.clone(),
+                ctx.cancellation.clone(),
+            ))
+        };
+        self.handle_request_with_execution(execution, request).await
     }
 
     fn declaration(&self) -> FunctionDeclaration {

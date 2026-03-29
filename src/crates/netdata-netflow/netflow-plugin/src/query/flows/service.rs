@@ -2,7 +2,16 @@ use super::*;
 
 impl FlowQueryService {
     pub(crate) async fn query_flows(&self, request: &FlowsRequest) -> Result<FlowQueryOutput> {
+        self.query_flows_blocking(request, None)
+    }
+
+    pub(crate) fn query_flows_blocking(
+        &self,
+        request: &FlowsRequest,
+        execution: Option<QueryExecutionContext>,
+    ) -> Result<FlowQueryOutput> {
         let setup = self.prepare_query(request)?;
+        let execution = execution.map(|ctx| QueryExecutionPlan::for_flows(&setup, ctx));
         let projected_grouped_scan = planner::grouped_query_can_use_projected_scan(request);
 
         let scan_started = Instant::now();
@@ -12,6 +21,8 @@ impl FlowQueryService {
                 &setup,
                 request,
                 &mut grouped_aggregates,
+                execution.as_ref(),
+                0,
             )?;
             let scan_elapsed_ms = scan_started.elapsed().as_millis() as u64;
             let facets_started = Instant::now();
@@ -85,20 +96,26 @@ impl FlowQueryService {
         } else {
             let mut grouped_aggregates = CompactGroupAccumulator::new(&setup.effective_group_by)?;
             let mut accumulate_error = None;
-            let counts = self.scan_matching_records(&setup, request, |record, handle| {
-                if accumulate_error.is_some() {
-                    return;
-                }
-                accumulate_compact_grouped_record(
-                    record,
-                    handle,
-                    metrics_from_fields(&record.fields),
-                    &setup.effective_group_by,
-                    &mut grouped_aggregates,
-                    self.max_groups,
-                )
-                .unwrap_or_else(|err| accumulate_error = Some(err));
-            })?;
+            let counts = self.scan_matching_records(
+                &setup,
+                request,
+                |record, handle| {
+                    if accumulate_error.is_some() {
+                        return;
+                    }
+                    accumulate_compact_grouped_record(
+                        record,
+                        handle,
+                        metrics_from_fields(&record.fields),
+                        &setup.effective_group_by,
+                        &mut grouped_aggregates,
+                        self.max_groups,
+                    )
+                    .unwrap_or_else(|err| accumulate_error = Some(err));
+                },
+                execution.as_ref(),
+                0,
+            )?;
             if let Some(err) = accumulate_error {
                 return Err(err);
             }
@@ -165,6 +182,9 @@ impl FlowQueryService {
         stats.insert("query_facet_overflow_fields".to_string(), 0);
 
         let warnings = build_query_warnings(build_result.overflow_records, 0, 0);
+        if let Some(execution) = &execution {
+            execution.finish();
+        }
 
         Ok(FlowQueryOutput {
             agent_id: self.agent_id.clone(),

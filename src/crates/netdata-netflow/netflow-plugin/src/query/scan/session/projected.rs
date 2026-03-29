@@ -6,6 +6,8 @@ impl FlowQueryService {
         setup: &QuerySetup,
         request: &FlowsRequest,
         grouped_aggregates: &mut ProjectedGroupAccumulator,
+        execution: Option<&QueryExecutionPlan>,
+        pass_index: usize,
     ) -> Result<ScanCounts> {
         let mut counts = ScanCounts::default();
 
@@ -67,6 +69,8 @@ impl FlowQueryService {
                 setup,
                 request,
                 grouped_aggregates,
+                execution,
+                pass_index,
                 &prefilter_pairs,
                 &projected_capture_positions,
                 &projected_field_specs,
@@ -78,8 +82,14 @@ impl FlowQueryService {
             );
         }
 
-        for span in &setup.spans {
+        for (span_index, span) in setup.spans.iter().enumerate() {
+            if let Some(execution) = execution {
+                execution.start_span(pass_index, span_index)?;
+            }
             if span.files.is_empty() {
+                if let Some(execution) = execution {
+                    execution.finish_span(pass_index, span_index)?;
+                }
                 continue;
             }
 
@@ -116,6 +126,14 @@ impl FlowQueryService {
 
                 counts.streamed_entries = counts.streamed_entries.saturating_add(1);
                 let timestamp_usec = cursor.realtime_usec();
+                if let Some(execution) = execution {
+                    execution.checkpoint(
+                        pass_index,
+                        span_index,
+                        counts.streamed_entries,
+                        timestamp_usec,
+                    )?;
+                }
                 if timestamp_usec < after_usec || timestamp_usec >= before_usec {
                     continue;
                 }
@@ -173,6 +191,10 @@ impl FlowQueryService {
                     self.max_groups,
                 )?;
                 counts.matched_entries = counts.matched_entries.saturating_add(1);
+            }
+
+            if let Some(execution) = execution {
+                execution.finish_span(pass_index, span_index)?;
             }
         }
 

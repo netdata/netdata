@@ -30,6 +30,7 @@ use std::sync::{Arc, LazyLock};
 use std::time::Instant;
 use tokio::sync::mpsc::UnboundedReceiver;
 
+mod execution;
 mod facets;
 mod fields;
 mod flows;
@@ -42,6 +43,7 @@ mod scan;
 mod service;
 mod timeseries;
 
+pub(crate) use execution::*;
 pub(crate) use facets::*;
 pub(crate) use fields::*;
 #[allow(unused_imports)]

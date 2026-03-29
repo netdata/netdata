@@ -5,24 +5,39 @@ impl FlowQueryService {
         &self,
         request: &FlowsRequest,
     ) -> Result<FlowMetricsQueryOutput> {
+        self.query_flow_metrics_blocking(request, None)
+    }
+
+    pub(crate) fn query_flow_metrics_blocking(
+        &self,
+        request: &FlowsRequest,
+        execution: Option<QueryExecutionContext>,
+    ) -> Result<FlowMetricsQueryOutput> {
         let setup = self.prepare_query(request)?;
+        let execution = execution.map(|ctx| QueryExecutionPlan::for_timeseries(&setup, ctx));
         let layout = setup
             .timeseries_layout
             .context("timeseries query missing aligned layout")?;
 
         let mut grouped_aggregates: HashMap<GroupKey, AggregatedFlow> = HashMap::new();
         let mut group_overflow = GroupOverflow::default();
-        let pass1_counts = self.scan_matching_records(&setup, request, |record, _| {
-            let metrics = sampled_metrics_from_fields(&record.fields);
-            accumulate_grouped_record(
-                record,
-                metrics,
-                &setup.effective_group_by,
-                &mut grouped_aggregates,
-                &mut group_overflow,
-                self.max_groups,
-            );
-        })?;
+        let pass1_counts = self.scan_matching_records(
+            &setup,
+            request,
+            |record, _| {
+                let metrics = sampled_metrics_from_fields(&record.fields);
+                accumulate_grouped_record(
+                    record,
+                    metrics,
+                    &setup.effective_group_by,
+                    &mut grouped_aggregates,
+                    &mut group_overflow,
+                    self.max_groups,
+                );
+            },
+            execution.as_ref(),
+            0,
+        )?;
 
         let ranked = rank_aggregates(
             grouped_aggregates,
@@ -41,24 +56,30 @@ impl FlowQueryService {
         let pass2_counts = if top_keys.is_empty() {
             ScanCounts::default()
         } else {
-            self.scan_matching_records(&setup, request, |record, _| {
-                let labels = labels_for_group(record, &setup.effective_group_by);
-                let key = group_key_from_labels(&labels);
-                let Some(index) = top_keys.get(&key).copied() else {
-                    return;
-                };
+            self.scan_matching_records(
+                &setup,
+                request,
+                |record, _| {
+                    let labels = labels_for_group(record, &setup.effective_group_by);
+                    let key = group_key_from_labels(&labels);
+                    let Some(index) = top_keys.get(&key).copied() else {
+                        return;
+                    };
 
-                let metric_value = sampled_metric_value(setup.sort_by, &record.fields);
-                accumulate_series_bucket(
-                    &mut series_buckets,
-                    chart_timestamp_usec(record),
-                    layout.after,
-                    layout.before,
-                    layout.bucket_seconds,
-                    index,
-                    metric_value,
-                );
-            })?
+                    let metric_value = sampled_metric_value(setup.sort_by, &record.fields);
+                    accumulate_series_bucket(
+                        &mut series_buckets,
+                        chart_timestamp_usec(record),
+                        layout.after,
+                        layout.before,
+                        layout.bucket_seconds,
+                        index,
+                        metric_value,
+                    );
+                },
+                execution.as_ref(),
+                1,
+            )?
         };
 
         let mut stats = setup.stats;
@@ -114,6 +135,9 @@ impl FlowQueryService {
             &top_rows,
             &series_buckets,
         );
+        if let Some(execution) = &execution {
+            execution.finish();
+        }
 
         Ok(FlowMetricsQueryOutput {
             agent_id: self.agent_id.clone(),

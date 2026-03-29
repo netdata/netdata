@@ -21,6 +21,8 @@ impl FlowQueryService {
         setup: &QuerySetup,
         request: &FlowsRequest,
         grouped_aggregates: &mut ProjectedGroupAccumulator,
+        execution: Option<&QueryExecutionPlan>,
+        pass_index: usize,
         prefilter_pairs: &[(String, String)],
         projected_capture_positions: &FastHashMap<String, usize>,
         projected_field_specs: &[ProjectedFieldSpec],
@@ -33,8 +35,14 @@ impl FlowQueryService {
         let mut counts = ScanCounts::default();
         let prefilter_matches = build_prefilter_matches(prefilter_pairs);
 
-        for span in &setup.spans {
+        for (span_index, span) in setup.spans.iter().enumerate() {
+            if let Some(execution) = execution {
+                execution.start_span(pass_index, span_index)?;
+            }
             if span.files.is_empty() {
+                if let Some(execution) = execution {
+                    execution.finish_span(pass_index, span_index)?;
+                }
                 continue;
             }
 
@@ -51,6 +59,9 @@ impl FlowQueryService {
                     file_path,
                     request,
                     grouped_aggregates,
+                    execution,
+                    pass_index,
+                    span_index,
                     &prefilter_matches,
                     projected_capture_positions,
                     projected_field_specs,
@@ -63,6 +74,10 @@ impl FlowQueryService {
                 counts.matched_entries = counts
                     .matched_entries
                     .saturating_add(file_counts.matched_entries);
+            }
+
+            if let Some(execution) = execution {
+                execution.finish_span(pass_index, span_index)?;
             }
         }
 
@@ -77,6 +92,9 @@ impl FlowQueryService {
         file_path: &Path,
         request: &FlowsRequest,
         grouped_aggregates: &mut ProjectedGroupAccumulator,
+        execution: Option<&QueryExecutionPlan>,
+        pass_index: usize,
+        span_index: usize,
         prefilter_matches: &[Vec<u8>],
         projected_capture_positions: &FastHashMap<String, usize>,
         projected_field_specs: &[ProjectedFieldSpec],
@@ -133,6 +151,14 @@ impl FlowQueryService {
                 format!("failed to read current entry from {}", file_path.display())
             })?;
             let timestamp_usec = entry_guard.header.realtime;
+            if let Some(execution) = execution {
+                execution.checkpoint(
+                    pass_index,
+                    span_index,
+                    counts.streamed_entries,
+                    timestamp_usec,
+                )?;
+            }
             if timestamp_usec < after_usec || timestamp_usec >= before_usec {
                 continue;
             }

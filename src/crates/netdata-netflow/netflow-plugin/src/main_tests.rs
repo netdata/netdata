@@ -8,6 +8,7 @@ use journal_core::file::Mmap;
 use journal_core::repository::File as RepoFile;
 use journal_core::{Direction, JournalFile, JournalReader, Location};
 use pcap_file::pcap::PcapReader;
+use rt::ProgressState;
 use std::collections::HashMap;
 use std::fs;
 use std::net::UdpSocket as StdUdpSocket;
@@ -69,6 +70,39 @@ async fn e2e_ingest_writes_journals_and_query_reads_flows() {
     assert!(
         metrics.journal_entries_written.load(Ordering::Relaxed) > 0,
         "expected raw journal entries written by ingest service"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_query_service_timeseries_path_returns_chart_data() {
+    let (cfg, _metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
+    let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+        .await
+        .expect("create query service");
+    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let after = before.saturating_sub(3600);
+
+    let output = query_service
+        .query_flow_metrics(&query::FlowsRequest {
+            view: query::ViewMode::TimeSeries,
+            after: Some(after),
+            before: Some(before),
+            group_by: vec!["PROTOCOL".to_string()],
+            sort_by: query::SortBy::Bytes,
+            top_n: query::TopN::N25,
+            ..Default::default()
+        })
+        .await
+        .expect("query timeseries metrics");
+
+    assert_eq!(output.metric, "bytes");
+    assert_eq!(output.group_by, vec!["PROTOCOL".to_string()]);
+    assert!(
+        output.chart["result"]["data"]
+            .as_array()
+            .map(|rows| !rows.is_empty())
+            .unwrap_or(false),
+        "expected timeseries chart rows from query service"
     );
 }
 
@@ -221,6 +255,85 @@ async fn e2e_flows_function_returns_expected_response_sections() {
             .iter()
             .any(|param| param.id == "top_n"),
         "expected required 'top_n' parameter declaration"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_flows_function_marks_progress_complete_with_execution_context() {
+    let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
+    let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+        .await
+        .expect("create query service");
+    let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
+    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let progress = ProgressState::default();
+    let execution = query::QueryExecutionContext::new(progress.clone(), CancellationToken::new());
+
+    let response = handler
+        .handle_request_with_execution(
+            Some(execution),
+            query::FlowsRequest {
+                view: query::ViewMode::TableSankey,
+                after: Some(1),
+                before: Some(before),
+                group_by: vec![
+                    "SRC_ADDR".to_string(),
+                    "DST_ADDR".to_string(),
+                    "PROTOCOL".to_string(),
+                ],
+                top_n: query::TopN::N100,
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("flows function call with execution");
+
+    match response {
+        FlowsFunctionResponse::Table(_) => {}
+        FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
+        FlowsFunctionResponse::Autocomplete(_) => panic!("expected table response"),
+    }
+
+    let (done, total) = progress.snapshot();
+    assert!(total > 0, "expected progress total to be initialized");
+    assert_eq!(done, total, "expected completed progress after response");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_flows_function_honors_cancelled_execution_context() {
+    let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
+    let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+        .await
+        .expect("create query service");
+    let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
+    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let cancellation = CancellationToken::new();
+    cancellation.cancel();
+    let execution = query::QueryExecutionContext::new(ProgressState::default(), cancellation);
+
+    let err = handler
+        .handle_request_with_execution(
+            Some(execution),
+            query::FlowsRequest {
+                view: query::ViewMode::TableSankey,
+                after: Some(1),
+                before: Some(before),
+                group_by: vec![
+                    "SRC_ADDR".to_string(),
+                    "DST_ADDR".to_string(),
+                    "PROTOCOL".to_string(),
+                ],
+                top_n: query::TopN::N100,
+                ..Default::default()
+            },
+        )
+        .await
+        .expect_err("cancelled execution should fail");
+
+    let message = err.to_string();
+    assert!(
+        message.contains("cancelled"),
+        "expected cancellation error, got: {message}"
     );
 }
 
@@ -538,7 +651,10 @@ async fn e2e_state_map_reuses_tuple_table_shape_with_state_keys() {
             "DST_GEO_STATE".to_string()
         ]
     );
-    assert!(!response.data.flows.is_empty(), "expected non-empty state-map rows");
+    assert!(
+        !response.data.flows.is_empty(),
+        "expected non-empty state-map rows"
+    );
     assert!(
         !response
             .required_params
@@ -592,7 +708,10 @@ async fn e2e_city_map_reuses_tuple_table_shape_with_city_and_coordinate_keys() {
             "DST_GEO_LONGITUDE".to_string(),
         ]
     );
-    assert!(!response.data.flows.is_empty(), "expected non-empty city-map rows");
+    assert!(
+        !response.data.flows.is_empty(),
+        "expected non-empty city-map rows"
+    );
     assert!(
         response
             .data

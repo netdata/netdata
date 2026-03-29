@@ -6,6 +6,8 @@ impl FlowQueryService {
         setup: &QuerySetup,
         request: &FlowsRequest,
         mut on_record: F,
+        execution: Option<&QueryExecutionPlan>,
+        pass_index: usize,
     ) -> Result<ScanCounts>
     where
         F: FnMut(&QueryFlowRecord, RecordHandle),
@@ -21,8 +23,14 @@ impl FlowQueryService {
 
         let mut counts = ScanCounts::default();
 
-        for span in &setup.spans {
+        for (span_index, span) in setup.spans.iter().enumerate() {
+            if let Some(execution) = execution {
+                execution.start_span(pass_index, span_index)?;
+            }
             if span.files.is_empty() {
+                if let Some(execution) = execution {
+                    execution.finish_span(pass_index, span_index)?;
+                }
                 continue;
             }
 
@@ -58,6 +66,14 @@ impl FlowQueryService {
 
                 counts.streamed_entries = counts.streamed_entries.saturating_add(1);
                 let timestamp_usec = cursor.realtime_usec();
+                if let Some(execution) = execution {
+                    execution.checkpoint(
+                        pass_index,
+                        span_index,
+                        counts.streamed_entries,
+                        timestamp_usec,
+                    )?;
+                }
                 if timestamp_usec < after_usec || timestamp_usec >= before_usec {
                     continue;
                 }
@@ -111,6 +127,10 @@ impl FlowQueryService {
                     },
                 );
                 counts.matched_entries = counts.matched_entries.saturating_add(1);
+            }
+
+            if let Some(execution) = execution {
+                execution.finish_span(pass_index, span_index)?;
             }
         }
 
