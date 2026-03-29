@@ -170,8 +170,13 @@ const char *db_models_add_model =
 const char *db_models_load =
     "SELECT after, before, min_dist, max_dist, "
     "c00, c01, c02, c03, c04, c05, "
+    "c10, c11, c12, c13, c14, c15 FROM ("
+    "SELECT after, before, min_dist, max_dist, "
+    "c00, c01, c02, c03, c04, c05, "
     "c10, c11, c12, c13, c14, c15 FROM models "
-    "WHERE dim_id = @dim_id AND after >= @after ORDER BY before ASC;";
+    "WHERE dim_id = @dim_id AND after >= @after "
+    "ORDER BY after DESC LIMIT @n"
+    ") ORDER BY after ASC;";
 
 const char *db_models_delete =
     "DELETE FROM models "
@@ -400,6 +405,10 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
         goto bind_fail;
 
     rc = sqlite3_bind_int64(res, ++param, now_realtime_sec() - (Cfg.num_models_to_use * Cfg.train_every));
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int64(res, ++param, Cfg.num_models_to_use);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
