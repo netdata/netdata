@@ -767,52 +767,91 @@ intraChart:
     rrdset_done(st_dra_replication_intrasite_compressed_traffic);
 }
 
-static void netdata_ad_replication_highest_usn(
+static void netdata_ad_replication_highest_usn_committed(
     PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA replicationHighestUSNCommittedHighPart = {.key = "DRA Highest USN Committed (High part)"};
     static COUNTER_DATA replicationHighestUSNCommittedLowPart = {.key = "DRA Highest USN Committed (Low part)"};
-    static COUNTER_DATA replicationHighestUSNIssuedHighPart = {.key = "DRA Highest USN Issued (High part)"};
-    static COUNTER_DATA replicationHighestUSNIssuedLowPart = {.key = "DRA Highest USN Issued (Low part)"};
-
-    static RRDSET *st_replication_highest_usn = NULL;
+    static RRDSET *st_replication_highest_usn_committed = NULL;
     static RRDDIM *rd_replication_highest_usn_committed = NULL;
-    static RRDDIM *rd_replication_highest_usn_issued = NULL;
 
-    perflibGetObjectCounter(pDataBlock, pObjectType, &replicationHighestUSNCommittedHighPart);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &replicationHighestUSNCommittedLowPart);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &replicationHighestUSNIssuedHighPart);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &replicationHighestUSNIssuedLowPart);
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationHighestUSNCommittedHighPart) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &replicationHighestUSNCommittedLowPart))
+        return;
 
-    if (unlikely(!st_replication_highest_usn)) {
-        st_replication_highest_usn = rrdset_create_localhost(
+    if (unlikely(!st_replication_highest_usn_committed)) {
+        st_replication_highest_usn_committed = rrdset_create_localhost(
             "ad",
-            "replication_highest_usn",
+            "replication_highest_usn_committed",
             NULL,
             "replication",
-            "ad.replication_highest_usn",
-            "Highest replication update sequence numbers",
+            "ad.replication_highest_usn_committed",
+            "Highest replication committed update sequence number",
             "usn",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
-            PRIO_AD_REPLICATION_HIGHEST_USN,
+            PRIO_AD_REPLICATION_HIGHEST_USN_COMMITTED,
             update_every,
             RRDSET_TYPE_LINE);
 
         rd_replication_highest_usn_committed =
-            rrddim_add(st_replication_highest_usn, "committed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        rd_replication_highest_usn_issued =
-            rrddim_add(st_replication_highest_usn, "issued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(st_replication_highest_usn_committed, "committed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
+    // Windows exposes the 64-bit USN as separate high/low perf counters.
     uint64_t committed = ((uint64_t)replicationHighestUSNCommittedHighPart.current.Data << 32) |
                          (uint64_t)replicationHighestUSNCommittedLowPart.current.Data;
+
+    rrddim_set_by_pointer(
+        st_replication_highest_usn_committed, rd_replication_highest_usn_committed, (collected_number)committed);
+    rrdset_done(st_replication_highest_usn_committed);
+}
+
+static void netdata_ad_replication_highest_usn_issued(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA replicationHighestUSNIssuedHighPart = {.key = "DRA Highest USN Issued (High part)"};
+    static COUNTER_DATA replicationHighestUSNIssuedLowPart = {.key = "DRA Highest USN Issued (Low part)"};
+    static RRDSET *st_replication_highest_usn_issued = NULL;
+    static RRDDIM *rd_replication_highest_usn_issued = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationHighestUSNIssuedHighPart) ||
+        !perflibGetObjectCounter(pDataBlock, pObjectType, &replicationHighestUSNIssuedLowPart))
+        return;
+
+    if (unlikely(!st_replication_highest_usn_issued)) {
+        st_replication_highest_usn_issued = rrdset_create_localhost(
+            "ad",
+            "replication_highest_usn_issued",
+            NULL,
+            "replication",
+            "ad.replication_highest_usn_issued",
+            "Highest replication issued update sequence number",
+            "usn",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_REPLICATION_HIGHEST_USN_ISSUED,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_replication_highest_usn_issued =
+            rrddim_add(st_replication_highest_usn_issued, "issued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    // Windows exposes the 64-bit USN as separate high/low perf counters.
     uint64_t issued = ((uint64_t)replicationHighestUSNIssuedHighPart.current.Data << 32) |
                       (uint64_t)replicationHighestUSNIssuedLowPart.current.Data;
 
-    rrddim_set_by_pointer(st_replication_highest_usn, rd_replication_highest_usn_committed, (collected_number)committed);
-    rrddim_set_by_pointer(st_replication_highest_usn, rd_replication_highest_usn_issued, (collected_number)issued);
-    rrdset_done(st_replication_highest_usn);
+    rrddim_set_by_pointer(
+        st_replication_highest_usn_issued, rd_replication_highest_usn_issued, (collected_number)issued);
+    rrdset_done(st_replication_highest_usn_issued);
+}
+
+static void netdata_ad_replication_highest_usn(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    netdata_ad_replication_highest_usn_committed(pDataBlock, pObjectType, update_every);
+    netdata_ad_replication_highest_usn_issued(pDataBlock, pObjectType, update_every);
 }
 
 static void netdata_ad_replication_inbound(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
