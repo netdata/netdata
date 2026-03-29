@@ -1270,18 +1270,15 @@ static void netdata_ad_name_translations(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
     netdata_ad_name_translations_server(pDataBlock, pObjectType, update_every);
 }
 
-static void netdata_ad_change_monitors(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void netdata_ad_change_monitors_registered(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA changeMonitorsRegistered = {.key = "DS Monitor List Size"};
-    static COUNTER_DATA changeMonitorUpdatesPending = {.key = "DS Notify Queue Size"};
-
     static RRDSET *st_change_monitors_registered = NULL;
     static RRDDIM *rd_change_monitors_registered = NULL;
-    static RRDSET *st_change_monitor_updates_pending = NULL;
-    static RRDDIM *rd_change_monitor_updates_pending = NULL;
 
-    perflibGetObjectCounter(pDataBlock, pObjectType, &changeMonitorsRegistered);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &changeMonitorUpdatesPending);
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &changeMonitorsRegistered))
+        return;
 
     if (unlikely(!st_change_monitors_registered)) {
         st_change_monitors_registered = rrdset_create_localhost(
@@ -1307,6 +1304,17 @@ static void netdata_ad_change_monitors(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
         rd_change_monitors_registered,
         (collected_number)changeMonitorsRegistered.current.Data);
     rrdset_done(st_change_monitors_registered);
+}
+
+static void netdata_ad_change_monitor_updates_pending(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA changeMonitorUpdatesPending = {.key = "DS Notify Queue Size"};
+    static RRDSET *st_change_monitor_updates_pending = NULL;
+    static RRDDIM *rd_change_monitor_updates_pending = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &changeMonitorUpdatesPending))
+        return;
 
     if (unlikely(!st_change_monitor_updates_pending)) {
         st_change_monitor_updates_pending = rrdset_create_localhost(
@@ -1332,6 +1340,12 @@ static void netdata_ad_change_monitors(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
         rd_change_monitor_updates_pending,
         (collected_number)changeMonitorUpdatesPending.current.Data);
     rrdset_done(st_change_monitor_updates_pending);
+}
+
+static void netdata_ad_change_monitors(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    netdata_ad_change_monitors_registered(pDataBlock, pObjectType, update_every);
+    netdata_ad_change_monitor_updates_pending(pDataBlock, pObjectType, update_every);
 }
 
 static void netdata_ad_directory_search_suboperations(
