@@ -110,6 +110,22 @@ pub(super) fn set_record_network_field(rec: &mut FlowRecord, key: &str, value: &
             rec.dst_geo_state = value.to_string();
             true
         }
+        "SRC_GEO_LATITUDE" => {
+            rec.src_geo_latitude = value.to_string();
+            true
+        }
+        "DST_GEO_LATITUDE" => {
+            rec.dst_geo_latitude = value.to_string();
+            true
+        }
+        "SRC_GEO_LONGITUDE" => {
+            rec.src_geo_longitude = value.to_string();
+            true
+        }
+        "DST_GEO_LONGITUDE" => {
+            rec.dst_geo_longitude = value.to_string();
+            true
+        }
         "DST_AS_PATH" => {
             rec.dst_as_path = value.to_string();
             true

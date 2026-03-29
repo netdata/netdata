@@ -86,6 +86,13 @@ fn raw_tier_is_required_for_ip_or_port_fields() {
 }
 
 #[test]
+fn raw_tier_is_required_for_city_fields() {
+    let group_by = vec!["SRC_GEO_CITY".to_string(), "DST_GEO_STATE".to_string()];
+    let selections = HashMap::new();
+    assert!(requires_raw_tier_for_fields(&group_by, &selections, ""));
+}
+
+#[test]
 fn grouped_flows_add_other_bucket_when_truncated() {
     let mut records = Vec::new();
     for idx in 0..3 {
@@ -209,6 +216,50 @@ fn country_map_view_replaces_user_group_by_with_country_pair() {
 }
 
 #[test]
+fn state_map_view_replaces_user_group_by_with_state_pairs() {
+    let request = FlowsRequest {
+        view: super::ViewMode::StateMap,
+        group_by: vec!["SRC_ADDR".to_string(), "DST_ADDR".to_string()],
+        ..FlowsRequest::default()
+    };
+    let group_by = resolve_effective_group_by(&request);
+    assert_eq!(
+        group_by,
+        vec![
+            "SRC_COUNTRY".to_string(),
+            "SRC_GEO_STATE".to_string(),
+            "DST_COUNTRY".to_string(),
+            "DST_GEO_STATE".to_string()
+        ]
+    );
+}
+
+#[test]
+fn city_map_view_replaces_user_group_by_with_city_and_coordinate_tuple() {
+    let request = FlowsRequest {
+        view: super::ViewMode::CityMap,
+        group_by: vec!["SRC_ADDR".to_string(), "DST_ADDR".to_string()],
+        ..FlowsRequest::default()
+    };
+    let group_by = resolve_effective_group_by(&request);
+    assert_eq!(
+        group_by,
+        vec![
+            "SRC_COUNTRY".to_string(),
+            "SRC_GEO_STATE".to_string(),
+            "SRC_GEO_CITY".to_string(),
+            "SRC_GEO_LATITUDE".to_string(),
+            "SRC_GEO_LONGITUDE".to_string(),
+            "DST_COUNTRY".to_string(),
+            "DST_GEO_STATE".to_string(),
+            "DST_GEO_CITY".to_string(),
+            "DST_GEO_LATITUDE".to_string(),
+            "DST_GEO_LONGITUDE".to_string(),
+        ]
+    );
+}
+
+#[test]
 fn supported_group_by_fields_exclude_metrics_and_include_defaults() {
     let fields = super::supported_group_by_fields();
     assert!(fields.iter().any(|field| field == "SRC_AS"));
@@ -218,6 +269,8 @@ fn supported_group_by_fields_exclude_metrics_and_include_defaults() {
     assert!(fields.iter().any(|field| field == "PROTOCOL"));
     assert!(fields.iter().any(|field| field == "ICMPV4"));
     assert!(fields.iter().any(|field| field == "ICMPV6"));
+    assert!(!fields.iter().any(|field| field == "SRC_GEO_LATITUDE"));
+    assert!(!fields.iter().any(|field| field == "DST_GEO_LONGITUDE"));
     assert!(!fields.iter().any(|field| field == "BYTES"));
     assert!(!fields.iter().any(|field| field == "PACKETS"));
     assert!(!fields.iter().any(|field| field == "RAW_BYTES"));
@@ -298,6 +351,21 @@ fn request_deserialization_defaults_missing_view_group_by_sort_by_and_top_n() {
         invalid_top_n.to_string().contains("unknown variant `42`"),
         "unexpected error: {invalid_top_n}"
     );
+}
+
+#[test]
+fn request_deserialization_accepts_state_and_city_map_views() {
+    let state = serde_json::from_str::<FlowsRequest>(
+        r#"{"view":"state-map","group_by":["PROTOCOL"],"sort_by":"bytes","top_n":"25"}"#,
+    )
+    .expect("state-map should deserialize");
+    assert_eq!(state.view, super::ViewMode::StateMap);
+
+    let city = serde_json::from_str::<FlowsRequest>(
+        r#"{"view":"city-map","group_by":["PROTOCOL"],"sort_by":"bytes","top_n":"25"}"#,
+    )
+    .expect("city-map should deserialize");
+    assert_eq!(city.view, super::ViewMode::CityMap);
 }
 
 #[test]

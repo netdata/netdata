@@ -42,6 +42,10 @@ pub(super) fn insert_endpoint_fields(record: &FlowRecord, fields: &mut FlowField
     fields.insert("DST_GEO_CITY", record.dst_geo_city.clone());
     fields.insert("SRC_GEO_STATE", record.src_geo_state.clone());
     fields.insert("DST_GEO_STATE", record.dst_geo_state.clone());
+    fields.insert("SRC_GEO_LATITUDE", record.src_geo_latitude.clone());
+    fields.insert("DST_GEO_LATITUDE", record.dst_geo_latitude.clone());
+    fields.insert("SRC_GEO_LONGITUDE", record.src_geo_longitude.clone());
+    fields.insert("DST_GEO_LONGITUDE", record.dst_geo_longitude.clone());
 
     // BGP routing
     fields.insert("DST_AS_PATH", record.dst_as_path.clone());

@@ -126,6 +126,58 @@ fn validate_accepts_network_source_explicit_insecure_tls_opt_out() {
 }
 
 #[test]
+fn validate_rejects_static_network_coordinate_without_pair() {
+    let mut cfg = PluginConfig::default();
+    cfg.enrichment.networks.insert(
+        "198.51.100.0/24".to_string(),
+        NetworkAttributesValue::Attributes(NetworkAttributesConfig {
+            city: "Paris".to_string(),
+            latitude: Some(48.8566),
+            ..Default::default()
+        }),
+    );
+
+    let err = cfg.validate().expect_err("expected validation error");
+    assert!(
+        err.to_string()
+            .contains("must set both latitude and longitude")
+    );
+}
+
+#[test]
+fn validate_rejects_static_network_coordinate_out_of_range() {
+    let mut cfg = PluginConfig::default();
+    cfg.enrichment.networks.insert(
+        "198.51.100.0/24".to_string(),
+        NetworkAttributesValue::Attributes(NetworkAttributesConfig {
+            city: "Paris".to_string(),
+            latitude: Some(120.0),
+            longitude: Some(2.3522),
+            ..Default::default()
+        }),
+    );
+
+    let err = cfg.validate().expect_err("expected validation error");
+    assert!(err.to_string().contains(".latitude must be a finite value between -90 and 90"));
+}
+
+#[test]
+fn validate_accepts_static_network_coordinates() {
+    let mut cfg = PluginConfig::default();
+    cfg.enrichment.networks.insert(
+        "198.51.100.0/24".to_string(),
+        NetworkAttributesValue::Attributes(NetworkAttributesConfig {
+            city: "Paris".to_string(),
+            latitude: Some(48.8566),
+            longitude: Some(2.3522),
+            ..Default::default()
+        }),
+    );
+
+    cfg.validate().expect("configuration should be valid");
+}
+
+#[test]
 fn validate_rejects_zero_query_max_groups() {
     let mut cfg = PluginConfig::default();
     cfg.journal.query_max_groups = 0;

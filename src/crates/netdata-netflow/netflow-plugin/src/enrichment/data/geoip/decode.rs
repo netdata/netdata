@@ -60,6 +60,14 @@ pub(crate) fn apply_geo_record(out: &mut NetworkAttributes, record: &GeoLookupRe
     {
         out.state = state;
     }
+    if let Some(location) = &record.location {
+        if let Some(latitude) = normalized_coordinate(location.latitude, -90.0, 90.0) {
+            out.latitude = latitude;
+        }
+        if let Some(longitude) = normalized_coordinate(location.longitude, -180.0, 180.0) {
+            out.longitude = longitude;
+        }
+    }
 }
 
 pub(crate) fn country_code(value: &CountryValue) -> Option<String> {
@@ -74,4 +82,12 @@ pub(crate) fn city_name(value: &CityValue) -> Option<String> {
         CityValue::Structured { names } => names.get("en").cloned(),
         CityValue::Plain(name) => Some(name.clone()),
     }
+}
+
+pub(crate) fn normalized_coordinate(value: Option<f64>, min: f64, max: f64) -> Option<String> {
+    let value = value?;
+    if !value.is_finite() || !(min..=max).contains(&value) {
+        return None;
+    }
+    Some(format!("{value:.6}"))
 }

@@ -1418,6 +1418,8 @@ fn network_enrichment_populates_network_dimensions_and_asn_fallback() {
                 country: "FR".to_string(),
                 state: "Ile-de-France".to_string(),
                 city: "Paris".to_string(),
+                latitude: Some(48.8566),
+                longitude: Some(2.3522),
                 tenant: "tenant-a".to_string(),
                 asn: 64_500,
             }),
@@ -1491,6 +1493,22 @@ fn network_enrichment_populates_network_dimensions_and_asn_fallback() {
     assert_eq!(
         fields.get("DST_GEO_STATE").map(String::as_str),
         Some("Ile-de-France")
+    );
+    assert_eq!(
+        fields.get("SRC_GEO_LATITUDE").map(String::as_str),
+        Some("48.856600")
+    );
+    assert_eq!(
+        fields.get("DST_GEO_LATITUDE").map(String::as_str),
+        Some("48.856600")
+    );
+    assert_eq!(
+        fields.get("SRC_GEO_LONGITUDE").map(String::as_str),
+        Some("2.352200")
+    );
+    assert_eq!(
+        fields.get("DST_GEO_LONGITUDE").map(String::as_str),
+        Some("2.352200")
     );
 }
 
@@ -1706,6 +1724,41 @@ fn decode_ip_class_returns_non_empty_value() {
     };
 
     assert_eq!(decode_ip_class(&record).as_deref(), Some("private"));
+}
+
+#[test]
+fn apply_geo_record_normalizes_coordinates_and_rejects_invalid_values() {
+    let mut attrs = NetworkAttributes::default();
+    let record = GeoLookupRecord {
+        country: None,
+        city: None,
+        location: Some(LocationValue {
+            latitude: Some(48.8566),
+            longitude: Some(2.3522),
+        }),
+        subdivisions: Vec::new(),
+        region: None,
+    };
+
+    apply_geo_record(&mut attrs, &record);
+
+    assert_eq!(attrs.latitude, "48.856600");
+    assert_eq!(attrs.longitude, "2.352200");
+
+    let invalid = GeoLookupRecord {
+        country: None,
+        city: None,
+        location: Some(LocationValue {
+            latitude: Some(120.0),
+            longitude: Some(f64::NAN),
+        }),
+        subdivisions: Vec::new(),
+        region: None,
+    };
+    apply_geo_record(&mut attrs, &invalid);
+
+    assert_eq!(attrs.latitude, "48.856600");
+    assert_eq!(attrs.longitude, "2.352200");
 }
 
 #[test]
@@ -1972,6 +2025,8 @@ fn assert_enrich_equivalence(
         "SRC_COUNTRY",
         "SRC_GEO_CITY",
         "SRC_GEO_STATE",
+        "SRC_GEO_LATITUDE",
+        "SRC_GEO_LONGITUDE",
         "DST_NET_NAME",
         "DST_NET_ROLE",
         "DST_NET_SITE",
@@ -1980,6 +2035,8 @@ fn assert_enrich_equivalence(
         "DST_COUNTRY",
         "DST_GEO_CITY",
         "DST_GEO_STATE",
+        "DST_GEO_LATITUDE",
+        "DST_GEO_LONGITUDE",
         "DST_AS_PATH",
         "DST_COMMUNITIES",
         "DST_LARGE_COMMUNITIES",
@@ -2099,6 +2156,8 @@ fn enrich_record_matches_with_routing_and_network_attributes() {
                 country: String::new(),
                 state: String::new(),
                 city: String::new(),
+                latitude: None,
+                longitude: None,
                 asn: 0,
             }),
         )]),

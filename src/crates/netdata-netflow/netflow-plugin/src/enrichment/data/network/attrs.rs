@@ -9,6 +9,8 @@ pub(crate) struct NetworkAttributes {
     pub(crate) country: String,
     pub(crate) state: String,
     pub(crate) city: String,
+    pub(crate) latitude: String,
+    pub(crate) longitude: String,
     pub(crate) tenant: String,
     pub(crate) asn: u32,
     pub(crate) asn_name: String,
@@ -25,6 +27,9 @@ impl NetworkAttributes {
             country: config.country.clone(),
             state: config.state.clone(),
             city: config.city.clone(),
+            latitude: normalized_coordinate(config.latitude, -90.0, 90.0).unwrap_or_default(),
+            longitude: normalized_coordinate(config.longitude, -180.0, 180.0)
+                .unwrap_or_default(),
             tenant: config.tenant.clone(),
             asn: config.asn,
             asn_name: String::new(),
@@ -40,6 +45,8 @@ impl NetworkAttributes {
             && self.country.is_empty()
             && self.state.is_empty()
             && self.city.is_empty()
+            && self.latitude.is_empty()
+            && self.longitude.is_empty()
             && self.tenant.is_empty()
             && self.asn == 0
             && self.asn_name.is_empty()
@@ -77,6 +84,12 @@ impl NetworkAttributes {
         }
         if !overlay.city.is_empty() {
             self.city = overlay.city.clone();
+        }
+        if !overlay.latitude.is_empty() {
+            self.latitude = overlay.latitude.clone();
+        }
+        if !overlay.longitude.is_empty() {
+            self.longitude = overlay.longitude.clone();
         }
         if !overlay.tenant.is_empty() {
             self.tenant = overlay.tenant.clone();

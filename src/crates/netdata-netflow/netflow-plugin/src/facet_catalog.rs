@@ -73,6 +73,9 @@ fn facet_field_spec_for_name(field: &'static str) -> Option<FacetFieldSpec> {
         "BYTES" | "PACKETS" | "FLOWS" | "RAW_BYTES" | "RAW_PACKETS" | "SAMPLING_RATE" => {
             return None;
         }
+        "SRC_GEO_LATITUDE" | "DST_GEO_LATITUDE" | "SRC_GEO_LONGITUDE" | "DST_GEO_LONGITUDE" => {
+            return None;
+        }
         "EXPORTER_IP" | "SRC_ADDR" | "DST_ADDR" | "NEXT_HOP" | "SRC_ADDR_NAT" | "DST_ADDR_NAT" => {
             FacetValueKind::IpAddr
         }

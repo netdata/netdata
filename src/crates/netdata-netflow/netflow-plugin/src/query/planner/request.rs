@@ -34,6 +34,18 @@ pub(crate) fn resolve_effective_group_by(request: &FlowsRequest) -> Vec<String> 
             .map(|field| (*field).to_string())
             .collect();
     }
+    if request.is_state_map_view() {
+        return STATE_MAP_GROUP_BY_FIELDS
+            .iter()
+            .map(|field| (*field).to_string())
+            .collect();
+    }
+    if request.is_city_map_view() {
+        return CITY_MAP_GROUP_BY_FIELDS
+            .iter()
+            .map(|field| (*field).to_string())
+            .collect();
+    }
 
     request.normalized_group_by()
 }

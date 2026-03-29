@@ -1,4 +1,4 @@
-use crate::plugin_config::{PluginConfig, RemoteNetworkSourceTlsConfig};
+use crate::plugin_config::{NetworkAttributesValue, PluginConfig, RemoteNetworkSourceTlsConfig};
 use anyhow::{Context, Result};
 use jaq_interpret::ParseCtx;
 use std::net::SocketAddr;
@@ -27,6 +27,39 @@ pub(super) fn validate_enrichment(cfg: &PluginConfig) -> Result<()> {
         }
         validate_network_source_tls(source_name, &source_cfg.tls)?;
         validate_network_source_transform(source_name, &source_cfg.transform)?;
+    }
+
+    for (prefix, value) in &cfg.enrichment.networks {
+        validate_static_network_attributes(prefix, value)?;
+    }
+
+    Ok(())
+}
+
+fn validate_static_network_attributes(prefix: &str, value: &NetworkAttributesValue) -> Result<()> {
+    let NetworkAttributesValue::Attributes(attrs) = value else {
+        return Ok(());
+    };
+
+    match (attrs.latitude, attrs.longitude) {
+        (Some(_), None) | (None, Some(_)) => {
+            anyhow::bail!(
+                "enrichment.networks.{prefix} must set both latitude and longitude when either coordinate is configured"
+            );
+        }
+        (Some(latitude), Some(longitude)) => {
+            if !latitude.is_finite() || !(-90.0..=90.0).contains(&latitude) {
+                anyhow::bail!(
+                    "enrichment.networks.{prefix}.latitude must be a finite value between -90 and 90"
+                );
+            }
+            if !longitude.is_finite() || !(-180.0..=180.0).contains(&longitude) {
+                anyhow::bail!(
+                    "enrichment.networks.{prefix}.longitude must be a finite value between -180 and 180"
+                );
+            }
+        }
+        (None, None) => {}
     }
 
     Ok(())

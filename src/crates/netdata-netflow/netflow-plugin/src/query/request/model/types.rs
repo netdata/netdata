@@ -61,6 +61,10 @@ pub(crate) enum ViewMode {
     TimeSeries,
     #[serde(rename = "country-map")]
     CountryMap,
+    #[serde(rename = "state-map")]
+    StateMap,
+    #[serde(rename = "city-map")]
+    CityMap,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, Default)]

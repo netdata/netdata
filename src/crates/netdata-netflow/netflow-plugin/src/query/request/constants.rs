@@ -20,8 +20,37 @@ pub(crate) const VIRTUAL_FLOW_FIELDS: &[&str] = &["ICMPV4", "ICMPV6"];
 
 pub(crate) const DEFAULT_GROUP_BY_FIELDS: &[&str] = &["SRC_AS_NAME", "PROTOCOL", "DST_AS_NAME"];
 pub(crate) const COUNTRY_MAP_GROUP_BY_FIELDS: &[&str] = &["SRC_COUNTRY", "DST_COUNTRY"];
+pub(crate) const STATE_MAP_GROUP_BY_FIELDS: &[&str] = &[
+    "SRC_COUNTRY",
+    "SRC_GEO_STATE",
+    "DST_COUNTRY",
+    "DST_GEO_STATE",
+];
+pub(crate) const CITY_MAP_GROUP_BY_FIELDS: &[&str] = &[
+    "SRC_COUNTRY",
+    "SRC_GEO_STATE",
+    "SRC_GEO_CITY",
+    "SRC_GEO_LATITUDE",
+    "SRC_GEO_LONGITUDE",
+    "DST_COUNTRY",
+    "DST_GEO_STATE",
+    "DST_GEO_CITY",
+    "DST_GEO_LATITUDE",
+    "DST_GEO_LONGITUDE",
+];
 
-pub(crate) const RAW_ONLY_FIELDS: &[&str] = &["SRC_ADDR", "DST_ADDR", "SRC_PORT", "DST_PORT"];
+pub(crate) const RAW_ONLY_FIELDS: &[&str] = &[
+    "SRC_ADDR",
+    "DST_ADDR",
+    "SRC_PORT",
+    "DST_PORT",
+    "SRC_GEO_CITY",
+    "DST_GEO_CITY",
+    "SRC_GEO_LATITUDE",
+    "DST_GEO_LATITUDE",
+    "SRC_GEO_LONGITUDE",
+    "DST_GEO_LONGITUDE",
+];
 
 pub(crate) fn default_group_by() -> Vec<String> {
     DEFAULT_GROUP_BY_FIELDS
@@ -32,6 +61,15 @@ pub(crate) fn default_group_by() -> Vec<String> {
 
 pub(crate) fn supported_flow_field_names() -> impl Iterator<Item = &'static str> {
     canonical_flow_field_names()
+        .filter(|field| {
+            !matches!(
+                *field,
+                "SRC_GEO_LATITUDE"
+                    | "DST_GEO_LATITUDE"
+                    | "SRC_GEO_LONGITUDE"
+                    | "DST_GEO_LONGITUDE"
+            )
+        })
         .filter(|field| !matches!(*field, "SAMPLING_RATE" | "RAW_BYTES" | "RAW_PACKETS"))
         .chain(VIRTUAL_FLOW_FIELDS.iter().copied())
 }

@@ -9,91 +9,91 @@ pub(super) fn push_presence_field_ids(
     push_field_id(
         index,
         scratch_field_ids,
-        58,
+        56,
         IndexFieldValue::U8(u8::from(rec.has_direction())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        59,
+        57,
         IndexFieldValue::U8(u8::from(rec.has_etype())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        60,
+        58,
         IndexFieldValue::U8(u8::from(rec.has_forwarding_status())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        61,
+        59,
         IndexFieldValue::U8(u8::from(rec.has_iptos())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        62,
+        60,
         IndexFieldValue::U8(u8::from(rec.has_tcp_flags())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        63,
+        61,
         IndexFieldValue::U8(u8::from(rec.has_icmpv4_type())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        64,
+        62,
         IndexFieldValue::U8(u8::from(rec.has_icmpv4_code())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        65,
+        63,
         IndexFieldValue::U8(u8::from(rec.has_icmpv6_type())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        66,
+        64,
         IndexFieldValue::U8(u8::from(rec.has_icmpv6_code())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        67,
+        65,
         IndexFieldValue::U8(u8::from(rec.has_in_if_speed())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        68,
+        66,
         IndexFieldValue::U8(u8::from(rec.has_out_if_speed())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        69,
+        67,
         IndexFieldValue::U8(u8::from(rec.has_in_if_boundary())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        70,
+        68,
         IndexFieldValue::U8(u8::from(rec.has_out_if_boundary())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        71,
+        69,
         IndexFieldValue::U8(u8::from(rec.has_src_vlan())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        72,
+        70,
         IndexFieldValue::U8(u8::from(rec.has_dst_vlan())),
     )
 }

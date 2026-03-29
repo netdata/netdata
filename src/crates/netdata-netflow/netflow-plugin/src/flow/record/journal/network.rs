@@ -30,6 +30,10 @@ pub(super) fn encode_network_journal_fields(
     writer.push_str("DST_GEO_CITY", &record.dst_geo_city);
     writer.push_str("SRC_GEO_STATE", &record.src_geo_state);
     writer.push_str("DST_GEO_STATE", &record.dst_geo_state);
+    writer.push_str("SRC_GEO_LATITUDE", &record.src_geo_latitude);
+    writer.push_str("DST_GEO_LATITUDE", &record.dst_geo_latitude);
+    writer.push_str("SRC_GEO_LONGITUDE", &record.src_geo_longitude);
+    writer.push_str("DST_GEO_LONGITUDE", &record.dst_geo_longitude);
     writer.push_str("DST_AS_PATH", &record.dst_as_path);
     writer.push_str("DST_COMMUNITIES", &record.dst_communities);
     writer.push_str("DST_LARGE_COMMUNITIES", &record.dst_large_communities);

@@ -21,6 +21,8 @@ pub(super) fn decode_remote_records(
             country: remote.country,
             state: remote.state,
             city: remote.city,
+            latitude: String::new(),
+            longitude: String::new(),
             tenant: remote.tenant,
             asn: decode_remote_asn(remote.asn),
             asn_name: remote.asn_name.trim().to_string(),

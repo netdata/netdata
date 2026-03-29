@@ -48,6 +48,8 @@ pub(crate) struct GeoLookupRecord {
     #[serde(default)]
     pub(crate) city: Option<CityValue>,
     #[serde(default)]
+    pub(crate) location: Option<LocationValue>,
+    #[serde(default)]
     pub(crate) subdivisions: Vec<SubdivisionValue>,
     #[serde(default)]
     pub(crate) region: Option<String>,
@@ -71,6 +73,14 @@ pub(crate) enum CityValue {
         names: HashMap<String, String>,
     },
     Plain(String),
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct LocationValue {
+    #[serde(default)]
+    pub(crate) latitude: Option<f64>,
+    #[serde(default)]
+    pub(crate) longitude: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]

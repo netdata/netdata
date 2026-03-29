@@ -83,48 +83,36 @@ pub(super) fn push_network_field_ids(
         index,
         scratch_field_ids,
         50,
-        IndexFieldValue::Text(rec.src_geo_city.as_str()),
-    )?;
-    push_field_id(
-        index,
-        scratch_field_ids,
-        51,
-        IndexFieldValue::Text(rec.dst_geo_city.as_str()),
-    )?;
-    push_field_id(
-        index,
-        scratch_field_ids,
-        52,
         IndexFieldValue::Text(rec.src_geo_state.as_str()),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        53,
+        51,
         IndexFieldValue::Text(rec.dst_geo_state.as_str()),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        54,
+        52,
         IndexFieldValue::U8(u8::from(rec.next_hop.is_some())),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        55,
+        53,
         IndexFieldValue::IpAddr(rec.next_hop.unwrap_or(missing_ip)),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        56,
+        54,
         IndexFieldValue::U16(rec.src_vlan),
     )?;
     push_field_id(
         index,
         scratch_field_ids,
-        57,
+        55,
         IndexFieldValue::U16(rec.dst_vlan),
     )
 }

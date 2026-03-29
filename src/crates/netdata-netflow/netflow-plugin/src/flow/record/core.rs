@@ -119,6 +119,10 @@ pub(crate) struct FlowRecord {
     pub(crate) dst_geo_city: String,
     pub(crate) src_geo_state: String,
     pub(crate) dst_geo_state: String,
+    pub(crate) src_geo_latitude: String,
+    pub(crate) dst_geo_latitude: String,
+    pub(crate) src_geo_longitude: String,
+    pub(crate) dst_geo_longitude: String,
 
     // --- BGP routing (enrichment-derived CSV) ---
     pub(crate) dst_as_path: String,

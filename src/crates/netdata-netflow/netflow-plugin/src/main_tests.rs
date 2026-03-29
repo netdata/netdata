@@ -491,6 +491,125 @@ async fn e2e_country_map_reuses_tuple_table_shape_with_country_keys() {
     assert!(first.get("timestamp").is_none());
     assert!(first.get("duration_sec").is_none());
     assert!(first.get("exporter").is_none());
+    assert!(
+        !response
+            .required_params
+            .iter()
+            .any(|param| param.id == "group_by"),
+        "expected country-map response to hide group_by controls"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_state_map_reuses_tuple_table_shape_with_state_keys() {
+    let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
+    let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+        .await
+        .expect("create query service");
+    let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
+    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+
+    let response = handler
+        .handle_request(query::FlowsRequest {
+            view: query::ViewMode::StateMap,
+            after: Some(1),
+            before: Some(before),
+            group_by: vec!["SRC_ADDR".to_string(), "DST_ADDR".to_string()],
+            top_n: query::TopN::N25,
+            ..Default::default()
+        })
+        .await
+        .expect("state-map function call");
+    let response = match response {
+        FlowsFunctionResponse::Table(response) => response,
+        FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
+        FlowsFunctionResponse::Autocomplete(_) => panic!("expected table response"),
+    };
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.response_type, "flows");
+    assert_eq!(response.data.view, "state-map");
+    assert_eq!(
+        response.data.group_by,
+        vec![
+            "SRC_COUNTRY".to_string(),
+            "SRC_GEO_STATE".to_string(),
+            "DST_COUNTRY".to_string(),
+            "DST_GEO_STATE".to_string()
+        ]
+    );
+    assert!(!response.data.flows.is_empty(), "expected non-empty state-map rows");
+    assert!(
+        !response
+            .required_params
+            .iter()
+            .any(|param| param.id == "group_by"),
+        "expected state-map response to hide group_by controls"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_city_map_reuses_tuple_table_shape_with_city_and_coordinate_keys() {
+    let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
+    let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+        .await
+        .expect("create query service");
+    let handler = NetflowFlowsHandler::new(Arc::clone(&metrics), Arc::new(query_service));
+    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+
+    let response = handler
+        .handle_request(query::FlowsRequest {
+            view: query::ViewMode::CityMap,
+            after: Some(1),
+            before: Some(before),
+            group_by: vec!["SRC_ADDR".to_string(), "DST_ADDR".to_string()],
+            top_n: query::TopN::N25,
+            ..Default::default()
+        })
+        .await
+        .expect("city-map function call");
+    let response = match response {
+        FlowsFunctionResponse::Table(response) => response,
+        FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
+        FlowsFunctionResponse::Autocomplete(_) => panic!("expected table response"),
+    };
+
+    assert_eq!(response.status, 200);
+    assert_eq!(response.response_type, "flows");
+    assert_eq!(response.data.view, "city-map");
+    assert_eq!(
+        response.data.group_by,
+        vec![
+            "SRC_COUNTRY".to_string(),
+            "SRC_GEO_STATE".to_string(),
+            "SRC_GEO_CITY".to_string(),
+            "SRC_GEO_LATITUDE".to_string(),
+            "SRC_GEO_LONGITUDE".to_string(),
+            "DST_COUNTRY".to_string(),
+            "DST_GEO_STATE".to_string(),
+            "DST_GEO_CITY".to_string(),
+            "DST_GEO_LATITUDE".to_string(),
+            "DST_GEO_LONGITUDE".to_string(),
+        ]
+    );
+    assert!(!response.data.flows.is_empty(), "expected non-empty city-map rows");
+    assert!(
+        response
+            .data
+            .stats
+            .get("query_forced_raw_tier")
+            .copied()
+            .unwrap_or_default()
+            > 0,
+        "expected city-map query to force raw tier"
+    );
+    assert!(
+        !response
+            .required_params
+            .iter()
+            .any(|param| param.id == "group_by"),
+        "expected city-map response to hide group_by controls"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

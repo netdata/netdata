@@ -11,6 +11,8 @@ impl FlowsRequest {
             ViewMode::TableSankey => "table-sankey",
             ViewMode::TimeSeries => "timeseries",
             ViewMode::CountryMap => "country-map",
+            ViewMode::StateMap => "state-map",
+            ViewMode::CityMap => "city-map",
         }
     }
 
@@ -20,6 +22,14 @@ impl FlowsRequest {
 
     pub(crate) fn is_country_map_view(&self) -> bool {
         matches!(self.view, ViewMode::CountryMap)
+    }
+
+    pub(crate) fn is_state_map_view(&self) -> bool {
+        matches!(self.view, ViewMode::StateMap)
+    }
+
+    pub(crate) fn is_city_map_view(&self) -> bool {
+        matches!(self.view, ViewMode::CityMap)
     }
 
     pub(crate) fn normalized_sort_by(&self) -> SortBy {

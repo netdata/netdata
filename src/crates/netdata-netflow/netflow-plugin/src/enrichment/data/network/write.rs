@@ -11,6 +11,8 @@ pub(crate) struct SideKeys {
     pub(crate) country: &'static str,
     pub(crate) geo_city: &'static str,
     pub(crate) geo_state: &'static str,
+    pub(crate) geo_latitude: &'static str,
+    pub(crate) geo_longitude: &'static str,
 }
 
 #[cfg(test)]
@@ -24,6 +26,8 @@ pub(crate) const SRC_KEYS: SideKeys = SideKeys {
     country: "SRC_COUNTRY",
     geo_city: "SRC_GEO_CITY",
     geo_state: "SRC_GEO_STATE",
+    geo_latitude: "SRC_GEO_LATITUDE",
+    geo_longitude: "SRC_GEO_LONGITUDE",
 };
 
 #[cfg(test)]
@@ -37,6 +41,8 @@ pub(crate) const DST_KEYS: SideKeys = SideKeys {
     country: "DST_COUNTRY",
     geo_city: "DST_GEO_CITY",
     geo_state: "DST_GEO_STATE",
+    geo_latitude: "DST_GEO_LATITUDE",
+    geo_longitude: "DST_GEO_LONGITUDE",
 };
 
 #[cfg(test)]
@@ -56,6 +62,8 @@ pub(crate) fn write_network_attributes(
     fields.insert(keys.country, attrs.country);
     fields.insert(keys.geo_city, attrs.city);
     fields.insert(keys.geo_state, attrs.state);
+    fields.insert(keys.geo_latitude, attrs.latitude);
+    fields.insert(keys.geo_longitude, attrs.longitude);
 }
 
 pub(crate) fn write_network_attributes_record_src(
@@ -72,6 +80,8 @@ pub(crate) fn write_network_attributes_record_src(
     rec.src_country = attrs.country;
     rec.src_geo_city = attrs.city;
     rec.src_geo_state = attrs.state;
+    rec.src_geo_latitude = attrs.latitude;
+    rec.src_geo_longitude = attrs.longitude;
 }
 
 pub(crate) fn write_network_attributes_record_dst(
@@ -88,4 +98,6 @@ pub(crate) fn write_network_attributes_record_dst(
     rec.dst_country = attrs.country;
     rec.dst_geo_city = attrs.city;
     rec.dst_geo_state = attrs.state;
+    rec.dst_geo_latitude = attrs.latitude;
+    rec.dst_geo_longitude = attrs.longitude;
 }

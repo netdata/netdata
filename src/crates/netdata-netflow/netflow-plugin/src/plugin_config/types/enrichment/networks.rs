@@ -18,6 +18,10 @@ pub(crate) struct NetworkAttributesConfig {
     #[serde(default)]
     pub(crate) city: String,
     #[serde(default)]
+    pub(crate) latitude: Option<f64>,
+    #[serde(default)]
+    pub(crate) longitude: Option<f64>,
+    #[serde(default)]
     pub(crate) tenant: String,
     #[serde(default)]
     pub(crate) asn: u32,
