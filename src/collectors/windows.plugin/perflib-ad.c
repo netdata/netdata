@@ -2253,30 +2253,15 @@ static void netdata_ad_ldap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
     netdata_ad_ldap_client_sessions(pDataBlock, pObjectType, update_every);
 }
 
-static void netdata_ad_cleanup_metrics(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void netdata_ad_cleanup_link_values_cleaned(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA linkValuesCleanedPerSec = {.key = "Link Values Cleaned/sec"};
-    static COUNTER_DATA phantomsCleanedPerSec = {.key = "Phantoms Cleaned/sec"};
-    static COUNTER_DATA phantomsVisitedPerSec = {.key = "Phantoms Visited/sec"};
-    static COUNTER_DATA tombstonesGarbageCollectedPerSec = {.key = "Tombstones Garbage Collected/sec"};
-    static COUNTER_DATA tombstonesVisitedPerSec = {.key = "Tombstones Visited/sec"};
-
     static RRDSET *st_link_values_cleaned_total = NULL;
     static RRDDIM *rd_link_values_cleaned_total = NULL;
-    static RRDSET *st_phantom_objects_cleaned_total = NULL;
-    static RRDDIM *rd_phantom_objects_cleaned_total = NULL;
-    static RRDSET *st_phantom_objects_visited_total = NULL;
-    static RRDDIM *rd_phantom_objects_visited_total = NULL;
-    static RRDSET *st_tombstoned_objects_collected_total = NULL;
-    static RRDDIM *rd_tombstoned_objects_collected_total = NULL;
-    static RRDSET *st_tombstoned_objects_visited_total = NULL;
-    static RRDDIM *rd_tombstoned_objects_visited_total = NULL;
 
-    perflibGetObjectCounter(pDataBlock, pObjectType, &linkValuesCleanedPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &phantomsCleanedPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &phantomsVisitedPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &tombstonesGarbageCollectedPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &tombstonesVisitedPerSec);
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &linkValuesCleanedPerSec))
+        return;
 
     if (unlikely(!st_link_values_cleaned_total)) {
         st_link_values_cleaned_total = rrdset_create_localhost(
@@ -2300,6 +2285,17 @@ static void netdata_ad_cleanup_metrics(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
     rrddim_set_by_pointer(
         st_link_values_cleaned_total, rd_link_values_cleaned_total, (collected_number)linkValuesCleanedPerSec.current.Data);
     rrdset_done(st_link_values_cleaned_total);
+}
+
+static void netdata_ad_cleanup_phantom_objects_cleaned(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA phantomsCleanedPerSec = {.key = "Phantoms Cleaned/sec"};
+    static RRDSET *st_phantom_objects_cleaned_total = NULL;
+    static RRDDIM *rd_phantom_objects_cleaned_total = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &phantomsCleanedPerSec))
+        return;
 
     if (unlikely(!st_phantom_objects_cleaned_total)) {
         st_phantom_objects_cleaned_total = rrdset_create_localhost(
@@ -2325,6 +2321,17 @@ static void netdata_ad_cleanup_metrics(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
         rd_phantom_objects_cleaned_total,
         (collected_number)phantomsCleanedPerSec.current.Data);
     rrdset_done(st_phantom_objects_cleaned_total);
+}
+
+static void netdata_ad_cleanup_phantom_objects_visited(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA phantomsVisitedPerSec = {.key = "Phantoms Visited/sec"};
+    static RRDSET *st_phantom_objects_visited_total = NULL;
+    static RRDDIM *rd_phantom_objects_visited_total = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &phantomsVisitedPerSec))
+        return;
 
     if (unlikely(!st_phantom_objects_visited_total)) {
         st_phantom_objects_visited_total = rrdset_create_localhost(
@@ -2350,6 +2357,17 @@ static void netdata_ad_cleanup_metrics(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
         rd_phantom_objects_visited_total,
         (collected_number)phantomsVisitedPerSec.current.Data);
     rrdset_done(st_phantom_objects_visited_total);
+}
+
+static void netdata_ad_cleanup_tombstoned_objects_collected(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA tombstonesGarbageCollectedPerSec = {.key = "Tombstones Garbage Collected/sec"};
+    static RRDSET *st_tombstoned_objects_collected_total = NULL;
+    static RRDDIM *rd_tombstoned_objects_collected_total = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &tombstonesGarbageCollectedPerSec))
+        return;
 
     if (unlikely(!st_tombstoned_objects_collected_total)) {
         st_tombstoned_objects_collected_total = rrdset_create_localhost(
@@ -2375,6 +2393,17 @@ static void netdata_ad_cleanup_metrics(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
         rd_tombstoned_objects_collected_total,
         (collected_number)tombstonesGarbageCollectedPerSec.current.Data);
     rrdset_done(st_tombstoned_objects_collected_total);
+}
+
+static void netdata_ad_cleanup_tombstoned_objects_visited(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA tombstonesVisitedPerSec = {.key = "Tombstones Visited/sec"};
+    static RRDSET *st_tombstoned_objects_visited_total = NULL;
+    static RRDDIM *rd_tombstoned_objects_visited_total = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &tombstonesVisitedPerSec))
+        return;
 
     if (unlikely(!st_tombstoned_objects_visited_total)) {
         st_tombstoned_objects_visited_total = rrdset_create_localhost(
@@ -2400,6 +2429,15 @@ static void netdata_ad_cleanup_metrics(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
         rd_tombstoned_objects_visited_total,
         (collected_number)tombstonesVisitedPerSec.current.Data);
     rrdset_done(st_tombstoned_objects_visited_total);
+}
+
+static void netdata_ad_cleanup_metrics(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    netdata_ad_cleanup_link_values_cleaned(pDataBlock, pObjectType, update_every);
+    netdata_ad_cleanup_phantom_objects_cleaned(pDataBlock, pObjectType, update_every);
+    netdata_ad_cleanup_phantom_objects_visited(pDataBlock, pObjectType, update_every);
+    netdata_ad_cleanup_tombstoned_objects_collected(pDataBlock, pObjectType, update_every);
+    netdata_ad_cleanup_tombstoned_objects_visited(pDataBlock, pObjectType, update_every);
 }
 
 static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every)
