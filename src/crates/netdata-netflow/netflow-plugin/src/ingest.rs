@@ -39,6 +39,7 @@ const REBUILD_CACHE_MEMORY_CAPACITY: usize = 16;
 const REBUILD_CACHE_DISK_CAPACITY: usize = 64 * 1024 * 1024;
 const REBUILD_CACHE_BLOCK_SIZE: usize = 1024 * 1024;
 const DECODER_STATE_PERSIST_INTERVAL_USEC: u64 = 30 * 1_000_000;
+const QUERY_TIME_RANGE_MAX_BUCKET_SECONDS: u32 = 30 * 24 * 60 * 60;
 
 mod encode;
 mod metrics;
@@ -54,6 +55,15 @@ fn now_usec() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_micros() as u64)
         .unwrap_or(0)
+}
+
+fn tier_timestamp_lookup_query_end(now_usec: u64) -> u32 {
+    let safe_end = u32::MAX.saturating_sub(QUERY_TIME_RANGE_MAX_BUCKET_SECONDS);
+    let now_seconds = now_usec.saturating_div(1_000_000);
+    now_seconds
+        .saturating_add(1)
+        .min(u64::from(safe_end))
+        .max(1) as u32
 }
 
 #[cfg(test)]

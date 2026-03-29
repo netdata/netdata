@@ -242,6 +242,17 @@ fn ingest_service_persist_decoder_state_skips_clean_namespaces() {
     );
 }
 
+#[test]
+fn tier_timestamp_lookup_query_end_stays_within_query_time_range_limits() {
+    let end = super::tier_timestamp_lookup_query_end(u64::MAX);
+    let range = QueryTimeRange::new(0, end).expect("bounded rebuild query time range");
+
+    assert!(end > 0, "expected a non-zero exclusive end bound");
+    assert_eq!(range.requested_start(), 0);
+    assert_eq!(range.requested_end(), end);
+    assert!(range.aligned_end() >= range.requested_end());
+}
+
 fn new_test_ingest_service(
     decapsulation_mode: ConfigDecapsulationMode,
 ) -> (TempDir, IngestService) {

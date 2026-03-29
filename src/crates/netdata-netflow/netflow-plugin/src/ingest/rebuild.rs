@@ -26,7 +26,10 @@ impl IngestService {
             .map(|fi| FileIndexKey::new(&fi.file, &facets, Some(source_ts.clone())))
             .collect();
 
-        let time_range = QueryTimeRange::new(0, u32::MAX).ok()?;
+        // QueryTimeRange aligns the end boundary up to a histogram bucket.
+        // Using u32::MAX here overflows that alignment math in debug builds.
+        let query_end = super::tier_timestamp_lookup_query_end(super::now_usec());
+        let time_range = QueryTimeRange::new(0, query_end).ok()?;
         let cancel = CancellationToken::new();
         let indexed = batch_compute_file_indexes(
             cache,
