@@ -68,6 +68,48 @@
       "type": "string",
       "enum": ["none", "range", "multiselect", "facet"]
     },
+    "facet_value": {
+      "type": "object",
+      "required": ["value"],
+      "properties": {
+        "value": { "type": ["string", "number", "boolean"] },
+        "name": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "facet_field": {
+      "type": "object",
+      "required": ["field"],
+      "properties": {
+        "field": { "type": "string" },
+        "name": { "type": "string" },
+        "total_values": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" },
+        "autocomplete": { "type": "boolean" },
+        "overflowed": { "type": "boolean" },
+        "overflow_records": { "type": "integer", "minimum": 0 },
+        "values": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/facet_value" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "facets": {
+      "type": "object",
+      "properties": {
+        "value_limit": { "type": "integer" },
+        "excluded_fields": { "type": "array", "items": { "type": "string" } },
+        "overflowed_fields": { "type": "integer" },
+        "overflowed_records": { "type": "integer" },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/facet_field" }
+        },
+        "auto": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
     "value_options": {
       "type": "object",
       "properties": {
@@ -225,7 +267,7 @@
             "items": { "type": "string" }
           }
         },
-        "facets": { "type": ["array", "object"] },
+        "facets": { "$ref": "#/definitions/facets" },
         "histogram": { "type": "object" },
         "items": { "type": "object" },
         "pagination": { "type": "object" }
@@ -573,7 +615,7 @@
             "stats": { "type": "object" },
             "metrics": { "type": "object" },
             "warnings": { "type": ["array", "object"] },
-            "facets": { "type": ["array", "object"] },
+            "facets": { "$ref": "#/definitions/facets" },
             "histogram": { "type": "object" },
             "visualizations": { "type": "object" },
             "pagination": { "type": "object" }
