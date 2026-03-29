@@ -29,7 +29,7 @@ func TestFlattenSnapshotScenarios(t *testing.T) {
 					},
 				}
 
-				flat := flattenSnapshot(src)
+				flat := flattenSnapshot(src, true)
 				r := &storeReader{snap: flat}
 
 				_, ok := r.Value("svc.latency_bucket", Labels{"le": "1"})
@@ -58,7 +58,7 @@ func TestFlattenSnapshotScenarios(t *testing.T) {
 					},
 				}
 
-				flat := flattenSnapshot(src)
+				flat := flattenSnapshot(src, true)
 				require.Contains(t, flat.series, "svc.latency_count")
 				require.Contains(t, flat.series, "svc.latency_sum")
 				r := &storeReader{snap: flat, raw: true}
@@ -99,7 +99,7 @@ func TestFlattenSnapshotScenarios(t *testing.T) {
 					},
 				}
 
-				flat := flattenSnapshot(src)
+				flat := flattenSnapshot(src, true)
 				require.Equal(t, uint64(1), flat.collectMeta.FlattenCollisionCount)
 
 				r := &storeReader{snap: flat, raw: true, flattened: true}

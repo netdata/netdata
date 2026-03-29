@@ -19,6 +19,16 @@ type typedFamilyKey struct {
 	hash uint64
 }
 
+type relabeledTypedFamilyState struct {
+	ownerName     string
+	touched       bool
+	keptAny       bool
+	hasFinalKey   bool
+	split         bool
+	finalKey      typedFamilyKey
+	outputIndexes []int
+}
+
 func (c *Collector) processScrapeBatch(batch *scrapeBatch, checking bool) (promscrapemodel.MetricFamilies, *collectorRuntime, error) {
 	runtime := c.runtime
 	if checking {
@@ -34,13 +44,31 @@ func (c *Collector) processScrapeBatch(batch *scrapeBatch, checking bool) (proms
 		return mfs, runtime, err
 	}
 
-	processed, err := c.applyCuratedRuntime(batch, runtime, checking)
+	processed, typedFamilies, err := c.applyCuratedRuntime(batch, runtime, checking)
 	if err != nil {
 		return nil, runtime, err
 	}
 
 	mfs, err := assembleMetricFamilies(processed)
-	return mfs, runtime, err
+	if err != nil {
+		return nil, runtime, err
+	}
+
+	invalid, err := c.validateRelabeledTypedFamilies(typedFamilies, mfs, checking)
+	if err != nil {
+		return nil, runtime, err
+	}
+	if len(invalid) == 0 {
+		return mfs, runtime, nil
+	}
+
+	filtered := filterInvalidTypedFamilySamples(processed, typedFamilies, invalid)
+	mfs, err = assembleMetricFamilies(filtered)
+	if err != nil {
+		return nil, runtime, err
+	}
+
+	return mfs, runtime, nil
 }
 
 func (c *Collector) buildRuntimeForCheck(samples promscrapemodel.Samples) (*collectorRuntime, error) {
@@ -135,35 +163,43 @@ func profileMatchesSamples(prof promprofiles.Profile, samples promscrapemodel.Sa
 	return false, nil
 }
 
-func (c *Collector) applyCuratedRuntime(batch *scrapeBatch, runtime *collectorRuntime, checking bool) (*scrapeBatch, error) {
+func (c *Collector) applyCuratedRuntime(batch *scrapeBatch, runtime *collectorRuntime, checking bool) (*scrapeBatch, map[typedFamilyKey]*relabeledTypedFamilyState, error) {
 	out := &scrapeBatch{
 		help:    make([]helpEntry, 0, len(batch.help)),
 		samples: make(promscrapemodel.Samples, 0, len(batch.samples)),
 	}
 
 	familyOwners := make(map[typedFamilyKey]string)
+	relabeledFamilies := make(map[typedFamilyKey]*relabeledTypedFamilyState)
 	helpTargets := make(map[string][]string)
 	helpTargetSeen := make(map[string]map[string]struct{})
 
 	for _, raw := range batch.samples {
+		rawKey, rawTyped := typedFamilyOwnershipKey(raw)
 		owner, drop, err := c.resolveSampleOwner(raw, runtime.compiledProfiles, checking)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if drop {
 			continue
 		}
 
 		if conflict, err := c.checkTypedFamilyOwnership(raw, owner, familyOwners, checking); err != nil {
-			return nil, err
+			return nil, nil, err
 		} else if conflict {
 			continue
 		}
 
 		sample := raw
 		if owner != nil {
-			var keep bool
-			sample, keep = owner.apply(sample)
+			var (
+				keep    bool
+				touched bool
+			)
+			sample, keep, touched = owner.apply(sample)
+			if rawTyped && len(owner.blocks) > 0 {
+				recordRelabeledTypedFamily(relabeledFamilies, rawKey, owner.profile.Name, touched, keep, sample, len(out.samples))
+			}
 			if !keep {
 				continue
 			}
@@ -180,7 +216,7 @@ func (c *Collector) applyCuratedRuntime(batch *scrapeBatch, runtime *collectorRu
 		}
 	}
 
-	return out, nil
+	return out, relabeledFamilies, nil
 }
 
 func (c *Collector) resolveSampleOwner(sample promscrapemodel.Sample, profiles []compiledProfile, checking bool) (*compiledProfile, bool, error) {
@@ -235,23 +271,143 @@ func displayProfileKey(prevKey string) string {
 	return prevKey
 }
 
-func (p *compiledProfile) apply(sample promscrapemodel.Sample) (promscrapemodel.Sample, bool) {
+func (p *compiledProfile) apply(sample promscrapemodel.Sample) (promscrapemodel.Sample, bool, bool) {
 	if len(p.blocks) == 0 {
-		return sample, true
+		return sample, true, false
 	}
 
 	current := sample
+	touched := false
 	for _, block := range p.blocks {
 		if block.selector != nil && !block.selector.Matches(sampleSelectorLabels(current)) {
 			continue
 		}
 		next, keep := block.processor.Apply(current)
 		if !keep {
-			return promscrapemodel.Sample{}, false
+			return promscrapemodel.Sample{}, false, true
+		}
+		if next.Name != current.Name || !promlabels.Equal(next.Labels, current.Labels) {
+			touched = true
 		}
 		current = next
 	}
-	return current, true
+	return current, true, touched
+}
+
+func recordRelabeledTypedFamily(states map[typedFamilyKey]*relabeledTypedFamilyState, rawKey typedFamilyKey, ownerName string, touched, keep bool, sample promscrapemodel.Sample, outputIndex int) {
+	state := states[rawKey]
+	if state == nil {
+		state = &relabeledTypedFamilyState{ownerName: ownerName}
+		states[rawKey] = state
+	}
+	state.touched = state.touched || touched
+	if !keep {
+		return
+	}
+
+	finalKey, ok := typedFamilyOwnershipKey(sample)
+	if !ok {
+		return
+	}
+
+	state.keptAny = true
+	if !state.hasFinalKey {
+		state.finalKey = finalKey
+		state.hasFinalKey = true
+	} else if state.finalKey != finalKey {
+		state.split = true
+	}
+	state.outputIndexes = append(state.outputIndexes, outputIndex)
+}
+
+func (c *Collector) validateRelabeledTypedFamilies(states map[typedFamilyKey]*relabeledTypedFamilyState, mfs promscrapemodel.MetricFamilies, checking bool) (map[typedFamilyKey]struct{}, error) {
+	if len(states) == 0 {
+		return nil, nil
+	}
+
+	assembled := assembledTypedFamilyKeys(mfs)
+	invalid := make(map[typedFamilyKey]struct{})
+
+	for rawKey, state := range states {
+		if state == nil || !state.touched {
+			continue
+		}
+
+		var msg string
+		switch {
+		case state.split:
+			msg = fmt.Sprintf("curated relabel splits logical typed family %q within profile %q after ownership resolution", rawKey.name, state.ownerName)
+		case !state.keptAny:
+			continue
+		case !state.hasFinalKey:
+			continue
+		case !assembledHasTypedFamily(assembled, state.finalKey):
+			msg = fmt.Sprintf("curated relabel leaves logical typed family %q within profile %q without a valid assembled family", rawKey.name, state.ownerName)
+		default:
+			continue
+		}
+
+		if checking {
+			return nil, errors.New(msg)
+		}
+		c.Warning(msg)
+		invalid[rawKey] = struct{}{}
+	}
+
+	return invalid, nil
+}
+
+func assembledTypedFamilyKeys(mfs promscrapemodel.MetricFamilies) map[typedFamilyKey]struct{} {
+	keys := make(map[typedFamilyKey]struct{})
+	for _, mf := range mfs {
+		if mf == nil {
+			continue
+		}
+		if mf.Type() != commonmodel.MetricTypeSummary && mf.Type() != commonmodel.MetricTypeHistogram {
+			continue
+		}
+		for _, metric := range mf.Metrics() {
+			keys[typedFamilyKey{name: mf.Name(), hash: metric.Labels().Hash()}] = struct{}{}
+		}
+	}
+	return keys
+}
+
+func assembledHasTypedFamily(keys map[typedFamilyKey]struct{}, key typedFamilyKey) bool {
+	_, ok := keys[key]
+	return ok
+}
+
+func filterInvalidTypedFamilySamples(batch *scrapeBatch, states map[typedFamilyKey]*relabeledTypedFamilyState, invalid map[typedFamilyKey]struct{}) *scrapeBatch {
+	if len(invalid) == 0 {
+		return batch
+	}
+
+	dropIndexes := make(map[int]struct{})
+	for rawKey := range invalid {
+		state := states[rawKey]
+		if state == nil {
+			continue
+		}
+		for _, idx := range state.outputIndexes {
+			dropIndexes[idx] = struct{}{}
+		}
+	}
+	if len(dropIndexes) == 0 {
+		return batch
+	}
+
+	filtered := &scrapeBatch{
+		help:    append([]helpEntry(nil), batch.help...),
+		samples: make(promscrapemodel.Samples, 0, len(batch.samples)-len(dropIndexes)),
+	}
+	for i, sample := range batch.samples {
+		if _, drop := dropIndexes[i]; drop {
+			continue
+		}
+		filtered.samples.Add(sample)
+	}
+	return filtered
 }
 
 func sampleSelectorLabels(sample promscrapemodel.Sample) promlabels.Labels {

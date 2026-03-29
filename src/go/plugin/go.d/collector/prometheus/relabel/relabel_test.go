@@ -60,6 +60,21 @@ func TestProcessor_Apply(t *testing.T) {
 			want: sample("http_requests", map[string]string{"method": "GET"}, 1, promscrapemodel.SampleKindScalar, commonmodel.MetricTypeCounter),
 			keep: true,
 		},
+		"label-only relabel preserves existing utf8 metric name": {
+			cfgs: []Config{
+				{
+					SourceLabels: []string{"method"},
+					TargetLabel:  "method_upper",
+					Action:       Uppercase,
+				},
+			},
+			in: sample("http.requests_total", map[string]string{"method": "get"}, 1, promscrapemodel.SampleKindScalar, commonmodel.MetricTypeCounter),
+			want: sample("http.requests_total", map[string]string{
+				"method":       "get",
+				"method_upper": "GET",
+			}, 1, promscrapemodel.SampleKindScalar, commonmodel.MetricTypeCounter),
+			keep: true,
+		},
 		"replace rewrites __name__ with explicit utf8 scheme at runtime": {
 			cfgs: []Config{
 				{

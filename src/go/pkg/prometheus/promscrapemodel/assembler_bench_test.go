@@ -31,7 +31,9 @@ func BenchmarkAssembler_ApplySample(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		a.beginCycle()
 		for _, sample := range samples {
-			require.NoError(b, a.ApplySample(sample))
+			if err := a.ApplySample(sample); err != nil {
+				b.Fatalf("ApplySample(): %v", err)
+			}
 		}
 		_ = a.MetricFamilies()
 	}
@@ -58,7 +60,9 @@ func BenchmarkMetricFamilies_NewParseAndAssemble(b *testing.B) {
 				return a.ApplySample(sample)
 			},
 		)
-		require.NoError(b, err)
+		if err != nil {
+			b.Fatalf("ParseStreamWithMeta(): %v", err)
+		}
 		_ = a.MetricFamilies()
 	}
 }
@@ -76,7 +80,9 @@ func BenchmarkMetricFamilies_FastParseAndAssemble(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		a.beginCycle()
 		err := p.parseToAssembler(data, &a)
-		require.NoError(b, err)
+		if err != nil {
+			b.Fatalf("parseToAssembler(): %v", err)
+		}
 		_ = a.MetricFamilies()
 	}
 }

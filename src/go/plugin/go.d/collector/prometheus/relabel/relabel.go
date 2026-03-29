@@ -350,7 +350,7 @@ func (p *Processor) Apply(sample promscrapemodel.Sample) (promscrapemodel.Sample
 
 	p.builder.Reset(sample.Labels)
 	p.currentName = sample.Name
-	p.currentNameScheme = defaultNameValidationScheme
+	p.currentNameScheme = inferMetricNameValidationScheme(sample.Name)
 	p.labelsChanged = false
 	p.nameChanged = false
 
@@ -576,6 +576,16 @@ func withNameScheme(scheme commonmodel.ValidationScheme) commonmodel.ValidationS
 		return defaultNameValidationScheme
 	}
 	return scheme
+}
+
+func inferMetricNameValidationScheme(name string) commonmodel.ValidationScheme {
+	if defaultNameValidationScheme.IsValidMetricName(name) {
+		return defaultNameValidationScheme
+	}
+	if commonmodel.UTF8Validation.IsValidMetricName(name) {
+		return commonmodel.UTF8Validation
+	}
+	return defaultNameValidationScheme
 }
 
 func validateNameScheme(scheme commonmodel.ValidationScheme) error {

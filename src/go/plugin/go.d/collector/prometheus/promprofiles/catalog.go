@@ -194,7 +194,7 @@ func defaultDirSpecs() []DirSpec {
 			IsStock: false,
 		})
 	}
-	if dir := filepath.Join(pluginconfig.CollectorsStockDir(), profilesDirName, "default"); dir != "" {
+	if dir := filepath.Join(pluginconfig.CollectorsStockDir(), profilesDirName, "default"); dir != "" && isDirExists(dir) {
 		specs = append(specs, DirSpec{
 			Path:    dir,
 			IsStock: true,

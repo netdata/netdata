@@ -187,7 +187,7 @@ func (r *storeReader) CollectMeta() CollectMeta {
 	return r.snap.collectMeta
 }
 
-func flattenSnapshot(src *readSnapshot) *readSnapshot {
+func flattenSnapshot(src *readSnapshot, raw bool) *readSnapshot {
 	series := snapshotSeriesView(src)
 	dst := &readSnapshot{
 		collectMeta:       src.collectMeta,
@@ -198,6 +198,9 @@ func flattenSnapshot(src *readSnapshot) *readSnapshot {
 
 	for _, s := range series {
 		if s.desc == nil {
+			continue
+		}
+		if !visibleSeries(src.collectMeta, raw, s) {
 			continue
 		}
 		switch s.desc.kind {
@@ -685,7 +688,11 @@ func materializeRuntimeSeries(snap *readSnapshot) map[string]*committedSeries {
 
 // visible applies freshness policy for Read(); Read(ReadRaw()) bypasses it.
 func (r *storeReader) visible(s *committedSeries) bool {
-	if r.raw {
+	return visibleSeries(r.snap.collectMeta, r.raw, s)
+}
+
+func visibleSeries(meta CollectMeta, raw bool, s *committedSeries) bool {
+	if raw {
 		return true
 	}
 	if s.desc == nil {
@@ -694,6 +701,5 @@ func (r *storeReader) visible(s *committedSeries) bool {
 	if s.desc.freshness == FreshnessCommitted {
 		return true
 	}
-	meta := r.snap.collectMeta
 	return meta.LastAttemptStatus == CollectStatusSuccess && s.meta.LastSeenSuccessSeq == meta.LastSuccessSeq
 }

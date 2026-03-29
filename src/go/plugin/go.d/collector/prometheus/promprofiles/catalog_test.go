@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
 func TestLoadFromDirs_UserOverridesStock(t *testing.T) {
@@ -112,6 +114,21 @@ func TestLoadFromDirs_OrderedProfilesPreserveMergedLoadOrder(t *testing.T) {
 	assert.Equal(t, "User Alpha", profiles[0].Template.Charts[0].Title)
 	assert.Equal(t, "Beta", profiles[1].Name)
 	assert.Equal(t, "Gamma", profiles[2].Name)
+}
+
+func TestDefaultCatalog_MissingDefaultStockDirReturnsEmptyCatalog(t *testing.T) {
+	oldName := executable.Name
+	oldDir := executable.Directory
+	executable.Name = "go.d"
+	executable.Directory = t.TempDir()
+	t.Cleanup(func() {
+		executable.Name = oldName
+		executable.Directory = oldDir
+	})
+
+	catalog, err := DefaultCatalog()
+	require.NoError(t, err)
+	assert.True(t, catalog.Empty())
 }
 
 func writeProfileFile(t *testing.T, path, body string) {

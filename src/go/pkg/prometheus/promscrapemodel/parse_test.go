@@ -183,6 +183,36 @@ handler_latency_test_count{label1="value1"} 3
 				},
 			},
 		},
+		"keeps explicit non typed family kinds despite quantile and le labels": {
+			input: []byte(`
+# TYPE odd_quantile gauge
+odd_quantile{label1="value1",quantile="0.5"} 2
+# TYPE odd_bucket_bucket counter
+odd_bucket_bucket{label1="value1",le="0.5"} 3
+`),
+			want: Samples{
+				{
+					Name: "odd_quantile",
+					Labels: labels.Labels{
+						{Name: "label1", Value: "value1"},
+						{Name: "quantile", Value: "0.5"},
+					},
+					Value:      2,
+					Kind:       SampleKindScalar,
+					FamilyType: model.MetricTypeGauge,
+				},
+				{
+					Name: "odd_bucket_bucket",
+					Labels: labels.Labels{
+						{Name: "label1", Value: "value1"},
+						{Name: "le", Value: "0.5"},
+					},
+					Value:      3,
+					Kind:       SampleKindScalar,
+					FamilyType: model.MetricTypeCounter,
+				},
+			},
+		},
 		"selector filters raw labels": {
 			selector: `test_metric{label1="value2"}`,
 			input: []byte(`
@@ -334,6 +364,37 @@ handler_latency_test_count{label1="value1"} 3
 				{
 					Name:       "handler_latency_test_count",
 					Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+					Value:      3,
+					Kind:       SampleKindScalar,
+					FamilyType: model.MetricTypeCounter,
+				},
+			},
+		},
+		"keeps explicit non typed family kinds despite quantile and le labels": {
+			input: []byte(`
+# TYPE odd_quantile gauge
+odd_quantile{label1="value1",quantile="0.5"} 2
+# TYPE odd_bucket_bucket counter
+odd_bucket_bucket{label1="value1",le="0.5"} 3
+`),
+			wantHelp: map[string]string{},
+			want: Samples{
+				{
+					Name: "odd_quantile",
+					Labels: labels.Labels{
+						{Name: "label1", Value: "value1"},
+						{Name: "quantile", Value: "0.5"},
+					},
+					Value:      2,
+					Kind:       SampleKindScalar,
+					FamilyType: model.MetricTypeGauge,
+				},
+				{
+					Name: "odd_bucket_bucket",
+					Labels: labels.Labels{
+						{Name: "label1", Value: "value1"},
+						{Name: "le", Value: "0.5"},
+					},
 					Value:      3,
 					Kind:       SampleKindScalar,
 					FamilyType: model.MetricTypeCounter,

@@ -151,6 +151,9 @@ func (d *parseDriver) makeSample(value float64, ownLabels bool) (Sample, string,
 	}
 
 	if sample.Labels.Has(quantileLabel) {
+		if sample.FamilyType != model.MetricTypeUnknown && sample.FamilyType != model.MetricTypeSummary {
+			return sample, "", pendingNone, true
+		}
 		sample.Kind = SampleKindSummaryQuantile
 		sample.FamilyType = model.MetricTypeSummary
 		d.familyTypes[name] = model.MetricTypeSummary
@@ -158,6 +161,9 @@ func (d *parseDriver) makeSample(value float64, ownLabels bool) (Sample, string,
 	}
 
 	if strings.HasSuffix(name, bucketSuffix) && sample.Labels.Has(bucketLabel) {
+		if sample.FamilyType != model.MetricTypeUnknown && sample.FamilyType != model.MetricTypeHistogram {
+			return sample, "", pendingNone, true
+		}
 		baseName := strings.TrimSuffix(name, bucketSuffix)
 		sample.Kind = SampleKindHistogramBucket
 		sample.FamilyType = model.MetricTypeHistogram

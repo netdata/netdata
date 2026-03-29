@@ -4,11 +4,12 @@ package prometheus
 
 import (
 	"fmt"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
@@ -47,11 +48,11 @@ func buildCollectorRuntimeFromProfiles(profiles []promprofiles.Profile) (*collec
 		}
 		runtime.compiledProfiles = append(runtime.compiledProfiles, compiled)
 
-		if err := walkCharts(prof.Template, func(chart charttpl.Chart) error {
-			if _, ok := seenChartIDs[chart.ID]; ok {
-				return fmt.Errorf("chart id collision: %s", chart.ID)
+		if err := walkCharts(prof.Template, []string{spec.ContextNamespace}, func(chart charttpl.Chart, effectiveID string) error {
+			if _, ok := seenChartIDs[effectiveID]; ok {
+				return fmt.Errorf("chart id collision: %s", effectiveID)
 			}
-			seenChartIDs[chart.ID] = struct{}{}
+			seenChartIDs[effectiveID] = struct{}{}
 			return nil
 		}); err != nil {
 			return nil, err
@@ -111,16 +112,48 @@ func compileProfileMatch(prof promprofiles.Profile) (matcher.Matcher, error) {
 	return match, nil
 }
 
-func walkCharts(group charttpl.Group, fn func(charttpl.Chart) error) error {
+func walkCharts(group charttpl.Group, inheritedContext []string, fn func(charttpl.Chart, string) error) error {
+	contextParts := append(append([]string(nil), inheritedContext...), normalizeOptional(group.ContextNamespace)...)
 	for _, chart := range group.Charts {
-		if err := fn(chart); err != nil {
+		if err := fn(chart, effectiveChartID(chart, contextParts)); err != nil {
 			return err
 		}
 	}
 	for _, child := range group.Groups {
-		if err := walkCharts(child, fn); err != nil {
+		if err := walkCharts(child, contextParts, fn); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func effectiveChartID(chart charttpl.Chart, inheritedContext []string) string {
+	baseID := strings.TrimSpace(chart.ID)
+	if baseID != "" {
+		return baseID
+	}
+
+	contextParts := append(append([]string(nil), inheritedContext...), strings.TrimSpace(chart.Context))
+	context := strings.Join(filterEmpty(contextParts), ".")
+	return strings.ReplaceAll(context, ".", "_")
+}
+
+func normalizeOptional(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return []string{value}
+}
+
+func filterEmpty(parts []string) []string {
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		out = append(out, part)
+	}
+	return out
 }

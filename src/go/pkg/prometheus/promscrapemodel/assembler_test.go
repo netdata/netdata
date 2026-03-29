@@ -3,6 +3,7 @@
 package promscrapemodel
 
 import (
+	"math"
 	"testing"
 
 	"github.com/prometheus/common/model"
@@ -13,11 +14,11 @@ import (
 
 func TestAssembler_MetricFamilies(t *testing.T) {
 	tests := map[string]struct {
-		apply  func(a *Assembler) error
+		apply  func(t *testing.T, a *Assembler) error
 		verify func(t *testing.T, mfs MetricFamilies)
 	}{
 		"assembles mixed families": {
-			apply: func(a *Assembler) error {
+			apply: func(t *testing.T, a *Assembler) error {
 				a.beginCycle()
 				a.applyHelp("test_gauge", "Test Gauge")
 				a.applyHelp("test_summary", "Test Summary")
@@ -114,7 +115,7 @@ func TestAssembler_MetricFamilies(t *testing.T) {
 			},
 		},
 		"sealed readout is idempotent and next sample starts new cycle": {
-			apply: func(a *Assembler) error {
+			apply: func(t *testing.T, a *Assembler) error {
 				a.beginCycle()
 				if err := a.ApplySample(Sample{
 					Name:       "first_metric",
@@ -150,8 +151,68 @@ func TestAssembler_MetricFamilies(t *testing.T) {
 				assert.Equal(t, 2.0, second.Metrics()[0].Gauge().Value())
 			},
 		},
+		"keeps summaries with nan quantile values": {
+			apply: func(t *testing.T, a *Assembler) error {
+				a.beginCycle()
+				a.applyHelp("nan_summary", "Summary With NaN Quantiles")
+
+				for _, sample := range []Sample{
+					{
+						Name: "nan_summary",
+						Labels: labels.Labels{
+							{Name: "label1", Value: "value1"},
+							{Name: "quantile", Value: "0.5"},
+						},
+						Value:      math.NaN(),
+						Kind:       SampleKindSummaryQuantile,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name: "nan_summary",
+						Labels: labels.Labels{
+							{Name: "label1", Value: "value1"},
+							{Name: "quantile", Value: "0.9"},
+						},
+						Value:      math.NaN(),
+						Kind:       SampleKindSummaryQuantile,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name:       "nan_summary_sum",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      0,
+						Kind:       SampleKindSummarySum,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name:       "nan_summary_count",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      0,
+						Kind:       SampleKindSummaryCount,
+						FamilyType: model.MetricTypeSummary,
+					},
+				} {
+					if err := a.ApplySample(sample); err != nil {
+						return err
+					}
+				}
+
+				return nil
+			},
+			verify: func(t *testing.T, mfs MetricFamilies) {
+				summary := mfs.GetSummary("nan_summary")
+				require.NotNil(t, summary)
+				require.Len(t, summary.Metrics(), 1)
+				qs := summary.Metrics()[0].Summary().Quantiles()
+				require.Len(t, qs, 2)
+				assert.True(t, math.IsNaN(qs[0].Value()))
+				assert.True(t, math.IsNaN(qs[1].Value()))
+				assert.Equal(t, 0.0, summary.Metrics()[0].Summary().Sum())
+				assert.Equal(t, 0.0, summary.Metrics()[0].Summary().Count())
+			},
+		},
 		"drops malformed and incomplete typed groups": {
-			apply: func(a *Assembler) error {
+			apply: func(t *testing.T, a *Assembler) error {
 				a.beginCycle()
 
 				for _, sample := range []Sample{
@@ -237,7 +298,7 @@ func TestAssembler_MetricFamilies(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			a := NewAssembler()
-			require.NoError(t, test.apply(a))
+			require.NoError(t, test.apply(t, a))
 			test.verify(t, a.MetricFamilies())
 		})
 	}

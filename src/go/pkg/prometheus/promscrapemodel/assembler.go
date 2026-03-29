@@ -509,7 +509,10 @@ func validSummaryState(state *summaryState) bool {
 
 	qs := make([]float64, 0, len(state.summary.quantiles))
 	for _, q := range state.summary.quantiles {
-		if !isFiniteValue(q.quantile) || q.quantile < 0 || q.quantile > 1 || !isFiniteValue(q.value) {
+		// Prometheus summaries can legitimately expose NaN quantile values when
+		// there are no observations yet. Keep the family and let consumers decide
+		// whether to skip or normalize those values.
+		if !isFiniteValue(q.quantile) || q.quantile < 0 || q.quantile > 1 {
 			return false
 		}
 		qs = append(qs, q.quantile)

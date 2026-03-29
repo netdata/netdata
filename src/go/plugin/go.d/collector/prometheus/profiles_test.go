@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -99,6 +100,24 @@ func TestCollector_InitLoadProfileCatalogError(t *testing.T) {
 	assert.Contains(t, err.Error(), "load profiles catalog")
 }
 
+func TestCollector_InitDefaultCatalogMissingStockDirDoesNotFailGenericJob(t *testing.T) {
+	oldName := executable.Name
+	oldDir := executable.Directory
+	executable.Name = "go.d"
+	executable.Directory = t.TempDir()
+	t.Cleanup(func() {
+		executable.Name = oldName
+		executable.Directory = oldDir
+	})
+
+	collr := New()
+	collr.URL = "http://127.0.0.1:9090/metrics"
+	collr.loadProfileCatalog = nil
+
+	require.NoError(t, collr.Init(context.Background()))
+	assert.True(t, collr.profileCatalog.Empty())
+}
+
 func TestCollector_ChartTemplateYAML_RuntimeOverride(t *testing.T) {
 	collr := New()
 	runtime, err := buildCollectorRuntimeFromProfiles([]promprofiles.Profile{testPromProfile("demo")})
@@ -110,6 +129,56 @@ func TestCollector_ChartTemplateYAML_RuntimeOverride(t *testing.T) {
 	collecttest.AssertChartTemplateSchema(t, templateYAML)
 	assert.Contains(t, templateYAML, "demo_metric_total")
 	assert.Contains(t, templateYAML, "enabled: true")
+}
+
+func TestBuildCollectorRuntimeFromProfiles_DerivesMissingChartIDFromEffectiveContext(t *testing.T) {
+	profiles := []promprofiles.Profile{
+		{
+			Name:  "demo_a",
+			Match: "demo_a_*",
+			Template: charttpl.Group{
+				Family:           "prometheus_curated",
+				ContextNamespace: "alpha",
+				Metrics:          []string{"demo_a_metric"},
+				Charts: []charttpl.Chart{
+					{
+						Title:   "Demo A",
+						Context: "requests",
+						Units:   "requests/s",
+						Dimensions: []charttpl.Dimension{
+							{Selector: "demo_a_metric", Name: "value"},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:  "demo_b",
+			Match: "demo_b_*",
+			Template: charttpl.Group{
+				Family:           "prometheus_curated",
+				ContextNamespace: "beta",
+				Metrics:          []string{"demo_b_metric"},
+				Charts: []charttpl.Chart{
+					{
+						Title:   "Demo B",
+						Context: "requests",
+						Units:   "requests/s",
+						Dimensions: []charttpl.Dimension{
+							{Selector: "demo_b_metric", Name: "value"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	runtime, err := buildCollectorRuntimeFromProfiles(profiles)
+	require.NoError(t, err)
+	require.NotNil(t, runtime)
+	assert.Contains(t, runtime.ChartTemplateYAML, "context_namespace: prometheus")
+	assert.Contains(t, runtime.ChartTemplateYAML, "context_namespace: alpha")
+	assert.Contains(t, runtime.ChartTemplateYAML, "context_namespace: beta")
 }
 
 func TestCollector_CheckFailsWhenExactProfileMatchesNothing(t *testing.T) {
@@ -163,6 +232,34 @@ metrics_relabeling:
 	mf := mfs.GetGauge("renamed_metric")
 	require.NotNil(t, mf)
 	assert.Equal(t, "Original Help", mf.Help())
+}
+
+func TestCollector_CheckFailsWhenProfileRelabelInvalidatesHistogramFamily(t *testing.T) {
+	collr := New()
+	collr.URL = newMetricsServer(t, `
+# TYPE demo_duration_seconds histogram
+demo_duration_seconds_bucket{le="0.1"} 1
+demo_duration_seconds_bucket{le="+Inf"} 2
+demo_duration_seconds_sum 0.2
+demo_duration_seconds_count 2
+`)
+	collr.ProfileSelectionMode = profileSelectionModeExact
+	collr.Profiles = []string{"demo"}
+	collr.loadProfileCatalog = func() (promprofiles.Catalog, error) {
+		return loadTestCatalog(t, map[string]string{
+			"demo.yaml": testProfileYAML("Demo", "demo_duration_seconds*", `
+metrics_relabeling:
+  - selector: demo_duration_seconds_bucket
+    rules:
+      - action: drop
+`, "demo_duration_seconds", "demo_chart", "Demo Metric"),
+		})
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+	err := collr.Check(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `curated relabel leaves logical typed family "demo_duration_seconds" within profile "Demo" without a valid assembled family`)
 }
 
 func TestCollector_CheckFailsOnSelectedProfileOverlap(t *testing.T) {
