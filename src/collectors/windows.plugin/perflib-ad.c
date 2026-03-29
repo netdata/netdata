@@ -854,27 +854,15 @@ static void netdata_ad_replication_highest_usn(
     netdata_ad_replication_highest_usn_issued(pDataBlock, pObjectType, update_every);
 }
 
-static void netdata_ad_replication_inbound(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void netdata_ad_replication_inbound_sync_objects_remaining(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA replicationInboundSyncObjectsRemaining = {.key = "DRA Inbound Full Sync Objects Remaining"};
-    static COUNTER_DATA replicationInboundLinkValueUpdatesRemaining = {
-        .key = "DRA Inbound Link Value Updates Remaining in Packet"};
-    static COUNTER_DATA replicationInboundObjectsUpdatedTotal = {.key = "DRA Inbound Objects Applied/sec"};
-    static COUNTER_DATA replicationInboundObjectsFilteredTotal = {.key = "DRA Inbound Objects Filtered/sec"};
-
     static RRDSET *st_replication_inbound_sync_objects_remaining = NULL;
     static RRDDIM *rd_replication_inbound_sync_objects_remaining = NULL;
-    static RRDSET *st_replication_inbound_link_value_updates_remaining = NULL;
-    static RRDDIM *rd_replication_inbound_link_value_updates_remaining = NULL;
-    static RRDSET *st_replication_inbound_objects_updated = NULL;
-    static RRDDIM *rd_replication_inbound_objects_updated = NULL;
-    static RRDSET *st_replication_inbound_objects_filtered = NULL;
-    static RRDDIM *rd_replication_inbound_objects_filtered = NULL;
 
-    perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundSyncObjectsRemaining);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundLinkValueUpdatesRemaining);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundObjectsUpdatedTotal);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundObjectsFilteredTotal);
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundSyncObjectsRemaining))
+        return;
 
     if (unlikely(!st_replication_inbound_sync_objects_remaining)) {
         st_replication_inbound_sync_objects_remaining = rrdset_create_localhost(
@@ -900,6 +888,18 @@ static void netdata_ad_replication_inbound(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
         rd_replication_inbound_sync_objects_remaining,
         (collected_number)replicationInboundSyncObjectsRemaining.current.Data);
     rrdset_done(st_replication_inbound_sync_objects_remaining);
+}
+
+static void netdata_ad_replication_inbound_link_value_updates_remaining(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA replicationInboundLinkValueUpdatesRemaining = {
+        .key = "DRA Inbound Link Value Updates Remaining in Packet"};
+    static RRDSET *st_replication_inbound_link_value_updates_remaining = NULL;
+    static RRDDIM *rd_replication_inbound_link_value_updates_remaining = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundLinkValueUpdatesRemaining))
+        return;
 
     if (unlikely(!st_replication_inbound_link_value_updates_remaining)) {
         st_replication_inbound_link_value_updates_remaining = rrdset_create_localhost(
@@ -925,6 +925,17 @@ static void netdata_ad_replication_inbound(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
         rd_replication_inbound_link_value_updates_remaining,
         (collected_number)replicationInboundLinkValueUpdatesRemaining.current.Data);
     rrdset_done(st_replication_inbound_link_value_updates_remaining);
+}
+
+static void netdata_ad_replication_inbound_objects_updated(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA replicationInboundObjectsUpdatedTotal = {.key = "DRA Inbound Objects Applied/sec"};
+    static RRDSET *st_replication_inbound_objects_updated = NULL;
+    static RRDDIM *rd_replication_inbound_objects_updated = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundObjectsUpdatedTotal))
+        return;
 
     if (unlikely(!st_replication_inbound_objects_updated)) {
         st_replication_inbound_objects_updated = rrdset_create_localhost(
@@ -950,6 +961,17 @@ static void netdata_ad_replication_inbound(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
         rd_replication_inbound_objects_updated,
         (collected_number)replicationInboundObjectsUpdatedTotal.current.Data);
     rrdset_done(st_replication_inbound_objects_updated);
+}
+
+static void netdata_ad_replication_inbound_objects_filtered(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA replicationInboundObjectsFilteredTotal = {.key = "DRA Inbound Objects Filtered/sec"};
+    static RRDSET *st_replication_inbound_objects_filtered = NULL;
+    static RRDDIM *rd_replication_inbound_objects_filtered = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundObjectsFilteredTotal))
+        return;
 
     if (unlikely(!st_replication_inbound_objects_filtered)) {
         st_replication_inbound_objects_filtered = rrdset_create_localhost(
@@ -975,6 +997,14 @@ static void netdata_ad_replication_inbound(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
         rd_replication_inbound_objects_filtered,
         (collected_number)replicationInboundObjectsFilteredTotal.current.Data);
     rrdset_done(st_replication_inbound_objects_filtered);
+}
+
+static void netdata_ad_replication_inbound(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    netdata_ad_replication_inbound_sync_objects_remaining(pDataBlock, pObjectType, update_every);
+    netdata_ad_replication_inbound_link_value_updates_remaining(pDataBlock, pObjectType, update_every);
+    netdata_ad_replication_inbound_objects_updated(pDataBlock, pObjectType, update_every);
+    netdata_ad_replication_inbound_objects_filtered(pDataBlock, pObjectType, update_every);
 }
 
 static void netdata_ad_sync(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
