@@ -1459,82 +1459,296 @@ static void netdata_ad_bind_time(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
     rrdset_done(st_ldap_last_bind_time_seconds_total);
 }
 
-static void netdata_ad_binds(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void netdata_ad_binds_digest(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA digestBindsPerSec = {.key = "Digest Binds/sec"};
-    static COUNTER_DATA dsClientBindsPerSec = {.key = "DS Client Binds/sec"};
-    static COUNTER_DATA dsServerBindsPerSec = {.key = "DS Server Binds/sec"};
-    static COUNTER_DATA externalBindsPerSec = {.key = "External Binds/sec"};
-    static COUNTER_DATA fastBindsPerSec = {.key = "Fast Binds/sec"};
-    static COUNTER_DATA negotiatedBindsPerSec = {.key = "Negotiated Binds/sec"};
-    static COUNTER_DATA ntlmBindsPerSec = {.key = "NTLM Binds/sec"};
-    static COUNTER_DATA simpleBindsPerSec = {.key = "Simple Binds/sec"};
-    static COUNTER_DATA ldapSuccessfulBindsPerSec = {.key = "LDAP Successful Binds/sec"};
+    static RRDSET *st_binds_digest = NULL;
+    static RRDDIM *rd_binds_digest = NULL;
 
-    static RRDSET *st_binds_total = NULL;
-    static RRDDIM *rd_binds_total_digest = NULL;
-    static RRDDIM *rd_binds_total_ds_client = NULL;
-    static RRDDIM *rd_binds_total_ds_server = NULL;
-    static RRDDIM *rd_binds_total_external = NULL;
-    static RRDDIM *rd_binds_total_fast = NULL;
-    static RRDDIM *rd_binds_total_negotiate = NULL;
-    static RRDDIM *rd_binds_total_ntlm = NULL;
-    static RRDDIM *rd_binds_total_simple = NULL;
-    static RRDDIM *rd_binds_total_ldap = NULL;
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &digestBindsPerSec))
+        return;
 
-    perflibGetObjectCounter(pDataBlock, pObjectType, &digestBindsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &dsClientBindsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &dsServerBindsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &externalBindsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &fastBindsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &negotiatedBindsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &ntlmBindsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &simpleBindsPerSec);
-    perflibGetObjectCounter(pDataBlock, pObjectType, &ldapSuccessfulBindsPerSec);
-
-    if (unlikely(!st_binds_total)) {
-        st_binds_total = rrdset_create_localhost(
+    if (unlikely(!st_binds_digest)) {
+        st_binds_digest = rrdset_create_localhost(
             "ad",
-            "binds",
+            "binds_digest",
             NULL,
             "bind",
-            "ad.binds",
-            "Successful binds",
+            "ad.binds_digest",
+            "Digest binds",
             "bind/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
-            PRIO_AD_BIND_TOTAL,
+            PRIO_AD_BIND_DIGEST,
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_binds_total_digest = rrddim_add(st_binds_total, "digest", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_binds_total_ds_client =
-            rrddim_add(st_binds_total, "ds_client", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_binds_total_ds_server =
-            rrddim_add(st_binds_total, "ds_server", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_binds_total_external = rrddim_add(st_binds_total, "external", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_binds_total_fast = rrddim_add(st_binds_total, "fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_binds_total_negotiate = rrddim_add(st_binds_total, "negotiate", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_binds_total_ntlm = rrddim_add(st_binds_total, "ntlm", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_binds_total_simple = rrddim_add(st_binds_total, "simple", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_binds_total_ldap = rrddim_add(st_binds_total, "ldap", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_binds_digest = rrddim_add(st_binds_digest, "digest", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(st_binds_total, rd_binds_total_digest, (collected_number)digestBindsPerSec.current.Data);
-    rrddim_set_by_pointer(
-        st_binds_total, rd_binds_total_ds_client, (collected_number)dsClientBindsPerSec.current.Data);
-    rrddim_set_by_pointer(
-        st_binds_total, rd_binds_total_ds_server, (collected_number)dsServerBindsPerSec.current.Data);
-    rrddim_set_by_pointer(
-        st_binds_total, rd_binds_total_external, (collected_number)externalBindsPerSec.current.Data);
-    rrddim_set_by_pointer(st_binds_total, rd_binds_total_fast, (collected_number)fastBindsPerSec.current.Data);
-    rrddim_set_by_pointer(
-        st_binds_total, rd_binds_total_negotiate, (collected_number)negotiatedBindsPerSec.current.Data);
-    rrddim_set_by_pointer(st_binds_total, rd_binds_total_ntlm, (collected_number)ntlmBindsPerSec.current.Data);
-    rrddim_set_by_pointer(st_binds_total, rd_binds_total_simple, (collected_number)simpleBindsPerSec.current.Data);
-    rrddim_set_by_pointer(
-        st_binds_total, rd_binds_total_ldap, (collected_number)ldapSuccessfulBindsPerSec.current.Data);
-    rrdset_done(st_binds_total);
+    rrddim_set_by_pointer(st_binds_digest, rd_binds_digest, (collected_number)digestBindsPerSec.current.Data);
+    rrdset_done(st_binds_digest);
+}
+
+static void netdata_ad_binds_ds_client(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA dsClientBindsPerSec = {.key = "DS Client Binds/sec"};
+    static RRDSET *st_binds_ds_client = NULL;
+    static RRDDIM *rd_binds_ds_client = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &dsClientBindsPerSec))
+        return;
+
+    if (unlikely(!st_binds_ds_client)) {
+        st_binds_ds_client = rrdset_create_localhost(
+            "ad",
+            "binds_ds_client",
+            NULL,
+            "bind",
+            "ad.binds_ds_client",
+            "DS client binds",
+            "bind/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_BIND_DS_CLIENT,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_binds_ds_client = rrddim_add(st_binds_ds_client, "ds_client", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_binds_ds_client, rd_binds_ds_client, (collected_number)dsClientBindsPerSec.current.Data);
+    rrdset_done(st_binds_ds_client);
+}
+
+static void netdata_ad_binds_ds_server(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA dsServerBindsPerSec = {.key = "DS Server Binds/sec"};
+    static RRDSET *st_binds_ds_server = NULL;
+    static RRDDIM *rd_binds_ds_server = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &dsServerBindsPerSec))
+        return;
+
+    if (unlikely(!st_binds_ds_server)) {
+        st_binds_ds_server = rrdset_create_localhost(
+            "ad",
+            "binds_ds_server",
+            NULL,
+            "bind",
+            "ad.binds_ds_server",
+            "DS server binds",
+            "bind/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_BIND_DS_SERVER,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_binds_ds_server = rrddim_add(st_binds_ds_server, "ds_server", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_binds_ds_server, rd_binds_ds_server, (collected_number)dsServerBindsPerSec.current.Data);
+    rrdset_done(st_binds_ds_server);
+}
+
+static void netdata_ad_binds_external(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA externalBindsPerSec = {.key = "External Binds/sec"};
+    static RRDSET *st_binds_external = NULL;
+    static RRDDIM *rd_binds_external = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &externalBindsPerSec))
+        return;
+
+    if (unlikely(!st_binds_external)) {
+        st_binds_external = rrdset_create_localhost(
+            "ad",
+            "binds_external",
+            NULL,
+            "bind",
+            "ad.binds_external",
+            "External binds",
+            "bind/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_BIND_EXTERNAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_binds_external = rrddim_add(st_binds_external, "external", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_binds_external, rd_binds_external, (collected_number)externalBindsPerSec.current.Data);
+    rrdset_done(st_binds_external);
+}
+
+static void netdata_ad_binds_fast(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA fastBindsPerSec = {.key = "Fast Binds/sec"};
+    static RRDSET *st_binds_fast = NULL;
+    static RRDDIM *rd_binds_fast = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &fastBindsPerSec))
+        return;
+
+    if (unlikely(!st_binds_fast)) {
+        st_binds_fast = rrdset_create_localhost(
+            "ad",
+            "binds_fast",
+            NULL,
+            "bind",
+            "ad.binds_fast",
+            "Fast binds",
+            "bind/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_BIND_FAST,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_binds_fast = rrddim_add(st_binds_fast, "fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_binds_fast, rd_binds_fast, (collected_number)fastBindsPerSec.current.Data);
+    rrdset_done(st_binds_fast);
+}
+
+static void netdata_ad_binds_negotiate(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA negotiatedBindsPerSec = {.key = "Negotiated Binds/sec"};
+    static RRDSET *st_binds_negotiate = NULL;
+    static RRDDIM *rd_binds_negotiate = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &negotiatedBindsPerSec))
+        return;
+
+    if (unlikely(!st_binds_negotiate)) {
+        st_binds_negotiate = rrdset_create_localhost(
+            "ad",
+            "binds_negotiate",
+            NULL,
+            "bind",
+            "ad.binds_negotiate",
+            "Negotiated binds",
+            "bind/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_BIND_NEGOTIATE,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_binds_negotiate = rrddim_add(st_binds_negotiate, "negotiate", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_binds_negotiate, rd_binds_negotiate, (collected_number)negotiatedBindsPerSec.current.Data);
+    rrdset_done(st_binds_negotiate);
+}
+
+static void netdata_ad_binds_ntlm(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA ntlmBindsPerSec = {.key = "NTLM Binds/sec"};
+    static RRDSET *st_binds_ntlm = NULL;
+    static RRDDIM *rd_binds_ntlm = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ntlmBindsPerSec))
+        return;
+
+    if (unlikely(!st_binds_ntlm)) {
+        st_binds_ntlm = rrdset_create_localhost(
+            "ad",
+            "binds_ntlm",
+            NULL,
+            "bind",
+            "ad.binds_ntlm",
+            "NTLM binds",
+            "bind/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_BIND_NTLM,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_binds_ntlm = rrddim_add(st_binds_ntlm, "ntlm", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_binds_ntlm, rd_binds_ntlm, (collected_number)ntlmBindsPerSec.current.Data);
+    rrdset_done(st_binds_ntlm);
+}
+
+static void netdata_ad_binds_simple(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA simpleBindsPerSec = {.key = "Simple Binds/sec"};
+    static RRDSET *st_binds_simple = NULL;
+    static RRDDIM *rd_binds_simple = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &simpleBindsPerSec))
+        return;
+
+    if (unlikely(!st_binds_simple)) {
+        st_binds_simple = rrdset_create_localhost(
+            "ad",
+            "binds_simple",
+            NULL,
+            "bind",
+            "ad.binds_simple",
+            "Simple binds",
+            "bind/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_BIND_SIMPLE,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_binds_simple = rrddim_add(st_binds_simple, "simple", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_binds_simple, rd_binds_simple, (collected_number)simpleBindsPerSec.current.Data);
+    rrdset_done(st_binds_simple);
+}
+
+static void netdata_ad_binds_ldap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA ldapSuccessfulBindsPerSec = {.key = "LDAP Successful Binds/sec"};
+    static RRDSET *st_binds_ldap = NULL;
+    static RRDDIM *rd_binds_ldap = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &ldapSuccessfulBindsPerSec))
+        return;
+
+    if (unlikely(!st_binds_ldap)) {
+        st_binds_ldap = rrdset_create_localhost(
+            "ad",
+            "binds_ldap",
+            NULL,
+            "bind",
+            "ad.binds_ldap",
+            "LDAP successful binds",
+            "bind/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_BIND_LDAP,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_binds_ldap = rrddim_add(st_binds_ldap, "ldap", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_binds_ldap, rd_binds_ldap, (collected_number)ldapSuccessfulBindsPerSec.current.Data);
+    rrdset_done(st_binds_ldap);
+}
+
+static void netdata_ad_binds(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    netdata_ad_binds_digest(pDataBlock, pObjectType, update_every);
+    netdata_ad_binds_ds_client(pDataBlock, pObjectType, update_every);
+    netdata_ad_binds_ds_server(pDataBlock, pObjectType, update_every);
+    netdata_ad_binds_external(pDataBlock, pObjectType, update_every);
+    netdata_ad_binds_fast(pDataBlock, pObjectType, update_every);
+    netdata_ad_binds_negotiate(pDataBlock, pObjectType, update_every);
+    netdata_ad_binds_ntlm(pDataBlock, pObjectType, update_every);
+    netdata_ad_binds_simple(pDataBlock, pObjectType, update_every);
+    netdata_ad_binds_ldap(pDataBlock, pObjectType, update_every);
 }
 
 static void netdata_ad_bind(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
