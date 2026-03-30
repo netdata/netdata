@@ -151,6 +151,10 @@ void del_pid_entry(pid_t pid) {
     string_freez(p->sid_name);
 #endif
 
+#if (PROCESSES_HAVE_SERVICE == 1)
+    string_freez(p->service_name);
+#endif
+
     string_freez(p->comm_orig);
     string_freez(p->comm);
     string_freez(p->cmdline);
