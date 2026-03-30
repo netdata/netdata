@@ -143,6 +143,10 @@ On Linux, you can continuously monitor all kernel features and hardware sensors 
 
 ---
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/netdata-netdata-netdata).
+
 ## Getting Started
 
 You can install Netdata on all major operating systems. To begin:
