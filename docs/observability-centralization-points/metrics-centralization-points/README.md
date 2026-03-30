@@ -23,7 +23,7 @@ flowchart BT
 
 ## Installation
 
-A **Netdata Parent** is a regular Netdata Agent configured to receive streaming metrics from Netdata Children.
+A **Netdata Parent** is a regular Netdata Agent configured to receive streaming metrics from Netdata Children (also normal Agents!).
 
 To install a Netdata Parent:
 
