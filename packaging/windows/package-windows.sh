@@ -7,6 +7,51 @@ repo_root="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/nu
 
 set -eu -o pipefail
 
+find_cmd() {
+    local cmd
+
+    for cmd in "$@"; do
+        if command -v "${cmd}" > /dev/null 2>&1; then
+            command -v "${cmd}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+find_wix() {
+    local candidate=""
+
+    if candidate="$(find_cmd wix wix.exe)"; then
+        printf '%s\n' "${candidate}"
+        return 0
+    fi
+
+    for candidate in \
+        "/c/Program Files/WixToolset v6.0/bin/wix.exe" \
+        "/c/Program Files/WiX Toolset v6.0/bin/wix.exe" \
+        "/c/Program Files/WixToolset v5.0/bin/wix.exe" \
+        "/c/Program Files/WiX Toolset v5.0/bin/wix.exe" \
+        "/c/Program Files (x86)/WixToolset v6.0/bin/wix.exe" \
+        "/c/Program Files (x86)/WiX Toolset v6.0/bin/wix.exe" \
+        "/c/Program Files (x86)/WixToolset v5.0/bin/wix.exe" \
+        "/c/Program Files (x86)/WiX Toolset v5.0/bin/wix.exe"
+    do
+        if [ -f "${candidate}" ]; then
+            printf '%s\n' "${candidate}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+if ! find_wix > /dev/null; then
+    echo "Missing required command: wix. Checked PATH and common WiX installation directories." >&2
+    exit 1
+fi
+
 # Regenerate keys everytime there is an update
 if [ -d /opt/netdata/etc/pki/ ]; then
     rm -rf /opt/netdata/etc/pki/
