@@ -3,12 +3,15 @@
 package secretresolver
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -430,4 +433,79 @@ func TestResolveRefUsesProviderRegistry(t *testing.T) {
 	require.NoError(t, resolver.Resolve(cfg))
 	assert.True(t, called)
 	assert.Equal(t, "resolved-by-stub", cfg["value"])
+}
+
+func TestResolveWithStoreResolver_LogsDetailedBuiltinResolution(t *testing.T) {
+	modeFile := filepath.Join(t.TempDir(), "secret.txt")
+	require.NoError(t, os.WriteFile(modeFile, []byte("from-file\n"), 0o600))
+
+	tests := map[string]struct {
+		cfg          map[string]any
+		setup        func(t *testing.T)
+		wantLog      string
+		dontWantLogs []string
+	}{
+		"env": {
+			cfg: map[string]any{"value": "${env:TEST_SECRET_ENV}"},
+			setup: func(t *testing.T) {
+				t.Setenv("TEST_SECRET_ENV", "from-env")
+			},
+			wantLog:      "resolved secret via env variable 'TEST_SECRET_ENV'",
+			dontWantLogs: []string{"from-env"},
+		},
+		"file": {
+			cfg:          map[string]any{"value": "${file:" + modeFile + "}"},
+			wantLog:      "resolved secret via file '" + modeFile + "'",
+			dontWantLogs: []string{"from-file"},
+		},
+		"cmd": {
+			cfg:          map[string]any{"value": "${cmd:/bin/echo from-cmd}"},
+			wantLog:      "resolved secret via command '/bin/echo'",
+			dontWantLogs: []string{"from-cmd"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if tc.setup != nil {
+				tc.setup(t)
+			}
+
+			out := captureResolverLoggerOutput(t, func(log *logger.Logger) {
+				ctx := logger.ContextWithLogger(context.Background(), log)
+				require.NoError(t, New().ResolveWithStoreResolver(ctx, tc.cfg, nil))
+			})
+
+			assert.Contains(t, out, tc.wantLog)
+			for _, s := range tc.dontWantLogs {
+				assert.NotContains(t, out, s)
+			}
+		})
+	}
+}
+
+func captureResolverLoggerOutput(t *testing.T, fn func(log *logger.Logger)) string {
+	t.Helper()
+
+	prevStderr := os.Stderr
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stderr = w
+	t.Cleanup(func() {
+		_ = w.Close()
+		_ = r.Close()
+		os.Stderr = prevStderr
+	})
+
+	done := make(chan string, 1)
+	go func() {
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, r)
+		done <- buf.String()
+	}()
+
+	fn(logger.New())
+
+	require.NoError(t, w.Close())
+	return <-done
 }

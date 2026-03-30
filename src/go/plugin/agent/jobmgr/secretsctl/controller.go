@@ -77,6 +77,7 @@ func New(opts Options) *Controller {
 	}
 	c.cb = newSecretStoreCallbacks(secretStoreCallbackDeps{
 		pluginName:           c.pluginName,
+		log:                  c.Logger,
 		service:              c.service,
 		restartDependentJobs: c.restartDependentJobs,
 	})

@@ -135,12 +135,12 @@ func (s *inMemoryService) GetStatus(key string) (StoreStatus, bool) {
 	return cloneStoreStatus(record.status), true
 }
 
-func (s *inMemoryService) Validate(cfg Config) error {
-	_, err := s.prepareConfig(context.Background(), cfg)
+func (s *inMemoryService) Validate(ctx context.Context, cfg Config) error {
+	_, err := s.prepareConfig(ctx, cfg)
 	return err
 }
 
-func (s *inMemoryService) ValidateStored(key string) error {
+func (s *inMemoryService) ValidateStored(ctx context.Context, key string) error {
 	key, err := normalizeStoreKey(key)
 	if err != nil {
 		return err
@@ -156,7 +156,7 @@ func (s *inMemoryService) ValidateStored(key string) error {
 	}
 	validatedHash := record.configHash
 
-	_, err = s.prepareConfig(context.Background(), record.rawConfig)
+	_, err = s.prepareConfig(ctx, record.rawConfig)
 
 	validation := &ValidationStatus{
 		CheckedAt: s.now().UTC(),
@@ -194,8 +194,8 @@ func (s *inMemoryService) ValidateStored(key string) error {
 	return err
 }
 
-func (s *inMemoryService) Add(cfg Config) error {
-	prepared, err := s.prepareConfig(context.Background(), cfg)
+func (s *inMemoryService) Add(ctx context.Context, cfg Config) error {
+	prepared, err := s.prepareConfig(ctx, cfg)
 	if err != nil {
 		return err
 	}
@@ -221,7 +221,7 @@ func (s *inMemoryService) Add(cfg Config) error {
 	return nil
 }
 
-func (s *inMemoryService) Update(key string, cfg Config) error {
+func (s *inMemoryService) Update(ctx context.Context, key string, cfg Config) error {
 	key, err := normalizeStoreKey(key)
 	if err != nil {
 		return err
@@ -236,7 +236,7 @@ func (s *inMemoryService) Update(key string, cfg Config) error {
 		return storeNotConfiguredError(key)
 	}
 
-	prepared, err := s.prepareConfig(context.Background(), cfg)
+	prepared, err := s.prepareConfig(ctx, cfg)
 	if err != nil {
 		return err
 	}

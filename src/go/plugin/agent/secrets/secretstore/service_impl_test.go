@@ -3,11 +3,13 @@
 package secretstore_test
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/stretchr/testify/assert"
@@ -39,7 +41,7 @@ func TestServiceStatusAndGenerationLifecycle(t *testing.T) {
 	svc := secretstore.NewService(backends.Creators()...)
 
 	config := testSingleVaultConfig()
-	err := svc.Add(newStoreFromConfig(t, svc, secretstore.KindVault, config))
+	err := svc.Add(context.Background(), newStoreFromConfig(t, svc, secretstore.KindVault, config))
 	require.NoError(t, err)
 	assert.Equal(t, uint64(1), svc.Capture().Generation())
 
@@ -56,15 +58,15 @@ func TestServiceStatusAndGenerationLifecycle(t *testing.T) {
 	runtimeUpdate["mode_token_file"] = map[string]any{
 		"path": "/var/lib/netdata/vault.token",
 	}
-	err = svc.Update(storeKey, newStoreFromConfig(t, svc, secretstore.KindVault, runtimeUpdate))
+	err = svc.Update(context.Background(), storeKey, newStoreFromConfig(t, svc, secretstore.KindVault, runtimeUpdate))
 	require.NoError(t, err)
 	assert.Equal(t, uint64(2), svc.Capture().Generation())
 
-	err = svc.Update(storeKey, newStoreFromConfig(t, svc, secretstore.KindVault, runtimeUpdate))
+	err = svc.Update(context.Background(), storeKey, newStoreFromConfig(t, svc, secretstore.KindVault, runtimeUpdate))
 	require.NoError(t, err)
 	assert.Equal(t, uint64(2), svc.Capture().Generation())
 
-	err = svc.ValidateStored(storeKey)
+	err = svc.ValidateStored(context.Background(), storeKey)
 	require.NoError(t, err)
 
 	status, ok = svc.GetStatus(storeKey)
@@ -77,13 +79,13 @@ func TestServiceUpdate_UnknownFieldOnlyChangeCountsAsChange(t *testing.T) {
 	svc := secretstore.NewService(backends.Creators()...)
 
 	base := testSingleVaultConfig()
-	err := svc.Add(newStoreFromConfig(t, svc, secretstore.KindVault, base))
+	err := svc.Add(context.Background(), newStoreFromConfig(t, svc, secretstore.KindVault, base))
 	require.NoError(t, err)
 	assert.Equal(t, uint64(1), svc.Capture().Generation())
 
 	changed := testSingleVaultConfig()
 	changed["ui_note"] = "kept"
-	err = svc.Update(secretstore.StoreKey(secretstore.KindVault, "vault_prod"), newStoreFromConfig(t, svc, secretstore.KindVault, changed))
+	err = svc.Update(context.Background(), secretstore.StoreKey(secretstore.KindVault, "vault_prod"), newStoreFromConfig(t, svc, secretstore.KindVault, changed))
 	require.NoError(t, err)
 	assert.Equal(t, uint64(2), svc.Capture().Generation())
 }
@@ -103,22 +105,22 @@ addr: https://vault.example
 	cfg.SetSource("dyncfg")
 	cfg.SetSourceType("dyncfg")
 
-	require.NoError(t, svc.Validate(cfg))
+	require.NoError(t, svc.Validate(context.Background(), cfg))
 }
 
 func TestServiceUsesSentinelErrors(t *testing.T) {
 	svc := secretstore.NewService(backends.Creators()...)
 
-	err := svc.Add(newStoreFromConfig(t, svc, secretstore.KindVault, testSingleVaultConfig()))
+	err := svc.Add(context.Background(), newStoreFromConfig(t, svc, secretstore.KindVault, testSingleVaultConfig()))
 	require.NoError(t, err)
 
-	err = svc.Add(newStoreFromConfig(t, svc, secretstore.KindVault, testSingleVaultConfig()))
+	err = svc.Add(context.Background(), newStoreFromConfig(t, svc, secretstore.KindVault, testSingleVaultConfig()))
 	require.Error(t, err)
 	assert.ErrorIs(t, err, secretstore.ErrStoreExists)
 
 	missing := testSingleVaultConfig()
 	missing["name"] = "missing"
-	err = svc.Update(secretstore.StoreKey(secretstore.KindVault, "missing"), newStoreFromConfig(t, svc, secretstore.KindVault, missing))
+	err = svc.Update(context.Background(), secretstore.StoreKey(secretstore.KindVault, "missing"), newStoreFromConfig(t, svc, secretstore.KindVault, missing))
 	require.Error(t, err)
 	assert.ErrorIs(t, err, secretstore.ErrStoreNotFound)
 
@@ -130,14 +132,14 @@ func TestServiceUsesSentinelErrors(t *testing.T) {
 func TestProviderBackedValidationContracts(t *testing.T) {
 	svc := secretstore.NewService(backends.Creators()...)
 
-	err := svc.Validate(newStoreFromConfig(t, svc, secretstore.KindAWSSM, map[string]any{
+	err := svc.Validate(context.Background(), newStoreFromConfig(t, svc, secretstore.KindAWSSM, map[string]any{
 		"name":      "aws_prod",
 		"auth_mode": "env",
 	}))
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "region is required")
 
-	err = svc.Validate(newStoreFromConfig(t, svc, secretstore.KindVault, map[string]any{
+	err = svc.Validate(context.Background(), newStoreFromConfig(t, svc, secretstore.KindVault, map[string]any{
 		"name": "vault_prod",
 		"mode": "token",
 		"mode_token": map[string]any{
@@ -170,14 +172,14 @@ func TestProviderBackedAddAcrossKinds(t *testing.T) {
 	for _, entry := range providerBackedConfigs() {
 		entry := entry
 		t.Run(string(entry.kind), func(t *testing.T) {
-			err := svc.Add(newStoreFromConfig(t, svc, entry.kind, entry.config))
+			err := svc.Add(context.Background(), newStoreFromConfig(t, svc, entry.kind, entry.config))
 			require.NoError(t, err)
 
 			status, ok := svc.GetStatus(secretstore.StoreKey(entry.kind, entry.name))
 			require.True(t, ok)
 			assert.Equal(t, entry.kind, status.Kind)
 
-			err = svc.ValidateStored(secretstore.StoreKey(entry.kind, entry.name))
+			err = svc.ValidateStored(context.Background(), secretstore.StoreKey(entry.kind, entry.name))
 			require.NoError(t, err)
 		})
 	}
@@ -202,7 +204,7 @@ func TestServiceValidate_ResolvesBuiltinSecretsInProviderPayload(t *testing.T) {
 			cfg := testSingleVaultConfig()
 			cfg["mode"] = modeRef
 
-			require.NoError(t, svc.Validate(newStoreFromConfig(t, svc, secretstore.KindVault, cfg)))
+			require.NoError(t, svc.Validate(context.Background(), newStoreFromConfig(t, svc, secretstore.KindVault, cfg)))
 		})
 	}
 }
@@ -218,17 +220,17 @@ func TestServiceAddUpdate_ResolvesBuiltinSecretsInProviderPayload(t *testing.T) 
 
 	envCfg := testSingleVaultConfig()
 	envCfg["mode"] = "${env:TEST_VAULT_MODE}"
-	require.NoError(t, svc.Add(newStoreFromConfig(t, svc, secretstore.KindVault, envCfg)))
+	require.NoError(t, svc.Add(context.Background(), newStoreFromConfig(t, svc, secretstore.KindVault, envCfg)))
 	assert.Equal(t, uint64(1), svc.Capture().Generation())
 
 	fileCfg := testSingleVaultConfig()
 	fileCfg["mode"] = "${file:" + modeFile + "}"
-	require.NoError(t, svc.Update(storeKey, newStoreFromConfig(t, svc, secretstore.KindVault, fileCfg)))
+	require.NoError(t, svc.Update(context.Background(), storeKey, newStoreFromConfig(t, svc, secretstore.KindVault, fileCfg)))
 	assert.Equal(t, uint64(2), svc.Capture().Generation())
 
 	cmdCfg := testSingleVaultConfig()
 	cmdCfg["mode"] = "${cmd:/bin/echo token}"
-	require.NoError(t, svc.Update(storeKey, newStoreFromConfig(t, svc, secretstore.KindVault, cmdCfg)))
+	require.NoError(t, svc.Update(context.Background(), storeKey, newStoreFromConfig(t, svc, secretstore.KindVault, cmdCfg)))
 	assert.Equal(t, uint64(3), svc.Capture().Generation())
 }
 
@@ -238,7 +240,7 @@ func TestServiceValidate_RejectsStoreRefsInProviderPayload(t *testing.T) {
 	cfg := testSingleVaultConfig()
 	cfg["mode"] = "${store:vault:vault_prod:value}"
 
-	err := svc.Validate(newStoreFromConfig(t, svc, secretstore.KindVault, cfg))
+	err := svc.Validate(context.Background(), newStoreFromConfig(t, svc, secretstore.KindVault, cfg))
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "secretstore resolver is not configured")
 }
@@ -251,7 +253,23 @@ func TestServiceValidate_KeepsMetadataStatic(t *testing.T) {
 	cfg := testSingleVaultConfig()
 	cfg["name"] = "${env:TEST_STORE_NAME}"
 
-	err := svc.Validate(newStoreFromConfig(t, svc, secretstore.KindVault, cfg))
+	err := svc.Validate(context.Background(), newStoreFromConfig(t, svc, secretstore.KindVault, cfg))
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "invalid store name")
+}
+
+func TestServiceValidate_LogsBuiltinResolutionWithContext(t *testing.T) {
+	t.Setenv("TEST_VAULT_MODE", "token")
+
+	svc := secretstore.NewService(backends.Creators()...)
+	cfg := testSingleVaultConfig()
+	cfg["mode"] = "${env:TEST_VAULT_MODE}"
+
+	out := captureLoggerOutput(t, func(log *logger.Logger) {
+		ctx := logger.ContextWithLogger(context.Background(), log)
+		require.NoError(t, svc.Validate(ctx, newStoreFromConfig(t, svc, secretstore.KindVault, cfg)))
+	})
+
+	assert.Contains(t, out, "resolved secret via env variable 'TEST_VAULT_MODE'")
+	assert.NotContains(t, out, "token")
 }

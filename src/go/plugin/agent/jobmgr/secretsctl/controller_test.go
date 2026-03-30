@@ -4,6 +4,7 @@ package secretsctl
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"regexp"
 	"testing"
@@ -173,7 +174,7 @@ func TestControllerSeqExec_TestStoredWithoutService_Returns400(t *testing.T) {
 func TestRememberDiscoveredConfig_DrainsRestartFailureMessageFromNonHandlerStop(t *testing.T) {
 	ctl, _, seams := newControllerTestSubject()
 	existing := newSecretStoreConfigWithSource(t, secretstore.KindVault, "vault_prod", map[string]any{"value": "one"}, "/etc/netdata/secretstores.yaml", confgroup.TypeUser)
-	require.NoError(t, ctl.Service().Add(existing))
+	require.NoError(t, ctl.Service().Add(context.Background(), existing))
 	ctl.seen.Add(existing)
 	ctl.exposed.Add(&dyncfg.Entry[secretstore.Config]{
 		Cfg:    existing,

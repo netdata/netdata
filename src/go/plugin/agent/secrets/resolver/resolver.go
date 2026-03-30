@@ -135,7 +135,11 @@ func (r *Resolver) resolveRef(ctx context.Context, ref, original string, storeRe
 		return "", fmt.Errorf("resolving secret '%s': unknown secret provider '%s'", original, scheme)
 	}
 
-	return provider(ctx, name, original)
+	value, err := provider(ctx, name, original)
+	if err != nil {
+		return "", err
+	}
+	return value, nil
 }
 
 func isInternalKey(k string) bool {

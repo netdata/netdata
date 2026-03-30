@@ -51,11 +51,15 @@ func (r *runtimeResolver) resolveContext(ctx context.Context, snapshot *Snapshot
 		return "", fmt.Errorf("resolving secret '%s': secretstore '%s' has no published resolver state", original, storeKey)
 	}
 
-	return store.published.Resolve(ctx, ResolveRequest{
+	value, err := store.published.Resolve(ctx, ResolveRequest{
 		StoreKey:  storeKey,
 		StoreKind: kind,
 		StoreName: name,
 		Operand:   operand,
 		Original:  original,
 	})
+	if err != nil {
+		return "", err
+	}
+	return value, nil
 }
