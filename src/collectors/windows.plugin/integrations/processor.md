@@ -49,54 +49,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per System
-
-These metrics refer to the entire system.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.cpu | interrupts, user, privileged, dpc | percentage |
-
-### Per CPU
-
-These metrics provide information about individual CPU cores.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| cpu | The identifier of the CPU core. On Windows systems, CPU cores are labeled as 'cpu0', 'cpu1', etc. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cpu.cpu | interrupts, user, privileged, dpc | percentage |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ 10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | Average CPU utilization over the last 10 minutes |
-
-
 ## Setup
 
 
@@ -144,5 +96,53 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ 10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | Average CPU utilization over the last 10 minutes |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per System
+
+These metrics refer to the entire system.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.cpu | interrupts, user, privileged, dpc | percentage |
+
+### Per CPU
+
+These metrics provide information about individual CPU cores.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| cpu | The identifier of the CPU core. On Windows systems, CPU cores are labeled as 'cpu0', 'cpu1', etc. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cpu.cpu | interrupts, user, privileged, dpc | percentage |
 
 

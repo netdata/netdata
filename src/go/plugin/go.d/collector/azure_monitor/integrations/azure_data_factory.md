@@ -41,7 +41,7 @@ The monitoring principal needs read access to Azure Resource Graph and Azure Mon
 
 #### Auto-Detection
 
-When `profiles` includes `auto` (the default), the collector queries Azure Resource Graph
+When `profile_selection_mode` is `auto` (the default), the collector queries Azure Resource Graph
 to discover which resource types exist in the subscription and enables matching built-in profiles automatically.
 
 
@@ -55,119 +55,6 @@ The collector enforces a minimum collection interval of 60 seconds.
 
 The collector uses bounded request concurrency and batches resources and metrics to minimize API calls.
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
-
-
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.data_factory.pipeline_runs | succeeded, failed, cancelled | runs/s |
-| azure_monitor.data_factory.pipeline_elapsed_time | elapsed_time | runs/s |
-| azure_monitor.data_factory.activity_runs | succeeded, failed, cancelled | runs/s |
-| azure_monitor.data_factory.trigger_runs | succeeded, failed, cancelled | runs/s |
-| azure_monitor.data_factory.ssis_ir_starts | succeeded, failed, cancelled | runs/s |
-| azure_monitor.data_factory.ssis_ir_stops | succeeded, stuck | runs/s |
-| azure_monitor.data_factory.ssis_package_executions | succeeded, failed, cancelled | executions/s |
-| azure_monitor.data_factory.ir_cpu | average | percentage |
-| azure_monitor.data_factory.ir_memory | available | bytes |
-| azure_monitor.data_factory.ir_nodes | available | nodes |
-| azure_monitor.data_factory.ir_queue | queue_length | tasks |
-| azure_monitor.data_factory.ir_task_pickup_delay | average | seconds |
-| azure_monitor.data_factory.factory_size | current, max_allowed | GiB |
-| azure_monitor.data_factory.entity_count | current, max_allowed | entities |
-| azure_monitor.data_factory.mvnet_ir_copy_capacity | utilization, available | percentage |
-| azure_monitor.data_factory.mvnet_ir_copy_queue | waiting | tasks |
-| azure_monitor.data_factory.mvnet_ir_external_capacity | utilization, available | percentage |
-| azure_monitor.data_factory.mvnet_ir_external_queue | waiting | tasks |
-| azure_monitor.data_factory.mvnet_ir_pipeline_capacity | utilization, available | percentage |
-| azure_monitor.data_factory.mvnet_ir_pipeline_queue | waiting | tasks |
-| azure_monitor.data_factory.airflow_ir_cpu | percentage | percentage |
-| azure_monitor.data_factory.airflow_ir_cpu_usage | average | millicores |
-| azure_monitor.data_factory.airflow_ir_memory | percentage | percentage |
-| azure_monitor.data_factory.airflow_ir_memory_usage | average | bytes |
-| azure_monitor.data_factory.airflow_ir_nodes | average | nodes |
-| azure_monitor.data_factory.airflow_ir_dag_collection | average | milliseconds |
-| azure_monitor.data_factory.airflow_ir_dag_bag | total | dags/s |
-| azure_monitor.data_factory.airflow_ir_dag_errors | callback_exceptions, file_refresh, import | errors/s |
-| azure_monitor.data_factory.airflow_ir_dag_processing_duration | last_duration | milliseconds |
-| azure_monitor.data_factory.airflow_ir_dag_processing_lag | last_run_seconds_ago, processor_timeouts, total_parse_time | seconds |
-| azure_monitor.data_factory.airflow_ir_dag_processing_activity | manager_stalls, processes | events/s |
-| azure_monitor.data_factory.airflow_ir_dag_run_duration | success, failed | milliseconds |
-| azure_monitor.data_factory.airflow_ir_dag_run_scheduling | dependency_check, first_task_delay, schedule_delay | milliseconds |
-| azure_monitor.data_factory.airflow_ir_executor | open_slots, queued_tasks, running_tasks | slots/s |
-| azure_monitor.data_factory.airflow_ir_jobs | started, ended, heartbeat_failures | jobs/s |
-| azure_monitor.data_factory.airflow_ir_operators | successes, failures | operations/s |
-| azure_monitor.data_factory.airflow_ir_pool_slots | open, queued, running | slots/s |
-| azure_monitor.data_factory.airflow_ir_pool_starving | starving | tasks/s |
-| azure_monitor.data_factory.airflow_ir_scheduler_critical_section | duration | milliseconds |
-| azure_monitor.data_factory.airflow_ir_scheduler_activity | critical_section_busy, heartbeats, failed_sla_emails | events/s |
-| azure_monitor.data_factory.airflow_ir_scheduler_orphaned_tasks | adopted, cleared | tasks/s |
-| azure_monitor.data_factory.airflow_ir_scheduler_tasks | executable, running, starving, killed_externally | tasks/s |
-| azure_monitor.data_factory.airflow_ir_task_instances | started, succeeded, failed, finished, previously_succeeded, created_via_operator | instances/s |
-| azure_monitor.data_factory.airflow_ir_task_instance_duration | average | milliseconds |
-| azure_monitor.data_factory.airflow_ir_task_dag_changes | removed, restored | tasks/s |
-| azure_monitor.data_factory.airflow_ir_triggers | succeeded, failed, running | triggers/s |
-| azure_monitor.data_factory.airflow_ir_trigger_issues | blocked_main_thread, celery_timeout_errors | events/s |
-| azure_monitor.data_factory.airflow_ir_zombies | killed | tasks/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_data_factory_pipeline_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.pipeline_runs | Data Factory pipeline failures on ${label:resource_name} |
-| [ am_data_factory_pipeline_cancelled_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.pipeline_runs | Data Factory pipeline cancellations on ${label:resource_name} |
-| [ am_data_factory_activity_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.activity_runs | Data Factory activity failures on ${label:resource_name} |
-| [ am_data_factory_trigger_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.trigger_runs | Data Factory trigger failures on ${label:resource_name} |
-| [ am_data_factory_ssis_ir_start_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ssis_ir_starts | Data Factory SSIS IR start failures on ${label:resource_name} |
-| [ am_data_factory_ssis_ir_stop_stuck ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ssis_ir_stops | Data Factory SSIS IR stuck stops on ${label:resource_name} |
-| [ am_data_factory_ssis_package_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ssis_package_executions | Data Factory SSIS package failures on ${label:resource_name} |
-| [ am_data_factory_ir_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ir_cpu | Data Factory IR CPU on ${label:resource_name} |
-| [ am_data_factory_ir_queue_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ir_queue | Data Factory IR queue depth on ${label:resource_name} |
-| [ am_data_factory_ir_task_pickup_delay ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ir_task_pickup_delay | Data Factory IR task pickup delay on ${label:resource_name} |
-| [ am_data_factory_size_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.factory_size | Data Factory size utilization on ${label:resource_name} |
-| [ am_data_factory_entity_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.entity_count | Data Factory entity count on ${label:resource_name} |
-| [ am_data_factory_mvnet_ir_copy_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.mvnet_ir_copy_capacity | Data Factory MVNet IR copy utilization on ${label:resource_name} |
-| [ am_data_factory_mvnet_ir_external_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.mvnet_ir_external_capacity | Data Factory MVNet IR external utilization on ${label:resource_name} |
-| [ am_data_factory_mvnet_ir_pipeline_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.mvnet_ir_pipeline_capacity | Data Factory MVNet IR pipeline utilization on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_cpu | Data Factory Airflow IR CPU on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_memory | Data Factory Airflow IR memory on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_dag_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_dag_errors | Data Factory Airflow DAG errors on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_operator_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_operators | Data Factory Airflow operator failures on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_job_heartbeat_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_jobs | Data Factory Airflow job heartbeat failures on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_pool_starving ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_pool_starving | Data Factory Airflow pool starvation on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_tasks_killed_externally ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_scheduler_tasks | Data Factory Airflow tasks killed externally on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_tasks_starving ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_scheduler_tasks | Data Factory Airflow scheduler starving tasks on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_task_instance_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_task_instances | Data Factory Airflow task failures on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_trigger_issues ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_trigger_issues | Data Factory Airflow trigger issues on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_zombies ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_zombies | Data Factory Airflow zombie tasks on ${label:resource_name} |
 
 
 ## Setup
@@ -243,7 +130,9 @@ User profile files with the same filename override stock profiles.
 | **Limits** | max_concurrency | Maximum concurrent batch queries to Azure Monitor. | 4 | no |
 |  | max_batch_resources | Maximum resources per Azure Monitor batch request. | 50 | no |
 |  | max_metrics_per_query | Maximum metrics per Azure Monitor batch request. | 20 | no |
-| **Profiles** | profiles | Profile ids to enable. Use `auto` to discover resource types via Azure Resource Graph and enable matching profiles. Combine with explicit ids: `[auto, custom_profile]`. | [auto] | no |
+| **Profiles** | profile_selection_mode | Profile selection mode: `auto` discovers matching profiles via Azure Resource Graph, `exact` uses only listed profile ids, `combined` merges listed ids with auto-discovered profiles. | auto | no |
+|  | profile_selection_mode_exact.profiles | Profile ids to enable (used when `profile_selection_mode` is `exact`). | [] | no |
+|  | profile_selection_mode_combined.profiles | Profile ids to merge with auto-discovered profiles (used when `profile_selection_mode` is `combined`). | [] | no |
 | **Filters** | resource_groups | Optional list of resource group names to restrict monitoring scope. | [] | no |
 | **Authentication** | auth.mode | Authentication mode: `service_principal`, `managed_identity`, or `default`. |  | yes |
 |  | auth.mode_service_principal.tenant_id | Entra ID tenant ID (required for `service_principal` mode). |  | no |
@@ -388,6 +277,119 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_data_factory_pipeline_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.pipeline_runs | Data Factory pipeline failures on ${label:resource_name} |
+| [ am_data_factory_pipeline_cancelled_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.pipeline_runs | Data Factory pipeline cancellations on ${label:resource_name} |
+| [ am_data_factory_activity_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.activity_runs | Data Factory activity failures on ${label:resource_name} |
+| [ am_data_factory_trigger_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.trigger_runs | Data Factory trigger failures on ${label:resource_name} |
+| [ am_data_factory_ssis_ir_start_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ssis_ir_starts | Data Factory SSIS IR start failures on ${label:resource_name} |
+| [ am_data_factory_ssis_ir_stop_stuck ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ssis_ir_stops | Data Factory SSIS IR stuck stops on ${label:resource_name} |
+| [ am_data_factory_ssis_package_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ssis_package_executions | Data Factory SSIS package failures on ${label:resource_name} |
+| [ am_data_factory_ir_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ir_cpu | Data Factory IR CPU on ${label:resource_name} |
+| [ am_data_factory_ir_queue_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ir_queue | Data Factory IR queue depth on ${label:resource_name} |
+| [ am_data_factory_ir_task_pickup_delay ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ir_task_pickup_delay | Data Factory IR task pickup delay on ${label:resource_name} |
+| [ am_data_factory_size_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.factory_size | Data Factory size utilization on ${label:resource_name} |
+| [ am_data_factory_entity_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.entity_count | Data Factory entity count on ${label:resource_name} |
+| [ am_data_factory_mvnet_ir_copy_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.mvnet_ir_copy_capacity | Data Factory MVNet IR copy utilization on ${label:resource_name} |
+| [ am_data_factory_mvnet_ir_external_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.mvnet_ir_external_capacity | Data Factory MVNet IR external utilization on ${label:resource_name} |
+| [ am_data_factory_mvnet_ir_pipeline_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.mvnet_ir_pipeline_capacity | Data Factory MVNet IR pipeline utilization on ${label:resource_name} |
+| [ am_data_factory_airflow_ir_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_cpu | Data Factory Airflow IR CPU on ${label:resource_name} |
+| [ am_data_factory_airflow_ir_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_memory | Data Factory Airflow IR memory on ${label:resource_name} |
+| [ am_data_factory_airflow_ir_dag_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_dag_errors | Data Factory Airflow DAG errors on ${label:resource_name} |
+| [ am_data_factory_airflow_ir_operator_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_operators | Data Factory Airflow operator failures on ${label:resource_name} |
+| [ am_data_factory_airflow_ir_job_heartbeat_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_jobs | Data Factory Airflow job heartbeat failures on ${label:resource_name} |
+| [ am_data_factory_airflow_ir_pool_starving ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_pool_starving | Data Factory Airflow pool starvation on ${label:resource_name} |
+| [ am_data_factory_airflow_ir_tasks_killed_externally ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_scheduler_tasks | Data Factory Airflow tasks killed externally on ${label:resource_name} |
+| [ am_data_factory_airflow_ir_tasks_starving ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_scheduler_tasks | Data Factory Airflow scheduler starving tasks on ${label:resource_name} |
+| [ am_data_factory_airflow_ir_task_instance_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_task_instances | Data Factory Airflow task failures on ${label:resource_name} |
+| [ am_data_factory_airflow_ir_trigger_issues ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_trigger_issues | Data Factory Airflow trigger issues on ${label:resource_name} |
+| [ am_data_factory_airflow_ir_zombies ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_zombies | Data Factory Airflow zombie tasks on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.data_factory.pipeline_runs | succeeded, failed, cancelled | runs/s |
+| azure_monitor.data_factory.pipeline_elapsed_time | elapsed_time | runs/s |
+| azure_monitor.data_factory.activity_runs | succeeded, failed, cancelled | runs/s |
+| azure_monitor.data_factory.trigger_runs | succeeded, failed, cancelled | runs/s |
+| azure_monitor.data_factory.ssis_ir_starts | succeeded, failed, cancelled | runs/s |
+| azure_monitor.data_factory.ssis_ir_stops | succeeded, stuck | runs/s |
+| azure_monitor.data_factory.ssis_package_executions | succeeded, failed, cancelled | executions/s |
+| azure_monitor.data_factory.ir_cpu | average | percentage |
+| azure_monitor.data_factory.ir_memory | available | bytes |
+| azure_monitor.data_factory.ir_nodes | available | nodes |
+| azure_monitor.data_factory.ir_queue | queue_length | tasks |
+| azure_monitor.data_factory.ir_task_pickup_delay | average | seconds |
+| azure_monitor.data_factory.factory_size | current, max_allowed | GiB |
+| azure_monitor.data_factory.entity_count | current, max_allowed | entities |
+| azure_monitor.data_factory.mvnet_ir_copy_capacity | utilization, available | percentage |
+| azure_monitor.data_factory.mvnet_ir_copy_queue | waiting | tasks |
+| azure_monitor.data_factory.mvnet_ir_external_capacity | utilization, available | percentage |
+| azure_monitor.data_factory.mvnet_ir_external_queue | waiting | tasks |
+| azure_monitor.data_factory.mvnet_ir_pipeline_capacity | utilization, available | percentage |
+| azure_monitor.data_factory.mvnet_ir_pipeline_queue | waiting | tasks |
+| azure_monitor.data_factory.airflow_ir_cpu | percentage | percentage |
+| azure_monitor.data_factory.airflow_ir_cpu_usage | average | millicores |
+| azure_monitor.data_factory.airflow_ir_memory | percentage | percentage |
+| azure_monitor.data_factory.airflow_ir_memory_usage | average | bytes |
+| azure_monitor.data_factory.airflow_ir_nodes | average | nodes |
+| azure_monitor.data_factory.airflow_ir_dag_collection | average | milliseconds |
+| azure_monitor.data_factory.airflow_ir_dag_bag | total | dags/s |
+| azure_monitor.data_factory.airflow_ir_dag_errors | callback_exceptions, file_refresh, import | errors/s |
+| azure_monitor.data_factory.airflow_ir_dag_processing_duration | last_duration | milliseconds |
+| azure_monitor.data_factory.airflow_ir_dag_processing_lag | last_run_seconds_ago, processor_timeouts, total_parse_time | seconds |
+| azure_monitor.data_factory.airflow_ir_dag_processing_activity | manager_stalls, processes | events/s |
+| azure_monitor.data_factory.airflow_ir_dag_run_duration | success, failed | milliseconds |
+| azure_monitor.data_factory.airflow_ir_dag_run_scheduling | dependency_check, first_task_delay, schedule_delay | milliseconds |
+| azure_monitor.data_factory.airflow_ir_executor | open_slots, queued_tasks, running_tasks | slots/s |
+| azure_monitor.data_factory.airflow_ir_jobs | started, ended, heartbeat_failures | jobs/s |
+| azure_monitor.data_factory.airflow_ir_operators | successes, failures | operations/s |
+| azure_monitor.data_factory.airflow_ir_pool_slots | open, queued, running | slots/s |
+| azure_monitor.data_factory.airflow_ir_pool_starving | starving | tasks/s |
+| azure_monitor.data_factory.airflow_ir_scheduler_critical_section | duration | milliseconds |
+| azure_monitor.data_factory.airflow_ir_scheduler_activity | critical_section_busy, heartbeats, failed_sla_emails | events/s |
+| azure_monitor.data_factory.airflow_ir_scheduler_orphaned_tasks | adopted, cleared | tasks/s |
+| azure_monitor.data_factory.airflow_ir_scheduler_tasks | executable, running, starving, killed_externally | tasks/s |
+| azure_monitor.data_factory.airflow_ir_task_instances | started, succeeded, failed, finished, previously_succeeded, created_via_operator | instances/s |
+| azure_monitor.data_factory.airflow_ir_task_instance_duration | average | milliseconds |
+| azure_monitor.data_factory.airflow_ir_task_dag_changes | removed, restored | tasks/s |
+| azure_monitor.data_factory.airflow_ir_triggers | succeeded, failed, running | triggers/s |
+| azure_monitor.data_factory.airflow_ir_trigger_issues | blocked_main_thread, celery_timeout_errors | events/s |
+| azure_monitor.data_factory.airflow_ir_zombies | killed | tasks/s |
 
 
 

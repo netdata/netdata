@@ -418,7 +418,11 @@ static void aclk_run_query_job(uv_work_t *req)
     struct aclk_sync_config_s *config = worker->config;
     aclk_query_t *query = (aclk_query_t *)worker->payload;
 
-    aclk_run_query(config, query);
+    // aclk_run_query() frees the query; if we're shutting down we must still free it here
+    if (unlikely(__atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED)))
+        aclk_query_free(query);
+    else
+        aclk_run_query(config, query);
     worker_is_idle();
 }
 
@@ -449,7 +453,12 @@ static void aclk_execute_batch(uv_work_t *req)
             continue;
 
         aclk_query_t *query = *Pvalue;
-        aclk_run_query(config, query);
+        // Shutdown may be requested while this batch is already running, so
+        // re-check before each query instead of relying on a stale snapshot.
+        if (unlikely(__atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED)))
+            aclk_query_free(query);
+        else
+            aclk_run_query(config, query);
     }
 
     (void) JudyLFreeArray(&aclk_query_batch->JudyL, PJE0);
@@ -514,9 +523,15 @@ static void after_start_alert_push(uv_work_t *req, int status __maybe_unused)
 }
 
 // Worker thread to scan hosts for pending metadata to store
-static void start_alert_push(uv_work_t *req __maybe_unused)
+static void start_alert_push(uv_work_t *req)
 {
     register_libuv_worker_jobs();
+
+    struct worker_data *worker = req->data;
+    struct aclk_sync_config_s *config = worker->config;
+
+    if (unlikely(__atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED)))
+        return;
 
     worker_is_busy(UV_EVENT_ACLK_NODE_INFO);
     aclk_check_node_info_and_collectors();
@@ -586,8 +601,8 @@ static void timer_cb(uv_timer_t *handle)
         config->run_query_batch = true;
 }
 
-#define MAX_SHUTDOWN_TIMEOUT_SECONDS (5)
 #define SHUTDOWN_SLEEP_INTERVAL_MS (100)
+#define ACLK_SHUTDOWN_WATCHDOG_TIMEOUT_SECONDS (15)
 #define CMD_POOL_SIZE (2048)
 
 #define ACLK_JOBS_ARE_RUNNING                                                                                          \
@@ -641,11 +656,11 @@ static void aclk_synchronization_event_loop(void *arg)
     Pvoid_t *Pvalue;
     worker_data_t  *worker;
 
-    config->shutdown_requested = false;
+    __atomic_store_n(&config->shutdown_requested, false, __ATOMIC_RELAXED);
     config->initialized = true;
     completion_mark_complete(&config->start_stop_complete);
 
-    while (likely(config->shutdown_requested == false))  {
+    while (likely(!__atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED)))  {
         enum aclk_database_opcode opcode;
         RRDHOST *host;
         struct aclk_sync_cfg_t *aclk_host_config;
@@ -879,7 +894,7 @@ static void aclk_synchronization_event_loop(void *arg)
                     }
                     break;
                 case ACLK_SYNC_SHUTDOWN:
-                    config->shutdown_requested = true;
+                    __atomic_store_n(&config->shutdown_requested, true, __ATOMIC_RELAXED);
                     mark_pending_req_cancel_all();
                     break;
                 default:
@@ -899,13 +914,38 @@ static void aclk_synchronization_event_loop(void *arg)
     uv_close((uv_handle_t *)&config->async, NULL);
     uv_walk(loop, libuv_close_callback, NULL);
 
-    size_t loop_count = (MAX_SHUTDOWN_TIMEOUT_SECONDS * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
+    size_t shutdown_wait_iterations = 0;
+    const size_t log_every_iterations = (10 * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
+    const size_t watchdog_iterations = (ACLK_SHUTDOWN_WATCHDOG_TIMEOUT_SECONDS * MSEC_PER_SEC) / SHUTDOWN_SLEEP_INTERVAL_MS;
 
-    while (ACLK_JOBS_ARE_RUNNING && loop_count > 0) {
-        if (!uv_run(loop, UV_RUN_NOWAIT))
-            break;  // No pending callbacks
+    while (ACLK_JOBS_ARE_RUNNING || uv_loop_alive(loop)) {
+        (void)uv_run(loop, UV_RUN_NOWAIT);
+
+        shutdown_wait_iterations++;
+
+        if (shutdown_wait_iterations >= watchdog_iterations) {
+            nd_log_daemon(
+                NDLP_ERR,
+                "ACLK: shutdown watchdog timeout (%d seconds) exceeded, abandoning outstanding libuv jobs "
+                "(queries_running=%d, alert_push_running=%d, batch_job_running=%d)",
+                ACLK_SHUTDOWN_WATCHDOG_TIMEOUT_SECONDS,
+                config->aclk_queries_running,
+                config->alert_push_running,
+                config->aclk_batch_job_is_running);
+            break;
+        }
+
+        if ((shutdown_wait_iterations % log_every_iterations) == 0) {
+            nd_log_daemon(
+                NDLP_WARNING,
+                "ACLK: waiting for outstanding libuv jobs during shutdown "
+                "(queries_running=%d, alert_push_running=%d, batch_job_running=%d)",
+                config->aclk_queries_running,
+                config->alert_push_running,
+                config->aclk_batch_job_is_running);
+        }
+
         sleep_usec(SHUTDOWN_SLEEP_INTERVAL_MS * USEC_PER_MS);
-        loop_count--;
     }
 
     (void) uv_loop_close(loop);

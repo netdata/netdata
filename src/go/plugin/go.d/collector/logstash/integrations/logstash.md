@@ -45,61 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Logstash instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| logstash.jvm_threads | threads | count |
-| logstash.jvm_mem_heap_used | in_use | percentage |
-| logstash.jvm_mem_heap | committed, used | KiB |
-| logstash.jvm_mem_pools_eden | committed, used | KiB |
-| logstash.jvm_mem_pools_survivor | committed, used | KiB |
-| logstash.jvm_mem_pools_old | committed, used | KiB |
-| logstash.jvm_gc_collector_count | eden, old | counts/s |
-| logstash.jvm_gc_collector_time | eden, old | ms |
-| logstash.open_file_descriptors | open | fd |
-| logstash.event | in, filtered, out | events/s |
-| logstash.event_duration | event, queue | seconds |
-| logstash.uptime | uptime | seconds |
-
-### Per pipeline
-
-These metrics refer to the pipeline.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| pipeline | pipeline name |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| logstash.pipeline_event | in, filtered, out | events/s |
-| logstash.pipeline_event_duration | event, queue | seconds |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -260,6 +205,61 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Logstash instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| logstash.jvm_threads | threads | count |
+| logstash.jvm_mem_heap_used | in_use | percentage |
+| logstash.jvm_mem_heap | committed, used | KiB |
+| logstash.jvm_mem_pools_eden | committed, used | KiB |
+| logstash.jvm_mem_pools_survivor | committed, used | KiB |
+| logstash.jvm_mem_pools_old | committed, used | KiB |
+| logstash.jvm_gc_collector_count | eden, old | counts/s |
+| logstash.jvm_gc_collector_time | eden, old | ms |
+| logstash.open_file_descriptors | open | fd |
+| logstash.event | in, filtered, out | events/s |
+| logstash.event_duration | event, queue | seconds |
+| logstash.uptime | uptime | seconds |
+
+### Per pipeline
+
+These metrics refer to the pipeline.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| pipeline | pipeline name |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| logstash.pipeline_event | in, filtered, out | events/s |
+| logstash.pipeline_event_duration | event, queue | seconds |
 
 
 

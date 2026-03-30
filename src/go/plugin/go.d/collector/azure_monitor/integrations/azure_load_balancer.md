@@ -41,7 +41,7 @@ The monitoring principal needs read access to Azure Resource Graph and Azure Mon
 
 #### Auto-Detection
 
-When `profiles` includes `auto` (the default), the collector queries Azure Resource Graph
+When `profile_selection_mode` is `auto` (the default), the collector queries Azure Resource Graph
 to discover which resource types exist in the subscription and enables matching built-in profiles automatically.
 
 
@@ -55,57 +55,6 @@ The collector enforces a minimum collection interval of 60 seconds.
 
 The collector uses bounded request concurrency and batches resources and metrics to minimize API calls.
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
-
-
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.load_balancers.vip_availability | average | percentage |
-| azure_monitor.load_balancers.dip_availability | average | percentage |
-| azure_monitor.load_balancers.global_backend_availability | average | percentage |
-| azure_monitor.load_balancers.byte_throughput | total | bytes/s |
-| azure_monitor.load_balancers.packet_throughput | total | packets/s |
-| azure_monitor.load_balancers.syn_count | total | packets/s |
-| azure_monitor.load_balancers.snat_connections | total | connections/s |
-| azure_monitor.load_balancers.snat_ports | allocated, used | ports |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_load_balancers_vip_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.vip_availability | LB data path availability on ${label:resource_name} |
-| [ am_load_balancers_dip_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.dip_availability | LB health probe status on ${label:resource_name} |
-| [ am_load_balancers_global_backend_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.global_backend_availability | LB global backend availability on ${label:resource_name} |
-| [ am_load_balancers_snat_port_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.snat_ports | LB SNAT port utilization on ${label:resource_name} |
 
 
 ## Setup
@@ -181,7 +130,9 @@ User profile files with the same filename override stock profiles.
 | **Limits** | max_concurrency | Maximum concurrent batch queries to Azure Monitor. | 4 | no |
 |  | max_batch_resources | Maximum resources per Azure Monitor batch request. | 50 | no |
 |  | max_metrics_per_query | Maximum metrics per Azure Monitor batch request. | 20 | no |
-| **Profiles** | profiles | Profile ids to enable. Use `auto` to discover resource types via Azure Resource Graph and enable matching profiles. Combine with explicit ids: `[auto, custom_profile]`. | [auto] | no |
+| **Profiles** | profile_selection_mode | Profile selection mode: `auto` discovers matching profiles via Azure Resource Graph, `exact` uses only listed profile ids, `combined` merges listed ids with auto-discovered profiles. | auto | no |
+|  | profile_selection_mode_exact.profiles | Profile ids to enable (used when `profile_selection_mode` is `exact`). | [] | no |
+|  | profile_selection_mode_combined.profiles | Profile ids to merge with auto-discovered profiles (used when `profile_selection_mode` is `combined`). | [] | no |
 | **Filters** | resource_groups | Optional list of resource group names to restrict monitoring scope. | [] | no |
 | **Authentication** | auth.mode | Authentication mode: `service_principal`, `managed_identity`, or `default`. |  | yes |
 |  | auth.mode_service_principal.tenant_id | Entra ID tenant ID (required for `service_principal` mode). |  | no |
@@ -326,6 +277,57 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_load_balancers_vip_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.vip_availability | LB data path availability on ${label:resource_name} |
+| [ am_load_balancers_dip_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.dip_availability | LB health probe status on ${label:resource_name} |
+| [ am_load_balancers_global_backend_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.global_backend_availability | LB global backend availability on ${label:resource_name} |
+| [ am_load_balancers_snat_port_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.snat_ports | LB SNAT port utilization on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.load_balancers.vip_availability | average | percentage |
+| azure_monitor.load_balancers.dip_availability | average | percentage |
+| azure_monitor.load_balancers.global_backend_availability | average | percentage |
+| azure_monitor.load_balancers.byte_throughput | total | bytes/s |
+| azure_monitor.load_balancers.packet_throughput | total | packets/s |
+| azure_monitor.load_balancers.syn_count | total | packets/s |
+| azure_monitor.load_balancers.snat_connections | total | connections/s |
+| azure_monitor.load_balancers.snat_ports | allocated, used | ports |
 
 
 

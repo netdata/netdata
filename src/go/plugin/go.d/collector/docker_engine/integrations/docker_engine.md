@@ -47,40 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Docker Engine instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| docker_engine.engine_daemon_container_actions | changes, commit, create, delete, start | actions/s |
-| docker_engine.engine_daemon_container_states_containers | running, paused, stopped | containers |
-| docker_engine.builder_builds_failed_total | build_canceled, build_target_not_reachable_error, command_not_supported_error, dockerfile_empty_error, dockerfile_syntax_error, error_processing_commands_error, missing_onbuild_arguments_error, unknown_instruction_error | fails/s |
-| docker_engine.engine_daemon_health_checks_failed_total | fails | events/s |
-| docker_engine.swarm_manager_leader | is_leader | bool |
-| docker_engine.swarm_manager_object_store | nodes, services, tasks, networks, secrets, configs | objects |
-| docker_engine.swarm_manager_nodes_per_state | ready, down, unknown, disconnected | nodes |
-| docker_engine.swarm_manager_tasks_per_state | running, failed, ready, rejected, starting, shutdown, new, orphaned, preparing, pending, complete, remove, accepted, assigned | tasks |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -241,6 +207,40 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Docker Engine instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| docker_engine.engine_daemon_container_actions | changes, commit, create, delete, start | actions/s |
+| docker_engine.engine_daemon_container_states_containers | running, paused, stopped | containers |
+| docker_engine.builder_builds_failed_total | build_canceled, build_target_not_reachable_error, command_not_supported_error, dockerfile_empty_error, dockerfile_syntax_error, error_processing_commands_error, missing_onbuild_arguments_error, unknown_instruction_error | fails/s |
+| docker_engine.engine_daemon_health_checks_failed_total | fails | events/s |
+| docker_engine.swarm_manager_leader | is_leader | bool |
+| docker_engine.swarm_manager_object_store | nodes, services, tasks, networks, secrets, configs | objects |
+| docker_engine.swarm_manager_nodes_per_state | ready, down, unknown, disconnected | nodes |
+| docker_engine.swarm_manager_tasks_per_state | running, failed, ready, rejected, starting, shutdown, new, orphaned, preparing, pending, complete, remove, accepted, assigned | tasks |
 
 
 

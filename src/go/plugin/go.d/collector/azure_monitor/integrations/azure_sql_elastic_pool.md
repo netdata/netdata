@@ -41,7 +41,7 @@ The monitoring principal needs read access to Azure Resource Graph and Azure Mon
 
 #### Auto-Detection
 
-When `profiles` includes `auto` (the default), the collector queries Azure Resource Graph
+When `profile_selection_mode` is `auto` (the default), the collector queries Azure Resource Graph
 to discover which resource types exist in the subscription and enables matching built-in profiles automatically.
 
 
@@ -55,75 +55,6 @@ The collector enforces a minimum collection interval of 60 seconds.
 
 The collector uses bounded request concurrency and batches resources and metrics to minimize API calls.
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
-
-
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.sql_elastic_pool.cpu | average, maximum | percentage |
-| azure_monitor.sql_elastic_pool.instance_cpu | average | percentage |
-| azure_monitor.sql_elastic_pool.instance_memory | average | percentage |
-| azure_monitor.sql_elastic_pool.dtu_consumption | average | percentage |
-| azure_monitor.sql_elastic_pool.io_utilization | data_read, log_write | percentage |
-| azure_monitor.sql_elastic_pool.resource_utilization | workers, sessions | percentage |
-| azure_monitor.sql_elastic_pool.sessions_count | average | sessions |
-| azure_monitor.sql_elastic_pool.storage | used, allocated, limit | bytes |
-| azure_monitor.sql_elastic_pool.storage_utilization | used, allocated | percentage |
-| azure_monitor.sql_elastic_pool.xtp_storage | average | percentage |
-| azure_monitor.sql_elastic_pool.tempdb_size | data, log | KiB |
-| azure_monitor.sql_elastic_pool.tempdb_log_utilization | average | percentage |
-| azure_monitor.sql_elastic_pool.vcore_usage | used, limit | vCores |
-| azure_monitor.sql_elastic_pool.edtu_usage | used, limit | eDTU |
-| azure_monitor.sql_elastic_pool.serverless_utilization | cpu, memory | percentage |
-| azure_monitor.sql_elastic_pool.serverless_billing | total | vCore-seconds/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_sql_elastic_pool_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.cpu | SQL Elastic Pool CPU on ${label:resource_name} |
-| [ am_sql_elastic_pool_instance_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.instance_cpu | SQL Elastic Pool instance CPU on ${label:resource_name} |
-| [ am_sql_elastic_pool_instance_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.instance_memory | SQL Elastic Pool instance memory on ${label:resource_name} |
-| [ am_sql_elastic_pool_dtu_consumption ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.dtu_consumption | SQL Elastic Pool DTU consumption on ${label:resource_name} |
-| [ am_sql_elastic_pool_data_io ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.io_utilization | SQL Elastic Pool data I/O on ${label:resource_name} |
-| [ am_sql_elastic_pool_log_write ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.io_utilization | SQL Elastic Pool log write on ${label:resource_name} |
-| [ am_sql_elastic_pool_workers ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.resource_utilization | SQL Elastic Pool workers on ${label:resource_name} |
-| [ am_sql_elastic_pool_sessions ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.resource_utilization | SQL Elastic Pool sessions on ${label:resource_name} |
-| [ am_sql_elastic_pool_storage_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.storage_utilization | SQL Elastic Pool storage used on ${label:resource_name} |
-| [ am_sql_elastic_pool_storage_allocated ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.storage_utilization | SQL Elastic Pool storage allocated on ${label:resource_name} |
-| [ am_sql_elastic_pool_xtp_storage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.xtp_storage | SQL Elastic Pool In-Memory OLTP storage on ${label:resource_name} |
-| [ am_sql_elastic_pool_tempdb_log ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.tempdb_log_utilization | SQL Elastic Pool tempdb log on ${label:resource_name} |
-| [ am_sql_elastic_pool_serverless_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.serverless_utilization | SQL Elastic Pool serverless CPU on ${label:resource_name} |
-| [ am_sql_elastic_pool_serverless_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.serverless_utilization | SQL Elastic Pool serverless memory on ${label:resource_name} |
 
 
 ## Setup
@@ -199,7 +130,9 @@ User profile files with the same filename override stock profiles.
 | **Limits** | max_concurrency | Maximum concurrent batch queries to Azure Monitor. | 4 | no |
 |  | max_batch_resources | Maximum resources per Azure Monitor batch request. | 50 | no |
 |  | max_metrics_per_query | Maximum metrics per Azure Monitor batch request. | 20 | no |
-| **Profiles** | profiles | Profile ids to enable. Use `auto` to discover resource types via Azure Resource Graph and enable matching profiles. Combine with explicit ids: `[auto, custom_profile]`. | [auto] | no |
+| **Profiles** | profile_selection_mode | Profile selection mode: `auto` discovers matching profiles via Azure Resource Graph, `exact` uses only listed profile ids, `combined` merges listed ids with auto-discovered profiles. | auto | no |
+|  | profile_selection_mode_exact.profiles | Profile ids to enable (used when `profile_selection_mode` is `exact`). | [] | no |
+|  | profile_selection_mode_combined.profiles | Profile ids to merge with auto-discovered profiles (used when `profile_selection_mode` is `combined`). | [] | no |
 | **Filters** | resource_groups | Optional list of resource group names to restrict monitoring scope. | [] | no |
 | **Authentication** | auth.mode | Authentication mode: `service_principal`, `managed_identity`, or `default`. |  | yes |
 |  | auth.mode_service_principal.tenant_id | Entra ID tenant ID (required for `service_principal` mode). |  | no |
@@ -344,6 +277,75 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_sql_elastic_pool_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.cpu | SQL Elastic Pool CPU on ${label:resource_name} |
+| [ am_sql_elastic_pool_instance_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.instance_cpu | SQL Elastic Pool instance CPU on ${label:resource_name} |
+| [ am_sql_elastic_pool_instance_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.instance_memory | SQL Elastic Pool instance memory on ${label:resource_name} |
+| [ am_sql_elastic_pool_dtu_consumption ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.dtu_consumption | SQL Elastic Pool DTU consumption on ${label:resource_name} |
+| [ am_sql_elastic_pool_data_io ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.io_utilization | SQL Elastic Pool data I/O on ${label:resource_name} |
+| [ am_sql_elastic_pool_log_write ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.io_utilization | SQL Elastic Pool log write on ${label:resource_name} |
+| [ am_sql_elastic_pool_workers ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.resource_utilization | SQL Elastic Pool workers on ${label:resource_name} |
+| [ am_sql_elastic_pool_sessions ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.resource_utilization | SQL Elastic Pool sessions on ${label:resource_name} |
+| [ am_sql_elastic_pool_storage_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.storage_utilization | SQL Elastic Pool storage used on ${label:resource_name} |
+| [ am_sql_elastic_pool_storage_allocated ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.storage_utilization | SQL Elastic Pool storage allocated on ${label:resource_name} |
+| [ am_sql_elastic_pool_xtp_storage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.xtp_storage | SQL Elastic Pool In-Memory OLTP storage on ${label:resource_name} |
+| [ am_sql_elastic_pool_tempdb_log ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.tempdb_log_utilization | SQL Elastic Pool tempdb log on ${label:resource_name} |
+| [ am_sql_elastic_pool_serverless_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.serverless_utilization | SQL Elastic Pool serverless CPU on ${label:resource_name} |
+| [ am_sql_elastic_pool_serverless_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_elastic_pool.conf) | azure_monitor.sql_elastic_pool.serverless_utilization | SQL Elastic Pool serverless memory on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.sql_elastic_pool.cpu | average, maximum | percentage |
+| azure_monitor.sql_elastic_pool.instance_cpu | average | percentage |
+| azure_monitor.sql_elastic_pool.instance_memory | average | percentage |
+| azure_monitor.sql_elastic_pool.dtu_consumption | average | percentage |
+| azure_monitor.sql_elastic_pool.io_utilization | data_read, log_write | percentage |
+| azure_monitor.sql_elastic_pool.resource_utilization | workers, sessions | percentage |
+| azure_monitor.sql_elastic_pool.sessions_count | average | sessions |
+| azure_monitor.sql_elastic_pool.storage | used, allocated, limit | bytes |
+| azure_monitor.sql_elastic_pool.storage_utilization | used, allocated | percentage |
+| azure_monitor.sql_elastic_pool.xtp_storage | average | percentage |
+| azure_monitor.sql_elastic_pool.tempdb_size | data, log | KiB |
+| azure_monitor.sql_elastic_pool.tempdb_log_utilization | average | percentage |
+| azure_monitor.sql_elastic_pool.vcore_usage | used, limit | vCores |
+| azure_monitor.sql_elastic_pool.edtu_usage | used, limit | eDTU |
+| azure_monitor.sql_elastic_pool.serverless_utilization | cpu, memory | percentage |
+| azure_monitor.sql_elastic_pool.serverless_billing | total | vCore-seconds/s |
 
 
 

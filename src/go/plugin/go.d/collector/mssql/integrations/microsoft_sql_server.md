@@ -85,6 +85,344 @@ The collector executes lightweight queries against system views.
 Most queries complete in milliseconds and have minimal impact on server performance.
 
 
+## Setup
+
+
+You can configure the **mssql** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **mssql**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/mssql.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
+### Prerequisites
+
+#### Create monitoring user
+
+Create a SQL Server login with VIEW SERVER STATE permission:
+
+```sql
+-- Create login
+CREATE LOGIN netdata_user WITH PASSWORD = 'YourStrongPassword!';
+
+-- Grant VIEW SERVER STATE (required for DMVs)
+GRANT VIEW SERVER STATE TO netdata_user;
+
+-- Grant VIEW ANY DEFINITION (required for Always On AG monitoring)
+GRANT VIEW ANY DEFINITION TO netdata_user;
+
+-- Grant VIEW SERVER PERFORMANCE STATE (required for HADR DMVs on SQL Server 2022+)
+-- GRANT VIEW SERVER PERFORMANCE STATE TO netdata_user;
+
+-- Grant access to msdb for SQL Agent job monitoring (required)
+USE msdb;
+CREATE USER netdata_user FOR LOGIN netdata_user;
+GRANT SELECT ON dbo.sysjobs TO netdata_user;
+
+-- Optional: Grant access to distribution database for replication monitoring
+-- (only if replication is configured)
+USE distribution;
+CREATE USER netdata_user FOR LOGIN netdata_user;
+GRANT SELECT ON dbo.MSreplication_monitordata TO netdata_user;
+GRANT SELECT ON dbo.MSpublications TO netdata_user;
+GRANT SELECT ON dbo.MSsubscriptions TO netdata_user;
+```
+
+**Required permissions:**
+- `VIEW SERVER STATE` - Access to dynamic management views
+- `SELECT on msdb.dbo.sysjobs` - SQL Agent job status monitoring
+
+**Optional permissions:**
+- `VIEW ANY DEFINITION` - Always On Availability Group monitoring
+- `VIEW SERVER PERFORMANCE STATE` - HADR DMVs on SQL Server 2022+
+- `SELECT on distribution.dbo.MSreplication_monitordata` - Replication monitoring
+- `SELECT on distribution.dbo.MSpublications` - Publication information
+- `SELECT on distribution.dbo.MSsubscriptions` - Subscription counts
+
+
+#### Grant Windows Authentication access (optional)
+
+If you prefer Windows integrated authentication instead of SQL authentication, grant the
+Netdata service account access to SQL Server.
+
+By default, the Netdata service runs as `Local System`. The identity it presents to
+SQL Server depends on your environment:
+
+**Domain-joined machine (Active Directory):**
+
+`Local System` authenticates as the computer account (`DOMAIN\COMPUTERNAME$`).
+Replace `DOMAIN\COMPUTERNAME$` with your actual values
+(e.g., `MYDOM\SQLBOX01$`).
+
+```sql
+CREATE LOGIN [DOMAIN\COMPUTERNAME$] FROM WINDOWS;
+GRANT VIEW SERVER STATE TO [DOMAIN\COMPUTERNAME$];
+GRANT VIEW ANY DEFINITION TO [DOMAIN\COMPUTERNAME$];
+USE msdb;
+CREATE USER [DOMAIN\COMPUTERNAME$] FOR LOGIN [DOMAIN\COMPUTERNAME$];
+GRANT SELECT ON dbo.sysjobs TO [DOMAIN\COMPUTERNAME$];
+```
+
+**Workgroup machine (no Active Directory, localhost only):**
+
+`Local System` authenticates as `NT AUTHORITY\SYSTEM`.
+This only works when SQL Server runs on the same machine.
+
+```sql
+CREATE LOGIN [NT AUTHORITY\SYSTEM] FROM WINDOWS;
+GRANT VIEW SERVER STATE TO [NT AUTHORITY\SYSTEM];
+GRANT VIEW ANY DEFINITION TO [NT AUTHORITY\SYSTEM];
+USE msdb;
+CREATE USER [NT AUTHORITY\SYSTEM] FOR LOGIN [NT AUTHORITY\SYSTEM];
+GRANT SELECT ON dbo.sysjobs TO [NT AUTHORITY\SYSTEM];
+```
+
+> **Note**: To verify which account SQL Server sees, connect with Windows Authentication
+> and run `SELECT SYSTEM_USER`.
+
+
+
+### Configuration
+
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 10 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | dsn | SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). When `cloud_auth.provider` is `azure_ad`, use URL format with `sqlserver://` scheme. | sqlserver://localhost:1433 | yes |
+| **Cloud Auth** | cloud_auth.provider | Cloud auth provider (`none` or `azure_ad`). | none | no |
+| **Cloud Auth/Azure** | cloud_auth.azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). Required when `cloud_auth.provider` is `azure_ad`. |  | yes |
+|  | cloud_auth.azure_ad.mode_service_principal.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.mode_service_principal.client_id | Azure client ID. Required for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.mode_service_principal.client_secret | Azure client secret for `service_principal` mode. |  | no |
+|  | cloud_auth.azure_ad.mode_managed_identity.client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
+| **Target** | timeout | Query timeout (seconds). | 5 | no |
+| **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
+|  | functions.top_queries.timeout | Query timeout for top-queries function (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.top_queries.limit | Maximum number of queries to return in the top-queries response. | 500 | no |
+|  | functions.top_queries.time_window_days | Number of days of Query Store data to analyze. Set to 0 to include all available data. Smaller values improve query performance but show less history. | 7 | no |
+|  | functions.deadlock_info.disabled | Disable the [deadlock-info](#deadlock-info) function. | no | no |
+|  | functions.deadlock_info.timeout | Query timeout for deadlock-info function (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.deadlock_info.use_ring_buffer | Use ring_buffer instead of event_file for system_health session.<br/><br/>WARNING: Not recommended for production:<br/>• Data cleared on failover/restart<br/>• 4 MB capacity limit<br/>• High CPU load during queries<br/><br/>Use only for Azure SQL Database without Blob Storage or testing. | no | no |
+|  | functions.error_info.disabled | Disable the [error-info](#error-info) function. | no | no |
+|  | functions.error_info.timeout | Query timeout for error-info function (seconds). Uses collector timeout if not set. |  | no |
+|  | functions.error_info.session_name | Extended Events session name capturing error_reported events.<br/>Must be created by administrator with event_file (recommended) or ring_buffer target. | netdata_errors | no |
+|  | functions.error_info.use_ring_buffer | Use ring_buffer instead of event_file for error events.<br/><br/>WARNING: Not recommended for production:<br/>• Data cleared on failover/restart<br/>• 4 MB capacity limit<br/>• High CPU load during queries<br/><br/>Use only for Azure SQL Database without Blob Storage or testing. | no | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+
+</details>
+
+
+#### via UI
+
+Configure the **mssql** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the mssql data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _mssql_ (or scroll the list) to locate the **mssql** collector.
+5. Click the **+** next to the **mssql** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/mssql.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name2
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/mssql.conf
+```
+
+##### Examples
+
+###### Basic configuration
+
+Connect to local SQL Server with SQL authentication.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    dsn: "sqlserver://netdata_user:password@localhost:1433"
+
+```
+</details>
+
+###### Windows Authentication
+
+Connect using Windows integrated authentication (Windows only).
+
+When no username/password is provided in the DSN, the driver uses the Netdata service account's
+Windows credentials. By default, the Netdata service runs as `Local System`, which authenticates
+to SQL Server as the computer account (`DOMAIN\COMPUTERNAME$`).
+
+See the [Grant Windows Authentication access](#grant-windows-authentication-access-optional) prerequisite
+to configure SQL Server for this.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    dsn: "sqlserver://localhost:1433"
+
+```
+</details>
+
+###### Named instance
+
+Connect to a named SQL Server instance.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: named_instance
+    dsn: "sqlserver://netdata_user:password@localhost/INSTANCENAME"
+
+```
+</details>
+
+###### Remote server
+
+Connect to a remote SQL Server.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: remote
+    dsn: "sqlserver://netdata_user:password@192.168.1.100:1433"
+
+```
+</details>
+
+###### Azure SQL with service principal
+
+Use Microsoft Entra service principal authentication for Azure SQL.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: azure_sql_sp
+    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
+    cloud_auth:
+      provider: azure_ad
+      azure_ad:
+        mode: service_principal
+        mode_service_principal:
+          tenant_id: "00000000-0000-0000-0000-000000000000"
+          client_id: "11111111-1111-1111-1111-111111111111"
+          client_secret: "super-secret-value"
+
+```
+</details>
+
+###### Azure SQL with managed identity
+
+Use managed identity authentication (system-assigned by default).
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: azure_sql_mi
+    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
+    cloud_auth:
+      provider: azure_ad
+      azure_ad:
+        mode: managed_identity
+
+```
+</details>
+
+###### Multi-instance
+
+> **Note**: When you define multiple jobs, their names must be unique.
+
+Monitoring multiple SQL Server instances.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: production
+    dsn: "sqlserver://netdata_user:password@prod-sql:1433"
+
+  - name: development
+    dsn: "sqlserver://netdata_user:password@dev-sql:1433"
+
+```
+</details>
+
+###### With custom function settings
+
+Configure function-specific settings like timeouts and limits.
+
+> **Warning**: Query Store may contain unmasked literal values (PII).
+> Disable functions if not needed or ensure proper access controls.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    dsn: "sqlserver://netdata_user:password@localhost:1433"
+    functions:
+      top_queries:
+        limit: 100
+        time_window_days: 7
+      deadlock_info:
+        use_ring_buffer: true
+      error_info:
+        session_name: custom_errors
+
+```
+</details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -360,7 +698,7 @@ Metrics:
 
 
 
-## Functions
+## Live Data
 
 This collector exposes real-time functions for interactive troubleshooting in the Live tab.
 
@@ -629,295 +967,6 @@ Recent error events from the configured Extended Events session.
 | Error Message | string |  |  | Error message text. |
 | Query | string |  |  | SQL text captured with the error event. |
 | Query Hash | string |  | hidden | Query hash captured with the error event (used for mapping into top-queries). |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
-## Setup
-
-
-You can configure the **mssql** collector in two ways:
-
-| Method                | Best for                                                                                 | How to                                                                                                                                 |
-|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **mssql**, then click **+** to add a job. |
-| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/mssql.conf` and add a job.                                                                        |
-
-:::important
-
-UI configuration requires paid Netdata Cloud plan.
-
-:::
-
-
-### Prerequisites
-
-#### Create monitoring user
-
-Create a SQL Server login with VIEW SERVER STATE permission:
-
-```sql
--- Create login
-CREATE LOGIN netdata_user WITH PASSWORD = 'YourStrongPassword!';
-
--- Grant VIEW SERVER STATE (required for DMVs)
-GRANT VIEW SERVER STATE TO netdata_user;
-
--- Grant VIEW ANY DEFINITION (required for Always On AG monitoring)
-GRANT VIEW ANY DEFINITION TO netdata_user;
-
--- Grant VIEW SERVER PERFORMANCE STATE (required for HADR DMVs on SQL Server 2022+)
--- GRANT VIEW SERVER PERFORMANCE STATE TO netdata_user;
-
--- Grant access to msdb for SQL Agent job monitoring (required)
-USE msdb;
-CREATE USER netdata_user FOR LOGIN netdata_user;
-GRANT SELECT ON dbo.sysjobs TO netdata_user;
-
--- Optional: Grant access to distribution database for replication monitoring
--- (only if replication is configured)
-USE distribution;
-CREATE USER netdata_user FOR LOGIN netdata_user;
-GRANT SELECT ON dbo.MSreplication_monitordata TO netdata_user;
-GRANT SELECT ON dbo.MSpublications TO netdata_user;
-GRANT SELECT ON dbo.MSsubscriptions TO netdata_user;
-```
-
-**Required permissions:**
-- `VIEW SERVER STATE` - Access to dynamic management views
-- `SELECT on msdb.dbo.sysjobs` - SQL Agent job status monitoring
-
-**Optional permissions:**
-- `VIEW ANY DEFINITION` - Always On Availability Group monitoring
-- `VIEW SERVER PERFORMANCE STATE` - HADR DMVs on SQL Server 2022+
-- `SELECT on distribution.dbo.MSreplication_monitordata` - Replication monitoring
-- `SELECT on distribution.dbo.MSpublications` - Publication information
-- `SELECT on distribution.dbo.MSsubscriptions` - Subscription counts
-
-
-
-### Configuration
-
-#### Options
-
-The following options can be defined globally: update_every, autodetection_retry.
-
-
-<details open><summary>Config options</summary>
-
-
-
-| Group | Option | Description | Default | Required |
-|:------|:-----|:------------|:--------|:---------:|
-| **Collection** | update_every | Data collection interval (seconds). | 10 | no |
-|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| **Target** | dsn | SQL Server DSN (Data Source Name). See [DSN syntax](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). When `cloud_auth.provider` is `azure_ad`, use URL format with `sqlserver://` scheme. | sqlserver://localhost:1433 | yes |
-| **Cloud Auth** | cloud_auth.provider | Cloud auth provider (`none` or `azure_ad`). | none | no |
-| **Cloud Auth/Azure** | cloud_auth.azure_ad.mode | Azure AD credential mode (`service_principal`, `managed_identity`, or `default`). Required when `cloud_auth.provider` is `azure_ad`. |  | yes |
-|  | cloud_auth.azure_ad.mode_service_principal.tenant_id | Azure tenant ID. Required for `service_principal` mode. |  | no |
-|  | cloud_auth.azure_ad.mode_service_principal.client_id | Azure client ID. Required for `service_principal` mode. |  | no |
-|  | cloud_auth.azure_ad.mode_service_principal.client_secret | Azure client secret for `service_principal` mode. |  | no |
-|  | cloud_auth.azure_ad.mode_managed_identity.client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
-| **Target** | timeout | Query timeout (seconds). | 5 | no |
-| **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
-|  | functions.top_queries.timeout | Query timeout for top-queries function (seconds). Uses collector timeout if not set. |  | no |
-|  | functions.top_queries.limit | Maximum number of queries to return in the top-queries response. | 500 | no |
-|  | functions.top_queries.time_window_days | Number of days of Query Store data to analyze. Set to 0 to include all available data. Smaller values improve query performance but show less history. | 7 | no |
-|  | functions.deadlock_info.disabled | Disable the [deadlock-info](#deadlock-info) function. | no | no |
-|  | functions.deadlock_info.timeout | Query timeout for deadlock-info function (seconds). Uses collector timeout if not set. |  | no |
-|  | functions.deadlock_info.use_ring_buffer | Use ring_buffer instead of event_file for system_health session.<br/><br/>WARNING: Not recommended for production:<br/>• Data cleared on failover/restart<br/>• 4 MB capacity limit<br/>• High CPU load during queries<br/><br/>Use only for Azure SQL Database without Blob Storage or testing. | no | no |
-|  | functions.error_info.disabled | Disable the [error-info](#error-info) function. | no | no |
-|  | functions.error_info.timeout | Query timeout for error-info function (seconds). Uses collector timeout if not set. |  | no |
-|  | functions.error_info.session_name | Extended Events session name capturing error_reported events.<br/>Must be created by administrator with event_file (recommended) or ring_buffer target. | netdata_errors | no |
-|  | functions.error_info.use_ring_buffer | Use ring_buffer instead of event_file for error events.<br/><br/>WARNING: Not recommended for production:<br/>• Data cleared on failover/restart<br/>• 4 MB capacity limit<br/>• High CPU load during queries<br/><br/>Use only for Azure SQL Database without Blob Storage or testing. | no | no |
-| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
-
-
-</details>
-
-
-#### via UI
-
-Configure the **mssql** collector from the Netdata web interface:
-
-1. Go to **Nodes**.
-2. Select the node **where you want the mssql data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
-3. The **Collectors → Jobs** view opens by default.
-4. In the Search box, type _mssql_ (or scroll the list) to locate the **mssql** collector.
-5. Click the **+** next to the **mssql** collector to add a new job.
-6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
-    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
-
-
-#### via File
-
-The configuration file name for this integration is `go.d/mssql.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name2
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/mssql.conf
-```
-
-##### Examples
-
-###### Basic configuration
-
-Connect to local SQL Server with SQL authentication.
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: local
-    dsn: "sqlserver://netdata_user:password@localhost:1433"
-
-```
-</details>
-
-###### Windows Authentication
-
-Connect using Windows integrated authentication.
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: local
-    dsn: "sqlserver://localhost:1433?trusted_connection=yes"
-
-```
-</details>
-
-###### Named instance
-
-Connect to a named SQL Server instance.
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: named_instance
-    dsn: "sqlserver://netdata_user:password@localhost/INSTANCENAME"
-
-```
-</details>
-
-###### Remote server
-
-Connect to a remote SQL Server.
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: remote
-    dsn: "sqlserver://netdata_user:password@192.168.1.100:1433"
-
-```
-</details>
-
-###### Azure SQL with service principal
-
-Use Microsoft Entra service principal authentication for Azure SQL.
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: azure_sql_sp
-    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
-    cloud_auth:
-      provider: azure_ad
-      azure_ad:
-        mode: service_principal
-        mode_service_principal:
-          tenant_id: "00000000-0000-0000-0000-000000000000"
-          client_id: "11111111-1111-1111-1111-111111111111"
-          client_secret: "super-secret-value"
-
-```
-</details>
-
-###### Azure SQL with managed identity
-
-Use managed identity authentication (system-assigned by default).
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: azure_sql_mi
-    dsn: "sqlserver://my-server.database.windows.net:1433?database=mydb"
-    cloud_auth:
-      provider: azure_ad
-      azure_ad:
-        mode: managed_identity
-
-```
-</details>
-
-###### Multi-instance
-
-> **Note**: When you define multiple jobs, their names must be unique.
-
-Monitoring multiple SQL Server instances.
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: production
-    dsn: "sqlserver://netdata_user:password@prod-sql:1433"
-
-  - name: development
-    dsn: "sqlserver://netdata_user:password@dev-sql:1433"
-
-```
-</details>
-
-###### With custom function settings
-
-Configure function-specific settings like timeouts and limits.
-
-> **Warning**: Query Store may contain unmasked literal values (PII).
-> Disable functions if not needed or ensure proper access controls.
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: local
-    dsn: "sqlserver://netdata_user:password@localhost:1433"
-    functions:
-      top_queries:
-        limit: 100
-        time_window_days: 7
-      deadlock_info:
-        use_ring_buffer: true
-      error_info:
-        session_name: custom_errors
-
-```
-</details>
 
 
 

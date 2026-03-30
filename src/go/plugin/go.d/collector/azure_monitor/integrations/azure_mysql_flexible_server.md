@@ -41,7 +41,7 @@ The monitoring principal needs read access to Azure Resource Graph and Azure Mon
 
 #### Auto-Detection
 
-When `profiles` includes `auto` (the default), the collector queries Azure Resource Graph
+When `profile_selection_mode` is `auto` (the default), the collector queries Azure Resource Graph
 to discover which resource types exist in the subscription and enables matching built-in profiles automatically.
 
 
@@ -55,97 +55,6 @@ The collector enforces a minimum collection interval of 60 seconds.
 
 The collector uses bounded request concurrency and batches resources and metrics to minimize API calls.
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
-
-
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.mysql_flexible.cpu | average | percentage |
-| azure_monitor.mysql_flexible.memory | average | percentage |
-| azure_monitor.mysql_flexible.io_utilization | average | percentage |
-| azure_monitor.mysql_flexible.cpu_credits | consumed, remaining | credits |
-| azure_monitor.mysql_flexible.ha_status | io, sql | status |
-| azure_monitor.mysql_flexible.replica_status | io, sql | status |
-| azure_monitor.mysql_flexible.uptime | uptime | seconds |
-| azure_monitor.mysql_flexible.replication_lag | replica, ha | seconds |
-| azure_monitor.mysql_flexible.innodb_row_lock_time | average | milliseconds |
-| azure_monitor.mysql_flexible.innodb_row_lock_waits | total | waits/s |
-| azure_monitor.mysql_flexible.aborted_connections | total | connections/s |
-| azure_monitor.mysql_flexible.active_connections | average | connections |
-| azure_monitor.mysql_flexible.total_connections | total | connections/s |
-| azure_monitor.mysql_flexible.active_transactions | average | transactions |
-| azure_monitor.mysql_flexible.threads_running | maximum | threads |
-| azure_monitor.mysql_flexible.queries | total, slow | queries/s |
-| azure_monitor.mysql_flexible.dml_statements | select, insert, update, delete | statements/s |
-| azure_monitor.mysql_flexible.ddl_statements | create_table, alter_table, drop_table, create_db, drop_db | statements/s |
-| azure_monitor.mysql_flexible.lock_deadlocks | total | deadlocks/s |
-| azure_monitor.mysql_flexible.lock_timeouts | total | timeouts/s |
-| azure_monitor.mysql_flexible.innodb_buffer_pool_pages | data, dirty, free, flushed | pages |
-| azure_monitor.mysql_flexible.innodb_buffer_pool_io | read_requests, disk_reads | requests/s |
-| azure_monitor.mysql_flexible.innodb_data_writes | total | writes/s |
-| azure_monitor.mysql_flexible.sort_merge_passes | total | passes/s |
-| azure_monitor.mysql_flexible.network | in, out | bytes/s |
-| azure_monitor.mysql_flexible.storage_io | total | operations/s |
-| azure_monitor.mysql_flexible.storage | used, limit | bytes |
-| azure_monitor.mysql_flexible.storage_utilization | average | percentage |
-| azure_monitor.mysql_flexible.storage_breakdown | data, ibdata1, binlog, others | bytes |
-| azure_monitor.mysql_flexible.backup_storage | used | bytes |
-| azure_monitor.mysql_flexible.serverlog_storage | used, limit | bytes |
-| azure_monitor.mysql_flexible.serverlog_storage_utilization | average | percentage |
-| azure_monitor.mysql_flexible.history_list_length | maximum | entries |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_mysql_flexible_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.cpu | MySQL Flexible CPU on ${label:resource_name} |
-| [ am_mysql_flexible_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.memory | MySQL Flexible memory on ${label:resource_name} |
-| [ am_mysql_flexible_io_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.io_utilization | MySQL Flexible I/O utilization on ${label:resource_name} |
-| [ am_mysql_flexible_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.storage_utilization | MySQL Flexible storage on ${label:resource_name} |
-| [ am_mysql_flexible_serverlog_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.serverlog_storage_utilization | MySQL Flexible server log storage on ${label:resource_name} |
-| [ am_mysql_flexible_cpu_credits_remaining ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.cpu_credits | MySQL Flexible CPU credits low on ${label:resource_name} |
-| [ am_mysql_flexible_ha_io_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.ha_status | MySQL Flexible HA IO thread down on ${label:resource_name} |
-| [ am_mysql_flexible_ha_sql_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.ha_status | MySQL Flexible HA SQL thread down on ${label:resource_name} |
-| [ am_mysql_flexible_replica_io_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.replica_status | MySQL Flexible replica IO thread down on ${label:resource_name} |
-| [ am_mysql_flexible_replica_sql_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.replica_status | MySQL Flexible replica SQL thread down on ${label:resource_name} |
-| [ am_mysql_flexible_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.replication_lag | MySQL Flexible replica lag on ${label:resource_name} |
-| [ am_mysql_flexible_ha_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.replication_lag | MySQL Flexible HA replication lag on ${label:resource_name} |
-| [ am_mysql_flexible_innodb_row_lock_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.innodb_row_lock_time | MySQL Flexible row lock wait time on ${label:resource_name} |
-| [ am_mysql_flexible_lock_deadlocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.lock_deadlocks | MySQL Flexible deadlocks on ${label:resource_name} |
-| [ am_mysql_flexible_lock_timeouts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.lock_timeouts | MySQL Flexible lock timeouts on ${label:resource_name} |
-| [ am_mysql_flexible_aborted_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.aborted_connections | MySQL Flexible aborted connections on ${label:resource_name} |
-| [ am_mysql_flexible_slow_queries ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.queries | MySQL Flexible slow queries on ${label:resource_name} |
-| [ am_mysql_flexible_innodb_row_lock_waits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.innodb_row_lock_waits | MySQL Flexible row lock waits on ${label:resource_name} |
-| [ am_mysql_flexible_history_list_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.history_list_length | MySQL Flexible history list length on ${label:resource_name} |
 
 
 ## Setup
@@ -221,7 +130,9 @@ User profile files with the same filename override stock profiles.
 | **Limits** | max_concurrency | Maximum concurrent batch queries to Azure Monitor. | 4 | no |
 |  | max_batch_resources | Maximum resources per Azure Monitor batch request. | 50 | no |
 |  | max_metrics_per_query | Maximum metrics per Azure Monitor batch request. | 20 | no |
-| **Profiles** | profiles | Profile ids to enable. Use `auto` to discover resource types via Azure Resource Graph and enable matching profiles. Combine with explicit ids: `[auto, custom_profile]`. | [auto] | no |
+| **Profiles** | profile_selection_mode | Profile selection mode: `auto` discovers matching profiles via Azure Resource Graph, `exact` uses only listed profile ids, `combined` merges listed ids with auto-discovered profiles. | auto | no |
+|  | profile_selection_mode_exact.profiles | Profile ids to enable (used when `profile_selection_mode` is `exact`). | [] | no |
+|  | profile_selection_mode_combined.profiles | Profile ids to merge with auto-discovered profiles (used when `profile_selection_mode` is `combined`). | [] | no |
 | **Filters** | resource_groups | Optional list of resource group names to restrict monitoring scope. | [] | no |
 | **Authentication** | auth.mode | Authentication mode: `service_principal`, `managed_identity`, or `default`. |  | yes |
 |  | auth.mode_service_principal.tenant_id | Entra ID tenant ID (required for `service_principal` mode). |  | no |
@@ -366,6 +277,97 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_mysql_flexible_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.cpu | MySQL Flexible CPU on ${label:resource_name} |
+| [ am_mysql_flexible_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.memory | MySQL Flexible memory on ${label:resource_name} |
+| [ am_mysql_flexible_io_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.io_utilization | MySQL Flexible I/O utilization on ${label:resource_name} |
+| [ am_mysql_flexible_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.storage_utilization | MySQL Flexible storage on ${label:resource_name} |
+| [ am_mysql_flexible_serverlog_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.serverlog_storage_utilization | MySQL Flexible server log storage on ${label:resource_name} |
+| [ am_mysql_flexible_cpu_credits_remaining ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.cpu_credits | MySQL Flexible CPU credits low on ${label:resource_name} |
+| [ am_mysql_flexible_ha_io_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.ha_status | MySQL Flexible HA IO thread down on ${label:resource_name} |
+| [ am_mysql_flexible_ha_sql_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.ha_status | MySQL Flexible HA SQL thread down on ${label:resource_name} |
+| [ am_mysql_flexible_replica_io_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.replica_status | MySQL Flexible replica IO thread down on ${label:resource_name} |
+| [ am_mysql_flexible_replica_sql_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.replica_status | MySQL Flexible replica SQL thread down on ${label:resource_name} |
+| [ am_mysql_flexible_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.replication_lag | MySQL Flexible replica lag on ${label:resource_name} |
+| [ am_mysql_flexible_ha_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.replication_lag | MySQL Flexible HA replication lag on ${label:resource_name} |
+| [ am_mysql_flexible_innodb_row_lock_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.innodb_row_lock_time | MySQL Flexible row lock wait time on ${label:resource_name} |
+| [ am_mysql_flexible_lock_deadlocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.lock_deadlocks | MySQL Flexible deadlocks on ${label:resource_name} |
+| [ am_mysql_flexible_lock_timeouts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.lock_timeouts | MySQL Flexible lock timeouts on ${label:resource_name} |
+| [ am_mysql_flexible_aborted_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.aborted_connections | MySQL Flexible aborted connections on ${label:resource_name} |
+| [ am_mysql_flexible_slow_queries ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.queries | MySQL Flexible slow queries on ${label:resource_name} |
+| [ am_mysql_flexible_innodb_row_lock_waits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.innodb_row_lock_waits | MySQL Flexible row lock waits on ${label:resource_name} |
+| [ am_mysql_flexible_history_list_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_mysql_flexible.conf) | azure_monitor.mysql_flexible.history_list_length | MySQL Flexible history list length on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.mysql_flexible.cpu | average | percentage |
+| azure_monitor.mysql_flexible.memory | average | percentage |
+| azure_monitor.mysql_flexible.io_utilization | average | percentage |
+| azure_monitor.mysql_flexible.cpu_credits | consumed, remaining | credits |
+| azure_monitor.mysql_flexible.ha_status | io, sql | status |
+| azure_monitor.mysql_flexible.replica_status | io, sql | status |
+| azure_monitor.mysql_flexible.uptime | uptime | seconds |
+| azure_monitor.mysql_flexible.replication_lag | replica, ha | seconds |
+| azure_monitor.mysql_flexible.innodb_row_lock_time | average | milliseconds |
+| azure_monitor.mysql_flexible.innodb_row_lock_waits | total | waits/s |
+| azure_monitor.mysql_flexible.aborted_connections | total | connections/s |
+| azure_monitor.mysql_flexible.active_connections | average | connections |
+| azure_monitor.mysql_flexible.total_connections | total | connections/s |
+| azure_monitor.mysql_flexible.active_transactions | average | transactions |
+| azure_monitor.mysql_flexible.threads_running | maximum | threads |
+| azure_monitor.mysql_flexible.queries | total, slow | queries/s |
+| azure_monitor.mysql_flexible.dml_statements | select, insert, update, delete | statements/s |
+| azure_monitor.mysql_flexible.ddl_statements | create_table, alter_table, drop_table, create_db, drop_db | statements/s |
+| azure_monitor.mysql_flexible.lock_deadlocks | total | deadlocks/s |
+| azure_monitor.mysql_flexible.lock_timeouts | total | timeouts/s |
+| azure_monitor.mysql_flexible.innodb_buffer_pool_pages | data, dirty, free, flushed | pages |
+| azure_monitor.mysql_flexible.innodb_buffer_pool_io | read_requests, disk_reads | requests/s |
+| azure_monitor.mysql_flexible.innodb_data_writes | total | writes/s |
+| azure_monitor.mysql_flexible.sort_merge_passes | total | passes/s |
+| azure_monitor.mysql_flexible.network | in, out | bytes/s |
+| azure_monitor.mysql_flexible.storage_io | total | operations/s |
+| azure_monitor.mysql_flexible.storage | used, limit | bytes |
+| azure_monitor.mysql_flexible.storage_utilization | average | percentage |
+| azure_monitor.mysql_flexible.storage_breakdown | data, ibdata1, binlog, others | bytes |
+| azure_monitor.mysql_flexible.backup_storage | used | bytes |
+| azure_monitor.mysql_flexible.serverlog_storage | used, limit | bytes |
+| azure_monitor.mysql_flexible.serverlog_storage_utilization | average | percentage |
+| azure_monitor.mysql_flexible.history_list_length | maximum | entries |
 
 
 

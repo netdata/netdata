@@ -41,7 +41,7 @@ The monitoring principal needs read access to Azure Resource Graph and Azure Mon
 
 #### Auto-Detection
 
-When `profiles` includes `auto` (the default), the collector queries Azure Resource Graph
+When `profile_selection_mode` is `auto` (the default), the collector queries Azure Resource Graph
 to discover which resource types exist in the subscription and enables matching built-in profiles automatically.
 
 
@@ -55,107 +55,6 @@ The collector enforces a minimum collection interval of 60 seconds.
 
 The collector uses bounded request concurrency and batches resources and metrics to minimize API calls.
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
-
-
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.postgres_flexible.cpu | average | percentage |
-| azure_monitor.postgres_flexible.memory | average | percentage |
-| azure_monitor.postgres_flexible.availability | maximum | state |
-| azure_monitor.postgres_flexible.iops | total, read, write | operations/s |
-| azure_monitor.postgres_flexible.disk_throughput | read, write | bytes/s |
-| azure_monitor.postgres_flexible.disk_saturation | bandwidth, iops | percentage |
-| azure_monitor.postgres_flexible.disk_queue_depth | average | operations |
-| azure_monitor.postgres_flexible.buffer_cache | hits, reads | blocks/s |
-| azure_monitor.postgres_flexible.active_connections | average | connections |
-| azure_monitor.postgres_flexible.connection_rate | succeeded, failed | connections/s |
-| azure_monitor.postgres_flexible.transactions | committed, rolled_back | transactions/s |
-| azure_monitor.postgres_flexible.transaction_rate | total, xact_total | transactions/s |
-| azure_monitor.postgres_flexible.deadlocks | total | deadlocks/s |
-| azure_monitor.postgres_flexible.tuple_reads | returned, fetched | tuples/s |
-| azure_monitor.postgres_flexible.tuple_writes | inserted, updated, deleted | tuples/s |
-| azure_monitor.postgres_flexible.temp_files | total | files/s |
-| azure_monitor.postgres_flexible.temp_bytes | total | bytes/s |
-| azure_monitor.postgres_flexible.long_running | query, transaction | seconds |
-| azure_monitor.postgres_flexible.xid_usage | max_used, oldest_xmin | transactions |
-| azure_monitor.postgres_flexible.xmin_age | maximum | transactions |
-| azure_monitor.postgres_flexible.network | in, out | bytes/s |
-| azure_monitor.postgres_flexible.storage | used, free | bytes |
-| azure_monitor.postgres_flexible.storage_utilization | average | percentage |
-| azure_monitor.postgres_flexible.wal_storage | used | bytes |
-| azure_monitor.postgres_flexible.database_size | average | bytes |
-| azure_monitor.postgres_flexible.backup_storage | used | bytes |
-| azure_monitor.postgres_flexible.replication_lag_time | average | seconds |
-| azure_monitor.postgres_flexible.replication_lag_bytes | physical, logical | bytes |
-| azure_monitor.postgres_flexible.sessions_by_state | maximum | sessions |
-| azure_monitor.postgres_flexible.sessions_by_wait_event_type | maximum | sessions |
-| azure_monitor.postgres_flexible.autovacuum_operations | vacuum, autovacuum, analyze, autoanalyze | operations |
-| azure_monitor.postgres_flexible.autovacuum_table_coverage | vacuumed, autovacuumed, analyzed, autoanalyzed, total | tables |
-| azure_monitor.postgres_flexible.tuple_liveness | live, dead, modified_since_analyze | tuples |
-| azure_monitor.postgres_flexible.bloat | maximum | percentage |
-| azure_monitor.postgres_flexible.backend_count | maximum | connections |
-| azure_monitor.postgres_flexible.pgbouncer_client_connections | active, waiting | connections |
-| azure_monitor.postgres_flexible.pgbouncer_server_connections | active, idle | connections |
-| azure_monitor.postgres_flexible.pgbouncer_pool_count | pools | pools |
-| azure_monitor.postgres_flexible.pgbouncer_pooled_connections | pooled_connections | connections |
-| azure_monitor.postgres_flexible.cpu_credits | consumed, remaining | credits |
-| azure_monitor.postgres_flexible.postmaster_cpu | average | percentage |
-| azure_monitor.postgres_flexible.max_connections | maximum | connections |
-| azure_monitor.postgres_flexible.tcp_connection_backlog | maximum | connections |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_postgres_flexible_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.availability | PostgreSQL Flexible Server down on ${label:resource_name} |
-| [ am_postgres_flexible_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.cpu | PostgreSQL Flexible CPU on ${label:resource_name} |
-| [ am_postgres_flexible_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.memory | PostgreSQL Flexible memory on ${label:resource_name} |
-| [ am_postgres_flexible_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.storage_utilization | PostgreSQL Flexible storage on ${label:resource_name} |
-| [ am_postgres_flexible_disk_bandwidth_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.disk_saturation | PostgreSQL Flexible disk bandwidth saturation on ${label:resource_name} |
-| [ am_postgres_flexible_disk_iops_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.disk_saturation | PostgreSQL Flexible disk IOPS saturation on ${label:resource_name} |
-| [ am_postgres_flexible_disk_queue_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.disk_queue_depth | PostgreSQL Flexible disk queue depth on ${label:resource_name} |
-| [ am_postgres_flexible_failed_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.connection_rate | PostgreSQL Flexible failed connections on ${label:resource_name} |
-| [ am_postgres_flexible_tcp_connection_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.tcp_connection_backlog | PostgreSQL Flexible TCP connection backlog on ${label:resource_name} |
-| [ am_postgres_flexible_deadlocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.deadlocks | PostgreSQL Flexible deadlocks on ${label:resource_name} |
-| [ am_postgres_flexible_rollback_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.transactions | PostgreSQL Flexible rollback ratio on ${label:resource_name} |
-| [ am_postgres_flexible_longest_query ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.long_running | PostgreSQL Flexible long running query on ${label:resource_name} |
-| [ am_postgres_flexible_longest_transaction ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.long_running | PostgreSQL Flexible long running transaction on ${label:resource_name} |
-| [ am_postgres_flexible_xid_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.xid_usage | PostgreSQL Flexible transaction ID usage on ${label:resource_name} |
-| [ am_postgres_flexible_xmin_age ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.xmin_age | PostgreSQL Flexible backend xmin age on ${label:resource_name} |
-| [ am_postgres_flexible_bloat ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.bloat | PostgreSQL Flexible table bloat on ${label:resource_name} |
-| [ am_postgres_flexible_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.replication_lag_time | PostgreSQL Flexible replication lag on ${label:resource_name} |
-| [ am_postgres_flexible_cpu_credits_remaining ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.cpu_credits | PostgreSQL Flexible CPU credits low on ${label:resource_name} |
-| [ am_postgres_flexible_temp_bytes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.temp_bytes | PostgreSQL Flexible temp file I/O on ${label:resource_name} |
 
 
 ## Setup
@@ -231,7 +130,9 @@ User profile files with the same filename override stock profiles.
 | **Limits** | max_concurrency | Maximum concurrent batch queries to Azure Monitor. | 4 | no |
 |  | max_batch_resources | Maximum resources per Azure Monitor batch request. | 50 | no |
 |  | max_metrics_per_query | Maximum metrics per Azure Monitor batch request. | 20 | no |
-| **Profiles** | profiles | Profile ids to enable. Use `auto` to discover resource types via Azure Resource Graph and enable matching profiles. Combine with explicit ids: `[auto, custom_profile]`. | [auto] | no |
+| **Profiles** | profile_selection_mode | Profile selection mode: `auto` discovers matching profiles via Azure Resource Graph, `exact` uses only listed profile ids, `combined` merges listed ids with auto-discovered profiles. | auto | no |
+|  | profile_selection_mode_exact.profiles | Profile ids to enable (used when `profile_selection_mode` is `exact`). | [] | no |
+|  | profile_selection_mode_combined.profiles | Profile ids to merge with auto-discovered profiles (used when `profile_selection_mode` is `combined`). | [] | no |
 | **Filters** | resource_groups | Optional list of resource group names to restrict monitoring scope. | [] | no |
 | **Authentication** | auth.mode | Authentication mode: `service_principal`, `managed_identity`, or `default`. |  | yes |
 |  | auth.mode_service_principal.tenant_id | Entra ID tenant ID (required for `service_principal` mode). |  | no |
@@ -376,6 +277,107 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_postgres_flexible_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.availability | PostgreSQL Flexible Server down on ${label:resource_name} |
+| [ am_postgres_flexible_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.cpu | PostgreSQL Flexible CPU on ${label:resource_name} |
+| [ am_postgres_flexible_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.memory | PostgreSQL Flexible memory on ${label:resource_name} |
+| [ am_postgres_flexible_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.storage_utilization | PostgreSQL Flexible storage on ${label:resource_name} |
+| [ am_postgres_flexible_disk_bandwidth_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.disk_saturation | PostgreSQL Flexible disk bandwidth saturation on ${label:resource_name} |
+| [ am_postgres_flexible_disk_iops_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.disk_saturation | PostgreSQL Flexible disk IOPS saturation on ${label:resource_name} |
+| [ am_postgres_flexible_disk_queue_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.disk_queue_depth | PostgreSQL Flexible disk queue depth on ${label:resource_name} |
+| [ am_postgres_flexible_failed_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.connection_rate | PostgreSQL Flexible failed connections on ${label:resource_name} |
+| [ am_postgres_flexible_tcp_connection_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.tcp_connection_backlog | PostgreSQL Flexible TCP connection backlog on ${label:resource_name} |
+| [ am_postgres_flexible_deadlocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.deadlocks | PostgreSQL Flexible deadlocks on ${label:resource_name} |
+| [ am_postgres_flexible_rollback_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.transactions | PostgreSQL Flexible rollback ratio on ${label:resource_name} |
+| [ am_postgres_flexible_longest_query ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.long_running | PostgreSQL Flexible long running query on ${label:resource_name} |
+| [ am_postgres_flexible_longest_transaction ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.long_running | PostgreSQL Flexible long running transaction on ${label:resource_name} |
+| [ am_postgres_flexible_xid_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.xid_usage | PostgreSQL Flexible transaction ID usage on ${label:resource_name} |
+| [ am_postgres_flexible_xmin_age ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.xmin_age | PostgreSQL Flexible backend xmin age on ${label:resource_name} |
+| [ am_postgres_flexible_bloat ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.bloat | PostgreSQL Flexible table bloat on ${label:resource_name} |
+| [ am_postgres_flexible_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.replication_lag_time | PostgreSQL Flexible replication lag on ${label:resource_name} |
+| [ am_postgres_flexible_cpu_credits_remaining ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.cpu_credits | PostgreSQL Flexible CPU credits low on ${label:resource_name} |
+| [ am_postgres_flexible_temp_bytes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_postgres_flexible.conf) | azure_monitor.postgres_flexible.temp_bytes | PostgreSQL Flexible temp file I/O on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.postgres_flexible.cpu | average | percentage |
+| azure_monitor.postgres_flexible.memory | average | percentage |
+| azure_monitor.postgres_flexible.availability | maximum | state |
+| azure_monitor.postgres_flexible.iops | total, read, write | operations/s |
+| azure_monitor.postgres_flexible.disk_throughput | read, write | bytes/s |
+| azure_monitor.postgres_flexible.disk_saturation | bandwidth, iops | percentage |
+| azure_monitor.postgres_flexible.disk_queue_depth | average | operations |
+| azure_monitor.postgres_flexible.buffer_cache | hits, reads | blocks/s |
+| azure_monitor.postgres_flexible.active_connections | average | connections |
+| azure_monitor.postgres_flexible.connection_rate | succeeded, failed | connections/s |
+| azure_monitor.postgres_flexible.transactions | committed, rolled_back | transactions/s |
+| azure_monitor.postgres_flexible.transaction_rate | total, xact_total | transactions/s |
+| azure_monitor.postgres_flexible.deadlocks | total | deadlocks/s |
+| azure_monitor.postgres_flexible.tuple_reads | returned, fetched | tuples/s |
+| azure_monitor.postgres_flexible.tuple_writes | inserted, updated, deleted | tuples/s |
+| azure_monitor.postgres_flexible.temp_files | total | files/s |
+| azure_monitor.postgres_flexible.temp_bytes | total | bytes/s |
+| azure_monitor.postgres_flexible.long_running | query, transaction | seconds |
+| azure_monitor.postgres_flexible.xid_usage | max_used, oldest_xmin | transactions |
+| azure_monitor.postgres_flexible.xmin_age | maximum | transactions |
+| azure_monitor.postgres_flexible.network | in, out | bytes/s |
+| azure_monitor.postgres_flexible.storage | used, free | bytes |
+| azure_monitor.postgres_flexible.storage_utilization | average | percentage |
+| azure_monitor.postgres_flexible.wal_storage | used | bytes |
+| azure_monitor.postgres_flexible.database_size | average | bytes |
+| azure_monitor.postgres_flexible.backup_storage | used | bytes |
+| azure_monitor.postgres_flexible.replication_lag_time | average | seconds |
+| azure_monitor.postgres_flexible.replication_lag_bytes | physical, logical | bytes |
+| azure_monitor.postgres_flexible.sessions_by_state | maximum | sessions |
+| azure_monitor.postgres_flexible.sessions_by_wait_event_type | maximum | sessions |
+| azure_monitor.postgres_flexible.autovacuum_operations | vacuum, autovacuum, analyze, autoanalyze | operations |
+| azure_monitor.postgres_flexible.autovacuum_table_coverage | vacuumed, autovacuumed, analyzed, autoanalyzed, total | tables |
+| azure_monitor.postgres_flexible.tuple_liveness | live, dead, modified_since_analyze | tuples |
+| azure_monitor.postgres_flexible.bloat | maximum | percentage |
+| azure_monitor.postgres_flexible.backend_count | maximum | connections |
+| azure_monitor.postgres_flexible.pgbouncer_client_connections | active, waiting | connections |
+| azure_monitor.postgres_flexible.pgbouncer_server_connections | active, idle | connections |
+| azure_monitor.postgres_flexible.pgbouncer_pool_count | pools | pools |
+| azure_monitor.postgres_flexible.pgbouncer_pooled_connections | pooled_connections | connections |
+| azure_monitor.postgres_flexible.cpu_credits | consumed, remaining | credits |
+| azure_monitor.postgres_flexible.postmaster_cpu | average | percentage |
+| azure_monitor.postgres_flexible.max_connections | maximum | connections |
+| azure_monitor.postgres_flexible.tcp_connection_backlog | maximum | connections |
 
 
 

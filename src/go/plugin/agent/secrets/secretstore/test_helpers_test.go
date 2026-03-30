@@ -3,9 +3,11 @@
 package secretstore_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/stretchr/testify/require"
 )
@@ -133,4 +135,13 @@ func cloneTestSlice(in []any) []any {
 		}
 	}
 	return out
+}
+
+func captureLoggerOutput(t *testing.T, fn func(log *logger.Logger)) string {
+	t.Helper()
+
+	var buf bytes.Buffer
+	log := logger.NewWithWriter(&buf)
+	fn(log)
+	return buf.String()
 }

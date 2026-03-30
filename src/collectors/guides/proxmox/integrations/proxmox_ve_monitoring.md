@@ -81,17 +81,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-This guide does not collect metrics directly. Metrics are collected by the related integrations listed above. See each integration's page for detailed metric documentation.
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -123,6 +112,17 @@ There is no configuration file.
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+This guide does not collect metrics directly. Metrics are collected by the related integrations listed above. See each integration's page for detailed metric documentation.
 
 
 

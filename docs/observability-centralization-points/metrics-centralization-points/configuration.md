@@ -111,6 +111,12 @@ This section assumes you have read the documentation on [how to edit the Netdata
         api key = 11111111-2222-3333-4444-555555555555
     ```
 
+    :::note
+
+    The `:SSL` suffix enables TLS encryption for Netdata's custom streaming protocol. This is different from HTTPS—Netdata streaming uses its own binary protocol over TCP, and TLS adds encryption on top of that protocol.
+
+    :::
+
 3. **Restart both nodes**  
    Restart the Netdata Agent on both the parent and child nodes to stream encrypted metrics using TLS/SSL.
 

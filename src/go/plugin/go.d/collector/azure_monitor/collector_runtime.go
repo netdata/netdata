@@ -74,6 +74,10 @@ type resourceInfo struct {
 	Region        string
 }
 
+func (r resourceInfo) String() string {
+	return r.Name + " (" + r.Type + ")"
+}
+
 type queryBatch struct {
 	Profile        *profileRuntime
 	Metrics        []*metricRuntime

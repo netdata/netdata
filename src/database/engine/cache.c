@@ -216,12 +216,18 @@ static inline size_t page_size_from_assumed_size(PGC *cache, size_t assumed_size
 // locking
 
 static inline size_t pgc_indexing_partition(PGC *cache, Word_t metric_id) {
+    static __thread PGC *last_cache = NULL;
+    static __thread size_t last_partitions = 0;
     static __thread Word_t last_metric_id = 0;
     static __thread size_t last_partition = 0;
 
-    if(metric_id == last_metric_id || cache->config.partitions == 1)
+    if(cache == last_cache &&
+       cache->config.partitions == last_partitions &&
+       (metric_id == last_metric_id || cache->config.partitions == 1))
         return last_partition;
 
+    last_cache = cache;
+    last_partitions = cache->config.partitions;
     last_metric_id = metric_id;
     last_partition = indexing_partition(metric_id, cache->config.partitions);
 
@@ -2462,7 +2468,8 @@ void pgc_open_cache_to_journal_v2(
 
     struct section_pages *sp = *section_pages_pptr;
     if(!spinlock_trylock(&sp->migration_to_v2_spinlock)) {
-        netdata_log_info("DBENGINE: migration to journal v2 for datafile %u is postponed, another jv2 indexer is already running for this section", datafile_fileno);
+        netdata_log_info("DBENGINE: migration to journal v2 for datafile %u (section %" PRIu64 ") is postponed, another jv2 indexer is already running for this section",
+                         datafile_fileno, (uint64_t)section);
         pgc_queue_unlock(cache, &cache->hot);
         return;
     }
@@ -3141,6 +3148,32 @@ int pgc_unittest(void) {
     pgc_page_hot_to_dirty_and_release(cache, page3, false);
 
     pgc_destroy(cache, true);
+
+    {
+        PGC *cache_a = pgc_create("partition-cache-a",
+                                  32 * 1024 * 1024, unittest_free_clean_page_callback,
+                                  64, NULL, unittest_save_dirty_page_callback,
+                                  10, 10, 1000, 10,
+                                  PGC_OPTIONS_DEFAULT, 4, 0);
+        PGC *cache_b = pgc_create("partition-cache-b",
+                                  32 * 1024 * 1024, unittest_free_clean_page_callback,
+                                  64, NULL, unittest_save_dirty_page_callback,
+                                  10, 10, 1000, 10,
+                                  PGC_OPTIONS_DEFAULT, 5, 0);
+
+        Word_t metric_id = 5;
+        size_t partition_a = pgc_indexing_partition(cache_a, metric_id);
+        size_t partition_b = pgc_indexing_partition(cache_b, metric_id);
+
+        if(partition_a != indexing_partition(metric_id, cache_a->config.partitions))
+            fatal("pgc_indexing_partition() returned the wrong partition for cache_a");
+
+        if(partition_b != indexing_partition(metric_id, cache_b->config.partitions))
+            fatal("pgc_indexing_partition() returned the wrong partition for cache_b");
+
+        pgc_destroy(cache_a, true);
+        pgc_destroy(cache_b, true);
+    }
 
 #ifdef PGC_STRESS_TEST
     unittest_stress_test();

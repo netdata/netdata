@@ -41,7 +41,7 @@ The monitoring principal needs read access to Azure Resource Graph and Azure Mon
 
 #### Auto-Detection
 
-When `profiles` includes `auto` (the default), the collector queries Azure Resource Graph
+When `profile_selection_mode` is `auto` (the default), the collector queries Azure Resource Graph
 to discover which resource types exist in the subscription and enables matching built-in profiles automatically.
 
 
@@ -55,98 +55,6 @@ The collector enforces a minimum collection interval of 60 seconds.
 
 The collector uses bounded request concurrency and batches resources and metrics to minimize API calls.
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
-
-
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.vpn_gateway.s2s_bandwidth | average | bytes/s |
-| azure_monitor.vpn_gateway.p2s_bandwidth | average | bytes/s |
-| azure_monitor.vpn_gateway.p2s_connections | total | connections |
-| azure_monitor.vpn_gateway.gateway_flows | inbound, outbound | flows |
-| azure_monitor.vpn_gateway.tunnel_bandwidth | average | bytes/s |
-| azure_monitor.vpn_gateway.tunnel_bytes | egress, ingress | bytes/s |
-| azure_monitor.vpn_gateway.tunnel_packets | egress, ingress | packets/s |
-| azure_monitor.vpn_gateway.tunnel_peak_pps | peak | packets/s |
-| azure_monitor.vpn_gateway.tunnel_total_flows | total | flows/s |
-| azure_monitor.vpn_gateway.tunnel_nat_allocations | total | allocations/s |
-| azure_monitor.vpn_gateway.tunnel_nated_bytes | nated, reverse_nated | bytes/s |
-| azure_monitor.vpn_gateway.tunnel_nated_packets | nated, reverse_nated | packets/s |
-| azure_monitor.vpn_gateway.tunnel_nat_flows | total | flows/s |
-| azure_monitor.vpn_gateway.tunnel_packet_drops | egress, ingress | packets/s |
-| azure_monitor.vpn_gateway.tunnel_ts_mismatch_drops | egress, ingress | packets/s |
-| azure_monitor.vpn_gateway.tunnel_nat_packet_drops | total | packets/s |
-| azure_monitor.vpn_gateway.ipsec_sa | mmsa, qmsa | associations |
-| azure_monitor.vpn_gateway.bgp_peer_status | average | status |
-| azure_monitor.vpn_gateway.bgp_routes | advertised, learned | routes/s |
-| azure_monitor.vpn_gateway.route_counts | user_vpn, vnet_prefix | routes |
-| azure_monitor.vpn_gateway.er_gateway_bandwidth | average | bits/s |
-| azure_monitor.vpn_gateway.er_gateway_cpu | average | percentage |
-| azure_monitor.vpn_gateway.er_gateway_packets | average | packets/s |
-| azure_monitor.vpn_gateway.er_gateway_active_flows | average | flows |
-| azure_monitor.vpn_gateway.er_gateway_routes_advertised | maximum | routes |
-| azure_monitor.vpn_gateway.er_gateway_routes_learned | maximum | routes |
-| azure_monitor.vpn_gateway.er_gateway_route_changes | total | changes/s |
-| azure_monitor.vpn_gateway.er_gateway_max_flows_rate | maximum | flows/s |
-| azure_monitor.vpn_gateway.er_gateway_vm_count | maximum | VMs |
-| azure_monitor.vpn_gateway.scalable_er_bandwidth | average | bits/s |
-| azure_monitor.vpn_gateway.scalable_er_cpu | average | percentage |
-| azure_monitor.vpn_gateway.scalable_er_packets | average | packets/s |
-| azure_monitor.vpn_gateway.scalable_er_active_flows | average | flows |
-| azure_monitor.vpn_gateway.scalable_er_routes_advertised | maximum | routes |
-| azure_monitor.vpn_gateway.scalable_er_routes_learned | maximum | routes |
-| azure_monitor.vpn_gateway.scalable_er_route_changes | total | changes/s |
-| azure_monitor.vpn_gateway.scalable_er_max_flows_rate | maximum | flows/s |
-| azure_monitor.vpn_gateway.scalable_er_vm_count | maximum | VMs |
-| azure_monitor.vpn_gateway.scalable_er_scale_units | maximum | units |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_vpn_gateway_tunnel_packet_drops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.tunnel_packet_drops | VPN Gateway tunnel packet drops on ${label:resource_name} |
-| [ am_vpn_gateway_tunnel_ts_mismatch_drops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.tunnel_ts_mismatch_drops | VPN Gateway TS mismatch drops on ${label:resource_name} |
-| [ am_vpn_gateway_tunnel_nat_packet_drops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.tunnel_nat_packet_drops | VPN Gateway NAT packet drops on ${label:resource_name} |
-| [ am_vpn_gateway_bgp_peer_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.bgp_peer_status | VPN Gateway BGP peer down on ${label:resource_name} |
-| [ am_vpn_gateway_er_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.er_gateway_cpu | VPN GW ExpressRoute CPU on ${label:resource_name} |
-| [ am_vpn_gateway_er_gateway_active_flows ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.er_gateway_active_flows | VPN GW ExpressRoute active flows on ${label:resource_name} |
-| [ am_vpn_gateway_er_gateway_route_changes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.er_gateway_route_changes | VPN GW ExpressRoute route churn on ${label:resource_name} |
-| [ am_vpn_gateway_er_gateway_routes_advertised ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.er_gateway_routes_advertised | VPN GW ExpressRoute routes advertised on ${label:resource_name} |
-| [ am_vpn_gateway_er_gateway_routes_learned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.er_gateway_routes_learned | VPN GW ExpressRoute routes learned on ${label:resource_name} |
-| [ am_vpn_gateway_scalable_er_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.scalable_er_cpu | VPN GW Scalable ER CPU on ${label:resource_name} |
-| [ am_vpn_gateway_scalable_er_active_flows ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.scalable_er_active_flows | VPN GW Scalable ER active flows on ${label:resource_name} |
-| [ am_vpn_gateway_scalable_er_route_changes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.scalable_er_route_changes | VPN GW Scalable ER route churn on ${label:resource_name} |
-| [ am_vpn_gateway_scalable_er_routes_advertised ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.scalable_er_routes_advertised | VPN GW Scalable ER routes advertised on ${label:resource_name} |
-| [ am_vpn_gateway_scalable_er_routes_learned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.scalable_er_routes_learned | VPN GW Scalable ER routes learned on ${label:resource_name} |
 
 
 ## Setup
@@ -222,7 +130,9 @@ User profile files with the same filename override stock profiles.
 | **Limits** | max_concurrency | Maximum concurrent batch queries to Azure Monitor. | 4 | no |
 |  | max_batch_resources | Maximum resources per Azure Monitor batch request. | 50 | no |
 |  | max_metrics_per_query | Maximum metrics per Azure Monitor batch request. | 20 | no |
-| **Profiles** | profiles | Profile ids to enable. Use `auto` to discover resource types via Azure Resource Graph and enable matching profiles. Combine with explicit ids: `[auto, custom_profile]`. | [auto] | no |
+| **Profiles** | profile_selection_mode | Profile selection mode: `auto` discovers matching profiles via Azure Resource Graph, `exact` uses only listed profile ids, `combined` merges listed ids with auto-discovered profiles. | auto | no |
+|  | profile_selection_mode_exact.profiles | Profile ids to enable (used when `profile_selection_mode` is `exact`). | [] | no |
+|  | profile_selection_mode_combined.profiles | Profile ids to merge with auto-discovered profiles (used when `profile_selection_mode` is `combined`). | [] | no |
 | **Filters** | resource_groups | Optional list of resource group names to restrict monitoring scope. | [] | no |
 | **Authentication** | auth.mode | Authentication mode: `service_principal`, `managed_identity`, or `default`. |  | yes |
 |  | auth.mode_service_principal.tenant_id | Entra ID tenant ID (required for `service_principal` mode). |  | no |
@@ -367,6 +277,98 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_vpn_gateway_tunnel_packet_drops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.tunnel_packet_drops | VPN Gateway tunnel packet drops on ${label:resource_name} |
+| [ am_vpn_gateway_tunnel_ts_mismatch_drops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.tunnel_ts_mismatch_drops | VPN Gateway TS mismatch drops on ${label:resource_name} |
+| [ am_vpn_gateway_tunnel_nat_packet_drops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.tunnel_nat_packet_drops | VPN Gateway NAT packet drops on ${label:resource_name} |
+| [ am_vpn_gateway_bgp_peer_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.bgp_peer_status | VPN Gateway BGP peer down on ${label:resource_name} |
+| [ am_vpn_gateway_er_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.er_gateway_cpu | VPN GW ExpressRoute CPU on ${label:resource_name} |
+| [ am_vpn_gateway_er_gateway_active_flows ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.er_gateway_active_flows | VPN GW ExpressRoute active flows on ${label:resource_name} |
+| [ am_vpn_gateway_er_gateway_route_changes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.er_gateway_route_changes | VPN GW ExpressRoute route churn on ${label:resource_name} |
+| [ am_vpn_gateway_er_gateway_routes_advertised ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.er_gateway_routes_advertised | VPN GW ExpressRoute routes advertised on ${label:resource_name} |
+| [ am_vpn_gateway_er_gateway_routes_learned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.er_gateway_routes_learned | VPN GW ExpressRoute routes learned on ${label:resource_name} |
+| [ am_vpn_gateway_scalable_er_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.scalable_er_cpu | VPN GW Scalable ER CPU on ${label:resource_name} |
+| [ am_vpn_gateway_scalable_er_active_flows ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.scalable_er_active_flows | VPN GW Scalable ER active flows on ${label:resource_name} |
+| [ am_vpn_gateway_scalable_er_route_changes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.scalable_er_route_changes | VPN GW Scalable ER route churn on ${label:resource_name} |
+| [ am_vpn_gateway_scalable_er_routes_advertised ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.scalable_er_routes_advertised | VPN GW Scalable ER routes advertised on ${label:resource_name} |
+| [ am_vpn_gateway_scalable_er_routes_learned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vpn_gateway.conf) | azure_monitor.vpn_gateway.scalable_er_routes_learned | VPN GW Scalable ER routes learned on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.vpn_gateway.s2s_bandwidth | average | bytes/s |
+| azure_monitor.vpn_gateway.p2s_bandwidth | average | bytes/s |
+| azure_monitor.vpn_gateway.p2s_connections | total | connections |
+| azure_monitor.vpn_gateway.gateway_flows | inbound, outbound | flows |
+| azure_monitor.vpn_gateway.tunnel_bandwidth | average | bytes/s |
+| azure_monitor.vpn_gateway.tunnel_bytes | egress, ingress | bytes/s |
+| azure_monitor.vpn_gateway.tunnel_packets | egress, ingress | packets/s |
+| azure_monitor.vpn_gateway.tunnel_peak_pps | peak | packets/s |
+| azure_monitor.vpn_gateway.tunnel_total_flows | total | flows/s |
+| azure_monitor.vpn_gateway.tunnel_nat_allocations | total | allocations/s |
+| azure_monitor.vpn_gateway.tunnel_nated_bytes | nated, reverse_nated | bytes/s |
+| azure_monitor.vpn_gateway.tunnel_nated_packets | nated, reverse_nated | packets/s |
+| azure_monitor.vpn_gateway.tunnel_nat_flows | total | flows/s |
+| azure_monitor.vpn_gateway.tunnel_packet_drops | egress, ingress | packets/s |
+| azure_monitor.vpn_gateway.tunnel_ts_mismatch_drops | egress, ingress | packets/s |
+| azure_monitor.vpn_gateway.tunnel_nat_packet_drops | total | packets/s |
+| azure_monitor.vpn_gateway.ipsec_sa | mmsa, qmsa | associations |
+| azure_monitor.vpn_gateway.bgp_peer_status | average | status |
+| azure_monitor.vpn_gateway.bgp_routes | advertised, learned | routes/s |
+| azure_monitor.vpn_gateway.route_counts | user_vpn, vnet_prefix | routes |
+| azure_monitor.vpn_gateway.er_gateway_bandwidth | average | bits/s |
+| azure_monitor.vpn_gateway.er_gateway_cpu | average | percentage |
+| azure_monitor.vpn_gateway.er_gateway_packets | average | packets/s |
+| azure_monitor.vpn_gateway.er_gateway_active_flows | average | flows |
+| azure_monitor.vpn_gateway.er_gateway_routes_advertised | maximum | routes |
+| azure_monitor.vpn_gateway.er_gateway_routes_learned | maximum | routes |
+| azure_monitor.vpn_gateway.er_gateway_route_changes | total | changes/s |
+| azure_monitor.vpn_gateway.er_gateway_max_flows_rate | maximum | flows/s |
+| azure_monitor.vpn_gateway.er_gateway_vm_count | maximum | VMs |
+| azure_monitor.vpn_gateway.scalable_er_bandwidth | average | bits/s |
+| azure_monitor.vpn_gateway.scalable_er_cpu | average | percentage |
+| azure_monitor.vpn_gateway.scalable_er_packets | average | packets/s |
+| azure_monitor.vpn_gateway.scalable_er_active_flows | average | flows |
+| azure_monitor.vpn_gateway.scalable_er_routes_advertised | maximum | routes |
+| azure_monitor.vpn_gateway.scalable_er_routes_learned | maximum | routes |
+| azure_monitor.vpn_gateway.scalable_er_route_changes | total | changes/s |
+| azure_monitor.vpn_gateway.scalable_er_max_flows_rate | maximum | flows/s |
+| azure_monitor.vpn_gateway.scalable_er_vm_count | maximum | VMs |
+| azure_monitor.vpn_gateway.scalable_er_scale_units | maximum | units |
 
 
 

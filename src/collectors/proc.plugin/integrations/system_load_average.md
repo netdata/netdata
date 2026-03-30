@@ -67,43 +67,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per System Load Average instance
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.load | load1, load5, load15 | load |
-| system.active_processes | active | processes |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ load_cpu_number ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | number of active CPU cores in the system |
-| [ load_average_15 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system fifteen-minute load average |
-| [ load_average_5 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system five-minute load average |
-| [ load_average_1 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system one-minute load average |
-| [ active_processes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/processes.conf) | system.active_processes | system process IDs (PID) space utilization |
-
-
 ## Setup
 
 
@@ -127,5 +90,42 @@ There is no configuration file.
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ load_cpu_number ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | number of active CPU cores in the system |
+| [ load_average_15 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system fifteen-minute load average |
+| [ load_average_5 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system five-minute load average |
+| [ load_average_1 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system one-minute load average |
+| [ active_processes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/processes.conf) | system.active_processes | system process IDs (PID) space utilization |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per System Load Average instance
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.load | load1, load5, load15 | load |
+| system.active_processes | active | processes |
 
 

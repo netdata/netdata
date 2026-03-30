@@ -49,37 +49,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Windows Service
-
-These metrics refer to Windows Services.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| service | The service name |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| windows.service_state | running, stopped, start_pending, stop_pending, continue_pending, pause_pending, paused, unknown | state |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -127,5 +96,36 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Windows Service
+
+These metrics refer to Windows Services.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| service | The service name |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| windows.service_state | running, stopped, start_pending, stop_pending, continue_pending, pause_pending, paused, unknown | state |
 
 

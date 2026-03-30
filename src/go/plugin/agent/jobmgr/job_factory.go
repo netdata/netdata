@@ -110,7 +110,8 @@ func (f *jobFactory) createV2(cfg confgroup.Config, creator collectorapi.Creator
 	if f.secretStoreSvc != nil {
 		storeSnapshot = f.secretStoreSvc.Capture()
 	}
-	if err := applyConfig(f.ctx, cfg, mod, f.secretResolver, f.secretStoreSvc, storeSnapshot); err != nil {
+	resolveCtx := collectorSecretResolveContext(f.ctx, f.logger, cfg)
+	if err := applyConfig(resolveCtx, cfg, mod, f.secretResolver, f.secretStoreSvc, storeSnapshot); err != nil {
 		return nil, err
 	}
 
@@ -149,7 +150,8 @@ func (f *jobFactory) createV1(cfg confgroup.Config, creator collectorapi.Creator
 	if f.secretStoreSvc != nil {
 		storeSnapshot = f.secretStoreSvc.Capture()
 	}
-	if err := applyConfig(f.ctx, cfg, mod, f.secretResolver, f.secretStoreSvc, storeSnapshot); err != nil {
+	resolveCtx := collectorSecretResolveContext(f.ctx, f.logger, cfg)
+	if err := applyConfig(resolveCtx, cfg, mod, f.secretResolver, f.secretStoreSvc, storeSnapshot); err != nil {
 		return nil, err
 	}
 

@@ -48,51 +48,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Intel GPU instance
-
-These metrics refer to the Intel GPU.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| intelgpu.frequency | frequency | MHz |
-| intelgpu.power | gpu, package | Watts |
-
-### Per engine
-
-These metrics refer to the GPU hardware engine.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| engine_class | Engine class (Render/3D, Blitter, VideoEnhance, Video, Compute). |
-| engine_instance | Engine instance (e.g. Render/3D/0, Video/0, Video/1). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| intelgpu.engine_busy_perc | busy | percentage |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -187,6 +142,51 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Intel GPU instance
+
+These metrics refer to the Intel GPU.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| intelgpu.frequency | frequency | MHz |
+| intelgpu.power | gpu, package | Watts |
+
+### Per engine
+
+These metrics refer to the GPU hardware engine.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| engine_class | Engine class (Render/3D, Blitter, VideoEnhance, Video, Compute). |
+| engine_instance | Engine instance (e.g. Render/3D/0, Video/0, Video/1). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| intelgpu.engine_busy_perc | busy | percentage |
 
 
 

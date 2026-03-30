@@ -59,43 +59,6 @@ Calls to the following endpoints are disabled by default due to IPFS bugs:
 **Disabled by default** due to potential high CPU usage. Consider enabling only if necessary.
 
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per IPFS instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipfs.bandwidth | in, out | bytes/s |
-| ipfs.peers | peers | peers |
-| ipfs.datastore_space_utilization | used | percent |
-| ipfs.repo_size | size | bytes |
-| ipfs.repo_objects | objects | objects |
-| ipfs.repo_pinned_objects | pinned, recursive_pins | objects |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ ipfs_datastore_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipfs.conf) | ipfs.datastore_space_utilization | IPFS datastore utilization |
-
-
 ## Setup
 
 
@@ -223,6 +186,43 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ ipfs_datastore_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipfs.conf) | ipfs.datastore_space_utilization | IPFS datastore utilization |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per IPFS instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ipfs.bandwidth | in, out | bytes/s |
+| ipfs.peers | peers | peers |
+| ipfs.datastore_space_utilization | used | percent |
+| ipfs.repo_size | size | bytes |
+| ipfs.repo_objects | objects | objects |
+| ipfs.repo_pinned_objects | pinned, recursive_pins | objects |
 
 
 

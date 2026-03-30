@@ -1,5 +1,5 @@
 [% if entry.functions %]
-## Functions
+## Live Data
 
 [[ entry.functions.description ]]
 

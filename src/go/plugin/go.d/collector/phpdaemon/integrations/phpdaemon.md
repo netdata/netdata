@@ -45,36 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per phpDaemon instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| phpdaemon.workers | alive, shutdown | workers |
-| phpdaemon.alive_workers | idle, busy, reloading | workers |
-| phpdaemon.idle_workers | preinit, init, initialized | workers |
-| phpdaemon.uptime | time | seconds |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -310,6 +280,36 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per phpDaemon instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| phpdaemon.workers | alive, shutdown | workers |
+| phpdaemon.alive_workers | idle, busy, reloading | workers |
+| phpdaemon.idle_workers | preinit, init, initialized | workers |
+| phpdaemon.uptime | time | seconds |
 
 
 

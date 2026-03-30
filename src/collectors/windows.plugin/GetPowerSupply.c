@@ -15,17 +15,34 @@
 #include <setupapi.h> // for SetupDi*
 #include <batclass.h> // for BATTERY_*
 
-static struct power_supply *power_supply_root = NULL;
+struct win_battery {
+    struct power_supply ps;
+    struct simple_property voltage;
+    bool seen; // true if discovered in the current collection pass
+    struct win_battery *next;
+};
 
-static inline void netdata_allocate_power_supply(char *path)
+static struct win_battery *batteries_root = NULL;
+
+static struct win_battery *netdata_get_or_create_battery(const char *name)
 {
-    power_supply_root = callocz(1, sizeof(struct power_supply));
-    power_supply_root->capacity = callocz(1, sizeof(struct simple_property));
+    for (struct win_battery *battery = batteries_root; battery; battery = battery->next) {
+        if (battery->ps.name && !strcmp(battery->ps.name, name))
+            return battery;
+    }
+
+    struct win_battery *battery = callocz(1, sizeof(*battery));
+    battery->ps.name = strdupz(name);
+    battery->ps.capacity = callocz(1, sizeof(struct simple_property));
+    battery->next = batteries_root;
+    batteries_root = battery;
+
+    return battery;
 }
 
 static inline void netdata_update_power_supply_values(
+    struct win_battery *battery,
     HANDLE hBattery,
-    struct simple_property *voltage,
     BATTERY_INFORMATION *bi,
     BATTERY_QUERY_INFORMATION *bqi)
 {
@@ -42,19 +59,18 @@ static inline void netdata_update_power_supply_values(
         NETDATA_DOUBLE den = bi->FullChargedCapacity;
         num = (den) ? num / den : 0;
 
-        power_supply_root->capacity->value = (unsigned long long)(num * 100.0);
+        battery->ps.capacity->value = (unsigned long long)(num * 100.0);
     }
 
-    if (bs.Voltage != BATTERY_UNKNOWN_VOLTAGE) {
-        voltage->value = bs.Voltage;
-    }
+    if (bs.Voltage != BATTERY_UNKNOWN_VOLTAGE)
+        battery->voltage.value = bs.Voltage;
 }
 
-static void netdata_power_supply_plot(struct simple_property *voltage, int update_every)
+static void netdata_power_supply_plot(struct win_battery *battery, int update_every)
 {
     rrdset_create_simple_prop(
-        power_supply_root,
-        power_supply_root->capacity,
+        &battery->ps,
+        battery->ps.capacity,
         "Battery capacity",
         "capacity",
         1,
@@ -63,8 +79,8 @@ static void netdata_power_supply_plot(struct simple_property *voltage, int updat
         update_every);
 
     rrdset_create_simple_prop(
-        power_supply_root,
-        voltage,
+        &battery->ps,
+        &battery->voltage,
         "Power supply voltage",
         "now",
         1000,
@@ -73,9 +89,27 @@ static void netdata_power_supply_plot(struct simple_property *voltage, int updat
         update_every);
 }
 
+void do_GetPowerSupply_cleanup(void)
+{
+    while (batteries_root) {
+        struct win_battery *battery = batteries_root;
+        batteries_root = battery->next;
+
+        if (battery->ps.capacity && battery->ps.capacity->st)
+            rrdset_is_obsolete___safe_from_collector_thread(battery->ps.capacity->st);
+        if (battery->voltage.st)
+            rrdset_is_obsolete___safe_from_collector_thread(battery->voltage.st);
+
+        freez(battery->ps.name);
+        freez(battery->ps.capacity);
+        freez(battery);
+    }
+}
+
 int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
 {
-    static struct simple_property voltage = {0};
+    for (struct win_battery *b = batteries_root; b; b = b->next)
+        b->seen = false;
 
     HDEVINFO hdev = SetupDiGetClassDevs(&GUID_DEVCLASS_BATTERY, 0, 0, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
     if (hdev == INVALID_HANDLE_VALUE)
@@ -88,6 +122,7 @@ int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
         DWORD cbRequired = 0;
         PSP_DEVICE_INTERFACE_DETAIL_DATA pdidd = NULL;
         HANDLE hBattery = NULL;
+
         SetupDiGetDeviceInterfaceDetail(hdev, &did, 0, 0, &cbRequired, 0);
         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
             goto endPowerSupply;
@@ -112,7 +147,6 @@ int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
             goto endPowerSupply;
 
         BATTERY_QUERY_INFORMATION bqi = {0};
-
         DWORD dwWait = 0;
         DWORD dwOut;
 
@@ -130,34 +164,19 @@ int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
 
         BATTERY_INFORMATION bi = {0};
         bqi.InformationLevel = BatteryInformation;
-
         if (!DeviceIoControl(
                 hBattery, IOCTL_BATTERY_QUERY_INFORMATION, &bqi, sizeof(bqi), &bi, sizeof(bi), &dwOut, NULL))
             goto endPowerSupply;
 
-        if (!power_supply_root)
-            netdata_allocate_power_supply(pdidd->DevicePath);
-
         char name[RRD_ID_LENGTH_MAX + 1];
         snprintfz(name, sizeof(name), "BAT%d", i + 1);
+        struct win_battery *battery = netdata_get_or_create_battery(name);
+        battery->seen = true;
+        netdata_update_power_supply_values(battery, hBattery, &bi, &bqi);
+        netdata_power_supply_plot(battery, update_every);
 
-        if (likely(power_supply_root->name))
-            freez(power_supply_root->name);
-        if (likely(power_supply_root->capacity->filename))
-            freez(power_supply_root->capacity->filename);
-        if (likely(voltage.filename))
-            freez(voltage.filename);
-
-        power_supply_root->name = power_supply_root->capacity->filename = voltage.filename = NULL;
-        power_supply_root->name = strdupz(name);
-        power_supply_root->capacity->filename = strdupz(power_supply_root->name);
-        voltage.filename = strdupz(power_supply_root->name);
-
-        netdata_update_power_supply_values(hBattery, &voltage, &bi, &bqi);
-
-        netdata_power_supply_plot(&voltage, update_every);
     endPowerSupply:
-        if (hBattery)
+        if (hBattery != NULL && hBattery != INVALID_HANDLE_VALUE)
             CloseHandle(hBattery);
 
         if (pdidd)
@@ -165,6 +184,24 @@ int do_GetPowerSupply(int update_every, usec_t dt __maybe_unused)
     }
 
     SetupDiDestroyDeviceInfoList(hdev);
+
+    // Retire batteries that were not seen in this discovery pass (e.g. physically removed).
+    struct win_battery **pp = &batteries_root;
+    while (*pp) {
+        struct win_battery *b = *pp;
+        if (!b->seen) {
+            if (b->ps.capacity && b->ps.capacity->st)
+                rrdset_is_obsolete___safe_from_collector_thread(b->ps.capacity->st);
+            if (b->voltage.st)
+                rrdset_is_obsolete___safe_from_collector_thread(b->voltage.st);
+            *pp = b->next;
+            freez(b->ps.name);
+            freez(b->ps.capacity);
+            freez(b);
+        } else {
+            pp = &b->next;
+        }
+    }
 
     return 0;
 }

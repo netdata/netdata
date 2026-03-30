@@ -41,7 +41,7 @@ The monitoring principal needs read access to Azure Resource Graph and Azure Mon
 
 #### Auto-Detection
 
-When `profiles` includes `auto` (the default), the collector queries Azure Resource Graph
+When `profile_selection_mode` is `auto` (the default), the collector queries Azure Resource Graph
 to discover which resource types exist in the subscription and enables matching built-in profiles automatically.
 
 
@@ -55,90 +55,6 @@ The collector enforces a minimum collection interval of 60 seconds.
 
 The collector uses bounded request concurrency and batches resources and metrics to minimize API calls.
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
-
-
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.machine_learning.agent_events | agent_events, thread_events | events/s |
-| azure_monitor.machine_learning.agent_messages | messages | messages/s |
-| azure_monitor.machine_learning.agent_runs | runs | runs/s |
-| azure_monitor.machine_learning.agent_tokens | tokens | tokens/s |
-| azure_monitor.machine_learning.agent_tool_calls | tool_calls | calls/s |
-| azure_monitor.machine_learning.agent_indexed_files | indexed_files | files/s |
-| azure_monitor.machine_learning.model_deployments | started, succeeded, failed | deployments/s |
-| azure_monitor.machine_learning.model_registrations | succeeded, failed | registrations/s |
-| azure_monitor.machine_learning.cluster_cores | active, idle, leaving, preempted, unusable | cores |
-| azure_monitor.machine_learning.total_cores | total | cores |
-| azure_monitor.machine_learning.cluster_nodes | active, idle, leaving, preempted, unusable | nodes |
-| azure_monitor.machine_learning.total_nodes | total | nodes |
-| azure_monitor.machine_learning.quota_utilization | utilization | percentage |
-| azure_monitor.machine_learning.cpu_utilization | cluster_cpu, node_cpu | percentage |
-| azure_monitor.machine_learning.cpu_millicores | used, capacity | millicores |
-| azure_monitor.machine_learning.cpu_memory_utilization | utilization | percentage |
-| azure_monitor.machine_learning.cpu_memory_megabytes | used, capacity | megabytes |
-| azure_monitor.machine_learning.gpu_utilization | cluster_gpu, node_gpu | percentage |
-| azure_monitor.machine_learning.gpu_milligpus | used, capacity | milliGPUs |
-| azure_monitor.machine_learning.gpu_memory_utilization | cluster_gpu_memory, node_gpu_memory | percentage |
-| azure_monitor.machine_learning.gpu_memory_megabytes | used, capacity | megabytes |
-| azure_monitor.machine_learning.gpu_energy | energy | joules/s |
-| azure_monitor.machine_learning.disk_usage | used, available | megabytes |
-| azure_monitor.machine_learning.disk_io | read, write | megabytes/s |
-| azure_monitor.machine_learning.network_traffic | in, out | megabytes/s |
-| azure_monitor.machine_learning.infiniband_traffic | receive, transmit | megabytes/s |
-| azure_monitor.machine_learning.storage_api_calls | success, failure | calls/s |
-| azure_monitor.machine_learning.run_lifecycle | not_started, starting, preparing, provisioning, queued, started | runs/s |
-| azure_monitor.machine_learning.run_completion | completed, failed, finalizing, cancelled, cancel_requested, not_responding | runs/s |
-| azure_monitor.machine_learning.run_issues | errors, warnings | events/s |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_ml_quota_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.quota_utilization | ML quota utilization on ${label:resource_name} |
-| [ am_ml_unusable_cores ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cluster_cores | ML unusable cores on ${label:resource_name} |
-| [ am_ml_preempted_cores ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cluster_cores | ML preempted cores on ${label:resource_name} |
-| [ am_ml_unusable_nodes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cluster_nodes | ML unusable nodes on ${label:resource_name} |
-| [ am_ml_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cpu_utilization | ML CPU utilization on ${label:resource_name} |
-| [ am_ml_cpu_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cpu_memory_utilization | ML CPU memory utilization on ${label:resource_name} |
-| [ am_ml_gpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.gpu_utilization | ML GPU utilization on ${label:resource_name} |
-| [ am_ml_gpu_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.gpu_memory_utilization | ML GPU memory utilization on ${label:resource_name} |
-| [ am_ml_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.disk_usage | ML disk utilization on ${label:resource_name} |
-| [ am_ml_model_deploy_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.model_deployments | ML model deployment failures on ${label:resource_name} |
-| [ am_ml_model_register_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.model_registrations | ML model registration failures on ${label:resource_name} |
-| [ am_ml_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.run_completion | ML failed runs on ${label:resource_name} |
-| [ am_ml_not_responding_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.run_completion | ML not-responding runs on ${label:resource_name} |
-| [ am_ml_run_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.run_issues | ML run errors on ${label:resource_name} |
-| [ am_ml_storage_api_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.storage_api_calls | ML storage API failure rate on ${label:resource_name} |
 
 
 ## Setup
@@ -214,7 +130,9 @@ User profile files with the same filename override stock profiles.
 | **Limits** | max_concurrency | Maximum concurrent batch queries to Azure Monitor. | 4 | no |
 |  | max_batch_resources | Maximum resources per Azure Monitor batch request. | 50 | no |
 |  | max_metrics_per_query | Maximum metrics per Azure Monitor batch request. | 20 | no |
-| **Profiles** | profiles | Profile ids to enable. Use `auto` to discover resource types via Azure Resource Graph and enable matching profiles. Combine with explicit ids: `[auto, custom_profile]`. | [auto] | no |
+| **Profiles** | profile_selection_mode | Profile selection mode: `auto` discovers matching profiles via Azure Resource Graph, `exact` uses only listed profile ids, `combined` merges listed ids with auto-discovered profiles. | auto | no |
+|  | profile_selection_mode_exact.profiles | Profile ids to enable (used when `profile_selection_mode` is `exact`). | [] | no |
+|  | profile_selection_mode_combined.profiles | Profile ids to merge with auto-discovered profiles (used when `profile_selection_mode` is `combined`). | [] | no |
 | **Filters** | resource_groups | Optional list of resource group names to restrict monitoring scope. | [] | no |
 | **Authentication** | auth.mode | Authentication mode: `service_principal`, `managed_identity`, or `default`. |  | yes |
 |  | auth.mode_service_principal.tenant_id | Entra ID tenant ID (required for `service_principal` mode). |  | no |
@@ -359,6 +277,90 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_ml_quota_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.quota_utilization | ML quota utilization on ${label:resource_name} |
+| [ am_ml_unusable_cores ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cluster_cores | ML unusable cores on ${label:resource_name} |
+| [ am_ml_preempted_cores ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cluster_cores | ML preempted cores on ${label:resource_name} |
+| [ am_ml_unusable_nodes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cluster_nodes | ML unusable nodes on ${label:resource_name} |
+| [ am_ml_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cpu_utilization | ML CPU utilization on ${label:resource_name} |
+| [ am_ml_cpu_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.cpu_memory_utilization | ML CPU memory utilization on ${label:resource_name} |
+| [ am_ml_gpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.gpu_utilization | ML GPU utilization on ${label:resource_name} |
+| [ am_ml_gpu_memory_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.gpu_memory_utilization | ML GPU memory utilization on ${label:resource_name} |
+| [ am_ml_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.disk_usage | ML disk utilization on ${label:resource_name} |
+| [ am_ml_model_deploy_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.model_deployments | ML model deployment failures on ${label:resource_name} |
+| [ am_ml_model_register_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.model_registrations | ML model registration failures on ${label:resource_name} |
+| [ am_ml_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.run_completion | ML failed runs on ${label:resource_name} |
+| [ am_ml_not_responding_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.run_completion | ML not-responding runs on ${label:resource_name} |
+| [ am_ml_run_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.run_issues | ML run errors on ${label:resource_name} |
+| [ am_ml_storage_api_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.storage_api_calls | ML storage API failure rate on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.machine_learning.agent_events | agent_events, thread_events | events/s |
+| azure_monitor.machine_learning.agent_messages | messages | messages/s |
+| azure_monitor.machine_learning.agent_runs | runs | runs/s |
+| azure_monitor.machine_learning.agent_tokens | tokens | tokens/s |
+| azure_monitor.machine_learning.agent_tool_calls | tool_calls | calls/s |
+| azure_monitor.machine_learning.agent_indexed_files | indexed_files | files/s |
+| azure_monitor.machine_learning.model_deployments | started, succeeded, failed | deployments/s |
+| azure_monitor.machine_learning.model_registrations | succeeded, failed | registrations/s |
+| azure_monitor.machine_learning.cluster_cores | active, idle, leaving, preempted, unusable | cores |
+| azure_monitor.machine_learning.total_cores | total | cores |
+| azure_monitor.machine_learning.cluster_nodes | active, idle, leaving, preempted, unusable | nodes |
+| azure_monitor.machine_learning.total_nodes | total | nodes |
+| azure_monitor.machine_learning.quota_utilization | utilization | percentage |
+| azure_monitor.machine_learning.cpu_utilization | cluster_cpu, node_cpu | percentage |
+| azure_monitor.machine_learning.cpu_millicores | used, capacity | millicores |
+| azure_monitor.machine_learning.cpu_memory_utilization | utilization | percentage |
+| azure_monitor.machine_learning.cpu_memory_megabytes | used, capacity | megabytes |
+| azure_monitor.machine_learning.gpu_utilization | cluster_gpu, node_gpu | percentage |
+| azure_monitor.machine_learning.gpu_milligpus | used, capacity | milliGPUs |
+| azure_monitor.machine_learning.gpu_memory_utilization | cluster_gpu_memory, node_gpu_memory | percentage |
+| azure_monitor.machine_learning.gpu_memory_megabytes | used, capacity | megabytes |
+| azure_monitor.machine_learning.gpu_energy | energy | joules/s |
+| azure_monitor.machine_learning.disk_usage | used, available | megabytes |
+| azure_monitor.machine_learning.disk_io | read, write | megabytes/s |
+| azure_monitor.machine_learning.network_traffic | in, out | megabytes/s |
+| azure_monitor.machine_learning.infiniband_traffic | receive, transmit | megabytes/s |
+| azure_monitor.machine_learning.storage_api_calls | success, failure | calls/s |
+| azure_monitor.machine_learning.run_lifecycle | not_started, starting, preparing, provisioning, queued, started | runs/s |
+| azure_monitor.machine_learning.run_completion | completed, failed, finalizing, cancelled, cancel_requested, not_responding | runs/s |
+| azure_monitor.machine_learning.run_issues | errors, warnings | events/s |
 
 
 

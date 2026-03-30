@@ -41,7 +41,7 @@ The monitoring principal needs read access to Azure Resource Graph and Azure Mon
 
 #### Auto-Detection
 
-When `profiles` includes `auto` (the default), the collector queries Azure Resource Graph
+When `profile_selection_mode` is `auto` (the default), the collector queries Azure Resource Graph
 to discover which resource types exist in the subscription and enables matching built-in profiles automatically.
 
 
@@ -55,96 +55,6 @@ The collector enforces a minimum collection interval of 60 seconds.
 
 The collector uses bounded request concurrency and batches resources and metrics to minimize API calls.
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
-
-
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.log_analytics.query_availability | availability | percentage |
-| azure_monitor.log_analytics.ingestion_latency | average, maximum, minimum | seconds |
-| azure_monitor.log_analytics.ingestion_volume | records | records/s |
-| azure_monitor.log_analytics.queries | total, failed | queries/s |
-| azure_monitor.log_analytics.export_data | exported | bytes/s |
-| azure_monitor.log_analytics.export_records | exported | records/s |
-| azure_monitor.log_analytics.export_failures | failed | exports/s |
-| azure_monitor.log_analytics.legacy_cpu_utilization | processor, privileged, user, idle | percentage |
-| azure_monitor.log_analytics.legacy_cpu_detailed | dpc, interrupt, io_wait, nice | percentage |
-| azure_monitor.log_analytics.legacy_cpu_pct | privileged, user | percentage |
-| azure_monitor.log_analytics.legacy_memory_utilization | available, used, committed | percentage |
-| azure_monitor.log_analytics.legacy_memory_available | available_mbytes, available_mbytes_memory | megabytes |
-| azure_monitor.log_analytics.legacy_memory_used_kbytes | used | kilobytes |
-| azure_monitor.log_analytics.legacy_memory_used_mbytes | used | megabytes |
-| azure_monitor.log_analytics.legacy_memory_free | physical, virtual, shared | megabytes |
-| azure_monitor.log_analytics.legacy_swap_utilization | available, used | percentage |
-| azure_monitor.log_analytics.legacy_swap_size | available, used | megabytes |
-| azure_monitor.log_analytics.legacy_disk_space_utilization | free, used | percentage |
-| azure_monitor.log_analytics.legacy_disk_inodes | free, used | percentage |
-| azure_monitor.log_analytics.legacy_disk_free | free | megabytes |
-| azure_monitor.log_analytics.legacy_disk_io_throughput | read, write, logical, physical | bytes/s |
-| azure_monitor.log_analytics.legacy_disk_io_operations | reads, writes, transfers | operations/s |
-| azure_monitor.log_analytics.legacy_disk_io_latency | read, write, transfer | seconds |
-| azure_monitor.log_analytics.legacy_disk_queue | queue_length | operations |
-| azure_monitor.log_analytics.legacy_paging | reads, writes, total | pages/s |
-| azure_monitor.log_analytics.legacy_paging_files | free, stored | megabytes |
-| azure_monitor.log_analytics.legacy_network_throughput_win | received, sent, total | bytes/s |
-| azure_monitor.log_analytics.legacy_network_traffic | total, received, transmitted | bytes |
-| azure_monitor.log_analytics.legacy_network_packets | received, transmitted | packets |
-| azure_monitor.log_analytics.legacy_network_errors | rx, tx, collisions | errors |
-| azure_monitor.log_analytics.legacy_system | processes | processes |
-| azure_monitor.log_analytics.legacy_processor_queue | queue_length | threads |
-| azure_monitor.log_analytics.legacy_uptime | uptime | seconds |
-| azure_monitor.log_analytics.legacy_users | users | users |
-| azure_monitor.log_analytics.legacy_events | events | events/s |
-| azure_monitor.log_analytics.legacy_heartbeat | heartbeats | heartbeats/s |
-| azure_monitor.log_analytics.legacy_updates | updates | updates |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_log_analytics_query_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.query_availability | Log Analytics query availability on ${label:resource_name} |
-| [ am_log_analytics_ingestion_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.ingestion_latency | Log Analytics ingestion latency on ${label:resource_name} |
-| [ am_log_analytics_query_failure_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.queries | Log Analytics query failures on ${label:resource_name} |
-| [ am_log_analytics_export_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.export_failures | Log Analytics export failures on ${label:resource_name} |
-| [ am_log_analytics_legacy_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_cpu_utilization | Legacy agent CPU on ${label:resource_name} |
-| [ am_log_analytics_legacy_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_memory_utilization | Legacy agent memory on ${label:resource_name} |
-| [ am_log_analytics_legacy_swap ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_swap_utilization | Legacy agent swap usage on ${label:resource_name} |
-| [ am_log_analytics_legacy_disk_space ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_disk_space_utilization | Legacy agent disk space on ${label:resource_name} |
-| [ am_log_analytics_legacy_disk_inodes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_disk_inodes | Legacy agent inode usage on ${label:resource_name} |
-| [ am_log_analytics_legacy_disk_read_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_disk_io_latency | Legacy agent disk read latency on ${label:resource_name} |
-| [ am_log_analytics_legacy_disk_write_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_disk_io_latency | Legacy agent disk write latency on ${label:resource_name} |
-| [ am_log_analytics_legacy_disk_queue ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_disk_queue | Legacy agent disk queue on ${label:resource_name} |
-| [ am_log_analytics_legacy_network_rx_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_network_errors | Legacy agent network RX errors on ${label:resource_name} |
-| [ am_log_analytics_legacy_network_tx_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_network_errors | Legacy agent network TX errors on ${label:resource_name} |
 
 
 ## Setup
@@ -220,7 +130,9 @@ User profile files with the same filename override stock profiles.
 | **Limits** | max_concurrency | Maximum concurrent batch queries to Azure Monitor. | 4 | no |
 |  | max_batch_resources | Maximum resources per Azure Monitor batch request. | 50 | no |
 |  | max_metrics_per_query | Maximum metrics per Azure Monitor batch request. | 20 | no |
-| **Profiles** | profiles | Profile ids to enable. Use `auto` to discover resource types via Azure Resource Graph and enable matching profiles. Combine with explicit ids: `[auto, custom_profile]`. | [auto] | no |
+| **Profiles** | profile_selection_mode | Profile selection mode: `auto` discovers matching profiles via Azure Resource Graph, `exact` uses only listed profile ids, `combined` merges listed ids with auto-discovered profiles. | auto | no |
+|  | profile_selection_mode_exact.profiles | Profile ids to enable (used when `profile_selection_mode` is `exact`). | [] | no |
+|  | profile_selection_mode_combined.profiles | Profile ids to merge with auto-discovered profiles (used when `profile_selection_mode` is `combined`). | [] | no |
 | **Filters** | resource_groups | Optional list of resource group names to restrict monitoring scope. | [] | no |
 | **Authentication** | auth.mode | Authentication mode: `service_principal`, `managed_identity`, or `default`. |  | yes |
 |  | auth.mode_service_principal.tenant_id | Entra ID tenant ID (required for `service_principal` mode). |  | no |
@@ -365,6 +277,96 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_log_analytics_query_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.query_availability | Log Analytics query availability on ${label:resource_name} |
+| [ am_log_analytics_ingestion_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.ingestion_latency | Log Analytics ingestion latency on ${label:resource_name} |
+| [ am_log_analytics_query_failure_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.queries | Log Analytics query failures on ${label:resource_name} |
+| [ am_log_analytics_export_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.export_failures | Log Analytics export failures on ${label:resource_name} |
+| [ am_log_analytics_legacy_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_cpu_utilization | Legacy agent CPU on ${label:resource_name} |
+| [ am_log_analytics_legacy_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_memory_utilization | Legacy agent memory on ${label:resource_name} |
+| [ am_log_analytics_legacy_swap ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_swap_utilization | Legacy agent swap usage on ${label:resource_name} |
+| [ am_log_analytics_legacy_disk_space ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_disk_space_utilization | Legacy agent disk space on ${label:resource_name} |
+| [ am_log_analytics_legacy_disk_inodes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_disk_inodes | Legacy agent inode usage on ${label:resource_name} |
+| [ am_log_analytics_legacy_disk_read_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_disk_io_latency | Legacy agent disk read latency on ${label:resource_name} |
+| [ am_log_analytics_legacy_disk_write_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_disk_io_latency | Legacy agent disk write latency on ${label:resource_name} |
+| [ am_log_analytics_legacy_disk_queue ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_disk_queue | Legacy agent disk queue on ${label:resource_name} |
+| [ am_log_analytics_legacy_network_rx_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_network_errors | Legacy agent network RX errors on ${label:resource_name} |
+| [ am_log_analytics_legacy_network_tx_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_log_analytics.conf) | azure_monitor.log_analytics.legacy_network_errors | Legacy agent network TX errors on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.log_analytics.query_availability | availability | percentage |
+| azure_monitor.log_analytics.ingestion_latency | average, maximum, minimum | seconds |
+| azure_monitor.log_analytics.ingestion_volume | records | records/s |
+| azure_monitor.log_analytics.queries | total, failed | queries/s |
+| azure_monitor.log_analytics.export_data | exported | bytes/s |
+| azure_monitor.log_analytics.export_records | exported | records/s |
+| azure_monitor.log_analytics.export_failures | failed | exports/s |
+| azure_monitor.log_analytics.legacy_cpu_utilization | processor, privileged, user, idle | percentage |
+| azure_monitor.log_analytics.legacy_cpu_detailed | dpc, interrupt, io_wait, nice | percentage |
+| azure_monitor.log_analytics.legacy_cpu_pct | privileged, user | percentage |
+| azure_monitor.log_analytics.legacy_memory_utilization | available, used, committed | percentage |
+| azure_monitor.log_analytics.legacy_memory_available | available_mbytes, available_mbytes_memory | megabytes |
+| azure_monitor.log_analytics.legacy_memory_used_kbytes | used | kilobytes |
+| azure_monitor.log_analytics.legacy_memory_used_mbytes | used | megabytes |
+| azure_monitor.log_analytics.legacy_memory_free | physical, virtual, shared | megabytes |
+| azure_monitor.log_analytics.legacy_swap_utilization | available, used | percentage |
+| azure_monitor.log_analytics.legacy_swap_size | available, used | megabytes |
+| azure_monitor.log_analytics.legacy_disk_space_utilization | free, used | percentage |
+| azure_monitor.log_analytics.legacy_disk_inodes | free, used | percentage |
+| azure_monitor.log_analytics.legacy_disk_free | free | megabytes |
+| azure_monitor.log_analytics.legacy_disk_io_throughput | read, write, logical, physical | bytes/s |
+| azure_monitor.log_analytics.legacy_disk_io_operations | reads, writes, transfers | operations/s |
+| azure_monitor.log_analytics.legacy_disk_io_latency | read, write, transfer | seconds |
+| azure_monitor.log_analytics.legacy_disk_queue | queue_length | operations |
+| azure_monitor.log_analytics.legacy_paging | reads, writes, total | pages/s |
+| azure_monitor.log_analytics.legacy_paging_files | free, stored | megabytes |
+| azure_monitor.log_analytics.legacy_network_throughput_win | received, sent, total | bytes/s |
+| azure_monitor.log_analytics.legacy_network_traffic | total, received, transmitted | bytes |
+| azure_monitor.log_analytics.legacy_network_packets | received, transmitted | packets |
+| azure_monitor.log_analytics.legacy_network_errors | rx, tx, collisions | errors |
+| azure_monitor.log_analytics.legacy_system | processes | processes |
+| azure_monitor.log_analytics.legacy_processor_queue | queue_length | threads |
+| azure_monitor.log_analytics.legacy_uptime | uptime | seconds |
+| azure_monitor.log_analytics.legacy_users | users | users |
+| azure_monitor.log_analytics.legacy_events | events | events/s |
+| azure_monitor.log_analytics.legacy_heartbeat | heartbeats | heartbeats/s |
+| azure_monitor.log_analytics.legacy_updates | updates | updates |
 
 
 

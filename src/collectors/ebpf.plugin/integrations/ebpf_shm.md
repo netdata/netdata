@@ -52,71 +52,6 @@ The default configuration for this integration does not impose any limits on dat
 
 This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per cgroup
-
-These Metrics show grouped information per cgroup/service.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.shmget | get | calls/s |
-| cgroup.shmat | at | calls/s |
-| cgroup.shmdt | dt | calls/s |
-| cgroup.shmctl | ctl | calls/s |
-| services.shmget | a dimension per systemd service | calls/s |
-| services.shmat | a dimension per systemd service | calls/s |
-| services.shmdt | a dimension per systemd service | calls/s |
-| services.shmctl | a dimension per systemd service | calls/s |
-
-### Per apps
-
-These Metrics show grouped information per apps group.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| app_group | The name of the group defined in the configuration. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.ebpf_shmget_call | calls | calls/s |
-| app.ebpf_shmat_call | calls | calls/s |
-| app.ebpf_shmdt_call | calls | calls/s |
-| app.ebpf_shmctl_call | calls | calls/s |
-
-### Per eBPF SHM instance
-
-These Metrics show number of calls for specified syscall.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.shared_memory_calls | get, at, dt, ctl | calls/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -201,5 +136,70 @@ sudo ./edit-config ebpf.d/shm.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per cgroup
+
+These Metrics show grouped information per cgroup/service.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cgroup.shmget | get | calls/s |
+| cgroup.shmat | at | calls/s |
+| cgroup.shmdt | dt | calls/s |
+| cgroup.shmctl | ctl | calls/s |
+| services.shmget | a dimension per systemd service | calls/s |
+| services.shmat | a dimension per systemd service | calls/s |
+| services.shmdt | a dimension per systemd service | calls/s |
+| services.shmctl | a dimension per systemd service | calls/s |
+
+### Per apps
+
+These Metrics show grouped information per apps group.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| app.ebpf_shmget_call | calls | calls/s |
+| app.ebpf_shmat_call | calls | calls/s |
+| app.ebpf_shmdt_call | calls | calls/s |
+| app.ebpf_shmctl_call | calls | calls/s |
+
+### Per eBPF SHM instance
+
+These Metrics show number of calls for specified syscall.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.shared_memory_calls | get, at, dt, ctl | calls/s |
 
 

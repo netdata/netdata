@@ -41,7 +41,7 @@ The monitoring principal needs read access to Azure Resource Graph and Azure Mon
 
 #### Auto-Detection
 
-When `profiles` includes `auto` (the default), the collector queries Azure Resource Graph
+When `profile_selection_mode` is `auto` (the default), the collector queries Azure Resource Graph
 to discover which resource types exist in the subscription and enables matching built-in profiles automatically.
 
 
@@ -55,80 +55,6 @@ The collector enforces a minimum collection interval of 60 seconds.
 
 The collector uses bounded request concurrency and batches resources and metrics to minimize API calls.
 Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
-
-
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per resource
-
-These metrics refer to each monitored Azure resource.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| resource_name | The Azure resource name. |
-| resource_group | The Azure resource group. |
-| region | The Azure region where the resource is deployed. |
-| resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
-| resource_uid | The unique Azure resource identifier. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.aks.apiserver_cpu | average, maximum | percentage |
-| azure_monitor.aks.apiserver_memory | average, maximum | percentage |
-| azure_monitor.aks.apiserver_inflight_requests | average | requests |
-| azure_monitor.aks.etcd_cpu | average, maximum | percentage |
-| azure_monitor.aks.etcd_memory | average, maximum | percentage |
-| azure_monitor.aks.etcd_database | average, maximum | percentage |
-| azure_monitor.aks.pod_status_phase | average | pods |
-| azure_monitor.aks.pod_status_ready | average | pods |
-| azure_monitor.aks.allocatable_cpu | average | cores |
-| azure_monitor.aks.allocatable_memory | average | bytes |
-| azure_monitor.aks.node_conditions | average | nodes |
-| azure_monitor.aks.autoscaler_health | safe_to_autoscale, cooldown | state |
-| azure_monitor.aks.autoscaler_unschedulable_pods | average | pods |
-| azure_monitor.aks.autoscaler_unneeded_nodes | average | nodes |
-| azure_monitor.aks.node_cpu_millicores | average, maximum | millicores |
-| azure_monitor.aks.node_cpu_percentage | average, maximum | percentage |
-| azure_monitor.aks.node_memory_working_set | average, maximum | bytes |
-| azure_monitor.aks.node_memory_working_set_percentage | average, maximum | percentage |
-| azure_monitor.aks.node_memory_rss | average, maximum | bytes |
-| azure_monitor.aks.node_memory_rss_percentage | average, maximum | percentage |
-| azure_monitor.aks.node_disk_usage | average, maximum | bytes |
-| azure_monitor.aks.node_disk_percentage | average, maximum | percentage |
-| azure_monitor.aks.node_network | in, out | bytes |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ am_aks_apiserver_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_cpu | AKS API server CPU on ${label:resource_name} |
-| [ am_aks_apiserver_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_memory | AKS API server memory on ${label:resource_name} |
-| [ am_aks_apiserver_inflight_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_inflight_requests | AKS API server inflight requests on ${label:resource_name} |
-| [ am_aks_etcd_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_cpu | AKS etcd CPU on ${label:resource_name} |
-| [ am_aks_etcd_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_memory | AKS etcd memory on ${label:resource_name} |
-| [ am_aks_etcd_database ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_database | AKS etcd database usage on ${label:resource_name} |
-| [ am_aks_autoscaler_safe_to_autoscale ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.autoscaler_health | AKS autoscaler unsafe on ${label:resource_name} |
-| [ am_aks_autoscaler_unschedulable_pods ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.autoscaler_unschedulable_pods | AKS unschedulable pods on ${label:resource_name} |
-| [ am_aks_node_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_cpu_percentage | AKS node CPU on ${label:resource_name} |
-| [ am_aks_node_memory_working_set ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_memory_working_set_percentage | AKS node memory working set on ${label:resource_name} |
-| [ am_aks_node_memory_rss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_memory_rss_percentage | AKS node memory RSS on ${label:resource_name} |
-| [ am_aks_node_disk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_disk_percentage | AKS node disk usage on ${label:resource_name} |
 
 
 ## Setup
@@ -204,7 +130,9 @@ User profile files with the same filename override stock profiles.
 | **Limits** | max_concurrency | Maximum concurrent batch queries to Azure Monitor. | 4 | no |
 |  | max_batch_resources | Maximum resources per Azure Monitor batch request. | 50 | no |
 |  | max_metrics_per_query | Maximum metrics per Azure Monitor batch request. | 20 | no |
-| **Profiles** | profiles | Profile ids to enable. Use `auto` to discover resource types via Azure Resource Graph and enable matching profiles. Combine with explicit ids: `[auto, custom_profile]`. | [auto] | no |
+| **Profiles** | profile_selection_mode | Profile selection mode: `auto` discovers matching profiles via Azure Resource Graph, `exact` uses only listed profile ids, `combined` merges listed ids with auto-discovered profiles. | auto | no |
+|  | profile_selection_mode_exact.profiles | Profile ids to enable (used when `profile_selection_mode` is `exact`). | [] | no |
+|  | profile_selection_mode_combined.profiles | Profile ids to merge with auto-discovered profiles (used when `profile_selection_mode` is `combined`). | [] | no |
 | **Filters** | resource_groups | Optional list of resource group names to restrict monitoring scope. | [] | no |
 | **Authentication** | auth.mode | Authentication mode: `service_principal`, `managed_identity`, or `default`. |  | yes |
 |  | auth.mode_service_principal.tenant_id | Entra ID tenant ID (required for `service_principal` mode). |  | no |
@@ -349,6 +277,80 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ am_aks_apiserver_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_cpu | AKS API server CPU on ${label:resource_name} |
+| [ am_aks_apiserver_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_memory | AKS API server memory on ${label:resource_name} |
+| [ am_aks_apiserver_inflight_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_inflight_requests | AKS API server inflight requests on ${label:resource_name} |
+| [ am_aks_etcd_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_cpu | AKS etcd CPU on ${label:resource_name} |
+| [ am_aks_etcd_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_memory | AKS etcd memory on ${label:resource_name} |
+| [ am_aks_etcd_database ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_database | AKS etcd database usage on ${label:resource_name} |
+| [ am_aks_autoscaler_safe_to_autoscale ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.autoscaler_health | AKS autoscaler unsafe on ${label:resource_name} |
+| [ am_aks_autoscaler_unschedulable_pods ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.autoscaler_unschedulable_pods | AKS unschedulable pods on ${label:resource_name} |
+| [ am_aks_node_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_cpu_percentage | AKS node CPU on ${label:resource_name} |
+| [ am_aks_node_memory_working_set ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_memory_working_set_percentage | AKS node memory working set on ${label:resource_name} |
+| [ am_aks_node_memory_rss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_memory_rss_percentage | AKS node memory RSS on ${label:resource_name} |
+| [ am_aks_node_disk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_disk_percentage | AKS node disk usage on ${label:resource_name} |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per resource
+
+These metrics refer to each monitored Azure resource.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource_name | The Azure resource name. |
+| resource_group | The Azure resource group. |
+| region | The Azure region where the resource is deployed. |
+| resource_type | The Azure resource type identifier. |
+| profile | The Azure Monitor profile id. |
+| resource_uid | The unique Azure resource identifier. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| azure_monitor.aks.apiserver_cpu | average, maximum | percentage |
+| azure_monitor.aks.apiserver_memory | average, maximum | percentage |
+| azure_monitor.aks.apiserver_inflight_requests | average | requests |
+| azure_monitor.aks.etcd_cpu | average, maximum | percentage |
+| azure_monitor.aks.etcd_memory | average, maximum | percentage |
+| azure_monitor.aks.etcd_database | average, maximum | percentage |
+| azure_monitor.aks.pod_status_phase | average | pods |
+| azure_monitor.aks.pod_status_ready | average | pods |
+| azure_monitor.aks.allocatable_cpu | average | cores |
+| azure_monitor.aks.allocatable_memory | average | bytes |
+| azure_monitor.aks.node_conditions | average | nodes |
+| azure_monitor.aks.autoscaler_health | safe_to_autoscale, cooldown | state |
+| azure_monitor.aks.autoscaler_unschedulable_pods | average | pods |
+| azure_monitor.aks.autoscaler_unneeded_nodes | average | nodes |
+| azure_monitor.aks.node_cpu_millicores | average, maximum | millicores |
+| azure_monitor.aks.node_cpu_percentage | average, maximum | percentage |
+| azure_monitor.aks.node_memory_working_set | average, maximum | bytes |
+| azure_monitor.aks.node_memory_working_set_percentage | average, maximum | percentage |
+| azure_monitor.aks.node_memory_rss | average, maximum | bytes |
+| azure_monitor.aks.node_memory_rss_percentage | average, maximum | percentage |
+| azure_monitor.aks.node_disk_usage | average, maximum | bytes |
+| azure_monitor.aks.node_disk_percentage | average, maximum | percentage |
+| azure_monitor.aks.node_network | in, out | bytes |
 
 
 

@@ -43,36 +43,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per net.inet6.ip6.stats instance
-
-These metrics show general information about IPv6 connections.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipv6.packets | received, sent, forwarded, delivers | packets/s |
-| ipv6.fragsout | ok, failed, all | packets/s |
-| ipv6.fragsin | ok, failed, timeout, all | packets/s |
-| ipv6.errors | InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes | packets/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -127,5 +97,35 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per net.inet6.ip6.stats instance
+
+These metrics show general information about IPv6 connections.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| ipv6.packets | received, sent, forwarded, delivers | packets/s |
+| ipv6.fragsout | ok, failed, all | packets/s |
+| ipv6.fragsin | ok, failed, timeout, all | packets/s |
+| ipv6.errors | InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes | packets/s |
 
 

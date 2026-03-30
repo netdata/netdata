@@ -1033,6 +1033,450 @@ bool dictionary_traverse_or_destroy_unittest(void) {
  * sanitizer. Need to investigate if it's introduced by the unit-test itself,
  * or the dictionary implementation.
 */
+// ============================================================================
+// Dictionary benchmark harness for before/after concurrency work (for example
+// RCU internals). Keep the workloads stable and the output compact.
+// ============================================================================
+
+#define DICT_BENCH_MAX_SAMPLES 4096
+#define DICT_BENCH_SAMPLE_EVERY 64
+
+typedef enum {
+    DICT_BENCH_READ_NONE = 0,
+    DICT_BENCH_READ_TRAVERSAL,
+    DICT_BENCH_READ_LOOKUP_HOT,
+    DICT_BENCH_READ_LOOKUP_RANDOM,
+} dict_bench_read_mode_t;
+
+typedef enum {
+    DICT_BENCH_WRITE_NONE = 0,
+    DICT_BENCH_WRITE_CHURN,
+    DICT_BENCH_WRITE_UPDATE,
+} dict_bench_write_mode_t;
+
+struct dict_bench_config {
+    const char *workload;
+    size_t entries;
+    int readers;
+    int writers;
+    time_t seconds_to_run;
+    dict_bench_read_mode_t read_mode;
+    dict_bench_write_mode_t write_mode;
+};
+
+struct dict_bench_stats {
+    uint64_t ops;
+    uint64_t items_seen;
+    uint64_t latency_total_ut;
+    size_t latency_samples_used;
+    uint64_t latency_samples_seen;
+    usec_t latency_samples[DICT_BENCH_MAX_SAMPLES];
+};
+
+struct dict_bench_thread {
+    int id;
+    int *join;
+    DICTIONARY *dict;
+    const struct dict_bench_config *cfg;
+    struct dict_bench_stats stats;
+    bool is_writer;
+    uint32_t rng_state;
+    ND_THREAD *thread;
+};
+
+struct dict_bench_summary {
+    uint64_t read_ops;
+    uint64_t read_items_seen;
+    uint64_t write_ops;
+    double read_avg_ut;
+    double read_p99_ut;
+    double write_avg_ut;
+    double write_p99_ut;
+};
+
+static int dict_bench_usec_cmp(const void *a, const void *b) {
+    const usec_t ua = *(const usec_t *)a;
+    const usec_t ub = *(const usec_t *)b;
+    return (ua > ub) - (ua < ub);
+}
+
+static inline uint32_t dict_bench_rand(uint32_t *state) {
+    if(!*state) *state = 1;
+    *state ^= *state << 13;
+    *state ^= *state >> 17;
+    *state ^= *state << 5;
+    return *state;
+}
+
+static inline void dict_bench_record_latency(struct dict_bench_stats *stats, usec_t latency_ut, uint32_t *rng) {
+    stats->latency_total_ut += latency_ut;
+    stats->latency_samples_seen++;
+
+    if(stats->latency_samples_used < DICT_BENCH_MAX_SAMPLES)
+        stats->latency_samples[stats->latency_samples_used++] = latency_ut;
+    else {
+        // reservoir sampling: replace a random slot with probability N/total_seen
+        uint32_t idx = dict_bench_rand(rng) % stats->latency_samples_seen;
+        if(idx < DICT_BENCH_MAX_SAMPLES)
+            stats->latency_samples[idx] = latency_ut;
+    }
+}
+
+static void dict_bench_lookup_key(char *buf, size_t len, size_t key_idx) {
+    snprintfz(buf, len, "bench-item-%zu", key_idx);
+}
+
+static void dict_bench_reader_thread(void *arg) {
+    struct dict_bench_thread *ctx = arg;
+    const size_t hot_keys = MIN(ctx->cfg->entries, (size_t)64);
+
+    while(!__atomic_load_n(ctx->join, __ATOMIC_RELAXED)) {
+        usec_t started_ut = 0;
+        bool sample_latency = ((ctx->stats.ops & (DICT_BENCH_SAMPLE_EVERY - 1)) == 0);
+
+        if(sample_latency)
+            started_ut = now_monotonic_usec();
+
+        if(ctx->cfg->read_mode == DICT_BENCH_READ_TRAVERSAL) {
+            void *v;
+            dfe_start_read(ctx->dict, v) {
+                (void)v;
+                ctx->stats.items_seen++;
+            }
+            dfe_done(v);
+        }
+        else {
+            char name[64];
+            size_t key_idx;
+
+            if(ctx->cfg->read_mode == DICT_BENCH_READ_LOOKUP_HOT)
+                key_idx = dict_bench_rand(&ctx->rng_state) % hot_keys;
+            else
+                key_idx = dict_bench_rand(&ctx->rng_state) % ctx->cfg->entries;
+
+            dict_bench_lookup_key(name, sizeof(name), key_idx);
+            (void)dictionary_get(ctx->dict, name);
+        }
+
+        ctx->stats.ops++;
+
+        if(sample_latency)
+            dict_bench_record_latency(&ctx->stats, now_monotonic_usec() - started_ut, &ctx->rng_state);
+    }
+}
+
+static void dict_bench_writer_thread(void *arg) {
+    struct dict_bench_thread *ctx = arg;
+    uint64_t counter = 0;
+
+    while(!__atomic_load_n(ctx->join, __ATOMIC_RELAXED)) {
+        usec_t started_ut = 0;
+        bool sample_latency = ((ctx->stats.ops & (DICT_BENCH_SAMPLE_EVERY - 1)) == 0);
+
+        if(sample_latency)
+            started_ut = now_monotonic_usec();
+
+        if(ctx->cfg->write_mode == DICT_BENCH_WRITE_CHURN) {
+            char buf[64];
+            snprintfz(buf, sizeof(buf), "writer-key-%d-%"PRIu64, ctx->id, counter);
+            dictionary_set(ctx->dict, buf, NULL, 0);
+            dictionary_del(ctx->dict, buf);
+        }
+        else {
+            char buf[64];
+            size_t key_idx = dict_bench_rand(&ctx->rng_state) % ctx->cfg->entries;
+            uint64_t value = counter;
+
+            dict_bench_lookup_key(buf, sizeof(buf), key_idx);
+            dictionary_set(ctx->dict, buf, &value, sizeof(value));
+        }
+
+        counter++;
+        ctx->stats.ops++;
+
+        if(sample_latency)
+            dict_bench_record_latency(&ctx->stats, now_monotonic_usec() - started_ut, &ctx->rng_state);
+    }
+}
+
+static void dict_bench_prepopulate(DICTIONARY *dict, size_t entries) {
+    char name[64];
+
+    for(size_t i = 0; i < entries; i++) {
+        uint64_t value = i;
+        dict_bench_lookup_key(name, sizeof(name), i);
+        dictionary_set(dict, name, &value, sizeof(value));
+    }
+}
+
+static double dict_bench_percentile_ut(usec_t *samples, size_t samples_used, size_t percentile) {
+    if(!samples_used)
+        return 0.0;
+
+    qsort(samples, samples_used, sizeof(*samples), dict_bench_usec_cmp);
+
+    size_t idx = ((samples_used - 1) * percentile) / 100;
+    return (double)samples[idx];
+}
+
+static void dict_bench_aggregate_latency(
+    struct dict_bench_thread *threads,
+    int count,
+    bool writers,
+    double *avg_ut,
+    double *p99_ut
+) {
+    size_t max_samples = (size_t)DICT_BENCH_MAX_SAMPLES * count;
+    usec_t *samples = callocz(max_samples, sizeof(usec_t));
+    size_t samples_used = 0;
+    uint64_t total_latency_ut = 0;
+    uint64_t total_ops = 0;
+
+    for(int i = 0; i < count; i++) {
+        if(threads[i].is_writer != writers)
+            continue;
+
+        total_latency_ut += threads[i].stats.latency_total_ut;
+        total_ops += threads[i].stats.latency_samples_seen;
+
+        size_t available = max_samples - samples_used;
+        size_t copy = MIN(available, threads[i].stats.latency_samples_used);
+        if(copy) {
+            memcpy(&samples[samples_used], threads[i].stats.latency_samples, copy * sizeof(usec_t));
+            samples_used += copy;
+        }
+    }
+
+    *avg_ut = total_ops ? (double)total_latency_ut / (double)total_ops : 0.0;
+    *p99_ut = dict_bench_percentile_ut(samples, samples_used, 99);
+    freez(samples);
+}
+
+static void dict_bench_run_case(const struct dict_bench_config *cfg) {
+    int total_threads = cfg->readers + cfg->writers;
+    int join = 0;
+    struct dict_bench_thread *threads = callocz(total_threads, sizeof(*threads));
+    struct dict_bench_summary summary = {0};
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_NONE);
+    dict_bench_prepopulate(dict, cfg->entries);
+
+    for(int i = 0; i < cfg->readers; i++) {
+        char tname[32];
+        threads[i] = (struct dict_bench_thread){
+            .id = i,
+            .join = &join,
+            .dict = dict,
+            .cfg = cfg,
+            .is_writer = false,
+            .rng_state = (uint32_t)(i + 1) * 2654435761U,
+        };
+        snprintfz(tname, sizeof(tname), "dbread%d", i);
+        threads[i].thread = nd_thread_create(tname, NETDATA_THREAD_OPTION_DONT_LOG,
+                                             dict_bench_reader_thread, &threads[i]);
+    }
+
+    for(int i = 0; i < cfg->writers; i++) {
+        int idx = cfg->readers + i;
+        char tname[32];
+        threads[idx] = (struct dict_bench_thread){
+            .id = idx,
+            .join = &join,
+            .dict = dict,
+            .cfg = cfg,
+            .is_writer = true,
+            .rng_state = (uint32_t)(idx + 1) * 2246822519U,
+        };
+        snprintfz(tname, sizeof(tname), "dbwrite%d", i);
+        threads[idx].thread = nd_thread_create(tname, NETDATA_THREAD_OPTION_DONT_LOG,
+                                               dict_bench_writer_thread, &threads[idx]);
+    }
+
+    sleep_usec(cfg->seconds_to_run * USEC_PER_SEC);
+    __atomic_store_n(&join, 1, __ATOMIC_RELAXED);
+
+    for(int i = 0; i < total_threads; i++) {
+        nd_thread_join(threads[i].thread);
+        if(threads[i].is_writer)
+            summary.write_ops += threads[i].stats.ops;
+        else {
+            summary.read_ops += threads[i].stats.ops;
+            summary.read_items_seen += threads[i].stats.items_seen;
+        }
+    }
+
+    dict_bench_aggregate_latency(threads, total_threads, false, &summary.read_avg_ut, &summary.read_p99_ut);
+    dict_bench_aggregate_latency(threads, total_threads, true, &summary.write_avg_ut, &summary.write_p99_ut);
+    dictionary_destroy(dict);
+    cleanup_destroyed_dictionaries(false);
+    freez(threads);
+
+    if(cfg->read_mode == DICT_BENCH_READ_TRAVERSAL) {
+        fprintf(stderr, "%-14s %8zu %8d %8d %14.0f %14.0f %14.0f %14.2f %14.2f %14.2f %14.2f\n",
+                cfg->workload,
+                cfg->entries,
+                cfg->readers,
+                cfg->writers,
+                cfg->seconds_to_run ? (double)summary.read_ops / cfg->seconds_to_run : 0.0,
+                cfg->seconds_to_run ? (double)summary.read_items_seen / cfg->seconds_to_run : 0.0,
+                cfg->seconds_to_run ? (double)summary.write_ops / cfg->seconds_to_run : 0.0,
+                summary.read_avg_ut,
+                summary.read_p99_ut,
+                summary.write_avg_ut,
+                summary.write_p99_ut);
+    }
+    else {
+        fprintf(stderr, "%-14s %8zu %8d %8d %14.0f %14.0f %14.2f %14.2f %14.2f %14.2f\n",
+                cfg->workload,
+                cfg->entries,
+                cfg->readers,
+                cfg->writers,
+                cfg->seconds_to_run ? (double)summary.read_ops / cfg->seconds_to_run : 0.0,
+                cfg->seconds_to_run ? (double)summary.write_ops / cfg->seconds_to_run : 0.0,
+                summary.read_avg_ut,
+                summary.read_p99_ut,
+                summary.write_avg_ut,
+                summary.write_p99_ut);
+    }
+}
+
+static void dict_bench_print_separator(size_t width) {
+    for(size_t i = 0; i < width; i++)
+        fputc('-', stderr);
+    fputc('\n', stderr);
+}
+
+static void dict_bench_print_header_line(const char *line) {
+    fprintf(stderr, "%s\n", line);
+    dict_bench_print_separator(strlen(line));
+}
+
+static void dict_bench_print_suite_header(
+    const char *suite,
+    const char *read_ops_label,
+    const char *read_avg_label,
+    const char *read_slow_label,
+    const char *writer_desc
+) {
+    char header[512];
+
+    fprintf(stderr, "\n=== %s ===\n", suite);
+    fprintf(stderr, "%s\n", writer_desc);
+    snprintfz(header, sizeof(header),
+              "%-14s %8s %8s %8s %14s %14s %14s %14s %14s %14s",
+              "workload", "entries", "readers", "writers",
+              read_ops_label, "write ops/s",
+              read_avg_label, read_slow_label, "w avg us", "w slow us");
+    dict_bench_print_header_line(header);
+}
+
+static void dict_bench_print_traversal_header(void) {
+    char header[512];
+
+    fprintf(stderr, "\n=== Dictionary Traversal Benchmark ===\n");
+    fprintf(stderr, "Reader workload: full dictionary scan. Writer workload: temporary-key insert followed by delete.\n");
+    snprintfz(header, sizeof(header),
+              "%-14s %8s %8s %8s %14s %14s %14s %14s %14s %14s %14s",
+              "workload", "entries", "readers", "writers",
+              "full scans/s", "items visited/s", "write ops/s",
+              "avg scan us", "slow scan us", "w avg us", "w slow us");
+    dict_bench_print_header_line(header);
+}
+
+int dictionary_unittest_benchmark(void) {
+    const time_t seconds_to_run = 2;
+    const size_t sizes[] = {100, 10000};
+    const int readers[] = {1, 4, 8};
+    const int writers[] = {0, 1, 2};
+
+    dict_bench_print_traversal_header();
+    for(size_t i = 0; i < sizeof(readers) / sizeof(readers[0]); i++) {
+        for(size_t j = 0; j < sizeof(writers) / sizeof(writers[0]); j++) {
+            struct dict_bench_config cfg = {
+                .workload = "traversal",
+                .entries = 10000,
+                .readers = readers[i],
+                .writers = writers[j],
+                .seconds_to_run = seconds_to_run,
+                .read_mode = DICT_BENCH_READ_TRAVERSAL,
+                .write_mode = DICT_BENCH_WRITE_CHURN,
+            };
+            dict_bench_run_case(&cfg);
+        }
+    }
+
+    dict_bench_print_suite_header(
+        "Dictionary Lookup Benchmark",
+        "lookups/s",
+        "avg lookup us",
+        "slow lookup us",
+        "Reader workload: dictionary_get(). Writer workload: overwrite an existing dictionary entry."
+    );
+    for(size_t s = 0; s < sizeof(sizes) / sizeof(sizes[0]); s++) {
+        for(size_t i = 0; i < sizeof(readers) / sizeof(readers[0]); i++) {
+            for(size_t j = 0; j < sizeof(writers) / sizeof(writers[0]); j++) {
+                struct dict_bench_config hot_cfg = {
+                    .workload = "lookup-hot",
+                    .entries = sizes[s],
+                    .readers = readers[i],
+                    .writers = writers[j],
+                    .seconds_to_run = seconds_to_run,
+                    .read_mode = DICT_BENCH_READ_LOOKUP_HOT,
+                    .write_mode = DICT_BENCH_WRITE_UPDATE,
+                };
+                struct dict_bench_config random_cfg = hot_cfg;
+                random_cfg.workload = "lookup-random";
+                random_cfg.read_mode = DICT_BENCH_READ_LOOKUP_RANDOM;
+
+                dict_bench_run_case(&hot_cfg);
+                dict_bench_run_case(&random_cfg);
+            }
+        }
+    }
+
+    dict_bench_print_suite_header(
+        "Dictionary Mixed RW Benchmark",
+        "read ops/s",
+        "read avg us",
+        "slow read us",
+        "Reader workload: random lookups. Writer workload depends on the row: update rewrites existing keys, churn inserts then deletes temporary keys."
+    );
+    {
+        const struct dict_bench_config configs[] = {
+            {.workload = "mixed-8r1w", .entries = 10000, .readers = 8, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_UPDATE},
+            {.workload = "mixed-8r2w", .entries = 10000, .readers = 8, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_UPDATE},
+            {.workload = "mixed-4r1w", .entries = 10000, .readers = 4, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_CHURN},
+            {.workload = "mixed-4r2w", .entries = 10000, .readers = 4, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_CHURN},
+        };
+
+        for(size_t i = 0; i < sizeof(configs) / sizeof(configs[0]); i++)
+            dict_bench_run_case(&configs[i]);
+    }
+
+    dict_bench_print_suite_header(
+        "Dictionary Writer Cost Benchmark",
+        "read ops/s",
+        "read avg us",
+        "slow read us",
+        "Writer workload: 'update' overwrites existing keys, 'churn' inserts then deletes temporary keys; '+r' rows include background readers."
+    );
+    {
+        const struct dict_bench_config configs[] = {
+            {.workload = "update-1w", .entries = 10000, .readers = 0, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_NONE, .write_mode = DICT_BENCH_WRITE_UPDATE},
+            {.workload = "update-2w", .entries = 10000, .readers = 0, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_NONE, .write_mode = DICT_BENCH_WRITE_UPDATE},
+            {.workload = "churn-1w",  .entries = 10000, .readers = 0, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_NONE, .write_mode = DICT_BENCH_WRITE_CHURN},
+            {.workload = "churn-2w",  .entries = 10000, .readers = 0, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_NONE, .write_mode = DICT_BENCH_WRITE_CHURN},
+            {.workload = "update+r",  .entries = 10000, .readers = 8, .writers = 1, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_UPDATE},
+            {.workload = "churn+r",   .entries = 10000, .readers = 8, .writers = 2, .seconds_to_run = seconds_to_run, .read_mode = DICT_BENCH_READ_LOOKUP_RANDOM, .write_mode = DICT_BENCH_WRITE_CHURN},
+        };
+
+        for(size_t i = 0; i < sizeof(configs) / sizeof(configs[0]); i++)
+            dict_bench_run_case(&configs[i]);
+    }
+
+    fprintf(stderr, "\n");
+    return 0;
+}
+
 int dictionary_unittest(size_t entries) {
     if(entries < 10) entries = 10;
 

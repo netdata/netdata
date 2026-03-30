@@ -48,7 +48,7 @@ func TestDyncfgSecretStoreSeqExec(t *testing.T) {
 				assert.Equal(t, dyncfg.StatusRunning, entry.Status)
 				_, ok = mustSecretStoreService(t, mgr).GetStatus(secretstore.StoreKey(secretstore.KindVault, "vault_prod"))
 				assert.True(t, ok)
-				assert.Contains(t, out.String(), "schema get update test remove")
+				assert.Contains(t, out.String(), "schema get update test userconfig remove")
 				assert.NotContains(t, out.String(), "enable")
 				assert.NotContains(t, out.String(), "disable")
 

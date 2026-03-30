@@ -52,74 +52,6 @@ The default configuration for this integration does not impose any limits on dat
 
 This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per eBPF Cachestat instance
-
-These metrics show total number of calls to functions inside kernel.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.cachestat_ratio | ratio | % |
-| mem.cachestat_dirties | dirty | page/s |
-| mem.cachestat_hits | hit | hits/s |
-| mem.cachestat_misses | miss | misses/s |
-
-### Per apps
-
-These Metrics show grouped information per apps group.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| app_group | The name of the group defined in the configuration. |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.ebpf_cachestat_hit_ratio | ratio | % |
-| app.ebpf_cachestat_dirty_pages | pages | page/s |
-| app.ebpf_cachestat_access | hits | hits/s |
-| app.ebpf_cachestat_misses | misses | misses/s |
-
-### Per cgroup
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.cachestat_ratio | ratio | % |
-| cgroup.cachestat_dirties | dirty | page/s |
-| cgroup.cachestat_hits | hit | hits/s |
-| cgroup.cachestat_misses | miss | misses/s |
-| services.cachestat_ratio | a dimension per systemd service | % |
-| services.cachestat_dirties | a dimension per systemd service | page/s |
-| services.cachestat_hits | a dimension per systemd service | hits/s |
-| services.cachestat_misses | a dimension per systemd service | misses/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -195,5 +127,73 @@ sudo ./edit-config ebpf.d/cachestat.conf
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per eBPF Cachestat instance
+
+These metrics show total number of calls to functions inside kernel.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| mem.cachestat_ratio | ratio | % |
+| mem.cachestat_dirties | dirty | page/s |
+| mem.cachestat_hits | hit | hits/s |
+| mem.cachestat_misses | miss | misses/s |
+
+### Per apps
+
+These Metrics show grouped information per apps group.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| app.ebpf_cachestat_hit_ratio | ratio | % |
+| app.ebpf_cachestat_dirty_pages | pages | page/s |
+| app.ebpf_cachestat_access | hits | hits/s |
+| app.ebpf_cachestat_misses | misses | misses/s |
+
+### Per cgroup
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cgroup.cachestat_ratio | ratio | % |
+| cgroup.cachestat_dirties | dirty | page/s |
+| cgroup.cachestat_hits | hit | hits/s |
+| cgroup.cachestat_misses | miss | misses/s |
+| services.cachestat_ratio | a dimension per systemd service | % |
+| services.cachestat_dirties | a dimension per systemd service | page/s |
+| services.cachestat_hits | a dimension per systemd service | hits/s |
+| services.cachestat_misses | a dimension per systemd service | misses/s |
 
 

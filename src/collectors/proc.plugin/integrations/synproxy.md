@@ -44,35 +44,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Synproxy instance
-
-
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| netfilter.synproxy_syn_received | received | packets/s |
-| netfilter.synproxy_conn_reopened | reopened | connections/s |
-| netfilter.synproxy_cookies | valid, invalid, retransmits | cookies/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -96,5 +67,34 @@ There is no configuration file.
 
 ##### Examples
 There are no configuration examples.
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Synproxy instance
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| netfilter.synproxy_syn_received | received | packets/s |
+| netfilter.synproxy_conn_reopened | reopened | connections/s |
+| netfilter.synproxy_cookies | valid, invalid, retransmits | cookies/s |
 
 

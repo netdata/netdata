@@ -48,42 +48,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per FreeRADIUS instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| freeradius.authentication | requests, responses | packets/s |
-| freeradius.authentication_access_responses | accepts, rejects, challenges | packets/s |
-| freeradius.bad_authentication | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
-| freeradius.proxy_authentication | requests, responses | packets/s |
-| freeradius.proxy_authentication_access_responses | accepts, rejects, challenges | packets/s |
-| freeradius.proxy_bad_authentication | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
-| freeradius.accounting | requests, responses | packets/s |
-| freeradius.bad_accounting | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
-| freeradius.proxy_accounting | requests, responses | packets/s |
-| freeradius.proxy_bad_accounting | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
-
-
-
-## Alerts
-
-There are no alerts configured by default for this integration.
-
-
 ## Setup
 
 
@@ -210,6 +174,42 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+There are no alerts configured by default for this integration.
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per FreeRADIUS instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| freeradius.authentication | requests, responses | packets/s |
+| freeradius.authentication_access_responses | accepts, rejects, challenges | packets/s |
+| freeradius.bad_authentication | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
+| freeradius.proxy_authentication | requests, responses | packets/s |
+| freeradius.proxy_authentication_access_responses | accepts, rejects, challenges | packets/s |
+| freeradius.proxy_bad_authentication | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
+| freeradius.accounting | requests, responses | packets/s |
+| freeradius.bad_accounting | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
+| freeradius.proxy_accounting | requests, responses | packets/s |
+| freeradius.proxy_bad_accounting | dropped, duplicate, invalid, malformed, unknown-types | packets/s |
 
 
 

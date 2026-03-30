@@ -54,71 +54,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-## Metrics
-
-Metrics grouped by *scope*.
-
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-
-
-### Per Kubelet instance
-
-These metrics refer to the entire monitored application.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s_kubelet.apiserver_audit_requests_rejected | rejected | requests/s |
-| k8s_kubelet.apiserver_storage_data_key_generation_failures | failures | events/s |
-| k8s_kubelet.apiserver_storage_data_key_generation_latencies | 5_µs, 10_µs, 20_µs, 40_µs, 80_µs, 160_µs, 320_µs, 640_µs, 1280_µs, 2560_µs, 5120_µs, 10240_µs, 20480_µs, 40960_µs, +Inf | observes/s |
-| k8s_kubelet.apiserver_storage_data_key_generation_latencies_percent | 5_µs, 10_µs, 20_µs, 40_µs, 80_µs, 160_µs, 320_µs, 640_µs, 1280_µs, 2560_µs, 5120_µs, 10240_µs, 20480_µs, 40960_µs, +Inf | percentage |
-| k8s_kubelet.apiserver_storage_envelope_transformation_cache_misses | cache misses | events/s |
-| k8s_kubelet.kubelet_containers_running | total | running_containers |
-| k8s_kubelet.kubelet_pods_running | total | running_pods |
-| k8s_kubelet.kubelet_pods_log_filesystem_used_bytes | a dimension per namespace and pod | B |
-| k8s_kubelet.kubelet_runtime_operations | a dimension per operation type | operations/s |
-| k8s_kubelet.kubelet_runtime_operations_errors | a dimension per operation type | errors/s |
-| k8s_kubelet.kubelet_docker_operations | a dimension per operation type | operations/s |
-| k8s_kubelet.kubelet_docker_operations_errors | a dimension per operation type | errors/s |
-| k8s_kubelet.kubelet_node_config_error | experiencing_error | bool |
-| k8s_kubelet.kubelet_pleg_relist_interval_microseconds | 0.5, 0.9, 0.99 | microseconds |
-| k8s_kubelet.kubelet_pleg_relist_latency_microseconds | 0.5, 0.9, 0.99 | microseconds |
-| k8s_kubelet.kubelet_token_requests | total, failed | token_requests/s |
-| k8s_kubelet.rest_client_requests_by_code | a dimension per HTTP status code | requests/s |
-| k8s_kubelet.rest_client_requests_by_method | a dimension per HTTP method | requests/s |
-
-### Per volume manager
-
-These metrics refer to the Volume Manager.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s_kubelet.volume_manager_total_volumes | actual, desired | state |
-
-
-
-## Alerts
-
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ kubelet_node_config_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_node_config_error | the node is experiencing a configuration-related error (0: false, 1: true) |
-| [ kubelet_token_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_token_requests | number of failed Token() requests to the alternate token source |
-| [ kubelet_token_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_token_requests | number of failed Token() requests to the alternate token source |
-| [ kubelet_operations_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_operations_errors | number of Docker or runtime operation errors |
-| [ kubelet_operations_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_operations_errors | number of Docker or runtime operation errors |
-
-
 ## Setup
 
 
@@ -240,6 +175,71 @@ jobs:
 
 ```
 </details>
+
+
+
+## Alerts
+
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ kubelet_node_config_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_node_config_error | the node is experiencing a configuration-related error (0: false, 1: true) |
+| [ kubelet_token_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_token_requests | number of failed Token() requests to the alternate token source |
+| [ kubelet_token_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_token_requests | number of failed Token() requests to the alternate token source |
+| [ kubelet_operations_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_operations_errors | number of Docker or runtime operation errors |
+| [ kubelet_operations_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_operations_errors | number of Docker or runtime operation errors |
+
+
+## Metrics
+
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+
+
+### Per Kubelet instance
+
+These metrics refer to the entire monitored application.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| k8s_kubelet.apiserver_audit_requests_rejected | rejected | requests/s |
+| k8s_kubelet.apiserver_storage_data_key_generation_failures | failures | events/s |
+| k8s_kubelet.apiserver_storage_data_key_generation_latencies | 5_µs, 10_µs, 20_µs, 40_µs, 80_µs, 160_µs, 320_µs, 640_µs, 1280_µs, 2560_µs, 5120_µs, 10240_µs, 20480_µs, 40960_µs, +Inf | observes/s |
+| k8s_kubelet.apiserver_storage_data_key_generation_latencies_percent | 5_µs, 10_µs, 20_µs, 40_µs, 80_µs, 160_µs, 320_µs, 640_µs, 1280_µs, 2560_µs, 5120_µs, 10240_µs, 20480_µs, 40960_µs, +Inf | percentage |
+| k8s_kubelet.apiserver_storage_envelope_transformation_cache_misses | cache misses | events/s |
+| k8s_kubelet.kubelet_containers_running | total | running_containers |
+| k8s_kubelet.kubelet_pods_running | total | running_pods |
+| k8s_kubelet.kubelet_pods_log_filesystem_used_bytes | a dimension per namespace and pod | B |
+| k8s_kubelet.kubelet_runtime_operations | a dimension per operation type | operations/s |
+| k8s_kubelet.kubelet_runtime_operations_errors | a dimension per operation type | errors/s |
+| k8s_kubelet.kubelet_docker_operations | a dimension per operation type | operations/s |
+| k8s_kubelet.kubelet_docker_operations_errors | a dimension per operation type | errors/s |
+| k8s_kubelet.kubelet_node_config_error | experiencing_error | bool |
+| k8s_kubelet.kubelet_pleg_relist_interval_microseconds | 0.5, 0.9, 0.99 | microseconds |
+| k8s_kubelet.kubelet_pleg_relist_latency_microseconds | 0.5, 0.9, 0.99 | microseconds |
+| k8s_kubelet.kubelet_token_requests | total, failed | token_requests/s |
+| k8s_kubelet.rest_client_requests_by_code | a dimension per HTTP status code | requests/s |
+| k8s_kubelet.rest_client_requests_by_method | a dimension per HTTP method | requests/s |
+
+### Per volume manager
+
+These metrics refer to the Volume Manager.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| k8s_kubelet.volume_manager_total_volumes | actual, desired | state |
 
 
 

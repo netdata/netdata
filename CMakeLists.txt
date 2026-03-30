@@ -1527,6 +1527,7 @@ if(ENABLE_ML)
                 src/ml/ml_private.h
                 src/ml/ml_public.h
                 src/ml/ml_public.cc
+                src/ml/ml-unittest.cc
         )
 
         if(NOT ENABLE_MIMALLOC)
