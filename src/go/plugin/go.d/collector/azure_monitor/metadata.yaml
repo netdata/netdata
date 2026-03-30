@@ -41,7 +41,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            When `profiles` includes `auto` (the default), the collector queries Azure Resource Graph
+            When `profile_selection_mode` is `auto` (the default), the collector queries Azure Resource Graph
             to discover which resource types exist in the subscription and enables matching built-in profiles automatically.
         limits:
           description: |
@@ -142,9 +142,19 @@ modules:
               default_value: 20
               required: false
               group: Limits
-            - name: profiles
-              description: "Profile ids to enable. Use `auto` to discover resource types via Azure Resource Graph and enable matching profiles. Combine with explicit ids: `[auto, custom_profile]`."
-              default_value: "[auto]"
+            - name: profile_selection_mode
+              description: "Profile selection mode: `auto` discovers matching profiles via Azure Resource Graph, `exact` uses only listed profile ids, `combined` merges listed ids with auto-discovered profiles."
+              default_value: "auto"
+              required: false
+              group: Profiles
+            - name: profile_selection_mode_exact.profiles
+              description: Profile ids to enable (used when `profile_selection_mode` is `exact`).
+              default_value: "[]"
+              required: false
+              group: Profiles
+            - name: profile_selection_mode_combined.profiles
+              description: Profile ids to merge with auto-discovered profiles (used when `profile_selection_mode` is `combined`).
+              default_value: "[]"
               required: false
               group: Profiles
             - name: resource_groups
