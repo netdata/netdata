@@ -302,6 +302,33 @@ struct target *get_sid_target(STRING *sid_name) {
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------
+// Service
+
+#if (PROCESSES_HAVE_SERVICE == 1)
+struct target *services_root_target = NULL;
+
+struct target *get_service_target(STRING *service_name) {
+    struct target *w;
+    for(w = services_root_target ; w ; w = w->next)
+        if(w->service_name == service_name) return w;
+
+    w = callocz(sizeof(struct target), 1);
+    w->type = TARGET_TYPE_SERVICE;
+    w->service_name = string_dup(service_name);
+    w->id = string_dup(service_name);
+    w->name = string_dup(service_name);
+    w->clean_name = get_clean_name(w->name);
+
+    w->next = services_root_target;
+    services_root_target = w;
+
+    debug_log("added service '%s' target", string2str(w->service_name));
+
+    return w;
+}
+#endif
+
+// --------------------------------------------------------------------------------------------------------------------
 // apps_groups.conf
 
 struct target *apps_groups_root_target = NULL;
