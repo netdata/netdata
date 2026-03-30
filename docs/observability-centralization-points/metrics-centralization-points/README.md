@@ -29,7 +29,7 @@ To install a Netdata Parent:
 
 1. Install Netdata on your Parent node.
 
-   For installation instructions, see [Connect Agent to Cloud](/src/claim/README.md).
+   For installation instructions, see the [Installation section](/packaging/installer/README.md).
 
 2. After installation, configure `stream.conf` to enable reception from Children.
 
