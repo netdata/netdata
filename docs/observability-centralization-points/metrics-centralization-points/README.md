@@ -27,13 +27,9 @@ A **Netdata Parent** is a regular Netdata Agent configured to receive streaming 
 
 To install a Netdata Parent:
 
-1. Install Netdata using the kickstart script:
+1. Install Netdata on your Parent node.
 
-   ```bash
-   wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
-   ```
-
-   For more installation options, see the [kickstart installation guide](/packaging/installer/methods/kickstart.md).
+   For installation instructions, see [Connect Agent to Cloud](/src/claim/README.md).
 
 2. After installation, configure `stream.conf` to enable reception from Children.
 
