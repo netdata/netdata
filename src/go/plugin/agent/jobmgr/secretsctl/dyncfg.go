@@ -106,19 +106,10 @@ func (c *Controller) dyncfgCmdAdd(fn dyncfg.Function) {
 }
 
 func (c *Controller) dyncfgCmdSchema(fn dyncfg.Function) {
-	kind, ok := c.dyncfgExtractSecretStoreKindFromTemplateID(fn.ID())
-	if !ok {
-		storeKey, ok := c.dyncfgExtractSecretStoreKey(fn.ID())
-		if !ok {
-			c.api.SendCodef(fn, 400, "Invalid ID format for secretstore schema: %s.", fn.ID())
-			return
-		}
-		entry, ok := c.lookup(storeKey)
-		if !ok {
-			c.api.SendCodef(fn, 404, "The specified secretstore '%s' is not configured.", storeKey)
-			return
-		}
-		kind = entry.Cfg.Kind()
+	kind, err := c.dyncfgResolveSecretStoreKind(fn.ID())
+	if err != nil {
+		c.api.SendCodef(fn, secretStoreErrorCode(err), "%v", err)
+		return
 	}
 
 	schema, ok := c.service.Schema(kind)
@@ -201,9 +192,9 @@ func (c *Controller) dyncfgCmdTest(fn dyncfg.Function) {
 }
 
 func (c *Controller) dyncfgCmdUserconfig(fn dyncfg.Function) {
-	kind, ok := c.dyncfgExtractSecretStoreKindFromTemplateID(fn.ID())
-	if !ok {
-		c.api.SendCodef(fn, 400, "Invalid template ID for secretstore userconfig: %s.", fn.ID())
+	kind, err := c.dyncfgResolveSecretStoreKind(fn.ID())
+	if err != nil {
+		c.api.SendCodef(fn, secretStoreErrorCode(err), "%v", err)
 		return
 	}
 	if err := fn.ValidateHasPayload(); err != nil {
@@ -288,6 +279,21 @@ func (c *Controller) dyncfgNewTypedConfig(kind secretstore.StoreKind) (any, erro
 		return nil, fmt.Errorf("secretstore kind '%s' does not provide configuration", kind)
 	}
 	return cfg, nil
+}
+
+func (c *Controller) dyncfgResolveSecretStoreKind(id string) (secretstore.StoreKind, error) {
+	if kind, ok := c.dyncfgExtractSecretStoreKindFromTemplateID(id); ok {
+		return kind, nil
+	}
+	storeKey, ok := c.dyncfgExtractSecretStoreKey(id)
+	if !ok {
+		return "", fmt.Errorf("invalid secretstore ID format: %s", id)
+	}
+	entry, ok := c.lookup(storeKey)
+	if !ok {
+		return "", fmt.Errorf("%w: %s", secretstore.ErrStoreNotFound, storeKey)
+	}
+	return entry.Cfg.Kind(), nil
 }
 
 func (c *Controller) dyncfgExtractSecretStoreKindFromTemplateID(id string) (secretstore.StoreKind, bool) {
