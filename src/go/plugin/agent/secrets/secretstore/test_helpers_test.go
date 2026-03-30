@@ -5,8 +5,6 @@ package secretstore_test
 import (
 	"bytes"
 	"encoding/json"
-	"io"
-	"os"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -142,33 +140,8 @@ func cloneTestSlice(in []any) []any {
 func captureLoggerOutput(t *testing.T, fn func(log *logger.Logger)) string {
 	t.Helper()
 
-	prevStderr := os.Stderr
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	os.Stderr = w
-	restored := false
-	defer func() {
-		if !restored {
-			os.Stderr = prevStderr
-		}
-		_ = w.Close()
-		_ = r.Close()
-	}()
-
-	done := make(chan string, 1)
-	go func() {
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, r)
-		done <- buf.String()
-	}()
-
-	log := logger.New()
+	var buf bytes.Buffer
+	log := logger.NewWithWriter(&buf)
 	fn(log)
-
-	os.Stderr = prevStderr
-	restored = true
-	require.NoError(t, w.Close())
-	out := <-done
-	require.NoError(t, r.Close())
-	return out
+	return buf.String()
 }

@@ -2,16 +2,16 @@ package logger
 
 import (
 	"context"
+	"io"
 	"log/slog"
-	"os"
 	"runtime"
 	"strings"
 
 	"github.com/lmittmann/tint"
 )
 
-func newTextHandler() slog.Handler {
-	return slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+func newTextHandler(w io.Writer) slog.Handler {
+	return slog.NewTextHandler(w, &slog.HandlerOptions{
 		Level: Level.lvl,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 			switch a.Key {
@@ -32,8 +32,8 @@ func newTextHandler() slog.Handler {
 	})
 }
 
-func newTerminalHandler() slog.Handler {
-	return tint.NewHandler(os.Stderr, &tint.Options{
+func newTerminalHandler(w io.Writer) slog.Handler {
+	return tint.NewHandler(w, &tint.Options{
 		NoColor:   runtime.GOOS == "windows",
 		AddSource: true,
 		Level:     Level.lvl,

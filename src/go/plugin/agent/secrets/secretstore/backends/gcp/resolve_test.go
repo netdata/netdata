@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"io"
 	"net/http"
-	"os"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -64,32 +63,7 @@ func TestPublishedStoreResolve_LogsDetailedResolution(t *testing.T) {
 func captureLoggerOutput(t *testing.T, fn func(log *logger.Logger)) string {
 	t.Helper()
 
-	prevStderr := os.Stderr
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	os.Stderr = w
-	restored := false
-	defer func() {
-		if !restored {
-			os.Stderr = prevStderr
-		}
-		_ = w.Close()
-		_ = r.Close()
-	}()
-
-	done := make(chan string, 1)
-	go func() {
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, r)
-		done <- buf.String()
-	}()
-
-	fn(logger.New())
-
-	os.Stderr = prevStderr
-	restored = true
-	require.NoError(t, w.Close())
-	out := <-done
-	require.NoError(t, r.Close())
-	return out
+	var buf bytes.Buffer
+	fn(logger.NewWithWriter(&buf))
+	return buf.String()
 }

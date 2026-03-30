@@ -3,18 +3,12 @@
 package logger
 
 import (
-	"log/slog"
+	"os"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 )
 
 func newDefaultLogger() *Logger {
-	if terminal.IsTerminal() {
-		// skip 2 slog pkg calls, 3 this pkg calls
-		return &Logger{sl: slog.New(withTerminalCallDepth(5, newTerminalHandler())), rl: newRateLimiter()}
-	}
-	return &Logger{sl: slog.New(newTextHandler()).With(pluginAttr), rl: newRateLimiter()}
+	return newLogger(os.Stderr, isTerm, 5)
 }
 
 var defaultLogger = newDefaultLogger()
