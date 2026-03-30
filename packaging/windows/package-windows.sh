@@ -7,6 +7,9 @@ repo_root="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/nu
 
 set -eu -o pipefail
 
+wix_arch="${WIX_ARCH:-x64}"
+WIX_BIN="${WIX_BIN:-}"
+
 find_cmd() {
     local cmd
 
@@ -46,11 +49,6 @@ find_wix() {
 
     return 1
 }
-
-if ! find_wix > /dev/null; then
-    echo "Missing required command: wix. Checked PATH and common WiX installation directories." >&2
-    exit 1
-fi
 
 # Regenerate keys everytime there is an update
 if [ -d /opt/netdata/etc/pki/ ]; then
@@ -101,3 +99,19 @@ ${GITHUB_ACTIONS+echo "::endgroup::"}
 #cp "${build}/usr/bin/netdata_driver.*" "${build}/driver"
 #powershell.exe -ExecutionPolicy Bypass -File "${repo_root}/packaging/windows/generate-driver-catalog.ps1"
 #${GITHUB_ACTIONS+echo "::endgroup::"}
+
+if [ -z "${WIX_BIN}" ]; then
+    WIX_BIN="$(find_wix || true)"
+fi
+
+if [ -n "${WIX_BIN}" ] && [ -f "${build}/netdata.wxs" ]; then
+    ${GITHUB_ACTIONS+echo "::group::MSI"}
+    cd "${build}"
+    "${WIX_BIN}" build \
+        -arch "${wix_arch}" \
+        -ext WixToolset.Util.wixext \
+        -ext WixToolset.UI.wixext \
+        -out "${repo_root}/packaging/windows/netdata-${wix_arch}.msi" \
+        "netdata.wxs"
+    ${GITHUB_ACTIONS+echo "::endgroup::"}
+fi
