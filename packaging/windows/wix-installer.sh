@@ -2,7 +2,7 @@
 
 repo_root="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
 
-# shellcheck source=./win-build-dir.sh
+# shellcheck source=packaging/windows/win-build-dir.sh
 . "${repo_root}/packaging/windows/win-build-dir.sh"
 
 set -eu -o pipefail
@@ -54,6 +54,7 @@ if [ -z "${WIX_BIN}" ]; then
     WIX_BIN="$(find_wix || true)"
 fi
 
+# shellcheck disable=SC2154  # build is set by the sourced win-build-dir.sh
 if [ -n "${WIX_BIN}" ] && [ -f "${build}/netdata.wxs" ]; then
     ${GITHUB_ACTIONS+echo "::group::MSI"}
     cd "${build}"
