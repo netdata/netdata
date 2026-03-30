@@ -515,6 +515,7 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
         buf = strdupz(comm);
 
     sanitize_apps_plugin_chart_meta(buf);
+    string_freez(p->comm);
     p->comm = string_strdupz(buf);
     freez(buf);
     p->is_manager = is_process_a_manager(p);
