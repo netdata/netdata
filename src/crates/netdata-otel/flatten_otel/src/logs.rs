@@ -5,8 +5,8 @@ use opentelemetry_proto::tonic::{
 };
 
 use crate::{
-    json_from_any_value, json_from_instrumentation_scope, json_from_key_value_list,
-    json_from_resource,
+    flatten_and_strip, json_from_any_value, json_from_instrumentation_scope,
+    json_from_key_value_list, json_from_resource,
 };
 
 pub fn json_from_log_record(jm: &mut JsonMap<String, JsonValue>, log_record: &LogRecord) {
@@ -43,7 +43,7 @@ pub fn json_from_log_record(jm: &mut JsonMap<String, JsonValue>, log_record: &Lo
                         let mut temp_map = JsonMap::new();
                         temp_map.insert("body".to_string(), parsed);
 
-                        let flattened_body = flatten_serde_json::flatten(&temp_map);
+                        let flattened_body = flatten_and_strip(&temp_map);
                         for (key, value) in flattened_body {
                             jm.insert(format!("log.{}", key), value);
                         }
@@ -66,7 +66,7 @@ pub fn json_from_log_record(jm: &mut JsonMap<String, JsonValue>, log_record: &Lo
                 let mut temp_map = JsonMap::new();
                 temp_map.insert("body".to_string(), body_json);
 
-                let flattened_body = flatten_serde_json::flatten(&temp_map);
+                let flattened_body = flatten_and_strip(&temp_map);
                 for (key, value) in flattened_body {
                     jm.insert(format!("log.{}", key), value);
                 }
