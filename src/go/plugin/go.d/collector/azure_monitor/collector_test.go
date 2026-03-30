@@ -60,9 +60,12 @@ func TestCollector_Init(t *testing.T) {
 		},
 		"fails on negative timeout": {
 			cfg: Config{
-				SubscriptionID: "sub-1",
-				Timeout:        confopt.Duration(-time.Second),
-				Profiles:       []string{"postgres_flexible"},
+				SubscriptionID:       "sub-1",
+				Timeout:              confopt.Duration(-time.Second),
+				ProfileSelectionMode: profileSelectionModeExact,
+				ProfileSelectionModeExact: &ProfileSelectionModeExactConfig{
+					Profiles: []string{"postgres_flexible"},
+				},
 				Auth: cloudauth.AzureADAuthConfig{
 					Mode: cloudauth.AzureADAuthModeDefault,
 				},
@@ -150,7 +153,8 @@ func TestCollector_UsesConfiguredTimeout(t *testing.T) {
 			setup: func(c *Collector, rg *mockResourceGraph, mx *mockMetricsClient) {
 				c.Config = testConfig()
 				c.Config.Timeout = confopt.Duration(timeout)
-				c.Config.Profiles = []string{"auto"}
+				c.Config.ProfileSelectionMode = profileSelectionModeAuto
+				c.Config.ProfileSelectionModeExact = nil
 				rg.resources = []map[string]any{
 					{"type": "microsoft.dbforpostgresql/flexibleservers", "count_": int64(1)},
 				}
@@ -357,7 +361,7 @@ func TestCollector_TimeGrainScheduling(t *testing.T) {
 	}
 
 	cfg := testConfig()
-	cfg.Profiles = []string{"storage_slow"}
+	cfg.ProfileSelectionModeExact = &ProfileSelectionModeExactConfig{Profiles: []string{"storage_slow"}}
 
 	catalog := mustLoadStockCatalog(t, map[string]string{
 		"storage_slow.yaml": `
@@ -424,7 +428,8 @@ func TestCollector_InitAutoDiscover(t *testing.T) {
 
 	c := New()
 	c.Config = testConfig()
-	c.Config.Profiles = []string{"auto"}
+	c.Config.ProfileSelectionMode = profileSelectionModeAuto
+	c.Config.ProfileSelectionModeExact = nil
 	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
 		return rg, nil
 	}
@@ -433,7 +438,8 @@ func TestCollector_InitAutoDiscover(t *testing.T) {
 	}
 
 	require.NoError(t, c.Init(context.Background()))
-	assert.Contains(t, c.Config.Profiles, "postgres_flexible")
+	require.NotEmpty(t, c.runtime.Profiles)
+	assert.Equal(t, "postgres_flexible", c.runtime.Profiles[0].ID)
 }
 
 func TestCollector_InitAutoDiscoverWithExplicit(t *testing.T) {
@@ -445,7 +451,11 @@ func TestCollector_InitAutoDiscoverWithExplicit(t *testing.T) {
 
 	c := New()
 	c.Config = testConfig()
-	c.Config.Profiles = []string{"auto", "cosmos_db"}
+	c.Config.ProfileSelectionMode = profileSelectionModeCombined
+	c.Config.ProfileSelectionModeExact = nil
+	c.Config.ProfileSelectionModeCombined = &ProfileSelectionModeCombinedConfig{
+		Profiles: []string{"cosmos_db"},
+	}
 	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
 		return rg, nil
 	}
@@ -454,14 +464,19 @@ func TestCollector_InitAutoDiscoverWithExplicit(t *testing.T) {
 	}
 
 	require.NoError(t, c.Init(context.Background()))
-	assert.Contains(t, c.Config.Profiles, "cosmos_db")
-	assert.Contains(t, c.Config.Profiles, "postgres_flexible")
+	var ids []string
+	for _, p := range c.runtime.Profiles {
+		ids = append(ids, p.ID)
+	}
+	assert.Contains(t, ids, "cosmos_db")
+	assert.Contains(t, ids, "postgres_flexible")
 }
 
-func TestCollector_InitEmptyProfilesDefaultsToAuto(t *testing.T) {
+func TestCollector_InitDefaultModeIsAuto(t *testing.T) {
 	c := New()
 	c.Config = testConfig()
-	c.Config.Profiles = []string{}
+	c.Config.ProfileSelectionMode = ""
+	c.Config.ProfileSelectionModeExact = nil
 	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
 		return &mockResourceGraph{}, nil
 	}
@@ -483,7 +498,8 @@ func TestCollector_InitAutoDiscoverNoMatchFails(t *testing.T) {
 
 	c := New()
 	c.Config = testConfig()
-	c.Config.Profiles = []string{"auto"}
+	c.Config.ProfileSelectionMode = profileSelectionModeAuto
+	c.Config.ProfileSelectionModeExact = nil
 	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
 		return rg, nil
 	}
@@ -494,48 +510,6 @@ func TestCollector_InitAutoDiscoverNoMatchFails(t *testing.T) {
 	err := c.Init(context.Background())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "auto-discovery found no Azure resources")
-}
-
-func TestExtractAutoKeyword(t *testing.T) {
-	tests := map[string]struct {
-		input      []string
-		wantAuto   bool
-		wantRemain []string
-	}{
-		"auto only": {
-			input:      []string{"auto"},
-			wantAuto:   true,
-			wantRemain: []string{},
-		},
-		"auto with explicit": {
-			input:      []string{"auto", "vm", "sql"},
-			wantAuto:   true,
-			wantRemain: []string{"vm", "sql"},
-		},
-		"no auto": {
-			input:      []string{"vm", "sql"},
-			wantAuto:   false,
-			wantRemain: []string{"vm", "sql"},
-		},
-		"empty": {
-			input:      []string{},
-			wantAuto:   false,
-			wantRemain: []string{},
-		},
-		"auto case insensitive": {
-			input:      []string{"AUTO"},
-			wantAuto:   true,
-			wantRemain: []string{},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			gotAuto, gotRemain := extractAutoKeyword(tc.input)
-			assert.Equal(t, tc.wantAuto, gotAuto)
-			assert.Equal(t, tc.wantRemain, gotRemain)
-		})
-	}
 }
 
 func TestMergeProfileIDs(t *testing.T) {
@@ -570,8 +544,7 @@ func TestMergeProfileIDs(t *testing.T) {
 }
 
 func TestBuildCollectorRuntime_DetectsChartIDCollision(t *testing.T) {
-	cfg := testConfig()
-	cfg.Profiles = []string{"redis_upper", "redis_lower"}
+	profileIDs := []string{"redis_upper", "redis_lower"}
 
 	catalog := mustLoadStockCatalog(t, map[string]string{
 		"redis_upper.yaml": `
@@ -628,23 +601,26 @@ template:
 `,
 	})
 
-	_, err := buildCollectorRuntimeFromConfig(cfg, catalog)
+	_, err := buildCollectorRuntimeFromConfig(profileIDs, catalog)
 	require.Error(t, err)
 }
 
 func testConfig() Config {
 	return Config{
-		UpdateEvery:        60,
-		AutoDetectionRetry: 0,
-		SubscriptionID:     "sub-1",
-		Cloud:              "public",
-		DiscoveryEvery:     300,
-		QueryOffset:        180,
-		Timeout:            defaultTimeout,
-		MaxConcurrency:     4,
-		MaxBatchResources:  50,
-		MaxMetricsPerQuery: 20,
-		Profiles:           []string{"postgres_flexible"},
+		UpdateEvery:          60,
+		AutoDetectionRetry:   0,
+		SubscriptionID:       "sub-1",
+		Cloud:                "public",
+		DiscoveryEvery:       300,
+		QueryOffset:          180,
+		Timeout:              defaultTimeout,
+		MaxConcurrency:       4,
+		MaxBatchResources:    50,
+		MaxMetricsPerQuery:   20,
+		ProfileSelectionMode: profileSelectionModeExact,
+		ProfileSelectionModeExact: &ProfileSelectionModeExactConfig{
+			Profiles: []string{"postgres_flexible"},
+		},
 		Auth: cloudauth.AzureADAuthConfig{
 			Mode: cloudauth.AzureADAuthModeDefault,
 		},

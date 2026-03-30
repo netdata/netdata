@@ -19,6 +19,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
@@ -80,7 +81,14 @@ func (s *publishedStore) resolve(ctx context.Context, req secretstore.ResolveReq
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': store '%s': decoding secret data: %w", req.Original, req.StoreKey, err)
 	}
+	logResolvedRequest(ctx, req, project, secretName, version)
 	return string(decoded), nil
+}
+
+func logResolvedRequest(ctx context.Context, req secretstore.ResolveRequest, project, secretName, version string) {
+	if log, ok := logger.LoggerFromContext(ctx); ok {
+		log.Infof("resolved secret via gcp-sm secretstore '%s' project '%s' secret '%s' version '%s'", req.StoreKey, project, secretName, version)
+	}
 }
 
 func parseOperand(operand string) (string, string, string, bool) {

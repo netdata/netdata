@@ -24,7 +24,11 @@ const (
 	defaultMaxMetricsQuery  = 20
 )
 
-const profileAutoKeyword = "auto"
+const (
+	profileSelectionModeAuto     = "auto"
+	profileSelectionModeExact    = "exact"
+	profileSelectionModeCombined = "combined"
+)
 
 const (
 	cloudPublic     = "public"
@@ -33,20 +37,30 @@ const (
 )
 
 type Config struct {
-	Vnode              string                      `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int                         `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int                         `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	SubscriptionID     string                      `yaml:"subscription_id" json:"subscription_id"`
-	Cloud              string                      `yaml:"cloud,omitempty" json:"cloud"`
-	DiscoveryEvery     int                         `yaml:"discovery_every,omitempty" json:"discovery_every"`
-	QueryOffset        int                         `yaml:"query_offset,omitempty" json:"query_offset"`
-	Timeout            confopt.Duration            `yaml:"timeout,omitempty" json:"timeout"`
-	MaxConcurrency     int                         `yaml:"max_concurrency,omitempty" json:"max_concurrency"`
-	MaxBatchResources  int                         `yaml:"max_batch_resources,omitempty" json:"max_batch_resources"`
-	MaxMetricsPerQuery int                         `yaml:"max_metrics_per_query,omitempty" json:"max_metrics_per_query"`
-	ResourceGroups     []string                    `yaml:"resource_groups,omitempty" json:"resource_groups"`
-	Profiles           []string                    `yaml:"profiles,omitempty" json:"profiles"`
-	Auth               cloudauth.AzureADAuthConfig `yaml:"auth" json:"auth"`
+	Vnode                        string                              `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery                  int                                 `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry           int                                 `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	SubscriptionID               string                              `yaml:"subscription_id" json:"subscription_id"`
+	Cloud                        string                              `yaml:"cloud,omitempty" json:"cloud"`
+	DiscoveryEvery               int                                 `yaml:"discovery_every,omitempty" json:"discovery_every"`
+	QueryOffset                  int                                 `yaml:"query_offset,omitempty" json:"query_offset"`
+	Timeout                      confopt.Duration                    `yaml:"timeout,omitempty" json:"timeout"`
+	MaxConcurrency               int                                 `yaml:"max_concurrency,omitempty" json:"max_concurrency"`
+	MaxBatchResources            int                                 `yaml:"max_batch_resources,omitempty" json:"max_batch_resources"`
+	MaxMetricsPerQuery           int                                 `yaml:"max_metrics_per_query,omitempty" json:"max_metrics_per_query"`
+	ResourceGroups               []string                            `yaml:"resource_groups,omitempty" json:"resource_groups"`
+	ProfileSelectionMode         string                              `yaml:"profile_selection_mode,omitempty" json:"profile_selection_mode"`
+	ProfileSelectionModeExact    *ProfileSelectionModeExactConfig    `yaml:"profile_selection_mode_exact,omitempty" json:"profile_selection_mode_exact,omitempty"`
+	ProfileSelectionModeCombined *ProfileSelectionModeCombinedConfig `yaml:"profile_selection_mode_combined,omitempty" json:"profile_selection_mode_combined,omitempty"`
+	Auth                         cloudauth.AzureADAuthConfig         `yaml:"auth" json:"auth"`
+}
+
+type ProfileSelectionModeExactConfig struct {
+	Profiles []string `yaml:"profiles" json:"profiles"`
+}
+
+type ProfileSelectionModeCombinedConfig struct {
+	Profiles []string `yaml:"profiles" json:"profiles"`
 }
 
 func (c *Config) applyDefaults() {
@@ -77,8 +91,8 @@ func (c *Config) applyDefaults() {
 	if c.MaxMetricsPerQuery <= 0 {
 		c.MaxMetricsPerQuery = defaultMaxMetricsQuery
 	}
-	if len(c.Profiles) == 0 {
-		c.Profiles = []string{"auto"}
+	if strings.TrimSpace(c.ProfileSelectionMode) == "" {
+		c.ProfileSelectionMode = profileSelectionModeAuto
 	}
 }
 
@@ -120,19 +134,42 @@ func (c Config) validate() error {
 		errs = append(errs, err)
 	}
 
-	seenProfiles := map[string]struct{}{}
-	for _, name := range c.Profiles {
+	switch strings.ToLower(strings.TrimSpace(c.ProfileSelectionMode)) {
+	case profileSelectionModeAuto:
+	case profileSelectionModeExact:
+		if c.ProfileSelectionModeExact == nil || len(c.ProfileSelectionModeExact.Profiles) == 0 {
+			errs = append(errs, errors.New("'profile_selection_mode_exact.profiles' must not be empty when mode is 'exact'"))
+		} else {
+			errs = append(errs, validateProfilesList(c.ProfileSelectionModeExact.Profiles)...)
+		}
+	case profileSelectionModeCombined:
+		if c.ProfileSelectionModeCombined == nil || len(c.ProfileSelectionModeCombined.Profiles) == 0 {
+			errs = append(errs, errors.New("'profile_selection_mode_combined.profiles' must not be empty when mode is 'combined'"))
+		} else {
+			errs = append(errs, validateProfilesList(c.ProfileSelectionModeCombined.Profiles)...)
+		}
+	default:
+		errs = append(errs, fmt.Errorf("'profile_selection_mode' must be one of: %s, %s, %s",
+			profileSelectionModeAuto, profileSelectionModeExact, profileSelectionModeCombined))
+	}
+
+	return errors.Join(errs...)
+}
+
+func validateProfilesList(profiles []string) []error {
+	var errs []error
+	seen := map[string]struct{}{}
+	for _, name := range profiles {
 		n := strings.TrimSpace(name)
 		if n == "" {
 			errs = append(errs, errors.New("'profiles' contains an empty value"))
 			continue
 		}
 		norm := stringsLowerTrim(n)
-		if _, ok := seenProfiles[norm]; ok {
+		if _, ok := seen[norm]; ok {
 			errs = append(errs, fmt.Errorf("'profiles' contains duplicate value '%s'", n))
 		}
-		seenProfiles[norm] = struct{}{}
+		seen[norm] = struct{}{}
 	}
-
-	return errors.Join(errs...)
+	return errs
 }

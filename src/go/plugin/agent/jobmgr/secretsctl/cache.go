@@ -97,7 +97,7 @@ func (c *Controller) validateConfig(cfg secretstore.Config) error {
 	if c.service == nil {
 		return fmt.Errorf("secretstore service is not available")
 	}
-	return c.service.Validate(cfg)
+	return c.service.Validate(secretStoreResolveContext(c.Logger, cfg), cfg)
 }
 
 func (c *Controller) validateStored(key string) error {
@@ -110,7 +110,7 @@ func (c *Controller) validateStored(key string) error {
 	}
 
 	if _, ok := c.service.GetStatus(key); ok {
-		return c.service.ValidateStored(key)
+		return c.service.ValidateStored(secretStoreResolveContextForKey(c.Logger, key, entry.Cfg.Kind(), entry.Cfg.Name()), key)
 	}
 
 	return c.validateConfig(entry.Cfg)

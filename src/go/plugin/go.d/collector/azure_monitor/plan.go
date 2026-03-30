@@ -12,8 +12,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func buildCollectorRuntimeFromConfig(cfg Config, catalog azureprofiles.Catalog) (*collectorRuntime, error) {
-	profiles, err := catalog.Resolve(cfg.Profiles)
+func buildCollectorRuntimeFromConfig(profileIDs []string, catalog azureprofiles.Catalog) (*collectorRuntime, error) {
+	profiles, err := catalog.Resolve(profileIDs)
 	if err != nil {
 		return nil, err
 	}

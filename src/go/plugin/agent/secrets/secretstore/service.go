@@ -15,10 +15,10 @@ type Service interface {
 
 	GetStatus(key string) (StoreStatus, bool)
 
-	Validate(cfg Config) error
-	ValidateStored(key string) error
-	Add(cfg Config) error
-	Update(key string, cfg Config) error
+	Validate(ctx context.Context, cfg Config) error
+	ValidateStored(ctx context.Context, key string) error
+	Add(ctx context.Context, cfg Config) error
+	Update(ctx context.Context, key string, cfg Config) error
 	Remove(key string) error
 }
 

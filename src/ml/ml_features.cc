@@ -3,6 +3,29 @@
 #include "ml_config.h"
 #include "ml_features.h"
 
+static inline size_t ml_effective_smooth_n(const ml_features_t *features)
+{
+    // smooth_n == 0 is normalized to an effective window of 1, preserving the
+    // existing feature-extraction shape without introducing a separate no-op path.
+    return features->smooth_n == 0 ? 1 : features->smooth_n;
+}
+
+static inline void ml_validate_features_input(const ml_features_t *features, bool prediction_path)
+{
+    size_t smooth_n = ml_effective_smooth_n(features);
+    size_t min_required_samples = features->diff_n + smooth_n + features->lag_n;
+
+    fatal_assert(features->dst_n >= features->src_n &&
+                 "ml_features: dst buffer must be at least as large as src buffer");
+    if (prediction_path) {
+        fatal_assert(features->src_n >= min_required_samples &&
+                     "ml_features_preprocess_predict: src buffer is smaller than diff_n + effective_smooth_n + lag_n");
+    } else {
+        fatal_assert(features->src_n >= min_required_samples &&
+                     "ml_features_preprocess: src buffer is smaller than diff_n + effective_smooth_n + lag_n");
+    }
+}
+
 static void ml_features_diff(ml_features_t *features)
 {
     if (features->diff_n == 0)
@@ -24,27 +47,29 @@ static void ml_features_diff(ml_features_t *features)
 
 static void ml_features_smooth(ml_features_t *features)
 {
+    size_t smooth_n = ml_effective_smooth_n(features);
     calculated_number_t sum = 0.0;
 
     size_t idx = 0;
-    for (; idx != features->smooth_n - 1; idx++)
+    for (; idx != smooth_n - 1; idx++)
         sum += features->src[idx];
 
     for (; idx != (features->src_n - features->diff_n); idx++) {
         sum += features->src[idx];
-        calculated_number_t prev_cn = features->src[idx - (features->smooth_n - 1)];
-        features->src[idx - (features->smooth_n - 1)] = sum / features->smooth_n;
+        calculated_number_t prev_cn = features->src[idx - (smooth_n - 1)];
+        features->src[idx - (smooth_n - 1)] = sum / smooth_n;
         sum -= prev_cn;
     }
 
-    for (idx = 0; idx != features->smooth_n; idx++)
+    for (idx = 0; idx != smooth_n; idx++)
         features->src[(features->src_n - 1) - idx] = 0.0;
 }
 
-static void ml_features_lag(ml_features_t *features, double sampling_ratio)
+static void ml_features_lag(ml_features_t *features, std::vector<DSample> &preprocessed_features, double sampling_ratio)
 {
-    size_t n = features->src_n - features->diff_n - features->smooth_n + 1 - features->lag_n;
-    features->preprocessed_features.resize(n);
+    size_t n = features->src_n - features->diff_n - ml_effective_smooth_n(features) + 1 - features->lag_n;
+    preprocessed_features.clear();
+    preprocessed_features.reserve(n);
 
     uint32_t max_mt = std::numeric_limits<uint32_t>::max();
     uint32_t cutoff = static_cast<double>(max_mt) * sampling_ratio;
@@ -52,24 +77,34 @@ static void ml_features_lag(ml_features_t *features, double sampling_ratio)
     size_t sample_idx = 0;
 
     for (size_t idx = 0; idx != n; idx++) {
-        DSample &DS = features->preprocessed_features[sample_idx++];
-        DS.set_size(features->lag_n + 1);
-
         if (Cfg.random_nums[idx % Cfg.random_nums.size()] > cutoff) {
-            sample_idx--;
             continue;
         }
+
+        preprocessed_features.emplace_back();
+        DSample &DS = preprocessed_features[sample_idx++];
+        DS.set_size(features->lag_n + 1);
 
         for (size_t feature_idx = 0; feature_idx != features->lag_n + 1; feature_idx++)
             DS(feature_idx) = features->src[idx + feature_idx];
     }
-
-    features->preprocessed_features.resize(sample_idx);
 }
 
-void ml_features_preprocess(ml_features_t *features, double sampling_ratio)
+void ml_features_preprocess(ml_features_t *features, std::vector<DSample> &preprocessed_features, double sampling_ratio)
 {
+    ml_validate_features_input(features, false);
     ml_features_diff(features);
     ml_features_smooth(features);
-    ml_features_lag(features, sampling_ratio);
+    ml_features_lag(features, preprocessed_features, sampling_ratio);
+}
+
+void ml_features_preprocess_predict(ml_features_t *features, DSample &sample)
+{
+    ml_validate_features_input(features, true);
+    ml_features_diff(features);
+    ml_features_smooth(features);
+
+    sample.set_size(features->lag_n + 1);
+    for (size_t feature_idx = 0; feature_idx != features->lag_n + 1; feature_idx++)
+        sample(feature_idx) = features->src[feature_idx];
 }

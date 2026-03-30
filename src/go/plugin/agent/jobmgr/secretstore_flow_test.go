@@ -87,7 +87,7 @@ func newTestSecretStoreService() secretstore.Service {
 func TestApplyConfig_ResolvesStoreReferenceWithKindAndName(t *testing.T) {
 	svc := newTestSecretStoreService()
 	raw := newSecretStoreConfigWithSource(t, secretstore.KindVault, "vault_prod", map[string]any{"value": "resolved-secret"}, confgroup.TypeDyncfg, confgroup.TypeDyncfg)
-	require.NoError(t, svc.Add(raw))
+	require.NoError(t, svc.Add(context.Background(), raw))
 
 	cfg := prepareDyncfgCfg("success", "secret-job").
 		Set("option_str", "${store:vault:vault_prod:value}").

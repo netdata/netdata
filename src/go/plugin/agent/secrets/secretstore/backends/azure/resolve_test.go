@@ -3,6 +3,7 @@
 package azure
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 	"github.com/stretchr/testify/assert"
@@ -111,4 +113,55 @@ func TestPublishedStoreResolve(t *testing.T) {
 			assert.Equal(t, tc.wantValue, value)
 		})
 	}
+}
+
+func TestPublishedStoreResolve_LogsDetailedResolution(t *testing.T) {
+	tokenProvider, err := cloudauth.NewTokenProvider(
+		fakeTokenCredential{
+			getToken: func(context.Context, policy.TokenRequestOptions) (azcore.AccessToken, error) {
+				return azcore.AccessToken{
+					Token:     "test-token",
+					ExpiresOn: time.Now().Add(30 * time.Minute),
+				}, nil
+			},
+		},
+		[]string{azureKeyVaultScope},
+		time.Minute,
+	)
+	require.NoError(t, err)
+
+	s := &publishedStore{
+		provider: &provider{
+			apiClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"value":"secret-value"}`)),
+					Header:     make(http.Header),
+				}, nil
+			})},
+		},
+		tokenProvider: tokenProvider,
+	}
+
+	out := captureLoggerOutput(t, func(log *logger.Logger) {
+		ctx := logger.ContextWithLogger(context.Background(), log)
+		value, err := s.Resolve(ctx, secretstore.ResolveRequest{
+			StoreKey: "azure-kv:azure_prod",
+			Operand:  "my-vault/my-secret",
+			Original: "${store:azure-kv:azure_prod:my-vault/my-secret}",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "secret-value", value)
+	})
+
+	assert.Contains(t, out, "resolved secret via azure-kv secretstore 'azure-kv:azure_prod' vault 'my-vault' secret 'my-secret'")
+	assert.NotContains(t, out, "secret-value")
+}
+
+func captureLoggerOutput(t *testing.T, fn func(log *logger.Logger)) string {
+	t.Helper()
+
+	var buf bytes.Buffer
+	fn(logger.NewWithWriter(&buf))
+	return buf.String()
 }

@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
@@ -68,7 +69,18 @@ func (s *publishedStore) resolve(ctx context.Context, req secretstore.ResolveReq
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("resolving secret '%s': store '%s': vault returned HTTP %d: %s", req.Original, req.StoreKey, resp.StatusCode, httpx.TruncateBody(body))
 	}
-	return parseResponse(body, key, req)
+	value, err := parseResponse(body, key, req)
+	if err != nil {
+		return "", err
+	}
+	logResolvedRequest(ctx, req, path, key)
+	return value, nil
+}
+
+func logResolvedRequest(ctx context.Context, req secretstore.ResolveRequest, path, key string) {
+	if log, ok := logger.LoggerFromContext(ctx); ok {
+		log.Infof("resolved secret via vault secretstore '%s' path '%s' key '%s'", req.StoreKey, path, key)
+	}
 }
 
 func (s *publishedStore) address() (string, error) {

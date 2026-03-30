@@ -57,7 +57,7 @@ func (c *Collector) initInstruments(runtime *collectorRuntime) error {
 }
 
 func (c *Collector) prepareInitResult(ctx context.Context) (*initResult, error) {
-	cfg, catalog, autoDiscover, err := c.prepareInitConfig()
+	cfg, catalog, autoDiscover, explicitProfiles, err := c.prepareInitConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -67,19 +67,23 @@ func (c *Collector) prepareInitResult(ctx context.Context) (*initResult, error) 
 		return nil, err
 	}
 
+	var profileIDs []string
+
 	if autoDiscover {
-		profiles, err := resolveAutoProfiles(ctx, cfg.SubscriptionID, cfg.Timeout.Duration(), resourceGraph, catalog, cfg.Profiles)
+		profiles, err := resolveAutoProfiles(ctx, cfg.SubscriptionID, cfg.Timeout.Duration(), resourceGraph, catalog, explicitProfiles)
 		if err != nil {
 			return nil, fmt.Errorf("auto-discover resource types: %w", err)
 		}
-		cfg.Profiles = profiles
-		if len(cfg.Profiles) == 0 {
+		if len(profiles) == 0 {
 			return nil, errors.New("auto-discovery found no Azure resources matching any known profile")
 		}
-		c.Infof("auto-discovery resolved profiles: %v", cfg.Profiles)
+		c.Infof("auto-discovery resolved profiles: %v", profiles)
+		profileIDs = profiles
+	} else {
+		profileIDs = explicitProfiles
 	}
 
-	runtime, err := buildCollectorRuntimeFromConfig(cfg, catalog)
+	runtime, err := buildCollectorRuntimeFromConfig(profileIDs, catalog)
 	if err != nil {
 		return nil, fmt.Errorf("build collector runtime: %w", err)
 	}
@@ -92,27 +96,33 @@ func (c *Collector) prepareInitResult(ctx context.Context) (*initResult, error) 
 	}, nil
 }
 
-func (c *Collector) prepareInitConfig() (Config, azureprofiles.Catalog, bool, error) {
+func (c *Collector) prepareInitConfig() (Config, azureprofiles.Catalog, bool, []string, error) {
 	cfg := c.Config
 	cfg.applyDefaults()
 
 	catalog, err := c.loadProfileCatalog()
 	if err != nil {
-		return Config{}, azureprofiles.Catalog{}, false, fmt.Errorf("load profiles catalog: %w", err)
-	}
-
-	autoDiscover, explicitProfiles := extractAutoKeyword(cfg.Profiles)
-	cfg.Profiles = explicitProfiles
-
-	if !autoDiscover && len(cfg.Profiles) == 0 {
-		return Config{}, azureprofiles.Catalog{}, false, errors.New("no profiles configured; use 'auto' for auto-discovery or specify profile ids")
+		return Config{}, azureprofiles.Catalog{}, false, nil, fmt.Errorf("load profiles catalog: %w", err)
 	}
 
 	if err := cfg.validate(); err != nil {
-		return Config{}, azureprofiles.Catalog{}, false, fmt.Errorf("config validation: %w", err)
+		return Config{}, azureprofiles.Catalog{}, false, nil, fmt.Errorf("config validation: %w", err)
 	}
 
-	return cfg, catalog, autoDiscover, nil
+	var autoDiscover bool
+	var explicitProfiles []string
+
+	switch stringsLowerTrim(cfg.ProfileSelectionMode) {
+	case profileSelectionModeAuto:
+		autoDiscover = true
+	case profileSelectionModeExact:
+		explicitProfiles = cfg.ProfileSelectionModeExact.Profiles
+	case profileSelectionModeCombined:
+		autoDiscover = true
+		explicitProfiles = cfg.ProfileSelectionModeCombined.Profiles
+	}
+
+	return cfg, catalog, autoDiscover, explicitProfiles, nil
 }
 
 func (c *Collector) prepareInitClients(cfg Config) (resourceGraphClient, *queryExecutor, error) {
@@ -151,19 +161,6 @@ func createCredential(auth cloudauth.AzureADAuthConfig, cloudCfg azcloud.Configu
 	return auth.NewCredentialWithOptions(&cloudauth.AzureADCredentialOptions{
 		ClientOptions: azcore.ClientOptions{Cloud: cloudCfg},
 	})
-}
-
-func extractAutoKeyword(profiles []string) (bool, []string) {
-	auto := false
-	filtered := make([]string, 0, len(profiles))
-	for _, p := range profiles {
-		if stringsLowerTrim(p) == profileAutoKeyword {
-			auto = true
-			continue
-		}
-		filtered = append(filtered, p)
-	}
-	return auto, filtered
 }
 
 func mergeProfileIDs(explicit, discovered []string) []string {

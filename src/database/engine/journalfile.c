@@ -1373,8 +1373,8 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
     journalfile_v2_generate_path(datafile, path, sizeof(path));
 
-    netdata_log_info("DBENGINE: tier %d: indexing journal v2 file %s: extents %zu, metrics %zu, pages %zu",
-        datafile_ctx(datafile)->config.tier, path,
+    netdata_log_info("DBENGINE: tier %d: indexing " WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 ": extents %zu, metrics %zu, pages %zu",
+        ctx->config.tier, datafile->tier, datafile->fileno,
         number_of_extents,
         number_of_metrics,
         number_of_pages);
@@ -1567,8 +1567,8 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
             char size_for_humans[128];
             size_snprintf(size_for_humans, sizeof(size_for_humans), total_file_size, "B", false);
-            netdata_log_info("DBENGINE: tier %d: migrated journal v2 file %s, %s",
-                           ctx->config.tier, path, size_for_humans);
+            netdata_log_info("DBENGINE: tier %d: migrated " WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 ", %s",
+                           ctx->config.tier, datafile->tier, datafile->fileno, size_for_humans);
 
             // msync(data_start, total_file_size, MS_SYNC);
             journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);

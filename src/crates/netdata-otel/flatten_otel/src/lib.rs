@@ -13,6 +13,10 @@ pub use logs::{json_from_export_logs_service_request, json_from_log_record};
 pub use metrics::flatten_metrics_request;
 
 pub fn json_from_key_value_list(kvl: &Vec<KeyValue>) -> JsonMap<String, JsonValue> {
+    flatten_and_strip(&json_map_from_key_value_list(kvl))
+}
+
+fn json_map_from_key_value_list(kvl: &Vec<KeyValue>) -> JsonMap<String, JsonValue> {
     let mut map = JsonMap::new();
 
     for kv in kvl {
@@ -23,7 +27,14 @@ pub fn json_from_key_value_list(kvl: &Vec<KeyValue>) -> JsonMap<String, JsonValu
         }
     }
 
-    flatten_serde_json::flatten(&map)
+    map
+}
+
+pub(crate) fn flatten_and_strip(map: &JsonMap<String, JsonValue>) -> JsonMap<String, JsonValue> {
+    flatten_serde_json::flatten(map)
+        .into_iter()
+        .filter(|(_k, v)| !v.is_object())
+        .collect()
 }
 
 fn json_from_any_value(any_value: &AnyValue) -> JsonValue {
@@ -42,7 +53,9 @@ fn json_from_any_value(any_value: &AnyValue) -> JsonValue {
             let values: Vec<JsonValue> = array.values.iter().map(json_from_any_value).collect();
             JsonValue::Array(values)
         }
-        Some(Value::KvlistValue(kvl)) => JsonValue::Object(json_from_key_value_list(&kvl.values)),
+        Some(Value::KvlistValue(kvl)) => {
+            JsonValue::Object(json_map_from_key_value_list(&kvl.values))
+        }
         Some(Value::BytesValue(bytes)) => JsonValue::String(BASE64.encode(bytes)),
         None => JsonValue::Null,
     }
