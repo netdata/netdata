@@ -180,12 +180,12 @@ func TestServiceStatusLifecycle(t *testing.T) {
 		Auth: map[string]any{"mode": "token_env"},
 	}, "vault_prod")
 
-	err := svc.Add(store)
+	err := svc.Add(context.Background(), store)
 	require.NoError(t, err)
 
 	failInit.Store(true)
 	storeKey := secretstore.StoreKey(secretstore.KindVault, "vault_prod")
-	err = svc.ValidateStored(storeKey)
+	err = svc.ValidateStored(context.Background(), storeKey)
 	require.Error(t, err)
 
 	status, ok := svc.GetStatus(storeKey)
@@ -195,7 +195,7 @@ func TestServiceStatusLifecycle(t *testing.T) {
 	assert.Equal(t, "simulated validation error", status.LastErrorSummary)
 
 	failInit.Store(false)
-	err = svc.ValidateStored(storeKey)
+	err = svc.ValidateStored(context.Background(), storeKey)
 	require.NoError(t, err)
 
 	status, ok = svc.GetStatus(storeKey)
@@ -213,7 +213,7 @@ func TestServiceResolveHonorsCanceledContext(t *testing.T) {
 	store := newFakeStore(t, svc, secretstore.KindVault, fakeConfig{
 		Auth: map[string]any{"mode": "token_env"},
 	}, "vault_prod")
-	err := svc.Add(store)
+	err := svc.Add(context.Background(), store)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -230,7 +230,7 @@ func TestServiceResolve_NormalizesNilContext(t *testing.T) {
 	store := newFakeStore(t, svc, secretstore.KindVault, fakeConfig{
 		Auth: map[string]any{"mode": "token_env"},
 	}, "vault_prod")
-	err := svc.Add(store)
+	err := svc.Add(context.Background(), store)
 	require.NoError(t, err)
 
 	val, err := svc.Resolve(nil, svc.Capture(), "vault:vault_prod:secret/data/app#key", "${store:vault:vault_prod:secret/data/app#key}")
@@ -245,7 +245,7 @@ func TestServiceConcurrentResolveAndMutation(t *testing.T) {
 		Auth: map[string]any{"mode": "token_env"},
 	}
 
-	err := svc.Add(newFakeStore(t, svc, secretstore.KindVault, baseCfg, "vault_prod"))
+	err := svc.Add(context.Background(), newFakeStore(t, svc, secretstore.KindVault, baseCfg, "vault_prod"))
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -279,7 +279,7 @@ func TestServiceConcurrentResolveAndMutation(t *testing.T) {
 					"tag":  "alt",
 				}
 			}
-			if err := svc.Update(secretstore.StoreKey(secretstore.KindVault, "vault_prod"), newFakeStore(t, svc, secretstore.KindVault, updateCfg, "vault_prod")); err != nil {
+			if err := svc.Update(context.Background(), secretstore.StoreKey(secretstore.KindVault, "vault_prod"), newFakeStore(t, svc, secretstore.KindVault, updateCfg, "vault_prod")); err != nil {
 				errCh <- err
 				return
 			}
@@ -302,13 +302,13 @@ func TestServiceValidateStored_RemovedDuringValidationReturnsNotFound(t *testing
 	store := newFakeStore(t, svc, secretstore.KindVault, fakeConfig{
 		Auth: map[string]any{"mode": "token_env"},
 	}, "vault_prod")
-	require.NoError(t, svc.Add(store))
+	require.NoError(t, svc.Add(context.Background(), store))
 
 	storeKey := secretstore.StoreKey(secretstore.KindVault, "vault_prod")
 	errCh := make(chan error, 1)
 
 	go func() {
-		errCh <- svc.ValidateStored(storeKey)
+		errCh <- svc.ValidateStored(context.Background(), storeKey)
 	}()
 
 	<-validateStarted
@@ -328,17 +328,17 @@ func TestServiceValidateStored_UpdatedDuringValidationReturnsRetryWithoutOverwri
 	store := newFakeStore(t, svc, secretstore.KindVault, fakeConfig{
 		Auth: map[string]any{"mode": "token_env"},
 	}, "vault_prod")
-	require.NoError(t, svc.Add(store))
+	require.NoError(t, svc.Add(context.Background(), store))
 
 	storeKey := secretstore.StoreKey(secretstore.KindVault, "vault_prod")
 	errCh := make(chan error, 1)
 
 	go func() {
-		errCh <- svc.ValidateStored(storeKey)
+		errCh <- svc.ValidateStored(context.Background(), storeKey)
 	}()
 
 	<-validateStarted
-	require.NoError(t, svc.Update(storeKey, newFakeStore(t, svc, secretstore.KindVault, fakeConfig{
+	require.NoError(t, svc.Update(context.Background(), storeKey, newFakeStore(t, svc, secretstore.KindVault, fakeConfig{
 		Auth: map[string]any{"mode": "token_env", "tag": "new"},
 	}, "vault_prod")))
 	close(validateRelease)

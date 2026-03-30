@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/envx"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
@@ -45,6 +46,7 @@ func (s *publishedStore) resolve(ctx context.Context, req secretstore.ResolveReq
 	}
 
 	if jsonKey == "" {
+		logResolvedRequest(ctx, req, secretName, "")
 		return secretString, nil
 	}
 
@@ -57,13 +59,27 @@ func (s *publishedStore) resolve(ctx context.Context, req secretstore.ResolveReq
 		return "", fmt.Errorf("resolving secret '%s': store '%s': key '%s' not found in SecretString JSON", req.Original, req.StoreKey, jsonKey)
 	}
 	if value, ok := val.(string); ok {
+		logResolvedRequest(ctx, req, secretName, jsonKey)
 		return value, nil
 	}
 	b, err := json.Marshal(val)
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': store '%s': encoding value for key '%s': %w", req.Original, req.StoreKey, jsonKey, err)
 	}
+	logResolvedRequest(ctx, req, secretName, jsonKey)
 	return string(b), nil
+}
+
+func logResolvedRequest(ctx context.Context, req secretstore.ResolveRequest, secretName, jsonKey string) {
+	log, ok := logger.LoggerFromContext(ctx)
+	if !ok {
+		return
+	}
+	if jsonKey == "" {
+		log.Infof("resolved secret via aws-sm secretstore '%s' secret '%s'", req.StoreKey, secretName)
+		return
+	}
+	log.Infof("resolved secret via aws-sm secretstore '%s' secret '%s' key '%s'", req.StoreKey, secretName, jsonKey)
 }
 
 func (s *publishedStore) region() (string, error) {

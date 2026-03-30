@@ -15,7 +15,7 @@ import (
 func TestProviderBackedRuntimeResolverOperandValidation(t *testing.T) {
 	svc := secretstore.NewService(backends.Creators()...)
 	for _, entry := range providerBackedConfigs() {
-		err := svc.Add(newStoreFromConfig(t, svc, entry.kind, entry.config))
+		err := svc.Add(context.Background(), newStoreFromConfig(t, svc, entry.kind, entry.config))
 		require.NoError(t, err)
 	}
 
