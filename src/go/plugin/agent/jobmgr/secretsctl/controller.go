@@ -92,6 +92,7 @@ func New(opts Options) *Controller {
 			dyncfg.CommandGet,
 			dyncfg.CommandUpdate,
 			dyncfg.CommandTest,
+			dyncfg.CommandUserconfig,
 		},
 	})
 	return c
