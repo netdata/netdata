@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -191,18 +192,32 @@ func TestServiceValidate_ResolvesBuiltinSecretsInProviderPayload(t *testing.T) {
 	modeFile := filepath.Join(t.TempDir(), "vault-mode")
 	require.NoError(t, os.WriteFile(modeFile, []byte("token\n"), 0o644))
 
-	tests := map[string]string{
-		"env":  "${env:TEST_VAULT_MODE}",
-		"file": "${file:" + modeFile + "}",
-		"cmd":  "${cmd:/bin/echo token}",
+	tests := map[string]struct {
+		modeRef       string
+		onWindowsSkip bool
+	}{
+		"env": {
+			modeRef: "${env:TEST_VAULT_MODE}",
+		},
+		"file": {
+			modeRef: "${file:" + modeFile + "}",
+		},
+		"cmd": {
+			modeRef:       "${cmd:/bin/echo token}",
+			onWindowsSkip: true,
+		},
 	}
 
-	for name, modeRef := range tests {
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			if tc.onWindowsSkip && runtime.GOOS == "windows" {
+				t.Skip("skipping on windows")
+			}
+
 			svc := secretstore.NewService(backends.Creators()...)
 
 			cfg := testSingleVaultConfig()
-			cfg["mode"] = modeRef
+			cfg["mode"] = tc.modeRef
 
 			require.NoError(t, svc.Validate(context.Background(), newStoreFromConfig(t, svc, secretstore.KindVault, cfg)))
 		})
@@ -241,10 +256,16 @@ func TestServiceAddUpdate_ResolvesBuiltinSecretsInProviderPayload(t *testing.T) 
 	require.NoError(t, svc.Update(context.Background(), storeKey, newStoreFromConfig(t, svc, secretstore.KindVault, fileCfg)))
 	assert.Equal(t, uint64(2), svc.Capture().Generation())
 
-	cmdCfg := testSingleVaultConfig()
-	cmdCfg["mode"] = "${cmd:/bin/echo token}"
-	require.NoError(t, svc.Update(context.Background(), storeKey, newStoreFromConfig(t, svc, secretstore.KindVault, cmdCfg)))
-	assert.Equal(t, uint64(3), svc.Capture().Generation())
+	t.Run("cmd", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("skipping on windows")
+		}
+
+		cmdCfg := testSingleVaultConfig()
+		cmdCfg["mode"] = "${cmd:/bin/echo token}"
+		require.NoError(t, svc.Update(context.Background(), storeKey, newStoreFromConfig(t, svc, secretstore.KindVault, cmdCfg)))
+		assert.Equal(t, uint64(3), svc.Capture().Generation())
+	})
 }
 
 func TestServiceValidate_RejectsStoreRefsInProviderPayload(t *testing.T) {

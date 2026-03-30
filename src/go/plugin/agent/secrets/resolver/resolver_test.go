@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -439,10 +440,11 @@ func TestResolveWithStoreResolver_LogsDetailedBuiltinResolution(t *testing.T) {
 	require.NoError(t, os.WriteFile(modeFile, []byte("from-file\n"), 0o600))
 
 	tests := map[string]struct {
-		cfg          map[string]any
-		setup        func(t *testing.T)
-		wantLog      string
-		dontWantLogs []string
+		cfg           map[string]any
+		onWindowsSkip bool
+		setup         func(t *testing.T)
+		wantLog       string
+		dontWantLogs  []string
 	}{
 		"env": {
 			cfg: map[string]any{"value": "${env:TEST_SECRET_ENV}"},
@@ -458,14 +460,18 @@ func TestResolveWithStoreResolver_LogsDetailedBuiltinResolution(t *testing.T) {
 			dontWantLogs: []string{"from-file"},
 		},
 		"cmd": {
-			cfg:          map[string]any{"value": "${cmd:/bin/echo from-cmd}"},
-			wantLog:      "resolved secret via command '/bin/echo'",
-			dontWantLogs: []string{"from-cmd"},
+			cfg:           map[string]any{"value": "${cmd:/bin/echo from-cmd}"},
+			onWindowsSkip: true,
+			wantLog:       "resolved secret via command '/bin/echo'",
+			dontWantLogs:  []string{"from-cmd"},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			if tc.onWindowsSkip && runtime.GOOS == "windows" {
+				t.Skip("skipping on windows")
+			}
 			if tc.setup != nil {
 				tc.setup(t)
 			}
