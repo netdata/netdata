@@ -708,6 +708,24 @@ async fn e2e_city_map_reuses_tuple_table_shape_with_city_and_coordinate_keys() {
             "DST_GEO_LONGITUDE".to_string(),
         ]
     );
+    assert_eq!(
+        response.data.columns["SRC_GEO_LATITUDE"]["visible"],
+        serde_json::json!(false)
+    );
+    assert_eq!(
+        response.data.columns["SRC_GEO_LONGITUDE"]["visible"],
+        serde_json::json!(false)
+    );
+    assert_eq!(
+        response.data.columns["DST_GEO_LATITUDE"]["visible"],
+        serde_json::json!(false)
+    );
+    assert_eq!(
+        response.data.columns["DST_GEO_LONGITUDE"]["visible"],
+        serde_json::json!(false)
+    );
+    assert!(response.data.columns["SRC_GEO_CITY"].get("visible").is_none());
+    assert!(response.data.columns["DST_GEO_CITY"].get("visible").is_none());
     assert!(
         !response.data.flows.is_empty(),
         "expected non-empty city-map rows"

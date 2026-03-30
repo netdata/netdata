@@ -3,6 +3,12 @@ use super::labels::field_value_labels;
 use serde_json::{Map, Value, json};
 
 const FULL_WIDTH_FIELDS: &[&str] = &["SRC_AS_NAME", "DST_AS_NAME"];
+const HIDDEN_GROUP_FIELDS: &[&str] = &[
+    "SRC_GEO_LATITUDE",
+    "SRC_GEO_LONGITUDE",
+    "DST_GEO_LATITUDE",
+    "DST_GEO_LONGITUDE",
+];
 
 pub(crate) fn build_table_columns(group_by: &[String]) -> Value {
     let mut columns = Map::new();
@@ -72,6 +78,9 @@ fn build_group_column(field: &str, index: usize) -> Value {
     column.insert("filter".to_string(), json!("multiselect"));
     if FULL_WIDTH_FIELDS.contains(&field) {
         column.insert("full_width".to_string(), json!(true));
+    }
+    if HIDDEN_GROUP_FIELDS.contains(&field) {
+        column.insert("visible".to_string(), json!(false));
     }
     if !value_options.is_empty() {
         column.insert("value_options".to_string(), Value::Object(value_options));
