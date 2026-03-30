@@ -741,7 +741,7 @@ intraChart:
             NULL,
             "replication",
             "ad.dra_replication_intrasite_compressed_traffic",
-            "DRA replication compressed traffic within site",
+            "DRA replication uncompressed traffic within site",
             "bytes/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",

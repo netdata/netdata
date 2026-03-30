@@ -2519,7 +2519,7 @@ modules:
                 - name: inbound
                 - name: outbound
             - name: ad.dra_replication_intrasite_compressed_traffic
-              description: DRA replication compressed traffic within site
+              description: DRA replication uncompressed traffic within site
               unit: bytes/s
               chart_type: area
               dimensions:
