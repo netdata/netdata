@@ -324,6 +324,12 @@ func (s *inMemoryService) prepareConfig(ctx context.Context, cfg Config) (prepar
 	if err := raw.Validate(); err != nil {
 		return preparedStore{}, err
 	}
+	rawConfig := cloneConfig(raw)
+	rawHash := raw.Hash()
+	resolvedPayload, err := resolveProviderPayload(ctx, raw)
+	if err != nil {
+		return preparedStore{}, err
+	}
 
 	kind := raw.Kind()
 	name := raw.Name()
@@ -341,6 +347,15 @@ func (s *inMemoryService) prepareConfig(ctx context.Context, cfg Config) (prepar
 	if err != nil {
 		return preparedStore{}, fmt.Errorf("store '%s': marshaling raw config: %w", key, err)
 	}
+	if len(resolvedPayload) != 0 {
+		for k, v := range resolvedPayload {
+			raw[k] = v
+		}
+		bs, err = yaml.Marshal(raw)
+		if err != nil {
+			return preparedStore{}, fmt.Errorf("store '%s': marshaling resolved config: %w", key, err)
+		}
+	}
 	if err := yaml.Unmarshal(bs, store.Configuration()); err != nil {
 		return preparedStore{}, fmt.Errorf("store '%s': invalid provider payload: %w", key, err)
 	}
@@ -356,8 +371,8 @@ func (s *inMemoryService) prepareConfig(ctx context.Context, cfg Config) (prepar
 
 	return preparedStore{
 		key:        key,
-		rawConfig:  raw,
-		configHash: raw.Hash(),
+		rawConfig:  rawConfig,
+		configHash: rawHash,
 		status: StoreStatus{
 			Name: name,
 			Kind: kind,

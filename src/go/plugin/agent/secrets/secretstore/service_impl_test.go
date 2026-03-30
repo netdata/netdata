@@ -4,6 +4,8 @@ package secretstore_test
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -179,4 +181,77 @@ func TestProviderBackedAddAcrossKinds(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestServiceValidate_ResolvesBuiltinSecretsInProviderPayload(t *testing.T) {
+	t.Setenv("TEST_VAULT_MODE", "token")
+
+	modeFile := filepath.Join(t.TempDir(), "vault-mode")
+	require.NoError(t, os.WriteFile(modeFile, []byte("token\n"), 0o644))
+
+	tests := map[string]string{
+		"env":  "${env:TEST_VAULT_MODE}",
+		"file": "${file:" + modeFile + "}",
+		"cmd":  "${cmd:/bin/echo token}",
+	}
+
+	for name, modeRef := range tests {
+		t.Run(name, func(t *testing.T) {
+			svc := secretstore.NewService(backends.Creators()...)
+
+			cfg := testSingleVaultConfig()
+			cfg["mode"] = modeRef
+
+			require.NoError(t, svc.Validate(newStoreFromConfig(t, svc, secretstore.KindVault, cfg)))
+		})
+	}
+}
+
+func TestServiceAddUpdate_ResolvesBuiltinSecretsInProviderPayload(t *testing.T) {
+	t.Setenv("TEST_VAULT_MODE", "token")
+
+	modeFile := filepath.Join(t.TempDir(), "vault-mode")
+	require.NoError(t, os.WriteFile(modeFile, []byte("token\n"), 0o644))
+
+	svc := secretstore.NewService(backends.Creators()...)
+	storeKey := secretstore.StoreKey(secretstore.KindVault, "vault_prod")
+
+	envCfg := testSingleVaultConfig()
+	envCfg["mode"] = "${env:TEST_VAULT_MODE}"
+	require.NoError(t, svc.Add(newStoreFromConfig(t, svc, secretstore.KindVault, envCfg)))
+	assert.Equal(t, uint64(1), svc.Capture().Generation())
+
+	fileCfg := testSingleVaultConfig()
+	fileCfg["mode"] = "${file:" + modeFile + "}"
+	require.NoError(t, svc.Update(storeKey, newStoreFromConfig(t, svc, secretstore.KindVault, fileCfg)))
+	assert.Equal(t, uint64(2), svc.Capture().Generation())
+
+	cmdCfg := testSingleVaultConfig()
+	cmdCfg["mode"] = "${cmd:/bin/echo token}"
+	require.NoError(t, svc.Update(storeKey, newStoreFromConfig(t, svc, secretstore.KindVault, cmdCfg)))
+	assert.Equal(t, uint64(3), svc.Capture().Generation())
+}
+
+func TestServiceValidate_RejectsStoreRefsInProviderPayload(t *testing.T) {
+	svc := secretstore.NewService(backends.Creators()...)
+
+	cfg := testSingleVaultConfig()
+	cfg["mode"] = "${store:vault:vault_prod:value}"
+
+	err := svc.Validate(newStoreFromConfig(t, svc, secretstore.KindVault, cfg))
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "secretstore resolver is not configured")
+}
+
+func TestServiceValidate_KeepsMetadataStatic(t *testing.T) {
+	t.Setenv("TEST_STORE_NAME", "vault_prod")
+
+	svc := secretstore.NewService(backends.Creators()...)
+
+	cfg := testSingleVaultConfig()
+	cfg["name"] = "${env:TEST_STORE_NAME}"
+
+	err := svc.Validate(newStoreFromConfig(t, svc, secretstore.KindVault, cfg))
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "invalid store name")
 }
