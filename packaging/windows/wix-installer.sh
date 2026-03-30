@@ -32,6 +32,7 @@ find_wix() {
     fi
 
     for candidate in \
+        "${HOME}/.dotnet/tools/wix.exe" \
         "/c/Program Files/WixToolset v6.0/bin/wix.exe" \
         "/c/Program Files/WiX Toolset v6.0/bin/wix.exe" \
         "/c/Program Files/WixToolset v5.0/bin/wix.exe" \
