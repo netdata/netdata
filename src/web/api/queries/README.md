@@ -2,7 +2,7 @@
 
 :::caution
 
-The `/api/v1/charts` endpoint is **deprecated** and has reached **End of Life (EOL)** status. For new integrations, use `/api/v3/contexts` instead to retrieve chart metadata and dimension information.
+The `/api/v1/charts` endpoint is **deprecated** and **no longer supported**. It remains available in current releases but may be removed in a future version. For new integrations, use `/api/v3/contexts` instead to retrieve chart metadata and dimension information.
 
 :::
 
