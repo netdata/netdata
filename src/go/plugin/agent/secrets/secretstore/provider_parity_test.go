@@ -3,6 +3,7 @@
 package secretstore_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -144,10 +145,10 @@ func TestProviderSchemaAndValidationParity(t *testing.T) {
 				tc.assertSchemaShape(t, schemaObj)
 			}
 
-			err := svc.Validate(newStoreFromConfig(t, svc, tc.kind, tc.valid))
+			err := svc.Validate(context.Background(), newStoreFromConfig(t, svc, tc.kind, tc.valid))
 			require.NoError(t, err)
 
-			err = svc.Validate(newStoreFromConfig(t, svc, tc.kind, tc.invalid))
+			err = svc.Validate(context.Background(), newStoreFromConfig(t, svc, tc.kind, tc.invalid))
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tc.wantErrContains)
 		})

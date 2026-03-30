@@ -2299,6 +2299,19 @@ static void ebpf_signal_stop_handler(int sig)
  */
 int main(int argc, char **argv)
 {
+    // Reduce memory footprint:
+    // - Single malloc arena avoids fragmentation across 24+ threads
+    // - Allocations >1MB use mmap so they're returned to OS on free,
+    //   preventing 30MB+ of brk heap holes from libbpf's temp buffers
+    // - THP disabled prevents 2MB huge page waste in sparse allocations
+#if defined(HAVE_C_MALLOPT)
+    mallopt(M_ARENA_MAX, 1);
+    mallopt(M_MMAP_THRESHOLD, 1024 * 1024);
+#endif
+#if defined(HAVE_SYS_PRCTL_H) && defined(PR_SET_THP_DISABLE)
+    prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0);
+#endif
+
     nd_log_initialize_for_external_plugins(NETDATA_EBPF_PLUGIN_NAME);
     netdata_threads_init_for_external_plugins(0);
 
@@ -2372,6 +2385,12 @@ int main(int argc, char **argv)
             em->lifetime = EBPF_DEFAULT_LIFETIME;
         }
     }
+
+    // BPF loading allocated ~50MB then freed most of it.
+    // glibc keeps freed pages in its free list; trim returns them to the OS.
+#if defined(HAVE_C_MALLOC_TRIM)
+    malloc_trim(0);
+#endif
 
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);

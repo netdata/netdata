@@ -3,6 +3,7 @@
 package secretstore_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -13,7 +14,7 @@ import (
 
 func TestRuntimeResolverResolveErrors(t *testing.T) {
 	enabledSvc := secretstore.NewService(backends.Creators()...)
-	err := enabledSvc.Add(newStoreFromConfig(t, enabledSvc, secretstore.KindVault, testSingleVaultConfig()))
+	err := enabledSvc.Add(context.Background(), newStoreFromConfig(t, enabledSvc, secretstore.KindVault, testSingleVaultConfig()))
 	require.NoError(t, err)
 
 	tests := map[string]struct {

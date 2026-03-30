@@ -897,13 +897,15 @@ func (*blockingSecretStoreService) GetStatus(string) (secretstore.StoreStatus, b
 	return secretstore.StoreStatus{}, false
 }
 
-func (*blockingSecretStoreService) Validate(secretstore.Config) error { return nil }
+func (*blockingSecretStoreService) Validate(context.Context, secretstore.Config) error { return nil }
 
-func (*blockingSecretStoreService) ValidateStored(string) error { return nil }
+func (*blockingSecretStoreService) ValidateStored(context.Context, string) error { return nil }
 
-func (*blockingSecretStoreService) Add(secretstore.Config) error { return nil }
+func (*blockingSecretStoreService) Add(context.Context, secretstore.Config) error { return nil }
 
-func (*blockingSecretStoreService) Update(string, secretstore.Config) error { return nil }
+func (*blockingSecretStoreService) Update(context.Context, string, secretstore.Config) error {
+	return nil
+}
 
 func (*blockingSecretStoreService) Remove(string) error      { return nil }
 func (j *collectorProbeJob) Cleanup()                        {}

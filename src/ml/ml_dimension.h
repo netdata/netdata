@@ -18,12 +18,13 @@ struct ml_dimension_t {
     uint32_t suppression_window_counter;
     uint32_t suppression_anomaly_counter;
     bool training_in_progress;
+    size_t cns_head;
 
     std::vector<calculated_number_t> cns;
 
     std::vector<ml_kmeans_inlined_t> km_contexts;
     ml_kmeans_t kmeans;
-    std::vector<DSample> feature;
+    DSample feature;
 };
 
 bool
