@@ -5,6 +5,7 @@ package azure_monitor
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -21,6 +22,10 @@ func (c *Collector) refreshDiscovery(ctx context.Context, force bool) ([]resourc
 	resources, byType, err := c.discoverResources(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	if !slices.Equal(resources, c.discovery.Resources) {
+		c.Infof("discovered %d resources: %v", len(resources), resources)
 	}
 
 	c.discovery = discoveryState{
