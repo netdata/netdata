@@ -51,6 +51,50 @@ You can modify web server behavior by editing the `[web]` section in `netdata.co
 | `web server max sockets`           | auto-detected                                                                                                                                                                          | Available sockets. The default is system-specific, automatically adjusted to 50% of the max number of open files Netdata is allowed to use (via `/etc/security/limits.conf` or systemd), to allow enough file descriptors to be available for data collection                                                                                                                                           |
 | `custom dashboard_info.js`         | empty                                                                                                                                                                                  | Specifies the location of a custom `dashboard.js` file.                                                                                                                                                                                                                                                                                                                                                 |
 
+## Embedding Netdata Metrics in External Pages
+
+If you want to embed Netdata charts or metrics in external web pages, applications, or documentation, you have several options depending on your needs.
+
+### Embedding Single Metrics
+
+For embedding individual metrics in external pages, use the **Badge API**. Badges are SVG images that display real-time metric values and can be added anywhere with a simple `<img>` tag.
+
+```html
+<img src="http://NODE:19999/api/v1/badge.svg?chart=CHART.NAME&dimensions=DIMENSION&label=LABEL" />
+```
+
+For example, to display the current system load:
+
+```html
+<img src="http://localhost:19999/api/v1/badge.svg?chart=system.load&dimensions=load1&label=System%20Load" />
+```
+
+The Badge API supports various options including time-frames, aggregation functions (average, min, max, sum), custom colors, and thresholds. For comprehensive documentation on badge options and examples, see the [Badge API documentation](/src/web/api/v1/api_v1_badge/README.md).
+
+### Embedding Full Dashboards
+
+For embedding complete Netdata dashboards in external applications:
+
+1. **Agent iframe embedding**: Use an HTML iframe pointing to your Netdata Agent URL:
+
+   ```html
+   <iframe src="http://NODE:19999" width="100%" height="600"></iframe>
+   ```
+
+   This embeds the full agent dashboard. Note that CORS and `X-Frame-Options` settings (configured via the `x-frame-options response header` setting above) may need to be adjusted for cross-origin embedding.
+
+2. **Netdata Cloud TV Mode**: For Netdata Cloud users, TV Mode provides clean, full-screen dashboards optimized for display on monitors or embedded views. Access TV Mode from any Cloud dashboard or War Room.
+
+### Custom Dashboard Files
+
+The `custom dashboard_info.js` configuration option allows advanced users to provide their own dashboard customization file. This setting specifies the filesystem path to a custom JavaScript file that can modify or extend dashboard behavior.
+
+:::note
+
+The Netdata dashboard is served from Netdata Cloud by default for connected Nodes. The Agent serves its own local dashboard when accessed directly at `http://NODE:19999`. The `custom dashboard_info.js` setting is for users who need to customize the local agent dashboard's behavior or appearance.
+
+:::
+
 ## Access Lists
 
 You can control who accesses different Netdata features using access lists in `netdata.conf`. `*` does string matches on the IPs or FQDNs of the clients.
