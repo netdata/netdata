@@ -505,11 +505,14 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
 
     // some process names have ( and ), remove the parenthesis
     size_t len = strlen(comm);
-    char *buf = strdupz(comm);
+    char *buf;
     if(comm[0] == '(' && comm[len - 1] == ')') {
+        buf = mallocz(len - 1);
         memcpy(buf, &comm[1], len - 2);
         buf[len - 2] = '\0';
     }
+    else
+        buf = strdupz(comm);
 
     sanitize_apps_plugin_chart_meta(buf);
     p->comm = string_strdupz(buf);
