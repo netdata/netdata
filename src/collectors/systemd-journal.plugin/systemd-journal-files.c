@@ -313,23 +313,27 @@ void nd_journal_file_update_header(const char *filename, struct nd_journal_file 
 
 static STRING *string_strdupz_source(const char *s, const char *e, size_t max_len, const char *prefix)
 {
-    char *buf = mallocz(max_len);
+    size_t buf_size = max_len;
+    size_t remaining = max_len;
+    char *buf = mallocz(buf_size);
     size_t len;
     char *dst = buf;
 
     if (prefix) {
         len = strlen(prefix);
+        if (len >= remaining)
+            len = remaining - 1;
         memcpy(buf, prefix, len);
         dst = &buf[len];
-        max_len -= len;
+        remaining -= len;
     }
 
     len = e - s;
-    if (len >= max_len)
-        len = max_len - 1;
+    if (len >= remaining)
+        len = remaining - 1;
     memcpy(dst, s, len);
     dst[len] = '\0';
-    buf[max_len - 1] = '\0';
+    buf[buf_size - 1] = '\0';
 
     for (size_t i = 0; buf[i]; i++)
         if (!is_netdata_api_valid_character(buf[i]))
