@@ -28,6 +28,17 @@ static void __attribute__((destructor)) destroy_mutex(void) {
     netdata_mutex_destroy(&db_mutex);
 }
 
+static inline size_t ml_dimension_smoothing_window(const ml_dimension_t *dim)
+{
+    unsigned chart_update_every = dim->rd->rrdset->update_every;
+    if (chart_update_every > nd_profile.update_every)
+        return 1;
+
+    // max_samples_to_smooth == 0 is normalized to an effective smoothing window
+    // of 1 for feature extraction.
+    return std::max<size_t>(Cfg.max_samples_to_smooth, 1);
+}
+
 typedef struct {
     // First/last entry of the dimension in DB when generating the response
     time_t first_entry_on_response;
@@ -57,7 +68,7 @@ ml_dimension_calculated_numbers(ml_worker_t *worker, ml_dimension_t *dim)
     training_response.last_entry_on_response = rrddim_last_entry_s_of_tier(dim->rd, 0);
 
     unsigned chart_update_every = dim->rd->rrdset->update_every;
-    size_t smoothing_window = (chart_update_every > nd_profile.update_every) ? 1 : Cfg.max_samples_to_smooth;
+    size_t smoothing_window = ml_dimension_smoothing_window(dim);
     size_t min_required_samples = Cfg.diff_n + smoothing_window + Cfg.lag_n;
 
     auto round_up_div = [](time_t window, unsigned step) -> size_t {
@@ -724,13 +735,12 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         memcpy(worker->scratch_training_cns, worker->training_cns,
                training_response.total_values * sizeof(calculated_number_t));
 
-        size_t smoothing_window = (dim->rd->rrdset->update_every > nd_profile.update_every) ? 1 : Cfg.max_samples_to_smooth;
+        size_t smoothing_window = ml_dimension_smoothing_window(dim);
 
         ml_features_t features = {
             Cfg.diff_n, smoothing_window, Cfg.lag_n,
             worker->scratch_training_cns, training_response.total_values,
-            worker->training_cns, training_response.total_values,
-            worker->training_samples
+            worker->training_cns, training_response.total_values
         };
         
         // Calculate dynamic sampling ratio based on expected output size
@@ -746,10 +756,10 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         }
 
         // Apply sampling during lag feature extraction
-        ml_features_preprocess(&features, sampling_ratio);
+        ml_features_preprocess(&features, worker->training_samples, sampling_ratio);
 
         ml_kmeans_init(&dim->kmeans);
-        ml_kmeans_train(&dim->kmeans, &features,  Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
+        ml_kmeans_train(&dim->kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
     }
 
     // update models
@@ -772,42 +782,79 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     // Don't treat values that don't exist as anomalous
     if (!exists) {
         dim->cns.clear();
+        dim->cns_head = 0;
         spinlock_unlock(&dim->slock);
         return false;
     }
 
     // Save the value and return if we don't have enough values for a sample
-    unsigned n = Cfg.diff_n + Cfg.max_samples_to_smooth + Cfg.lag_n;
-    if (dim->cns.size() < n) {
+    size_t smoothing_window = ml_dimension_smoothing_window(dim);
+    unsigned n = Cfg.diff_n + smoothing_window + Cfg.lag_n;
+
+    size_t cns_size = dim->cns.size();
+
+    // The ring buffer modulus is derived from the current effective smoothing
+    // window. When the effective window changes, the existing history is only
+    // reusable if it is still a linear chronological prefix, which in this
+    // representation means cns_head == 0. Wrapped ring state from the old
+    // modulus must be discarded before warmup/indexing/linearization continue.
+    bool invalid_head = (cns_size > 0 && dim->cns_head >= cns_size);
+    bool size_changed_with_wrapped_state = (cns_size != n && dim->cns_head != 0);
+    bool shrunk_below_existing_history = (cns_size > n);
+    if (invalid_head || size_changed_with_wrapped_state || shrunk_below_existing_history) {
+        dim->cns.clear();
+        dim->cns_head = 0;
+        cns_size = 0;
+    }
+
+    if (cns_size < n) {
         dim->cns.push_back(value);
         spinlock_unlock(&dim->slock);
         return false;
     }
 
-    // Push the value and check if it's different from the last one
-    bool same_value = true;
-    std::rotate(std::begin(dim->cns), std::begin(dim->cns) + 1, std::end(dim->cns));
-    if (dim->cns[n - 1] != value)
-        same_value = false;
-    dim->cns[n - 1] = value;
+    // Compare incoming value against the most recent sample (newest_idx).
+    //
+    // The old std::rotate code compared against the oldest element being dropped — that
+    // was a side effect of rotate mechanics, not intentional design.
+    //
+    // Downstream effect: when same_value is false, we set dim->mt = METRIC_TYPE_VARIABLE.
+    // This controls two things:
+    //   1. ml_dimension_train_model() skips training when mt == METRIC_TYPE_CONSTANT.
+    //   2. Statistics reporting counts constant vs variable dimensions.
+    //
+    // Comparing against newest is safe (and more correct) because:
+    //   - For truly constant series, all elements are equal — either comparison works.
+    //   - For changing series, comparing against newest detects the transition on the
+    //     first differing tick. The old oldest-comparison could miss transitions when
+    //     the oldest element happened to equal the new value by coincidence.
+    //   - mt is reset to METRIC_TYPE_CONSTANT after each training cycle,
+    //     so a single false negative cannot cause a permanent misclassification.
+    size_t newest_idx = (dim->cns_head + n - 1) % n;
+    bool same_value = (dim->cns[newest_idx] == value);
+    dim->cns[dim->cns_head] = value;
+    dim->cns_head = (dim->cns_head + 1) % n;
 
     // Create the sample
-    assert((n * (Cfg.lag_n + 1) <= 128) &&
-           "Static buffers too small to perform prediction. "
-           "This should not be possible with the default clamping of feature extraction options");
     calculated_number_t src_cns[128];
     calculated_number_t dst_cns[128];
+    constexpr size_t src_cns_capacity = sizeof(src_cns) / sizeof(src_cns[0]);
+    constexpr size_t dst_cns_capacity = sizeof(dst_cns) / sizeof(dst_cns[0]);
+    fatal_assert((n <= src_cns_capacity && n <= dst_cns_capacity) &&
+                 "Static buffers too small to perform prediction. "
+                 "This should not be possible with the default clamping of feature extraction options");
 
-    memset(src_cns, 0, n * (Cfg.lag_n + 1) * sizeof(calculated_number_t));
-    memcpy(src_cns, dim->cns.data(), n * sizeof(calculated_number_t));
-    memcpy(dst_cns, dim->cns.data(), n * sizeof(calculated_number_t));
+    size_t first_chunk = n - dim->cns_head;
+    memcpy(src_cns, dim->cns.data() + dim->cns_head, first_chunk * sizeof(calculated_number_t));
+    if (dim->cns_head)
+        memcpy(src_cns + first_chunk, dim->cns.data(), dim->cns_head * sizeof(calculated_number_t));
+    memcpy(dst_cns, src_cns, n * sizeof(calculated_number_t));
 
     ml_features_t features = {
-        Cfg.diff_n, Cfg.max_samples_to_smooth, Cfg.lag_n,
-        dst_cns, n, src_cns, n,
-        dim->feature
+        Cfg.diff_n, smoothing_window, Cfg.lag_n,
+        dst_cns, n, src_cns, n
     };
-    ml_features_preprocess(&features, 1.0);
+    ml_features_preprocess_predict(&features, dim->feature);
 
     // Mark the metric time as variable if we received different values
     if (!same_value)
@@ -831,7 +878,7 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     for (const auto &km_ctx : dim->km_contexts) {
         models_consulted++;
 
-        calculated_number_t anomaly_score = ml_kmeans_anomaly_score(&km_ctx, features.preprocessed_features[0]);
+        calculated_number_t anomaly_score = ml_kmeans_anomaly_score(&km_ctx, dim->feature);
         if (std::isnan(anomaly_score))
             continue;
 
