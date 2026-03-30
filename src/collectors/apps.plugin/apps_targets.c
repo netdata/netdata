@@ -5,14 +5,15 @@
 pid_t INIT_PID = OS_INIT_PID;
 
 static STRING *get_clean_name(STRING *name) {
-    char buf[string_strlen(name) + 1];
-    memcpy(buf, string2str(name), string_strlen(name) + 1);
+    char *buf = strdupz(string2str(name));
     netdata_fix_chart_name(buf);
 
     for (char *d = buf; *d ; d++)
         if (*d == '.') *d = '_';
 
-    return string_strdupz(buf);
+    STRING *clean = string_strdupz(buf);
+    freez(buf);
+    return clean;
 }
 
 static inline STRING *get_numeric_string(uint64_t n) {

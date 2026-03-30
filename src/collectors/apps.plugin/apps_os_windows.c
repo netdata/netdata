@@ -565,8 +565,7 @@ STRING *GetProcessFriendlyNameFromPathSanitized(WCHAR *path) {
 static STRING *GetNameFromCmdlineSanitized(struct pid_stat *p) {
     if(!p->cmdline) return NULL;
 
-    char buf[string_strlen(p->cmdline) + 1];
-    memcpy(buf, string2str(p->cmdline), sizeof(buf));
+    char *buf = strdupz(string2str(p->cmdline));
     char *words[100];
     size_t num_words = quoted_strings_splitter(buf, words, 100, isspace_map_pluginsd);
 
@@ -574,15 +573,19 @@ static STRING *GetNameFromCmdlineSanitized(struct pid_stat *p) {
         // find -s SERVICE in the command line
         for(size_t i = 0; i < num_words ;i++) {
             if(strcmp(words[i], "-s") == 0 && i + 1 < num_words) {
-                char service[strlen(words[i + 1]) + sizeof(SERVICE_PREFIX)]; // sizeof() includes a null
+                char *service = mallocz(strlen(words[i + 1]) + sizeof(SERVICE_PREFIX)); // sizeof() includes a null
                 strcpy(service, SERVICE_PREFIX);
                 strcpy(&service[sizeof(SERVICE_PREFIX) - 1], words[i + 1]);
                 sanitize_apps_plugin_chart_meta(service);
-                return string_strdupz(service);
+                STRING *sanitized = string_strdupz(service);
+                freez(service);
+                freez(buf);
+                return sanitized;
             }
         }
     }
 
+    freez(buf);
     return NULL;
 }
 

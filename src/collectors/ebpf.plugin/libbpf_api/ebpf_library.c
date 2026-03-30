@@ -1432,8 +1432,7 @@ static void ebpf_parse_service_list(void **out, const char *service)
  */
 static void ebpf_parse_port_list(void **out, const char *range_param)
 {
-    char range[strlen(range_param) + 1];
-    strncpyz(range, range_param, strlen(range_param));
+    char *range = strdupz(range_param);
 
     int first, last;
     ebpf_network_viewer_port_list_t **list = (ebpf_network_viewer_port_list_t **)out;
@@ -1459,6 +1458,7 @@ static void ebpf_parse_port_list(void **out, const char *range_param)
             netdata_log_info(
                 "The exclusion cannot be in the second part of the range, the range %s will be ignored.", copied);
             freez(copied);
+            freez(range);
             return;
         }
         last = str2i((const char *)end);
@@ -1470,6 +1470,7 @@ static void ebpf_parse_port_list(void **out, const char *range_param)
     if (first < NETDATA_MINIMUM_PORT_VALUE || first > NETDATA_MAXIMUM_PORT_VALUE) {
         netdata_log_info("The first port %d of the range \"%s\" is invalid and it will be ignored!", first, copied);
         freez(copied);
+        freez(range);
         return;
     }
 
@@ -1480,6 +1481,7 @@ static void ebpf_parse_port_list(void **out, const char *range_param)
         netdata_log_info(
             "The second port %d of the range \"%s\" is invalid and the whole range will be ignored!", last, copied);
         freez(copied);
+        freez(range);
         return;
     }
 
@@ -1487,6 +1489,7 @@ static void ebpf_parse_port_list(void **out, const char *range_param)
         netdata_log_info(
             "The specified order %s is wrong, the smallest value is always the first, it will be ignored!", copied);
         freez(copied);
+        freez(range);
         return;
     }
 
@@ -1501,6 +1504,7 @@ fillenvpl:
     w->cmp_last = (uint16_t)last;
 
     fill_port_list(list, w);
+    freez(range);
 }
 
 /**
