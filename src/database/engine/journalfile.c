@@ -1374,7 +1374,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     journalfile_v2_generate_path(datafile, path, sizeof(path));
 
     netdata_log_info("DBENGINE: tier %d: indexing " WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 ": extents %zu, metrics %zu, pages %zu",
-        datafile_ctx(datafile)->config.tier, datafile->tier, datafile->fileno,
+        ctx->config.tier, datafile->tier, datafile->fileno,
         number_of_extents,
         number_of_metrics,
         number_of_pages);
