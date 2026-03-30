@@ -146,11 +146,14 @@ func captureLoggerOutput(t *testing.T, fn func(log *logger.Logger)) string {
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	os.Stderr = w
-	t.Cleanup(func() {
+	restored := false
+	defer func() {
+		if !restored {
+			os.Stderr = prevStderr
+		}
 		_ = w.Close()
-		os.Stderr = prevStderr
 		_ = r.Close()
-	})
+	}()
 
 	done := make(chan string, 1)
 	go func() {
@@ -162,7 +165,10 @@ func captureLoggerOutput(t *testing.T, fn func(log *logger.Logger)) string {
 	log := logger.New()
 	fn(log)
 
+	os.Stderr = prevStderr
+	restored = true
 	require.NoError(t, w.Close())
 	out := <-done
+	require.NoError(t, r.Close())
 	return out
 }

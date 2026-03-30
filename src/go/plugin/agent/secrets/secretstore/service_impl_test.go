@@ -209,6 +209,19 @@ func TestServiceValidate_ResolvesBuiltinSecretsInProviderPayload(t *testing.T) {
 	}
 }
 
+func TestServiceValidate_ResolvesBuiltinSecretsInNestedProviderPayload(t *testing.T) {
+	t.Setenv("TEST_VAULT_TOKEN", "vault-token")
+
+	svc := secretstore.NewService(backends.Creators()...)
+
+	cfg := testSingleVaultConfig()
+	cfg["mode_token"] = map[string]any{
+		"token": "${env:TEST_VAULT_TOKEN}",
+	}
+
+	require.NoError(t, svc.Validate(context.Background(), newStoreFromConfig(t, svc, secretstore.KindVault, cfg)))
+}
+
 func TestServiceAddUpdate_ResolvesBuiltinSecretsInProviderPayload(t *testing.T) {
 	t.Setenv("TEST_VAULT_MODE", "token")
 

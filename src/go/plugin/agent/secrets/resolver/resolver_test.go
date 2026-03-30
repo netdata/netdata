@@ -491,11 +491,14 @@ func captureResolverLoggerOutput(t *testing.T, fn func(log *logger.Logger)) stri
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
 	os.Stderr = w
-	t.Cleanup(func() {
+	restored := false
+	defer func() {
+		if !restored {
+			os.Stderr = prevStderr
+		}
 		_ = w.Close()
 		_ = r.Close()
-		os.Stderr = prevStderr
-	})
+	}()
 
 	done := make(chan string, 1)
 	go func() {
@@ -506,6 +509,10 @@ func captureResolverLoggerOutput(t *testing.T, fn func(log *logger.Logger)) stri
 
 	fn(logger.New())
 
+	os.Stderr = prevStderr
+	restored = true
 	require.NoError(t, w.Close())
-	return <-done
+	out := <-done
+	require.NoError(t, r.Close())
+	return out
 }
