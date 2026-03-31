@@ -45,17 +45,17 @@ Edit the `[web]` section in `netdata.conf` using the [`edit-config`](/docs/netda
     mode = none
 ```
 
-Restart your Agent to apply changes. After restart, the local dashboard (http://NODE:19999) will no longer be accessible, but all metrics remain available through Netdata Cloud.
+Restart your Agent to apply changes. After restart, the agent's web server (default port `19999`) will no longer accept inbound connections.
 
 :::warning
 
-Setting `mode = none` disables the entire web server on port `19999`, including streaming capability. This means:
+Setting `mode = none` disables the web server listener, so the agent will not accept inbound HTTP connections, including inbound streaming (`STREAM`) requests. This means:
 
-- Parent-child streaming architectures will **not work** with this setting
-- Streaming from child agents to parent nodes uses the same web server infrastructure
-- This setting should only be used for agents connecting directly to Netdata Cloud via [ACLK](/src/aclk/README.md)
+- The agent cannot act as a streaming receiver/Parent (it will not accept inbound streams from child agents)
+- Outbound streaming from this agent to a remote Parent (child → parent) is not inherently disabled by this setting, as it uses outbound client connections
+- This setting is best suited for agents that are not used as Parents and are accessed primarily via Netdata Cloud via [ACLK](/src/aclk/README.md)
 
-If you need streaming functionality, use [bearer token protection](#recommended-methods) or [restrict access to private networks](#alternative-methods) instead.
+If you need the agent to receive streaming data from other agents, do **not** set `mode = none`. Keep the web server enabled and secure access to port `19999` (for example, by binding to private interfaces, using firewall/ACL rules, or restricting access to private networks/VPNs). Bearer token protection secures access to the local dashboard and API, but streaming connections themselves must be protected at the network level.
 
 :::
 
