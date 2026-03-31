@@ -297,7 +297,7 @@ static void netdata_ad_directory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
     static COUNTER_DATA directoryPercReadsFromNSPI = {.key = "DS % Reads from NSPI"};
     static COUNTER_DATA directoryPercReadsFromNTDSAPI = {.key = "DS % Reads from NTDSAPI"};
     static COUNTER_DATA directoryPercReadsFromSAM = {.key = "DS % Reads from SAM"};
-    static COUNTER_DATA directoryPercReadsOther = {.key = "DS % Reads from Other"};
+    static COUNTER_DATA directoryPercReadsOther = {.key = "DS % Reads Other"};
 
     static COUNTER_DATA directoryPercSearchesFromDCA = {.key = "DS % Searches from DRA"};
     static COUNTER_DATA directoryPercSearchesFromKCC = {.key = "DS % Searches from KCC"};
@@ -305,7 +305,7 @@ static void netdata_ad_directory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
     static COUNTER_DATA directoryPercSearchesFromNSPI = {.key = "DS % Searches from NSPI"};
     static COUNTER_DATA directoryPercSearchesFromNTDSAPI = {.key = "DS % Searches from NTDSAPI"};
     static COUNTER_DATA directoryPercSearchesFromSAM = {.key = "DS % Searches from SAM"};
-    static COUNTER_DATA directoryPercSearchesOther = {.key = "DS % Searches from Other"};
+    static COUNTER_DATA directoryPercSearchesOther = {.key = "DS % Searches Other"};
 
     static COUNTER_DATA directoryPercWritesFromDCA = {.key = "DS % Writes from DRA"};
     static COUNTER_DATA directoryPercWritesFromKCC = {.key = "DS % Writes from KCC"};
@@ -313,7 +313,7 @@ static void netdata_ad_directory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
     static COUNTER_DATA directoryPercWritesFromNSPI = {.key = "DS % Writes from NSPI"};
     static COUNTER_DATA directoryPercWritesFromNTDSAPI = {.key = "DS % Writes from NTDSAPI"};
     static COUNTER_DATA directoryPercWritesFromSAM = {.key = "DS % Writes from SAM"};
-    static COUNTER_DATA directoryPercWritesOther = {.key = "DS % Writes from Other"};
+    static COUNTER_DATA directoryPercWritesOther = {.key = "DS % Writes Other"};
 
     perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercReadsFromDCA);
     perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercReadsFromKCC);
@@ -500,7 +500,7 @@ static void netdata_ad_search_scope(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYP
 
 static void netdata_ad_cache_lookups(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
-    static COUNTER_DATA nameCacheLookupsTotal = {.key = "DS Name Cache hit rate,secondvalue"};
+    static COUNTER_DATA nameCacheLookupsTotal = {.key = "DS Name Cache hit rate"};
 
     static RRDSET *st_name_cache_lookups_total = NULL;
     static RRDDIM *rd_name_cache_lookups_total = NULL;
@@ -529,7 +529,7 @@ static void netdata_ad_cache_lookups(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TY
     }
 
     rrddim_set_by_pointer(
-        st_name_cache_lookups_total, rd_name_cache_lookups_total, (collected_number)nameCacheLookupsTotal.current.Data);
+        st_name_cache_lookups_total, rd_name_cache_lookups_total, (collected_number)nameCacheLookupsTotal.current.Time);
     rrdset_done(st_name_cache_lookups_total);
 }
 
