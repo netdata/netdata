@@ -3,10 +3,7 @@
 package snmp
 
 import (
-	"sort"
 	"strings"
-
-	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
 )
 
 func collapseActorsByIP(data *topologyData) int {
@@ -145,102 +142,4 @@ func collapseActorsByIP(data *topologyData) int {
 	}
 	data.Links = links
 	return collapsed
-}
-
-func compareCollapseActorPriority(left, right topologyActor) int {
-	if leftDevice, rightDevice := topologyengine.IsDeviceActorType(left.ActorType), topologyengine.IsDeviceActorType(right.ActorType); leftDevice != rightDevice {
-		if leftDevice {
-			return -1
-		}
-		return 1
-	}
-	if leftInferred, rightInferred := topologyActorIsInferred(left), topologyActorIsInferred(right); leftInferred != rightInferred {
-		if !leftInferred {
-			return -1
-		}
-		return 1
-	}
-	leftID := strings.ToLower(strings.TrimSpace(left.ActorID))
-	rightID := strings.ToLower(strings.TrimSpace(right.ActorID))
-	if (leftID == "") != (rightID == "") {
-		if leftID != "" {
-			return -1
-		}
-		return 1
-	}
-	return strings.Compare(leftID, rightID)
-}
-
-func mergeTopologyMatch(base, other topologyMatch) topologyMatch {
-	base.ChassisIDs = appendUniqueTopologyStrings(base.ChassisIDs, other.ChassisIDs...)
-	base.MacAddresses = appendUniqueTopologyStrings(base.MacAddresses, other.MacAddresses...)
-	base.IPAddresses = appendUniqueTopologyStrings(base.IPAddresses, other.IPAddresses...)
-	base.Hostnames = appendUniqueTopologyStrings(base.Hostnames, other.Hostnames...)
-	base.DNSNames = appendUniqueTopologyStrings(base.DNSNames, other.DNSNames...)
-	if strings.TrimSpace(base.SysName) == "" {
-		base.SysName = strings.TrimSpace(other.SysName)
-	}
-	if strings.TrimSpace(base.SysObjectID) == "" {
-		base.SysObjectID = strings.TrimSpace(other.SysObjectID)
-	}
-	return base
-}
-
-func mergeTopologyStringMap(base, other map[string]string) map[string]string {
-	if len(other) == 0 {
-		return base
-	}
-	if base == nil {
-		base = make(map[string]string, len(other))
-	}
-	for key, value := range other {
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-		if key == "" || value == "" {
-			continue
-		}
-		if _, exists := base[key]; exists {
-			continue
-		}
-		base[key] = value
-	}
-	return base
-}
-
-func mergeTopologyAnyMap(base, other map[string]any) map[string]any {
-	if len(other) == 0 {
-		return base
-	}
-	if base == nil {
-		base = make(map[string]any, len(other))
-	}
-	for key, value := range other {
-		key = strings.TrimSpace(key)
-		if key == "" {
-			continue
-		}
-		if _, exists := base[key]; exists {
-			continue
-		}
-		base[key] = value
-	}
-	return base
-}
-
-func appendUniqueTopologyStrings(base []string, values ...string) []string {
-	seen := make(map[string]struct{}, len(base)+len(values))
-	out := make([]string, 0, len(base)+len(values))
-	for _, value := range append(base, values...) {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
-		if _, exists := seen[value]; exists {
-			continue
-		}
-		seen[value] = struct{}{}
-		out = append(out, value)
-	}
-	sort.Strings(out)
-	return out
 }

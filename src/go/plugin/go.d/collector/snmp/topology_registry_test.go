@@ -166,6 +166,69 @@ func TestTopologyRegistry_SnapshotWithOptions_LLDPManagedKeepsRequestedMapType(t
 	require.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, data.Stats["inference_strategy"])
 }
 
+func TestTopologyRegistry_SnapshotWithOptions_CollapseByIPPreservesEngineManagedOverlapPruning(t *testing.T) {
+	registry := newTopologyRegistry()
+
+	cache := newTopologyCache()
+	cache.updateTime = time.Now().UTC()
+	cache.lastUpdate = cache.updateTime
+	cache.agentID = "agent-test"
+	cache.localDevice = topologyDevice{
+		ChassisID:     "aa:aa:aa:aa:aa:aa",
+		ChassisIDType: "macAddress",
+		SysName:       "switch-a",
+		ManagementIP:  "10.0.0.1",
+	}
+	cache.lldpLocPorts["1"] = &lldpLocPort{
+		portNum:       "1",
+		portID:        "Gi0/1",
+		portIDSubtype: "interfaceName",
+	}
+	cache.lldpRemotes["1:1"] = &lldpRemote{
+		localPortNum:     "1",
+		remIndex:         "1",
+		chassisID:        "9c:6b:00:7b:98:c6",
+		chassisIDSubtype: "macAddress",
+		portID:           "9c:6b:00:7b:98:c7",
+		portIDSubtype:    "macAddress",
+		sysName:          "nova",
+		managementAddr:   "172.22.0.1",
+	}
+	cache.ifNamesByIndex["1"] = "Gi0/1"
+	cache.ifNamesByIndex["2"] = "Gi0/2"
+	cache.bridgePortToIf["2"] = "2"
+	cache.fdbEntries["9c:6b:00:7b:98:c7|2||"] = &fdbEntry{
+		mac:        "9c:6b:00:7b:98:c7",
+		bridgePort: "2",
+	}
+	cache.arpEntries["2|10.20.4.22|9c:6b:00:7b:98:c7"] = &arpEntry{
+		ifIndex: "2",
+		ifName:  "Gi0/2",
+		ip:      "10.20.4.22",
+		mac:     "9c:6b:00:7b:98:c7",
+	}
+	registry.register(cache)
+
+	withoutCollapse, ok := registry.snapshotWithOptions(topologyQueryOptions{
+		MapType:            topologyMapTypeAllDevicesLowConfidence,
+		ManagedDeviceFocus: topologyManagedFocusAllDevices,
+		Depth:              topologyDepthAllInternal,
+	})
+	require.True(t, ok)
+	require.NotNil(t, findActorByMAC(withoutCollapse, "9c:6b:00:7b:98:c7"))
+
+	withCollapse, ok := registry.snapshotWithOptions(topologyQueryOptions{
+		CollapseActorsByIP: true,
+		MapType:            topologyMapTypeAllDevicesLowConfidence,
+		ManagedDeviceFocus: topologyManagedFocusAllDevices,
+		Depth:              topologyDepthAllInternal,
+	})
+	require.True(t, ok)
+	require.NotNil(t, findActorByMAC(withCollapse, "9c:6b:00:7b:98:c6"))
+	require.Nil(t, findActorByMAC(withCollapse, "9c:6b:00:7b:98:c7"))
+	require.Equal(t, 1, withCollapse.Stats["actors_unlinked_suppressed"])
+}
+
 func TestTopologyRegistry_ManagedDeviceFocusTargets_ReturnsPerDeviceIPTargets(t *testing.T) {
 	registry := newTopologyRegistry()
 	registry.register(newTestTopologyCacheLLDP(
