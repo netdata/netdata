@@ -441,7 +441,7 @@ Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
-Each configured job produces execution state and resource usage charts. When a check emits Nagios performance data, additional charts are created automatically for each metric. Non-counter perfdata with warning/critical thresholds also get threshold state charts for alerting.
+Each configured job produces execution state and resource usage charts. When a check emits Nagios performance data, additional charts are created automatically for each metric. Non-counter perfdata also get threshold state charts for alerting, and if a metric is first observed with threshold bounds, the value chart includes only those bound sides for the lifetime of the current collector runtime.
 
 
 ### Per job
@@ -481,7 +481,7 @@ Performance-data charts are created only when the check prints Nagios performanc
 
 ### Some performance-data values are ignored
 
-Check that each metric uses the Nagios performance-data format `label=value[UOM];warn;crit;min;max` and that multiple metrics are separated by spaces. If a label contains spaces, quote it. Netdata charts the main value for every perfdata metric, and for non-counter metrics it derives threshold state from `warn` and `crit`; it does not create separate charts for raw `min`, `max`, or raw threshold bounds.
+Check that each metric uses the Nagios performance-data format `label=value[UOM];warn;crit;min;max` and that multiple metrics are separated by spaces. If a label contains spaces, quote it. Netdata charts the main value for every perfdata metric, and for non-counter metrics it derives threshold state from `warn` and `crit`. When a non-counter metric is first observed with threshold bounds, Netdata also adds those same bound sides to the value chart for the lifetime of the current collector runtime. Raw `min` and `max` are still not charted.
 
 
 ### The job state does not match the output text
@@ -522,6 +522,5 @@ Netdata captures the check's standard output for status and performance data par
 ### Windows checks need an executable entry point
 
 The collector runs the command named in `plugin` directly. On Windows, point `plugin` to an executable or to an interpreter such as `powershell.exe` and pass the script path in `args`.
-
 
 

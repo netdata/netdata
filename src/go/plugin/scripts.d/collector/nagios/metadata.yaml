@@ -415,7 +415,7 @@ modules:
               Performance-data charts are created only when the check prints Nagios performance data after the `|` separator. If the command returns only a status line without performance data, Netdata will still show the job state but no extra charts.
           - name: Some performance-data values are ignored
             description: |
-              Check that each metric uses the Nagios performance-data format `label=value[UOM];warn;crit;min;max` and that multiple metrics are separated by spaces. If a label contains spaces, quote it. Netdata charts the main value for every perfdata metric, and for non-counter metrics it derives threshold state from `warn` and `crit`; it does not create separate charts for raw `min`, `max`, or raw threshold bounds.
+              Check that each metric uses the Nagios performance-data format `label=value[UOM];warn;crit;min;max` and that multiple metrics are separated by spaces. If a label contains spaces, quote it. Netdata charts the main value for every perfdata metric, and for non-counter metrics it derives threshold state from `warn` and `crit`. When a non-counter metric is first observed with threshold bounds, Netdata also adds those same bound sides to the value chart for the lifetime of the current collector runtime. Raw `min` and `max` are still not charted.
           - name: The job state does not match the output text
             description: |
               The visible text does not decide the state. Netdata uses the process exit code instead: `0` for OK, `1` for WARNING, `2` for CRITICAL, and `3` for UNKNOWN. If the check exceeds the configured `timeout`, Netdata reports `timeout` even if the script never had a chance to print its own final state. If the current time is outside `check_period`, Netdata reports `paused` until the check is allowed to run again.
@@ -462,7 +462,7 @@ modules:
         title: Metrics
         enabled: false
       description: |
-        Each configured job produces execution state and resource usage charts. When a check emits Nagios performance data, additional charts are created automatically for each metric. Non-counter perfdata with warning/critical thresholds also get threshold state charts for alerting.
+        Each configured job produces execution state and resource usage charts. When a check emits Nagios performance data, additional charts are created automatically for each metric. Non-counter perfdata also get threshold state charts for alerting, and if a metric is first observed with threshold bounds, the value chart includes only those bound sides for the lifetime of the current collector runtime.
       availability: []
       scopes:
         - name: job

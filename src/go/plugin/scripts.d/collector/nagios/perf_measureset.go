@@ -6,6 +6,10 @@ import "github.com/netdata/netdata/go/plugins/pkg/metrix"
 
 const (
 	perfFieldValue                 = "value"
+	perfFieldWarnLow               = "warn_low"
+	perfFieldWarnHigh              = "warn_high"
+	perfFieldCritLow               = "crit_low"
+	perfFieldCritHigh              = "crit_high"
 	perfThresholdStateNone         = "no_threshold"
 	perfThresholdStateOK           = "ok"
 	perfThresholdStateWarning      = "warning"
@@ -36,7 +40,12 @@ type perfValueMeasureSet struct {
 	scriptName string
 	unit       string
 	counter    bool
+	fieldMask  perfMeasureFieldMask
 	value      metrix.SampleValue
+	warnLow    metrix.SampleValue
+	warnHigh   metrix.SampleValue
+	critLow    metrix.SampleValue
+	critHigh   metrix.SampleValue
 }
 
 type perfThresholdStateSet struct {
@@ -51,22 +60,82 @@ type perfRouteResult struct {
 	thresholdStates []perfThresholdStateSet
 }
 
-func perfMeasureSetFieldSpecs() []metrix.MeasureFieldSpec {
-	return []metrix.MeasureFieldSpec{
+type perfMeasureFieldMask uint8
+
+const (
+	perfMeasureFieldWarnLow perfMeasureFieldMask = 1 << iota
+	perfMeasureFieldWarnHigh
+	perfMeasureFieldCritLow
+	perfMeasureFieldCritHigh
+)
+
+func perfMeasureSetFieldSpecs(mask perfMeasureFieldMask) []metrix.MeasureFieldSpec {
+	specs := []metrix.MeasureFieldSpec{
 		{Name: perfFieldValue, Float: true},
 	}
+	if mask.has(perfMeasureFieldWarnLow) {
+		specs = append(specs, metrix.MeasureFieldSpec{Name: perfFieldWarnLow, Float: true})
+	}
+	if mask.has(perfMeasureFieldWarnHigh) {
+		specs = append(specs, metrix.MeasureFieldSpec{Name: perfFieldWarnHigh, Float: true})
+	}
+	if mask.has(perfMeasureFieldCritLow) {
+		specs = append(specs, metrix.MeasureFieldSpec{Name: perfFieldCritLow, Float: true})
+	}
+	if mask.has(perfMeasureFieldCritHigh) {
+		specs = append(specs, metrix.MeasureFieldSpec{Name: perfFieldCritHigh, Float: true})
+	}
+	return specs
 }
 
 func perfMeasureFieldFloat(field string) bool {
-	return field == perfFieldValue
+	switch field {
+	case perfFieldValue, perfFieldWarnLow, perfFieldWarnHigh, perfFieldCritLow, perfFieldCritHigh:
+		return true
+	default:
+		return false
+	}
 }
 
-func defaultPerfMeasureSetValues() map[string]metrix.SampleValue {
-	return map[string]metrix.SampleValue{perfFieldValue: 0}
+func defaultPerfMeasureSetValues(mask perfMeasureFieldMask) map[string]metrix.SampleValue {
+	fields := map[string]metrix.SampleValue{
+		perfFieldValue: 0,
+	}
+	if mask.has(perfMeasureFieldWarnLow) {
+		fields[perfFieldWarnLow] = 0
+	}
+	if mask.has(perfMeasureFieldWarnHigh) {
+		fields[perfFieldWarnHigh] = 0
+	}
+	if mask.has(perfMeasureFieldCritLow) {
+		fields[perfFieldCritLow] = 0
+	}
+	if mask.has(perfMeasureFieldCritHigh) {
+		fields[perfFieldCritHigh] = 0
+	}
+	return fields
 }
 
-func perfMeasureSetValues(value metrix.SampleValue) map[string]metrix.SampleValue {
-	return map[string]metrix.SampleValue{perfFieldValue: value}
+func perfMeasureSetValues(measureSet perfValueMeasureSet) map[string]metrix.SampleValue {
+	fields := defaultPerfMeasureSetValues(measureSet.fieldMask)
+	fields[perfFieldValue] = measureSet.value
+	if measureSet.fieldMask.has(perfMeasureFieldWarnLow) {
+		fields[perfFieldWarnLow] = measureSet.warnLow
+	}
+	if measureSet.fieldMask.has(perfMeasureFieldWarnHigh) {
+		fields[perfFieldWarnHigh] = measureSet.warnHigh
+	}
+	if measureSet.fieldMask.has(perfMeasureFieldCritLow) {
+		fields[perfFieldCritLow] = measureSet.critLow
+	}
+	if measureSet.fieldMask.has(perfMeasureFieldCritHigh) {
+		fields[perfFieldCritHigh] = measureSet.critHigh
+	}
+	return fields
+}
+
+func (m perfMeasureFieldMask) has(flag perfMeasureFieldMask) bool {
+	return m&flag != 0
 }
 
 func perfThresholdStatePoint(active string) metrix.StateSetPoint {

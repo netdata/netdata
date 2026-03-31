@@ -38,6 +38,7 @@ func TestPerfdataRouterRoutesAndCanonicalizesUnits(t *testing.T) {
 	})
 
 	values := valueSampleMap(got.values)
+	fieldValues := valueFieldSampleMap(got.values)
 	units := valueSampleUnits(got.values)
 	thresholds := thresholdStateMap(got.thresholdStates)
 	thresholdLabelValues := thresholdStateLabelValues(got.thresholdStates)
@@ -48,6 +49,16 @@ func TestPerfdataRouterRoutesAndCanonicalizesUnits(t *testing.T) {
 	assertNear(t, values["perfdata.check_memory.percent_free_pct_value"], 40)
 	assertNear(t, values["perfdata.check_memory.counter_checks_value"], 3)
 	assertNear(t, values["perfdata.check_memory.generic_custom_value"], 7.25)
+	assertNear(t, fieldValues["perfdata.check_memory.time_latency_warn_low"], 0.1)
+	assertNear(t, fieldValues["perfdata.check_memory.time_latency_warn_high"], 0.5)
+	_, hasLatencyCritLow := fieldValues["perfdata.check_memory.time_latency_crit_low"]
+	assert.False(t, hasLatencyCritLow)
+	_, hasLatencyCritHigh := fieldValues["perfdata.check_memory.time_latency_crit_high"]
+	assert.False(t, hasLatencyCritHigh)
+	_, hasThroughputWarnLow := fieldValues["perfdata.check_memory.bytes_throughput_warn_low"]
+	assert.False(t, hasThroughputWarnLow)
+	_, hasCounterWarnLow := fieldValues["perfdata.check_memory.counter_checks_warn_low"]
+	assert.False(t, hasCounterWarnLow)
 
 	assertString(t, units["perfdata.check_memory.time_latency_value"], "seconds")
 	assertString(t, units["perfdata.check_memory.bytes_throughput_value"], "bytes")
@@ -65,6 +76,39 @@ func TestPerfdataRouterRoutesAndCanonicalizesUnits(t *testing.T) {
 	assert.False(t, hasCounterThreshold)
 	assertString(t, thresholdLabelValues["perfdata.check_memory.time_latency_threshold_state"], "time_latency")
 	assertString(t, thresholdLabelValues["perfdata.check_memory.bytes_throughput_threshold_state"], "bytes_throughput")
+}
+
+func TestPerfdataRouterThresholdBoundsUseZeroForOpenSides(t *testing.T) {
+	router := newPerfdataRouter(64)
+
+	warnHigh := 5.0
+	critLow := 10.0
+	got := router.route(testPluginPath, []output.PerfDatum{
+		{
+			Label: "latency",
+			Unit:  "ms",
+			Value: 1,
+			Warn: &output.ThresholdRange{
+				High: &warnHigh,
+			},
+		},
+		{
+			Label: "queue",
+			Unit:  "ms",
+			Value: 1,
+			Crit: &output.ThresholdRange{
+				Low: &critLow,
+			},
+		},
+	})
+
+	fieldValues := valueFieldSampleMap(got.values)
+	_, hasLatencyWarnLow := fieldValues["perfdata.check_memory.time_latency_warn_low"]
+	assert.False(t, hasLatencyWarnLow)
+	assertNear(t, fieldValues["perfdata.check_memory.time_latency_warn_high"], 0.005)
+	assertNear(t, fieldValues["perfdata.check_memory.time_queue_crit_low"], 0.01)
+	_, hasQueueCritHigh := fieldValues["perfdata.check_memory.time_queue_crit_high"]
+	assert.False(t, hasQueueCritHigh)
 }
 
 func TestPerfdataRouterPolicies(t *testing.T) {
@@ -201,10 +245,24 @@ func valueSampleMap(sets []perfValueMeasureSet) map[string]float64 {
 	return out
 }
 
-func valueSampleUnits(sets []perfValueMeasureSet) map[string]string {
-	out := make(map[string]string, len(sets))
+func valueFieldSampleMap(sets []perfValueMeasureSet) map[string]float64 {
+	fullMask := perfMeasureFieldWarnLow | perfMeasureFieldWarnHigh | perfMeasureFieldCritLow | perfMeasureFieldCritHigh
+	out := make(map[string]float64, len(sets)*len(perfMeasureSetFieldSpecs(fullMask)))
 	for _, set := range sets {
-		out[set.name+"_"+perfFieldValue] = set.unit
+		for field, value := range perfMeasureSetValues(set) {
+			out[set.name+"_"+field] = float64(value)
+		}
+	}
+	return out
+}
+
+func valueSampleUnits(sets []perfValueMeasureSet) map[string]string {
+	fullMask := perfMeasureFieldWarnLow | perfMeasureFieldWarnHigh | perfMeasureFieldCritLow | perfMeasureFieldCritHigh
+	out := make(map[string]string, len(sets)*len(perfMeasureSetFieldSpecs(fullMask)))
+	for _, set := range sets {
+		for field := range perfMeasureSetValues(set) {
+			out[set.name+"_"+field] = set.unit
+		}
 	}
 	return out
 }

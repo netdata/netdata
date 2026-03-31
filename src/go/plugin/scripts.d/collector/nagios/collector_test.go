@@ -339,6 +339,7 @@ func TestCollector_Collect(t *testing.T) {
 				assertMetricValue(t, flat, "nagios.perfdata.true.bytes_used_value", metrix.Labels{"nagios_job": "check_disk", metrix.MeasureSetFieldLabel: "value"}, 30000)
 				point, ok := read.MeasureSet("nagios.perfdata.true.bytes_used", metrix.Labels{"nagios_job": "check_disk"})
 				require.True(t, ok)
+				require.Len(t, point.Values, 1)
 				assert.Equal(t, 30000.0, point.Values[0])
 
 				*now = now.Add(1 * time.Second)
@@ -817,6 +818,142 @@ func TestCollector_Collect(t *testing.T) {
 			tc.run(t, coll, runner, &now)
 		})
 	}
+}
+
+func TestCollector_PerfdataValueChartSchemaLocksOnFirstObservation(t *testing.T) {
+	makeCollector := func(t *testing.T, now *time.Time, results []fakeRun, name string) *Collector {
+		t.Helper()
+		coll := New()
+		coll.runner = &fakeRunner{results: results}
+		coll.now = func() time.Time { return *now }
+		coll.Config = Config{
+			UpdateEvery: 1,
+			JobConfig: JobConfig{
+				Name:          name,
+				Plugin:        "/bin/true",
+				CheckInterval: confDuration(1 * time.Second),
+				RetryInterval: confDuration(1 * time.Second),
+			},
+		}
+		require.NoError(t, coll.Init(context.Background()))
+		return coll
+	}
+
+	t.Run("first seen without thresholds stays value only", func(t *testing.T) {
+		high := 20.0
+		now := time.Date(2026, 3, 21, 12, 0, 0, 0, time.UTC)
+		coll := makeCollector(t, &now, []fakeRun{
+			{
+				result: checkRunResult{
+					ServiceState: "OK",
+					JobState:     "OK",
+					Parsed: output.ParsedOutput{
+						Perfdata: []output.PerfDatum{
+							{Label: "used", Unit: "KB", Value: 10},
+						},
+					},
+				},
+			},
+			{
+				result: checkRunResult{
+					ServiceState: "OK",
+					JobState:     "OK",
+					Parsed: output.ParsedOutput{
+						Perfdata: []output.PerfDatum{
+							{Label: "used", Unit: "KB", Value: 30, Warn: &output.ThresholdRange{High: &high}},
+						},
+					},
+				},
+			},
+		}, "schema_lock_value_only")
+
+		runCollectCycle(t, coll)
+		raw := coll.MetricStore().Read(metrix.ReadRaw())
+		point, ok := raw.MeasureSet("nagios.perfdata.true.bytes_used", metrix.Labels{"nagios_job": "schema_lock_value_only"})
+		require.True(t, ok)
+		require.Len(t, point.Values, 1)
+
+		now = now.Add(2 * time.Second)
+		runCollectCycle(t, coll)
+
+		raw = coll.MetricStore().Read(metrix.ReadRaw())
+		point, ok = raw.MeasureSet("nagios.perfdata.true.bytes_used", metrix.Labels{"nagios_job": "schema_lock_value_only"})
+		require.True(t, ok)
+		require.Len(t, point.Values, 1)
+		assert.Equal(t, 30000.0, point.Values[0])
+
+		flat := coll.MetricStore().Read(metrix.ReadFlatten())
+		assertMetricValue(t, flat, "nagios.perfdata.true.bytes_used_value", metrix.Labels{"nagios_job": "schema_lock_value_only", metrix.MeasureSetFieldLabel: perfFieldValue}, 30000)
+		assertMetricMissing(t, flat, "nagios.perfdata.true.bytes_used_warn_low", metrix.Labels{"nagios_job": "schema_lock_value_only", metrix.MeasureSetFieldLabel: perfFieldWarnLow})
+		assertMetricMissing(t, flat, "nagios.perfdata.true.bytes_used_warn_high", metrix.Labels{"nagios_job": "schema_lock_value_only", metrix.MeasureSetFieldLabel: perfFieldWarnHigh})
+		assertMetricValue(t, flat, "nagios.job.perfdata.threshold_state", metrix.Labels{
+			"nagios_job":                          "schema_lock_value_only",
+			perfdataValueLabelKey:                 "bytes_used",
+			"nagios.job.perfdata.threshold_state": perfThresholdStateWarning,
+		}, 1)
+	})
+
+	t.Run("first seen threshold subset ignores new bound sides later", func(t *testing.T) {
+		high := 20.0
+		warnLow := 5.0
+		critHigh := 40.0
+		now := time.Date(2026, 3, 21, 12, 0, 0, 0, time.UTC)
+		coll := makeCollector(t, &now, []fakeRun{
+			{
+				result: checkRunResult{
+					ServiceState: "OK",
+					JobState:     "OK",
+					Parsed: output.ParsedOutput{
+						Perfdata: []output.PerfDatum{
+							{Label: "used", Unit: "KB", Value: 30, Warn: &output.ThresholdRange{High: &high}},
+						},
+					},
+				},
+			},
+			{
+				result: checkRunResult{
+					ServiceState: "OK",
+					JobState:     "OK",
+					Parsed: output.ParsedOutput{
+						Perfdata: []output.PerfDatum{
+							{
+								Label: "used",
+								Unit:  "KB",
+								Value: 50,
+								Warn:  &output.ThresholdRange{Low: &warnLow, High: &high},
+								Crit:  &output.ThresholdRange{High: &critHigh},
+							},
+						},
+					},
+				},
+			},
+		}, "schema_lock_bounds")
+
+		runCollectCycle(t, coll)
+		raw := coll.MetricStore().Read(metrix.ReadRaw())
+		point, ok := raw.MeasureSet("nagios.perfdata.true.bytes_used", metrix.Labels{"nagios_job": "schema_lock_bounds"})
+		require.True(t, ok)
+		require.Len(t, point.Values, 2)
+
+		now = now.Add(2 * time.Second)
+		runCollectCycle(t, coll)
+
+		raw = coll.MetricStore().Read(metrix.ReadRaw())
+		point, ok = raw.MeasureSet("nagios.perfdata.true.bytes_used", metrix.Labels{"nagios_job": "schema_lock_bounds"})
+		require.True(t, ok)
+		require.Len(t, point.Values, 2)
+
+		flat := coll.MetricStore().Read(metrix.ReadFlatten())
+		assertMetricValue(t, flat, "nagios.perfdata.true.bytes_used_value", metrix.Labels{"nagios_job": "schema_lock_bounds", metrix.MeasureSetFieldLabel: perfFieldValue}, 50000)
+		assertMetricMissing(t, flat, "nagios.perfdata.true.bytes_used_warn_low", metrix.Labels{"nagios_job": "schema_lock_bounds", metrix.MeasureSetFieldLabel: perfFieldWarnLow})
+		assertMetricValue(t, flat, "nagios.perfdata.true.bytes_used_warn_high", metrix.Labels{"nagios_job": "schema_lock_bounds", metrix.MeasureSetFieldLabel: perfFieldWarnHigh}, 20000)
+		assertMetricMissing(t, flat, "nagios.perfdata.true.bytes_used_crit_high", metrix.Labels{"nagios_job": "schema_lock_bounds", metrix.MeasureSetFieldLabel: perfFieldCritHigh})
+		assertMetricValue(t, flat, "nagios.job.perfdata.threshold_state", metrix.Labels{
+			"nagios_job":                          "schema_lock_bounds",
+			perfdataValueLabelKey:                 "bytes_used",
+			"nagios.job.perfdata.threshold_state": perfThresholdStateCritical,
+		}, 1)
+	})
 }
 
 func TestBuildMacroSet(t *testing.T) {

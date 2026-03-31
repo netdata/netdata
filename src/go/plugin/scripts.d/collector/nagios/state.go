@@ -17,6 +17,8 @@ type collectState struct {
 	retrying     bool
 	maxAttempts  int
 
+	perfValueSchema map[string]perfMeasureFieldMask
+
 	lastPerfValues          []perfValueMeasureSet
 	lastPerfThresholdStates []perfThresholdStateSet
 }
@@ -28,6 +30,7 @@ func newCollectState(now time.Time, job JobConfig) collectState {
 		serviceState:    nagiosStateUnknown,
 		jobState:        nagiosStateUnknown,
 		maxAttempts:     max(job.MaxCheckAttempts, 1),
+		perfValueSchema: make(map[string]perfMeasureFieldMask),
 	}
 }
 
@@ -107,6 +110,22 @@ func (s *collectState) recordPeriodBlocked() {
 }
 
 func (s *collectState) rememberPerf(result perfRouteResult) {
+	if s.perfValueSchema == nil {
+		s.perfValueSchema = make(map[string]perfMeasureFieldMask)
+	}
+	for i := range result.values {
+		ms := &result.values[i]
+		if ms.counter {
+			ms.fieldMask = 0
+			continue
+		}
+		mask, ok := s.perfValueSchema[ms.name]
+		if !ok {
+			mask = ms.fieldMask
+			s.perfValueSchema[ms.name] = mask
+		}
+		ms.fieldMask = mask
+	}
 	s.lastPerfValues = append(s.lastPerfValues[:0], result.values...)
 	s.lastPerfThresholdStates = append(s.lastPerfThresholdStates[:0], result.thresholdStates...)
 }

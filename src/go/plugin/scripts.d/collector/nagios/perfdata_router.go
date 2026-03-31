@@ -7,6 +7,7 @@ import (
 	"math"
 	"sort"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios/internal/output"
 )
 
@@ -80,12 +81,19 @@ func (r *perfdataRouter) route(pluginPath string, perf []output.PerfDatum) perfR
 	for _, item := range deduped {
 		base := perfMetricIdentity(source, item)
 		tail := perfMetricTail(item)
+		warnLow, warnHigh := perfThresholdBounds(item.warn)
+		critLow, critHigh := perfThresholdBounds(item.crit)
 		result.values = append(result.values, perfValueMeasureSet{
 			name:       base,
 			scriptName: source,
 			unit:       unitForClass(item.class),
 			counter:    item.class == perfClassCounter,
+			fieldMask:  perfThresholdFieldMask(item.warn, item.crit),
 			value:      item.value,
+			warnLow:    warnLow,
+			warnHigh:   warnHigh,
+			critLow:    critLow,
+			critHigh:   critHigh,
 		})
 
 		if item.class == perfClassCounter {
@@ -152,4 +160,42 @@ func thresholdAlertable(value float64, rng *output.ThresholdRange) bool {
 		return inside
 	}
 	return !inside
+}
+
+func perfThresholdBounds(rng *output.ThresholdRange) (low, high metrix.SampleValue) {
+	if rng == nil {
+		return 0, 0
+	}
+	return perfThresholdBoundValue(rng.Low), perfThresholdBoundValue(rng.High)
+}
+
+func perfThresholdBoundValue(v *float64) metrix.SampleValue {
+	if v == nil {
+		// MeasureSet fields must be finite and always present once declared.
+		// Use zero for absent/open-ended bounds and keep threshold-state charts
+		// as the source of truth for whether a threshold exists.
+		return 0
+	}
+	return metrix.SampleValue(*v)
+}
+
+func perfThresholdFieldMask(warn, crit *output.ThresholdRange) perfMeasureFieldMask {
+	var mask perfMeasureFieldMask
+	if warn != nil {
+		if warn.Low != nil {
+			mask |= perfMeasureFieldWarnLow
+		}
+		if warn.High != nil {
+			mask |= perfMeasureFieldWarnHigh
+		}
+	}
+	if crit != nil {
+		if crit.Low != nil {
+			mask |= perfMeasureFieldCritLow
+		}
+		if crit.High != nil {
+			mask |= perfMeasureFieldCritHigh
+		}
+	}
+	return mask
 }

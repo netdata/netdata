@@ -117,18 +117,18 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 	}
 
 	for _, measureSet := range c.state.perfValueSets() {
-		fields := perfMeasureSetValues(measureSet.value)
+		fields := perfMeasureSetValues(measureSet)
 		if measureSet.counter {
 			jobMeter.MeasureSetCounter(
 				measureSet.name,
-				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
+				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs(0)...),
 				metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
 				metrix.WithUnit(measureSet.unit),
 			).ObserveTotalFields(fields)
 		} else {
 			jobMeter.MeasureSetGauge(
 				measureSet.name,
-				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
+				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs(measureSet.fieldMask)...),
 				metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
 				metrix.WithUnit(measureSet.unit),
 			).ObserveFields(fields)

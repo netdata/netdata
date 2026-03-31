@@ -127,6 +127,7 @@ Perfdata is routed plugin-side and materialized via autogen:
 - Collision policy: deterministic keep-first, drop conflicting label
 - Per-job metric count is capped by the collector budget before emission
 - Each perfdata metric creates one value chart.
+- If a non-counter perfdata metric is first observed with threshold bounds, that value chart also exposes only those same bound sides for the lifetime of the current collector runtime.
 - Non-counter perfdata also creates:
   - one plugin-scoped derived threshold-state chart for visualization
   - one static `nagios.job.perfdata.threshold_state` duplicate for alerting, labeled by `perfdata_value=<class>_<metricKey>`
@@ -136,7 +137,7 @@ Perfdata is routed plugin-side and materialized via autogen:
   - `warning`
   - `critical`
 - Counter perfdata currently does not emit a threshold-state chart.
-- Raw `min`, `max`, and raw threshold bounds are not charted.
+- Raw `min` and `max` are not charted.
 
 ## Alerts
 
