@@ -49,7 +49,7 @@ You can modify web server behavior by editing the `[web]` section in `netdata.co
 | `gzip compression level`           | `3`                                                                                                                                                                                    | Valid settings are 1 (fastest) to 9 (best ratio)                                                                                                                                                                                                                                                                                                                                                        |
 | `web server threads`               | auto-detected                                                                                                                                                                          | How many processor threads the web server is allowed. The default is system-specific, the minimum of `6` or the number of CPU cores                                                                                                                                                                                                                                                                     |
 | `web server max sockets`           | auto-detected                                                                                                                                                                          | Available sockets. The default is system-specific, automatically adjusted to 50% of the max number of open files Netdata is allowed to use (via `/etc/security/limits.conf` or systemd), to allow enough file descriptors to be available for data collection                                                                                                                                           |
-| `custom dashboard_info.js`         | empty                                                                                                                                                                                  | Specifies the location of a custom `dashboard.js` file.                                                                                                                                                                                                                                                                                                                                                 |
+| `custom dashboard_info.js`         | empty                                                                                                                                                                                  | Specifies the URL path to a custom dashboard customization file for the legacy local Agent dashboard. This value is exposed as `custom_info` in the /api/v1/charts API response. Connected Nodes use the Cloud-served dashboard by default; this setting only applies when accessing the Agent dashboard directly.                                                                                      |
 
 ## Embedding Netdata Metrics in External Pages
 
@@ -87,11 +87,11 @@ For embedding complete Netdata dashboards in external applications:
 
 ### Custom Dashboard Files
 
-The `custom dashboard_info.js` configuration option allows advanced users to provide their own dashboard customization file. This setting specifies the filesystem path to a custom JavaScript file that can modify or extend dashboard behavior.
+The `custom dashboard_info.js` configuration option allows advanced users to provide their own dashboard customization file for the legacy local Agent dashboard. This setting specifies the URL path to a custom JavaScript file that can modify or extend dashboard behavior.
 
 :::note
 
-The Netdata dashboard is served from Netdata Cloud by default for connected Nodes. The Agent serves its own local dashboard when accessed directly at `http://NODE:19999`. The `custom dashboard_info.js` setting is for users who need to customize the local agent dashboard's behavior or appearance.
+The Netdata dashboard is served from Netdata Cloud by default for connected Nodes. The Agent serves its own local dashboard when accessed directly at `http://NODE:19999`. The `custom dashboard_info.js` setting only applies to the legacy local Agent dashboard and does not affect Cloud-served dashboards.
 
 :::
 
