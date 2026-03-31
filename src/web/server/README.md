@@ -171,6 +171,7 @@ By default, the Netdata web server listens on port `19999`. To change the defaul
     default port = 800
 ```
 
+If you have configured `[web].bind to` with explicit ports, you must also update those explicit port numbers, or remove the port portion so the entries fall back to using `default port`.
 After modifying the configuration, restart the Netdata service to apply changes. See the [service control documentation](/docs/netdata-agent/start-stop-restart.md) for instructions.
 
 </details>
