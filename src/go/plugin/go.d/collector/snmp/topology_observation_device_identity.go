@@ -20,6 +20,15 @@ func ensureTopologyObservationDeviceID(device topologyDevice, baseBridgeAddress 
 	if managementIP := strings.TrimSpace(device.ManagementIP); managementIP != "" {
 		return "management_addr:" + strings.ToLower(managementIP)
 	}
+	if jobID := strings.TrimSpace(device.AgentJobID); jobID != "" {
+		return "agent_job:" + strings.ToLower(jobID)
+	}
+	if hostID := strings.TrimSpace(device.NetdataHostID); hostID != "" {
+		return "agent:" + strings.ToLower(hostID)
+	}
+	if agentID := strings.TrimSpace(device.AgentID); agentID != "" {
+		return "agent:" + strings.ToLower(agentID)
+	}
 	return "local-device"
 }
 

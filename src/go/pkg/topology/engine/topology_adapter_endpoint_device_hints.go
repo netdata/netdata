@@ -22,7 +22,7 @@ func filterManagedDeviceHints(hints []string, managedDeviceIDs map[string]struct
 		}
 	}
 	if len(managed) == 0 {
-		return hints
+		return nil
 	}
 	managed = uniqueTopologyStrings(managed)
 	sort.Strings(managed)

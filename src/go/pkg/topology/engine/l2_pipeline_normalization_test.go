@@ -46,3 +46,8 @@ func TestNormalizeLLDPChassisAndMACToken(t *testing.T) {
 	require.Equal(t, "001122334455", canonicalLLDPMACToken("0x001122334455"))
 	require.Equal(t, "", canonicalLLDPMACToken("001122"))
 }
+
+func TestCanonicalBridgeAddr_RejectsAllZeroMAC(t *testing.T) {
+	require.Equal(t, "00:11:22:33:44:55", canonicalBridgeAddr("00:00:00:00:00:00", "00:11:22:33:44:55"))
+	require.Equal(t, "", canonicalBridgeAddr("00:00:00:00:00:00", "00:00:00:00:00:00"))
+}

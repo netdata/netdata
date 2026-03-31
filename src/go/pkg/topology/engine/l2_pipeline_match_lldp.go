@@ -242,7 +242,7 @@ func matchLLDPLinksEnlinkdPassOrder(links []lldpMatchLink) []lldpMatchedPair {
 			continue
 		}
 		if lldpIdentityTokenForMatch(source.localMatchID, source.localChassisID) == lldpIdentityTokenForMatch(source.remoteMatchID, source.remoteChassisID) ||
-			source.localSysName == source.remoteSysName {
+			(source.localSysName != "" && source.localSysName == source.remoteSysName) {
 			parsed[source.index] = struct{}{}
 			continue
 		}

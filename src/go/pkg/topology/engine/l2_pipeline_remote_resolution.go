@@ -26,7 +26,7 @@ func (s *l2BuildState) isMACCompatibleWithDevice(deviceID, remoteMAC string) boo
 
 func (s *l2BuildState) resolveKnownRemote(hostname, chassisID, mgmtIP, remoteMAC string) string {
 	remoteIP := canonicalIP(mgmtIP)
-	enforceMACGuard := remoteMAC != "" && remoteIP != ""
+	enforceMACGuard := remoteMAC != ""
 	candidates := []string{
 		s.hostToID[canonicalHost(hostname)],
 		s.chassisToID[canonicalToken(chassisID)],

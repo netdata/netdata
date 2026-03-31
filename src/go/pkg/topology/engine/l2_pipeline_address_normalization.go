@@ -11,10 +11,10 @@ import (
 )
 
 func canonicalBridgeAddr(value, fallback string) string {
-	if mac := normalizeMAC(value); mac != "" {
+	if mac := normalizeMAC(value); mac != "" && mac != "00:00:00:00:00:00" {
 		return mac
 	}
-	if mac := normalizeMAC(fallback); mac != "" {
+	if mac := normalizeMAC(fallback); mac != "" && mac != "00:00:00:00:00:00" {
 		return mac
 	}
 	return ""

@@ -83,11 +83,17 @@ func bridgePortFromAttachment(attachment Attachment, ifaceByDeviceIndex map[stri
 }
 
 func bridgeAttachmentSortKey(attachment Attachment) string {
+	vlanID := strings.TrimSpace(attachment.Labels["vlan"])
+	if vlanID == "" {
+		vlanID = strings.TrimSpace(attachment.Labels["vlan_id"])
+	}
 	parts := []string{
 		strings.TrimSpace(attachment.DeviceID),
 		strconv.Itoa(attachment.IfIndex),
 		strings.TrimSpace(attachment.Labels["if_name"]),
 		strings.TrimSpace(attachment.Labels["bridge_port"]),
+		strings.ToLower(vlanID),
+		strings.ToLower(strings.TrimSpace(attachment.Method)),
 		strings.TrimSpace(attachment.EndpointID),
 	}
 	return strings.Join(parts, "|")

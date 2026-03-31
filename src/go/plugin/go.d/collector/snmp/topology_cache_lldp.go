@@ -57,6 +57,9 @@ func (c *topologyCache) updateLldpRemote(tags map[string]string) {
 	}
 
 	remIndex := tags[tagLldpRemIndex]
+	if remIndex == "" {
+		return
+	}
 	key := localPort + ":" + remIndex
 
 	entry := c.lldpRemotes[key]

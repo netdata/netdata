@@ -47,3 +47,16 @@ func TestTopologyObservationIdentityResolver_ReusesFallbackIdentityAcrossCanonic
 	require.Equal(t, id, resolver.resolve(nil, "CHASSIS-A", "local", ""))
 	require.Equal(t, id, resolver.resolve(nil, "", "", "10.20.4.60"))
 }
+
+func TestTopologyObservationIdentityResolver_RegistersAliasesWhenExistingIdentityIsReused(t *testing.T) {
+	resolver := newTopologyObservationIdentityResolver(topologyengine.L2Observation{
+		DeviceID:     "local-device",
+		Hostname:     "sw-a",
+		ChassisID:    "00:11:22:33:44:55",
+		ManagementIP: "10.0.0.1",
+	})
+
+	id := resolver.resolve(nil, "", "", "10.20.4.60")
+	require.Equal(t, id, resolver.resolve([]string{"Edge-A"}, "", "", "10.20.4.60"))
+	require.Equal(t, id, resolver.resolve([]string{" edge-a "}, "", "", ""))
+}

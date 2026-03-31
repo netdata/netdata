@@ -39,7 +39,7 @@ func addressStrings(addresses []netip.Addr) []string {
 		if !addr.IsValid() {
 			continue
 		}
-		out = append(out, addr.String())
+		out = append(out, addr.Unmap().String())
 	}
 	out = uniqueTopologyStrings(out)
 	if len(out) == 0 {
@@ -96,8 +96,9 @@ func sortedEndpointIPs(in map[string]netip.Addr) []string {
 		if !ok || !addr.IsValid() {
 			continue
 		}
-		out = append(out, addr.String())
+		out = append(out, addr.Unmap().String())
 	}
+	out = uniqueTopologyStrings(out)
 	if len(out) == 0 {
 		return nil
 	}

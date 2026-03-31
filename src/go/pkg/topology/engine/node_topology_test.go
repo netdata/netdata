@@ -51,6 +51,7 @@ func TestSubNetworkLifecycleAndHelpers(t *testing.T) {
 	require.Equal(t, 0, compareAddr(netip.MustParseAddr("10.0.0.1"), netip.MustParseAddr("10.0.0.1")))
 
 	require.True(t, IsPointToPointMask(netip.MustParseAddr("255.255.255.252")))
+	require.True(t, IsPointToPointMask(netip.MustParseAddr("ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe")))
 	require.True(t, IsLoopbackMask(netip.MustParseAddr("255.255.255.255")))
 	require.True(t, InSameNetwork(
 		netip.MustParseAddr("10.0.0.1"),
@@ -156,17 +157,23 @@ func TestNodeTopologyServiceAndRouterTopology(t *testing.T) {
 		router.Vertices[3].ID,
 	})
 
-	require.Equal(t, []string{"2", "4", "5"}, []string{
+	require.Equal(t, []string{
+		"192.168.1.0/24|192.168.1.0/24to:192.168.1.2->2|192.168.1.2",
+		"192.168.1.0/24|192.168.1.0/24to:192.168.1.3->3|192.168.1.3",
+		"1|10.0.0.1->2|10.0.0.2",
+	}, []string{
 		router.Edges[0].ID,
 		router.Edges[1].ID,
 		router.Edges[2].ID,
 	})
-	require.Equal(t, "1", router.Edges[0].SourcePort.Vertex)
+	require.Equal(t, "192.168.1.0/24", router.Edges[0].SourcePort.Vertex)
 	require.Equal(t, "2", router.Edges[0].TargetPort.Vertex)
-	require.Equal(t, "eth1", router.Edges[0].SourcePort.IfName)
-	require.Equal(t, "eth2", router.Edges[0].TargetPort.IfName)
+	require.Equal(t, "", router.Edges[0].SourcePort.IfName)
+	require.Equal(t, "eth3", router.Edges[0].TargetPort.IfName)
 	require.Equal(t, "192.168.1.0/24", router.Edges[1].SourcePort.Vertex)
 	require.Equal(t, "3", router.Edges[1].TargetPort.Vertex)
-	require.Equal(t, "192.168.1.0/24", router.Edges[2].SourcePort.Vertex)
+	require.Equal(t, "1", router.Edges[2].SourcePort.Vertex)
 	require.Equal(t, "2", router.Edges[2].TargetPort.Vertex)
+	require.Equal(t, "eth1", router.Edges[2].SourcePort.IfName)
+	require.Equal(t, "eth2", router.Edges[2].TargetPort.IfName)
 }

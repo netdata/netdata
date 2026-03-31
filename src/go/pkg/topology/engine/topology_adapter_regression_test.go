@@ -120,23 +120,6 @@ func TestBackfillEndpointPortFromPeerPreservesExistingCanonicalPort(t *testing.T
 	require.Equal(t, "", topologyAttrString(backfilled.Attributes, "port_id"))
 }
 
-func TestPruneUnlinkedEndpointActorsRemovesOnlyUnreferencedEndpoints(t *testing.T) {
-	actors := []topology.Actor{
-		{ActorID: "device-a", ActorType: "device"},
-		{ActorID: "endpoint-linked", ActorType: "endpoint"},
-		{ActorID: "endpoint-unlinked", ActorType: "endpoint"},
-	}
-	links := []topology.Link{
-		{SrcActorID: "device-a", DstActorID: "endpoint-linked"},
-	}
-
-	filtered := pruneUnlinkedEndpointActors(actors, links)
-
-	require.Len(t, filtered, 2)
-	require.Equal(t, "device-a", filtered[0].ActorID)
-	require.Equal(t, "endpoint-linked", filtered[1].ActorID)
-}
-
 func TestSegmentProjectionBuilderPruneSegmentsWithoutLinksRemovesEmptySegments(t *testing.T) {
 	builder := &segmentProjectionBuilder{
 		segmentIDs: []string{"segment-a", "segment-b"},

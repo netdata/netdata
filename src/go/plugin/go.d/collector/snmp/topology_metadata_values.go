@@ -2,7 +2,10 @@
 
 package snmp
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 func topologyCanonicalMetadataKey(key string) string {
 	key = strings.ToLower(strings.TrimSpace(key))
@@ -21,7 +24,13 @@ func topologyMetadataValue(labels map[string]string, aliases []string) string {
 		return ""
 	}
 	byKey := make(map[string]string, len(labels))
-	for key, value := range labels {
+	keys := make([]string, 0, len(labels))
+	for key := range labels {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		value := labels[key]
 		value = strings.TrimSpace(value)
 		if value == "" {
 			continue

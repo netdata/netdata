@@ -197,24 +197,6 @@ func canonicalTopologyHardwareKey(values []string) string {
 	return strings.Join(out, ",")
 }
 
-func canonicalTopologyMACListKey(values []string) string {
-	if len(values) == 0 {
-		return ""
-	}
-	out := make([]string, 0, len(values))
-	for _, value := range values {
-		if mac := normalizeMAC(value); mac != "" {
-			out = append(out, mac)
-		}
-	}
-	if len(out) == 0 {
-		return ""
-	}
-	sort.Strings(out)
-	out = uniqueTopologyStrings(out)
-	return strings.Join(out, ",")
-}
-
 func canonicalTopologyIPListKey(values []string) string {
 	if len(values) == 0 {
 		return ""

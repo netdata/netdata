@@ -236,7 +236,9 @@ func (b *topologyDataBuilder) finalizeGraph() {
 			b.segmentProjection.suppressedManagedOverlapIDs,
 		)
 	}
-	b.actors, b.links, _ = pruneSegmentArtifacts(b.actors, b.links)
+	var additionalSegmentSuppressed int
+	b.actors, b.links, additionalSegmentSuppressed = pruneSegmentArtifacts(b.actors, b.links)
+	b.segmentSuppressed += additionalSegmentSuppressed
 	sortTopologyActors(b.actors)
 	sortTopologyLinks(b.links)
 	applyTopologyDisplayNames(b.actors, b.links, b.opts.ResolveDNSName)

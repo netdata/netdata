@@ -278,6 +278,17 @@ func TestTopologyCache_CdpSnapshotHexAddress(t *testing.T) {
 	assert.Contains(t, remote.Match.IPAddresses, "10.0.0.3")
 }
 
+func TestTopologyCache_UpdateLldpRemote_IgnoresRowsWithoutRemoteIndex(t *testing.T) {
+	cache := newTopologyCache()
+
+	cache.updateLldpRemote(map[string]string{
+		tagLldpLocPortNum: "7",
+		tagLldpRemSysName: "sw-b",
+	})
+
+	require.Empty(t, cache.lldpRemotes)
+}
+
 func TestTopologyCache_CdpSnapshotRawAddressWithoutIP(t *testing.T) {
 	cache := newTopologyCache()
 	cache.updateTime = time.Now()

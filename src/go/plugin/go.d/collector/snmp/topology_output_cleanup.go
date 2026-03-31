@@ -118,10 +118,10 @@ func filterDanglingLinks(data *topologyData) {
 	}
 	filtered := make([]topologyLink, 0, len(data.Links))
 	for _, link := range data.Links {
-		if _, ok := actorSet[link.SrcActorID]; !ok {
+		if _, ok := actorSet[strings.TrimSpace(link.SrcActorID)]; !ok {
 			continue
 		}
-		if _, ok := actorSet[link.DstActorID]; !ok {
+		if _, ok := actorSet[strings.TrimSpace(link.DstActorID)]; !ok {
 			continue
 		}
 		filtered = append(filtered, link)

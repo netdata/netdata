@@ -29,3 +29,17 @@ func TestSetTopologyMetadataLabelIfMissing_PreservesExistingValue(t *testing.T) 
 	require.Equal(t, "SN-123", labels["serial_number"])
 	require.Equal(t, "1.2.3", labels["firmware_version"])
 }
+
+func TestTopologyMetadataValue_DeterministicAcrossCanonicalKeyCollisions(t *testing.T) {
+	first := map[string]string{
+		"serial_number": "SN-200",
+		"serial-number": "SN-100",
+	}
+	second := map[string]string{
+		"serial-number": "SN-100",
+		"serial_number": "SN-200",
+	}
+
+	require.Equal(t, "SN-100", topologyMetadataValue(first, []string{"serial_number"}))
+	require.Equal(t, "SN-100", topologyMetadataValue(second, []string{"serial_number"}))
+}

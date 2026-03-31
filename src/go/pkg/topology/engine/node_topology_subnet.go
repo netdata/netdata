@@ -11,7 +11,7 @@ import (
 
 var (
 	pointToPointMaskIPv4 = netip.MustParseAddr("255.255.255.252")
-	pointToPointMaskIPv6 = netip.MustParseAddr("ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffd")
+	pointToPointMaskIPv6 = netip.MustParseAddr("ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe")
 	loopbackMaskIPv4     = netip.MustParseAddr("255.255.255.255")
 	loopbackMaskIPv6     = netip.MustParseAddr("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
 	loopbackAddrIPv4     = netip.MustParseAddr("127.0.0.1")

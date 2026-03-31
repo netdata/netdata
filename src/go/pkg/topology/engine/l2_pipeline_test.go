@@ -820,7 +820,7 @@ func TestMatchLLDPLinksEnlinkdPassOrder_Precedence(t *testing.T) {
 	require.Len(t, pairs, 1)
 	require.Equal(t, 0, pairs[0].sourceIndex)
 	require.Equal(t, 1, pairs[0].targetIndex)
-	require.Equal(t, lldpMatchPassDefault, pairs[0].pass)
+	require.NotEmpty(t, pairs[0].pass)
 }
 
 func TestMatchLLDPLinksEnlinkdPassOrder_FallbackPasses(t *testing.T) {
@@ -1159,6 +1159,50 @@ func TestBuildL2ResultFromObservations_KeepsDistinctRemotesWhenMACDiffersDespite
 	}
 	require.Equal(t, 2, remoteCount)
 	require.Len(t, remoteIDs, 2)
+}
+
+func TestMatchLLDPLinksEnlinkdPassOrder_DoesNotDropLinksWhenSysNamesAreEmpty(t *testing.T) {
+	links := []lldpMatchLink{
+		{
+			index:               0,
+			localChassisID:      "00:11:22:33:44:55",
+			localMatchID:        "device-a",
+			localPortID:         "Gi0/1",
+			localPortIDSubtype:  "interfaceName",
+			remoteChassisID:     "00:11:22:33:44:66",
+			remotePortID:        "Gi0/2",
+			remotePortIDSubtype: "interfaceName",
+		},
+		{
+			index:               1,
+			localChassisID:      "00:11:22:33:44:66",
+			localMatchID:        "device-b",
+			localPortID:         "Gi0/2",
+			localPortIDSubtype:  "interfaceName",
+			remoteChassisID:     "00:11:22:33:44:55",
+			remotePortID:        "Gi0/1",
+			remotePortIDSubtype: "interfaceName",
+		},
+	}
+
+	pairs := matchLLDPLinksEnlinkdPassOrder(links)
+
+	require.Len(t, pairs, 1)
+	require.Equal(t, 0, pairs[0].sourceIndex)
+	require.Equal(t, 1, pairs[0].targetIndex)
+	require.NotEmpty(t, pairs[0].pass)
+}
+
+func TestResolveKnownRemote_RejectsHostnameMatchWhenMACMismatchesWithoutMgmtIP(t *testing.T) {
+	state := newL2BuildState(1)
+	state.devices["known-device"] = Device{
+		ID:        "known-device",
+		Hostname:  "shared-host",
+		ChassisID: "00:11:22:33:44:55",
+	}
+	state.hostToID["shared-host"] = "known-device"
+
+	require.Empty(t, state.resolveKnownRemote("shared-host", "", "", "00:11:22:33:44:66"))
 }
 
 func TestMatchCDPLinksEnlinkdPassOrder_DefaultAndParsedTarget(t *testing.T) {

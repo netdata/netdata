@@ -15,10 +15,6 @@ func TestCanonicalTopologyKeyHelpers_NormalizeDeterministically(t *testing.T) {
 		canonicalTopologyHardwareKey([]string{" Switch-A ", "0A000001", "00:11:22:33:44:55", "switch-a"}),
 	)
 	require.Equal(t,
-		"00:11:22:33:44:55,aa:bb:cc:dd:ee:ff",
-		canonicalTopologyMACListKey([]string{" AA-BB-CC-DD-EE-FF ", "00:11:22:33:44:55", "invalid", "aa:bb:cc:dd:ee:ff"}),
-	)
-	require.Equal(t,
 		"example.net,switch-a",
 		canonicalTopologyStringListKey([]string{" Switch-A ", "", "example.net", "switch-a"}),
 	)

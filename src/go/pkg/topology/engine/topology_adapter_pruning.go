@@ -210,37 +210,6 @@ func summarizeTopologyLinks(links []topology.Link) topologyLinkCounts {
 	return counts
 }
 
-func pruneUnlinkedEndpointActors(actors []topology.Actor, links []topology.Link) []topology.Actor {
-	if len(actors) == 0 {
-		return actors
-	}
-	linkedByActorID := make(map[string]struct{}, len(links)*2)
-	for _, link := range links {
-		if srcActorID := strings.TrimSpace(link.SrcActorID); srcActorID != "" {
-			linkedByActorID[srcActorID] = struct{}{}
-		}
-		if dstActorID := strings.TrimSpace(link.DstActorID); dstActorID != "" {
-			linkedByActorID[dstActorID] = struct{}{}
-		}
-	}
-	filtered := make([]topology.Actor, 0, len(actors))
-	for _, actor := range actors {
-		if !strings.EqualFold(strings.TrimSpace(actor.ActorType), "endpoint") {
-			filtered = append(filtered, actor)
-			continue
-		}
-		actorID := strings.TrimSpace(actor.ActorID)
-		if actorID == "" {
-			continue
-		}
-		if _, ok := linkedByActorID[actorID]; !ok {
-			continue
-		}
-		filtered = append(filtered, actor)
-	}
-	return filtered
-}
-
 func pruneManagedOverlapUnlinkedEndpointActors(
 	actors []topology.Actor,
 	links []topology.Link,

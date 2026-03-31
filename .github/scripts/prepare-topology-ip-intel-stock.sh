@@ -91,7 +91,7 @@ run rm -f \
 prepare_synthetic() {
   local tmpdir
   tmpdir="$(mktemp -d)"
-  trap 'rm -rf "${tmpdir}"' RETURN
+  trap "rm -rf -- $(printf '%q' "${tmpdir}")" EXIT
 
   run tee "${tmpdir}/asn.csv" >/dev/null <<'EOF'
 1.1.1.0,1.1.1.255,13335,Cloudflare, Inc.

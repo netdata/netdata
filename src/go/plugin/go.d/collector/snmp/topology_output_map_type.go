@@ -92,10 +92,6 @@ func suppressUnlinkedInferredEndpoints(data *topologyData) int {
 			kept = append(kept, actor)
 			continue
 		}
-		if !topologyActorIsInferred(actor) {
-			kept = append(kept, actor)
-			continue
-		}
 		if _, ok := linked[actor.ActorID]; ok {
 			kept = append(kept, actor)
 			continue

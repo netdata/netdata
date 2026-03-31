@@ -31,6 +31,7 @@ func newTopologyObservationIdentityResolver(local topologyengine.L2Observation) 
 func (r *topologyObservationIdentityResolver) resolve(hostAliases []string, chassisID, chassisType, managementIP string) string {
 	if mac := canonicalObservationMAC(chassisID); mac != "" {
 		if id := r.macToID[mac]; id != "" {
+			r.register(id, hostAliases, chassisID, managementIP)
 			return id
 		}
 
@@ -51,13 +52,16 @@ func (r *topologyObservationIdentityResolver) resolve(hostAliases []string, chas
 
 	for _, host := range hostAliases {
 		if id := r.hostToID[canonicalObservationHost(host)]; id != "" {
+			r.register(id, hostAliases, chassisID, managementIP)
 			return id
 		}
 	}
 	if id := r.chassisToID[canonicalObservationChassis(chassisID)]; id != "" {
+		r.register(id, hostAliases, chassisID, managementIP)
 		return id
 	}
 	if id := r.ipToID[canonicalObservationIP(managementIP)]; id != "" {
+		r.register(id, hostAliases, chassisID, managementIP)
 		return id
 	}
 
