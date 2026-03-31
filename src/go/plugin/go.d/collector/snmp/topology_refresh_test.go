@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
@@ -218,4 +219,23 @@ func TestEnsureTopologySchedulerStartedDoesNotWaitForInitialRefresh(t *testing.T
 
 	close(connectBlocked)
 	coll.stopTopologyScheduler()
+}
+
+func TestTopologyRefreshHelpersClampAndDescribeCadence(t *testing.T) {
+	coll := New()
+	coll.Topology.RefreshEvery = confopt.LongDuration(45 * time.Second)
+	coll.Topology.StaleAfter = confopt.LongDuration(10 * time.Second)
+
+	require.Equal(t, 45*time.Second, coll.topologyRefreshEvery())
+	require.Equal(t, "45s", coll.topologyRefreshEveryString())
+	require.Equal(t, 45*time.Second, coll.topologyStaleAfter())
+	require.Equal(t, "every 45s, stale after 45s", coll.topologyRefreshDescription())
+}
+
+func TestTopologyRefreshHelpersDefaultCadenceAndStaleAfter(t *testing.T) {
+	coll := New()
+
+	require.Equal(t, defaultTopologyRefreshEvery, coll.topologyRefreshEvery())
+	require.Equal(t, 2*defaultTopologyRefreshEvery, coll.topologyStaleAfter())
+	require.Equal(t, "every 30m, stale after 1h", coll.topologyRefreshDescription())
 }

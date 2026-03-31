@@ -124,3 +124,65 @@ func TestTopologyFocusGraphBuildAndDepthTraversal(t *testing.T) {
 		"segment-1": {},
 	}, includedActorsDepth2)
 }
+
+func TestTopologyActorHasIPMatchesMatchAndManagementAddresses(t *testing.T) {
+	actor := topologyActor{
+		Match: topologyMatch{
+			IPAddresses: []string{"10.0.0.1"},
+		},
+		Attributes: map[string]any{
+			"management_ip": "10.0.0.2",
+			"management_addresses": []any{
+				"10.0.0.3",
+				"not-an-ip",
+			},
+		},
+	}
+
+	require.True(t, topologyActorHasIP(actor, "10.0.0.1"))
+	require.True(t, topologyActorHasIP(actor, "10.0.0.2"))
+	require.True(t, topologyActorHasIP(actor, "10.0.0.3"))
+	require.False(t, topologyActorHasIP(actor, "10.0.0.9"))
+	require.False(t, topologyActorHasIP(actor, "not-an-ip"))
+}
+
+func TestRecordTopologyFocusStatsNormalizesDepthAndFilteredCounts(t *testing.T) {
+	data := &topologyData{
+		Actors: []topologyActor{
+			{ActorID: "device-a", ActorType: "device"},
+			{ActorID: "device-b", ActorType: "device"},
+		},
+		Links: []topologyLink{
+			{Protocol: "lldp", Direction: "bidirectional", SrcActorID: "device-a", DstActorID: "device-b"},
+		},
+	}
+
+	recordTopologyFocusStats(data, topologyQueryOptions{
+		ManagedDeviceFocus: "ip:10.0.0.1",
+		Depth:              topologyDepthAllInternal,
+	}, 5, 4)
+
+	require.Equal(t, "ip:10.0.0.1", data.Stats["managed_snmp_device_focus"])
+	require.Equal(t, topologyDepthAll, data.Stats["depth"])
+	require.Equal(t, 3, data.Stats["actors_focus_depth_filtered"])
+	require.Equal(t, 3, data.Stats["links_focus_depth_filtered"])
+	require.Equal(t, len(data.Links), intStatValue(data.Stats["links_total"]))
+}
+
+func TestRecordTopologyFocusAllDevicesStatsKeepsAllDepth(t *testing.T) {
+	data := &topologyData{
+		Links: []topologyLink{
+			{Protocol: "lldp", Direction: "bidirectional", SrcActorID: "device-a", DstActorID: "device-b"},
+		},
+	}
+
+	recordTopologyFocusAllDevicesStats(data, topologyQueryOptions{
+		ManagedDeviceFocus: topologyManagedFocusAllDevices,
+	})
+
+	require.Equal(t, topologyManagedFocusAllDevices, data.Stats["managed_snmp_device_focus"])
+	require.Equal(t, topologyDepthAll, data.Stats["depth"])
+	require.Equal(t, 0, data.Stats["actors_focus_depth_filtered"])
+	require.Equal(t, 0, data.Stats["links_focus_depth_filtered"])
+	require.Equal(t, len(data.Links), intStatValue(data.Stats["links_total"]))
+}
