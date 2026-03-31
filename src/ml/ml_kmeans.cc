@@ -24,8 +24,8 @@ ml_kmeans_init(ml_kmeans_t *kmeans)
 void
 ml_kmeans_train(ml_kmeans_t *kmeans, const std::vector<DSample> &preprocessed_features, unsigned max_iters, time_t after, time_t before)
 {
-    kmeans->after = (uint32_t) after;
-    kmeans->before = (uint32_t) before;
+    kmeans->after = after;
+    kmeans->before = before;
 
     kmeans->min_dist = std::numeric_limits<calculated_number_t>::max();
     kmeans->max_dist  = std::numeric_limits<calculated_number_t>::min();
@@ -186,7 +186,7 @@ bool ml_kmeans_deserialize(ml_kmeans_inlined_t *inlined_km, struct json_object *
         netdata_log_error("Failed to deserialize kmeans: failed to parse int for 'after'");
         return false;
     }
-    inlined_km->after = json_object_get_int(value);
+    inlined_km->after = (time_t) json_object_get_int64(value);
 
     if (!json_object_object_get_ex(root, "before", &value)) {
         netdata_log_error("Failed to deserialize kmeans: missing key 'before'");
@@ -196,7 +196,7 @@ bool ml_kmeans_deserialize(ml_kmeans_inlined_t *inlined_km, struct json_object *
         netdata_log_error("Failed to deserialize kmeans: failed to parse int for 'before'");
         return false;
     }
-    inlined_km->before = json_object_get_int(value);
+    inlined_km->before = (time_t) json_object_get_int64(value);
 
     if (!json_object_object_get_ex(root, "min_dist", &value)) {
         netdata_log_error("Failed to deserialize kmeans: missing key 'min_dist'");
