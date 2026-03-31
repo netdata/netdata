@@ -5,6 +5,8 @@
 
 #include "ml_features.h"
 
+#include <ctime>
+
 typedef struct web_buffer BUFFER;
 
 struct ml_kmeans_inlined_t;
