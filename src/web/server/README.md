@@ -162,6 +162,24 @@ Control the number of threads and sockets with the following settings:
 </details>
 
 <details>
+<summary><strong>Change the Default Port</strong></summary>
+
+By default, the Netdata web server listens on port `19999`. To change the default port, edit `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/configuration/README.md#edit-configuration-files):
+
+```text
+[web]
+    default port = 800
+```
+
+After modifying the configuration, restart Netdata to apply the changes:
+
+```bash
+sudo systemctl restart netdata
+```
+
+</details>
+
+<details>
 <summary><strong>Binding Netdata to Multiple Ports</strong></summary>
 
 Netdata can bind to multiple IPs and ports, offering access to different services on each. Up to 100 sockets can be used (increase it at compile time with `CFLAGS="-DMAX_LISTEN_FDS=200" ./netdata-installer.sh ...`).
