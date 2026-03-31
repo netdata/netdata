@@ -305,6 +305,7 @@ static void netdata_ad_directory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
     static COUNTER_DATA directoryPercSearchesFromNSPI = {.key = "DS % Searches from NSPI"};
     static COUNTER_DATA directoryPercSearchesFromNTDSAPI = {.key = "DS % Searches from NTDSAPI"};
     static COUNTER_DATA directoryPercSearchesFromSAM = {.key = "DS % Searches from SAM"};
+    static COUNTER_DATA directoryPercSearchesFromLDAP = {.key = "DS % Searches from LDAP"};
     static COUNTER_DATA directoryPercSearchesOther = {.key = "DS % Searches Other"};
 
     static COUNTER_DATA directoryPercWritesFromDCA = {.key = "DS % Writes from DRA"};
@@ -313,6 +314,7 @@ static void netdata_ad_directory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
     static COUNTER_DATA directoryPercWritesFromNSPI = {.key = "DS % Writes from NSPI"};
     static COUNTER_DATA directoryPercWritesFromNTDSAPI = {.key = "DS % Writes from NTDSAPI"};
     static COUNTER_DATA directoryPercWritesFromSAM = {.key = "DS % Writes from SAM"};
+    static COUNTER_DATA directoryPercWritesFromLDAP = {.key = "DS % Writes from LDAP"};
     static COUNTER_DATA directoryPercWritesOther = {.key = "DS % Writes Other"};
 
     perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercReadsFromDCA);
@@ -329,6 +331,7 @@ static void netdata_ad_directory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
     perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercSearchesFromNSPI);
     perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercSearchesFromNTDSAPI);
     perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercSearchesFromSAM);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercSearchesFromLDAP);
     perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercSearchesOther);
 
     perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercWritesFromDCA);
@@ -337,6 +340,7 @@ static void netdata_ad_directory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
     perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercWritesFromNSPI);
     perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercWritesFromNTDSAPI);
     perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercWritesFromSAM);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercWritesFromLDAP);
     perflibGetObjectCounter(pDataBlock, pObjectType, &directoryPercWritesOther);
 
     static RRDSET *st_directory_operation_total = NULL;
@@ -375,14 +379,14 @@ static void netdata_ad_directory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
 
     collected_number writeValue = directoryPercWritesFromDCA.current.Data + directoryPercWritesFromKCC.current.Data +
                                   directoryPercWritesFromLSA.current.Data + directoryPercWritesFromNSPI.current.Data +
-                                  directoryPercWritesFromNTDSAPI.current.Data +
-                                  directoryPercWritesFromSAM.current.Data + directoryPercWritesOther.current.Data;
+                                  directoryPercWritesFromNTDSAPI.current.Data + directoryPercWritesFromSAM.current.Data +
+                                  directoryPercWritesFromLDAP.current.Data + directoryPercWritesOther.current.Data;
 
     collected_number searchValue =
         directoryPercSearchesFromDCA.current.Data + directoryPercSearchesFromKCC.current.Data +
         directoryPercSearchesFromLSA.current.Data + directoryPercSearchesFromNSPI.current.Data +
         directoryPercSearchesFromNTDSAPI.current.Data + directoryPercSearchesFromSAM.current.Data +
-        directoryPercSearchesOther.current.Data;
+        directoryPercSearchesFromLDAP.current.Data + directoryPercSearchesOther.current.Data;
 
     rrddim_set_by_pointer(st_directory_operation_total, rd_directory_operation_total_read, readValue);
 
