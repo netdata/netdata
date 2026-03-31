@@ -2506,8 +2506,6 @@ netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
 
 list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
                        ${ACLK_PROTO_BUILT_HDRS})
-# Suppress false-positive -Wstringop-overflow from GCC 15 in protobuf-generated swap methods
-set_source_files_properties(${ACLK_PROTO_BUILT_SRCS} PROPERTIES COMPILE_OPTIONS "-Wno-stringop-overflow")
 
 #
 # nd-run helper program

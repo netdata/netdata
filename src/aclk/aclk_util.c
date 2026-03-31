@@ -640,13 +640,6 @@ static int aclk_http_proxy_negotiate(int sockfd, const char *proxy_username, con
         char *creds_base64 = callocz(1, (size_t)creds_base64_len + 1);
         (void)netdata_base64_encode((unsigned char *)creds_base64, (unsigned char *)creds_plain, creds_plain_len);
 
-        // pre-validate: "Proxy-Authorization: Basic " (27) + base64 + "\r\n" (2) + NUL (1) = 30 + base64
-        size_t needed = 30 + (size_t)creds_base64_len;
-        if (sizeof(req) - off < needed) {
-            aclk_sensitive_free(&creds_plain);
-            aclk_sensitive_free(&creds_base64);
-            goto cleanup;
-        }
         rc = snprintf(req + off, sizeof(req) - off, "Proxy-Authorization: Basic %s\r\n", creds_base64);
         aclk_sensitive_free(&creds_plain);
         aclk_sensitive_free(&creds_base64);
