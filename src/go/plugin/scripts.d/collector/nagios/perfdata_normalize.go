@@ -72,6 +72,8 @@ func normalizeThresholdRange(unit string, rng *output.ThresholdRange) *output.Th
 		Inclusive: rng.Inclusive,
 		Low:       normalizeOptionalFinite(unit, rng.Low),
 		High:      normalizeOptionalFinite(unit, rng.High),
+		LowSet:    rng.LowSet,
+		HighSet:   rng.HighSet,
 	}
 }
 

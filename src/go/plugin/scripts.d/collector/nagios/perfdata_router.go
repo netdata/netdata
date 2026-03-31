@@ -182,18 +182,18 @@ func perfThresholdBoundValue(v *float64) metrix.SampleValue {
 func perfThresholdFieldMask(warn, crit *output.ThresholdRange) perfMeasureFieldMask {
 	var mask perfMeasureFieldMask
 	if warn != nil {
-		if warn.Low != nil {
+		if warn.LowSet {
 			mask |= perfMeasureFieldWarnLow
 		}
-		if warn.High != nil {
+		if warn.HighSet {
 			mask |= perfMeasureFieldWarnHigh
 		}
 	}
 	if crit != nil {
-		if crit.Low != nil {
+		if crit.LowSet {
 			mask |= perfMeasureFieldCritLow
 		}
-		if crit.High != nil {
+		if crit.HighSet {
 			mask |= perfMeasureFieldCritHigh
 		}
 	}

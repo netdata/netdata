@@ -39,8 +39,8 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	samples := router.route(gatePluginPath, []output.PerfDatum{
 		{
 			Label: "latency", Unit: "ms", Value: 120,
-			Warn: &output.ThresholdRange{Inclusive: true, Low: &warnLow, High: &warnHigh},
-			Crit: &output.ThresholdRange{Inclusive: true, Low: &critLow, High: &critHigh},
+			Warn: &output.ThresholdRange{Inclusive: true, Low: &warnLow, High: &warnHigh, LowSet: true, HighSet: true},
+			Crit: &output.ThresholdRange{Inclusive: true, Low: &critLow, High: &critHigh, LowSet: true, HighSet: true},
 		},
 		{Label: "throughput", Unit: "KB", Value: 30},
 		{Label: "wire_rate", Unit: "kb", Value: 80},

@@ -17,11 +17,19 @@ func TestParsePerfdata(t *testing.T) {
 	assert.Equal(t, "ms", parsed.Perfdata[0].Unit)
 	assert.Equal(t, 123.0, parsed.Perfdata[0].Value)
 	require.NotNil(t, parsed.Perfdata[0].Warn)
+	require.NotNil(t, parsed.Perfdata[0].Warn.Low)
+	assert.Equal(t, 0.0, *parsed.Perfdata[0].Warn.Low)
 	require.NotNil(t, parsed.Perfdata[0].Warn.High)
 	assert.Equal(t, 200.0, *parsed.Perfdata[0].Warn.High)
+	assert.False(t, parsed.Perfdata[0].Warn.LowSet)
+	assert.True(t, parsed.Perfdata[0].Warn.HighSet)
 	require.NotNil(t, parsed.Perfdata[0].Crit)
+	require.NotNil(t, parsed.Perfdata[0].Crit.Low)
+	assert.Equal(t, 0.0, *parsed.Perfdata[0].Crit.Low)
 	require.NotNil(t, parsed.Perfdata[0].Crit.High)
 	assert.Equal(t, 500.0, *parsed.Perfdata[0].Crit.High)
+	assert.False(t, parsed.Perfdata[0].Crit.LowSet)
+	assert.True(t, parsed.Perfdata[0].Crit.HighSet)
 	assert.Equal(t, "load1", parsed.Perfdata[1].Label)
 	assert.Equal(t, 0.12, parsed.Perfdata[1].Value)
 }
@@ -32,14 +40,16 @@ func TestParseRangeVariants(t *testing.T) {
 		expectNil bool
 		low       *float64
 		high      *float64
+		lowSet    bool
+		highSet   bool
 		inclusive bool
 	}{
-		"simple":          {input: "10", low: floatPtr(0), high: floatPtr(10)},
-		"range":           {input: "10:20", low: floatPtr(10), high: floatPtr(20)},
-		"inclusive":       {input: "@5:15", low: floatPtr(5), high: floatPtr(15), inclusive: true},
-		"lower_unbounded": {input: "~:5", low: nil, high: floatPtr(5)},
-		"upper_unbounded": {input: "10:", low: floatPtr(10), high: nil},
-		"default_low":     {input: ":30", low: floatPtr(0), high: floatPtr(30)},
+		"simple":          {input: "10", low: floatPtr(0), high: floatPtr(10), highSet: true},
+		"range":           {input: "10:20", low: floatPtr(10), high: floatPtr(20), lowSet: true, highSet: true},
+		"inclusive":       {input: "@5:15", low: floatPtr(5), high: floatPtr(15), lowSet: true, highSet: true, inclusive: true},
+		"lower_unbounded": {input: "~:5", low: nil, high: floatPtr(5), highSet: true},
+		"upper_unbounded": {input: "10:", low: floatPtr(10), high: nil, lowSet: true},
+		"default_low":     {input: ":30", low: floatPtr(0), high: floatPtr(30), highSet: true},
 		"unknown":         {input: "U", expectNil: true},
 	}
 	for name, tc := range tests {
@@ -62,6 +72,8 @@ func TestParseRangeVariants(t *testing.T) {
 				require.NotNil(t, rng.High)
 				assert.Equal(t, *tc.high, *rng.High)
 			}
+			assert.Equal(t, tc.lowSet, rng.LowSet)
+			assert.Equal(t, tc.highSet, rng.HighSet)
 			assert.Equal(t, tc.inclusive, rng.Inclusive)
 		})
 	}

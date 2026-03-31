@@ -373,7 +373,7 @@ func TestCollector_Collect(t *testing.T) {
 										Label: "used",
 										Unit:  "KB",
 										Value: 30,
-										Warn:  &output.ThresholdRange{Low: &low, High: &high},
+										Warn:  &output.ThresholdRange{Low: &low, High: &high, LowSet: true, HighSet: true},
 									}
 								}(),
 							},
@@ -393,7 +393,7 @@ func TestCollector_Collect(t *testing.T) {
 										Label: "used",
 										Unit:  "KB",
 										Value: 10,
-										Warn:  &output.ThresholdRange{Low: &low, High: &high},
+										Warn:  &output.ThresholdRange{Low: &low, High: &high, LowSet: true, HighSet: true},
 									}
 								}(),
 							},
@@ -525,7 +525,7 @@ func TestCollector_Collect(t *testing.T) {
 										Label: "used",
 										Unit:  "KB",
 										Value: 30,
-										Warn:  &output.ThresholdRange{Low: &low, High: &high},
+										Warn:  &output.ThresholdRange{Low: &low, High: &high, LowSet: true, HighSet: true},
 									}
 								}(),
 							},
@@ -546,7 +546,7 @@ func TestCollector_Collect(t *testing.T) {
 										Label: "used",
 										Unit:  "KB",
 										Value: 10,
-										Warn:  &output.ThresholdRange{Low: &low, High: &high},
+										Warn:  &output.ThresholdRange{Low: &low, High: &high, LowSet: true, HighSet: true},
 									}
 								}(),
 							},
@@ -624,7 +624,7 @@ func TestCollector_Collect(t *testing.T) {
 										Label: "used",
 										Unit:  "KB",
 										Value: 30,
-										Warn:  &output.ThresholdRange{Low: &low, High: &high},
+										Warn:  &output.ThresholdRange{Low: &low, High: &high, LowSet: true, HighSet: true},
 									}
 								}(),
 							},
@@ -860,7 +860,7 @@ func TestCollector_PerfdataValueChartSchemaLocksOnFirstObservation(t *testing.T)
 					JobState:     "OK",
 					Parsed: output.ParsedOutput{
 						Perfdata: []output.PerfDatum{
-							{Label: "used", Unit: "KB", Value: 30, Warn: &output.ThresholdRange{High: &high}},
+							{Label: "used", Unit: "KB", Value: 30, Warn: &output.ThresholdRange{High: &high, HighSet: true}},
 						},
 					},
 				},
@@ -905,7 +905,7 @@ func TestCollector_PerfdataValueChartSchemaLocksOnFirstObservation(t *testing.T)
 					JobState:     "OK",
 					Parsed: output.ParsedOutput{
 						Perfdata: []output.PerfDatum{
-							{Label: "used", Unit: "KB", Value: 30, Warn: &output.ThresholdRange{High: &high}},
+							{Label: "used", Unit: "KB", Value: 30, Warn: &output.ThresholdRange{High: &high, HighSet: true}},
 						},
 					},
 				},
@@ -920,8 +920,8 @@ func TestCollector_PerfdataValueChartSchemaLocksOnFirstObservation(t *testing.T)
 								Label: "used",
 								Unit:  "KB",
 								Value: 50,
-								Warn:  &output.ThresholdRange{Low: &warnLow, High: &high},
-								Crit:  &output.ThresholdRange{High: &critHigh},
+								Warn:  &output.ThresholdRange{Low: &warnLow, High: &high, LowSet: true, HighSet: true},
+								Crit:  &output.ThresholdRange{High: &critHigh, HighSet: true},
 							},
 						},
 					},

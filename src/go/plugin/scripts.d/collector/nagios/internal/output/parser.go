@@ -30,6 +30,8 @@ type ThresholdRange struct {
 	Inclusive bool
 	Low       *float64
 	High      *float64
+	LowSet    bool
+	HighSet   bool
 }
 
 // Parse converts raw plugin output into status, long output, and perfdata sections.
@@ -204,6 +206,7 @@ func parseRange(val string) *ThresholdRange {
 		} else if start != "~" {
 			if v, ok := parseRangeNumber(start); ok {
 				rng.Low = &v
+				rng.LowSet = true
 			} else {
 				return nil
 			}
@@ -211,6 +214,7 @@ func parseRange(val string) *ThresholdRange {
 		if end != "" && end != "~" {
 			if v, ok := parseRangeNumber(end); ok {
 				rng.High = &v
+				rng.HighSet = true
 			} else {
 				return nil
 			}
@@ -223,6 +227,7 @@ func parseRange(val string) *ThresholdRange {
 		zero := 0.0
 		rng.Low = &zero
 		rng.High = &v
+		rng.HighSet = true
 	}
 	return rng
 }

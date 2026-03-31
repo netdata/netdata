@@ -28,6 +28,8 @@ func TestPerfdataRouterRoutesAndCanonicalizesUnits(t *testing.T) {
 				Inclusive: true,
 				Low:       &warnLow,
 				High:      &warnHigh,
+				LowSet:    true,
+				HighSet:   true,
 			},
 		},
 		{Label: "throughput", Unit: "KB", Value: 30},
@@ -89,7 +91,8 @@ func TestPerfdataRouterThresholdBoundsUseZeroForOpenSides(t *testing.T) {
 			Unit:  "ms",
 			Value: 1,
 			Warn: &output.ThresholdRange{
-				High: &warnHigh,
+				High:    &warnHigh,
+				HighSet: true,
 			},
 		},
 		{
@@ -97,7 +100,8 @@ func TestPerfdataRouterThresholdBoundsUseZeroForOpenSides(t *testing.T) {
 			Unit:  "ms",
 			Value: 1,
 			Crit: &output.ThresholdRange{
-				Low: &critLow,
+				Low:    &critLow,
+				LowSet: true,
 			},
 		},
 	})
@@ -109,6 +113,22 @@ func TestPerfdataRouterThresholdBoundsUseZeroForOpenSides(t *testing.T) {
 	assertNear(t, fieldValues["perfdata.check_memory.time_queue_crit_low"], 0.01)
 	_, hasQueueCritHigh := fieldValues["perfdata.check_memory.time_queue_crit_high"]
 	assert.False(t, hasQueueCritHigh)
+}
+
+func TestPerfdataRouterParsedShorthandThresholdsExposeOnlyHighBounds(t *testing.T) {
+	router := newPerfdataRouter(64)
+	parsed := output.Parse([]byte("OK - 70.4% used | USED=11539108KB;13104000;15561000;;"))
+
+	got := router.route(testPluginPath, parsed.Perfdata)
+	fieldValues := valueFieldSampleMap(got.values)
+
+	assertNear(t, fieldValues["perfdata.check_memory.bytes_used_value"], 11_539_108_000)
+	_, hasWarnLow := fieldValues["perfdata.check_memory.bytes_used_warn_low"]
+	assert.False(t, hasWarnLow)
+	assertNear(t, fieldValues["perfdata.check_memory.bytes_used_warn_high"], 13_104_000_000)
+	_, hasCritLow := fieldValues["perfdata.check_memory.bytes_used_crit_low"]
+	assert.False(t, hasCritLow)
+	assertNear(t, fieldValues["perfdata.check_memory.bytes_used_crit_high"], 15_561_000_000)
 }
 
 func TestPerfdataRouterPolicies(t *testing.T) {
