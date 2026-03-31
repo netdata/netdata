@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package snmp
+
+import "strings"
+
+func ensureTopologyObservationDeviceID(device topologyDevice, baseBridgeAddress string) string {
+	if mac := topologyPrimaryIdentityMAC(device.ChassisID, baseBridgeAddress); mac != "" {
+		return "macAddress:" + mac
+	}
+	if key := strings.TrimSpace(topologyDeviceKey(device)); key != "" {
+		return key
+	}
+	if sysName := strings.TrimSpace(device.SysName); sysName != "" {
+		return "sysname:" + strings.ToLower(sysName)
+	}
+	if ip := normalizeIPAddress(device.ManagementIP); ip != "" {
+		return "management_ip:" + ip
+	}
+	if managementIP := strings.TrimSpace(device.ManagementIP); managementIP != "" {
+		return "management_addr:" + strings.ToLower(managementIP)
+	}
+	return "local-device"
+}
+
+func topologyPrimaryIdentityMAC(chassisID, baseBridgeAddress string) string {
+	for _, candidate := range []string{chassisID, baseBridgeAddress} {
+		if mac := normalizeMAC(candidate); mac != "" && mac != "00:00:00:00:00:00" {
+			return mac
+		}
+	}
+	return ""
+}
