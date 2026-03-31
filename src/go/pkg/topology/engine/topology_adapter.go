@@ -32,8 +32,6 @@ const (
 	topologyInferenceStrategyFDBPairwise         = "fdb_pairwise_minimum_knowledge"
 	topologyInferenceStrategySTPFDBCorrelated    = "stp_fdb_correlated"
 	topologyInferenceStrategyCDPFDBHybrid        = "cdp_fdb_hybrid"
-	topologyInferenceStrategyFDBOverlapWeighted  = "fdb_overlap_weighted"
-	topologyInferenceStrategyExperimentalFull    = "experimental_full"
 )
 
 type topologyInferenceStrategyConfig struct {
@@ -43,8 +41,6 @@ type topologyInferenceStrategyConfig struct {
 	includeSTPBridgeLinks            bool
 	useSTPDesignatedParent           bool
 	enableFDBPairwiseLinks           bool
-	enableFDBOverlapLinks            bool
-	fdbOverlapMinShared              int
 	enableSTPManagedAliasCorrelation bool
 	filterSwitchFacingAttachments    bool
 }
@@ -217,10 +213,6 @@ func normalizeTopologyInferenceStrategy(value string) string {
 		return topologyInferenceStrategySTPFDBCorrelated
 	case topologyInferenceStrategyCDPFDBHybrid:
 		return topologyInferenceStrategyCDPFDBHybrid
-	case topologyInferenceStrategyFDBOverlapWeighted:
-		return topologyInferenceStrategyFDBOverlapWeighted
-	case topologyInferenceStrategyExperimentalFull:
-		return topologyInferenceStrategyExperimentalFull
 	default:
 		return topologyInferenceStrategyFDBMinimumKnowledge
 	}
@@ -249,8 +241,6 @@ func topologyInferenceStrategyConfigFor(strategy string) topologyInferenceStrate
 			includeSTPBridgeLinks:            true,
 			useSTPDesignatedParent:           true,
 			enableFDBPairwiseLinks:           true,
-			enableFDBOverlapLinks:            true,
-			fdbOverlapMinShared:              2,
 			enableSTPManagedAliasCorrelation: true,
 			filterSwitchFacingAttachments:    true,
 		}
@@ -259,30 +249,7 @@ func topologyInferenceStrategyConfigFor(strategy string) topologyInferenceStrate
 			id:                            topologyInferenceStrategyCDPFDBHybrid,
 			includeCDPBridgeLinks:         true,
 			enableFDBPairwiseLinks:        true,
-			enableFDBOverlapLinks:         true,
-			fdbOverlapMinShared:           2,
 			filterSwitchFacingAttachments: true,
-		}
-	case topologyInferenceStrategyFDBOverlapWeighted:
-		return topologyInferenceStrategyConfig{
-			id:                            topologyInferenceStrategyFDBOverlapWeighted,
-			enableFDBPairwiseLinks:        true,
-			enableFDBOverlapLinks:         true,
-			fdbOverlapMinShared:           2,
-			filterSwitchFacingAttachments: true,
-		}
-	case topologyInferenceStrategyExperimentalFull:
-		return topologyInferenceStrategyConfig{
-			id:                               topologyInferenceStrategyExperimentalFull,
-			includeLLDPBridgeLinks:           true,
-			includeCDPBridgeLinks:            true,
-			includeSTPBridgeLinks:            true,
-			useSTPDesignatedParent:           true,
-			enableFDBPairwiseLinks:           true,
-			enableFDBOverlapLinks:            true,
-			fdbOverlapMinShared:              1,
-			enableSTPManagedAliasCorrelation: true,
-			filterSwitchFacingAttachments:    false,
 		}
 	default:
 		return topologyInferenceStrategyConfig{
@@ -348,17 +315,6 @@ func ToTopologyData(result Result, opts TopologyDataOptions) topology.Data {
 		bridgeLinks = mergeBridgeLinkRecordSets(
 			bridgeLinks,
 			inferFDBPairwiseBridgeLinks(result.Attachments, ifaceByDeviceIndex, reporterAliases),
-		)
-	}
-	if strategyConfig.enableFDBOverlapLinks {
-		bridgeLinks = mergeBridgeLinkRecordSets(
-			bridgeLinks,
-			inferFDBOverlapWeightedBridgeLinks(
-				result.Attachments,
-				ifaceByDeviceIndex,
-				reporterAliases,
-				strategyConfig.fdbOverlapMinShared,
-			),
 		)
 	}
 	// LLDP/CDP ports and device pairs are deterministic for direct adjacency.

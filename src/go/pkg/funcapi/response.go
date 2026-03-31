@@ -5,6 +5,7 @@ package funcapi
 // MethodConfig describes a function method provided by a module.
 type MethodConfig struct {
 	ID             string        // Method ID (e.g., "top-queries")
+	Aliases        []string      // Additional function names to register for this method
 	Name           string        // Display name (e.g., "Top Queries")
 	UpdateEvery    int           // Default UI refresh interval
 	Help           string        // Description for UI

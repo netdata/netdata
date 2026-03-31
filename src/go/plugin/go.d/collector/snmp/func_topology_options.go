@@ -44,10 +44,6 @@ func normalizeTopologyInferenceStrategy(v string) string {
 		return topologyInferenceStrategySTPFDBCorrelated
 	case topologyInferenceStrategyCDPFDBHybrid:
 		return topologyInferenceStrategyCDPFDBHybrid
-	case topologyInferenceStrategyFDBOverlapWeighted:
-		return topologyInferenceStrategyFDBOverlapWeighted
-	case topologyInferenceStrategyExperimentalFull:
-		return topologyInferenceStrategyExperimentalFull
 	default:
 		return ""
 	}

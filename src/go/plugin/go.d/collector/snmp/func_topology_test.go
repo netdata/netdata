@@ -39,15 +39,13 @@ func TestTopologyMethodConfigIncludesSelectors(t *testing.T) {
 	assert.Equal(t, topologyParamInferenceStrategy, strategy.ID)
 	assert.Equal(t, "Infer Strategy", strategy.Name)
 	assert.Equal(t, funcapi.ParamSelect, strategy.Selection)
-	require.Len(t, strategy.Options, 7)
+	require.Len(t, strategy.Options, 5)
 	assert.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, strategy.Options[0].ID)
 	assert.True(t, strategy.Options[0].Default)
 	assert.Equal(t, topologyInferenceStrategySTPParentTree, strategy.Options[1].ID)
 	assert.Equal(t, topologyInferenceStrategyFDBPairwise, strategy.Options[2].ID)
 	assert.Equal(t, topologyInferenceStrategySTPFDBCorrelated, strategy.Options[3].ID)
 	assert.Equal(t, topologyInferenceStrategyCDPFDBHybrid, strategy.Options[4].ID)
-	assert.Equal(t, topologyInferenceStrategyFDBOverlapWeighted, strategy.Options[5].ID)
-	assert.Equal(t, topologyInferenceStrategyExperimentalFull, strategy.Options[6].ID)
 
 	managedFocus := cfg.RequiredParams[3]
 	assert.Equal(t, topologyParamManagedDeviceFocus, managedFocus.ID)
@@ -244,8 +242,6 @@ func TestNormalizeTopologyInferenceStrategy(t *testing.T) {
 	assert.Equal(t, topologyInferenceStrategyFDBPairwise, normalizeTopologyInferenceStrategy(topologyInferenceStrategyFDBPairwise))
 	assert.Equal(t, topologyInferenceStrategySTPFDBCorrelated, normalizeTopologyInferenceStrategy(topologyInferenceStrategySTPFDBCorrelated))
 	assert.Equal(t, topologyInferenceStrategyCDPFDBHybrid, normalizeTopologyInferenceStrategy(topologyInferenceStrategyCDPFDBHybrid))
-	assert.Equal(t, topologyInferenceStrategyFDBOverlapWeighted, normalizeTopologyInferenceStrategy(topologyInferenceStrategyFDBOverlapWeighted))
-	assert.Equal(t, topologyInferenceStrategyExperimentalFull, normalizeTopologyInferenceStrategy(topologyInferenceStrategyExperimentalFull))
 	assert.Equal(t, "", normalizeTopologyInferenceStrategy("invalid"))
 }
 

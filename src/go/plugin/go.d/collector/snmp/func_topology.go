@@ -35,8 +35,6 @@ const (
 	topologyInferenceStrategyFDBPairwise         = "fdb_pairwise_minimum_knowledge"
 	topologyInferenceStrategySTPFDBCorrelated    = "stp_fdb_correlated"
 	topologyInferenceStrategyCDPFDBHybrid        = "cdp_fdb_hybrid"
-	topologyInferenceStrategyFDBOverlapWeighted  = "fdb_overlap_weighted"
-	topologyInferenceStrategyExperimentalFull    = "experimental_full"
 	topologyManagedFocusAllDevices               = "all_devices"
 	topologyManagedFocusIPPrefix                 = "ip:"
 	topologyDepthAll                             = "all"

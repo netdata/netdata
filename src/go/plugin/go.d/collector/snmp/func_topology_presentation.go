@@ -47,7 +47,7 @@ func topologyInferenceStrategyParamConfig() funcapi.ParamConfig {
 	return funcapi.ParamConfig{
 		ID:        topologyParamInferenceStrategy,
 		Name:      "Infer Strategy",
-		Help:      "Choose the topology inference strategy (experimental modes are internal-testing only)",
+		Help:      "Choose the topology inference strategy",
 		Selection: funcapi.ParamSelect,
 		Options: []funcapi.ParamOption{
 			{
@@ -70,14 +70,6 @@ func topologyInferenceStrategyParamConfig() funcapi.ParamConfig {
 			{
 				ID:   topologyInferenceStrategyCDPFDBHybrid,
 				Name: "CDP + FDB Hybrid",
-			},
-			{
-				ID:   topologyInferenceStrategyFDBOverlapWeighted,
-				Name: "FDB Overlap Weighted",
-			},
-			{
-				ID:   topologyInferenceStrategyExperimentalFull,
-				Name: "Experimental Full (Internal Only)",
 			},
 		},
 	}
@@ -316,6 +308,7 @@ func snmpTopologyPresentation() *topology.Presentation {
 func topologyMethodConfig() funcapi.MethodConfig {
 	return funcapi.MethodConfig{
 		ID:           topologyMethodID,
+		Aliases:      []string{topologyMethodID},
 		Name:         "Topology (SNMP)",
 		UpdateEvery:  10,
 		Help:         "SNMP Layer-2 topology and neighbor discovery data",

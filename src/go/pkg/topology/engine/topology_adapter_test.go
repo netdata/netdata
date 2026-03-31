@@ -2595,10 +2595,10 @@ func TestToTopologyData_DeterministicTransitRuleSuppressesFDBOnLLDPPortInExperim
 		Source:            "snmp",
 		Layer:             "2",
 		View:              "summary",
-		InferenceStrategy: topologyInferenceStrategyExperimentalFull,
+		InferenceStrategy: topologyInferenceStrategyFDBMinimumKnowledge,
 	})
 
-	require.Equal(t, topologyInferenceStrategyExperimentalFull, data.Stats["inference_strategy"])
+	require.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, data.Stats["inference_strategy"])
 	require.Equal(t, 0, data.Stats["links_fdb_endpoint_emitted"])
 	require.Nil(t, findActorByType(data.Actors, "segment"))
 }
@@ -2639,7 +2639,7 @@ func TestToTopologyData_DeterministicTransitRuleMatchesNumericLLDPPortToIfIndex(
 		Source:            "snmp",
 		Layer:             "2",
 		View:              "summary",
-		InferenceStrategy: topologyInferenceStrategyExperimentalFull,
+		InferenceStrategy: topologyInferenceStrategyFDBMinimumKnowledge,
 	})
 
 	require.Equal(t, 0, data.Stats["links_fdb_endpoint_emitted"])

@@ -222,10 +222,10 @@ func TestParse(t *testing.T) {
 				assert.Equal(t, expected, group)
 			},
 		},
-		"static, snmp: inherit top-level topology into jobs": {
+		"static, module-wide defaults: inherit top-level nested config into jobs": {
 			test: func(t *testing.T, tmp *tmpDir) {
 				reg := confgroup.Registry{
-					"snmp": {},
+					"module": {},
 				}
 				cfg := staticConfig{
 					Jobs: []confgroup.Config{
@@ -235,13 +235,13 @@ func TestParse(t *testing.T) {
 							"community": "atadteN",
 						},
 					},
-					Extra: confgroup.Config{
+					ModuleDefaults: confgroup.Config{
 						"topology": confgroup.Config{
 							"autoprobe": false,
 						},
 					},
 				}
-				filename := tmp.join("snmp.conf")
+				filename := tmp.join("module.conf")
 				tmp.writeYAML(filename, cfg)
 
 				expected := &confgroup.Group{
@@ -249,7 +249,7 @@ func TestParse(t *testing.T) {
 					Configs: []confgroup.Config{
 						{
 							"name":                "edge-sw",
-							"module":              "snmp",
+							"module":              "module",
 							"hostname":            "10.20.4.84",
 							"community":           "atadteN",
 							"topology":            map[string]any{"autoprobe": false},
@@ -266,10 +266,10 @@ func TestParse(t *testing.T) {
 				assert.Equal(t, expected, group)
 			},
 		},
-		"static, snmp: per-job topology overrides global and keeps missing defaults": {
+		"static, module-wide defaults: per-job nested config overrides and keeps missing defaults": {
 			test: func(t *testing.T, tmp *tmpDir) {
 				reg := confgroup.Registry{
-					"snmp": {},
+					"module": {},
 				}
 				cfg := staticConfig{
 					Jobs: []confgroup.Config{
@@ -282,14 +282,14 @@ func TestParse(t *testing.T) {
 							},
 						},
 					},
-					Extra: confgroup.Config{
+					ModuleDefaults: confgroup.Config{
 						"topology": confgroup.Config{
 							"autoprobe": false,
 							"protocols": []any{"lldp", "cdp", "fdb"},
 						},
 					},
 				}
-				filename := tmp.join("snmp.conf")
+				filename := tmp.join("module.conf")
 				tmp.writeYAML(filename, cfg)
 
 				expected := &confgroup.Group{
@@ -297,7 +297,7 @@ func TestParse(t *testing.T) {
 					Configs: []confgroup.Config{
 						{
 							"name":                "core-router",
-							"module":              "snmp",
+							"module":              "module",
 							"hostname":            "10.20.4.1",
 							"community":           "atadteN",
 							"topology":            map[string]any{"autoprobe": true, "protocols": []any{"lldp", "cdp", "fdb"}},
@@ -314,7 +314,7 @@ func TestParse(t *testing.T) {
 				assert.Equal(t, expected, group)
 			},
 		},
-		"static, non-snmp ignores top-level topology": {
+		"static, module-wide defaults: inherit top-level scalar config into jobs when missing": {
 			test: func(t *testing.T, tmp *tmpDir) {
 				reg := confgroup.Registry{
 					"module": {},
@@ -325,10 +325,8 @@ func TestParse(t *testing.T) {
 							"name": "name",
 						},
 					},
-					Extra: confgroup.Config{
-						"topology": confgroup.Config{
-							"autoprobe": false,
-						},
+					ModuleDefaults: confgroup.Config{
+						"community": "public",
 					},
 				}
 				filename := tmp.join("module.conf")
@@ -340,6 +338,7 @@ func TestParse(t *testing.T) {
 						{
 							"name":                "name",
 							"module":              "module",
+							"community":           "public",
 							"autodetection_retry": collectorapi.AutoDetectionRetry,
 							"priority":            collectorapi.Priority,
 							"update_every":        collectorapi.UpdateEvery,

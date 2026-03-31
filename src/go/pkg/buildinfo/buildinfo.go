@@ -22,9 +22,6 @@ var UserConfigDir = ""
 // StockConfigDir is the path to the stock (default) configuration directory.
 var StockConfigDir = ""
 
-// StockDataDir is the path to Netdata's stock immutable data directory.
-var StockDataDir = "/usr/share/netdata"
-
 // PluginsDir is the path to the installed plugins directory.
 var PluginsDir = "/usr/libexec/netdata/plugins.d"
 
@@ -43,12 +40,11 @@ var CacheDir = "/var/cache/netdata"
 // remain forward-compatible.
 func Info() string {
 	return fmt.Sprintf(
-		"version=%s go_version=%s user_config_dir=%s stock_config_dir=%s stock_data_dir=%s plugins_dir=%s netdata_bin_dir=%s cache_dir=%s",
+		"version=%s go_version=%s user_config_dir=%s stock_config_dir=%s plugins_dir=%s netdata_bin_dir=%s cache_dir=%s",
 		Version,
 		runtime.Version(),
 		UserConfigDir,
 		StockConfigDir,
-		StockDataDir,
 		PluginsDir,
 		NetdataBinDir,
 		CacheDir,
@@ -149,7 +145,6 @@ func init() {
 
 	UserConfigDir = rebuild(UserConfigDir)
 	StockConfigDir = rebuild(StockConfigDir)
-	StockDataDir = rebuild(StockDataDir)
 	PluginsDir = rebuild(PluginsDir)
 	NetdataBinDir = rebuild(NetdataBinDir)
 	CacheDir = rebuild(CacheDir)

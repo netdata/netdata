@@ -59,7 +59,7 @@ func parseStaticFormat(reg confgroup.Registry, path string, bs []byte) (*confgro
 		return nil, err
 	}
 
-	applyModuleWideConfigDefaults(name, modCfg.Jobs, modCfg.Extra)
+	applyModuleWideJobConfigDefaults(modCfg.Jobs, modCfg.ModuleDefaults)
 
 	for _, cfg := range modCfg.Jobs {
 		cfg.SetModule(name)
@@ -75,13 +75,8 @@ func parseStaticFormat(reg confgroup.Registry, path string, bs []byte) (*confgro
 	return group, nil
 }
 
-func applyModuleWideConfigDefaults(module string, jobs []confgroup.Config, extra confgroup.Config) {
-	if module != "snmp" || len(jobs) == 0 || len(extra) == 0 {
-		return
-	}
-
-	globalTopology, ok := extra["topology"]
-	if !ok || globalTopology == nil {
+func applyModuleWideJobConfigDefaults(jobs []confgroup.Config, defaults confgroup.Config) {
+	if len(jobs) == 0 || len(defaults) == 0 {
 		return
 	}
 
@@ -89,14 +84,16 @@ func applyModuleWideConfigDefaults(module string, jobs []confgroup.Config, extra
 		if job == nil {
 			continue
 		}
-		jobTopology, hasJobTopology := job["topology"]
-		switch {
-		case !hasJobTopology || jobTopology == nil:
-			job["topology"] = deepCopyConfigValue(globalTopology)
-		default:
-			merged, ok := mergeConfigValueWithDefaults(jobTopology, globalTopology)
-			if ok {
-				job["topology"] = merged
+		for key, defValue := range defaults {
+			current, exists := job[key]
+			switch {
+			case !exists || current == nil:
+				job[key] = deepCopyConfigValue(defValue)
+			default:
+				merged, ok := mergeConfigValueWithDefaults(current, defValue)
+				if ok {
+					job[key] = merged
+				}
 			}
 		}
 	}

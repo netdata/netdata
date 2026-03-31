@@ -431,7 +431,7 @@ func TestControllerLifecycleHooks(t *testing.T) {
 				controller.RegisterModules(collectorapi.Registry{
 					"snmp": collectorapi.Creator{
 						Methods: func() []funcapi.MethodConfig {
-							return []funcapi.MethodConfig{{ID: "topology:snmp", ResponseType: "topology"}}
+							return []funcapi.MethodConfig{{ID: "topology:snmp", Aliases: []string{"topology:snmp"}}}
 						},
 					},
 				})

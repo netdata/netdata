@@ -5,7 +5,6 @@ package funcctl
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -178,9 +177,19 @@ func (c *Controller) registerModuleMethodsOnFirstJobStart(moduleName string) {
 }
 
 func methodFunctionNames(moduleName string, method funcapi.MethodConfig) []string {
-	funcNames := []string{fmt.Sprintf("%s:%s", moduleName, method.ID)}
-	if method.ResponseType == "topology" && strings.HasPrefix(method.ID, "topology:") {
-		funcNames = append(funcNames, method.ID)
+	funcName := fmt.Sprintf("%s:%s", moduleName, method.ID)
+	funcNames := []string{funcName}
+	seen := map[string]struct{}{funcName: {}}
+
+	for _, alias := range method.Aliases {
+		if alias == "" {
+			continue
+		}
+		if _, ok := seen[alias]; ok {
+			continue
+		}
+		seen[alias] = struct{}{}
+		funcNames = append(funcNames, alias)
 	}
 	return funcNames
 }
