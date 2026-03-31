@@ -22,7 +22,8 @@ impl FlowQueryService {
         };
 
         let mut counts = ScanCounts::default();
-        let prefilter_matches = build_prefilter_matches(&cursor_prefilter_pairs(&request.selections));
+        let prefilter_matches =
+            build_prefilter_matches(&cursor_prefilter_pairs(&request.selections));
 
         for (span_index, span) in setup.spans.iter().enumerate() {
             if let Some(execution) = execution {
@@ -44,11 +45,7 @@ impl FlowQueryService {
                 span_index,
                 &prefilter_matches,
                 "selected tier scan",
-                |file_path,
-                 journal,
-                 timestamp_usec,
-                 data_offsets,
-                 decompress_buf| {
+                |file_path, journal, timestamp_usec, data_offsets, decompress_buf| {
                     let mut fields = BTreeMap::new();
                     let mut regex_match = query_regex.is_none();
                     visit_journal_payloads(

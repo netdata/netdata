@@ -64,10 +64,7 @@ pub(crate) fn supported_flow_field_names() -> impl Iterator<Item = &'static str>
         .filter(|field| {
             !matches!(
                 *field,
-                "SRC_GEO_LATITUDE"
-                    | "DST_GEO_LATITUDE"
-                    | "SRC_GEO_LONGITUDE"
-                    | "DST_GEO_LONGITUDE"
+                "SRC_GEO_LATITUDE" | "DST_GEO_LATITUDE" | "SRC_GEO_LONGITUDE" | "DST_GEO_LONGITUDE"
             )
         })
         .filter(|field| !matches!(*field, "SAMPLING_RATE" | "RAW_BYTES" | "RAW_PACKETS"))

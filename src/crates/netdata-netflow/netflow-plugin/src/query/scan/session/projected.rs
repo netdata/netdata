@@ -103,11 +103,7 @@ impl FlowQueryService {
                 span_index,
                 &prefilter_matches,
                 "projected grouped query scan",
-                |file_path,
-                 journal,
-                 timestamp_usec,
-                 data_offsets,
-                 decompress_buf| {
+                |file_path, journal, timestamp_usec, data_offsets, decompress_buf| {
                     row_group_field_ids.fill(None);
                     for value in &mut row_missing_values {
                         let _ = value.take();

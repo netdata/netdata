@@ -28,8 +28,7 @@ impl NetworkAttributes {
             state: config.state.clone(),
             city: config.city.clone(),
             latitude: normalized_coordinate(config.latitude, -90.0, 90.0).unwrap_or_default(),
-            longitude: normalized_coordinate(config.longitude, -180.0, 180.0)
-                .unwrap_or_default(),
+            longitude: normalized_coordinate(config.longitude, -180.0, 180.0).unwrap_or_default(),
             tenant: config.tenant.clone(),
             asn: config.asn,
             asn_name: String::new(),

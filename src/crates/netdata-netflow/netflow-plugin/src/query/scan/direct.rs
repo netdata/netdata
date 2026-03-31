@@ -20,13 +20,7 @@ pub(crate) fn scan_journal_files_forward<F>(
     mut on_entry: F,
 ) -> Result<ScanCounts>
 where
-    F: FnMut(
-        &Path,
-        &JournalFile<Mmap>,
-        u64,
-        &[NonZeroU64],
-        &mut Vec<u8>,
-    ) -> Result<bool>,
+    F: FnMut(&Path, &JournalFile<Mmap>, u64, &[NonZeroU64], &mut Vec<u8>) -> Result<bool>,
 {
     let mut counts = ScanCounts::default();
     let mut data_offsets = Vec::new();
@@ -151,9 +145,9 @@ where
     F: FnMut(&[u8]) -> Result<()>,
 {
     for data_offset in data_offsets.iter().copied() {
-        let data_guard = journal
-            .data_ref(data_offset)
-            .with_context(|| format!("failed to read payload object from {}", file_path.display()))?;
+        let data_guard = journal.data_ref(data_offset).with_context(|| {
+            format!("failed to read payload object from {}", file_path.display())
+        })?;
         let payload = if data_guard.is_compressed() {
             data_guard.decompress(decompress_buf)?;
             decompress_buf.as_slice()

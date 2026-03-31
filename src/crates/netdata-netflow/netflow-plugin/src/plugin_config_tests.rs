@@ -158,7 +158,10 @@ fn validate_rejects_static_network_coordinate_out_of_range() {
     );
 
     let err = cfg.validate().expect_err("expected validation error");
-    assert!(err.to_string().contains(".latitude must be a finite value between -90 and 90"));
+    assert!(
+        err.to_string()
+            .contains(".latitude must be a finite value between -90 and 90")
+    );
 }
 
 #[test]

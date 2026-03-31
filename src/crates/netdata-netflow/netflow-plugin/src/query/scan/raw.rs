@@ -166,12 +166,14 @@ impl FlowQueryService {
             let mut entry_state =
                 reset_projected_raw_entry(projected_field_specs, projected_match_plan, buffers);
             data_offsets.clear();
-            entry_guard.collect_offsets(&mut data_offsets).with_context(|| {
-                format!(
-                    "failed to collect payload offsets from current entry in {}",
-                    file_path.display()
-                )
-            })?;
+            entry_guard
+                .collect_offsets(&mut data_offsets)
+                .with_context(|| {
+                    format!(
+                        "failed to collect payload offsets from current entry in {}",
+                        file_path.display()
+                    )
+                })?;
             drop(entry_guard);
 
             apply_projected_raw_payloads(
