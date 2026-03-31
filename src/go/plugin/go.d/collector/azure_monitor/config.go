@@ -74,9 +74,14 @@ type DiscoveryQueryConfig struct {
 	KQL string `yaml:"kql" json:"kql"`
 }
 
-type ProfilesConfig struct {
-	Mode  string   `yaml:"mode,omitempty" json:"mode"`
+type ProfilesModeConfig struct {
 	Names []string `yaml:"names,omitempty" json:"names,omitempty"`
+}
+
+type ProfilesConfig struct {
+	Mode         string              `yaml:"mode,omitempty" json:"mode"`
+	ModeExact    *ProfilesModeConfig `yaml:"mode_exact,omitempty" json:"mode_exact,omitempty"`
+	ModeCombined *ProfilesModeConfig `yaml:"mode_combined,omitempty" json:"mode_combined,omitempty"`
 }
 
 type LimitsConfig struct {
@@ -184,14 +189,29 @@ func (c Config) validate() error {
 
 	switch strings.ToLower(strings.TrimSpace(c.Profiles.Mode)) {
 	case profilesModeAuto:
-		if len(c.Profiles.Names) > 0 {
-			errs = append(errs, errors.New("'profiles.names' must be empty when profiles.mode is 'auto'"))
+		if c.Profiles.ModeExact != nil {
+			errs = append(errs, errors.New("'profiles.mode_exact' is only allowed when profiles.mode is 'exact'"))
 		}
-	case profilesModeExact, profilesModeCombined:
-		if len(c.Profiles.Names) == 0 {
-			errs = append(errs, fmt.Errorf("'profiles.names' must not be empty when profiles.mode is '%s'", c.Profiles.Mode))
+		if c.Profiles.ModeCombined != nil {
+			errs = append(errs, errors.New("'profiles.mode_combined' is only allowed when profiles.mode is 'combined'"))
+		}
+	case profilesModeExact:
+		if c.Profiles.ModeCombined != nil {
+			errs = append(errs, errors.New("'profiles.mode_combined' is only allowed when profiles.mode is 'combined'"))
+		}
+		if c.Profiles.ModeExact == nil || len(c.Profiles.ModeExact.Names) == 0 {
+			errs = append(errs, fmt.Errorf("'profiles.mode_exact.names' must not be empty when profiles.mode is '%s'", c.Profiles.Mode))
 		} else {
-			errs = append(errs, validateProfilesList(c.Profiles.Names)...)
+			errs = append(errs, validateProfilesList("profiles.mode_exact.names", c.Profiles.ModeExact.Names)...)
+		}
+	case profilesModeCombined:
+		if c.Profiles.ModeExact != nil {
+			errs = append(errs, errors.New("'profiles.mode_exact' is only allowed when profiles.mode is 'exact'"))
+		}
+		if c.Profiles.ModeCombined == nil || len(c.Profiles.ModeCombined.Names) == 0 {
+			errs = append(errs, fmt.Errorf("'profiles.mode_combined.names' must not be empty when profiles.mode is '%s'", c.Profiles.Mode))
+		} else {
+			errs = append(errs, validateProfilesList("profiles.mode_combined.names", c.Profiles.ModeCombined.Names)...)
 		}
 	default:
 		errs = append(errs, fmt.Errorf("'profiles.mode' must be one of: %s, %s, %s",
@@ -235,22 +255,36 @@ func validateDiscoveryFilters(filters *DiscoveryFiltersConfig) []error {
 	return errs
 }
 
-func validateProfilesList(profiles []string) []error {
+func validateProfilesList(path string, profiles []string) []error {
 	var errs []error
 	seen := map[string]struct{}{}
 	for _, name := range profiles {
 		n := strings.TrimSpace(name)
 		if n == "" {
-			errs = append(errs, errors.New("'profiles.names' contains an empty value"))
+			errs = append(errs, fmt.Errorf("'%s' contains an empty value", path))
 			continue
 		}
 		norm := stringsLowerTrim(n)
 		if _, ok := seen[norm]; ok {
-			errs = append(errs, fmt.Errorf("'profiles.names' contains duplicate value '%s'", n))
+			errs = append(errs, fmt.Errorf("'%s' contains duplicate value '%s'", path, n))
 		}
 		seen[norm] = struct{}{}
 	}
 	return errs
+}
+
+func (p ProfilesConfig) explicitNames() []string {
+	switch stringsLowerTrim(p.Mode) {
+	case profilesModeExact:
+		if p.ModeExact != nil {
+			return p.ModeExact.Names
+		}
+	case profilesModeCombined:
+		if p.ModeCombined != nil {
+			return p.ModeCombined.Names
+		}
+	}
+	return nil
 }
 
 func (c Config) primarySubscriptionID() string {

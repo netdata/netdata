@@ -15,9 +15,11 @@
   },
   "profiles": {
     "mode": "exact",
-    "names": [
-      "Azure SQL Managed Instance"
-    ]
+    "mode_exact": {
+      "names": [
+        "Azure SQL Managed Instance"
+      ]
+    }
   },
   "query_offset": 180,
   "timeout": 30,

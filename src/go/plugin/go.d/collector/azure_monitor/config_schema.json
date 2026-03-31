@@ -58,60 +58,8 @@
               "query"
             ],
             "default": "filters"
-          },
-          "mode_filters": {
-            "title": "Structured filters",
-            "type": "object",
-            "properties": {
-              "resource_groups": {
-                "title": "Resource groups",
-                "description": "Optional list of Azure resource groups to include.",
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "regions": {
-                "title": "Regions",
-                "description": "Optional list of Azure regions to include.",
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "tags": {
-                "title": "Tags",
-                "description": "Optional tag filters. Keys map to one or more accepted values.",
-                "type": "object",
-                "additionalProperties": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
-                  "minItems": 1
-                }
-              }
-            }
-          },
-          "mode_query": {
-            "title": "Custom query",
-            "type": "object",
-            "properties": {
-              "kql": {
-                "title": "Azure Resource Graph KQL",
-                "description": "Custom Azure Resource Graph query.",
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "required": [
-              "kql"
-            ]
           }
         },
-        "required": [
-          "mode"
-        ],
         "dependencies": {
           "mode": {
             "oneOf": [
@@ -119,6 +67,40 @@
                 "properties": {
                   "mode": {
                     "const": "filters"
+                  },
+                  "mode_filters": {
+                    "title": "Structured filters",
+                    "type": "object",
+                    "properties": {
+                      "resource_groups": {
+                        "title": "Resource groups",
+                        "description": "Optional list of Azure resource groups to include.",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "regions": {
+                        "title": "Regions",
+                        "description": "Optional list of Azure regions to include.",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "tags": {
+                        "title": "Tags",
+                        "description": "Optional tag filters. Keys map to one or more accepted values.",
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 1
+                        }
+                      }
+                    }
                   }
                 }
               },
@@ -127,9 +109,21 @@
                   "mode": {
                     "const": "query"
                   },
-                    "mode_query": {
-                      "type": "object"
-                    }
+                  "mode_query": {
+                    "title": "Custom query",
+                    "type": "object",
+                    "properties": {
+                      "kql": {
+                        "title": "Azure Resource Graph KQL",
+                        "description": "Custom Azure Resource Graph query.",
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kql"
+                    ]
+                  }
                 },
                 "required": [
                   "mode_query"
@@ -153,19 +147,75 @@
               "combined"
             ],
             "default": "auto"
-          },
-          "names": {
-            "title": "Profile Names",
-            "description": "Explicit profile names used by exact or combined mode. Matching is case-insensitive.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
           }
         },
-        "required": [
-          "mode"
-        ]
+        "dependencies": {
+          "mode": {
+            "oneOf": [
+              {
+                "properties": {
+                  "mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "exact"
+                  },
+                  "mode_exact": {
+                    "title": "Exact profiles",
+                    "type": "object",
+                    "properties": {
+                      "names": {
+                        "title": "Profile Names",
+                        "description": "Explicit profile names used by `exact` mode. Matching is case-insensitive.",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "names"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_exact"
+                ]
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "combined"
+                  },
+                  "mode_combined": {
+                    "title": "Combined profiles",
+                    "type": "object",
+                    "properties": {
+                      "names": {
+                        "title": "Profile Names",
+                        "description": "Explicit profile names merged with auto-discovered profiles in `combined` mode. Matching is case-insensitive.",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "names"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_combined"
+                ]
+              }
+            ]
+          }
+        }
       },
       "query_offset": {
         "title": "Query offset",
@@ -310,9 +360,6 @@
     },
     "required": [
       "subscription_ids",
-      "discovery",
-      "profiles",
-      "limits",
       "auth"
     ]
   },
@@ -357,8 +404,15 @@
           "inline": true
         }
       },
-      "ids": {
-        "ui:listFlavour": "list"
+      "mode_exact": {
+        "names": {
+          "ui:listFlavour": "list"
+        }
+      },
+      "mode_combined": {
+        "names": {
+          "ui:listFlavour": "list"
+        }
       }
     },
     "timeout": {
@@ -382,34 +436,39 @@
     "ui:options": {
       "tabs": [
         {
-          "title": "Target",
+          "title": "Base",
           "fields": [
             "subscription_ids",
             "cloud",
-            "vnode"
-          ]
-        },
-        {
-          "title": "Collection",
-          "fields": [
             "update_every",
             "autodetection_retry",
             "query_offset",
             "timeout",
-            "limits"
-          ]
-        },
-        {
-          "title": "Discovery",
-          "fields": [
-            "discovery",
-            "profiles"
+            "vnode"
           ]
         },
         {
           "title": "Auth",
           "fields": [
             "auth"
+          ]
+        },
+        {
+          "title": "Discovery",
+          "fields": [
+            "discovery"
+          ]
+        },
+        {
+          "title": "Profiles",
+          "fields": [
+            "profiles"
+          ]
+        },
+        {
+          "title": "Limits",
+          "fields": [
+            "limits"
           ]
         }
       ]

@@ -41,10 +41,14 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            When `profiles.mode` is `auto` (the default), the collector discovers candidate resources inside
-            `subscription_ids` using `discovery.mode=filters` and enables matching built-in profiles automatically.
-            A single job can monitor multiple subscriptions. Switch to `discovery.mode=query` to provide your own
-            Azure Resource Graph KQL for candidate discovery.
+            During bootstrap, when `profiles.mode` is `auto` (the default), the collector discovers candidate
+            resources inside `subscription_ids` using `discovery.mode=filters` and enables matching built-in
+            profiles automatically. A single job can monitor multiple subscriptions. Switch to
+            `discovery.mode=query` to provide your own Azure Resource Graph KQL for candidate discovery.
+
+            After bootstrap, periodic runtime discovery refreshes only the resources for already-active profile
+            resource types. It does not activate new profiles or rebuild the chart template; newly appearing
+            resource types require collector restart or rebootstrap.
         limits:
           description: |
             Azure Monitor metrics granularity is typically 1 minute.
@@ -118,7 +122,7 @@ modules:
               required: false
               group: Target
             - name: discovery.refresh_every
-              description: Resource discovery interval in seconds. Set to `0` to disable periodic runtime rediscovery after bootstrap.
+              description: Resource discovery interval in seconds for refreshing resources of already-active profiles. Set to `0` to disable periodic runtime rediscovery after bootstrap.
               default_value: 300
               required: false
               group: Discovery
@@ -148,12 +152,17 @@ modules:
               required: false
               group: Discovery
             - name: profiles.mode
-              description: "Profile selection mode: `auto` enables profiles for discovered resource types, `exact` uses only listed profile names, `combined` merges listed names with auto-discovered profiles."
+              description: "Profile selection mode: `auto` enables profiles for discovered resource types, `exact` uses names listed under `profiles.mode_exact.names`, `combined` merges names from `profiles.mode_combined.names` with auto-discovered profiles."
               default_value: auto
               required: false
               group: Profiles
-            - name: profiles.names
-              description: Explicit profile names used by `exact` or `combined` mode. Matching is case-insensitive.
+            - name: profiles.mode_exact.names
+              description: Explicit profile names used by `exact` mode. Matching is case-insensitive.
+              default_value: "[]"
+              required: false
+              group: Profiles
+            - name: profiles.mode_combined.names
+              description: Explicit profile names merged with auto-discovered profiles in `combined` mode. Matching is case-insensitive.
               default_value: "[]"
               required: false
               group: Profiles
@@ -254,9 +263,10 @@ modules:
                       - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                     profiles:
                       mode: exact
-                      names:
-                        - Azure SQL Database
-                        - Azure PostgreSQL Flexible Server
+                      mode_exact:
+                        names:
+                          - Azure SQL Database
+                          - Azure PostgreSQL Flexible Server
                     auth:
                       mode: managed_identity
             - name: Custom Azure Resource Graph KQL
@@ -304,7 +314,7 @@ modules:
           - name: Missing metrics for some resource types
             description: |
               Azure Monitor profiles are matched by resource type. If a resource type exists but no metrics appear:
-              1. Ensure `profiles.mode: auto` (default) is set, or list the specific profile names under `profiles.names`.
+              1. Ensure `profiles.mode: auto` (default) is set, or list the specific profile names under `profiles.mode_exact.names` or `profiles.mode_combined.names`, depending on the selected mode.
               2. Verify the resource type matches a built-in profile. Run `ls /usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/` to see available profiles.
               3. Some metrics require the resource to be actively processing data (e.g., IoT Hub telemetry metrics only appear when devices send messages).
           - name: Metrics appear delayed
@@ -327,7 +337,9 @@ modules:
       description: |
         Metrics depend on which Azure Monitor profiles are enabled. Each profile corresponds to an Azure
         service type and defines the specific metrics collected. With the default `profiles.mode: auto`
-        setting, profiles are automatically enabled for resource types found in your subscription.
+        setting, profiles are resolved during bootstrap for resource types found in the current discovery scope.
+        Later runtime rediscovery refreshes resources for already-active profile types only; it does not adopt
+        newly appearing resource types until the collector is restarted or rebootstrapped.
 
         See the service-specific integrations below for detailed metrics lists.
       availability: []

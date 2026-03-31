@@ -4,6 +4,7 @@ package azure_monitor
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -40,6 +41,72 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
+func TestConfigSchema_RuntimeContract(t *testing.T) {
+	raw, err := os.ReadFile("config_schema.json")
+	require.NoError(t, err)
+
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal(raw, &doc))
+
+	schema := requireMapField(t, doc, "jsonSchema")
+	assert.ElementsMatch(t, []string{"subscription_ids", "auth"}, requireStringSliceField(t, schema, "required"))
+
+	properties := requireMapField(t, schema, "properties")
+
+	discovery := requireMapField(t, properties, "discovery")
+	assert.NotContains(t, discovery, "required")
+	discoveryProps := requireMapField(t, discovery, "properties")
+	assert.Contains(t, discoveryProps, "refresh_every")
+	assert.Contains(t, discoveryProps, "mode")
+	assert.NotContains(t, discoveryProps, "mode_filters")
+	assert.NotContains(t, discoveryProps, "mode_query")
+
+	profiles := requireMapField(t, properties, "profiles")
+	assert.NotContains(t, profiles, "required")
+	profileProps := requireMapField(t, profiles, "properties")
+	assert.Contains(t, profileProps, "mode")
+	assert.NotContains(t, profileProps, "mode_exact")
+	assert.NotContains(t, profileProps, "mode_combined")
+
+	uiSchema := requireMapField(t, doc, "uiSchema")
+	uiProfiles := requireMapField(t, uiSchema, "profiles")
+	_, hasIDs := uiProfiles["ids"]
+	assert.False(t, hasIDs)
+	_, hasNames := uiProfiles["names"]
+	assert.False(t, hasNames)
+	_, hasModeExact := uiProfiles["mode_exact"]
+	assert.True(t, hasModeExact)
+	_, hasModeCombined := uiProfiles["mode_combined"]
+	assert.True(t, hasModeCombined)
+}
+
+func requireMapField(t *testing.T, m map[string]any, key string) map[string]any {
+	t.Helper()
+
+	value, ok := m[key]
+	require.Truef(t, ok, "missing key %q", key)
+	out, ok := value.(map[string]any)
+	require.Truef(t, ok, "key %q is not an object", key)
+	return out
+}
+
+func requireStringSliceField(t *testing.T, m map[string]any, key string) []string {
+	t.Helper()
+
+	value, ok := m[key]
+	require.Truef(t, ok, "missing key %q", key)
+	items, ok := value.([]any)
+	require.Truef(t, ok, "key %q is not an array", key)
+
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		s, ok := item.(string)
+		require.Truef(t, ok, "key %q contains a non-string item", key)
+		out = append(out, s)
+	}
+	return out
+}
+
 func TestCollector_ConfigurationSerialize(t *testing.T) {
 	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
@@ -64,8 +131,8 @@ func TestCollector_Init(t *testing.T) {
 				SubscriptionIDs: []string{"sub-1"},
 				Timeout:         confopt.Duration(-time.Second),
 				Profiles: ProfilesConfig{
-					Mode:  profilesModeExact,
-					Names: []string{"Azure PostgreSQL Flexible Server"},
+					Mode:      profilesModeExact,
+					ModeExact: &ProfilesModeConfig{Names: []string{"Azure PostgreSQL Flexible Server"}},
 				},
 				Auth: cloudauth.AzureADAuthConfig{
 					Mode: cloudauth.AzureADAuthModeDefault,
@@ -155,7 +222,8 @@ func TestCollector_UsesConfiguredTimeout(t *testing.T) {
 				c.Config = testConfig()
 				c.Config.Timeout = confopt.Duration(timeout)
 				c.Config.Profiles.Mode = profilesModeAuto
-				c.Config.Profiles.Names = nil
+				c.Config.Profiles.ModeExact = nil
+				c.Config.Profiles.ModeCombined = nil
 				rg.resources = []map[string]any{
 					{
 						"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
@@ -652,7 +720,7 @@ func TestCollector_TimeGrainScheduling(t *testing.T) {
 	}
 
 	cfg := testConfig()
-	cfg.Profiles.Names = []string{"azure storage slow"}
+	cfg.Profiles.ModeExact = &ProfilesModeConfig{Names: []string{"azure storage slow"}}
 
 	catalog := mustLoadStockCatalog(t, map[string]string{
 		"storage_slow.yaml": `
@@ -730,7 +798,8 @@ func TestCollector_CheckBootstrapProfileScenarios(t *testing.T) {
 			prepare: func(c *Collector) {
 				c.Config = testConfig()
 				c.Config.Profiles.Mode = profilesModeAuto
-				c.Config.Profiles.Names = nil
+				c.Config.Profiles.ModeExact = nil
+				c.Config.Profiles.ModeCombined = nil
 			},
 			check: func(t *testing.T, c *Collector, rg *mockResourceGraph) {
 				require.NotEmpty(t, c.runtime.Profiles)
@@ -750,7 +819,8 @@ func TestCollector_CheckBootstrapProfileScenarios(t *testing.T) {
 			prepare: func(c *Collector) {
 				c.Config = testConfig()
 				c.Config.Profiles.Mode = profilesModeCombined
-				c.Config.Profiles.Names = []string{"azure cosmos db account"}
+				c.Config.Profiles.ModeExact = nil
+				c.Config.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"azure cosmos db account"}}
 			},
 			check: func(t *testing.T, c *Collector, rg *mockResourceGraph) {
 				var ids []string
@@ -765,7 +835,8 @@ func TestCollector_CheckBootstrapProfileScenarios(t *testing.T) {
 			prepare: func(c *Collector) {
 				c.Config = testConfig()
 				c.Config.Profiles.Mode = profilesModeCombined
-				c.Config.Profiles.Names = []string{"Azure Cosmos DB Account"}
+				c.Config.Profiles.ModeExact = nil
+				c.Config.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"Azure Cosmos DB Account"}}
 			},
 			check: func(t *testing.T, c *Collector, rg *mockResourceGraph) {
 				require.Len(t, c.runtime.Profiles, 1)
@@ -776,7 +847,8 @@ func TestCollector_CheckBootstrapProfileScenarios(t *testing.T) {
 			prepare: func(c *Collector) {
 				c.Config = testConfig()
 				c.Config.Profiles.Mode = ""
-				c.Config.Profiles.Names = nil
+				c.Config.Profiles.ModeExact = nil
+				c.Config.Profiles.ModeCombined = nil
 			},
 			wantErrContains: "auto-discovery found no Azure resources",
 		},
@@ -784,7 +856,8 @@ func TestCollector_CheckBootstrapProfileScenarios(t *testing.T) {
 			prepare: func(c *Collector) {
 				c.Config = testConfig()
 				c.Config.Profiles.Mode = profilesModeAuto
-				c.Config.Profiles.Names = nil
+				c.Config.Profiles.ModeExact = nil
+				c.Config.Profiles.ModeCombined = nil
 			},
 			wantErrContains: "auto-discovery found no Azure resources",
 		},
@@ -833,7 +906,8 @@ func TestCollector_CheckBootstrapQueryModeScenarios(t *testing.T) {
 			prepare: func(c *Collector) {
 				c.Config = testConfig()
 				c.Config.Profiles.Mode = profilesModeAuto
-				c.Config.Profiles.Names = nil
+				c.Config.Profiles.ModeExact = nil
+				c.Config.Profiles.ModeCombined = nil
 				c.Config.Discovery.Mode = discoveryModeQuery
 				c.Config.Discovery.ModeFilters = nil
 				c.Config.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: kql}
@@ -960,7 +1034,8 @@ func TestCollector_InitQueryModeRejectsMalformedRows(t *testing.T) {
 			c := New()
 			c.Config = testConfig()
 			c.Config.Profiles.Mode = profilesModeAuto
-			c.Config.Profiles.Names = nil
+			c.Config.Profiles.ModeExact = nil
+			c.Config.Profiles.ModeCombined = nil
 			c.Config.Discovery.Mode = discoveryModeQuery
 			c.Config.Discovery.ModeFilters = nil
 			c.Config.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: kql}
@@ -1017,18 +1092,19 @@ func TestConfig_ValidateDiscoveryContracts(t *testing.T) {
 			cfg: func() Config {
 				cfg := testConfig()
 				cfg.Profiles.Mode = profilesModeAuto
+				cfg.Profiles.ModeCombined = nil
 				return cfg
 			}(),
-			wantErrContain: "'profiles.names' must be empty when profiles.mode is 'auto'",
+			wantErrContain: "'profiles.mode_exact' is only allowed when profiles.mode is 'exact'",
 		},
 		"exact mode rejects duplicate names ignoring case": {
 			cfg: func() Config {
 				cfg := testConfig()
 				cfg.Profiles.Mode = profilesModeExact
-				cfg.Profiles.Names = []string{"Azure PostgreSQL Flexible Server", "azure postgresql flexible server"}
+				cfg.Profiles.ModeExact = &ProfilesModeConfig{Names: []string{"Azure PostgreSQL Flexible Server", "azure postgresql flexible server"}}
 				return cfg
 			}(),
-			wantErrContain: "'profiles.names' contains duplicate value 'azure postgresql flexible server'",
+			wantErrContain: "'profiles.mode_exact.names' contains duplicate value 'azure postgresql flexible server'",
 		},
 	}
 
@@ -1145,8 +1221,8 @@ func testConfig() Config {
 			Mode:         discoveryModeFilters,
 		},
 		Profiles: ProfilesConfig{
-			Mode:  profilesModeExact,
-			Names: []string{"Azure PostgreSQL Flexible Server"},
+			Mode:      profilesModeExact,
+			ModeExact: &ProfilesModeConfig{Names: []string{"Azure PostgreSQL Flexible Server"}},
 		},
 		QueryOffset: 180,
 		Timeout:     defaultTimeout,
