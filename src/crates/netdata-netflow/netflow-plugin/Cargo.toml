@@ -27,7 +27,6 @@ journal-engine = { workspace = true }
 journal-index = { workspace = true }
 journal-log-writer = { workspace = true }
 journal-registry = { workspace = true }
-journal-session = { workspace = true }
 humantime = { workspace = true }
 humantime-serde = { workspace = true }
 hashbrown = { workspace = true }
@@ -77,3 +76,4 @@ protoc-bin-vendored = "3"
 etherparse = "0.19.0"
 pcap-file = "2.0.0"
 tempfile = { workspace = true }
+uuid = { workspace = true }

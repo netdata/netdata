@@ -1893,17 +1893,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "journal-session"
-version = "0.1.3"
-dependencies = [
- "journal-core",
- "journal-registry",
- "tempfile",
- "thiserror 2.0.17",
- "uuid",
-]
-
-[[package]]
 name = "js-sys"
 version = "0.3.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2317,7 +2306,6 @@ dependencies = [
  "journal-index",
  "journal-log-writer",
  "journal-registry",
- "journal-session",
  "maxminddb",
  "memchr",
  "memmap2",
@@ -2350,6 +2338,7 @@ dependencies = [
  "tonic-prost-build",
  "tracing",
  "twox-hash",
+ "uuid",
 ]
 
 [[package]]

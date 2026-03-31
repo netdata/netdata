@@ -9,7 +9,6 @@ members = [
     "journal-log-writer",
     "journal-engine",
     "journal-registry",
-    "journal-session",
     "rdp",
 
     # Netdata plugin workspace members
@@ -143,7 +142,6 @@ journal-index = { path = "journal-index" }
 journal-log-writer = { path = "journal-log-writer" }
 journal-engine = { path = "journal-engine" }
 journal-registry = { path = "journal-registry" }
-journal-session = { path = "journal-session" }
 rdp = { path = "rdp" }
 
 # Netdata plugin crates

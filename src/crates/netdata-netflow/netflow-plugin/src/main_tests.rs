@@ -780,7 +780,7 @@ async fn e2e_selection_filter_uses_streaming_reader_path() {
     assert_eq!(
         matched.stats.get("query_reader_path").copied().unwrap_or(0),
         1,
-        "expected query to use journal-session reader path"
+        "expected query to use streaming reader path"
     );
     assert!(
         matched
@@ -818,7 +818,7 @@ async fn e2e_selection_filter_uses_streaming_reader_path() {
     assert_eq!(
         multi.stats.get("query_reader_path").copied().unwrap_or(0),
         1,
-        "expected multi-value selection query to use journal-session reader path"
+        "expected multi-value selection query to use streaming reader path"
     );
     assert!(
         multi
@@ -902,7 +902,7 @@ async fn e2e_post_style_nested_required_controls_still_filter_correctly() {
     assert_eq!(
         output.stats.get("query_reader_path").copied().unwrap_or(0),
         1,
-        "expected query to use journal-session reader path"
+        "expected query to use streaming reader path"
     );
     assert!(
         output

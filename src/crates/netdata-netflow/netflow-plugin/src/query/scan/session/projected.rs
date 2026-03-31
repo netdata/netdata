@@ -15,6 +15,7 @@ impl FlowQueryService {
             return Ok(counts);
         }
         let prefilter_pairs = cursor_prefilter_pairs(&request.selections);
+        let prefilter_matches = build_prefilter_matches(&prefilter_pairs);
 
         let mut row_group_field_ids = vec![None; setup.effective_group_by.len()];
         let mut row_missing_values = std::iter::repeat_with(|| None)
@@ -93,105 +94,85 @@ impl FlowQueryService {
                 continue;
             }
 
-            let after_usec = (span.span.after as u64).saturating_mul(1_000_000);
-            let before_usec = (span.span.before as u64).saturating_mul(1_000_000);
-            let until_usec = before_usec.saturating_sub(1);
-
-            let session = JournalSession::builder()
-                .files(span.files.clone())
-                .load_remappings(false)
-                .build()
-                .context("failed to open journal session for projected grouped query")?;
-
-            let mut cursor_builder = session
-                .cursor_builder()
-                .direction(SessionDirection::Forward)
-                .since(after_usec)
-                .until(until_usec);
-            for (field, value) in &prefilter_pairs {
-                let pair = format!("{}={}", field, value);
-                cursor_builder = cursor_builder.add_match(pair.as_bytes());
-            }
-            let mut cursor = cursor_builder
-                .build()
-                .context("failed to build journal session cursor for projected grouped query")?;
-
-            loop {
-                let has_entry = cursor
-                    .step()
-                    .context("failed to step projected grouped query cursor")?;
-                if !has_entry {
-                    break;
-                }
-
-                counts.streamed_entries = counts.streamed_entries.saturating_add(1);
-                let timestamp_usec = cursor.realtime_usec();
-                if let Some(execution) = execution {
-                    execution.checkpoint(
-                        pass_index,
-                        span_index,
-                        counts.streamed_entries,
-                        timestamp_usec,
+            let span_counts = scan_journal_files_forward(
+                &span.files,
+                Some((span.span.after as u64).saturating_mul(1_000_000)),
+                Some((span.span.before as u64).saturating_mul(1_000_000)),
+                execution,
+                pass_index,
+                span_index,
+                &prefilter_matches,
+                "projected grouped query scan",
+                |file_path,
+                 journal,
+                 timestamp_usec,
+                 data_offsets,
+                 decompress_buf| {
+                    row_group_field_ids.fill(None);
+                    for value in &mut row_missing_values {
+                        let _ = value.take();
+                    }
+                    for value in &mut projected_captured_values {
+                        let _ = value.take();
+                    }
+                    let mut metrics = QueryFlowMetrics::default();
+                    pending_spec_indexes.clear();
+                    pending_spec_indexes.extend(0..projected_field_specs.len());
+                    let mut remaining = pending_spec_indexes.len();
+                    visit_journal_payloads(
+                        journal,
+                        file_path,
+                        data_offsets,
+                        decompress_buf,
+                        |payload| {
+                            let _ = apply_projected_payload(
+                                payload,
+                                &projected_field_specs,
+                                &mut pending_spec_indexes,
+                                &mut remaining,
+                                &mut metrics,
+                                grouped_aggregates,
+                                &mut row_group_field_ids,
+                                &mut row_missing_values,
+                                &mut projected_captured_values,
+                                self.max_groups,
+                            );
+                            Ok(())
+                        },
                     )?;
-                }
-                if timestamp_usec < after_usec || timestamp_usec >= before_usec {
-                    continue;
-                }
 
-                row_group_field_ids.fill(None);
-                for value in &mut row_missing_values {
-                    let _ = value.take();
-                }
-                for value in &mut projected_captured_values {
-                    let _ = value.take();
-                }
-                let mut metrics = QueryFlowMetrics::default();
-                pending_spec_indexes.clear();
-                pending_spec_indexes.extend(0..projected_field_specs.len());
-                let mut remaining = pending_spec_indexes.len();
-                cursor
-                    .visit_payloads(|payload| {
-                        let _ = apply_projected_payload(
-                            payload,
-                            &projected_field_specs,
-                            &mut pending_spec_indexes,
-                            &mut remaining,
-                            &mut metrics,
-                            grouped_aggregates,
-                            &mut row_group_field_ids,
-                            &mut row_missing_values,
-                            &mut projected_captured_values,
-                            self.max_groups,
-                        );
-                        Ok(())
-                    })
-                    .context("failed to visit projected journal payloads")?;
+                    if !request.selections.is_empty()
+                        && !captured_facet_matches_selections_except(
+                            None,
+                            &request.selections,
+                            &projected_capture_positions,
+                            &projected_captured_values,
+                        )
+                    {
+                        return Ok(false);
+                    }
 
-                if !request.selections.is_empty()
-                    && !captured_facet_matches_selections_except(
-                        None,
-                        &request.selections,
-                        &projected_capture_positions,
-                        &projected_captured_values,
-                    )
-                {
-                    continue;
-                }
-
-                grouped_aggregates.accumulate_projected(
-                    &setup.effective_group_by,
-                    timestamp_usec,
-                    RecordHandle::JournalRealtime {
-                        tier: span.span.tier,
+                    grouped_aggregates.accumulate_projected(
+                        &setup.effective_group_by,
                         timestamp_usec,
-                    },
-                    metrics,
-                    &mut row_group_field_ids,
-                    &mut row_missing_values,
-                    self.max_groups,
-                )?;
-                counts.matched_entries = counts.matched_entries.saturating_add(1);
-            }
+                        RecordHandle::JournalRealtime {
+                            tier: span.span.tier,
+                            timestamp_usec,
+                        },
+                        metrics,
+                        &mut row_group_field_ids,
+                        &mut row_missing_values,
+                        self.max_groups,
+                    )?;
+                    Ok(true)
+                },
+            )?;
+            counts.streamed_entries = counts
+                .streamed_entries
+                .saturating_add(span_counts.streamed_entries);
+            counts.matched_entries = counts
+                .matched_entries
+                .saturating_add(span_counts.matched_entries);
 
             if let Some(execution) = execution {
                 execution.finish_span(pass_index, span_index)?;

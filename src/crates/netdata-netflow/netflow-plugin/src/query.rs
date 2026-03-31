@@ -9,9 +9,8 @@ use chrono::Utc;
 use hashbrown::HashMap as FastHashMap;
 use journal_common::{Seconds, load_machine_id};
 use journal_core::file::{JournalFileMap, Mmap};
-use journal_core::{Direction as JournalDirection, JournalFile, JournalReader, Location};
+use journal_core::{Direction as JournalDirection, JournalCursor, JournalFile, JournalReader, Location};
 use journal_registry::{FileInfo, Monitor, Registry, repository::File as RegistryFile};
-use journal_session::{Direction as SessionDirection, JournalSession};
 use netdata_flow_index::{
     FieldKind as IndexFieldKind, FieldSpec as IndexFieldSpec, FieldValue as IndexFieldValue,
     FlowId as IndexedFlowId, FlowIndex,
@@ -55,6 +54,7 @@ pub(crate) use metrics::*;
 pub(crate) use planner::*;
 pub(crate) use projected::*;
 pub(crate) use request::*;
+pub(crate) use scan::*;
 pub(crate) use service::*;
 pub(crate) use timeseries::*;
 

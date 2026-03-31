@@ -63,69 +63,62 @@ pub(crate) fn accumulate_targeted_facet_values(
         .iter()
         .map(|(field, index)| (field.as_bytes().to_vec(), *index))
         .collect::<FastHashMap<_, _>>();
+    let prefilter_matches = build_prefilter_matches(prefilter_pairs);
+    scan_journal_files_forward(
+        file_paths,
+        None,
+        None,
+        None,
+        0,
+        0,
+        &prefilter_matches,
+        "targeted facet vocabulary scan",
+        |file_path, journal, _timestamp_usec, data_offsets, decompress_buf| {
+            for value in &mut captured_values {
+                let _ = value.take();
+            }
 
-    let session = JournalSession::builder()
-        .files(file_paths.to_vec())
-        .load_remappings(false)
-        .build()
-        .context("failed to open journal session for targeted facet vocabulary scan")?;
-    let mut cursor_builder = session
-        .cursor_builder()
-        .direction(SessionDirection::Forward);
-    for (field, value) in prefilter_pairs {
-        let pair = format!("{}={}", field, value);
-        cursor_builder = cursor_builder.add_match(pair.as_bytes());
-    }
-    let mut cursor = cursor_builder
-        .build()
-        .context("failed to build targeted facet vocabulary cursor")?;
+            visit_journal_payloads(
+                journal,
+                file_path,
+                data_offsets,
+                decompress_buf,
+                |payload| {
+                    let Some((key_bytes, value_bytes)) = split_payload_bytes(payload) else {
+                        return Ok(());
+                    };
+                    let Some(slot) = payload_actions.get(key_bytes).copied() else {
+                        return Ok(());
+                    };
+                    if captured_values[slot].is_some() {
+                        return Ok(());
+                    }
 
-    loop {
-        let has_entry = cursor
-            .step()
-            .context("failed to step targeted facet vocabulary cursor")?;
-        if !has_entry {
-            break;
-        }
+                    let value = payload_value(value_bytes);
+                    if value.is_empty() {
+                        return Ok(());
+                    }
+                    captured_values[slot] = Some(value.into_owned());
+                    Ok(())
+                },
+            )?;
 
-        for value in &mut captured_values {
-            let _ = value.take();
-        }
-
-        cursor
-            .visit_payloads(|payload| {
-                let Some((key_bytes, value_bytes)) = split_payload_bytes(payload) else {
-                    return Ok(());
-                };
-                let Some(slot) = payload_actions.get(key_bytes).copied() else {
-                    return Ok(());
-                };
-                if captured_values[slot].is_some() {
-                    return Ok(());
-                }
-
-                let value = payload_value(value_bytes);
-                if value.is_empty() {
-                    return Ok(());
-                }
-                captured_values[slot] = Some(value.into_owned());
-                Ok(())
-            })
-            .context("failed to read targeted facet vocabulary payloads")?;
-
-        let Some(value) =
-            captured_facet_field_value(requested_field, &capture_positions, &captured_values)
-        else {
-            continue;
-        };
-        if value.is_empty() {
-            continue;
-        }
-        by_field
-            .entry(requested_field.to_string())
-            .or_default()
-            .insert(value.into_owned());
-    }
+            let Some(value) =
+                captured_facet_field_value(requested_field, &capture_positions, &captured_values)
+            else {
+                return Ok(false);
+            };
+            if value.is_empty() {
+                return Ok(false);
+            }
+            by_field
+                .entry(requested_field.to_string())
+                .or_default()
+                .insert(value.into_owned());
+            Ok(false)
+        },
+    )
+    .context("failed to scan targeted facet vocabulary")?;
 
     Ok(())
 }
