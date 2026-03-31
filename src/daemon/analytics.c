@@ -965,14 +965,16 @@ static inline uint32_t tzif_read_be32(const unsigned char *src) {
 }
 
 static inline int64_t tzif_read_be64(const unsigned char *src) {
-    return ((int64_t)(uint64_t)src[0] << 56) |
-           ((int64_t)(uint64_t)src[1] << 48) |
-           ((int64_t)(uint64_t)src[2] << 40) |
-           ((int64_t)(uint64_t)src[3] << 32) |
-           ((int64_t)(uint64_t)src[4] << 24) |
-           ((int64_t)(uint64_t)src[5] << 16) |
-           ((int64_t)(uint64_t)src[6] << 8)  |
-           (int64_t)(uint64_t)src[7];
+    return (int64_t)(
+        ((uint64_t)src[0] << 56) |
+        ((uint64_t)src[1] << 48) |
+        ((uint64_t)src[2] << 40) |
+        ((uint64_t)src[3] << 32) |
+        ((uint64_t)src[4] << 24) |
+        ((uint64_t)src[5] << 16) |
+        ((uint64_t)src[6] << 8)  |
+        (uint64_t)src[7]
+    );
 }
 
 bool timezone_name_is_safe_tzdb_path(const char *timezone) {
