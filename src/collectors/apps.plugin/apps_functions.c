@@ -758,6 +758,7 @@ static void fp_emit_charts(BUFFER *wb, uint64_t total_memory_bytes) {
         }
         buffer_json_object_close(wb);
 
+#if (PROCESSES_HAVE_FDS == 1)
         // FDs chart
         buffer_json_member_add_object(wb, "FDs");
         {
@@ -778,6 +779,22 @@ static void fp_emit_charts(BUFFER *wb, uint64_t total_memory_bytes) {
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
+#endif
+
+#if (PROCESSES_HAVE_HANDLES == 1)
+        // Handles chart
+        buffer_json_member_add_object(wb, "Handles");
+        {
+            buffer_json_member_add_string(wb, "name", "Handles");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Handles");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+#endif
     }
     buffer_json_object_close(wb); // charts
 }
