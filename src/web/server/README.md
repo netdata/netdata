@@ -81,7 +81,7 @@ For embedding complete Netdata dashboards in external applications:
    <iframe src="http://NODE:19999" width="100%" height="600"></iframe>
    ```
 
-   This embeds the full agent dashboard. Note that CORS and `X-Frame-Options` settings (configured via the `x-frame-options response header` setting above) may need to be adjusted for cross-origin embedding.
+   This embeds the full agent dashboard. Note that `X-Frame-Options` settings (configured via the `x-frame-options response header` setting above) may need to be adjusted for cross-origin embedding.
 
 2. **Netdata Cloud TV Mode**: For Netdata Cloud users, TV Mode provides clean, full-screen dashboards optimized for display on monitors or embedded views. Access TV Mode from any Cloud dashboard or War Room.
 
