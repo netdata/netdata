@@ -344,7 +344,7 @@ ml_prune_old_models(size_t num_models_to_prune)
         }
     }
 
-    time_t after = now_realtime_sec() - Cfg.delete_models_older_than;
+    time_t after = now_realtime_sec() - (time_t) Cfg.delete_models_older_than;
 
     rc = sqlite3_bind_int64(res, ++param, (sqlite3_int64) after);
     if (unlikely(rc != SQLITE_OK))
@@ -429,8 +429,22 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
         ml_kmeans_t km;
 
-        km.after = (time_t) sqlite3_column_int64(res, 0);
-        km.before = (time_t) sqlite3_column_int64(res, 1);
+        sqlite3_int64 raw_after  = sqlite3_column_int64(res, 0);
+        sqlite3_int64 raw_before = sqlite3_column_int64(res, 1);
+
+        // Protect against silent truncation when time_t is narrower than int64_t
+        // (e.g. 32-bit builds, corrupted DB, or far-future timestamps).
+        static constexpr sqlite3_int64 kTimeMin = std::numeric_limits<time_t>::min();
+        static constexpr sqlite3_int64 kTimeMax = std::numeric_limits<time_t>::max();
+        if (raw_after  < kTimeMin || raw_after  > kTimeMax ||
+            raw_before < kTimeMin || raw_before > kTimeMax) {
+            error_report("Skipping ML model row with out-of-range timestamps: after=%" PRId64 " before=%" PRId64,
+                         (int64_t) raw_after, (int64_t) raw_before);
+            continue;
+        }
+
+        km.after  = (time_t) raw_after;
+        km.before = (time_t) raw_before;
 
         km.min_dist = sqlite3_column_double(res, 2);
         km.max_dist = sqlite3_column_double(res, 3);
