@@ -210,6 +210,20 @@
 - Regenerate integrations docs ([#22070](https://github.com/netdata/netdata/issues/22070))
 - Improve ML model loading ([#22073](https://github.com/netdata/netdata/issues/22073))
 - Optimize EBPF memory handling and PID indexing. ([#22050](https://github.com/netdata/netdata/issues/22050))
+- Fix(go.d/secretsctl): handle userconfig for job IDs ([#22081](https://github.com/netdata/netdata/issues/22081))
+- Optimize ML prediction hot path: circular buffer and reduce allocations ([#22042](https://github.com/netdata/netdata/issues/22042))
+- Docs: add deprecation notice for /api/v1/charts endpoint ([#21974](https://github.com/netdata/netdata/issues/21974))
+- Docs: add Installation section to metrics-centralization-points README ([#22036](https://github.com/netdata/netdata/issues/22036))
+- Feat(go.d): add secretstore config resolution and logging ([#22083](https://github.com/netdata/netdata/issues/22083))
+- Strip intermediate objects from flattened JSON ([#22085](https://github.com/netdata/netdata/issues/22085))
+- Docs(go.d/mssql): add Windows Authentication setup guide ([#22089](https://github.com/netdata/netdata/issues/22089))
+- Refactor(go.d/azure_monitor): replace profiles magic keyword ([#22088](https://github.com/netdata/netdata/issues/22088))
+- Simplify development on Windows (package-windows.sh) ([#22087](https://github.com/netdata/netdata/issues/22087))
+- Regenerate integrations docs ([#22090](https://github.com/netdata/netdata/issues/22090))
+- Apps.plugin: add per-Windows-service process tree grouping ([#21925](https://github.com/netdata/netdata/issues/21925))
+- Improve journal file logging ([#22086](https://github.com/netdata/netdata/issues/22086))
+- Regenerate integrations docs ([#22092](https://github.com/netdata/netdata/issues/22092))
+- Remove VLA (variable-length arrays) from collectors ([#22066](https://github.com/netdata/netdata/issues/22066))
 
 ## [2.9.0] - 2026-02-16
 
