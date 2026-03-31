@@ -436,13 +436,13 @@ func (f *funcTopology) Handle(_ context.Context, method string, params funcapi.R
 	options.Depth = normalizeTopologyDepth(params.GetOne(topologyParamDepth))
 
 	if snmpTopologyRegistry == nil {
-		return funcapi.UnavailableResponse("topology data not available yet, please retry after data collection")
+		return funcapi.UnavailableResponse("topology data not available yet, please retry after topology refresh")
 	}
 
 	data, ok := snmpTopologyRegistry.snapshotWithOptions(options)
 
 	if !ok {
-		return funcapi.UnavailableResponse("topology data not available yet, please retry after data collection")
+		return funcapi.UnavailableResponse("topology data not available yet, please retry after topology refresh")
 	}
 
 	return &funcapi.FunctionResponse{

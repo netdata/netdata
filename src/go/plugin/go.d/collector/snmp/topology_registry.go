@@ -36,7 +36,7 @@ func (c *topologyCache) snapshotEngineObservations() (topologyObservationSnapsho
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	if c.lastUpdate.IsZero() {
+	if !c.hasFreshSnapshotAt(time.Now()) {
 		return topologyObservationSnapshot{}, false
 	}
 

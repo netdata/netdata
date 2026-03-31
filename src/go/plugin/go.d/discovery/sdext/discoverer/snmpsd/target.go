@@ -36,11 +36,12 @@ func (g *targetGroup) addTarget(tg model.Target) {
 	g.targets = append(g.targets, tg)
 }
 
-func newTarget(ip string, cred CredentialConfig, si snmputils.SysInfo) *target {
+func newTarget(ip string, cred CredentialConfig, si snmputils.SysInfo, topologyRefreshEvery string) *target {
 	tg := &target{
-		IPAddress:  ip,
-		Credential: cred,
-		SysInfo:    si,
+		IPAddress:            ip,
+		Credential:           cred,
+		SysInfo:              si,
+		TopologyRefreshEvery: topologyRefreshEvery,
 	}
 
 	tg.hash, _ = model.CalcHash(tg)
@@ -53,9 +54,10 @@ type (
 		model.Base `hash:"ignore"`
 		hash       uint64
 
-		IPAddress  string
-		Credential CredentialConfig  `hash:"ignore"`
-		SysInfo    snmputils.SysInfo `hash:"ignore"`
+		IPAddress            string
+		Credential           CredentialConfig  `hash:"ignore"`
+		SysInfo              snmputils.SysInfo `hash:"ignore"`
+		TopologyRefreshEvery string            `hash:"ignore"`
 	}
 )
 

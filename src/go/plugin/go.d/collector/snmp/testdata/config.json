@@ -32,7 +32,9 @@
     "ok"
   ],
   "topology": {
-    "autoprobe": true
+    "autoprobe": true,
+    "refresh_every": "30m",
+    "stale_after": "1h"
   },
   "ping": {
     "enabled": true,

@@ -14,6 +14,7 @@ import (
 	"github.com/sourcegraph/conc/pool"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/iprange"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
@@ -200,7 +201,7 @@ func (d *Discoverer) discoverNetwork(ctx context.Context, in chan<- []model.Targ
 
 func (d *Discoverer) useCacheIPAddress(sub subnet, ip string, tgg *targetGroup) {
 	if dev := d.status.get(sub, ip); dev != nil {
-		tg := newTarget(ip, sub.credential, dev.SysInfo)
+		tg := newTarget(ip, sub.credential, dev.SysInfo, d.topologyRefreshEvery())
 		tgg.addTarget(tg)
 	}
 }
@@ -226,7 +227,7 @@ func (d *Discoverer) probeIPAddress(ctx context.Context, sub subnet, ip string, 
 					ip, dev.SysInfo.Name, subKey(sub), untilProbe)
 			}
 		}
-		tg := newTarget(ip, sub.credential, dev.SysInfo)
+		tg := newTarget(ip, sub.credential, dev.SysInfo, d.topologyRefreshEvery())
 		tgg.addTarget(tg)
 		return
 	}
@@ -249,8 +250,15 @@ func (d *Discoverer) probeIPAddress(ctx context.Context, sub subnet, ip string, 
 	d.Infof("device '%s': successfully discovered (sysName: '%s', network: '%s')", ip, si.Name, subKey(sub))
 	d.status.put(sub, ip, &discoveredDevice{DiscoverTime: now, SysInfo: *si})
 	d.status.updated.Store(true)
-	tg := newTarget(ip, sub.credential, *si)
+	tg := newTarget(ip, sub.credential, *si, d.topologyRefreshEvery())
 	tgg.addTarget(tg)
+}
+
+func (d *Discoverer) topologyRefreshEvery() string {
+	if d == nil || d.rescanInterval <= 0 {
+		return ""
+	}
+	return confopt.LongDuration(d.rescanInterval).String()
 }
 
 func (d *Discoverer) getSnmpSysInfo(sub subnet, ip string) (*snmputils.SysInfo, error) {

@@ -3,6 +3,7 @@
 package snmp
 
 import (
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
 )
@@ -33,7 +34,9 @@ type (
 	}
 
 	TopologyConfig struct {
-		Autoprobe bool `yaml:"autoprobe,omitempty" json:"autoprobe"`
+		Autoprobe    bool                 `yaml:"autoprobe,omitempty" json:"autoprobe"`
+		RefreshEvery confopt.LongDuration `yaml:"refresh_every,omitempty" json:"refresh_every,omitempty"`
+		StaleAfter   confopt.LongDuration `yaml:"stale_after,omitempty" json:"stale_after,omitempty"`
 	}
 
 	UserConfig struct {

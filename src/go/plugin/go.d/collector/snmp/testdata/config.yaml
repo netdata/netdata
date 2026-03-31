@@ -7,6 +7,8 @@ manual_profiles:
 
 topology:
   autoprobe: yes
+  refresh_every: 30m
+  stale_after: 1h
 
 vnode:
   name: "ok"

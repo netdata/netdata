@@ -134,6 +134,8 @@ func (c *Collector) ensureInitialized() error {
 		c.addPingCharts()
 	}
 
+	c.ensureTopologySchedulerStarted()
+
 	return nil
 }
 

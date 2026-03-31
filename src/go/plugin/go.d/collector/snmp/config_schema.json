@@ -214,6 +214,20 @@
             "description": "If set, Netdata will attempt LLDP/CDP discovery using standard profiles. Missing OIDs are cached in-memory to avoid repeated overhead.",
             "type": "boolean",
             "default": true
+          },
+          "refresh_every": {
+            "title": "Refresh every",
+            "description": "How often to refresh topology snapshots independently from normal SNMP metric collection.",
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?(ms|s|m|h|d|w|mo|y)?$",
+            "default": "30m"
+          },
+          "stale_after": {
+            "title": "Stale after",
+            "description": "How long to keep the last successful topology snapshot after refresh failures before excluding it. Defaults to 2x refresh_every.",
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?(ms|s|m|h|d|w|mo|y)?$",
+            "default": "1h"
           }
         }
       },

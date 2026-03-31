@@ -6,6 +6,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
@@ -115,12 +116,18 @@ type (
 		ddSnmpColl    ddCollector
 		newDdSnmpColl func(ddsnmpcollector.Config) ddCollector
 
-		sysInfo      *snmputils.SysInfo
-		snmpProfiles []*ddsnmp.Profile
+		sysInfo          *snmputils.SysInfo
+		snmpProfiles     []*ddsnmp.Profile
+		topologyProfiles []*ddsnmp.Profile
 
 		adjMaxRepetitions uint32
 
 		disableBulkWalk bool
+
+		topologyMu      sync.Mutex
+		topologyCancel  context.CancelFunc
+		topologyRunning bool
+		topologyWG      sync.WaitGroup
 	}
 	ddCollector interface {
 		Collect() ([]*ddsnmp.ProfileMetrics, error)
@@ -192,6 +199,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 		c.funcRouter.Cleanup(ctx)
 	}
 	snmpTopologyRegistry.unregister(c.topologyCache)
+	c.stopTopologyScheduler()
 	if c.snmpClient != nil {
 		_ = c.snmpClient.Close()
 	}
