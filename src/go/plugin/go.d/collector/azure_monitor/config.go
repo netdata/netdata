@@ -17,6 +17,8 @@ const (
 	defaultAutoDetectRetry  = 0
 	defaultCloud            = cloudPublic
 	defaultDiscoveryEvery   = 300
+	defaultDiscoveryMode    = discoveryModeFilters
+	defaultProfilesMode     = profilesModeAuto
 	defaultQueryOffset      = 180
 	defaultTimeout          = confopt.Duration(30 * time.Second)
 	defaultMaxConcurrency   = 4
@@ -25,9 +27,14 @@ const (
 )
 
 const (
-	profileSelectionModeAuto     = "auto"
-	profileSelectionModeExact    = "exact"
-	profileSelectionModeCombined = "combined"
+	discoveryModeFilters = "filters"
+	discoveryModeQuery   = "query"
+)
+
+const (
+	profilesModeAuto     = "auto"
+	profilesModeExact    = "exact"
+	profilesModeCombined = "combined"
 )
 
 const (
@@ -37,30 +44,50 @@ const (
 )
 
 type Config struct {
-	Vnode                        string                              `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery                  int                                 `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry           int                                 `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	SubscriptionID               string                              `yaml:"subscription_id" json:"subscription_id"`
-	Cloud                        string                              `yaml:"cloud,omitempty" json:"cloud"`
-	DiscoveryEvery               int                                 `yaml:"discovery_every,omitempty" json:"discovery_every"`
-	QueryOffset                  int                                 `yaml:"query_offset,omitempty" json:"query_offset"`
-	Timeout                      confopt.Duration                    `yaml:"timeout,omitempty" json:"timeout"`
-	MaxConcurrency               int                                 `yaml:"max_concurrency,omitempty" json:"max_concurrency"`
-	MaxBatchResources            int                                 `yaml:"max_batch_resources,omitempty" json:"max_batch_resources"`
-	MaxMetricsPerQuery           int                                 `yaml:"max_metrics_per_query,omitempty" json:"max_metrics_per_query"`
-	ResourceGroups               []string                            `yaml:"resource_groups,omitempty" json:"resource_groups"`
-	ProfileSelectionMode         string                              `yaml:"profile_selection_mode,omitempty" json:"profile_selection_mode"`
-	ProfileSelectionModeExact    *ProfileSelectionModeExactConfig    `yaml:"profile_selection_mode_exact,omitempty" json:"profile_selection_mode_exact,omitempty"`
-	ProfileSelectionModeCombined *ProfileSelectionModeCombinedConfig `yaml:"profile_selection_mode_combined,omitempty" json:"profile_selection_mode_combined,omitempty"`
-	Auth                         cloudauth.AzureADAuthConfig         `yaml:"auth" json:"auth"`
+	Vnode              string                      `yaml:"vnode,omitempty" json:"vnode,omitempty"`
+	UpdateEvery        int                         `yaml:"update_every,omitempty" json:"update_every,omitempty"`
+	AutoDetectionRetry int                         `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
+	SubscriptionIDs    []string                    `yaml:"subscription_ids" json:"subscription_ids"`
+	Cloud              string                      `yaml:"cloud,omitempty" json:"cloud"`
+	Discovery          DiscoveryConfig             `yaml:"discovery" json:"discovery"`
+	Profiles           ProfilesConfig              `yaml:"profiles" json:"profiles"`
+	QueryOffset        int                         `yaml:"query_offset,omitempty" json:"query_offset"`
+	Timeout            confopt.Duration            `yaml:"timeout,omitempty" json:"timeout"`
+	Limits             LimitsConfig                `yaml:"limits" json:"limits"`
+	Auth               cloudauth.AzureADAuthConfig `yaml:"auth" json:"auth"`
 }
 
-type ProfileSelectionModeExactConfig struct {
-	Profiles []string `yaml:"profiles" json:"profiles"`
+type DiscoveryConfig struct {
+	RefreshEvery int                     `yaml:"refresh_every,omitempty" json:"refresh_every"`
+	Mode         string                  `yaml:"mode,omitempty" json:"mode"`
+	ModeFilters  *DiscoveryFiltersConfig `yaml:"mode_filters,omitempty" json:"mode_filters,omitempty"`
+	ModeQuery    *DiscoveryQueryConfig   `yaml:"mode_query,omitempty" json:"mode_query,omitempty"`
 }
 
-type ProfileSelectionModeCombinedConfig struct {
-	Profiles []string `yaml:"profiles" json:"profiles"`
+type DiscoveryFiltersConfig struct {
+	ResourceGroups []string            `yaml:"resource_groups,omitempty" json:"resource_groups,omitempty"`
+	Regions        []string            `yaml:"regions,omitempty" json:"regions,omitempty"`
+	Tags           map[string][]string `yaml:"tags,omitempty" json:"tags,omitempty"`
+}
+
+type DiscoveryQueryConfig struct {
+	KQL string `yaml:"kql" json:"kql"`
+}
+
+type ProfilesModeConfig struct {
+	Names []string `yaml:"names,omitempty" json:"names,omitempty"`
+}
+
+type ProfilesConfig struct {
+	Mode         string              `yaml:"mode,omitempty" json:"mode"`
+	ModeExact    *ProfilesModeConfig `yaml:"mode_exact,omitempty" json:"mode_exact,omitempty"`
+	ModeCombined *ProfilesModeConfig `yaml:"mode_combined,omitempty" json:"mode_combined,omitempty"`
+}
+
+type LimitsConfig struct {
+	MaxConcurrency     int `yaml:"max_concurrency,omitempty" json:"max_concurrency"`
+	MaxBatchResources  int `yaml:"max_batch_resources,omitempty" json:"max_batch_resources"`
+	MaxMetricsPerQuery int `yaml:"max_metrics_per_query,omitempty" json:"max_metrics_per_query"`
 }
 
 func (c *Config) applyDefaults() {
@@ -73,8 +100,14 @@ func (c *Config) applyDefaults() {
 	if strings.TrimSpace(c.Cloud) == "" {
 		c.Cloud = defaultCloud
 	}
-	if c.DiscoveryEvery <= 0 {
-		c.DiscoveryEvery = defaultDiscoveryEvery
+	if c.Discovery.RefreshEvery < 0 {
+		c.Discovery.RefreshEvery = defaultDiscoveryEvery
+	}
+	if strings.TrimSpace(c.Discovery.Mode) == "" {
+		c.Discovery.Mode = defaultDiscoveryMode
+	}
+	if strings.TrimSpace(c.Profiles.Mode) == "" {
+		c.Profiles.Mode = defaultProfilesMode
 	}
 	if c.QueryOffset <= 0 {
 		c.QueryOffset = defaultQueryOffset
@@ -82,31 +115,34 @@ func (c *Config) applyDefaults() {
 	if c.Timeout.Duration() == 0 {
 		c.Timeout = defaultTimeout
 	}
-	if c.MaxConcurrency <= 0 {
-		c.MaxConcurrency = defaultMaxConcurrency
+	if c.Limits.MaxConcurrency <= 0 {
+		c.Limits.MaxConcurrency = defaultMaxConcurrency
 	}
-	if c.MaxBatchResources <= 0 {
-		c.MaxBatchResources = defaultMaxBatchResource
+	if c.Limits.MaxBatchResources <= 0 {
+		c.Limits.MaxBatchResources = defaultMaxBatchResource
 	}
-	if c.MaxMetricsPerQuery <= 0 {
-		c.MaxMetricsPerQuery = defaultMaxMetricsQuery
-	}
-	if strings.TrimSpace(c.ProfileSelectionMode) == "" {
-		c.ProfileSelectionMode = profileSelectionModeAuto
+	if c.Limits.MaxMetricsPerQuery <= 0 {
+		c.Limits.MaxMetricsPerQuery = defaultMaxMetricsQuery
 	}
 }
 
 func (c Config) validate() error {
 	var errs []error
 
-	if strings.TrimSpace(c.SubscriptionID) == "" {
-		errs = append(errs, errors.New("'subscription_id' is required"))
+	if len(c.SubscriptionIDs) == 0 {
+		errs = append(errs, errors.New("'subscription_ids' must contain at least one value"))
+	} else {
+		for i, v := range c.SubscriptionIDs {
+			if strings.TrimSpace(v) == "" {
+				errs = append(errs, fmt.Errorf("'subscription_ids[%d]' must not be empty", i))
+			}
+		}
 	}
 	if c.UpdateEvery < 60 {
 		errs = append(errs, errors.New("'update_every' must be >= 60 seconds"))
 	}
-	if c.DiscoveryEvery < 60 {
-		errs = append(errs, errors.New("'discovery_every' must be >= 60 seconds"))
+	if c.Discovery.RefreshEvery < 0 || (c.Discovery.RefreshEvery > 0 && c.Discovery.RefreshEvery < 60) {
+		errs = append(errs, errors.New("'discovery.refresh_every' must be 0 or >= 60 seconds"))
 	}
 	if c.QueryOffset < 60 {
 		errs = append(errs, errors.New("'query_offset' must be >= 60 seconds"))
@@ -114,14 +150,14 @@ func (c Config) validate() error {
 	if c.Timeout.Duration() < 0 {
 		errs = append(errs, errors.New("'timeout' cannot be negative"))
 	}
-	if c.MaxConcurrency < 1 || c.MaxConcurrency > 64 {
-		errs = append(errs, errors.New("'max_concurrency' must be between 1 and 64"))
+	if c.Limits.MaxConcurrency < 1 || c.Limits.MaxConcurrency > 64 {
+		errs = append(errs, errors.New("'limits.max_concurrency' must be between 1 and 64"))
 	}
-	if c.MaxBatchResources < 1 || c.MaxBatchResources > 50 {
-		errs = append(errs, errors.New("'max_batch_resources' must be between 1 and 50"))
+	if c.Limits.MaxBatchResources < 1 || c.Limits.MaxBatchResources > 50 {
+		errs = append(errs, errors.New("'limits.max_batch_resources' must be between 1 and 50"))
 	}
-	if c.MaxMetricsPerQuery < 1 || c.MaxMetricsPerQuery > 20 {
-		errs = append(errs, errors.New("'max_metrics_per_query' must be between 1 and 20"))
+	if c.Limits.MaxMetricsPerQuery < 1 || c.Limits.MaxMetricsPerQuery > 20 {
+		errs = append(errs, errors.New("'limits.max_metrics_per_query' must be between 1 and 20"))
 	}
 
 	switch strings.ToLower(strings.TrimSpace(c.Cloud)) {
@@ -134,42 +170,120 @@ func (c Config) validate() error {
 		errs = append(errs, err)
 	}
 
-	switch strings.ToLower(strings.TrimSpace(c.ProfileSelectionMode)) {
-	case profileSelectionModeAuto:
-	case profileSelectionModeExact:
-		if c.ProfileSelectionModeExact == nil || len(c.ProfileSelectionModeExact.Profiles) == 0 {
-			errs = append(errs, errors.New("'profile_selection_mode_exact.profiles' must not be empty when mode is 'exact'"))
-		} else {
-			errs = append(errs, validateProfilesList(c.ProfileSelectionModeExact.Profiles)...)
-		}
-	case profileSelectionModeCombined:
-		if c.ProfileSelectionModeCombined == nil || len(c.ProfileSelectionModeCombined.Profiles) == 0 {
-			errs = append(errs, errors.New("'profile_selection_mode_combined.profiles' must not be empty when mode is 'combined'"))
-		} else {
-			errs = append(errs, validateProfilesList(c.ProfileSelectionModeCombined.Profiles)...)
+	switch strings.ToLower(strings.TrimSpace(c.Discovery.Mode)) {
+	case discoveryModeFilters:
+		errs = append(errs, validateDiscoveryFilters(c.Discovery.ModeFilters)...)
+	case discoveryModeQuery:
+		if c.Discovery.ModeQuery == nil || strings.TrimSpace(c.Discovery.ModeQuery.KQL) == "" {
+			errs = append(errs, errors.New("'discovery.mode_query.kql' must not be empty when discovery.mode is 'query'"))
 		}
 	default:
-		errs = append(errs, fmt.Errorf("'profile_selection_mode' must be one of: %s, %s, %s",
-			profileSelectionModeAuto, profileSelectionModeExact, profileSelectionModeCombined))
+		errs = append(errs, fmt.Errorf("'discovery.mode' must be one of: %s, %s", discoveryModeFilters, discoveryModeQuery))
+	}
+
+	switch strings.ToLower(strings.TrimSpace(c.Profiles.Mode)) {
+	case profilesModeAuto:
+	case profilesModeExact:
+		if c.Profiles.ModeExact == nil || len(c.Profiles.ModeExact.Names) == 0 {
+			errs = append(errs, fmt.Errorf("'profiles.mode_exact.names' must not be empty when profiles.mode is '%s'", c.Profiles.Mode))
+		} else {
+			errs = append(errs, validateProfilesList("profiles.mode_exact.names", c.Profiles.ModeExact.Names)...)
+		}
+	case profilesModeCombined:
+		if c.Profiles.ModeCombined == nil || len(c.Profiles.ModeCombined.Names) == 0 {
+			errs = append(errs, fmt.Errorf("'profiles.mode_combined.names' must not be empty when profiles.mode is '%s'", c.Profiles.Mode))
+		} else {
+			errs = append(errs, validateProfilesList("profiles.mode_combined.names", c.Profiles.ModeCombined.Names)...)
+		}
+	default:
+		errs = append(errs, fmt.Errorf("'profiles.mode' must be one of: %s, %s, %s",
+			profilesModeAuto, profilesModeExact, profilesModeCombined))
 	}
 
 	return errors.Join(errs...)
 }
 
-func validateProfilesList(profiles []string) []error {
+func validateDiscoveryFilters(filters *DiscoveryFiltersConfig) []error {
+	if filters == nil {
+		return nil
+	}
+
+	var errs []error
+	for i, v := range filters.ResourceGroups {
+		if strings.TrimSpace(v) == "" {
+			errs = append(errs, fmt.Errorf("'discovery.mode_filters.resource_groups[%d]' must not be empty", i))
+		}
+	}
+	for i, v := range filters.Regions {
+		if strings.TrimSpace(v) == "" {
+			errs = append(errs, fmt.Errorf("'discovery.mode_filters.regions[%d]' must not be empty", i))
+		}
+	}
+	for key, values := range filters.Tags {
+		if strings.TrimSpace(key) == "" {
+			errs = append(errs, errors.New("'discovery.mode_filters.tags' contains an empty key"))
+			continue
+		}
+		if len(values) == 0 {
+			errs = append(errs, fmt.Errorf("'discovery.mode_filters.tags.%s' must contain at least one value", key))
+			continue
+		}
+		for i, v := range values {
+			if strings.TrimSpace(v) == "" {
+				errs = append(errs, fmt.Errorf("'discovery.mode_filters.tags.%s[%d]' must not be empty", key, i))
+			}
+		}
+	}
+	return errs
+}
+
+func validateProfilesList(path string, profiles []string) []error {
 	var errs []error
 	seen := map[string]struct{}{}
 	for _, name := range profiles {
 		n := strings.TrimSpace(name)
 		if n == "" {
-			errs = append(errs, errors.New("'profiles' contains an empty value"))
+			errs = append(errs, fmt.Errorf("'%s' contains an empty value", path))
 			continue
 		}
 		norm := stringsLowerTrim(n)
 		if _, ok := seen[norm]; ok {
-			errs = append(errs, fmt.Errorf("'profiles' contains duplicate value '%s'", n))
+			errs = append(errs, fmt.Errorf("'%s' contains duplicate value '%s'", path, n))
 		}
 		seen[norm] = struct{}{}
 	}
 	return errs
+}
+
+func (p ProfilesConfig) explicitBaseNames() []string {
+	switch stringsLowerTrim(p.Mode) {
+	case profilesModeExact:
+		if p.ModeExact != nil {
+			return p.ModeExact.Names
+		}
+	case profilesModeCombined:
+		if p.ModeCombined != nil {
+			return p.ModeCombined.Names
+		}
+	}
+	return nil
+}
+
+func (c Config) primarySubscriptionID() string {
+	for _, id := range c.SubscriptionIDs {
+		if v := strings.TrimSpace(id); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func (c Config) subscriptionIDs() []string {
+	out := make([]string, 0, len(c.SubscriptionIDs))
+	for _, id := range c.SubscriptionIDs {
+		if v := strings.TrimSpace(id); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }

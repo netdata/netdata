@@ -33,7 +33,7 @@ var SupportedTimeGrains = map[string]time.Duration{
 
 type Profile struct {
 	ID              string         `yaml:"id" json:"id,omitempty"`
-	Name            string         `yaml:"name" json:"name,omitempty"`
+	DisplayName     string         `yaml:"name" json:"name,omitempty"`
 	ResourceType    string         `yaml:"resource_type" json:"resource_type,omitempty"`
 	MetricNamespace string         `yaml:"metric_namespace,omitempty" json:"metric_namespace,omitempty"`
 	Metrics         []Metric       `yaml:"metrics" json:"metrics,omitempty"`
@@ -58,7 +58,7 @@ func (p Profile) Validate(prefix string) error {
 	if !IsValidIdentityID(p.ID) {
 		errs = append(errs, fmt.Errorf("%s: 'id' must match %q", prefix, reIdentityID.String()))
 	}
-	if strings.TrimSpace(p.Name) == "" {
+	if strings.TrimSpace(p.DisplayName) == "" {
 		errs = append(errs, fmt.Errorf("%s: 'name' is required", prefix))
 	}
 	if !IsValidResourceType(p.ResourceType) {
