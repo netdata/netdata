@@ -290,7 +290,7 @@ In Netdata, HTTP 412 specifically means "An authorization bearer token is requir
 1. **Bearer token protection enabled** - Your agent requires Cloud authentication for API access
 2. **Cloud connection lost** - Agent disconnected from Netdata Cloud
 3. **Session expired** - Bearer token has expired (tokens expire after 24 hours)
-4. **Insufficient permissions** - User lacks Admin or Manager role in the space
+4. **Missing browser authentication state** - Your browser is no longer sending a valid Cloud bearer token with the request
 
 **Resolution steps:**
 
