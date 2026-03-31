@@ -146,14 +146,9 @@ Edit `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/configu
     mode = none
 ```
 
-:::warning
+:::note
 
-Setting `mode = none` disables the web server listener (default port `19999`), so the agent will not accept any inbound HTTP connections. Since inbound streaming is handled as an HTTP `STREAM` request through the web server, the agent **cannot act as a streaming receiver (Parent)** when `mode = none` is set.
-
-- Outbound streaming from this agent to a remote Parent (child → parent) is **not** inherently disabled by this setting, as it uses outbound client connections that do not depend on the web server listener.
-- This setting is best suited for agents that are not used as Parents and are accessed primarily through Netdata Cloud via [ACLK](/src/aclk/README.md).
-
-If you need the agent to receive streaming data from other agents, do **not** set `mode = none`. Keep the web server enabled and secure access to port `19999` (for example, by binding to private interfaces, using firewall/ACL rules). Bearer token protection secures dashboard/API access but does not protect streaming connections, which must be secured at the network level.
+Setting `mode = none` disables the web server listener — the agent will not accept any inbound HTTP connections, including inbound streams from child agents. Do not use this for Parent agents.
 
 :::
 
