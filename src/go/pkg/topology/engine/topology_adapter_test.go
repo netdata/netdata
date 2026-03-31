@@ -731,6 +731,73 @@ func TestToTopologyData_AssignsDeterministicActorIDsAndLinkActorIDs(t *testing.T
 	require.True(t, dstExists)
 }
 
+func TestToTopologyData_DeterministicAcrossRepeatedCalls(t *testing.T) {
+	collectedAt := time.Date(2026, time.February, 20, 4, 5, 6, 0, time.UTC)
+
+	result := Result{
+		CollectedAt: collectedAt,
+		Devices: []Device{
+			{
+				ID:        "local-device",
+				Hostname:  "sw1",
+				ChassisID: "00:11:22:33:44:55",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.1")},
+				Labels:    map[string]string{"protocols_observed": "bridge,fdb,stp"},
+			},
+			{
+				ID:        "remote-device",
+				Hostname:  "sw2",
+				ChassisID: "aa:bb:cc:dd:ee:ff",
+				Addresses: []netip.Addr{netip.MustParseAddr("10.0.0.2")},
+				Labels:    map[string]string{"inferred": "true"},
+			},
+		},
+		Interfaces: []Interface{
+			{DeviceID: "local-device", IfIndex: 3, IfName: "Gi0/3", IfDescr: "Gi0/3", Labels: map[string]string{"admin_status": "up", "oper_status": "up"}},
+			{DeviceID: "local-device", IfIndex: 4, IfName: "Gi0/4", IfDescr: "Gi0/4", Labels: map[string]string{"admin_status": "up", "oper_status": "lowerLayerDown"}},
+		},
+		Adjacencies: []Adjacency{
+			{
+				Protocol:   "lldp",
+				SourceID:   "local-device",
+				SourcePort: "Gi0/3",
+				TargetID:   "remote-device",
+				TargetPort: "Gi0/1",
+			},
+		},
+		Attachments: []Attachment{
+			{DeviceID: "local-device", IfIndex: 4, EndpointID: "mac:70:49:a2:65:72:cd", Method: "fdb"},
+		},
+		Enrichments: []Enrichment{
+			{
+				EndpointID: "mac:70:49:a2:65:72:cd",
+				MAC:        "70:49:a2:65:72:cd",
+				IPs:        []netip.Addr{netip.MustParseAddr("10.20.4.84")},
+				Labels: map[string]string{
+					"sources":    "arp",
+					"if_indexes": "4",
+					"if_names":   "Gi0/4",
+				},
+			},
+		},
+	}
+
+	opts := TopologyDataOptions{
+		SchemaVersion: "2.0",
+		Source:        "snmp",
+		Layer:         "2",
+		View:          "summary",
+		AgentID:       "agent-1",
+		LocalDeviceID: "local-device",
+	}
+
+	baseline := ToTopologyData(result, opts)
+	for range 10 {
+		next := ToTopologyData(result, opts)
+		require.Equal(t, baseline, next)
+	}
+}
+
 func TestToTopologyData_DeduplicatesEndpointActorOverlappingManagedDevice(t *testing.T) {
 	result := Result{
 		Devices: []Device{
