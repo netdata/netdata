@@ -75,25 +75,15 @@ The Badge API supports various options including time-frames, aggregation functi
 
 For embedding complete Netdata dashboards in external applications:
 
-1. **Agent iframe embedding**: Use an HTML iframe pointing to your Netdata Agent URL:
+1. **Netdata Cloud TV Mode** (recommended): TV Mode generates shareable, token-authenticated URLs for full-screen dashboards optimized for display on monitors or embedded views. Access TV Mode from any Cloud dashboard or War Room. See the [TV Mode documentation](/docs/dashboards-and-charts/dashboards-tab.md#tv-mode) for details.
+
+2. **Agent iframe embedding**: Embed the local Agent dashboard using an HTML iframe:
 
    ```html
    <iframe src="http://NODE:19999" width="100%" height="600"></iframe>
    ```
 
-   This embeds the full agent dashboard. Note that `X-Frame-Options` settings (configured via the `x-frame-options response header` setting above) may need to be adjusted for cross-origin embedding.
-
-2. **Netdata Cloud TV Mode**: For Netdata Cloud users, TV Mode provides clean, full-screen dashboards optimized for display on monitors or embedded views. Access TV Mode from any Cloud dashboard or War Room.
-
-### Custom Dashboard Files (Deprecated)
-
-:::warning
-
-The `custom dashboard_info.js` configuration option is deprecated. This setting was designed for the legacy v1 dashboard which no longer exists. It is exposed as `custom_info` in the /api/v1/charts API response for backward compatibility but has no functional effect on current dashboards.
-
-Connected Nodes use the Cloud-served dashboard by default. The local Agent dashboard (when accessed directly at `http://NODE:19999`) uses the current dashboard version which does not use this setting.
-
-:::
+   The `x-frame-options response header` setting (see the configuration table above) and any Content-Security-Policy `frame-ancestors` directives must be configured to allow cross-origin framing. CORS settings apply to cross-origin `fetch`/`XHR` requests and do not control iframe rendering.
 
 ## Access Lists
 
