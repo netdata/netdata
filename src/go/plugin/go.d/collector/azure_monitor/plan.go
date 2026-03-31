@@ -63,7 +63,7 @@ func buildProfileRuntime(p azureprofiles.Profile) (*profileRuntime, error) {
 		return nil, fmt.Errorf("profile has empty id")
 	}
 
-	name := stringsTrim(p.Name)
+	name := stringsTrim(p.DisplayName)
 	if name == "" {
 		return nil, fmt.Errorf("profile %q has empty name", profileID)
 	}

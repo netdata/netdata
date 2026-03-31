@@ -277,17 +277,17 @@ modules:
                 | Mode | Behavior |
                 |:-----|:---------|
                 | `auto` | Discovers resource types in your subscriptions and enables matching built-in profiles automatically. This is the default. |
-                | `exact` | Uses only the profile names listed under `profiles.mode_exact.names`. No auto-discovery. |
-                | `combined` | Merges auto-discovered profiles with the names listed under `profiles.mode_combined.names`. |
+                | `exact` | Uses only the profile basenames listed under `profiles.mode_exact.names`. No auto-discovery. |
+                | `combined` | Merges auto-discovered profiles with the basenames listed under `profiles.mode_combined.names`. |
 
-                Profile name matching is case-insensitive.
+                Profile basename matching is case-insensitive. A basename is the profile filename without the `.yaml` / `.yml` suffix.
             - name: profiles.mode_exact.names
-              description: Explicit profile names used by `exact` mode. Matching is case-insensitive.
+              description: Explicit profile file basenames used by `exact` mode. Matching is case-insensitive.
               default_value: "[]"
               required: false
               group: Profiles
             - name: profiles.mode_combined.names
-              description: Explicit profile names merged with auto-discovered profiles in `combined` mode. Matching is case-insensitive.
+              description: Explicit profile file basenames merged with auto-discovered profiles in `combined` mode. Matching is case-insensitive.
               default_value: "[]"
               required: false
               group: Profiles
@@ -355,8 +355,8 @@ modules:
                       mode: exact
                       mode_exact:
                         names:
-                          - Azure SQL Database
-                          - Azure PostgreSQL Flexible Server
+                          - sql_database
+                          - postgres_flexible
                     auth:
                       mode: managed_identity
             - name: Custom Azure Resource Graph KQL
@@ -412,7 +412,7 @@ modules:
             description: |
               Profiles are matched by Azure resource type. If a resource type exists but metrics are missing:
 
-              - **Check profile mode** -- Ensure `profiles.mode: auto` (default), or explicitly list the profile name under `profiles.mode_exact.names` or `profiles.mode_combined.names`.
+              - **Check profile mode** -- Ensure `profiles.mode: auto` (default), or explicitly list the profile basename under `profiles.mode_exact.names` or `profiles.mode_combined.names`.
               - **Verify a built-in profile exists** -- List available profiles:
                 ```bash
                 ls /usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/

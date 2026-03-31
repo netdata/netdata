@@ -36,12 +36,8 @@ func TestLoadFromDefaultDirs_LoadsAllStockProfiles(t *testing.T) {
 	catalog, err := LoadFromDefaultDirs()
 	require.NoError(t, err)
 
-	ids := catalog.DefaultProfileIDs()
-	require.Len(t, ids, want)
-
-	profiles, err := catalog.Resolve(ids)
-	require.NoError(t, err)
-	require.Len(t, profiles, want)
+	assert.Len(t, catalog.byBaseName, want)
+	assert.Len(t, catalog.byID, want)
 }
 
 func TestDefaultCatalog_CachesSuccessfulLoads(t *testing.T) {
@@ -59,8 +55,8 @@ func TestDefaultCatalog_CachesSuccessfulLoads(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, calls)
-	assert.Equal(t, []string{"sql_database"}, first.DefaultProfileIDs())
-	assert.Equal(t, []string{"sql_database"}, second.DefaultProfileIDs())
+	assert.Equal(t, []string{"sql_database"}, first.defaultProfileBaseNames())
+	assert.Equal(t, []string{"sql_database"}, second.defaultProfileBaseNames())
 }
 
 func TestDefaultCatalog_RetriesAfterFailure(t *testing.T) {
@@ -81,7 +77,7 @@ func TestDefaultCatalog_RetriesAfterFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, calls)
-	assert.Equal(t, []string{"postgres_flexible"}, catalog.DefaultProfileIDs())
+	assert.Equal(t, []string{"postgres_flexible"}, catalog.defaultProfileBaseNames())
 }
 
 func TestDefaultCatalog_DoesNotCacheWhenDisabled(t *testing.T) {
@@ -126,16 +122,16 @@ func stubDefaultCatalog(t *testing.T, cacheEnabled func() bool, loader func() (C
 }
 
 func testCatalog(id string) Catalog {
-	profile := Profile{ID: id, Name: id}
+	profile := Profile{ID: id, DisplayName: id}
 	return Catalog{
-		byName: map[string]Profile{
-			normalizeKey(profile.Name): profile,
+		byBaseName: map[string]Profile{
+			normalizeKey(id): profile,
 		},
 		byID: map[string]Profile{
 			id: profile,
 		},
-		stockProfileIDs: map[string]struct{}{
-			id: {},
+		stockProfileBaseNames: map[string]struct{}{
+			normalizeKey(id): {},
 		},
 	}
 }

@@ -24,15 +24,16 @@ const (
 )
 
 type Catalog struct {
-	byName          map[string]Profile
-	byID            map[string]Profile
-	stockProfileIDs map[string]struct{}
+	byBaseName            map[string]Profile
+	byID                  map[string]Profile
+	stockProfileBaseNames map[string]struct{}
 }
 
 type catalogEntry struct {
-	Config  Profile
-	Path    string
-	IsStock bool
+	Config   Profile
+	Path     string
+	BaseName string
+	IsStock  bool
 }
 
 type DirSpec struct {
@@ -50,7 +51,7 @@ func LoadFromDefaultDirs() (Catalog, error) {
 	if err != nil {
 		return Catalog{}, err
 	}
-	if len(catalog.stockProfileIDs) == 0 {
+	if len(catalog.stockProfileBaseNames) == 0 {
 		return Catalog{}, fmt.Errorf("no stock profiles found under %q", filepath.Join(pluginconfig.CollectorsStockDir(), profilesDirName, "default"))
 	}
 	return catalog, nil
@@ -58,9 +59,9 @@ func LoadFromDefaultDirs() (Catalog, error) {
 
 func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 	catalog := Catalog{
-		byName:          make(map[string]Profile),
-		byID:            make(map[string]Profile),
-		stockProfileIDs: make(map[string]struct{}),
+		byBaseName:            make(map[string]Profile),
+		byID:                  make(map[string]Profile),
+		stockProfileBaseNames: make(map[string]struct{}),
 	}
 	seen := make(map[string]catalogEntry)
 
@@ -97,17 +98,17 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 				return err
 			}
 
-			id := normalizeKey(cfg.ID)
-			if id == "" {
-				return fmt.Errorf("profile %q: decoded empty id", path)
+			baseName := normalizeKey(profileBaseName(path))
+			if baseName == "" {
+				return fmt.Errorf("profile %q: decoded empty basename", path)
 			}
 			if spec.IsStock {
-				catalog.stockProfileIDs[id] = struct{}{}
+				catalog.stockProfileBaseNames[baseName] = struct{}{}
 			}
 
-			prev, exists := seen[id]
+			prev, exists := seen[baseName]
 			if !exists {
-				seen[id] = catalogEntry{Config: cfg, Path: path, IsStock: spec.IsStock}
+				seen[baseName] = catalogEntry{Config: cfg, Path: path, BaseName: baseName, IsStock: spec.IsStock}
 				return nil
 			}
 
@@ -117,9 +118,9 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 				if spec.IsStock {
 					scope = "stock"
 				}
-				return fmt.Errorf("duplicate %s profile id %q in %q and %q", scope, id, prev.Path, path)
+				return fmt.Errorf("duplicate %s profile basename %q in %q and %q", scope, baseName, prev.Path, path)
 			case prev.IsStock && !spec.IsStock:
-				seen[id] = catalogEntry{Config: cfg, Path: path, IsStock: false}
+				seen[baseName] = catalogEntry{Config: cfg, Path: path, BaseName: baseName, IsStock: false}
 			case !prev.IsStock && spec.IsStock:
 				// User overrides stock. Keep the existing user profile.
 			}
@@ -135,18 +136,18 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 		return Catalog{}, errors.New("no Azure Monitor profiles were loaded")
 	}
 
-	for id, entry := range seen {
+	idToBaseName := make(map[string]string, len(seen))
+	for _, entry := range seen {
+		id := normalizeKey(entry.Config.ID)
+		if id == "" {
+			return Catalog{}, fmt.Errorf("profile %q: decoded empty id", entry.Path)
+		}
+		if prevBaseName, ok := idToBaseName[id]; ok {
+			return Catalog{}, fmt.Errorf("duplicate profile id %q for basenames %q and %q", entry.Config.ID, prevBaseName, entry.BaseName)
+		}
+		idToBaseName[id] = entry.BaseName
 		catalog.byID[id] = entry.Config
-
-		name := strings.TrimSpace(entry.Config.Name)
-		nameKey := normalizeKey(name)
-		if nameKey == "" {
-			return Catalog{}, fmt.Errorf("profile %q: decoded empty name", entry.Path)
-		}
-		if prev, ok := catalog.byName[nameKey]; ok {
-			return Catalog{}, fmt.Errorf("duplicate profile name %q for ids %q and %q", name, prev.ID, entry.Config.ID)
-		}
-		catalog.byName[nameKey] = entry.Config
+		catalog.byBaseName[entry.BaseName] = entry.Config
 	}
 
 	return catalog, nil
@@ -176,19 +177,6 @@ func loadProfileFile(path string) (Profile, error) {
 	return cfg, nil
 }
 
-func (c Catalog) DefaultProfileIDs() []string {
-	if len(c.stockProfileIDs) == 0 {
-		return nil
-	}
-
-	ids := make([]string, 0, len(c.stockProfileIDs))
-	for id := range c.stockProfileIDs {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids
-}
-
 func (c Catalog) Resolve(profileIDs []string) ([]Profile, error) {
 	if len(profileIDs) == 0 {
 		return nil, errors.New("no Azure Monitor profiles selected")
@@ -206,17 +194,17 @@ func (c Catalog) Resolve(profileIDs []string) ([]Profile, error) {
 	return profiles, nil
 }
 
-func (c Catalog) ResolveNames(profileNames []string) ([]Profile, error) {
-	if len(profileNames) == 0 {
+func (c Catalog) ResolveBaseNames(profileBaseNames []string) ([]Profile, error) {
+	if len(profileBaseNames) == 0 {
 		return nil, errors.New("no Azure Monitor profiles selected")
 	}
 
-	profiles := make([]Profile, 0, len(profileNames))
-	for _, name := range profileNames {
-		normalizedName := normalizeKey(name)
-		prof, ok := c.byName[normalizedName]
+	profiles := make([]Profile, 0, len(profileBaseNames))
+	for _, baseName := range profileBaseNames {
+		normalizedBaseName := normalizeKey(baseName)
+		prof, ok := c.byBaseName[normalizedBaseName]
 		if !ok {
-			return nil, fmt.Errorf("unknown profile name %q", name)
+			return nil, fmt.Errorf("unknown profile basename %q", baseName)
 		}
 		profiles = append(profiles, prof)
 	}
@@ -271,8 +259,8 @@ func (c Catalog) ResourceTypesForProfileIDs(profileIDs []string) ([]string, erro
 	return types, nil
 }
 
-func (c Catalog) ProfileIDsForNames(profileNames []string) ([]string, error) {
-	profiles, err := c.ResolveNames(profileNames)
+func (c Catalog) ProfileIDsForBaseNames(profileBaseNames []string) ([]string, error) {
+	profiles, err := c.ResolveBaseNames(profileBaseNames)
 	if err != nil {
 		return nil, err
 	}
@@ -284,8 +272,8 @@ func (c Catalog) ProfileIDsForNames(profileNames []string) ([]string, error) {
 	return ids, nil
 }
 
-func (c Catalog) ResourceTypesForProfileNames(profileNames []string) ([]string, error) {
-	profiles, err := c.ResolveNames(profileNames)
+func (c Catalog) ResourceTypesForProfileBaseNames(profileBaseNames []string) ([]string, error) {
+	profiles, err := c.ResolveBaseNames(profileBaseNames)
 	if err != nil {
 		return nil, err
 	}
@@ -307,6 +295,25 @@ func (c Catalog) ResourceTypesForProfileNames(profileNames []string) ([]string, 
 
 	sort.Strings(types)
 	return types, nil
+}
+
+func (c Catalog) defaultProfileBaseNames() []string {
+	if len(c.stockProfileBaseNames) == 0 {
+		return nil
+	}
+
+	names := make([]string, 0, len(c.stockProfileBaseNames))
+	for name := range c.stockProfileBaseNames {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func profileBaseName(path string) string {
+	name := filepath.Base(path)
+	ext := filepath.Ext(name)
+	return strings.TrimSuffix(name, ext)
 }
 
 func (c Catalog) ResourceTypes() []string {

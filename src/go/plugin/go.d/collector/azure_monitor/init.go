@@ -211,7 +211,7 @@ func initDiscoveryResourceTypes(cfg Config, catalog azureprofiles.Catalog) ([]st
 	case profilesModeAuto, profilesModeCombined:
 		return catalog.ResourceTypes(), nil
 	case profilesModeExact:
-		return catalog.ResourceTypesForProfileNames(cfg.Profiles.explicitNames())
+		return catalog.ResourceTypesForProfileBaseNames(cfg.Profiles.explicitBaseNames())
 	default:
 		return nil, fmt.Errorf("unsupported profiles.mode %q", cfg.Profiles.Mode)
 	}
@@ -231,13 +231,13 @@ func resolveInitProfileIDs(cfg Config, catalog azureprofiles.Catalog, byType map
 		}
 		return autoProfiles, autoProfiles, nil
 	case profilesModeExact:
-		explicitProfileIDs, err := catalog.ProfileIDsForNames(cfg.Profiles.explicitNames())
+		explicitProfileIDs, err := catalog.ProfileIDsForBaseNames(cfg.Profiles.explicitBaseNames())
 		if err != nil {
 			return nil, nil, err
 		}
 		return explicitProfileIDs, nil, nil
 	case profilesModeCombined:
-		explicitProfileIDs, err := catalog.ProfileIDsForNames(cfg.Profiles.explicitNames())
+		explicitProfileIDs, err := catalog.ProfileIDsForBaseNames(cfg.Profiles.explicitBaseNames())
 		if err != nil {
 			return nil, nil, err
 		}

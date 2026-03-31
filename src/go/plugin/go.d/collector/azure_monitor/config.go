@@ -255,7 +255,7 @@ func validateProfilesList(path string, profiles []string) []error {
 	return errs
 }
 
-func (p ProfilesConfig) explicitNames() []string {
+func (p ProfilesConfig) explicitBaseNames() []string {
 	switch stringsLowerTrim(p.Mode) {
 	case profilesModeExact:
 		if p.ModeExact != nil {

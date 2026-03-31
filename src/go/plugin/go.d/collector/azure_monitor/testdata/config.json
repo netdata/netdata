@@ -17,7 +17,7 @@
     "mode": "exact",
     "mode_exact": {
       "names": [
-        "Azure SQL Managed Instance"
+        "sql_managed_instance"
       ]
     }
   },

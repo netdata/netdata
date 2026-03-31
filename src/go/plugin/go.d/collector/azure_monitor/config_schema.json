@@ -171,8 +171,8 @@
                     "type": "object",
                     "properties": {
                       "names": {
-                        "title": "Profile Names",
-                        "description": "Explicit profile names used by `exact` mode. Matching is case-insensitive.",
+                        "title": "Profile basenames",
+                        "description": "Explicit profile file basenames used by `exact` mode. Matching is case-insensitive.",
                         "type": "array",
                         "items": {
                           "type": "string"
@@ -198,8 +198,8 @@
                     "type": "object",
                     "properties": {
                       "names": {
-                        "title": "Profile Names",
-                        "description": "Explicit profile names merged with auto-discovered profiles in `combined` mode. Matching is case-insensitive.",
+                        "title": "Profile basenames",
+                        "description": "Explicit profile file basenames merged with auto-discovered profiles in `combined` mode. Matching is case-insensitive.",
                         "type": "array",
                         "items": {
                           "type": "string"
@@ -431,7 +431,7 @@
     },
     "profiles": {
       "mode": {
-        "ui:help": "Choose how metric profiles are activated: `auto` enables profiles for discovered resource types, `exact` uses only the listed profile names, and `combined` merges both.",
+        "ui:help": "Choose how metric profiles are activated: `auto` enables profiles for discovered resource types, `exact` uses only the listed profile basenames, and `combined` merges both.",
         "ui:widget": "radio",
         "ui:options": {
           "inline": true
@@ -440,20 +440,20 @@
       "mode_exact": {
         "names": {
           "ui:listFlavour": "list",
-          "ui:help": "Add the Azure Monitor profile names to enable explicitly in `exact` mode. Matching is case-insensitive.",
+          "ui:help": "Add Azure Monitor profile file basenames to enable explicitly in `exact` mode. Matching is case-insensitive.",
           "items": {
-            "ui:help": "Profile name from the Azure Monitor profile catalog.",
-            "ui:placeholder": "Azure SQL Database"
+            "ui:help": "Profile file basename from the Azure Monitor profile catalog.",
+            "ui:placeholder": "sql_database"
           }
         }
       },
       "mode_combined": {
         "names": {
           "ui:listFlavour": "list",
-          "ui:help": "Add profile names to merge with auto-discovered profiles in `combined` mode. Matching is case-insensitive.",
+          "ui:help": "Add profile file basenames to merge with auto-discovered profiles in `combined` mode. Matching is case-insensitive.",
           "items": {
-            "ui:help": "Profile name from the Azure Monitor profile catalog.",
-            "ui:placeholder": "Azure SQL Database"
+            "ui:help": "Profile file basename from the Azure Monitor profile catalog.",
+            "ui:placeholder": "sql_database"
           }
         }
       }

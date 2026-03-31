@@ -16,22 +16,22 @@ func TestLoadProfileCatalog_LoadsStockProfiles(t *testing.T) {
 	catalog, err := azureprofiles.LoadFromDefaultDirs()
 	require.NoError(t, err)
 
-	for _, name := range []string{
-		"Azure SQL Managed Instance",
-		"Azure SQL Database",
-		"Azure PostgreSQL Flexible Server",
-		"Azure Cosmos DB Account",
-		"Azure Logic Apps Workflow",
-		"Azure Virtual Machine",
-		"Azure Kubernetes Service Cluster",
-		"Azure Storage Account",
-		"Azure Load Balancer",
+	for _, baseName := range []string{
+		"sql_managed_instance",
+		"sql_database",
+		"postgres_flexible",
+		"cosmos_db",
+		"logic_apps",
+		"virtual_machines",
+		"aks",
+		"storage_accounts",
+		"load_balancers",
 	} {
-		profiles, err := catalog.ResolveNames([]string{name})
-		require.NoErrorf(t, err, "expected stock profile %q", name)
+		profiles, err := catalog.ResolveBaseNames([]string{baseName})
+		require.NoErrorf(t, err, "expected stock profile %q", baseName)
 		assert.Len(t, profiles, 1)
 	}
-	assert.GreaterOrEqual(t, len(catalog.DefaultProfileIDs()), 9)
+	assert.GreaterOrEqual(t, len(catalog.ResourceTypes()), 9)
 }
 
 func TestLoadProfileCatalogFromDirs_UserOverridesStock(t *testing.T) {
@@ -133,17 +133,14 @@ template:
 	})
 	require.NoError(t, err)
 
-	gotProfiles, err := catalog.ResolveNames([]string{"azure sql database (user override)"})
+	gotProfiles, err := catalog.ResolveBaseNames([]string{"SQL_DATABASE"})
 	require.NoError(t, err)
 	require.Len(t, gotProfiles, 1)
 	got := gotProfiles[0]
-	assert.Equal(t, "Azure SQL Database (User Override)", got.Name)
-
-	defaults := catalog.DefaultProfileIDs()
-	assert.Equal(t, []string{"postgres_flexible", "sql_database"}, defaults)
+	assert.Equal(t, "Azure SQL Database (User Override)", got.DisplayName)
 }
 
-func TestLoadProfileCatalogFromDirs_RejectsDuplicateProfileNames(t *testing.T) {
+func TestLoadProfileCatalogFromDirs_RejectsDuplicateProfileBasenames(t *testing.T) {
 	dir := t.TempDir()
 	stockDir := filepath.Join(dir, "stock")
 
@@ -176,7 +173,7 @@ template:
         - selector: sql_database.cpu_percent_average
           name: average
 `))
-	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "sql_database_copy.yaml"), `
+	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "nested", "sql_database.yml"), `
 id: sql_database_copy
 name: azure sql database
 resource_type: Microsoft.Sql/servers/databases
@@ -210,9 +207,80 @@ template:
 		{Path: stockDir, IsStock: true},
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `duplicate profile name`)
-	assert.Contains(t, err.Error(), `"sql_database_copy"`)
+	assert.Contains(t, err.Error(), `duplicate stock profile basename`)
 	assert.Contains(t, err.Error(), `"sql_database"`)
+}
+
+func TestLoadProfileCatalogFromDirs_RejectsDuplicateProfileIDsAcrossBasenames(t *testing.T) {
+	dir := t.TempDir()
+	stockDir := filepath.Join(dir, "stock")
+
+	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "sql_database.yaml"), `
+id: sql_database
+name: Azure SQL Database
+resource_type: Microsoft.Sql/servers/databases
+metrics:
+  - id: cpu_percent
+    azure_name: cpu_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+template:
+  family: Azure SQL Database
+  context_namespace: sql_database
+  charts:
+    - id: am_test_sql_database_cpu
+      title: Azure SQL Database CPU
+      context: cpu
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      label_promotion: [resource_name, resource_group, region, resource_type, profile]
+      instances:
+        by_labels: [resource_uid]
+      dimensions:
+        - selector: sql_database.cpu_percent_average
+          name: average
+`))
+	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "sql_database_copy.yaml"), `
+id: sql_database
+name: Azure SQL Database Copy
+resource_type: Microsoft.Sql/servers/databases
+metrics:
+  - id: cpu_percent
+    azure_name: cpu_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+template:
+  family: Azure SQL Database Copy
+  context_namespace: sql_database_copy
+  charts:
+    - id: am_test_sql_database_copy_cpu
+      title: Azure SQL Database Copy CPU
+      context: cpu_copy
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      label_promotion: [resource_name, resource_group, region, resource_type, profile]
+      instances:
+        by_labels: [resource_uid]
+      dimensions:
+        - selector: sql_database.cpu_percent_average
+          name: average
+`))
+
+	_, err := azureprofiles.LoadFromDirs([]azureprofiles.DirSpec{
+		{Path: stockDir, IsStock: true},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `duplicate profile id`)
+	assert.Contains(t, err.Error(), `"sql_database"`)
+	assert.Contains(t, err.Error(), `"sql_database_copy"`)
 }
 
 func writeProfileFile(path, data string) error {

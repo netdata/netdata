@@ -132,7 +132,7 @@ func TestCollector_Init(t *testing.T) {
 				Timeout:         confopt.Duration(-time.Second),
 				Profiles: ProfilesConfig{
 					Mode:      profilesModeExact,
-					ModeExact: &ProfilesModeConfig{Names: []string{"Azure PostgreSQL Flexible Server"}},
+					ModeExact: &ProfilesModeConfig{Names: []string{"postgres_flexible"}},
 				},
 				Auth: cloudauth.AzureADAuthConfig{
 					Mode: cloudauth.AzureADAuthModeDefault,
@@ -720,7 +720,7 @@ func TestCollector_TimeGrainScheduling(t *testing.T) {
 	}
 
 	cfg := testConfig()
-	cfg.Profiles.ModeExact = &ProfilesModeConfig{Names: []string{"azure storage slow"}}
+	cfg.Profiles.ModeExact = &ProfilesModeConfig{Names: []string{"storage_slow"}}
 
 	catalog := mustLoadStockCatalog(t, map[string]string{
 		"storage_slow.yaml": `
@@ -798,7 +798,7 @@ func TestCollector_QueryOffsetUsesEffectivePerBatchOffset(t *testing.T) {
 	}
 
 	cfg := testConfig()
-	cfg.Profiles.ModeExact = &ProfilesModeConfig{Names: []string{"Azure Storage Mixed Grains"}}
+	cfg.Profiles.ModeExact = &ProfilesModeConfig{Names: []string{"storage_mixed"}}
 
 	catalog := mustLoadStockCatalog(t, map[string]string{
 		"storage_mixed.yaml": `
@@ -925,7 +925,7 @@ func TestCollector_CheckBootstrapProfileScenarios(t *testing.T) {
 				c.Config = testConfig()
 				c.Config.Profiles.Mode = profilesModeCombined
 				c.Config.Profiles.ModeExact = nil
-				c.Config.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"azure cosmos db account"}}
+				c.Config.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"cosmos_db"}}
 			},
 			check: func(t *testing.T, c *Collector, rg *mockResourceGraph) {
 				var ids []string
@@ -941,7 +941,7 @@ func TestCollector_CheckBootstrapProfileScenarios(t *testing.T) {
 				c.Config = testConfig()
 				c.Config.Profiles.Mode = profilesModeCombined
 				c.Config.Profiles.ModeExact = nil
-				c.Config.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"Azure Cosmos DB Account"}}
+				c.Config.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"cosmos_db"}}
 			},
 			check: func(t *testing.T, c *Collector, rg *mockResourceGraph) {
 				require.Len(t, c.runtime.Profiles, 1)
@@ -1219,7 +1219,7 @@ func TestConfig_ValidateDiscoveryContracts(t *testing.T) {
 			cfg: func() Config {
 				cfg := testConfig()
 				cfg.Profiles.Mode = profilesModeAuto
-				cfg.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"Azure Cosmos DB Account"}}
+				cfg.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"cosmos_db"}}
 				return cfg
 			}(),
 			wantErr: false,
@@ -1228,7 +1228,7 @@ func TestConfig_ValidateDiscoveryContracts(t *testing.T) {
 			cfg: func() Config {
 				cfg := testConfig()
 				cfg.Profiles.Mode = profilesModeExact
-				cfg.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"Azure Cosmos DB Account"}}
+				cfg.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"cosmos_db"}}
 				return cfg
 			}(),
 			wantErr: false,
@@ -1237,11 +1237,11 @@ func TestConfig_ValidateDiscoveryContracts(t *testing.T) {
 			cfg: func() Config {
 				cfg := testConfig()
 				cfg.Profiles.Mode = profilesModeExact
-				cfg.Profiles.ModeExact = &ProfilesModeConfig{Names: []string{"Azure PostgreSQL Flexible Server", "azure postgresql flexible server"}}
+				cfg.Profiles.ModeExact = &ProfilesModeConfig{Names: []string{"POSTGRES_FLEXIBLE", "postgres_flexible"}}
 				return cfg
 			}(),
 			wantErr:        true,
-			wantErrContain: "'profiles.mode_exact.names' contains duplicate value 'azure postgresql flexible server'",
+			wantErrContain: "'profiles.mode_exact.names' contains duplicate value 'postgres_flexible'",
 		},
 	}
 
@@ -1363,7 +1363,7 @@ func testConfig() Config {
 		},
 		Profiles: ProfilesConfig{
 			Mode:      profilesModeExact,
-			ModeExact: &ProfilesModeConfig{Names: []string{"Azure PostgreSQL Flexible Server"}},
+			ModeExact: &ProfilesModeConfig{Names: []string{"postgres_flexible"}},
 		},
 		QueryOffset: 180,
 		Timeout:     defaultTimeout,
