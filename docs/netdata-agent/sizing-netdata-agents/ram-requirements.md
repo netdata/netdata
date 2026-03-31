@@ -78,14 +78,14 @@ In Netdata Cloud, navigate to the **Metrics** tab in the node's overview. The to
 Access the `/api/v1/info` endpoint on your Netdata Agent to retrieve the metrics count:
 
 ```bash
-curl http://localhost:19999/api/v1/info | grep metrics_count
+curl http://localhost:19999/api/v1/info | grep 'metrics-count'
 ```
 
-This returns the `metrics_count` field showing the number of unique time-series currently being collected.
+This returns the `metrics-count` field showing the number of unique time-series currently being collected.
 
 ### Baseline Estimates
 
-The number of metrics a Netdata Agent collects varies based on enabled collectors and monitoring scope. According to our [Scalability documentation](/docs/scalability.md), agents typically collect **3,000 to 20,000 metrics per second per node**.
+The number of metrics a Netdata Agent collects varies based on enabled collectors and monitoring scope. Use the methods above to get the exact `metrics_count` (`UNIQUE_METRICS`) for your node before calculating RAM.
 
 :::note
 
