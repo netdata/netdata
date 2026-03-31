@@ -1008,6 +1008,48 @@ fn merge_enrichment_matches_on_raw_counters_when_visible_counters_are_scaled() {
 }
 
 #[test]
+fn merge_enrichment_keeps_asn_names_and_geo_coordinates() {
+    let mut dst = vec![canonical_test_flow(&[])];
+    let incoming = canonical_test_flow(&[
+        ("SRC_AS_NAME", "AS15169 GOOGLE"),
+        ("DST_AS_NAME", "AS13335 CLOUDFLARE"),
+        ("SRC_GEO_LATITUDE", "40.712800"),
+        ("DST_GEO_LATITUDE", "50.110900"),
+        ("SRC_GEO_LONGITUDE", "-74.006000"),
+        ("DST_GEO_LONGITUDE", "8.682100"),
+    ]);
+
+    append_unique_flows(&mut dst, vec![incoming]);
+
+    assert_eq!(dst.len(), 1);
+    let fields = dst[0].record.to_fields();
+    assert_eq!(
+        fields.get("SRC_AS_NAME").map(String::as_str),
+        Some("AS15169 GOOGLE")
+    );
+    assert_eq!(
+        fields.get("DST_AS_NAME").map(String::as_str),
+        Some("AS13335 CLOUDFLARE")
+    );
+    assert_eq!(
+        fields.get("SRC_GEO_LATITUDE").map(String::as_str),
+        Some("40.712800")
+    );
+    assert_eq!(
+        fields.get("DST_GEO_LATITUDE").map(String::as_str),
+        Some("50.110900")
+    );
+    assert_eq!(
+        fields.get("SRC_GEO_LONGITUDE").map(String::as_str),
+        Some("-74.006000")
+    );
+    assert_eq!(
+        fields.get("DST_GEO_LONGITUDE").map(String::as_str),
+        Some("8.682100")
+    );
+}
+
+#[test]
 fn akvorado_samplingrate_fixture_matches_expected_flow() {
     let flows = decode_fixture_sequence(&["samplingrate-template.pcap", "samplingrate-data.pcap"]);
     assert!(

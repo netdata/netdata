@@ -51,6 +51,9 @@ pub(crate) fn decode_ipfix_special_from_raw_payload(
                 else {
                     break;
                 };
+                if consumed == 0 {
+                    break;
+                }
                 if let Some(flow) = decode_ipfix_special_record(
                     source,
                     timestamp_source,
@@ -73,4 +76,47 @@ pub(crate) fn decode_ipfix_special_from_raw_payload(
     }
 
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::{IpAddr, Ipv4Addr};
+
+    #[test]
+    fn zero_length_ipfix_special_records_do_not_loop_forever() {
+        let mut sampling = SamplingState::default();
+        sampling.set_ipfix_datalink_template(
+            "192.0.2.10",
+            7,
+            256,
+            vec![IPFixTemplateField {
+                field_type: IPFIX_FIELD_DATALINK_FRAME_SECTION,
+                field_length: 0,
+                enterprise_number: None,
+            }],
+        );
+
+        let payload = [
+            0x00, 0x0a, // version 10
+            0x00, 0x15, // packet length 21
+            0x00, 0x00, 0x00, 0x01, // export time
+            0x00, 0x00, 0x00, 0x01, // sequence number
+            0x00, 0x00, 0x00, 0x07, // observation domain id
+            0x01, 0x00, // flowset id 256
+            0x00, 0x05, // flowset length 5 => 1 byte body
+            0x00, // body byte to enter the loop even though record consumes 0
+        ];
+
+        let out = decode_ipfix_special_from_raw_payload(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10)), 9995),
+            &payload,
+            &sampling,
+            DecapsulationMode::None,
+            TimestampSource::Input,
+            1_700_000_000_000_000,
+        );
+
+        assert!(out.is_empty());
+    }
 }

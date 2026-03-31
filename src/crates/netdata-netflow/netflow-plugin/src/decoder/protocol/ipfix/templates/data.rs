@@ -1,5 +1,9 @@
 use super::*;
 
+fn bounded_ipfix_data_field_capacity(field_count: usize, remaining_bytes: usize) -> usize {
+    field_count.min(remaining_bytes / 4)
+}
+
 pub(crate) fn observe_ipfix_data_templates(
     exporter_ip: &str,
     observation_domain_id: u32,
@@ -14,8 +18,9 @@ pub(crate) fn observe_ipfix_data_templates(
         let field_count = u16::from_be_bytes([cursor[2], cursor[3]]) as usize;
         cursor = &cursor[4..];
 
-        let mut fields = Vec::with_capacity(field_count);
-        let mut persisted_fields = Vec::with_capacity(field_count);
+        let capacity = bounded_ipfix_data_field_capacity(field_count, cursor.len());
+        let mut fields = Vec::with_capacity(capacity);
+        let mut persisted_fields = Vec::with_capacity(capacity);
         for _ in 0..field_count {
             if cursor.len() < 4 {
                 return changed;
@@ -60,4 +65,29 @@ pub(crate) fn observe_ipfix_data_templates(
     }
 
     changed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ipfix_data_template_capacity_is_bounded_by_remaining_bytes() {
+        assert_eq!(bounded_ipfix_data_field_capacity(16, 8), 2);
+        assert_eq!(bounded_ipfix_data_field_capacity(2, 64), 2);
+    }
+
+    #[test]
+    fn ipfix_data_templates_ignore_truncated_huge_field_counts() {
+        let mut sampling = SamplingState::default();
+        let mut namespace = DecoderStateNamespace::default();
+        let body = [0x01, 0x00, 0xff, 0xff];
+
+        let changed =
+            observe_ipfix_data_templates("192.0.2.1", 42, &body, &mut sampling, &mut namespace);
+
+        assert!(!changed);
+        assert!(namespace.ipfix_templates.is_empty());
+        assert!(!sampling.has_any_ipfix_datalink_templates());
+    }
 }

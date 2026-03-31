@@ -75,6 +75,8 @@ pub(crate) fn merge_enriched_records(existing: &mut DecodedFlow, incoming: &Deco
     merge_copy!(dst_mask);
     merge_copy!(src_as);
     merge_copy!(dst_as);
+    merge_str!(src_as_name);
+    merge_str!(dst_as_name);
 
     // Network attributes
     merge_str!(src_net_name);
@@ -93,6 +95,10 @@ pub(crate) fn merge_enriched_records(existing: &mut DecodedFlow, incoming: &Deco
     merge_str!(dst_geo_city);
     merge_str!(src_geo_state);
     merge_str!(dst_geo_state);
+    merge_str!(src_geo_latitude);
+    merge_str!(dst_geo_latitude);
+    merge_str!(src_geo_longitude);
+    merge_str!(dst_geo_longitude);
 
     // BGP routing
     merge_str!(dst_as_path);
