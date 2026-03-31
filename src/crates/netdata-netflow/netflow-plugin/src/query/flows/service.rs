@@ -82,6 +82,9 @@ impl FlowQueryService {
             stats.insert("query_facet_overflow_fields".to_string(), 0);
 
             let warnings = build_query_warnings(build_result.overflow_records, 0, 0);
+            if let Some(execution) = &execution {
+                execution.finish();
+            }
 
             return Ok(FlowQueryOutput {
                 agent_id: self.agent_id.clone(),

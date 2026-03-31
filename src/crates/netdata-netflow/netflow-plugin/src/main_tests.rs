@@ -300,6 +300,67 @@ async fn e2e_flows_function_marks_progress_complete_with_execution_context() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_flows_function_marks_progress_complete_for_empty_projected_query() {
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let journal_root = tmp.path().join("flows");
+    fs::create_dir_all(journal_root.join("raw")).expect("create raw dir");
+    fs::create_dir_all(journal_root.join("1m")).expect("create 1m dir");
+    fs::create_dir_all(journal_root.join("5m")).expect("create 5m dir");
+    fs::create_dir_all(journal_root.join("1h")).expect("create 1h dir");
+
+    let mut cfg = plugin_config::PluginConfig::default();
+    cfg.journal.journal_dir = journal_root.to_string_lossy().to_string();
+
+    let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
+        .await
+        .expect("create query service");
+    let handler = NetflowFlowsHandler::new(
+        Arc::new(ingest::IngestMetrics::default()),
+        Arc::new(query_service),
+    );
+    let before = (Utc::now().timestamp().max(1) as u32).saturating_add(3600);
+    let progress = ProgressState::default();
+    let execution = query::QueryExecutionContext::new(progress.clone(), CancellationToken::new());
+
+    let response = handler
+        .handle_request_with_execution(
+            Some(execution),
+            query::FlowsRequest {
+                view: query::ViewMode::TableSankey,
+                after: Some(1),
+                before: Some(before),
+                group_by: vec![
+                    "SRC_ADDR".to_string(),
+                    "DST_ADDR".to_string(),
+                    "PROTOCOL".to_string(),
+                ],
+                top_n: query::TopN::N100,
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("empty projected flows function call with execution");
+
+    match response {
+        FlowsFunctionResponse::Table(response) => {
+            assert!(
+                response.data.flows.is_empty(),
+                "expected empty flows data for empty journals"
+            );
+        }
+        FlowsFunctionResponse::Metrics(_) => panic!("expected table response"),
+        FlowsFunctionResponse::Autocomplete(_) => panic!("expected table response"),
+    }
+
+    let (done, total) = progress.snapshot();
+    assert!(total > 0, "expected progress total to be initialized");
+    assert_eq!(
+        done, total,
+        "expected completed progress after empty response"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_flows_function_honors_cancelled_execution_context() {
     let (cfg, metrics, _open_tiers, _tier_flow_indexes, _tmp) = ingest_fixture("nfv5.pcap").await;
     let (query_service, _notify_rx) = query::FlowQueryService::new(&cfg)
