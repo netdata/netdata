@@ -1,13 +1,5 @@
 # Dynamic Configuration Manager
 
-## Table of Contents
-
-- [Overview](#overview)
-- [Quick Access Methods](#quick-access-methods)
-- [Getting Started](#getting-started)
-- [Collectors](#collectors)
-- [Multi-Node Deployment](#multi-node-deployment)
-
 ## Overview
 
 :::important
