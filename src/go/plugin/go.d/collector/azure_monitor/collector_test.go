@@ -778,6 +778,111 @@ template:
 	assert.Equal(t, 1, mx.calls())
 }
 
+func TestCollector_QueryOffsetUsesEffectivePerBatchOffset(t *testing.T) {
+	now := time.Date(2026, 3, 7, 12, 0, 0, 0, time.UTC)
+
+	rg := &mockResourceGraph{
+		resources: []map[string]any{
+			{
+				"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.Storage/storageAccounts/st-a",
+				"name":          "st-a",
+				"type":          "Microsoft.Storage/storageAccounts",
+				"resourceGroup": "rg-a",
+				"location":      "eastus",
+			},
+		},
+	}
+
+	mx := &mockMetricsClient{
+		queryResponse: azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{}},
+	}
+
+	cfg := testConfig()
+	cfg.Profiles.ModeExact = &ProfilesModeConfig{Names: []string{"Azure Storage Mixed Grains"}}
+
+	catalog := mustLoadStockCatalog(t, map[string]string{
+		"storage_mixed.yaml": `
+id: storage_mixed
+name: Azure Storage Mixed Grains
+resource_type: Microsoft.Storage/storageAccounts
+metrics:
+  - id: transactions
+    azure_name: Transactions
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: used_capacity
+    azure_name: UsedCapacity
+    time_grain: PT5M
+    series:
+      - aggregation: average
+        kind: gauge
+template:
+  family: Azure Storage Mixed
+  context_namespace: storage_mixed
+  charts:
+    - id: am_storage_mixed_transactions
+      title: Azure Storage Mixed Transactions
+      context: transactions
+      family: Throughput
+      type: line
+      units: ops/s
+      algorithm: absolute
+      dimensions:
+        - selector: ` + azureprofiles.ExportedSeriesName("storage_mixed", "transactions", "average") + `
+          name: average
+    - id: am_storage_mixed_used_capacity
+      title: Azure Storage Mixed Used Capacity
+      context: used_capacity
+      family: Capacity
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: ` + azureprofiles.ExportedSeriesName("storage_mixed", "used_capacity", "average") + `
+          name: average
+`,
+	})
+
+	c := New()
+	c.Config = cfg
+	c.now = func() time.Time { return now }
+	c.loadProfileCatalog = func() (azureprofiles.Catalog, error) {
+		return catalog, nil
+	}
+	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
+		return rg, nil
+	}
+	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
+		return mx, nil
+	}
+
+	require.NoError(t, c.Init(context.Background()))
+
+	_, err := collecttest.CollectScalarSeries(c, metrix.ReadRaw())
+	require.NoError(t, err)
+
+	calls := mx.queryCalls()
+	require.Len(t, calls, 2)
+
+	byInterval := make(map[string]metricsQueryCall, len(calls))
+	for _, call := range calls {
+		byInterval[call.Interval] = call
+	}
+
+	require.Contains(t, byInterval, "PT1M")
+	require.Contains(t, byInterval, "PT5M")
+
+	assert.Equal(t, "2026-03-07T11:56:00Z", byInterval["PT1M"].StartTime)
+	assert.Equal(t, "2026-03-07T11:57:00Z", byInterval["PT1M"].EndTime)
+	assert.Equal(t, []string{"Transactions"}, byInterval["PT1M"].MetricNames)
+
+	assert.Equal(t, "2026-03-07T11:50:00Z", byInterval["PT5M"].StartTime)
+	assert.Equal(t, "2026-03-07T11:55:00Z", byInterval["PT5M"].EndTime)
+	assert.Equal(t, []string{"UsedCapacity"}, byInterval["PT5M"].MetricNames)
+}
+
 func TestCollector_CheckBootstrapProfileScenarios(t *testing.T) {
 	tests := map[string]struct {
 		resources       []map[string]any
@@ -1371,17 +1476,42 @@ type mockMetricsClient struct {
 	queryResponses map[string]azmetrics.QueryResourcesResponse
 	queryErr       error
 	queryErrors    map[string]error
+	queryCallsLog  []metricsQueryCall
 	count          int
 	subs           []string
 	timeout        time.Duration
 	hasDL          bool
 }
 
-func (m *mockMetricsClient) QueryResources(ctx context.Context, subscriptionID string, _ string, _ []string, _ azmetrics.ResourceIDList, _ *azmetrics.QueryResourcesOptions) (azmetrics.QueryResourcesResponse, error) {
+type metricsQueryCall struct {
+	SubscriptionID string
+	MetricNames    []string
+	StartTime      string
+	EndTime        string
+	Interval       string
+	Aggregation    string
+}
+
+func (m *mockMetricsClient) QueryResources(ctx context.Context, subscriptionID string, _ string, metricNames []string, _ azmetrics.ResourceIDList, opts *azmetrics.QueryResourcesOptions) (azmetrics.QueryResourcesResponse, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.count++
 	m.subs = append(m.subs, subscriptionID)
+	var startTime, endTime, interval, aggregation string
+	if opts != nil {
+		startTime = derefString(opts.StartTime)
+		endTime = derefString(opts.EndTime)
+		interval = derefString(opts.Interval)
+		aggregation = derefString(opts.Aggregation)
+	}
+	m.queryCallsLog = append(m.queryCallsLog, metricsQueryCall{
+		SubscriptionID: subscriptionID,
+		MetricNames:    append([]string(nil), metricNames...),
+		StartTime:      startTime,
+		EndTime:        endTime,
+		Interval:       interval,
+		Aggregation:    aggregation,
+	})
 	deadline, ok := ctx.Deadline()
 	m.hasDL = ok
 	if ok {
@@ -1419,6 +1549,12 @@ func (m *mockMetricsClient) subscriptionCalls() []string {
 	return append([]string(nil), m.subs...)
 }
 
+func (m *mockMetricsClient) queryCalls() []metricsQueryCall {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]metricsQueryCall(nil), m.queryCallsLog...)
+}
+
 func metricWithAvg(name string, ts time.Time, value float64) azmetrics.Metric {
 	return azmetrics.Metric{
 		Name: &azmetrics.LocalizableString{Value: ptrString(name)},
@@ -1429,6 +1565,13 @@ func metricWithAvg(name string, ts time.Time, value float64) azmetrics.Metric {
 }
 
 func ptrString(v string) *string { return &v }
+
+func derefString(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
+}
 
 func assertTimeoutClose(t *testing.T, got, want time.Duration) {
 	t.Helper()

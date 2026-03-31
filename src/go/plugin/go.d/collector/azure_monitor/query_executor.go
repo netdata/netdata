@@ -44,7 +44,7 @@ func (e *queryExecutor) reset() {
 	e.clients = make(map[string]metricsQueryClient)
 }
 
-func (e *queryExecutor) runQueryBatches(ctx context.Context, batches []queryBatch, queryEnd time.Time) []queryBatchResult {
+func (e *queryExecutor) runQueryBatches(ctx context.Context, batches []queryBatch, queryNow time.Time, queryOffsetSeconds int) []queryBatchResult {
 	workers := e.maxConcurrency
 	if workers < 1 {
 		workers = 1
@@ -60,7 +60,7 @@ func (e *queryExecutor) runQueryBatches(ctx context.Context, batches []queryBatc
 	for i := 0; i < workers; i++ {
 		wg.Go(func() {
 			for batch := range input {
-				samples, err := e.executeQueryBatch(ctx, batch, queryEnd)
+				samples, err := e.executeQueryBatch(ctx, batch, queryNow, queryOffsetSeconds)
 				output <- queryBatchResult{Samples: samples, Err: err}
 			}
 		})
@@ -80,14 +80,14 @@ func (e *queryExecutor) runQueryBatches(ctx context.Context, batches []queryBatc
 	return results
 }
 
-func (e *queryExecutor) executeQueryBatch(ctx context.Context, batch queryBatch, queryEnd time.Time) ([]metricSample, error) {
+func (e *queryExecutor) executeQueryBatch(ctx context.Context, batch queryBatch, queryNow time.Time, queryOffsetSeconds int) ([]metricSample, error) {
 	client, err := e.getMetricsClient(batch.Region)
 	if err != nil {
 		return nil, err
 	}
 
 	resourceIDs, resourceByID := queryBatchResourceIndex(batch.Resources)
-	startTime, endTime, interval, aggregation := queryBatchWindow(batch, queryEnd)
+	startTime, endTime, interval, aggregation := queryBatchWindow(batch, queryNow, queryOffsetSeconds)
 
 	reqCtx, cancel := withOptionalTimeout(ctx, e.timeout)
 	defer cancel()
@@ -130,10 +130,28 @@ func queryBatchResourceIndex(resources []resourceInfo) ([]string, map[string]res
 	return resourceIDs, resourceByID
 }
 
-func queryBatchWindow(batch queryBatch, queryEnd time.Time) (string, string, string, string) {
+func queryBatchWindow(batch queryBatch, queryNow time.Time, queryOffsetSeconds int) (string, string, string, string) {
+	queryEnd := queryEndForBatch(queryNow, queryOffsetSeconds, batch.TimeGrainEvery)
 	start := queryEnd.Add(-batch.TimeGrainEvery).UTC().Format(time.RFC3339)
 	end := queryEnd.UTC().Format(time.RFC3339)
 	return start, end, batch.TimeGrain, strings.Join(batch.Aggregations, ",")
+}
+
+func queryEndForBatch(now time.Time, queryOffsetSeconds int, batchTimeGrainEvery time.Duration) time.Time {
+	offset := effectiveQueryOffset(queryOffsetSeconds, batchTimeGrainEvery)
+	queryEnd := now.Add(-offset)
+	if queryEnd.IsZero() {
+		return now
+	}
+	return queryEnd
+}
+
+func effectiveQueryOffset(queryOffsetSeconds int, batchTimeGrainEvery time.Duration) time.Duration {
+	offset := secondsToDuration(queryOffsetSeconds)
+	if batchTimeGrainEvery > offset {
+		return batchTimeGrainEvery
+	}
+	return offset
 }
 
 func samplesFromQueryResponse(metricData []azmetrics.MetricData, profileID string, metricToRuntime map[string]*metricRuntime, resourceByID map[string]resourceInfo) []metricSample {

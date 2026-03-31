@@ -221,7 +221,7 @@
       },
       "query_offset": {
         "title": "Query offset",
-        "description": "How many seconds to shift queries into the past to avoid partial Azure Monitor windows.",
+        "description": "Minimum seconds to shift metric queries into the past; slower time-grain batches may use a larger effective offset automatically.",
         "type": "integer",
         "minimum": 60,
         "default": 180
