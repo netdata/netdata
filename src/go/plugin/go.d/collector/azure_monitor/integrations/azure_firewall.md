@@ -21,40 +21,78 @@ Module: azure_monitor
 
 ## Overview
 
-Monitor Azure Firewall including data processed, throughput, application and network rule hit counts, SNAT port utilization, health state percentage, and latency probes.
+:::info
+
+This is part of the [Azure Monitor](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+:::
+
+Monitor Azure Firewall with metrics covering:
+
+- **Traffic** -- data processed, throughput (bits/s)
+- **Rules** -- application and network rule hit counts
+- **SNAT** -- SNAT port utilization
+- **Health** -- firewall health state percentage
+- **Latency** -- latency probe
+- **Capacity** -- observed capacity units
 
 
-The collector uses Azure SDK clients for:
-- Authentication via Entra ID (service principal, managed identity, or default credentials)
-- Resource discovery via Azure Resource Graph queries
-- Metrics collection via Azure Monitor Metrics batch API, grouped by region and time grain
+It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/migrate-to-batch-api) to collect metrics, grouping requests by subscription, region, and time grain. Resources are discovered via [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) queries at startup and refreshed periodically. Authentication is handled through [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/identity/) (service principal, managed identity, or default credentials).
 
 
 This collector is supported on all platforms.
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
-The monitoring principal needs read access to Azure Resource Graph and Azure Monitor metrics for target resources.
+The service principal or managed identity requires these Azure RBAC roles:
+
+| Role | Purpose | Scope |
+|:-----|:--------|:------|
+| **Monitoring Reader** | Read Azure Monitor metrics | Subscription or resource group |
+| **Reader** | Query Azure Resource Graph for resource discovery | Subscription or resource group |
 
 
 ### Default Behavior
 
 #### Auto-Detection
 
-When `profile_selection_mode` is `auto` (the default), the collector queries Azure Resource Graph
-to discover which resource types exist in the subscription and enables matching built-in profiles automatically.
+The collector has two discovery phases:
+
+**Bootstrap (first run)**
+
+- With the default `profiles.mode: auto`, the collector queries Azure Resource Graph within the configured `subscription_ids` to find candidate resources.
+- It matches discovered resource types against built-in profiles and automatically enables the relevant ones.
+- Discovery scope can be narrowed using `discovery.mode: filters` (resource groups, regions, tags) or replaced entirely with `discovery.mode: query` for a custom KQL query.
+- A single job can monitor multiple subscriptions.
+
+**Runtime (periodic refresh)**
+
+- Periodically re-discovers resources for **already-active profile types only**.
+- Controlled by `discovery.refresh_every` (default: 300 seconds, set to 0 to disable).
+
+> **Important:** Runtime refresh does not activate new profiles. If a new resource type appears after bootstrap, restart the collector to pick it up.
 
 
 #### Limits
 
-Azure Monitor metrics granularity is typically 1 minute.
-The collector enforces a minimum collection interval of 60 seconds.
+- **Minimum collection interval:** 60 seconds (enforced). Azure Monitor metrics granularity is typically 1 minute.
+- **Metrics reporting delay:** Azure Monitor metrics have a 1-3 minute reporting delay. The collector uses `query_offset` (default: 180s) as a minimum offset and automatically uses a larger effective offset for slower time-grain batches when needed.
+- **API throttling:** Azure Monitor applies per-subscription rate limits. The collector uses bounded concurrency and batching to stay within limits, but monitoring many resources in a single subscription may require tuning `limits.*` options.
 
 
 #### Performance Impact
 
-The collector uses bounded request concurrency and batches resources and metrics to minimize API calls.
-Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
+The collector batches resources and metrics to minimize Azure API calls and uses bounded concurrency to avoid overwhelming the API.
+
+**Default concurrency and batching limits:**
+
+| Setting | Default | Description |
+|:--------|:--------|:------------|
+| `limits.max_concurrency` | 4 | Maximum concurrent batch queries |
+| `limits.max_batch_resources` | 50 | Maximum resources per batch request |
+| `limits.max_metrics_per_query` | 20 | Maximum metrics per batch request |
+
+For large deployments, consider splitting resources across multiple jobs. If you hit Azure API rate limits, reduce `max_concurrency`.
 
 
 ## Setup
@@ -78,25 +116,36 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Create an Azure monitoring principal
 
-Create a service principal or use a managed identity with the following permissions:
+The collector requires a service principal or managed identity with two Azure RBAC roles:
 
-1. **Monitoring Reader** role on the target subscription or resource groups (for Azure Monitor metrics access)
-2. **Reader** role for Azure Resource Graph queries (for resource discovery)
+| Role | Purpose |
+|:-----|:--------|
+| **Monitoring Reader** | Access Azure Monitor metrics for target resources |
+| **Reader** | Query Azure Resource Graph for resource discovery |
 
-For service principal authentication:
+**Option A: Service principal**
+
 ```bash
-# Create the service principal
+# Create service principal with Monitoring Reader role
 az ad sp create-for-rbac --name "netdata-monitor" --role "Monitoring Reader" \
   --scopes /subscriptions/<subscription-id>
+
+# Add the Reader role for resource discovery
+az role assignment create --assignee <appId-from-above> \
+  --role "Reader" --scope /subscriptions/<subscription-id>
 
 # Note the appId (client_id), password (client_secret), and tenant
 ```
 
-For managed identity (on Azure VMs, VMSS, or AKS):
+**Option B: Managed identity** (Azure VMs, VMSS, or AKS)
+
 ```bash
-# Assign Monitoring Reader role to the VM's managed identity
+# Assign both roles to the VM's managed identity
 az role assignment create --assignee <managed-identity-principal-id> \
   --role "Monitoring Reader" --scope /subscriptions/<subscription-id>
+
+az role assignment create --assignee <managed-identity-principal-id> \
+  --role "Reader" --scope /subscriptions/<subscription-id>
 ```
 
 
@@ -105,13 +154,17 @@ az role assignment create --assignee <managed-identity-principal-id> \
 
 #### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+The following options can be defined globally: `update_every`, `autodetection_retry`.
 
-Profile files are loaded from:
-- Stock: `/usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/`
-- User: `/etc/netdata/go.d/azure_monitor.profiles/`
+**Profile file locations:**
 
-User profile files with the same filename override stock profiles.
+| Type | Path |
+|:-----|:-----|
+| Stock profiles | `/usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/` |
+| User overrides | `/etc/netdata/go.d/azure_monitor.profiles/` |
+
+User profile files with the same `id` as a stock profile override it.
+Custom profiles extend the collector's catalog -- they do not replace the discovery mechanism.
 
 
 <details open><summary>Config options</summary>
@@ -122,24 +175,102 @@ User profile files with the same filename override stock profiles.
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Data collection interval (seconds). Must be at least 60. | 60 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| **Target** | subscription_id | Azure subscription ID. |  | yes |
+|  | subscription_ids | List of Azure subscription IDs to monitor. Used as the scope for resource discovery. |  | yes |
 |  | cloud | Azure cloud environment: `public`, `government`, or `china`. | public | no |
-| **Collection** | discovery_every | Resource discovery interval in seconds. | 300 | no |
-|  | query_offset | Offset in seconds for metric query windows. Increase if metrics appear incomplete. | 180 | no |
+|  | [query_offset](#option-collection-query-offset) | Minimum offset (seconds) subtracted from metric query windows. Increase if metrics appear incomplete. | 180 | no |
 |  | timeout | Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds. | 30 | no |
-| **Limits** | max_concurrency | Maximum concurrent batch queries to Azure Monitor. | 4 | no |
-|  | max_batch_resources | Maximum resources per Azure Monitor batch request. | 50 | no |
-|  | max_metrics_per_query | Maximum metrics per Azure Monitor batch request. | 20 | no |
-| **Profiles** | profile_selection_mode | Profile selection mode: `auto` discovers matching profiles via Azure Resource Graph, `exact` uses only listed profile ids, `combined` merges listed ids with auto-discovered profiles. | auto | no |
-|  | profile_selection_mode_exact.profiles | Profile ids to enable (used when `profile_selection_mode` is `exact`). | [] | no |
-|  | profile_selection_mode_combined.profiles | Profile ids to merge with auto-discovered profiles (used when `profile_selection_mode` is `combined`). | [] | no |
-| **Filters** | resource_groups | Optional list of resource group names to restrict monitoring scope. | [] | no |
-| **Authentication** | auth.mode | Authentication mode: `service_principal`, `managed_identity`, or `default`. |  | yes |
+| **Authentication** | [auth.mode](#option-authentication-auth-mode) | Authentication method: `service_principal`, `managed_identity`, or `default`. |  | yes |
 |  | auth.mode_service_principal.tenant_id | Entra ID tenant ID (required for `service_principal` mode). |  | no |
 |  | auth.mode_service_principal.client_id | Entra ID application (client) ID (required for `service_principal` mode). |  | no |
 |  | auth.mode_service_principal.client_secret | Entra ID client secret (required for `service_principal` mode). |  | no |
 |  | auth.mode_managed_identity.client_id | Client ID for user-assigned managed identity. Leave empty for system-assigned. |  | no |
+| **Discovery** | discovery.refresh_every | Interval (seconds) for refreshing discovered resources. Set `0` to disable runtime re-discovery after bootstrap. | 300 | no |
+|  | [discovery.mode](#option-discovery-discovery-mode) | Resource discovery method: `filters` (structured filters) or `query` (custom KQL). | filters | no |
+|  | discovery.mode_filters.resource_groups | Optional list of Azure resource groups to include in `filters` mode. | [] | no |
+|  | discovery.mode_filters.regions | Optional list of Azure regions to include in `filters` mode. | [] | no |
+|  | discovery.mode_filters.tags | Optional exact-match tag filters for `filters` mode. Keys are matched case-insensitively and values case-sensitively. | {} | no |
+|  | [discovery.mode_query.kql](#option-discovery-discovery-mode-query-kql) | Custom Azure Resource Graph KQL for `query` mode. Must project `id`, `name`, `type`, `resourceGroup`, `location`. |  | no |
+| **Profiles** | [profiles.mode](#option-profiles-profiles-mode) | How profiles are selected: `auto` (discover from resources), `exact` (explicit list), or `combined` (both). | auto | no |
+|  | profiles.mode_exact.names | Explicit profile file basenames used by `exact` mode. Matching is case-insensitive. | [] | no |
+|  | profiles.mode_combined.names | Explicit profile file basenames merged with auto-discovered profiles in `combined` mode. Matching is case-insensitive. | [] | no |
+| **Limits** | limits.max_concurrency | Maximum concurrent batch queries to Azure Monitor. | 4 | no |
+|  | limits.max_batch_resources | Maximum resources per Azure Monitor batch request. | 50 | no |
+|  | limits.max_metrics_per_query | Maximum metrics per Azure Monitor batch request. | 20 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+<a id="option-collection-query-offset"></a>
+##### query_offset
+
+Azure Monitor metrics have a built-in reporting delay of 1-3 minutes. The collector subtracts this offset from the current time when building metric query windows to avoid fetching incomplete data points.
+
+The configured `query_offset` acts as a minimum floor. For slower metric batches, the collector automatically uses a larger effective offset when the batch time grain is longer than the configured value.
+
+- **Default (180s)** works for most services.
+- **Longer time grains** (for example `PT5M`) automatically use at least one full time grain as the effective offset.
+- **Increase to 240-300s** if you still see gaps or missing data points.
+- **Do not set below 60s** -- metrics will likely be incomplete.
+
+
+<a id="option-authentication-auth-mode"></a>
+##### auth.mode
+
+Determines how the collector authenticates with Azure.
+
+| Mode | When to use | Required options |
+|:-----|:------------|:-----------------|
+| `service_principal` | Running outside Azure, or when you need explicit credentials | `tenant_id`, `client_id`, `client_secret` |
+| `managed_identity` | Running on Azure VMs, VMSS, or AKS with a managed identity | Optionally `client_id` for user-assigned identity |
+| `default` | Uses the Azure SDK default credential chain (environment variables, managed identity, Azure CLI, etc.) | None |
+
+
+<a id="option-discovery-discovery-mode"></a>
+##### discovery.mode
+
+Controls how the collector finds candidate Azure resources.
+
+| Mode | Behavior |
+|:-----|:---------|
+| `filters` | Builds an Azure Resource Graph query from the structured `mode_filters.*` options (resource groups, regions, tags). This is the default. |
+| `query` | Uses the raw KQL you provide in `discovery.mode_query.kql`. The query must project `id`, `name`, `type`, `resourceGroup`, and `location`. |
+
+
+<a id="option-discovery-discovery-mode-query-kql"></a>
+##### discovery.mode_query.kql
+
+A raw Azure Resource Graph KQL query used when `discovery.mode` is `query`.
+
+The query **must** project these five columns:
+
+| Column | Description |
+|:-------|:------------|
+| `id` | Full Azure resource ID (ARM format) |
+| `name` | Resource name |
+| `type` | Resource type (e.g., `microsoft.sql/servers/databases`) |
+| `resourceGroup` | Resource group name |
+| `location` | Azure region |
+
+Example:
+
+```
+resources
+| where tags.env =~ "prod"
+| project id, name, type, resourceGroup, location
+```
+
+
+<a id="option-profiles-profiles-mode"></a>
+##### profiles.mode
+
+Controls how the collector decides which metric profiles to activate.
+
+| Mode | Behavior |
+|:-----|:---------|
+| `auto` | Discovers resource types in your subscriptions and enables matching built-in profiles automatically. This is the default. |
+| `exact` | Uses only the profile basenames listed under `profiles.mode_exact.names`. No auto-discovery. |
+| `combined` | Merges auto-discovered profiles with the basenames listed under `profiles.mode_combined.names`. |
+
+Profile basename matching is case-insensitive. A basename is the profile filename without the `.yaml` / `.yml` suffix.
+
 
 
 </details>
@@ -182,14 +313,28 @@ sudo ./edit-config go.d/azure_monitor.conf
 
 ##### Examples
 
-###### Service principal (auto-discover all resources)
+###### Service principal with structured discovery
 
-Authenticate with a service principal and auto-discover all supported Azure resource types in the subscription.
+Authenticate with a service principal and auto-discover resources across two subscriptions, filtered to the `production-rg` resource group in `eastus` with the tag `env=prod`.
 
 ```yaml
 jobs:
   - name: prod
-    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    subscription_ids:
+      - "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+      - "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    discovery:
+      mode: filters
+      mode_filters:
+        resource_groups:
+          - production-rg
+        regions:
+          - eastus
+        tags:
+          env:
+            - prod
+    profiles:
+      mode: auto
     auth:
       mode: service_principal
       mode_service_principal:
@@ -198,59 +343,49 @@ jobs:
         client_secret: "your-client-secret"
 
 ```
-###### Managed identity (Azure VM/VMSS/AKS)
+###### Managed identity with exact profiles
 
-Use the managed identity of the Azure VM, VMSS, or AKS node where Netdata is running.
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: prod
-    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-    auth:
-      mode: managed_identity
-
-```
-</details>
-
-###### Specific profiles only
-
-Monitor only specific Azure services instead of auto-discovering all resource types.
+Use a managed identity (on an Azure VM, VMSS, or AKS) and monitor only SQL Database and PostgreSQL Flexible Server resources -- skip auto-discovery of other services.
 
 <details open><summary>Config</summary>
 
 ```yaml
 jobs:
   - name: databases
-    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    subscription_ids:
+      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
     profiles:
-      - sql_database
-      - postgres_flexible
-      - redis_cache
+      mode: exact
+      mode_exact:
+        names:
+          - sql_database
+          - postgres_flexible
     auth:
-      mode: service_principal
-      mode_service_principal:
-        tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-        client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-        client_secret: "your-client-secret"
+      mode: managed_identity
 
 ```
 </details>
 
-###### Filter by resource group
+###### Custom Azure Resource Graph KQL
 
-Only monitor resources in specific resource groups.
+Replace the built-in discovery filters with your own KQL query. Useful when you need joins, computed columns, or filtering logic that structured filters cannot express.
 
 <details open><summary>Config</summary>
 
 ```yaml
 jobs:
-  - name: prod-rg
-    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-    resource_groups:
-      - production-rg
-      - staging-rg
+  - name: prod-query
+    subscription_ids:
+      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    discovery:
+      mode: query
+      mode_query:
+        kql: |
+          resources
+          | where tags.env =~ "prod"
+          | project id, name, type, resourceGroup, location
+    profiles:
+      mode: auto
     auth:
       mode: default
 
@@ -259,14 +394,15 @@ jobs:
 
 ###### Azure Government cloud
 
-Connect to Azure Government cloud environment.
+Connect to an Azure Government environment. Set `cloud: government` to use the correct authentication and API endpoints.
 
 <details open><summary>Config</summary>
 
 ```yaml
 jobs:
   - name: gov
-    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    subscription_ids:
+      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
     cloud: government
     auth:
       mode: service_principal
@@ -313,6 +449,7 @@ Labels:
 | region | The Azure region where the resource is deployed. |
 | resource_type | The Azure resource type identifier. |
 | profile | The Azure Monitor profile id. |
+| subscription_id | The Azure subscription identifier. |
 | resource_uid | The unique Azure resource identifier. |
 
 Metrics:
@@ -398,31 +535,46 @@ docker logs netdata 2>&1 | grep azure_monitor
 
 ### No metrics are collected
 
-Verify the following:
-1. The service principal or managed identity has **Monitoring Reader** role on the subscription or resource group.
-2. The `subscription_id` in the configuration matches the subscription containing the target resources.
-3. Target resources are running and producing metrics (check Azure Portal > Metrics for the resource).
-4. Check the Netdata error log for authentication or API errors: `grep azure_monitor /var/log/netdata/error.log`.
+Check the following:
+
+- **Permissions** -- The principal has both **Monitoring Reader** and **Reader** roles on the target subscription.
+- **Subscription IDs** -- The `subscription_ids` list includes the correct subscription(s).
+- **Resources are active** -- Verify in Azure Portal > Metrics that the resources are producing metrics.
+- **Collector logs** -- Check for authentication or API errors:
+  ```bash
+  # systemd
+  journalctl -u netdata --namespace=netdata --grep azure_monitor --since "5 minutes ago"
+  # non-systemd
+  grep azure_monitor /var/log/netdata/collector.log
+  ```
 
 
 ### Missing metrics for some resource types
 
-Azure Monitor profiles are matched by resource type. If a resource type exists but no metrics appear:
-1. Ensure `profiles: [auto]` (default) is set, or the specific profile id is listed.
-2. Verify the resource type matches a built-in profile. Run `ls /usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/` to see available profiles.
-3. Some metrics require the resource to be actively processing data (e.g., IoT Hub telemetry metrics only appear when devices send messages).
+Profiles are matched by Azure resource type. If a resource type exists but metrics are missing:
+
+- **Check profile mode** -- Ensure `profiles.mode: auto` (default), or explicitly list the profile basename under `profiles.mode_exact.names` or `profiles.mode_combined.names`.
+- **Verify a built-in profile exists** -- List available profiles:
+  ```bash
+  ls /usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/
+  ```
+- **Check resource activity** -- Some metrics only appear when the resource is actively processing data (e.g., IoT Hub telemetry metrics require devices to be sending messages).
+- **New resource types after startup** -- Runtime discovery does not activate new profiles. Restart the collector if new resource types were added after bootstrap.
 
 
-### Metrics appear delayed
+### Charts have gaps or incomplete data
 
-Azure Monitor metrics have a built-in reporting delay of 1-3 minutes. The collector uses a `query_offset` (default: 180 seconds) to account for this.
-If metrics are missing or incomplete, try increasing `query_offset` to 240 or 300 seconds.
-Some metrics with longer time grains (e.g., PT5M) may take up to 5 minutes to appear.
+Azure Monitor metrics have a built-in reporting delay of **1-3 minutes**.
+
+- The collector uses `query_offset` (default: **180 seconds**) as the minimum offset for metric query windows.
+- Slower time-grain batches automatically use a larger effective offset when needed.
+- If metrics are still missing or incomplete, increase `query_offset` to **240** or **300** seconds.
 
 
 ### Authentication errors in sovereign clouds
 
 For Azure Government or Azure China clouds, set the `cloud` parameter:
+
 - Azure Government: `cloud: government`
 - Azure China (21Vianet): `cloud: china`
 
