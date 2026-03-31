@@ -687,7 +687,7 @@ static void netdata_ad_compressed_traffic(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
     static RRDDIM *rd_replication_data_intersite_bytes_total_inbound = NULL;
     static RRDDIM *rd_replication_data_intersite_bytes_total_outbound = NULL;
 
-    static RRDSET *st_dra_replication_intrasite_compressed_traffic = NULL;
+    static RRDSET *st_dra_replication_intrasite_uncompressed_traffic = NULL;
     static RRDDIM *rd_replication_data_intrasite_bytes_total_inbound = NULL;
     static RRDDIM *rd_replication_data_intrasite_bytes_total_outbound = NULL;
 
@@ -734,37 +734,37 @@ intraChart:
         return;
     }
 
-    if (unlikely(!st_dra_replication_intrasite_compressed_traffic)) {
-        st_dra_replication_intrasite_compressed_traffic = rrdset_create_localhost(
+    if (unlikely(!st_dra_replication_intrasite_uncompressed_traffic)) {
+        st_dra_replication_intrasite_uncompressed_traffic = rrdset_create_localhost(
             "ad",
-            "dra_replication_intrasite_compressed_traffic",
+            "dra_replication_intrasite_uncompressed_traffic",
             NULL,
             "replication",
-            "ad.dra_replication_intrasite_compressed_traffic",
+            "ad.dra_replication_intrasite_uncompressed_traffic",
             "DRA replication uncompressed traffic within site",
             "bytes/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
-            PRIO_AD_REPLICATION_INTRASITE_COMPRESSED,
+            PRIO_AD_REPLICATION_INTRASITE_UNCOMPRESSED,
             update_every,
             RRDSET_TYPE_AREA);
 
         rd_replication_data_intrasite_bytes_total_inbound = rrddim_add(
-            st_dra_replication_intrasite_compressed_traffic, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            st_dra_replication_intrasite_uncompressed_traffic, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
         rd_replication_data_intrasite_bytes_total_outbound = rrddim_add(
-            st_dra_replication_intrasite_compressed_traffic, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            st_dra_replication_intrasite_uncompressed_traffic, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-        st_dra_replication_intrasite_compressed_traffic,
+        st_dra_replication_intrasite_uncompressed_traffic,
         rd_replication_data_intrasite_bytes_total_inbound,
         (collected_number)replicationDataInboundIntraSiteBytesTotal.current.Data);
     rrddim_set_by_pointer(
-        st_dra_replication_intrasite_compressed_traffic,
+        st_dra_replication_intrasite_uncompressed_traffic,
         rd_replication_data_intrasite_bytes_total_outbound,
         (collected_number)replicationDataOutboundIntraSiteBytesTotal.current.Data);
-    rrdset_done(st_dra_replication_intrasite_compressed_traffic);
+    rrdset_done(st_dra_replication_intrasite_uncompressed_traffic);
 }
 
 static void netdata_ad_replication_highest_usn_committed(

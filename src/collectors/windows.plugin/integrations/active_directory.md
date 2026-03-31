@@ -127,7 +127,7 @@ Metrics:
 | ad.dra_replication_properties_updated | inbound | properties/s |
 | ad.dra_replication_properties_filtered | inbound | properties/s |
 | ad.dra_replication_intersite_compressed_traffic | inbound, outbound | bytes/s |
-| ad.dra_replication_intrasite_compressed_traffic | inbound, outbound | bytes/s |
+| ad.dra_replication_intrasite_uncompressed_traffic | inbound, outbound | bytes/s |
 | ad.dra_replication_pending_syncs | pending | syncs |
 | ad.dra_replication_pending_syncs | pending | syncs |
 | ad.dra_replication_sync_requests | request | requests/s |
