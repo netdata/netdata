@@ -104,6 +104,12 @@ func (c *Collector) ensureBootstrapped(ctx context.Context) error {
 		c.Infof("auto-discovery resolved profiles: %v", autoProfiles)
 	}
 
+	// TODO(azure_monitor): Insert bootstrap-only metric-definition validation here.
+	// Resolve selected profiles, fetch one representative resource per
+	// (subscription_id, resource_type, metric_namespace), fail open per key on
+	// lookup errors, and prune unsupported metrics/aggregations/time grains
+	// before final runtime build. Because runtime is currently global per job,
+	// multi-subscription capability differences need an explicit merge rule first.
 	runtime, err := buildCollectorRuntimeFromConfig(profileIDs, c.profileCatalog)
 	if err != nil {
 		return fmt.Errorf("build collector runtime: %w", err)
