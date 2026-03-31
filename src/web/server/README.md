@@ -171,11 +171,7 @@ By default, the Netdata web server listens on port `19999`. To change the defaul
     default port = 800
 ```
 
-After modifying the configuration, restart Netdata to apply the changes:
-
-```bash
-sudo systemctl restart netdata
-```
+After modifying the configuration, restart the Netdata service to apply changes. See the [service control documentation](/docs/netdata-agent/start-stop-restart.md) for instructions.
 
 </details>
 
