@@ -649,7 +649,7 @@ func TestCollector_RefreshDiscovery_PushesModeFiltersIntoQuery(t *testing.T) {
 					"location":      "eastus",
 				},
 			},
-			filters:    &DiscoveryFiltersConfig{ResourceGroups: []string{"RG-B", " rg-a ", "rg-b", ""}},
+			filters:    &DiscoveryFiltersConfig{ResourceGroups: []string{"RG-B", " rg-a ", "rg-b"}},
 			wantCounts: 2,
 			wantQuery:  "resources | where type in~ ('Microsoft.DBforPostgreSQL/flexibleServers') | where resourceGroup in~ ('rg-a', 'rg-b') | project id, name, type, resourceGroup, location",
 		},
@@ -664,7 +664,7 @@ func TestCollector_RefreshDiscovery_PushesModeFiltersIntoQuery(t *testing.T) {
 				},
 			},
 			filters: &DiscoveryFiltersConfig{
-				ResourceGroups: []string{"RG-B", " rg-a ", "rg-b", ""},
+				ResourceGroups: []string{"RG-B", " rg-a ", "rg-b"},
 				Regions:        []string{" WestEurope ", "eastus", "EASTUS"},
 				Tags: map[string][]string{
 					"ROLE":  {"worker", "api", "worker"},
@@ -1057,18 +1057,19 @@ func TestCollector_InitQueryModeRejectsMalformedRows(t *testing.T) {
 func TestConfig_ValidateDiscoveryContracts(t *testing.T) {
 	tests := map[string]struct {
 		cfg            Config
+		wantErr        bool
 		wantErrContain string
 	}{
-		"filters mode rejects query block": {
+		"filters mode ignores query block": {
 			cfg: func() Config {
 				cfg := testConfig()
 				cfg.Discovery.Mode = discoveryModeFilters
 				cfg.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: "resources | project id, name, type, resourceGroup, location"}
 				return cfg
 			}(),
-			wantErrContain: "'discovery.mode_query' is only allowed when discovery.mode is 'query'",
+			wantErr: false,
 		},
-		"query mode rejects filters block": {
+		"query mode ignores filters block": {
 			cfg: func() Config {
 				cfg := testConfig()
 				cfg.Discovery.Mode = discoveryModeQuery
@@ -1076,7 +1077,7 @@ func TestConfig_ValidateDiscoveryContracts(t *testing.T) {
 				cfg.Discovery.ModeFilters = &DiscoveryFiltersConfig{ResourceGroups: []string{"rg-a"}}
 				return cfg
 			}(),
-			wantErrContain: "'discovery.mode_filters' is only allowed when discovery.mode is 'filters'",
+			wantErr: false,
 		},
 		"query mode requires kql": {
 			cfg: func() Config {
@@ -1086,16 +1087,46 @@ func TestConfig_ValidateDiscoveryContracts(t *testing.T) {
 				cfg.Discovery.ModeQuery = &DiscoveryQueryConfig{}
 				return cfg
 			}(),
+			wantErr:        true,
 			wantErrContain: "'discovery.mode_query.kql' must not be empty when discovery.mode is 'query'",
 		},
-		"auto mode rejects explicit names": {
+		"filters mode rejects empty resource group item": {
+			cfg: func() Config {
+				cfg := testConfig()
+				cfg.Discovery.Mode = discoveryModeFilters
+				cfg.Discovery.ModeFilters = &DiscoveryFiltersConfig{ResourceGroups: []string{""}}
+				return cfg
+			}(),
+			wantErr:        true,
+			wantErrContain: "'discovery.mode_filters.resource_groups[0]' must not be empty",
+		},
+		"filters mode rejects empty region item": {
+			cfg: func() Config {
+				cfg := testConfig()
+				cfg.Discovery.Mode = discoveryModeFilters
+				cfg.Discovery.ModeFilters = &DiscoveryFiltersConfig{Regions: []string{"  "}}
+				return cfg
+			}(),
+			wantErr:        true,
+			wantErrContain: "'discovery.mode_filters.regions[0]' must not be empty",
+		},
+		"auto mode ignores explicit names": {
 			cfg: func() Config {
 				cfg := testConfig()
 				cfg.Profiles.Mode = profilesModeAuto
-				cfg.Profiles.ModeCombined = nil
+				cfg.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"Azure Cosmos DB Account"}}
 				return cfg
 			}(),
-			wantErrContain: "'profiles.mode_exact' is only allowed when profiles.mode is 'exact'",
+			wantErr: false,
+		},
+		"exact mode ignores combined block": {
+			cfg: func() Config {
+				cfg := testConfig()
+				cfg.Profiles.Mode = profilesModeExact
+				cfg.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"Azure Cosmos DB Account"}}
+				return cfg
+			}(),
+			wantErr: false,
 		},
 		"exact mode rejects duplicate names ignoring case": {
 			cfg: func() Config {
@@ -1104,6 +1135,7 @@ func TestConfig_ValidateDiscoveryContracts(t *testing.T) {
 				cfg.Profiles.ModeExact = &ProfilesModeConfig{Names: []string{"Azure PostgreSQL Flexible Server", "azure postgresql flexible server"}}
 				return cfg
 			}(),
+			wantErr:        true,
 			wantErrContain: "'profiles.mode_exact.names' contains duplicate value 'azure postgresql flexible server'",
 		},
 	}
@@ -1111,6 +1143,10 @@ func TestConfig_ValidateDiscoveryContracts(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			err := tc.cfg.validate()
+			if !tc.wantErr {
+				require.NoError(t, err)
+				return
+			}
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tc.wantErrContain)
 		})

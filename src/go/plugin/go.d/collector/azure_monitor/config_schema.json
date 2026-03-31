@@ -77,7 +77,8 @@
                         "description": "Optional list of Azure resource groups to include.",
                         "type": "array",
                         "items": {
-                          "type": "string"
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
                       "regions": {
@@ -85,7 +86,8 @@
                         "description": "Optional list of Azure regions to include.",
                         "type": "array",
                         "items": {
-                          "type": "string"
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
                       "tags": {
@@ -368,9 +370,15 @@
       "fullPage": true
     },
     "subscription_ids": {
-      "ui:listFlavour": "list"
+      "ui:listFlavour": "list",
+      "ui:help": "Add one Azure subscription ID per row. This job will monitor resources across all listed subscriptions.",
+      "items": {
+        "ui:help": "Azure subscription ID.",
+        "ui:placeholder": "00000000-0000-0000-0000-000000000000"
+      }
     },
     "cloud": {
+      "ui:help": "Select the Azure cloud environment that contains the subscriptions you want to monitor.",
       "ui:widget": "radio",
       "ui:options": {
         "inline": true
@@ -378,6 +386,7 @@
     },
     "discovery": {
       "mode": {
+        "ui:help": "Choose how the collector finds candidate Azure resources: `filters` uses structured subscription/resource filters, while `query` runs your custom Azure Resource Graph KQL.",
         "ui:widget": "radio",
         "ui:options": {
           "inline": true
@@ -385,20 +394,44 @@
       },
       "mode_filters": {
         "resource_groups": {
-          "ui:listFlavour": "list"
+          "ui:listFlavour": "list",
+          "ui:help": "Optional list of Azure resource groups to include. Leave empty to include matching resources from all resource groups.",
+          "items": {
+            "ui:help": "Azure resource group name.",
+            "ui:placeholder": "rg-production"
+          }
         },
         "regions": {
-          "ui:listFlavour": "list"
+          "ui:listFlavour": "list",
+          "ui:help": "Optional list of Azure regions to include. Leave empty to include matching resources from all regions.",
+          "items": {
+            "ui:help": "Azure region name.",
+            "ui:placeholder": "eastus"
+          }
+        },
+        "tags": {
+          "ui:help": "Optional tag filters. Add a tag key and then provide one or more accepted values for that key. Tag keys are matched case-insensitively and values are matched case-sensitively.",
+          "additionalProperties": {
+            "ui:listFlavour": "list",
+            "ui:help": "Add one or more accepted values for this tag key.",
+            "items": {
+              "ui:help": "Allowed value for the selected tag key.",
+              "ui:placeholder": "prod"
+            }
+          }
         }
       },
       "mode_query": {
         "kql": {
+          "ui:help": "Provide a custom Azure Resource Graph KQL query. The result must include resource `id`, `name`, `type`, `resourceGroup`, and `location`.",
+          "ui:placeholder": "resources | where tags.env == 'prod' | project id, name, type, resourceGroup, location",
           "ui:widget": "textarea"
         }
       }
     },
     "profiles": {
       "mode": {
+        "ui:help": "Choose how metric profiles are activated: `auto` enables profiles for discovered resource types, `exact` uses only the listed profile names, and `combined` merges both.",
         "ui:widget": "radio",
         "ui:options": {
           "inline": true
@@ -406,12 +439,22 @@
       },
       "mode_exact": {
         "names": {
-          "ui:listFlavour": "list"
+          "ui:listFlavour": "list",
+          "ui:help": "Add the Azure Monitor profile names to enable explicitly in `exact` mode. Matching is case-insensitive.",
+          "items": {
+            "ui:help": "Profile name from the Azure Monitor profile catalog.",
+            "ui:placeholder": "Azure SQL Database"
+          }
         }
       },
       "mode_combined": {
         "names": {
-          "ui:listFlavour": "list"
+          "ui:listFlavour": "list",
+          "ui:help": "Add profile names to merge with auto-discovered profiles in `combined` mode. Matching is case-insensitive.",
+          "items": {
+            "ui:help": "Profile name from the Azure Monitor profile catalog.",
+            "ui:placeholder": "Azure SQL Database"
+          }
         }
       }
     },
@@ -421,16 +464,37 @@
     "limits": {},
     "auth": {
       "mode": {
+        "ui:help": "Choose how Netdata gets Azure credentials: `service_principal` uses explicit app credentials, `managed_identity` uses an attached Azure identity, and `default` uses the Azure SDK credential chain.",
         "ui:widget": "radio",
         "ui:options": {
           "inline": true
         }
       },
       "mode_service_principal": {
+        "tenant_id": {
+          "ui:help": "Azure tenant ID for the service principal.",
+          "ui:placeholder": "00000000-0000-0000-0000-000000000000"
+        },
+        "client_id": {
+          "ui:help": "Azure client ID of the service principal application.",
+          "ui:placeholder": "00000000-0000-0000-0000-000000000000"
+        },
         "client_secret": {
+          "ui:help": "Client secret for the Azure service principal.",
+          "ui:placeholder": "paste-client-secret-here",
           "ui:widget": "password"
         }
+      },
+      "mode_managed_identity": {
+        "client_id": {
+          "ui:help": "Optional client ID of a user-assigned managed identity. Leave empty to use the system-assigned managed identity.",
+          "ui:placeholder": "00000000-0000-0000-0000-000000000000"
+        }
       }
+    },
+    "vnode": {
+      "ui:help": "Optional virtual node name used to group charts from this job under a specific Netdata virtual node.",
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "ui:flavour": "tabs",
     "ui:options": {

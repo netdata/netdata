@@ -172,14 +172,8 @@ func (c Config) validate() error {
 
 	switch strings.ToLower(strings.TrimSpace(c.Discovery.Mode)) {
 	case discoveryModeFilters:
-		if c.Discovery.ModeQuery != nil {
-			errs = append(errs, errors.New("'discovery.mode_query' is only allowed when discovery.mode is 'query'"))
-		}
 		errs = append(errs, validateDiscoveryFilters(c.Discovery.ModeFilters)...)
 	case discoveryModeQuery:
-		if c.Discovery.ModeFilters != nil {
-			errs = append(errs, errors.New("'discovery.mode_filters' is only allowed when discovery.mode is 'filters'"))
-		}
 		if c.Discovery.ModeQuery == nil || strings.TrimSpace(c.Discovery.ModeQuery.KQL) == "" {
 			errs = append(errs, errors.New("'discovery.mode_query.kql' must not be empty when discovery.mode is 'query'"))
 		}
@@ -189,25 +183,13 @@ func (c Config) validate() error {
 
 	switch strings.ToLower(strings.TrimSpace(c.Profiles.Mode)) {
 	case profilesModeAuto:
-		if c.Profiles.ModeExact != nil {
-			errs = append(errs, errors.New("'profiles.mode_exact' is only allowed when profiles.mode is 'exact'"))
-		}
-		if c.Profiles.ModeCombined != nil {
-			errs = append(errs, errors.New("'profiles.mode_combined' is only allowed when profiles.mode is 'combined'"))
-		}
 	case profilesModeExact:
-		if c.Profiles.ModeCombined != nil {
-			errs = append(errs, errors.New("'profiles.mode_combined' is only allowed when profiles.mode is 'combined'"))
-		}
 		if c.Profiles.ModeExact == nil || len(c.Profiles.ModeExact.Names) == 0 {
 			errs = append(errs, fmt.Errorf("'profiles.mode_exact.names' must not be empty when profiles.mode is '%s'", c.Profiles.Mode))
 		} else {
 			errs = append(errs, validateProfilesList("profiles.mode_exact.names", c.Profiles.ModeExact.Names)...)
 		}
 	case profilesModeCombined:
-		if c.Profiles.ModeExact != nil {
-			errs = append(errs, errors.New("'profiles.mode_exact' is only allowed when profiles.mode is 'exact'"))
-		}
 		if c.Profiles.ModeCombined == nil || len(c.Profiles.ModeCombined.Names) == 0 {
 			errs = append(errs, fmt.Errorf("'profiles.mode_combined.names' must not be empty when profiles.mode is '%s'", c.Profiles.Mode))
 		} else {
@@ -227,14 +209,14 @@ func validateDiscoveryFilters(filters *DiscoveryFiltersConfig) []error {
 	}
 
 	var errs []error
-	for _, v := range filters.ResourceGroups {
+	for i, v := range filters.ResourceGroups {
 		if strings.TrimSpace(v) == "" {
-			continue
+			errs = append(errs, fmt.Errorf("'discovery.mode_filters.resource_groups[%d]' must not be empty", i))
 		}
 	}
-	for _, v := range filters.Regions {
+	for i, v := range filters.Regions {
 		if strings.TrimSpace(v) == "" {
-			continue
+			errs = append(errs, fmt.Errorf("'discovery.mode_filters.regions[%d]' must not be empty", i))
 		}
 	}
 	for key, values := range filters.Tags {
