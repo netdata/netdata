@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/topology/engine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -1012,6 +1013,86 @@ func TestTopologyCache_SnapshotDeterministicOrdering(t *testing.T) {
 	expectedLinkOrder := append([]string(nil), linkOrder...)
 	sort.Strings(expectedLinkOrder)
 	assert.Equal(t, expectedLinkOrder, linkOrder)
+}
+
+func TestTopologyCache_BuildEngineObservations_SeparatesProtocolSpecificRemoteObservations(t *testing.T) {
+	cache := newTopologyCache()
+	cache.localDevice = topologyDevice{
+		ChassisID:     "00:11:22:33:44:55",
+		ChassisIDType: "macAddress",
+		SysName:       "sw-a",
+		ManagementIP:  "10.0.0.1",
+	}
+	cache.lldpLocPorts["1"] = &lldpLocPort{
+		portNum:       "1",
+		portID:        "Gi0/1",
+		portIDSubtype: "interfaceName",
+		portDesc:      "uplink",
+	}
+	cache.lldpRemotes["1:1"] = &lldpRemote{
+		localPortNum:     "1",
+		remIndex:         "1",
+		chassisID:        "aa:bb:cc:dd:ee:ff",
+		chassisIDSubtype: "macAddress",
+		portID:           "Gi0/2",
+		portIDSubtype:    "interfaceName",
+		portDesc:         "downlink",
+		sysName:          "sw-b",
+		managementAddr:   "10.0.0.2",
+	}
+	cache.cdpRemotes["1:1"] = &cdpRemote{
+		ifIndex:    "1",
+		ifName:     "Gi0/1",
+		deviceID:   "sw-b",
+		sysName:    "switch-b",
+		devicePort: "Gi0/2",
+		address:    "10.0.0.2",
+	}
+
+	observations, localDeviceID := cache.buildEngineObservations(cache.localDevice)
+	require.Equal(t, "macAddress:00:11:22:33:44:55", localDeviceID)
+	require.Len(t, observations, 3)
+	require.Equal(t, localDeviceID, observations[0].DeviceID)
+
+	var lldpObservation *topologyengine.L2Observation
+	var cdpObservation *topologyengine.L2Observation
+	for i := 1; i < len(observations); i++ {
+		observation := &observations[i]
+		switch {
+		case len(observation.LLDPRemotes) > 0:
+			lldpObservation = observation
+		case len(observation.CDPRemotes) > 0:
+			cdpObservation = observation
+		}
+	}
+
+	require.NotNil(t, lldpObservation)
+	require.NotNil(t, cdpObservation)
+	require.Equal(t, lldpObservation.DeviceID, cdpObservation.DeviceID)
+	require.Equal(t, "macAddress:aa:bb:cc:dd:ee:ff", lldpObservation.DeviceID)
+	require.Equal(t, "10.0.0.2", lldpObservation.ManagementIP)
+	require.Equal(t, "10.0.0.2", cdpObservation.ManagementIP)
+	require.Equal(t, "sw-b", lldpObservation.Hostname)
+	require.Equal(t, "sw-b", cdpObservation.Hostname)
+	require.Len(t, lldpObservation.LLDPRemotes, 1)
+	require.Len(t, cdpObservation.CDPRemotes, 1)
+}
+
+func TestTopologyObservationIdentityResolver_ReusesStableRemoteIdentityAcrossSignals(t *testing.T) {
+	resolver := newTopologyObservationIdentityResolver(topologyengine.L2Observation{
+		DeviceID:     "macAddress:00:11:22:33:44:55",
+		Hostname:     "sw-a",
+		ManagementIP: "10.0.0.1",
+		ChassisID:    "00:11:22:33:44:55",
+	})
+
+	idFromLLDP := resolver.resolve([]string{"sw-b"}, "AA-BB-CC-DD-EE-FF", "macAddress", "10.0.0.2")
+	idFromCDP := resolver.resolve([]string{"switch-b", "sw-b"}, "", "", "10.0.0.2")
+	idFromMgmtIP := resolver.resolve([]string{"switch-b"}, "", "", "10.0.0.2")
+
+	require.Equal(t, "macAddress:aa:bb:cc:dd:ee:ff", idFromLLDP)
+	require.Equal(t, idFromLLDP, idFromCDP)
+	require.Equal(t, idFromLLDP, idFromMgmtIP)
 }
 
 func TestDecodePrintableASCII_HumanReadableHex(t *testing.T) {
