@@ -139,7 +139,7 @@ If you publish your Netdata web server to the internet, you may want to apply so
 <details>
 <summary><strong>Disable the Web Server</strong></summary>
 
-Edit `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/configuration/README.md#edit-configuration-files)
+Edit the `[web]` section in `netdata.conf` (see [Configure Basic Settings](#configure-basic-settings) for edit-config usage):
 
 ```text
 [web]
@@ -158,6 +158,21 @@ Control the number of threads and sockets with the following settings:
     web server threads = 4
     web server max sockets = 512
 ```
+
+</details>
+
+<details>
+<summary><strong>Change the Default Port</strong></summary>
+
+By default, the Netdata web server listens on port `19999`. To change the default port, edit the `[web]` section in `netdata.conf` (see [Configure Basic Settings](#configure-basic-settings) for edit-config usage):
+
+```text
+[web]
+    default port = 8000
+```
+
+If you have configured `[web].bind to` with explicit ports, you must also update those explicit port numbers, or remove the port portion so the entries fall back to using `default port`.
+After modifying the configuration, restart the Netdata service to apply changes. See the [service control documentation](/docs/netdata-agent/start-stop-restart.md) for instructions.
 
 </details>
 
