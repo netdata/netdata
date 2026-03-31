@@ -217,13 +217,14 @@ static void yaml_print_multiline_value(const char *s, size_t depth) {
         if(next) next++;
 
         size_t len = next ? (size_t)(next - s) : strlen(s);
-        char buf[len + 1];
-        copy_to_buffer(buf, sizeof(buf), s, len);
+        char *buf = mallocz(len + 1);
+        copy_to_buffer(buf, len + 1, s, len);
 
         fprintf(stderr, "%.*s%s%s",
                 (int)(depth * 2), "                    ",
                 buf, next ? "" : "\n");
 
+        freez(buf);
         s = next;
     } while(s && *s);
 }

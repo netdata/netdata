@@ -91,19 +91,16 @@
           "type": "string"
         }
       },
-      "profiles": {
-        "title": "Profiles",
-        "description": "Profile ids to enable. Use 'auto' for automatic discovery based on resource types in the subscription. Combine with explicit ids: ['auto', 'custom_profile']. Empty list disables collection.",
-        "type": [
-          "array",
-          "null"
+      "profile_selection_mode": {
+        "title": "Profile selection mode",
+        "description": "How profiles are selected for monitoring.",
+        "type": "string",
+        "enum": [
+          "auto",
+          "exact",
+          "combined"
         ],
-        "items": {
-          "type": "string"
-        },
-        "default": [
-          "auto"
-        ]
+        "default": "auto"
       },
       "auth": {
         "title": "Authentication",
@@ -205,7 +202,78 @@
     "required": [
       "subscription_id",
       "auth"
-    ]
+    ],
+    "dependencies": {
+      "profile_selection_mode": {
+        "oneOf": [
+          {
+            "properties": {
+              "profile_selection_mode": {
+                "const": "auto"
+              }
+            }
+          },
+          {
+            "properties": {
+              "profile_selection_mode": {
+                "const": "exact"
+              },
+              "profile_selection_mode_exact": {
+                "title": "Exact profile selection",
+                "description": "Settings for exact profile selection mode.",
+                "type": "object",
+                "properties": {
+                  "profiles": {
+                    "title": "Profiles",
+                    "description": "Profile ids to enable.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "profiles"
+                ]
+              }
+            },
+            "required": [
+              "profile_selection_mode_exact"
+            ]
+          },
+          {
+            "properties": {
+              "profile_selection_mode": {
+                "const": "combined"
+              },
+              "profile_selection_mode_combined": {
+                "title": "Combined profile selection",
+                "description": "Settings for combined profile selection mode. Listed profiles are merged with auto-discovered profiles.",
+                "type": "object",
+                "properties": {
+                  "profiles": {
+                    "title": "Profiles",
+                    "description": "Profile ids to merge with auto-discovered profiles.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "profiles"
+                ]
+              }
+            },
+            "required": [
+              "profile_selection_mode_combined"
+            ]
+          }
+        ]
+      }
+    }
   },
   "uiSchema": {
     "uiOptions": {
@@ -214,8 +282,22 @@
     "resource_groups": {
       "ui:listFlavour": "list"
     },
-    "profiles": {
-      "ui:listFlavour": "list"
+    "profile_selection_mode": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      },
+      "ui:help": "Choose how profiles are selected.\n\n- `auto`: Automatically discovers resource types in the subscription via Azure Resource Graph and enables matching profiles.\n- `exact`: Uses only the explicitly listed profile ids.\n- `combined`: Merges explicitly listed profile ids with auto-discovered profiles."
+    },
+    "profile_selection_mode_exact": {
+      "profiles": {
+        "ui:listFlavour": "list"
+      }
+    },
+    "profile_selection_mode_combined": {
+      "profiles": {
+        "ui:listFlavour": "list"
+      }
     },
     "timeout": {
       "ui:help": "Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
@@ -270,7 +352,9 @@
         {
           "title": "Profiles",
           "fields": [
-            "profiles",
+            "profile_selection_mode",
+            "profile_selection_mode_exact",
+            "profile_selection_mode_combined",
             "resource_groups"
           ]
         },

@@ -3,10 +3,12 @@
 package secretsctl
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -22,6 +24,7 @@ type secretStoreCallbacks struct {
 
 type secretStoreCallbackDeps struct {
 	pluginName           string
+	log                  *logger.Logger
 	service              secretstore.Service
 	restartDependentJobs func(string) string
 }
@@ -97,7 +100,11 @@ func (d secretStoreCallbackDeps) validateSecretStoreConfig(cfg secretstore.Confi
 	if d.service == nil {
 		return fmt.Errorf("secretstore service is not available")
 	}
-	return d.service.Validate(cfg)
+	return d.service.Validate(d.resolveContext(cfg), cfg)
+}
+
+func (d secretStoreCallbackDeps) resolveContext(cfg secretstore.Config) context.Context {
+	return secretStoreResolveContext(d.log, cfg)
 }
 
 func (d secretStoreCallbackDeps) dyncfgSecretStoreID(id string) string {
@@ -163,10 +170,10 @@ func (cb *secretStoreCallbacks) Start(cfg secretstore.Config) error {
 	}
 
 	if _, ok := cb.deps.service.GetStatus(key); ok {
-		if err := cb.deps.service.Update(key, cfg); err != nil {
+		if err := cb.deps.service.Update(cb.deps.resolveContext(cfg), key, cfg); err != nil {
 			return &codedError{err: err, code: secretStoreErrorCode(err)}
 		}
-	} else if err := cb.deps.service.Add(cfg); err != nil {
+	} else if err := cb.deps.service.Add(cb.deps.resolveContext(cfg), cfg); err != nil {
 		return &codedError{err: err, code: secretStoreErrorCode(err)}
 	}
 
@@ -182,10 +189,10 @@ func (cb *secretStoreCallbacks) Update(oldCfg, newCfg secretstore.Config) error 
 	}
 
 	if _, ok := cb.deps.service.GetStatus(key); ok {
-		if err := cb.deps.service.Update(key, newCfg); err != nil {
+		if err := cb.deps.service.Update(cb.deps.resolveContext(newCfg), key, newCfg); err != nil {
 			return &codedError{err: err, code: secretStoreErrorCode(err)}
 		}
-	} else if err := cb.deps.service.Add(newCfg); err != nil {
+	} else if err := cb.deps.service.Add(cb.deps.resolveContext(newCfg), newCfg); err != nil {
 		return &codedError{err: err, code: secretStoreErrorCode(err)}
 	}
 

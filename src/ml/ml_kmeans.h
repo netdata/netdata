@@ -92,7 +92,7 @@ inline ml_kmeans_t &ml_kmeans_t::operator=(const ml_kmeans_inlined_t &inlined_km
 
 void ml_kmeans_init(ml_kmeans_t *kmeans);
 
-void ml_kmeans_train(ml_kmeans_t *kmeans, const ml_features_t *features, unsigned max_iters, time_t after, time_t before);
+void ml_kmeans_train(ml_kmeans_t *kmeans, const std::vector<DSample> &preprocessed_features, unsigned max_iters, time_t after, time_t before);
 
 calculated_number_t ml_kmeans_anomaly_score(const ml_kmeans_inlined_t *kmeans, const DSample &DS);
 

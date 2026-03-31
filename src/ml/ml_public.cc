@@ -115,6 +115,7 @@ void ml_host_stop(RRDHOST *rh) {
             dim->suppression_anomaly_counter = 0;
             dim->suppression_window_counter = 0;
             dim->cns.clear();
+            dim->cns_head = 0;
             dim->km_contexts.clear();
 
             spinlock_unlock(&dim->slock);
@@ -273,6 +274,7 @@ void ml_dimension_new(RRDDIM *rd)
     dim->suppression_anomaly_counter = 0;
     dim->suppression_window_counter = 0;
     dim->training_in_progress = false;
+    dim->cns_head = 0;
 
     ml_kmeans_init(&dim->kmeans);
 

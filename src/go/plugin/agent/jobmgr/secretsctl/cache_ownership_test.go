@@ -4,6 +4,7 @@ package secretsctl
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -51,7 +52,7 @@ func TestControllerSeqExec_FileDefinedConfigBecomesDyncfgOverride(t *testing.T) 
 	key := secretstore.StoreKey(secretstore.KindVault, "vault_prod")
 
 	fileCfg := newSecretStoreConfigWithSource(t, secretstore.KindVault, "vault_prod", vaultModeTokenConfig(), "file=/etc/netdata/go.d/ss/vault.conf", confgroup.TypeUser)
-	require.NoError(t, ctl.Service().Add(fileCfg))
+	require.NoError(t, ctl.Service().Add(context.Background(), fileCfg))
 	ctl.seen.Add(fileCfg)
 	ctl.exposed.Add(&dyncfg.Entry[secretstore.Config]{
 		Cfg:    fileCfg,

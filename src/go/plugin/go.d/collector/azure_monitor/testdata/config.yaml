@@ -7,8 +7,10 @@ timeout: 30
 max_concurrency: 4
 max_batch_resources: 50
 max_metrics_per_query: 20
-profiles:
-  - sql_managed_instance
+profile_selection_mode: exact
+profile_selection_mode_exact:
+  profiles:
+    - sql_managed_instance
 resource_groups:
   - rg-a
 auth:
