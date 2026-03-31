@@ -24,6 +24,7 @@ const (
 )
 
 type Catalog struct {
+	byName          map[string]Profile
 	byID            map[string]Profile
 	stockProfileIDs map[string]struct{}
 }
@@ -57,6 +58,7 @@ func LoadFromDefaultDirs() (Catalog, error) {
 
 func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 	catalog := Catalog{
+		byName:          make(map[string]Profile),
 		byID:            make(map[string]Profile),
 		stockProfileIDs: make(map[string]struct{}),
 	}
@@ -135,6 +137,16 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 
 	for id, entry := range seen {
 		catalog.byID[id] = entry.Config
+
+		name := strings.TrimSpace(entry.Config.Name)
+		nameKey := normalizeKey(name)
+		if nameKey == "" {
+			return Catalog{}, fmt.Errorf("profile %q: decoded empty name", entry.Path)
+		}
+		if prev, ok := catalog.byName[nameKey]; ok {
+			return Catalog{}, fmt.Errorf("duplicate profile name %q for ids %q and %q", name, prev.ID, entry.Config.ID)
+		}
+		catalog.byName[nameKey] = entry.Config
 	}
 
 	return catalog, nil
@@ -194,6 +206,23 @@ func (c Catalog) Resolve(profileIDs []string) ([]Profile, error) {
 	return profiles, nil
 }
 
+func (c Catalog) ResolveNames(profileNames []string) ([]Profile, error) {
+	if len(profileNames) == 0 {
+		return nil, errors.New("no Azure Monitor profiles selected")
+	}
+
+	profiles := make([]Profile, 0, len(profileNames))
+	for _, name := range profileNames {
+		normalizedName := normalizeKey(name)
+		prof, ok := c.byName[normalizedName]
+		if !ok {
+			return nil, fmt.Errorf("unknown profile name %q", name)
+		}
+		profiles = append(profiles, prof)
+	}
+	return profiles, nil
+}
+
 func (c Catalog) ProfilesForResourceTypes(types map[string]struct{}) []string {
 	if len(types) == 0 {
 		return nil
@@ -211,6 +240,97 @@ func (c Catalog) ProfilesForResourceTypes(types map[string]struct{}) []string {
 	}
 	sort.Strings(ids)
 	return ids
+}
+
+func (c Catalog) ResourceTypesForProfileIDs(profileIDs []string) ([]string, error) {
+	if len(profileIDs) == 0 {
+		return nil, nil
+	}
+
+	seen := make(map[string]struct{}, len(profileIDs))
+	types := make([]string, 0, len(profileIDs))
+	for _, id := range profileIDs {
+		prof, ok := c.byID[normalizeKey(id)]
+		if !ok {
+			return nil, fmt.Errorf("unknown profile %q", id)
+		}
+
+		rt := strings.TrimSpace(prof.ResourceType)
+		key := normalizeKey(rt)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		types = append(types, rt)
+	}
+
+	sort.Strings(types)
+	return types, nil
+}
+
+func (c Catalog) ProfileIDsForNames(profileNames []string) ([]string, error) {
+	profiles, err := c.ResolveNames(profileNames)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, 0, len(profiles))
+	for _, profile := range profiles {
+		ids = append(ids, profile.ID)
+	}
+	return ids, nil
+}
+
+func (c Catalog) ResourceTypesForProfileNames(profileNames []string) ([]string, error) {
+	profiles, err := c.ResolveNames(profileNames)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]struct{}, len(profiles))
+	types := make([]string, 0, len(profiles))
+	for _, profile := range profiles {
+		rt := strings.TrimSpace(profile.ResourceType)
+		key := normalizeKey(rt)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		types = append(types, rt)
+	}
+
+	sort.Strings(types)
+	return types, nil
+}
+
+func (c Catalog) ResourceTypes() []string {
+	if len(c.byID) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(c.byID))
+	types := make([]string, 0, len(c.byID))
+	for _, prof := range c.byID {
+		rt := strings.TrimSpace(prof.ResourceType)
+		key := normalizeKey(rt)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		types = append(types, rt)
+	}
+
+	sort.Strings(types)
+	return types
 }
 
 func defaultDirSpecs() []DirSpec {

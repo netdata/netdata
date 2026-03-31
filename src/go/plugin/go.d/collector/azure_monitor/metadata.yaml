@@ -23,9 +23,9 @@ modules:
     overview: &overview
       data_collection:
         metrics_description: |
-          This collector monitors Azure resources through the Azure Monitor Metrics API. It automatically discovers
-          resources in your subscription and collects platform metrics based on configurable profiles, providing
-          visibility into the health and performance of over 35 Azure service types.
+          This collector monitors Azure resources through the Azure Monitor Metrics API. It discovers resources across
+          one or more Azure subscriptions and collects platform metrics based on configurable profiles, using either
+          structured Azure Resource Graph filters or a custom Azure Resource Graph KQL query.
         method_description: &method_description |
           The collector uses Azure SDK clients for:
           - Authentication via Entra ID (service principal, managed identity, or default credentials)
@@ -41,8 +41,10 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            When `profile_selection_mode` is `auto` (the default), the collector queries Azure Resource Graph
-            to discover which resource types exist in the subscription and enables matching built-in profiles automatically.
+            When `profiles.mode` is `auto` (the default), the collector discovers candidate resources inside
+            `subscription_ids` using `discovery.mode=filters` and enables matching built-in profiles automatically.
+            A single job can monitor multiple subscriptions. Switch to `discovery.mode=query` to provide your own
+            Azure Resource Graph KQL for candidate discovery.
         limits:
           description: |
             Azure Monitor metrics granularity is typically 1 minute.
@@ -87,7 +89,10 @@ modules:
             - Stock: `/usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/`
             - User: `/etc/netdata/go.d/azure_monitor.profiles/`
 
-            User profile files with the same filename override stock profiles.
+            User profile files with the same profile `id` override stock profiles.
+            Custom profiles define resource types, metric namespaces, metrics, and chart templates.
+            They extend the collector's profile catalog; they do not replace `discovery.mode=filters` unless you
+            explicitly use `discovery.mode=query`.
           folding:
             title: Config options
             enabled: true
@@ -102,8 +107,8 @@ modules:
               default_value: 0
               required: false
               group: Collection
-            - name: subscription_id
-              description: Azure subscription ID.
+            - name: subscription_ids
+              description: Azure subscription IDs used as the Azure Resource Graph discovery scope.
               default_value: ""
               required: true
               group: Target
@@ -112,11 +117,46 @@ modules:
               default_value: public
               required: false
               group: Target
-            - name: discovery_every
-              description: Resource discovery interval in seconds.
+            - name: discovery.refresh_every
+              description: Resource discovery interval in seconds. Set to `0` to disable periodic runtime rediscovery after bootstrap.
               default_value: 300
               required: false
-              group: Collection
+              group: Discovery
+            - name: discovery.mode
+              description: "Discovery mode: `filters` builds Azure Resource Graph KQL from structured filters, `query` uses `discovery.mode_query.kql` as-is."
+              default_value: filters
+              required: false
+              group: Discovery
+            - name: discovery.mode_filters.resource_groups
+              description: Optional list of Azure resource groups to include in `filters` mode.
+              default_value: "[]"
+              required: false
+              group: Discovery
+            - name: discovery.mode_filters.regions
+              description: Optional list of Azure regions to include in `filters` mode.
+              default_value: "[]"
+              required: false
+              group: Discovery
+            - name: discovery.mode_filters.tags
+              description: Optional exact-match tag filters for `filters` mode. Keys are matched case-insensitively and values case-sensitively.
+              default_value: "{}"
+              required: false
+              group: Discovery
+            - name: discovery.mode_query.kql
+              description: Custom Azure Resource Graph KQL used in `query` mode. It must project `id`, `name`, `type`, `resourceGroup`, and `location`.
+              default_value: ""
+              required: false
+              group: Discovery
+            - name: profiles.mode
+              description: "Profile selection mode: `auto` enables profiles for discovered resource types, `exact` uses only listed profile names, `combined` merges listed names with auto-discovered profiles."
+              default_value: auto
+              required: false
+              group: Profiles
+            - name: profiles.names
+              description: Explicit profile names used by `exact` or `combined` mode. Matching is case-insensitive.
+              default_value: "[]"
+              required: false
+              group: Profiles
             - name: query_offset
               description: Offset in seconds for metric query windows. Increase if metrics appear incomplete.
               default_value: 180
@@ -127,41 +167,21 @@ modules:
               default_value: 30
               required: false
               group: Collection
-            - name: max_concurrency
+            - name: limits.max_concurrency
               description: Maximum concurrent batch queries to Azure Monitor.
               default_value: 4
               required: false
               group: Limits
-            - name: max_batch_resources
+            - name: limits.max_batch_resources
               description: Maximum resources per Azure Monitor batch request.
               default_value: 50
               required: false
               group: Limits
-            - name: max_metrics_per_query
+            - name: limits.max_metrics_per_query
               description: Maximum metrics per Azure Monitor batch request.
               default_value: 20
               required: false
               group: Limits
-            - name: profile_selection_mode
-              description: "Profile selection mode: `auto` discovers matching profiles via Azure Resource Graph, `exact` uses only listed profile ids, `combined` merges listed ids with auto-discovered profiles."
-              default_value: "auto"
-              required: false
-              group: Profiles
-            - name: profile_selection_mode_exact.profiles
-              description: Profile ids to enable (used when `profile_selection_mode` is `exact`).
-              default_value: "[]"
-              required: false
-              group: Profiles
-            - name: profile_selection_mode_combined.profiles
-              description: Profile ids to merge with auto-discovered profiles (used when `profile_selection_mode` is `combined`).
-              default_value: "[]"
-              required: false
-              group: Profiles
-            - name: resource_groups
-              description: Optional list of resource group names to restrict monitoring scope.
-              default_value: "[]"
-              required: false
-              group: Filters
             - name: auth.mode
               description: "Authentication mode: `service_principal`, `managed_identity`, or `default`."
               default_value: ""
@@ -197,53 +217,64 @@ modules:
             title: Config
             enabled: true
           list:
-            - name: Service principal (auto-discover all resources)
-              description: Authenticate with a service principal and auto-discover all supported Azure resource types in the subscription.
+            - name: Service principal with structured discovery
+              description: Authenticate with a service principal and auto-discover matching resources across multiple subscriptions with structured filters.
               folding:
                 enabled: false
               config: |
                 jobs:
                   - name: prod
-                    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    subscription_ids:
+                      - "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+                      - "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+                    discovery:
+                      mode: filters
+                      mode_filters:
+                        resource_groups:
+                          - production-rg
+                        regions:
+                          - eastus
+                        tags:
+                          env:
+                            - prod
+                    profiles:
+                      mode: auto
                     auth:
                       mode: service_principal
                       mode_service_principal:
                         tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                         client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                         client_secret: "your-client-secret"
-            - name: Managed identity (Azure VM/VMSS/AKS)
-              description: Use the managed identity of the Azure VM, VMSS, or AKS node where Netdata is running.
-              config: |
-                jobs:
-                  - name: prod
-                    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    auth:
-                      mode: managed_identity
-            - name: Specific profiles only
-              description: Monitor only specific Azure services instead of auto-discovering all resource types.
+            - name: Managed identity with exact profiles
+              description: Use a managed identity and monitor only specific Azure services.
               config: |
                 jobs:
                   - name: databases
-                    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                     profiles:
-                      - sql_database
-                      - postgres_flexible
-                      - redis_cache
+                      mode: exact
+                      names:
+                        - Azure SQL Database
+                        - Azure PostgreSQL Flexible Server
                     auth:
-                      mode: service_principal
-                      mode_service_principal:
-                        tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                        client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                        client_secret: "your-client-secret"
-            - name: Filter by resource group
-              description: Only monitor resources in specific resource groups.
+                      mode: managed_identity
+            - name: Custom Azure Resource Graph KQL
+              description: Use your own Azure Resource Graph KQL to control candidate discovery while still relying on profiles for metrics.
               config: |
                 jobs:
-                  - name: prod-rg
-                    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    resource_groups:
-                      - production-rg
-                      - staging-rg
+                  - name: prod-query
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    discovery:
+                      mode: query
+                      mode_query:
+                        kql: |
+                          resources
+                          | where tags.env =~ "prod"
+                          | project id, name, type, resourceGroup, location
+                    profiles:
+                      mode: auto
                     auth:
                       mode: default
             - name: Azure Government cloud
@@ -251,7 +282,8 @@ modules:
               config: |
                 jobs:
                   - name: gov
-                    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                     cloud: government
                     auth:
                       mode: service_principal
@@ -266,13 +298,13 @@ modules:
             description: |
               Verify the following:
               1. The service principal or managed identity has **Monitoring Reader** role on the subscription or resource group.
-              2. The `subscription_id` in the configuration matches the subscription containing the target resources.
+              2. The `subscription_ids` list includes the subscription containing the target resources.
               3. Target resources are running and producing metrics (check Azure Portal > Metrics for the resource).
               4. Check the Netdata error log for authentication or API errors: `grep azure_monitor /var/log/netdata/error.log`.
           - name: Missing metrics for some resource types
             description: |
               Azure Monitor profiles are matched by resource type. If a resource type exists but no metrics appear:
-              1. Ensure `profiles: [auto]` (default) is set, or the specific profile id is listed.
+              1. Ensure `profiles.mode: auto` (default) is set, or list the specific profile names under `profiles.names`.
               2. Verify the resource type matches a built-in profile. Run `ls /usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/` to see available profiles.
               3. Some metrics require the resource to be actively processing data (e.g., IoT Hub telemetry metrics only appear when devices send messages).
           - name: Metrics appear delayed
@@ -294,8 +326,8 @@ modules:
         enabled: false
       description: |
         Metrics depend on which Azure Monitor profiles are enabled. Each profile corresponds to an Azure
-        service type and defines the specific metrics collected. With the default `profiles: [auto]` setting,
-        profiles are automatically enabled for resource types found in your subscription.
+        service type and defines the specific metrics collected. With the default `profiles.mode: auto`
+        setting, profiles are automatically enabled for resource types found in your subscription.
 
         See the service-specific integrations below for detailed metrics lists.
       availability: []
@@ -356,6 +388,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -511,6 +545,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -779,6 +815,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -1152,6 +1190,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -1377,6 +1417,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -1622,6 +1664,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -1959,6 +2003,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -2180,6 +2226,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -2281,6 +2329,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -2409,6 +2459,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -2627,6 +2679,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -2890,6 +2944,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -3183,6 +3239,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -3364,6 +3422,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -3544,6 +3604,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -3738,6 +3800,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -3853,6 +3917,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -3995,6 +4061,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -4227,6 +4295,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -4572,6 +4642,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -4799,6 +4871,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -5109,6 +5183,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -5313,6 +5389,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -5471,6 +5549,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -6075,6 +6155,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -6390,6 +6472,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -6546,6 +6630,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -6959,6 +7045,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -7354,6 +7442,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -7452,6 +7542,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -7528,6 +7620,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -7663,6 +7757,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -7868,6 +7964,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -8021,6 +8119,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -8367,6 +8467,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -8726,6 +8828,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -8872,6 +8976,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -9089,6 +9195,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -9413,6 +9521,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:

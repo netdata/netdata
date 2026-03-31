@@ -17,7 +17,6 @@ import (
 )
 
 type queryExecutor struct {
-	subscriptionID string
 	maxConcurrency int
 	timeout        time.Duration
 	cloudCfg       azcloud.Configuration
@@ -28,9 +27,8 @@ type queryExecutor struct {
 	clients   map[string]metricsQueryClient
 }
 
-func newQueryExecutor(subscriptionID string, maxConcurrency int, timeout time.Duration, credential azcore.TokenCredential, cloudCfg azcloud.Configuration, newClient func(endpoint string, cred azcore.TokenCredential, cloud azcloud.Configuration) (metricsQueryClient, error)) *queryExecutor {
+func newQueryExecutor(maxConcurrency int, timeout time.Duration, credential azcore.TokenCredential, cloudCfg azcloud.Configuration, newClient func(endpoint string, cred azcore.TokenCredential, cloud azcloud.Configuration) (metricsQueryClient, error)) *queryExecutor {
 	return &queryExecutor{
-		subscriptionID: subscriptionID,
 		maxConcurrency: maxConcurrency,
 		timeout:        timeout,
 		cloudCfg:       cloudCfg,
@@ -96,7 +94,7 @@ func (e *queryExecutor) executeQueryBatch(ctx context.Context, batch queryBatch,
 
 	resp, err := client.QueryResources(
 		reqCtx,
-		e.subscriptionID,
+		batch.SubscriptionID,
 		batch.Profile.MetricNamespace,
 		batch.MetricNames,
 		azmetrics.ResourceIDList{ResourceIDs: resourceIDs},
@@ -175,12 +173,13 @@ func samplesFromMetricValues(metrics []azmetrics.Metric, labels metrix.Labels, m
 
 func resourceLabels(resource resourceInfo, profileID string) metrix.Labels {
 	return metrix.Labels{
-		"resource_uid":   resource.UID,
-		"resource_name":  resource.Name,
-		"resource_group": resource.ResourceGroup,
-		"region":         resource.Region,
-		"resource_type":  resource.Type,
-		"profile":        profileID,
+		"resource_uid":    resource.UID,
+		"subscription_id": resource.SubscriptionID,
+		"resource_name":   resource.Name,
+		"resource_group":  resource.ResourceGroup,
+		"region":          resource.Region,
+		"resource_type":   resource.Type,
+		"profile":         profileID,
 	}
 }
 

@@ -34,6 +34,10 @@ func (c *Collector) collect(ctx context.Context) error {
 }
 
 func (c *Collector) refreshCollectResources(ctx context.Context) ([]resourceInfo, error) {
+	if err := c.ensureBootstrapped(ctx); err != nil {
+		return nil, err
+	}
+
 	prevFetchCounter := c.discovery.FetchCounter
 	resources, err := c.refreshDiscovery(ctx, false)
 	if err != nil {

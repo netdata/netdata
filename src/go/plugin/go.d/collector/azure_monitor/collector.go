@@ -5,7 +5,6 @@ package azure_monitor
 import (
 	"context"
 	_ "embed"
-	"errors"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -35,16 +34,23 @@ func New() *Collector {
 	store := metrix.NewCollectorStore()
 	c := &Collector{
 		Config: Config{
-			UpdateEvery:          defaultUpdateEvery,
-			AutoDetectionRetry:   defaultAutoDetectRetry,
-			Cloud:                defaultCloud,
-			DiscoveryEvery:       defaultDiscoveryEvery,
-			QueryOffset:          defaultQueryOffset,
-			Timeout:              defaultTimeout,
-			MaxConcurrency:       defaultMaxConcurrency,
-			MaxBatchResources:    defaultMaxBatchResource,
-			MaxMetricsPerQuery:   defaultMaxMetricsQuery,
-			ProfileSelectionMode: profileSelectionModeAuto,
+			UpdateEvery:        defaultUpdateEvery,
+			AutoDetectionRetry: defaultAutoDetectRetry,
+			Cloud:              defaultCloud,
+			Discovery: DiscoveryConfig{
+				RefreshEvery: defaultDiscoveryEvery,
+				Mode:         defaultDiscoveryMode,
+			},
+			Profiles: ProfilesConfig{
+				Mode: defaultProfilesMode,
+			},
+			QueryOffset: defaultQueryOffset,
+			Timeout:     defaultTimeout,
+			Limits: LimitsConfig{
+				MaxConcurrency:     defaultMaxConcurrency,
+				MaxBatchResources:  defaultMaxBatchResource,
+				MaxMetricsPerQuery: defaultMaxMetricsQuery,
+			},
 		},
 		store:              store,
 		now:                time.Now,
@@ -66,7 +72,9 @@ type Collector struct {
 	queryExecutor *queryExecutor
 	observations  *observationState
 
-	runtime *collectorRuntime
+	runtime                *collectorRuntime
+	profileCatalog         azureprofiles.Catalog
+	supportedResourceTypes map[string]struct{}
 
 	discovery discoveryState
 
@@ -80,20 +88,19 @@ type Collector struct {
 }
 
 func (c *Collector) Init(ctx context.Context) error {
-	result, err := c.prepareInitResult(ctx)
+	result, err := c.prepareInitResult()
 	if err != nil {
 		return err
 	}
 
-	if err := c.initInstruments(result.runtime); err != nil {
-		return err
-	}
-
 	c.Config = result.config
+	c.profileCatalog = result.profileCatalog
 	c.resourceGraph = result.resourceGraph
 	c.queryExecutor = result.queryExecutor
-	c.observations = newObservationState(result.runtime.Instruments)
-	c.runtime = result.runtime
+	c.supportedResourceTypes = result.supportedResourceTypes
+	c.runtime = nil
+	c.observations = nil
+	c.discovery = discoveryState{}
 
 	return nil
 }
@@ -101,14 +108,7 @@ func (c *Collector) Init(ctx context.Context) error {
 func (c *Collector) Configuration() any { return c.Config }
 
 func (c *Collector) Check(ctx context.Context) error {
-	resources, err := c.refreshDiscovery(ctx, true)
-	if err != nil {
-		return err
-	}
-	if len(resources) == 0 {
-		return errors.New("no Azure resources discovered for the configured profiles")
-	}
-	return nil
+	return c.ensureBootstrapped(ctx)
 }
 
 func (c *Collector) Collect(ctx context.Context) error { return c.collect(ctx) }

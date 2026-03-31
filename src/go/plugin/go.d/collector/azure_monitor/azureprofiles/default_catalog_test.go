@@ -126,9 +126,13 @@ func stubDefaultCatalog(t *testing.T, cacheEnabled func() bool, loader func() (C
 }
 
 func testCatalog(id string) Catalog {
+	profile := Profile{ID: id, Name: id}
 	return Catalog{
+		byName: map[string]Profile{
+			normalizeKey(profile.Name): profile,
+		},
 		byID: map[string]Profile{
-			id: {ID: id, Name: id},
+			id: profile,
 		},
 		stockProfileIDs: map[string]struct{}{
 			id: {},

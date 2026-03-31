@@ -66,12 +66,13 @@ type discoveryState struct {
 }
 
 type resourceInfo struct {
-	ID            string
-	UID           string
-	Name          string
-	Type          string
-	ResourceGroup string
-	Region        string
+	SubscriptionID string
+	ID             string
+	UID            string
+	Name           string
+	Type           string
+	ResourceGroup  string
+	Region         string
 }
 
 func (r resourceInfo) String() string {
@@ -79,6 +80,7 @@ func (r resourceInfo) String() string {
 }
 
 type queryBatch struct {
+	SubscriptionID string
 	Profile        *profileRuntime
 	Metrics        []*metricRuntime
 	MetricNames    []string
