@@ -20,9 +20,9 @@ Kind: aws-sm
 
 ## Overview
 
-Use AWS Secrets Manager as a secretstore backend when you want Netdata collectors to read secrets from AWS at runtime instead of storing them in plain text in collector configuration files.
+Netdata can pull collector credentials directly from AWS Secrets Manager at runtime, so you never store passwords or tokens in plain-text configuration files.
 
-This page covers AWS Secrets Manager specific setup. For the shared resolver workflow and syntax, see [Secrets Management](https://github.com/netdata/netdata/blob/master/src/collectors/SECRETS.md).
+This page covers AWS Secrets Manager specific setup. For the full resolver overview and syntax reference, including simpler alternatives like `${env:...}`, `${file:...}`, and `${cmd:...}`, see [Secrets Management](https://github.com/netdata/netdata/blob/master/src/collectors/SECRETS.md).
 
 
 ### Limitations
@@ -54,7 +54,7 @@ For production on AWS, prefer `ecs` or `imds` over `env` so credentials are supp
 
 #### Allow access to Secrets Manager
 
-The AWS identity used by this secretstore must be allowed to read the secrets you reference in collector configs in the configured `region`.
+The AWS identity used by this secretstore must have the `secretsmanager:GetSecretValue` permission on the secrets you reference in collector configs. Scope the IAM policy to only the secret ARNs Netdata needs.
 
 
 #### Plan for file-based changes
@@ -75,7 +75,7 @@ The following options can be defined for this secretstore backend.
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | [auth_mode](#option-auth-mode) | How Netdata obtains AWS credentials. | env | yes |
-| region | AWS region used for Secrets Manager requests. |  | yes |
+| region | AWS region used for Secrets Manager requests. There is no automatic region detection — you must always set this explicitly. |  | yes |
 
 <a id="option-auth-mode"></a>
 ##### auth_mode
@@ -148,13 +148,13 @@ jobs:
 
 ## Use in collector configs
 
-Reference AWS Secrets Manager secrets from collector configs with the `aws-sm` secretstore kind.
+Use the `${store:aws-sm:...}` syntax to reference AWS Secrets Manager secrets in any string field of a collector configuration file.
 
 
 The operand is `secret-name` or `secret-name#key`.
 
-- Use `secret-name` to return the whole `SecretString`.
-- Use `secret-name#key` to read one top-level field from a JSON `SecretString`.
+- Use `secret-name` to return the whole `SecretString`, for example: `${store:aws-sm:aws_prod:netdata/mysql/password}`.
+- Use `secret-name#key` to read one top-level field from a JSON `SecretString`, for example: `${store:aws-sm:aws_prod:netdata/mysql#password}`.
 - If you use `#key`, Netdata parses the secret value as JSON. Secret resolution fails if the value is not valid JSON or if the key does not exist.
 - Nested paths such as `parent.child` are not interpreted as nested JSON lookups.
 
@@ -168,28 +168,37 @@ ${store:aws-sm:<store-name>:<secret-name[#key]>}
 - `<secret-name[#key]>`: The AWS Secrets Manager secret name, optionally followed by `#key` to read one field from a JSON `SecretString`.
 
 ### Examples
-#### Whole secret value
+#### MySQL collector with password from AWS Secrets Manager
 
-Return the full `SecretString` stored under the `netdata/mysql/password` secret.
+This example configures a MySQL collector job in `/etc/netdata/go.d/mysql.conf`.
+The password in the DSN connection string is not stored in plain text. Instead,
+`${store:aws-sm:aws_prod:netdata/mysql#password}` tells Netdata to fetch the secret
+named `netdata/mysql` from the `aws_prod` store, extract the `password` field from
+its JSON value, and substitute it into the DSN at runtime.
 
-```text
-${store:aws-sm:aws_prod:netdata/mysql/password}
-```
-#### JSON field from SecretString
-
-Read the `password` field from a JSON `SecretString`.
-
-```text
-${store:aws-sm:aws_prod:netdata/mysql#password}
-```
-#### Collector config example
-
-Use an AWS-stored password in a collector DSN.
 
 ```yaml
+# /etc/netdata/go.d/mysql.conf
 jobs:
   - name: mysql_prod
     dsn: "netdata:${store:aws-sm:aws_prod:netdata/mysql#password}@tcp(127.0.0.1:3306)/"
+
+```
+#### Elasticsearch collector with HTTP basic auth
+
+This example configures an Elasticsearch collector job in `/etc/netdata/go.d/elasticsearch.conf`.
+The `password` field uses a secret reference instead of a plain-text password. Netdata fetches
+the secret named `netdata/elasticsearch/password` from the `aws_prod` store and substitutes
+its full value into the `password` field at runtime.
+
+
+```yaml
+# /etc/netdata/go.d/elasticsearch.conf
+jobs:
+  - name: es_prod
+    url: https://elasticsearch.example.com:9200
+    username: netdata
+    password: "${store:aws-sm:aws_prod:netdata/elasticsearch/password}"
 
 ```
 

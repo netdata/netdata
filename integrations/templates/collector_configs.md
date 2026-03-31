@@ -20,7 +20,7 @@
 
 [[ example.description ]]
 
-```[[ example.language or 'text' ]]
+```[[ example.language or 'yaml' ]]
 [[ example.content ]]
 ```
 [% endfor %]
