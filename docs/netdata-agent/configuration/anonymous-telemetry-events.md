@@ -169,7 +169,7 @@ environment:
 
 :::note
 
-You can also use `DO_NOT_TRACK=1` as an alternative to `DISABLE_TELEMETRY=1`. The `DO_NOT_TRACK` environment variable is an industry-standard opt-out variable that Netdata also supports.
+You can also use `DO_NOT_TRACK=1` as an alternative to `DISABLE_TELEMETRY=1`.
 
 :::
 
