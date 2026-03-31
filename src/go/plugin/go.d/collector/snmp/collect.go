@@ -6,12 +6,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"maps"
-	"path/filepath"
 	"slices"
 	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/google/uuid"
@@ -19,7 +16,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
@@ -98,8 +94,14 @@ func (c *Collector) ensureInitialized() error {
 		return err
 	}
 
-	if c.snmpProfiles == nil {
-		c.snmpProfiles = c.setupProfiles(si)
+	if c.snmpProfiles == nil || c.topologyProfiles == nil {
+		snmpProfiles, topologyProfiles := c.setupProfiles(si)
+		if c.snmpProfiles == nil {
+			c.snmpProfiles = snmpProfiles
+		}
+		if c.topologyProfiles == nil {
+			c.topologyProfiles = topologyProfiles
+		}
 	}
 
 	if c.ddSnmpColl == nil && len(c.snmpProfiles) > 0 {
@@ -112,7 +114,7 @@ func (c *Collector) ensureInitialized() error {
 		})
 	}
 
-	if c.ddSnmpColl == nil && !c.Ping.Enabled {
+	if c.ddSnmpColl == nil && len(c.topologyProfiles) == 0 && !c.Ping.Enabled {
 		return errors.New("no profiles found and ping disabled")
 	}
 
@@ -195,31 +197,6 @@ func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsn
 		Labels:   labels,
 	}
 }
-
-func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
-	snmpProfiles := ddsnmp.FindProfiles(si.SysObjectID, si.Descr, c.ManualProfiles)
-	snmpProfiles = c.appendTopologyProfiles(snmpProfiles)
-	var profInfo []string
-
-	for _, prof := range snmpProfiles {
-		if logger.Level.Enabled(slog.LevelDebug) {
-			profInfo = append(profInfo, prof.SourceTree())
-		} else {
-			name := strings.TrimSuffix(filepath.Base(prof.SourceFile), filepath.Ext(prof.SourceFile))
-			profInfo = append(profInfo, name)
-		}
-	}
-
-	msg := fmt.Sprintf("device matched %d profile(s): %s (sysObjectID: '%s')", len(snmpProfiles), strings.Join(profInfo, ", "), si.SysObjectID)
-	if len(snmpProfiles) == 0 {
-		c.Warning(msg)
-	} else {
-		c.Info(msg)
-	}
-
-	return snmpProfiles
-}
-
 func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 	snmpClient, err := c.initSNMPClient()
 	if err != nil {

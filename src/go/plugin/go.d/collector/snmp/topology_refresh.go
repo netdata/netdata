@@ -11,7 +11,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 )
 
@@ -59,7 +58,6 @@ func (c *Collector) ensureTopologySchedulerStarted() {
 		return
 	}
 
-	c.topologyProfiles = selectTopologyRefreshProfiles(c.snmpProfiles)
 	if len(c.topologyProfiles) == 0 {
 		c.topologyMu.Unlock()
 		return
@@ -210,54 +208,6 @@ func (c *Collector) publishTopologySnapshot(cache *topologyCache) {
 	c.topologyCache.mu.Lock()
 	c.topologyCache.replaceWith(cache)
 	c.topologyCache.mu.Unlock()
-}
-
-func selectTopologyRefreshProfiles(profiles []*ddsnmp.Profile) []*ddsnmp.Profile {
-	if len(profiles) == 0 {
-		return nil
-	}
-
-	selected := make([]*ddsnmp.Profile, 0, len(profiles))
-	for _, prof := range profiles {
-		if profileContainsTopologyData(prof) {
-			selected = append(selected, prof)
-		}
-	}
-
-	return selected
-}
-
-func profileContainsTopologyData(prof *ddsnmp.Profile) bool {
-	if prof == nil || prof.Definition == nil {
-		return false
-	}
-
-	for i := range prof.Definition.Metrics {
-		if metricConfigContainsTopologyData(&prof.Definition.Metrics[i]) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func metricConfigContainsTopologyData(metric *ddprofiledefinition.MetricsConfig) bool {
-	if metric == nil {
-		return false
-	}
-
-	if name := firstNonEmpty(metric.Symbol.Name, metric.Name); isTopologyMetric(name) || isTopologySysUptimeMetric(name) {
-		return true
-	}
-
-	for i := range metric.Symbols {
-		name := metric.Symbols[i].Name
-		if isTopologyMetric(name) || isTopologySysUptimeMetric(name) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (c *Collector) topologyRefreshDescription() string {

@@ -57,7 +57,7 @@ type (
 		IPAddress            string
 		Credential           CredentialConfig  `hash:"ignore"`
 		SysInfo              snmputils.SysInfo `hash:"ignore"`
-		TopologyRefreshEvery string            `hash:"ignore"`
+		TopologyRefreshEvery string
 	}
 )
 

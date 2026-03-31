@@ -192,7 +192,7 @@ func TestEnsureTopologySchedulerStartedDoesNotWaitForInitialRefresh(t *testing.T
 	coll.sysInfo = &snmputils.SysInfo{SysObjectID: "1.2.3.4.5"}
 	coll.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
 	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector { return &mockDdSnmpCollector{} }
-	coll.snmpProfiles = []*ddsnmp.Profile{
+	coll.topologyProfiles = []*ddsnmp.Profile{
 		{
 			Definition: &ddprofiledefinition.ProfileDefinition{
 				Metrics: []ddprofiledefinition.MetricsConfig{

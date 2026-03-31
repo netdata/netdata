@@ -222,6 +222,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr.CreateVnode = false
 				collr.Ping.Enabled = false
 				collr.snmpProfiles = []*ddsnmp.Profile{{}} // non-empty to enable collectSNMP()
+				collr.topologyProfiles = []*ddsnmp.Profile{}
 				collr.newSnmpClient = func() gosnmp.Handler { return m }
 				collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 					return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{
@@ -276,6 +277,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr.CreateVnode = false
 				collr.Ping.Enabled = false
 				collr.snmpProfiles = []*ddsnmp.Profile{{}}
+				collr.topologyProfiles = []*ddsnmp.Profile{}
 				collr.newSnmpClient = func() gosnmp.Handler { return m }
 				collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 					return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{
