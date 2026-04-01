@@ -2659,55 +2659,55 @@ modules:
                 - name: last_bind
             - name: ad.binds_digest
               description: Digest binds
-              unit: bind/s
+              unit: binds/s
               chart_type: line
               dimensions:
                 - name: digest
             - name: ad.binds_ds_client
               description: DS client binds
-              unit: bind/s
+              unit: binds/s
               chart_type: line
               dimensions:
                 - name: ds_client
             - name: ad.binds_ds_server
               description: DS server binds
-              unit: bind/s
+              unit: binds/s
               chart_type: line
               dimensions:
                 - name: ds_server
             - name: ad.binds_external
               description: External binds
-              unit: bind/s
+              unit: binds/s
               chart_type: line
               dimensions:
                 - name: external
             - name: ad.binds_fast
               description: Fast binds
-              unit: bind/s
+              unit: binds/s
               chart_type: line
               dimensions:
                 - name: fast
             - name: ad.binds_negotiate
               description: Negotiated binds
-              unit: bind/s
+              unit: binds/s
               chart_type: line
               dimensions:
                 - name: negotiate
             - name: ad.binds_ntlm
               description: NTLM binds
-              unit: bind/s
+              unit: binds/s
               chart_type: line
               dimensions:
                 - name: ntlm
             - name: ad.binds_simple
               description: Simple binds
-              unit: bind/s
+              unit: binds/s
               chart_type: line
               dimensions:
                 - name: simple
             - name: ad.binds_ldap
               description: LDAP successful binds
-              unit: bind/s
+              unit: binds/s
               chart_type: line
               dimensions:
                 - name: ldap

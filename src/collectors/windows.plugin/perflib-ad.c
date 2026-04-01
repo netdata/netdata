@@ -1525,7 +1525,7 @@ static void netdata_ad_security_descriptor_propagation_items_queued(
             RRDSET_TYPE_LINE);
 
         rd_security_descriptor_propagation_items_queued = rrddim_add(
-            st_security_descriptor_propagation_items_queued, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            st_security_descriptor_propagation_items_queued, "queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -1635,7 +1635,7 @@ static void netdata_ad_binds_digest(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYP
             "bind",
             "ad.binds_digest",
             "Digest binds",
-            "bind/s",
+            "binds/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
             PRIO_AD_BIND_DIGEST,
@@ -1666,7 +1666,7 @@ static void netdata_ad_binds_ds_client(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
             "bind",
             "ad.binds_ds_client",
             "DS client binds",
-            "bind/s",
+            "binds/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
             PRIO_AD_BIND_DS_CLIENT,
@@ -1697,7 +1697,7 @@ static void netdata_ad_binds_ds_server(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
             "bind",
             "ad.binds_ds_server",
             "DS server binds",
-            "bind/s",
+            "binds/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
             PRIO_AD_BIND_DS_SERVER,
@@ -1728,7 +1728,7 @@ static void netdata_ad_binds_external(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
             "bind",
             "ad.binds_external",
             "External binds",
-            "bind/s",
+            "binds/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
             PRIO_AD_BIND_EXTERNAL,
@@ -1759,7 +1759,7 @@ static void netdata_ad_binds_fast(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
             "bind",
             "ad.binds_fast",
             "Fast binds",
-            "bind/s",
+            "binds/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
             PRIO_AD_BIND_FAST,
@@ -1790,7 +1790,7 @@ static void netdata_ad_binds_negotiate(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
             "bind",
             "ad.binds_negotiate",
             "Negotiated binds",
-            "bind/s",
+            "binds/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
             PRIO_AD_BIND_NEGOTIATE,
@@ -1821,7 +1821,7 @@ static void netdata_ad_binds_ntlm(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
             "bind",
             "ad.binds_ntlm",
             "NTLM binds",
-            "bind/s",
+            "binds/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
             PRIO_AD_BIND_NTLM,
@@ -1852,7 +1852,7 @@ static void netdata_ad_binds_simple(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYP
             "bind",
             "ad.binds_simple",
             "Simple binds",
-            "bind/s",
+            "binds/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
             PRIO_AD_BIND_SIMPLE,
@@ -1883,7 +1883,7 @@ static void netdata_ad_binds_ldap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE 
             "bind",
             "ad.binds_ldap",
             "LDAP successful binds",
-            "bind/s",
+            "binds/s",
             PLUGIN_WINDOWS_NAME,
             "PerflibAD",
             PRIO_AD_BIND_LDAP,
@@ -2824,12 +2824,11 @@ static void netdata_ad_sam_group_evaluation_latency(
 static void netdata_ad_sam_computer_creation_requests(
     PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
-    static COUNTER_DATA samSuccessfulComputerCreationsPerSecIncludesAllRequests = {
-        .key = "SAM Successful Computer Creations/sec: Includes all requests"};
+    static COUNTER_DATA samMachineCreationAttemptsPerSec = {.key = "SAM Machine Creation Attempts/sec"};
     static RRDSET *st_sam_computer_creation_requests = NULL;
     static RRDDIM *rd_sam_computer_creation_requests = NULL;
 
-    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samSuccessfulComputerCreationsPerSecIncludesAllRequests))
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samMachineCreationAttemptsPerSec))
         return;
 
     if (unlikely(!st_sam_computer_creation_requests)) {
@@ -2854,18 +2853,19 @@ static void netdata_ad_sam_computer_creation_requests(
     rrddim_set_by_pointer(
         st_sam_computer_creation_requests,
         rd_sam_computer_creation_requests,
-        (collected_number)samSuccessfulComputerCreationsPerSecIncludesAllRequests.current.Data);
+        (collected_number)samMachineCreationAttemptsPerSec.current.Data);
     rrdset_done(st_sam_computer_creation_requests);
 }
 
 static void netdata_ad_sam_computer_creation_successful_requests(
     PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
-    static COUNTER_DATA samMachineCreationAttemptsPerSec = {.key = "SAM Machine Creation Attempts/sec"};
+    static COUNTER_DATA samSuccessfulComputerCreationsPerSecIncludesAllRequests = {
+        .key = "SAM Successful Computer Creations/sec: Includes all requests"};
     static RRDSET *st_sam_computer_creation_successful_requests = NULL;
     static RRDDIM *rd_sam_computer_creation_successful_requests = NULL;
 
-    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samMachineCreationAttemptsPerSec))
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samSuccessfulComputerCreationsPerSecIncludesAllRequests))
         return;
 
     if (unlikely(!st_sam_computer_creation_successful_requests)) {
@@ -2890,7 +2890,7 @@ static void netdata_ad_sam_computer_creation_successful_requests(
     rrddim_set_by_pointer(
         st_sam_computer_creation_successful_requests,
         rd_sam_computer_creation_successful_requests,
-        (collected_number)samMachineCreationAttemptsPerSec.current.Data);
+        (collected_number)samSuccessfulComputerCreationsPerSecIncludesAllRequests.current.Data);
     rrdset_done(st_sam_computer_creation_successful_requests);
 }
 
