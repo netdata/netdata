@@ -147,7 +147,9 @@ Edit `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/configu
 ```
 
 :::note
-Setting `mode = none` disables the web server listener — the agent will not accept any inbound HTTP connections, including inbound streams from child agents. Do not use this for Parent agents.
+
+Setting `mode = none` disables the web server listener — the Agent will not accept any inbound HTTP connections, including inbound streams from Child Agents. Do not use this for Parent Agents.
+
 :::
 
 </details>
