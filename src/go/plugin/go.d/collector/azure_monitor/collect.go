@@ -22,7 +22,7 @@ func (c *Collector) collect(ctx context.Context) error {
 	queryBatches := c.buildQueryBatches(resources, now)
 
 	dueInstruments := dueInstrumentsForBatches(queryBatches)
-	samples, err := c.collectQuerySamples(ctx, queryBatches, queryEndForCollect(now, c.QueryOffset))
+	samples, err := c.collectQuerySamples(ctx, queryBatches, now)
 	if err != nil {
 		return err
 	}
@@ -34,6 +34,10 @@ func (c *Collector) collect(ctx context.Context) error {
 }
 
 func (c *Collector) refreshCollectResources(ctx context.Context) ([]resourceInfo, error) {
+	if err := c.ensureBootstrapped(ctx); err != nil {
+		return nil, err
+	}
+
 	prevFetchCounter := c.discovery.FetchCounter
 	resources, err := c.refreshDiscovery(ctx, false)
 	if err != nil {
@@ -45,12 +49,12 @@ func (c *Collector) refreshCollectResources(ctx context.Context) ([]resourceInfo
 	return resources, nil
 }
 
-func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatch, queryEnd time.Time) ([]metricSample, error) {
+func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatch, queryNow time.Time) ([]metricSample, error) {
 	if len(batches) == 0 {
 		return nil, nil
 	}
 
-	results := c.queryExecutor.runQueryBatches(ctx, batches, queryEnd)
+	results := c.queryExecutor.runQueryBatches(ctx, batches, queryNow, c.QueryOffset)
 
 	var (
 		allSamples []metricSample
@@ -70,12 +74,4 @@ func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatc
 	}
 
 	return allSamples, nil
-}
-
-func queryEndForCollect(now time.Time, queryOffsetSeconds int) time.Time {
-	queryEnd := now.Add(-secondsToDuration(queryOffsetSeconds))
-	if queryEnd.IsZero() {
-		return now
-	}
-	return queryEnd
 }

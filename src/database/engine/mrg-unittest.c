@@ -6,7 +6,7 @@
 // Global dummy rrdengine_instances for tests
 static struct rrdengine_instance test_ctx_0 = {0};
 static struct rrdengine_instance test_ctx_1 = {0};
-static struct rrdengine_instance test_ctx_tier[4] = { {0}, {0}, {0}, {0} }; // For stress test tiers
+static struct rrdengine_instance test_ctx_tier[4] = { 0 }; // For stress test tiers
 
 struct mrg_stress_entry {
     nd_uuid_t uuid;
@@ -200,7 +200,7 @@ int mrg_unittest(void) {
     // Phase 3: Measure final statistics
     struct mrg_statistics final_stats;
     mrg_get_statistics(mrg, &final_stats);
-    fprintf(stderr, "DBENGINE METRIC: final MRG state - %zu entries, %zu acquired\n",
+    fprintf(stderr, "DBENGINE METRIC: final MRG state - %zu entries, %zd acquired\n",
                      final_stats.entries, final_stats.entries_acquired);
 
     freez(t.array);

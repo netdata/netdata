@@ -196,7 +196,7 @@ def build_readme_from_integration(integration, categories, mode: str = ""):
             sidebar_label = integration["meta"]["monitored_instance"]["name"]
             learn_rel_path = generate_category_from_name(
                 integration["meta"]["monitored_instance"]["categories"][0].split("."), categories
-            ).replace("Data Collection", "Collecting Metrics")
+            ).replace("Data Collection", "Collecting Metrics/Collectors")
             keywords = integration["meta"]["keywords"] if "keywords" in integration["meta"] else None
 
             md = f"""<!--startmeta
@@ -360,7 +360,7 @@ endmeta-->
         elif mode == "secretstore":
             meta_yaml = integration["edit_link"].replace("blob", "edit")
             sidebar_label = integration["meta"]["name"]
-            learn_rel_path = "Collecting Metrics/Secret Stores"
+            learn_rel_path = "Collecting Metrics/Secrets Management/Secret Stores"
             keywords = integration["keywords"] if "keywords" in integration else None
 
             md = f"""<!--startmeta

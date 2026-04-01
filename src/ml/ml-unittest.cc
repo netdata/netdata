@@ -47,8 +47,7 @@ static void test_features_diff()
     std::vector<DSample> pf;
     ml_features_t features = {
         1, 1, 1,    // diff_n=1, smooth_n=1, lag_n=1
-        dst, n, src, n,
-        pf
+        dst, n, src, n
     };
 
     // ml_features_preprocess calls diff, smooth, lag in sequence.
@@ -62,7 +61,7 @@ static void test_features_diff()
     //   feature vectors: [src[i], src[i+1]] for i in 0..6
     //   n_vectors = 9 - 1 - 1 + 1 - 1 = 7
 
-    ml_features_preprocess(&features, 1.0);
+    ml_features_preprocess(&features, pf, 1.0);
 
     ML_TEST_ASSERT(pf.size() == 7, "lag should produce 7 feature vectors");
     if (pf.size() >= 1) {
@@ -89,11 +88,10 @@ static void test_features_no_diff()
     std::vector<DSample> pf;
     ml_features_t features = {
         0, 1, 1,    // diff_n=0, smooth_n=1, lag_n=1
-        dst, n, src, n,
-        pf
+        dst, n, src, n
     };
 
-    ml_features_preprocess(&features, 1.0);
+    ml_features_preprocess(&features, pf, 1.0);
 
     // With diff_n=0, smooth_n=1 (no-op), lag_n=1:
     // n_vectors = 6 - 0 - 1 + 1 - 1 = 5
@@ -121,11 +119,10 @@ static void test_features_smooth()
     std::vector<DSample> pf;
     ml_features_t features = {
         0, 3, 1,    // diff_n=0, smooth_n=3, lag_n=1
-        dst, n, src, n,
-        pf
+        dst, n, src, n
     };
 
-    ml_features_preprocess(&features, 1.0);
+    ml_features_preprocess(&features, pf, 1.0);
 
     // With diff_n=0: no diff
     // Smooth with smooth_n=3, operating on src_n - diff_n = 9 elements:
@@ -148,6 +145,61 @@ static void test_features_smooth()
     if (pf.size() >= 6) {
         ML_TEST_ASSERT_DOUBLE_EQ(pf[5](0), 7.0, 1e-9, "pf[5](0) == 7.0 (smoothed)");
         ML_TEST_ASSERT_DOUBLE_EQ(pf[5](1), 0.0, 1e-9, "pf[5](1) == 0.0 (zeroed by smooth)");
+    }
+}
+
+// Test: smooth_n=0 is normalized to the same effective smoothing window as
+// smooth_n=1, for both training and prediction.
+static void test_features_zero_smooth_matches_one()
+{
+    fprintf(stderr, "  test_features_zero_smooth_matches_one...\n");
+
+    const size_t n = 6;
+    calculated_number_t input[16] = {10, 20, 30, 40, 50, 60};
+
+    calculated_number_t src0[16], dst0[16];
+    memcpy(src0, input, n * sizeof(calculated_number_t));
+    memcpy(dst0, input, n * sizeof(calculated_number_t));
+    std::vector<DSample> pf0;
+    ml_features_t features0 = {
+        0, 0, 1,
+        dst0, n, src0, n
+    };
+    ml_features_preprocess(&features0, pf0, 1.0);
+
+    calculated_number_t src1[16], dst1[16];
+    memcpy(src1, input, n * sizeof(calculated_number_t));
+    memcpy(dst1, input, n * sizeof(calculated_number_t));
+    std::vector<DSample> pf1;
+    ml_features_t features1 = {
+        0, 1, 1,
+        dst1, n, src1, n
+    };
+    ml_features_preprocess(&features1, pf1, 1.0);
+
+    ML_TEST_ASSERT(pf0.size() == pf1.size(), "smooth_n=0 and smooth_n=1 should produce the same number of vectors");
+    for (size_t i = 0; i < pf0.size() && i < pf1.size(); i++) {
+        for (size_t j = 0; j < features0.lag_n + 1; j++) {
+            char msg[128];
+            snprintf(msg, sizeof(msg), "smooth_n=0 should match smooth_n=1 at feature[%zu](%zu)", i, j);
+            ML_TEST_ASSERT_DOUBLE_EQ(pf0[i](j), pf1[i](j), 1e-12, msg);
+        }
+    }
+
+    DSample sample0, sample1;
+    memcpy(src0, input, n * sizeof(calculated_number_t));
+    memcpy(dst0, input, n * sizeof(calculated_number_t));
+    ml_features_preprocess_predict(&features0, sample0);
+
+    memcpy(src1, input, n * sizeof(calculated_number_t));
+    memcpy(dst1, input, n * sizeof(calculated_number_t));
+    ml_features_preprocess_predict(&features1, sample1);
+
+    ML_TEST_ASSERT(sample0.size() == sample1.size(), "prediction sample size should match for smooth_n=0 and smooth_n=1");
+    for (size_t i = 0; i < features0.lag_n + 1; i++) {
+        char msg[128];
+        snprintf(msg, sizeof(msg), "prediction smooth_n=0 should match smooth_n=1 at sample(%zu)", i);
+        ML_TEST_ASSERT_DOUBLE_EQ(sample0(i), sample1(i), 1e-12, msg);
     }
 }
 
@@ -185,10 +237,9 @@ static void test_full_pipeline()
         std::vector<DSample> pf;
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
-            dst, n, src, n,
-            pf
+            dst, n, src, n
         };
-        ml_features_preprocess(&features, 1.0);
+        ml_features_preprocess(&features, pf, 1.0);
 
         // With these params:
         // n_vectors = n - diff_n - smooth_n + 1 - lag_n = 9 - 1 - 3 + 1 - 5 = 1
@@ -208,15 +259,10 @@ static void test_full_pipeline()
 
     // Train a kmeans model on the normal data
     std::vector<DSample> training_features = std::move(all_features);
-    ml_features_t train_ft = {
-        diff_n, smooth_n, lag_n,
-        nullptr, 0, nullptr, 0,
-        training_features
-    };
 
     ml_kmeans_t kmeans;
     ml_kmeans_init(&kmeans);
-    ml_kmeans_train(&kmeans, &train_ft, 1000, 0, 100);
+    ml_kmeans_train(&kmeans, training_features, 1000, 0, 100);
 
     ML_TEST_ASSERT(kmeans.cluster_centers.size() == 2, "kmeans should have 2 cluster centers");
     ML_TEST_ASSERT(kmeans.min_dist < kmeans.max_dist, "min_dist < max_dist after training");
@@ -246,10 +292,9 @@ static void test_full_pipeline()
         std::vector<DSample> pf;
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
-            dst, n, src, n,
-            pf
+            dst, n, src, n
         };
-        ml_features_preprocess(&features, 1.0);
+        ml_features_preprocess(&features, pf, 1.0);
 
         if (pf.size() >= 1) {
             calculated_number_t anomaly_score = ml_kmeans_anomaly_score(&inlined_km, pf[0]);
@@ -357,10 +402,9 @@ static void test_circular_buffer_equivalence()
         std::vector<DSample> pf;
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
-            dst, n, src, n,
-            pf
+            dst, n, src, n
         };
-        ml_features_preprocess(&features, 1.0);
+        ml_features_preprocess(&features, pf, 1.0);
 
         if (pf.size() >= 1)
             rotate_results.push_back(pf[0]);
@@ -391,10 +435,9 @@ static void test_circular_buffer_equivalence()
         std::vector<DSample> pf;
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
-            dst, n, src, n,
-            pf
+            dst, n, src, n
         };
-        ml_features_preprocess(&features, 1.0);
+        ml_features_preprocess(&features, pf, 1.0);
 
         if (pf.size() >= 1)
             circ_results.push_back(pf[0]);
@@ -410,6 +453,33 @@ static void test_circular_buffer_equivalence()
             ML_TEST_ASSERT_DOUBLE_EQ(rotate_results[i](j), circ_results[i](j), 1e-12, msg);
         }
     }
+}
+
+// Test: same_value must compare against the previous newest sample, not the
+// oldest slot being overwritten. This locks in the intentional semantic change
+// in ml_dimension_predict().
+static void test_same_value_uses_newest_sample()
+{
+    fprintf(stderr, "  test_same_value_uses_newest_sample...\n");
+
+    const size_t n = 5;
+    std::vector<calculated_number_t> cns = {7.0, 2.0, 3.0, 4.0, 5.0};
+    size_t cns_head = 0;
+    calculated_number_t incoming = 7.0;
+
+    // Circular buffer state:
+    //   oldest slot being overwritten = cns[cns_head] = 7.0
+    //   previous newest sample        = cns[(cns_head + n - 1) % n] = 5.0
+    // If we compared against the oldest slot, same_value would be true and we'd
+    // miss the transition from 5.0 -> 7.0. Comparing against newest is correct.
+    bool old_rotate_equivalent = (cns[cns_head] == incoming);
+    size_t newest_idx = (cns_head + n - 1) % n;
+    bool new_ring_semantics = (cns[newest_idx] == incoming);
+
+    ML_TEST_ASSERT(old_rotate_equivalent,
+                   "oldest-slot comparison should report same_value for this edge case");
+    ML_TEST_ASSERT(!new_ring_semantics,
+                   "newest-sample comparison should detect the changed incoming value");
 }
 
 // Test: ml_features_preprocess with a prediction-sized window produces the same
@@ -468,10 +538,9 @@ static void test_preprocess_predict_equivalence()
             std::vector<DSample> pf;
             ml_features_t features1 = {
                 diff_n, smooth_n, lag_n,
-                dst1, n, src1, n,
-                pf
+                dst1, n, src1, n
             };
-            ml_features_preprocess(&features1, 1.0);
+            ml_features_preprocess(&features1, pf, 1.0);
 
             // With prediction-sized window: n_vectors = n - diff_n - smooth_n + 1 - lag_n = 1
             char msg[256];
@@ -480,53 +549,25 @@ static void test_preprocess_predict_equivalence()
             ML_TEST_ASSERT(pf.size() == 1, msg);
             if (pf.size() != 1) continue;
 
-            // Path 2: manual extraction matching what ml_features_preprocess_predict does:
-            // diff + smooth, then read first lag_n+1 values from src.
-            // This validates the logic without depending on the branch function existing.
+            // Path 2: ml_features_preprocess_predict should produce the same
+            // prediction-sized feature vector as the training preprocess path.
             calculated_number_t src2[128], dst2[128];
             memset(src2, 0, sizeof(src2));
             memcpy(src2, input, n * sizeof(calculated_number_t));
             memcpy(dst2, src2, n * sizeof(calculated_number_t));
 
-            // Replicate diff
-            if (diff_n > 0) {
-                for (size_t idx = 0; idx != (n - diff_n); idx++) {
-                    size_t high = (n - 1) - idx;
-                    size_t low = high - diff_n;
-                    dst2[low] = src2[high] - src2[low];
-                }
-                memcpy(src2, dst2, (n - diff_n) * sizeof(calculated_number_t));
-                for (size_t idx = n - diff_n; idx != n; idx++)
-                    src2[idx] = 0.0;
-            }
+            ml_features_t features2 = {
+                diff_n, smooth_n, lag_n,
+                dst2, n, src2, n
+            };
+            DSample predicted_feature;
+            ml_features_preprocess_predict(&features2, predicted_feature);
 
-            // Replicate smooth
-            {
-                calculated_number_t sum = 0.0;
-                size_t idx = 0;
-                for (; idx != smooth_n - 1; idx++)
-                    sum += src2[idx];
-                for (; idx != (n - diff_n); idx++) {
-                    sum += src2[idx];
-                    calculated_number_t prev = src2[idx - (smooth_n - 1)];
-                    src2[idx - (smooth_n - 1)] = sum / smooth_n;
-                    sum -= prev;
-                }
-                for (idx = 0; idx != smooth_n; idx++)
-                    src2[(n - 1) - idx] = 0.0;
-            }
-
-            // Extract feature: first lag_n+1 values (what preprocess_predict does)
-            DSample direct_feature;
-            direct_feature.set_size(lag_n + 1);
-            for (size_t fi = 0; fi != lag_n + 1; fi++)
-                direct_feature(fi) = src2[fi];
-
-            // Compare: pf[0] from full pipeline must match direct extraction
+            // Compare: pf[0] from full pipeline must match the direct prediction path.
             for (size_t fi = 0; fi < lag_n + 1; fi++) {
-                snprintf(msg, sizeof(msg), "params(%zu,%zu,%zu) %s: feature[%zu] preprocess vs direct",
+                snprintf(msg, sizeof(msg), "params(%zu,%zu,%zu) %s: feature[%zu] preprocess vs predict",
                          diff_n, smooth_n, lag_n, filler_names[f], fi);
-                ML_TEST_ASSERT_DOUBLE_EQ(pf[0](fi), direct_feature(fi), 1e-12, msg);
+                ML_TEST_ASSERT_DOUBLE_EQ(pf[0](fi), predicted_feature(fi), 1e-12, msg);
             }
         }
     }
@@ -551,10 +592,9 @@ static void test_constant_input()
     std::vector<DSample> pf;
     ml_features_t features = {
         diff_n, smooth_n, lag_n,
-        dst, n, src, n,
-        pf
+        dst, n, src, n
     };
-    ml_features_preprocess(&features, 1.0);
+    ml_features_preprocess(&features, pf, 1.0);
 
     ML_TEST_ASSERT(pf.size() == 1, "constant input should produce 1 feature vector");
 
@@ -577,10 +617,9 @@ static void test_constant_input()
     std::vector<DSample> pf2;
     ml_features_t features2 = {
         0, smooth_n, lag_n,
-        dst2, n, src2, n,
-        pf2
+        dst2, n, src2, n
     };
-    ml_features_preprocess(&features2, 1.0);
+    ml_features_preprocess(&features2, pf2, 1.0);
 
     // With diff_n=0, smooth on constant values gives the same constant.
     // Feature vector should be all 42.0.
@@ -670,10 +709,9 @@ static void test_parameter_combinations()
         std::vector<DSample> pf;
         ml_features_t features = {
             diff_n, smooth_n, lag_n,
-            dst, n, src, n,
-            pf
+            dst, n, src, n
         };
-        ml_features_preprocess(&features, 1.0);
+        ml_features_preprocess(&features, pf, 1.0);
 
         char msg[256];
         snprintf(msg, sizeof(msg), "params(%zu,%zu,%zu): expected %zu vectors, got %zu",
@@ -708,15 +746,119 @@ static void test_parameter_combinations()
         std::vector<DSample> pf_large;
         ml_features_t features_large = {
             diff_n, smooth_n, lag_n,
-            dst_large, large_n, src_large, large_n,
-            pf_large
+            dst_large, large_n, src_large, large_n
         };
-        ml_features_preprocess(&features_large, 1.0);
+        ml_features_preprocess(&features_large, pf_large, 1.0);
 
         size_t expected_large = large_n - diff_n - smooth_n + 1 - lag_n;
         snprintf(msg, sizeof(msg), "params(%zu,%zu,%zu) large window: expected %zu vectors",
                  diff_n, smooth_n, lag_n, expected_large);
         ML_TEST_ASSERT(pf_large.size() == expected_large, msg);
+    }
+}
+
+// Test: timestamps > INT32_MAX must survive serialize -> deserialize unchanged.
+// Before the bounds-check fix, the (time_t) cast of json_object_get_int64()
+// would silently truncate on 32-bit time_t, breaking model ordering/pruning.
+static void test_kmeans_timestamp_roundtrip()
+{
+    fprintf(stderr, "  test_kmeans_timestamp_roundtrip...\n");
+
+    // 3 000 000 000 > INT32_MAX (2 147 483 647). On 32-bit time_t the value
+    // doesn't fit, so skip — the guard would correctly reject it on the way in.
+    if (sizeof(time_t) < 8) {
+        fprintf(stderr, "    skipped (time_t is 32-bit on this platform)\n");
+        return;
+    }
+
+    const time_t large_after  = (time_t) 3000000000LL;
+    const time_t large_before = (time_t) 3000003600LL;
+
+    ml_kmeans_inlined_t original;
+    original.cluster_centers[0].set_size(6);
+    original.cluster_centers[1].set_size(6);
+    for (int i = 0; i < 6; i++) {
+        original.cluster_centers[0](i) = (double)(i + 1);
+        original.cluster_centers[1](i) = (double)(i + 7);
+    }
+    original.min_dist = 1.5;
+    original.max_dist = 9.5;
+    original.after    = large_after;
+    original.before   = large_before;
+
+    BUFFER *wb = buffer_create(0, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    ml_kmeans_serialize(&original, wb);
+    buffer_json_finalize(wb);
+
+    struct json_object *root = json_tokener_parse(buffer_tostring(wb));
+    ML_TEST_ASSERT(root != NULL, "round-trip: serialized output must be valid JSON");
+
+    if (root) {
+        ml_kmeans_inlined_t result;
+        result.cluster_centers[0].set_size(6);
+        result.cluster_centers[1].set_size(6);
+
+        bool ok = ml_kmeans_deserialize(&result, root);
+        ML_TEST_ASSERT(ok, "round-trip: deserialize must succeed for large timestamp");
+
+        if (ok) {
+            ML_TEST_ASSERT(result.after  == large_after,
+                           "round-trip: 'after' must survive unchanged (> INT32_MAX)");
+            ML_TEST_ASSERT(result.before == large_before,
+                           "round-trip: 'before' must survive unchanged (> INT32_MAX)");
+        }
+
+        json_object_put(root);
+    }
+
+    buffer_free(wb);
+}
+
+// Test: deserialize must reject models carrying negative timestamps.
+// Negative Unix timestamps are never valid for ML model windows.
+static void test_kmeans_timestamp_rejection()
+{
+    fprintf(stderr, "  test_kmeans_timestamp_rejection...\n");
+
+    // Build a fully-valid kmeans JSON object and then override one timestamp
+    // field to an invalid value, verifying that ml_kmeans_deserialize rejects it.
+    auto make_full_root = [](int64_t after_val, int64_t before_val) -> struct json_object * {
+        struct json_object *r = json_object_new_object();
+        json_object_object_add(r, "after",    json_object_new_int64(after_val));
+        json_object_object_add(r, "before",   json_object_new_int64(before_val));
+        json_object_object_add(r, "min_dist", json_object_new_double(1.0));
+        json_object_object_add(r, "max_dist", json_object_new_double(9.0));
+
+        struct json_object *cc = json_object_new_array();
+        for (int c = 0; c < 2; c++) {
+            struct json_object *cv = json_object_new_array();
+            for (int i = 0; i < 6; i++)
+                json_object_array_add(cv, json_object_new_double((double)(c * 6 + i + 1)));
+            json_object_array_add(cc, cv);
+        }
+        json_object_object_add(r, "cluster_centers", cc);
+        return r;
+    };
+
+    {
+        struct json_object *r = make_full_root(-1LL, 100LL);
+        ml_kmeans_inlined_t km;
+        km.cluster_centers[0].set_size(6);
+        km.cluster_centers[1].set_size(6);
+        bool ok = ml_kmeans_deserialize(&km, r);
+        ML_TEST_ASSERT(!ok, "negative 'after' must be rejected");
+        json_object_put(r);
+    }
+
+    {
+        struct json_object *r = make_full_root(100LL, -1LL);
+        ml_kmeans_inlined_t km;
+        km.cluster_centers[0].set_size(6);
+        km.cluster_centers[1].set_size(6);
+        bool ok = ml_kmeans_deserialize(&km, r);
+        ML_TEST_ASSERT(!ok, "negative 'before' must be rejected");
+        json_object_put(r);
     }
 }
 
@@ -736,12 +878,16 @@ extern "C" int ml_unittest()
     test_features_diff();
     test_features_no_diff();
     test_features_smooth();
+    test_features_zero_smooth_matches_one();
     test_kmeans_scoring();
     test_full_pipeline();
     test_circular_buffer_equivalence();
+    test_same_value_uses_newest_sample();
     test_preprocess_predict_equivalence();
     test_constant_input();
     test_parameter_combinations();
+    test_kmeans_timestamp_roundtrip();
+    test_kmeans_timestamp_rejection();
 
     fprintf(stderr, "\nML tests: %d run, %d failed\n", tests_run, tests_failed);
 

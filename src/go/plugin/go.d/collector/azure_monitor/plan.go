@@ -12,8 +12,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func buildCollectorRuntimeFromConfig(cfg Config, catalog azureprofiles.Catalog) (*collectorRuntime, error) {
-	profiles, err := catalog.Resolve(cfg.Profiles)
+func buildCollectorRuntimeFromConfig(profileIDs []string, catalog azureprofiles.Catalog) (*collectorRuntime, error) {
+	profiles, err := catalog.Resolve(profileIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func buildProfileRuntime(p azureprofiles.Profile) (*profileRuntime, error) {
 		return nil, fmt.Errorf("profile has empty id")
 	}
 
-	name := stringsTrim(p.Name)
+	name := stringsTrim(p.DisplayName)
 	if name == "" {
 		return nil, fmt.Errorf("profile %q has empty name", profileID)
 	}

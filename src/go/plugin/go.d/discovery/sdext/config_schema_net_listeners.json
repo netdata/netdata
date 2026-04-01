@@ -5,12 +5,6 @@
     "description": "Discovers services by scanning local listening network ports.",
     "type": "object",
     "properties": {
-      "name": {
-        "title": "Name",
-        "description": "Pipeline name (must be unique).",
-        "type": "string",
-        "minLength": 1
-      },
       "discoverer": {
         "title": "Discoverer",
         "type": "object",
@@ -72,7 +66,6 @@
       }
     },
     "required": [
-      "name",
       "discoverer",
       "services"
     ]
@@ -87,7 +80,6 @@
         {
           "title": "Base",
           "fields": [
-            "name",
             "discoverer"
           ]
         },
@@ -121,11 +113,11 @@
         "match": {
           "ui:widget": "textarea",
           "ui:placeholder": "{{ eq .Comm \"nginx\" }}",
-          "ui:help": "| Field | Description |\n|-------|-------------|\n| `.Protocol` | TCP, TCP6, UDP, UDP6 |\n| `.IPAddress` | IP address |\n| `.Port` | Port number |\n| `.Address` | IP:Port combined |\n| `.Comm` | Process name |\n| `.Cmdline` | Full command line |\n\n**Functions:** eq, ne, glob, regexp, and, or, not"
+          "ui:help": "| Field | Description |\n|-------|-------------|\n| `.Protocol` | TCP, TCP6, UDP, UDP6 |\n| `.IPAddress` | IP address |\n| `.Port` | Port number |\n| `.Address` | IP:Port combined |\n| `.Comm` | Process name |\n| `.Cmdline` | Full command line |\n| `.TUID` | Unique target ID (`protocol_port_hash`) |\n\n**Functions:** eq, ne, glob, regexp, and, or, not"
         },
         "config_template": {
           "ui:widget": "textarea",
-          "ui:placeholder": "module: nginx\nname: {{.Name}}-{{.Address}}\nurl: http://{{.Address}}/stub_status"
+          "ui:placeholder": "module: nginx\nname: {{.TUID}}\nurl: http://{{.Address}}/stub_status"
         }
       }
     }

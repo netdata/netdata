@@ -151,6 +151,10 @@ void del_pid_entry(pid_t pid) {
     string_freez(p->sid_name);
 #endif
 
+#if (PROCESSES_HAVE_SERVICE == 1)
+    string_freez(p->service_name);
+#endif
+
     string_freez(p->comm_orig);
     string_freez(p->comm);
     string_freez(p->cmdline);
@@ -401,8 +405,7 @@ static void remove_extension(char *name) {
 static inline STRING *comm_from_cmdline_param_sanitized(STRING *cmdline) {
     if(!cmdline) return NULL;
 
-    char buf[string_strlen(cmdline) + 1];
-    memcpy(buf, string2str(cmdline), sizeof(buf));
+    char *buf = strdupz(string2str(cmdline));
 
     char *words[100];
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, 100);
@@ -420,19 +423,21 @@ static inline STRING *comm_from_cmdline_param_sanitized(STRING *cmdline) {
                 name++;
                 remove_extension(name);
                 sanitize_apps_plugin_chart_meta(name);
-                return string_strdupz(name);
+                STRING *sanitized = string_strdupz(name);
+                freez(buf);
+                return sanitized;
             }
         }
     }
 
+    freez(buf);
     return NULL;
 }
 
 static inline STRING *comm_from_cmdline_sanitized(STRING *comm, STRING *cmdline) {
     if(!cmdline) return NULL;
 
-    char buf[string_strlen(cmdline) + 1];
-    memcpy(buf, string2str(cmdline), sizeof(buf));
+    char *buf = strdupz(string2str(cmdline));
 
     size_t comm_len = string_strlen(comm);
     char *start = strstr(buf, string2str(comm));
@@ -452,9 +457,12 @@ static inline STRING *comm_from_cmdline_sanitized(STRING *comm, STRING *cmdline)
 
         remove_extension(start);
         sanitize_apps_plugin_chart_meta(start);
-        return string_strdupz(start);
+        STRING *sanitized = string_strdupz(start);
+        freez(buf);
+        return sanitized;
     }
 
+    freez(buf);
     return NULL;
 }
 
@@ -501,16 +509,19 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
 
     // some process names have ( and ), remove the parenthesis
     size_t len = strlen(comm);
-    char buf[len + 1];
+    char *buf;
     if(comm[0] == '(' && comm[len - 1] == ')') {
+        buf = mallocz(len - 1);
         memcpy(buf, &comm[1], len - 2);
         buf[len - 2] = '\0';
     }
     else
-        memcpy(buf, comm, sizeof(buf));
+        buf = strdupz(comm);
 
     sanitize_apps_plugin_chart_meta(buf);
+    string_freez(p->comm);
     p->comm = string_strdupz(buf);
+    freez(buf);
     p->is_manager = is_process_a_manager(p);
     p->is_aggregator = is_process_an_aggregator(p);
 

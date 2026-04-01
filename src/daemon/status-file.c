@@ -93,16 +93,10 @@ static void fill_dmi_info(DAEMON_STATUS_FILE *ds) {
 
 // --------------------------------------------------------------------------------------------------------------------
 // json generation
+// Each section is a separate function to stay within GCC's -fvar-tracking-assignments size limit.
+// IMPORTANT: ALL functions here are called from signal handlers — no locks, no allocations.
 
-static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
-    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
-    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
-
-    dsf_acquire(*ds);
-
-    buffer_json_member_add_string(wb, "@timestamp", ds->timestamp_ut_rfc3339);
-    buffer_json_member_add_uint64(wb, "version", STATUS_FILE_VERSION);
-
+static void dsf_json_agent(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "agent");
     {
         buffer_json_member_add_uuid(wb, "id", ds->host_id.uuid.uuid);
@@ -121,7 +115,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         if(ds->v >= 24)
             buffer_json_member_add_uint64(wb, "crashes", ds->crashes);
-            
+
         // Only include PID if we're at version 27 or later
         if(ds->v >= 27)
             buffer_json_member_add_uint64(wb, "pid", (uint64_t)ds->pid);
@@ -159,7 +153,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_metrics(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     // Add metrics stats as a top-level node
     buffer_json_member_add_object(wb, "metrics");
     {
@@ -194,7 +190,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_host(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "host");
     {
         buffer_json_member_add_uuid_compact(wb, "id", ds->machine_id.uuid);
@@ -209,7 +207,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_string_or_empty(wb, "cloud_instance", ds->cloud_instance_type);
             buffer_json_member_add_string_or_empty(wb, "cloud_region", ds->cloud_instance_region);
         }
-        
+
         buffer_json_member_add_uint64(wb, "system_cpus", ds->system_cpus);
 
         buffer_json_member_add_object(wb, "boot");
@@ -241,7 +239,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
                 buffer_json_member_add_boolean(wb, "read_only", ds->var_cache.is_read_only);
             }
             buffer_json_object_close(wb);
-            
+
             buffer_json_member_add_object(wb, "netdata");
             buffer_json_member_add_uint64(wb, "dbengine", ds->disk_footprint.dbengine);
             buffer_json_member_add_uint64(wb, "sqlite", ds->disk_footprint.sqlite);
@@ -252,7 +250,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
-    
+}
+
+static void dsf_json_os(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "os");
     {
         buffer_json_member_add_string(wb, "type", DAEMON_OS_TYPE_2str(ds->os_type));
@@ -263,7 +263,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string_or_empty(wb, "platform", ds->os_id_like);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_hw(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "hw");
     {
         buffer_json_member_add_object(wb, "sys");
@@ -314,7 +316,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_product(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "product");
     {
         buffer_json_member_add_string(wb, "vendor", ds->product.vendor);
@@ -322,7 +326,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string(wb, "type", ds->product.type);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_fatal(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "fatal");
     {
         buffer_json_member_add_uint64(wb, "line", ds->fatal.line);
@@ -358,6 +364,24 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_uint64(wb, "worker_job_id", ds->fatal.worker_job_id);
     }
     buffer_json_object_close(wb);
+}
+
+static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
+    dsf_acquire(*ds);
+
+    buffer_json_member_add_string(wb, "@timestamp", ds->timestamp_ut_rfc3339);
+    buffer_json_member_add_uint64(wb, "version", STATUS_FILE_VERSION);
+
+    dsf_json_agent(wb, ds);
+    dsf_json_metrics(wb, ds);
+    dsf_json_host(wb, ds);
+    dsf_json_os(wb, ds);
+    dsf_json_hw(wb, ds);
+    dsf_json_product(wb, ds);
+    dsf_json_fatal(wb, ds);
 
     dsf_release(*ds);
 }

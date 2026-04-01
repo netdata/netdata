@@ -123,6 +123,45 @@ modules:
               - `SELECT on distribution.dbo.MSreplication_monitordata` - Replication monitoring
               - `SELECT on distribution.dbo.MSpublications` - Publication information
               - `SELECT on distribution.dbo.MSsubscriptions` - Subscription counts
+          - title: Grant Windows Authentication access (optional)
+            description: |
+              If you prefer Windows integrated authentication instead of SQL authentication, grant the
+              Netdata service account access to SQL Server.
+
+              By default, the Netdata service runs as `Local System`. The identity it presents to
+              SQL Server depends on your environment:
+
+              **Domain-joined machine (Active Directory):**
+
+              `Local System` authenticates as the computer account (`DOMAIN\COMPUTERNAME$`).
+              Replace `DOMAIN\COMPUTERNAME$` with your actual values
+              (e.g., `MYDOM\SQLBOX01$`).
+
+              ```sql
+              CREATE LOGIN [DOMAIN\COMPUTERNAME$] FROM WINDOWS;
+              GRANT VIEW SERVER STATE TO [DOMAIN\COMPUTERNAME$];
+              GRANT VIEW ANY DEFINITION TO [DOMAIN\COMPUTERNAME$];
+              USE msdb;
+              CREATE USER [DOMAIN\COMPUTERNAME$] FOR LOGIN [DOMAIN\COMPUTERNAME$];
+              GRANT SELECT ON dbo.sysjobs TO [DOMAIN\COMPUTERNAME$];
+              ```
+
+              **Workgroup machine (no Active Directory, localhost only):**
+
+              `Local System` authenticates as `NT AUTHORITY\SYSTEM`.
+              This only works when SQL Server runs on the same machine.
+
+              ```sql
+              CREATE LOGIN [NT AUTHORITY\SYSTEM] FROM WINDOWS;
+              GRANT VIEW SERVER STATE TO [NT AUTHORITY\SYSTEM];
+              GRANT VIEW ANY DEFINITION TO [NT AUTHORITY\SYSTEM];
+              USE msdb;
+              CREATE USER [NT AUTHORITY\SYSTEM] FOR LOGIN [NT AUTHORITY\SYSTEM];
+              GRANT SELECT ON dbo.sysjobs TO [NT AUTHORITY\SYSTEM];
+              ```
+
+              > **Note**: To verify which account SQL Server sees, connect with Windows Authentication
+              > and run `SELECT SYSTEM_USER`.
       configuration:
         file:
           name: go.d/mssql.conf
@@ -262,11 +301,19 @@ modules:
                   - name: local
                     dsn: "sqlserver://netdata_user:password@localhost:1433"
             - name: Windows Authentication
-              description: Connect using Windows integrated authentication.
+              description: |
+                Connect using Windows integrated authentication (Windows only).
+
+                When no username/password is provided in the DSN, the driver uses the Netdata service account's
+                Windows credentials. By default, the Netdata service runs as `Local System`, which authenticates
+                to SQL Server as the computer account (`DOMAIN\COMPUTERNAME$`).
+
+                See the [Grant Windows Authentication access](#grant-windows-authentication-access-optional) prerequisite
+                to configure SQL Server for this.
               config: |
                 jobs:
                   - name: local
-                    dsn: "sqlserver://localhost:1433?trusted_connection=yes"
+                    dsn: "sqlserver://localhost:1433"
             - name: Named instance
               description: Connect to a named SQL Server instance.
               config: |

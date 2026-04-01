@@ -1488,8 +1488,7 @@ static void freeimi_function_sensors(const char *transaction, char *function __m
     buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", "View IPMI sensor readings and its state");
 
-    char function_copy[strlen(function) + 1];
-    memcpy(function_copy, function, sizeof(function_copy));
+    char *function_copy = strdupz(function);
     char *words[1024];
     size_t num_words = quoted_strings_splitter_whitespace(function_copy, words, 1024);
     for(size_t i = 1; i < num_words ;i++) {
@@ -1499,9 +1498,12 @@ static void freeimi_function_sensors(const char *transaction, char *function __m
             buffer_json_array_close(wb); // accepted_params
             buffer_json_member_add_array(wb, "required_params");
             buffer_json_array_close(wb); // required_params
+            freez(function_copy);
             goto close_and_send;
         }
     }
+
+    freez(function_copy);
 
     buffer_json_member_add_array(wb, "data");
 

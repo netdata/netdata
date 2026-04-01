@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
@@ -17,10 +16,11 @@ import (
 )
 
 type initResult struct {
-	config        Config
-	resourceGraph resourceGraphClient
-	queryExecutor *queryExecutor
-	runtime       *collectorRuntime
+	config                 Config
+	profileCatalog         azureprofiles.Catalog
+	resourceGraph          resourceGraphClient
+	queryExecutor          *queryExecutor
+	supportedResourceTypes map[string]struct{}
 }
 
 func (c *Collector) initInstruments(runtime *collectorRuntime) error {
@@ -28,7 +28,7 @@ func (c *Collector) initInstruments(runtime *collectorRuntime) error {
 		return errors.New("nil collector runtime")
 	}
 
-	var labelKeys = []string{"resource_uid", "resource_name", "resource_group", "region", "resource_type", "profile"}
+	var labelKeys = []string{"resource_uid", "subscription_id", "resource_name", "resource_group", "region", "resource_type", "profile"}
 
 	vec := c.store.Write().SnapshotMeter("").Vec(labelKeys...)
 	if runtime.Instruments == nil {
@@ -56,8 +56,8 @@ func (c *Collector) initInstruments(runtime *collectorRuntime) error {
 	return nil
 }
 
-func (c *Collector) prepareInitResult(ctx context.Context) (*initResult, error) {
-	cfg, catalog, autoDiscover, err := c.prepareInitConfig()
+func (c *Collector) prepareInitResult() (*initResult, error) {
+	cfg, catalog, err := c.prepareInitConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -67,52 +67,87 @@ func (c *Collector) prepareInitResult(ctx context.Context) (*initResult, error) 
 		return nil, err
 	}
 
-	if autoDiscover {
-		profiles, err := resolveAutoProfiles(ctx, cfg.SubscriptionID, cfg.Timeout.Duration(), resourceGraph, catalog, cfg.Profiles)
-		if err != nil {
-			return nil, fmt.Errorf("auto-discover resource types: %w", err)
-		}
-		cfg.Profiles = profiles
-		if len(cfg.Profiles) == 0 {
-			return nil, errors.New("auto-discovery found no Azure resources matching any known profile")
-		}
-		c.Infof("auto-discovery resolved profiles: %v", cfg.Profiles)
-	}
-
-	runtime, err := buildCollectorRuntimeFromConfig(cfg, catalog)
-	if err != nil {
-		return nil, fmt.Errorf("build collector runtime: %w", err)
-	}
-
+	supportedResourceTypes := catalogResourceTypeSet(catalog)
 	return &initResult{
-		config:        cfg,
-		resourceGraph: resourceGraph,
-		queryExecutor: queryExecutor,
-		runtime:       runtime,
+		config:                 cfg,
+		profileCatalog:         catalog,
+		resourceGraph:          resourceGraph,
+		queryExecutor:          queryExecutor,
+		supportedResourceTypes: supportedResourceTypes,
 	}, nil
 }
 
-func (c *Collector) prepareInitConfig() (Config, azureprofiles.Catalog, bool, error) {
+func (c *Collector) ensureBootstrapped(ctx context.Context) error {
+	if c.runtime != nil {
+		return nil
+	}
+	if c.resourceGraph == nil || c.queryExecutor == nil {
+		return errors.New("collector is not initialized")
+	}
+	if len(c.supportedResourceTypes) == 0 && len(c.profileCatalog.ResourceTypes()) == 0 {
+		return errors.New("collector profile catalog is not initialized")
+	}
+
+	fetched, err := fetchInitDiscovery(ctx, c.Config, c.profileCatalog, c.resourceGraph, c.supportedResourceTypes)
+	if err != nil {
+		return err
+	}
+	if len(fetched.UnsupportedTypes) > 0 {
+		c.Warningf("ignoring unsupported discovered resource types: %v", fetched.UnsupportedTypes)
+	}
+
+	profileIDs, autoProfiles, err := resolveInitProfileIDs(c.Config, c.profileCatalog, fetched.ByType)
+	if err != nil {
+		return err
+	}
+	if len(autoProfiles) > 0 {
+		c.Infof("auto-discovery resolved profiles: %v", autoProfiles)
+	}
+
+	// TODO(azure_monitor): Insert bootstrap-only metric-definition validation here.
+	// Resolve selected profiles, fetch one representative resource per
+	// (subscription_id, resource_type, metric_namespace), fail open per key on
+	// lookup errors, and prune unsupported metrics/aggregations/time grains
+	// before final runtime build. Because runtime is currently global per job,
+	// multi-subscription capability differences need an explicit merge rule first.
+	runtime, err := buildCollectorRuntimeFromConfig(profileIDs, c.profileCatalog)
+	if err != nil {
+		return fmt.Errorf("build collector runtime: %w", err)
+	}
+	if err := c.initInstruments(runtime); err != nil {
+		return err
+	}
+
+	resources, byType := filterDiscoveryResourcesByTypes(fetched.Resources, runtimeResourceTypes(runtime))
+	now := c.now()
+
+	c.runtime = runtime
+	c.observations = newObservationState(runtime.Instruments)
+	c.discovery = discoveryState{
+		Resources:    resources,
+		ByType:       byType,
+		FetchedAt:    now,
+		ExpiresAt:    discoveryExpiresAt(now, c.Discovery.RefreshEvery),
+		FetchCounter: 1,
+	}
+
+	return nil
+}
+
+func (c *Collector) prepareInitConfig() (Config, azureprofiles.Catalog, error) {
 	cfg := c.Config
 	cfg.applyDefaults()
 
 	catalog, err := c.loadProfileCatalog()
 	if err != nil {
-		return Config{}, azureprofiles.Catalog{}, false, fmt.Errorf("load profiles catalog: %w", err)
-	}
-
-	autoDiscover, explicitProfiles := extractAutoKeyword(cfg.Profiles)
-	cfg.Profiles = explicitProfiles
-
-	if !autoDiscover && len(cfg.Profiles) == 0 {
-		return Config{}, azureprofiles.Catalog{}, false, errors.New("no profiles configured; use 'auto' for auto-discovery or specify profile ids")
+		return Config{}, azureprofiles.Catalog{}, fmt.Errorf("load profiles catalog: %w", err)
 	}
 
 	if err := cfg.validate(); err != nil {
-		return Config{}, azureprofiles.Catalog{}, false, fmt.Errorf("config validation: %w", err)
+		return Config{}, azureprofiles.Catalog{}, fmt.Errorf("config validation: %w", err)
 	}
 
-	return cfg, catalog, autoDiscover, nil
+	return cfg, catalog, nil
 }
 
 func (c *Collector) prepareInitClients(cfg Config) (resourceGraphClient, *queryExecutor, error) {
@@ -126,21 +161,90 @@ func (c *Collector) prepareInitClients(cfg Config) (resourceGraphClient, *queryE
 		return nil, nil, fmt.Errorf("create azure credential: %w", err)
 	}
 
-	resourceGraph, err := c.newResourceGraph(cfg.SubscriptionID, credential, cloudCfg)
+	subscriptionID := cfg.primarySubscriptionID()
+	resourceGraph, err := c.newResourceGraph(subscriptionID, credential, cloudCfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create resource graph client: %w", err)
 	}
 
-	return resourceGraph, newQueryExecutor(cfg.SubscriptionID, cfg.MaxConcurrency, cfg.Timeout.Duration(), credential, cloudCfg, c.newMetricsClient), nil
+	return resourceGraph, newQueryExecutor(cfg.Limits.MaxConcurrency, cfg.Timeout.Duration(), credential, cloudCfg, c.newMetricsClient), nil
 }
 
-func resolveAutoProfiles(ctx context.Context, subscriptionID string, timeout time.Duration, resourceGraph resourceGraphClient, catalog azureprofiles.Catalog, explicitProfiles []string) ([]string, error) {
-	types, err := discoverResourceTypes(ctx, subscriptionID, timeout, resourceGraph)
-	if err != nil {
-		return nil, err
+func fetchInitDiscovery(ctx context.Context, cfg Config, catalog azureprofiles.Catalog, resourceGraph resourceGraphClient, supportedResourceTypes map[string]struct{}) (discoveryFetchResult, error) {
+	if stringsLowerTrim(cfg.Discovery.Mode) == discoveryModeQuery {
+		fetched, err := discoverResourcesFromQuery(
+			ctx,
+			cfg.subscriptionIDs(),
+			cfg.Timeout.Duration(),
+			resourceGraph,
+			cfg.Discovery.ModeQuery.KQL,
+			supportedResourceTypes,
+		)
+		if err != nil {
+			return discoveryFetchResult{}, fmt.Errorf("discover candidate resources: %w", err)
+		}
+		return fetched, nil
 	}
-	matched := catalog.ProfilesForResourceTypes(types)
-	return mergeProfileIDs(explicitProfiles, matched), nil
+
+	discoveryTypes, err := initDiscoveryResourceTypes(cfg, catalog)
+	if err != nil {
+		return discoveryFetchResult{}, fmt.Errorf("prepare discovery scope: %w", err)
+	}
+
+	resources, byType, err := discoverResources(
+		ctx,
+		cfg.subscriptionIDs(),
+		cfg.Timeout.Duration(),
+		resourceGraph,
+		discoveryTypes,
+		cfg.Discovery.ModeFilters,
+	)
+	if err != nil {
+		return discoveryFetchResult{}, fmt.Errorf("discover candidate resources: %w", err)
+	}
+
+	return discoveryFetchResult{Resources: resources, ByType: byType}, nil
+}
+
+func initDiscoveryResourceTypes(cfg Config, catalog azureprofiles.Catalog) ([]string, error) {
+	switch stringsLowerTrim(cfg.Profiles.Mode) {
+	case profilesModeAuto, profilesModeCombined:
+		return catalog.ResourceTypes(), nil
+	case profilesModeExact:
+		return catalog.ResourceTypesForProfileBaseNames(cfg.Profiles.explicitBaseNames())
+	default:
+		return nil, fmt.Errorf("unsupported profiles.mode %q", cfg.Profiles.Mode)
+	}
+}
+
+func resolveInitProfileIDs(cfg Config, catalog azureprofiles.Catalog, byType map[string][]resourceInfo) ([]string, []string, error) {
+	discoveredTypes := make(map[string]struct{}, len(byType))
+	for key := range byType {
+		discoveredTypes[key] = struct{}{}
+	}
+
+	autoProfiles := catalog.ProfilesForResourceTypes(discoveredTypes)
+	switch stringsLowerTrim(cfg.Profiles.Mode) {
+	case profilesModeAuto:
+		if len(autoProfiles) == 0 {
+			return nil, nil, errors.New("auto-discovery found no Azure resources matching any known profile")
+		}
+		return autoProfiles, autoProfiles, nil
+	case profilesModeExact:
+		explicitProfileIDs, err := catalog.ProfileIDsForBaseNames(cfg.Profiles.explicitBaseNames())
+		if err != nil {
+			return nil, nil, err
+		}
+		return explicitProfileIDs, nil, nil
+	case profilesModeCombined:
+		explicitProfileIDs, err := catalog.ProfileIDsForBaseNames(cfg.Profiles.explicitBaseNames())
+		if err != nil {
+			return nil, nil, err
+		}
+		return mergeProfileIDs(explicitProfileIDs, autoProfiles), autoProfiles, nil
+	default:
+		return nil, nil, fmt.Errorf("unsupported profiles.mode %q", cfg.Profiles.Mode)
+	}
 }
 
 func createCredential(auth cloudauth.AzureADAuthConfig, cloudCfg azcloud.Configuration) (azcore.TokenCredential, error) {
@@ -151,19 +255,6 @@ func createCredential(auth cloudauth.AzureADAuthConfig, cloudCfg azcloud.Configu
 	return auth.NewCredentialWithOptions(&cloudauth.AzureADCredentialOptions{
 		ClientOptions: azcore.ClientOptions{Cloud: cloudCfg},
 	})
-}
-
-func extractAutoKeyword(profiles []string) (bool, []string) {
-	auto := false
-	filtered := make([]string, 0, len(profiles))
-	for _, p := range profiles {
-		if stringsLowerTrim(p) == profileAutoKeyword {
-			auto = true
-			continue
-		}
-		filtered = append(filtered, p)
-	}
-	return auto, filtered
 }
 
 func mergeProfileIDs(explicit, discovered []string) []string {

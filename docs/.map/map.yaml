@@ -429,8 +429,9 @@ sidebar:
           label: Secrets Management
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/SECRETS.md
           description: Use secret references to avoid storing credentials in plain text. Supports environment variables, files, commands, and secretstore backends.
-      - type: integration_placeholder
-        integration_kind: secretstore
+        items:
+          - type: integration_placeholder
+            integration_kind: secretstore
       - meta:
           label: SNMP Profile Format
           edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/snmp/profile-format.md

@@ -11,13 +11,6 @@
         "minimum": 60,
         "default": 60
       },
-      "timeout": {
-        "title": "Timeout",
-        "description": "Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds.",
-        "type": "number",
-        "minimum": 0,
-        "default": 30
-      },
       "autodetection_retry": {
         "title": "Detection retry",
         "description": "Recheck interval in seconds. Zero disables retries.",
@@ -25,11 +18,14 @@
         "minimum": 0,
         "default": 0
       },
-      "subscription_id": {
-        "title": "Subscription ID",
-        "description": "Azure subscription ID.",
-        "type": "string",
-        "default": ""
+      "subscription_ids": {
+        "title": "Subscription IDs",
+        "description": "Azure subscription IDs.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1
       },
       "cloud": {
         "title": "Azure cloud",
@@ -42,68 +38,230 @@
         ],
         "default": "public"
       },
-      "discovery_every": {
-        "title": "Discovery every",
-        "description": "Resource discovery refresh interval, in seconds.",
-        "type": "integer",
-        "minimum": 60,
-        "default": 300
-      },
-      "query_offset": {
-        "title": "Query offset",
-        "description": "How many seconds to shift queries into the past to avoid partial Azure Monitor windows.",
-        "type": "integer",
-        "minimum": 60,
-        "default": 180
-      },
-      "max_concurrency": {
-        "title": "Max concurrency",
-        "description": "Maximum concurrent Azure Monitor batch requests.",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 64,
-        "default": 4
-      },
-      "max_batch_resources": {
-        "title": "Max resources per batch",
-        "description": "Maximum resource IDs per batch API call.",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 50,
-        "default": 50
-      },
-      "max_metrics_per_query": {
-        "title": "Max metrics per query",
-        "description": "Maximum metric names per batch API call.",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 20,
-        "default": 20
-      },
-      "resource_groups": {
-        "title": "Resource groups",
-        "description": "Optional list of Azure resource groups to include.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "items": {
-          "type": "string"
+      "discovery": {
+        "title": "Discovery",
+        "type": "object",
+        "properties": {
+          "refresh_every": {
+            "title": "Discovery every",
+            "description": "Resource discovery refresh interval, in seconds. Set to 0 to disable periodic runtime rediscovery after bootstrap.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 300
+          },
+          "mode": {
+            "title": "Discovery mode",
+            "description": "How candidate Azure resources are selected.",
+            "type": "string",
+            "enum": [
+              "filters",
+              "query"
+            ],
+            "default": "filters"
+          }
+        },
+        "dependencies": {
+          "mode": {
+            "oneOf": [
+              {
+                "properties": {
+                  "mode": {
+                    "const": "filters"
+                  },
+                  "mode_filters": {
+                    "title": "Structured filters",
+                    "type": "object",
+                    "properties": {
+                      "resource_groups": {
+                        "title": "Resource groups",
+                        "description": "Optional list of Azure resource groups to include.",
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "regions": {
+                        "title": "Regions",
+                        "description": "Optional list of Azure regions to include.",
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "tags": {
+                        "title": "Tags",
+                        "description": "Optional tag filters. Keys map to one or more accepted values.",
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "query"
+                  },
+                  "mode_query": {
+                    "title": "Custom query",
+                    "type": "object",
+                    "properties": {
+                      "kql": {
+                        "title": "Azure Resource Graph KQL",
+                        "description": "Custom Azure Resource Graph query.",
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "kql"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_query"
+                ]
+              }
+            ]
+          }
         }
       },
       "profiles": {
         "title": "Profiles",
-        "description": "Profile ids to enable. Use 'auto' for automatic discovery based on resource types in the subscription. Combine with explicit ids: ['auto', 'custom_profile']. Empty list disables collection.",
-        "type": [
-          "array",
-          "null"
-        ],
-        "items": {
-          "type": "string"
+        "type": "object",
+        "properties": {
+          "mode": {
+            "title": "Profiles mode",
+            "description": "How metric profiles are selected.",
+            "type": "string",
+            "enum": [
+              "auto",
+              "exact",
+              "combined"
+            ],
+            "default": "auto"
+          }
         },
-        "default": [
-          "auto"
-        ]
+        "dependencies": {
+          "mode": {
+            "oneOf": [
+              {
+                "properties": {
+                  "mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "exact"
+                  },
+                  "mode_exact": {
+                    "title": "Exact profiles",
+                    "type": "object",
+                    "properties": {
+                      "names": {
+                        "title": "Profile basenames",
+                        "description": "Explicit profile file basenames used by `exact` mode. Matching is case-insensitive.",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "names"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_exact"
+                ]
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "combined"
+                  },
+                  "mode_combined": {
+                    "title": "Combined profiles",
+                    "type": "object",
+                    "properties": {
+                      "names": {
+                        "title": "Profile basenames",
+                        "description": "Explicit profile file basenames merged with auto-discovered profiles in `combined` mode. Matching is case-insensitive.",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "names"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_combined"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "query_offset": {
+        "title": "Query offset",
+        "description": "Minimum seconds to shift metric queries into the past; slower time-grain batches may use a larger effective offset automatically.",
+        "type": "integer",
+        "minimum": 60,
+        "default": 180
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds.",
+        "type": "number",
+        "minimum": 0,
+        "default": 30
+      },
+      "limits": {
+        "title": "Limits",
+        "type": "object",
+        "properties": {
+          "max_concurrency": {
+            "title": "Max concurrency",
+            "description": "Maximum concurrent Azure Monitor batch requests.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64,
+            "default": 4
+          },
+          "max_batch_resources": {
+            "title": "Max resources per batch",
+            "description": "Maximum resource IDs per batch API call.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 50
+          },
+          "max_metrics_per_query": {
+            "title": "Max metrics per query",
+            "description": "Maximum metric names per batch API call.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 20
+          }
+        }
       },
       "auth": {
         "title": "Authentication",
@@ -203,7 +361,7 @@
       }
     },
     "required": [
-      "subscription_id",
+      "subscription_ids",
       "auth"
     ]
   },
@@ -211,54 +369,146 @@
     "uiOptions": {
       "fullPage": true
     },
-    "resource_groups": {
-      "ui:listFlavour": "list"
-    },
-    "profiles": {
-      "ui:listFlavour": "list"
-    },
-    "timeout": {
-      "ui:help": "Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
+    "subscription_ids": {
+      "ui:listFlavour": "list",
+      "ui:help": "Add one Azure subscription ID per row. This job will monitor resources across all listed subscriptions.",
+      "items": {
+        "ui:help": "Azure subscription ID.",
+        "ui:placeholder": "00000000-0000-0000-0000-000000000000"
+      }
     },
     "cloud": {
+      "ui:help": "Select the Azure cloud environment that contains the subscriptions you want to monitor.",
       "ui:widget": "radio",
       "ui:options": {
         "inline": true
       }
     },
-    "auth": {
+    "discovery": {
       "mode": {
+        "ui:help": "Choose how the collector finds candidate Azure resources: `filters` uses structured subscription/resource filters, while `query` runs your custom Azure Resource Graph KQL.",
         "ui:widget": "radio",
         "ui:options": {
           "inline": true
-        },
-        "ui:help": "Choose how Netdata gets Azure credentials.\n\n- `service_principal`: Use an Azure app / service principal. Requires `tenant_id`, `client_id`, and `client_secret` in `mode_service_principal`.\n- `managed_identity`: Use the managed identity attached to the Azure resource running Netdata. Set `mode_managed_identity.client_id` only for a user-assigned identity.\n- `default`: Use the Azure SDK `DefaultAzureCredential` chain. This automatically tries available Azure credential sources, such as environment-based credentials, managed identity, and local developer credentials.\n\nUse `service_principal` for explicit app credentials. Use `managed_identity` when Netdata runs on an Azure resource with an attached identity. Use `default` when you want Azure SDK auto-discovery or local development convenience."
+        }
       },
-      "mode_service_principal": {
-        "client_secret": {
-          "ui:widget": "password"
+      "mode_filters": {
+        "resource_groups": {
+          "ui:listFlavour": "list",
+          "ui:help": "Optional list of Azure resource groups to include. Leave empty to include matching resources from all resource groups.",
+          "items": {
+            "ui:help": "Azure resource group name.",
+            "ui:placeholder": "rg-production"
+          }
+        },
+        "regions": {
+          "ui:listFlavour": "list",
+          "ui:help": "Optional list of Azure regions to include. Leave empty to include matching resources from all regions.",
+          "items": {
+            "ui:help": "Azure region name.",
+            "ui:placeholder": "eastus"
+          }
+        },
+        "tags": {
+          "ui:help": "Optional tag filters. Add a tag key and then provide one or more accepted values for that key. Tag keys are matched case-insensitively and values are matched case-sensitively.",
+          "additionalProperties": {
+            "ui:listFlavour": "list",
+            "ui:help": "Add one or more accepted values for this tag key.",
+            "items": {
+              "ui:help": "Allowed value for the selected tag key.",
+              "ui:placeholder": "prod"
+            }
+          }
+        }
+      },
+      "mode_query": {
+        "kql": {
+          "ui:help": "Provide a custom Azure Resource Graph KQL query. The result must include resource `id`, `name`, `type`, `resourceGroup`, and `location`.",
+          "ui:placeholder": "resources | where tags.env == 'prod' | project id, name, type, resourceGroup, location",
+          "ui:widget": "textarea"
         }
       }
+    },
+    "profiles": {
+      "mode": {
+        "ui:help": "Choose how metric profiles are activated: `auto` enables profiles for discovered resource types, `exact` uses only the listed profile basenames, and `combined` merges both.",
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "mode_exact": {
+        "names": {
+          "ui:listFlavour": "list",
+          "ui:help": "Add Azure Monitor profile file basenames to enable explicitly in `exact` mode. Matching is case-insensitive.",
+          "items": {
+            "ui:help": "Profile file basename from the Azure Monitor profile catalog.",
+            "ui:placeholder": "sql_database"
+          }
+        }
+      },
+      "mode_combined": {
+        "names": {
+          "ui:listFlavour": "list",
+          "ui:help": "Add profile file basenames to merge with auto-discovered profiles in `combined` mode. Matching is case-insensitive.",
+          "items": {
+            "ui:help": "Profile file basename from the Azure Monitor profile catalog.",
+            "ui:placeholder": "sql_database"
+          }
+        }
+      }
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
+    },
+    "limits": {},
+    "auth": {
+      "mode": {
+        "ui:help": "Choose how Netdata gets Azure credentials: `service_principal` uses explicit app credentials, `managed_identity` uses an attached Azure identity, and `default` uses the Azure SDK credential chain.",
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "mode_service_principal": {
+        "tenant_id": {
+          "ui:help": "Azure tenant ID for the service principal.",
+          "ui:placeholder": "00000000-0000-0000-0000-000000000000"
+        },
+        "client_id": {
+          "ui:help": "Azure client ID of the service principal application.",
+          "ui:placeholder": "00000000-0000-0000-0000-000000000000"
+        },
+        "client_secret": {
+          "ui:help": "Client secret for the Azure service principal.",
+          "ui:placeholder": "paste-client-secret-here",
+          "ui:widget": "password"
+        }
+      },
+      "mode_managed_identity": {
+        "client_id": {
+          "ui:help": "Optional client ID of a user-assigned managed identity. Leave empty to use the system-assigned managed identity.",
+          "ui:placeholder": "00000000-0000-0000-0000-000000000000"
+        }
+      }
+    },
+    "vnode": {
+      "ui:help": "Optional virtual node name used to group charts from this job under a specific Netdata virtual node.",
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
         {
-          "title": "Target",
+          "title": "Base",
           "fields": [
-            "subscription_id",
+            "subscription_ids",
             "cloud",
-            "vnode"
-          ]
-        },
-        {
-          "title": "Collection",
-          "fields": [
             "update_every",
-            "timeout",
             "autodetection_retry",
-            "discovery_every",
-            "query_offset"
+            "query_offset",
+            "timeout",
+            "vnode"
           ]
         },
         {
@@ -268,18 +518,21 @@
           ]
         },
         {
+          "title": "Discovery",
+          "fields": [
+            "discovery"
+          ]
+        },
+        {
           "title": "Profiles",
           "fields": [
-            "profiles",
-            "resource_groups"
+            "profiles"
           ]
         },
         {
           "title": "Limits",
           "fields": [
-            "max_concurrency",
-            "max_batch_resources",
-            "max_metrics_per_query"
+            "limits"
           ]
         }
       ]

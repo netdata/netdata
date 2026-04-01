@@ -1551,7 +1551,8 @@ static inline void statsd_get_metric_type_and_id(STATSD_METRIC *m, char *type, c
     // ${STATSD_CHART_PREFIX} + "_" + the first word of ${METRIC_NAME}
 
     // find the first word of ${METRIC_NAME}
-    char firstword[len + 1], *s = "";
+    char *firstword = mallocz(len + 1);
+    char *s = "";
     strncpyz(firstword, m->name, len);
     for (s = firstword; *s ; s++) {
         if (unlikely(*s == '.' || *s == '_')) {
@@ -1573,6 +1574,8 @@ static inline void statsd_get_metric_type_and_id(STATSD_METRIC *m, char *type, c
         snprintfz(id, len, "%s_%s", s, metrictype);
     else
         snprintfz(id, len, "%s", metrictype);
+
+    freez(firstword);
 
     // for the context, we want the full of both the above, separated with a dot (type.id):
     snprintfz(context, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
@@ -2136,7 +2139,7 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                     if(unlikely(dim->metric_pattern)) {
                         size_t dim_name_len = strlen(dim->name);
                         size_t wildcarded_len = dim_name_len + strlen(m->name) + 1;
-                        char wildcarded[wildcarded_len];
+                        char *wildcarded = mallocz(wildcarded_len);
 
                         strcpy(wildcarded, dim->name);
                         char *ws = &wildcarded[dim_name_len];
@@ -2175,6 +2178,8 @@ static inline void check_if_metric_is_for_app(STATSD_INDEX *index, STATSD_METRIC
                             // the new dimension is appended to the list
                             // so, it will be matched and linked later too
                         }
+
+                        freez(wildcarded);
                     }
                     else if(!dim->value_ptr && dim->metric_hash == m->hash && !strcmp(dim->metric, m->name)) {
                         // we have a match - this metric should be linked to this dimension
@@ -2212,7 +2217,7 @@ static inline RRDDIM *statsd_add_dim_to_app_chart(STATSD_APP *app, STATSD_APP_CH
         // the same metric is found multiple times
 
         size_t len = strlen(dim->metric) + 100;
-        char metric[ len + 1 ];
+        char *metric = mallocz(len + 1);
 
         if(count_same_metric_value_type > 1) {
             // the same metric, with the same value type, is added multiple times
@@ -2224,6 +2229,7 @@ static inline RRDDIM *statsd_add_dim_to_app_chart(STATSD_APP *app, STATSD_APP_CH
         }
 
         dim->rd = rrddim_add(chart->st, metric, dim->name, dim->multiplier, dim->divisor, dim->algorithm);
+        freez(metric);
         if(dim->flags != RRDDIM_FLAG_NONE) dim->rd->flags |= dim->flags;
         if(dim->options != RRDDIM_OPTION_NONE) dim->rd->collector.options |= dim->options;
         return dim->rd;

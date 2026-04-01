@@ -42,5 +42,7 @@ func (r *Resolver) resolveCmd(ctx context.Context, cmdLine, original string) (st
 		return "", fmt.Errorf("resolving secret '%s': command failed: %w", original, err)
 	}
 
-	return strings.TrimSpace(string(out)), nil
+	value := strings.TrimSpace(string(out))
+	logResolved(ctx, "resolved secret via command '%s'", parts[0])
+	return value, nil
 }

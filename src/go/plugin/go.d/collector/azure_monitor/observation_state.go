@@ -137,6 +137,7 @@ func accumulatorResourceUID(key string) string {
 func labelValues(labels metrix.Labels) []string {
 	return []string{
 		labels["resource_uid"],
+		labels["subscription_id"],
 		labels["resource_name"],
 		labels["resource_group"],
 		labels["region"],
