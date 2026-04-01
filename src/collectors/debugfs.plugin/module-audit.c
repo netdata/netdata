@@ -9,12 +9,15 @@
 #include <linux/audit.h>
 #include <linux/netlink.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
 
-// minimum payload size: 8 fields (mask through backlog) = 32 bytes
-#define AUDIT_STATUS_MIN_PAYLOAD 32
+#define AUDIT_STATUS_MIN_PAYLOAD 32  // 8 fields (mask through backlog) = 32 bytes
+#define AUDIT_RECV_TIMEOUT_SEC   2   // netlink receive timeout
+#define AUDIT_RECV_MAX_ATTEMPTS  5   // max recvfrom attempts per query
+#define AUDIT_STARTUP_RETRIES    3   // startup failures before permanent disable
 
 // -----------------------------------------------------------------------
 // netlink audit query
@@ -81,13 +84,13 @@ static int audit_netlink_query(struct audit_reply *reply) {
     char buf[8192];
 
     // set a 2-second timeout to avoid blocking forever
-    struct timeval tv = { .tv_sec = 2, .tv_usec = 0 };
+    struct timeval tv = { .tv_sec = AUDIT_RECV_TIMEOUT_SEC, .tv_usec = 0 };
     if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
         close(fd);
         return -1;
     }
 
-    for (int attempts = 0; attempts < 5; attempts++) {
+    for (int attempts = 0; attempts < AUDIT_RECV_MAX_ATTEMPTS; attempts++) {
         struct sockaddr_nl from;
         socklen_t fromlen = sizeof(from);
 
@@ -249,7 +252,7 @@ static void audit_send_data(struct audit_reply *r) {
 // module entry point
 
 int do_module_audit(int update_every, const char *name) {
-    static int startup_retries = 3;
+    static int startup_retries = AUDIT_STARTUP_RETRIES;
 
     struct audit_reply reply;
     if (audit_netlink_query(&reply) < 0 || !reply.valid) {
