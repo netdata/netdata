@@ -25,6 +25,19 @@ void *dictionary_foreach_start_rw(DICTFE *dfe) {
     dfe->locked = true;
     ll_recursive_lock(dfe->dict, dfe->rw);
 
+    // Re-check under the lock — dictionary_destroy() sets the flag while
+    // holding this lock, so this is the synchronized check.
+    if(unlikely(is_dictionary_destroyed(dfe->dict))) {
+        ll_recursive_unlock(dfe->dict, dfe->rw);
+        dfe->locked = false;
+        dfe->dict = NULL;
+        dfe->item = NULL;
+        dfe->name = NULL;
+        dfe->value = NULL;
+        dfe->counter = 0;
+        return NULL;
+    }
+
     // get the first item from the list
     DICTIONARY_ITEM *item = dfe->dict->items.list;
 
@@ -63,6 +76,11 @@ ALWAYS_INLINE void *dictionary_foreach_next(DICTFE *dfe) {
     if(unlikely(dfe->rw == DICTIONARY_LOCK_REENTRANT) || !dfe->locked) {
         ll_recursive_lock(dfe->dict, dfe->rw);
         dfe->locked = true;
+
+        if(unlikely(is_dictionary_destroyed(dfe->dict))) {
+            dictionary_foreach_done(dfe);
+            return NULL;
+        }
     }
 
     // the item we just did
@@ -147,6 +165,11 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callba
 
     ll_recursive_lock(dict, rw);
 
+    if(unlikely(is_dictionary_destroyed(dict))) {
+        ll_recursive_unlock(dict, rw);
+        return 0;
+    }
+
     DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
 
     // written in such a way, that the callback can delete the active element
@@ -211,6 +234,12 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough
     DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
 
     ll_recursive_lock(dict, rw);
+
+    if(unlikely(is_dictionary_destroyed(dict))) {
+        ll_recursive_unlock(dict, rw);
+        return 0;
+    }
+
     size_t entries = __atomic_load_n(&dict->entries, __ATOMIC_RELAXED);
     DICTIONARY_ITEM **array = mallocz(sizeof(DICTIONARY_ITEM *) * entries);
 

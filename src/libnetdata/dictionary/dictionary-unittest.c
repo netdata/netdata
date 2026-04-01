@@ -1009,6 +1009,174 @@ size_t dictionary_unittest_views(void) {
     return errors;
 }
 
+// ----------------------------------------------------------------------------
+// Test: dictionary_destroy() TOCTOU race
+//
+// Stress test for the race where dictionary_destroy() could start force-freeing
+// a dictionary while concurrent get/set/traversal operations were still able
+// to enter through stale pre-lock destroyed-state checks.
+//
+// The test runs the racy workload in a forked child process so that a crash
+// is detected as a child signal instead of bringing down the test harness.
+
+#include <sys/wait.h>
+
+struct dict_destroy_race_data {
+    DICTIONARY *dict;
+    int ready;          // atomic: worker signals it is looping
+    int stop;           // atomic: main tells worker to stop
+};
+
+// Worker that continuously acquires and releases an item.
+static void dict_destroy_race_getter_thread(void *arg) {
+    struct dict_destroy_race_data *d = arg;
+
+    __atomic_store_n(&d->ready, 1, __ATOMIC_RELEASE);
+
+    while(!__atomic_load_n(&d->stop, __ATOMIC_RELAXED)) {
+        DICTIONARY_ITEM *item = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(d->dict, "key");
+        if(item) {
+            const char *val = dictionary_acquired_item_value(item);
+            if(val) {
+                volatile char c __attribute__((unused)) = val[0];
+            }
+            dictionary_acquired_item_release(d->dict, item);
+        }
+    }
+}
+
+// Worker that continuously sets (inserts/updates) items.
+static void dict_destroy_race_setter_thread(void *arg) {
+    struct dict_destroy_race_data *d = arg;
+
+    __atomic_store_n(&d->ready, 1, __ATOMIC_RELEASE);
+
+    int counter = 0;
+    while(!__atomic_load_n(&d->stop, __ATOMIC_RELAXED)) {
+        char key[32], val[32];
+        snprintfz(key, sizeof(key), "key-%d", counter % 10);
+        snprintfz(val, sizeof(val), "val-%d", counter);
+        dictionary_set(d->dict, key, val, strlen(val) + 1);
+        counter++;
+    }
+}
+
+// Worker that continuously traverses (dfe_start_read / dfe_done).
+static void dict_destroy_race_traverser_thread(void *arg) {
+    struct dict_destroy_race_data *d = arg;
+
+    __atomic_store_n(&d->ready, 1, __ATOMIC_RELEASE);
+
+    while(!__atomic_load_n(&d->stop, __ATOMIC_RELAXED)) {
+        void *val;
+        dfe_start_read(d->dict, val) {
+            if(val) {
+                volatile char c __attribute__((unused)) = ((const char *)val)[0];
+            }
+        }
+        dfe_done(val);
+    }
+}
+
+// Run the racy workload in a child process: concurrent get/set/traverse
+// while the main thread destroys the dictionary. Without the fix this may
+// crash or trip internal consistency checks, depending on timing.
+static void dict_destroy_race_child(int iterations) {
+    for(int i = 0; i < iterations; i++) {
+        DICTIONARY *dict = dictionary_create(DICT_OPTION_NONE);
+        dictionary_set(dict, "key", "value", 6);
+
+        struct dict_destroy_race_data getter_data = { .dict = dict, .ready = 0, .stop = 0 };
+        struct dict_destroy_race_data setter_data = { .dict = dict, .ready = 0, .stop = 0 };
+        struct dict_destroy_race_data traverser_data = { .dict = dict, .ready = 0, .stop = 0 };
+
+        ND_THREAD *getter = nd_thread_create(
+            "race-getter", NETDATA_THREAD_OPTION_DONT_LOG,
+            dict_destroy_race_getter_thread, &getter_data);
+
+        ND_THREAD *setter = nd_thread_create(
+            "race-setter", NETDATA_THREAD_OPTION_DONT_LOG,
+            dict_destroy_race_setter_thread, &setter_data);
+
+        ND_THREAD *traverser = nd_thread_create(
+            "race-trav", NETDATA_THREAD_OPTION_DONT_LOG,
+            dict_destroy_race_traverser_thread, &traverser_data);
+
+        // wait for all workers to be running
+        while(!__atomic_load_n(&getter_data.ready, __ATOMIC_ACQUIRE) ||
+              !__atomic_load_n(&setter_data.ready, __ATOMIC_ACQUIRE) ||
+              !__atomic_load_n(&traverser_data.ready, __ATOMIC_ACQUIRE))
+            tinysleep();
+
+        tinysleep();
+
+        // destroy while all workers are in-flight
+        dictionary_destroy(dict);
+
+        __atomic_store_n(&getter_data.stop, 1, __ATOMIC_RELEASE);
+        __atomic_store_n(&setter_data.stop, 1, __ATOMIC_RELEASE);
+        __atomic_store_n(&traverser_data.stop, 1, __ATOMIC_RELEASE);
+        nd_thread_join(getter);
+        nd_thread_join(setter);
+        nd_thread_join(traverser);
+
+        cleanup_destroyed_dictionaries(false);
+    }
+}
+
+static int dictionary_destroy_race_unittest(void) {
+    const int iterations = 1000;
+
+    fprintf(stderr,
+            "\nTesting dictionary_destroy() TOCTOU race (%d iterations in child process)...\n",
+            iterations);
+
+    fflush(stderr);
+    fflush(stdout);
+
+    pid_t pid = fork();
+    if(pid == 0) {
+        // child — run the racy workload
+        dict_destroy_race_child(iterations);
+        _exit(0);
+    }
+
+    if(pid < 0) {
+        fprintf(stderr, "dictionary_destroy() TOCTOU race test: fork() failed: %s\n",
+                strerror(errno));
+        return 1;
+    }
+
+    int status = 0;
+    if(waitpid(pid, &status, 0) < 0) {
+        fprintf(stderr, "dictionary_destroy() TOCTOU race test: waitpid() failed: %s\n",
+                strerror(errno));
+        return 1;
+    }
+
+    if(WIFSIGNALED(status)) {
+        int sig = WTERMSIG(status);
+        fprintf(stderr,
+                "dictionary_destroy() TOCTOU race test: FAILED — "
+                "child killed by signal %d (%s) — "
+                "dictionary_destroy() still has a TOCTOU in its destroy/access "
+                "synchronization path\n",
+                sig, strsignal(sig));
+        return 1;
+    }
+
+    if(WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+        fprintf(stderr,
+                "dictionary_destroy() TOCTOU race test: FAILED — "
+                "child exited with status %d\n",
+                WEXITSTATUS(status));
+        return 1;
+    }
+
+    fprintf(stderr, "dictionary_destroy() TOCTOU race test: OK\n");
+    return 0;
+}
+
 bool dictionary_traverse_or_destroy_unittest(void) {
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     dictionary_set(dict, "KEY 1", "VALUE1", strlen("VALUE1") + 1);
@@ -1634,6 +1802,8 @@ int dictionary_unittest(size_t entries) {
     }
     else
         fprintf(stderr, "Destroy on traversal test OK\n");
+
+    errors += dictionary_destroy_race_unittest();
 
     cleanup_destroyed_dictionaries(false);
 
