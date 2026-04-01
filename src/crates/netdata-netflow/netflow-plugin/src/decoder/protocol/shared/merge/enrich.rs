@@ -34,6 +34,33 @@ pub(crate) fn merge_enriched_records(existing: &mut DecodedFlow, incoming: &Deco
             }
         };
     }
+    fn merge_asn_with_name(
+        dst_as: &mut u32,
+        dst_name: &mut String,
+        src_as: u32,
+        src_name: &str,
+        changed: &mut bool,
+    ) {
+        if src_as != 0 && *dst_as == 0 {
+            *dst_as = src_as;
+            *changed = true;
+
+            if src_name.is_empty() {
+                if !dst_name.is_empty() {
+                    dst_name.clear();
+                    *changed = true;
+                }
+            } else if dst_name.as_str() != src_name {
+                *dst_name = src_name.to_string();
+                *changed = true;
+            }
+        }
+
+        if !src_name.is_empty() && dst_name.is_empty() {
+            *dst_name = src_name.to_string();
+            *changed = true;
+        }
+    }
 
     // Protocol version / exporter identity
     merge_copy!(flow_version);
@@ -73,10 +100,20 @@ pub(crate) fn merge_enriched_records(existing: &mut DecodedFlow, incoming: &Deco
     merge_copy!(dst_prefix);
     merge_copy!(src_mask);
     merge_copy!(dst_mask);
-    merge_copy!(src_as);
-    merge_copy!(dst_as);
-    merge_str!(src_as_name);
-    merge_str!(dst_as_name);
+    merge_asn_with_name(
+        &mut dst.src_as,
+        &mut dst.src_as_name,
+        src.src_as,
+        &src.src_as_name,
+        &mut changed,
+    );
+    merge_asn_with_name(
+        &mut dst.dst_as,
+        &mut dst.dst_as_name,
+        src.dst_as,
+        &src.dst_as_name,
+        &mut changed,
+    );
 
     // Network attributes
     merge_str!(src_net_name);

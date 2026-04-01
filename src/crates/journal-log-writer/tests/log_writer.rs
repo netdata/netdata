@@ -5,7 +5,7 @@
 //! - File rotation (size-based, count-based)
 //! - Retention policies
 
-use journal_common::{Microseconds, load_machine_id};
+use journal_common::{Microseconds, load_machine_id, monotonic_now};
 use journal_log_writer::{
     Config, EntryTimestamps, Log, LogLifecycleEvent, LogLifecycleObserver, RetentionPolicy,
     RotationPolicy,
@@ -598,7 +598,7 @@ fn test_monotonic_override_remains_strict_after_restart() {
 }
 
 #[test]
-fn test_remapping_entry_respects_timestamp_overrides() {
+fn test_data_entry_preserves_timestamp_overrides_when_remapping_is_emitted() {
     if !journalctl_available() {
         eprintln!(
             "journalctl not available; skipping test_remapping_entry_respects_timestamp_overrides"
@@ -616,7 +616,10 @@ fn test_remapping_entry_respects_timestamp_overrides() {
         b"foo.bar=value",
     ];
     let realtime_override = Microseconds::now().get().saturating_add(1_000_000);
-    let monotonic_override = 123_456_u64;
+    let monotonic_override = monotonic_now()
+        .expect("read monotonic clock")
+        .get()
+        .saturating_add(1_000_000);
     let ts = EntryTimestamps::default()
         .with_entry_realtime_usec(realtime_override)
         .with_entry_monotonic_usec(monotonic_override);
@@ -641,10 +644,16 @@ fn test_remapping_entry_respects_timestamp_overrides() {
     let data_mono =
         parse_u64_field(data_row, "__MONOTONIC_TIMESTAMP").expect("missing data monotonic");
 
-    assert_eq!(remap_rt, realtime_override);
-    assert_eq!(data_rt, realtime_override + 1);
-    assert_eq!(remap_mono, monotonic_override);
-    assert_eq!(data_mono, monotonic_override + 1);
+    assert!(
+        remap_rt < data_rt,
+        "remapping entry should no longer consume the realtime override"
+    );
+    assert_eq!(data_rt, realtime_override);
+    assert!(
+        remap_mono < data_mono,
+        "remapping entry should no longer consume the monotonic override"
+    );
+    assert_eq!(data_mono, monotonic_override);
 }
 
 #[test]

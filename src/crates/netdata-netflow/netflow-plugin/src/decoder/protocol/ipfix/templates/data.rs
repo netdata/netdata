@@ -17,6 +17,9 @@ pub(crate) fn observe_ipfix_data_templates(
         let template_id = u16::from_be_bytes([cursor[0], cursor[1]]);
         let field_count = u16::from_be_bytes([cursor[2], cursor[3]]) as usize;
         cursor = &cursor[4..];
+        if field_count == 0 {
+            continue;
+        }
 
         let capacity = bounded_ipfix_data_field_capacity(field_count, cursor.len());
         let mut fields = Vec::with_capacity(capacity);
@@ -88,6 +91,35 @@ mod tests {
 
         assert!(!changed);
         assert!(namespace.ipfix_templates.is_empty());
+        assert!(!sampling.has_any_ipfix_datalink_templates());
+    }
+
+    #[test]
+    fn ipfix_data_templates_skip_empty_template_records() {
+        let mut sampling = SamplingState::default();
+        let mut namespace = DecoderStateNamespace::default();
+        let template_id = 0x0100;
+        assert!(namespace.set_ipfix_template(
+            template_id,
+            vec![PersistedIPFixTemplateField {
+                field_type: 8,
+                field_length: 4,
+                enterprise_number: None,
+            }],
+        ));
+
+        let body = [0x01, 0x00, 0x00, 0x00];
+        let changed =
+            observe_ipfix_data_templates("192.0.2.1", 42, &body, &mut sampling, &mut namespace);
+
+        assert!(!changed);
+        assert_eq!(
+            namespace
+                .ipfix_templates
+                .get(&template_id)
+                .map(|template| template.fields.len()),
+            Some(1)
+        );
         assert!(!sampling.has_any_ipfix_datalink_templates());
     }
 }

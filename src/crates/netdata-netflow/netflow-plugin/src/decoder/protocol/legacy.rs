@@ -48,6 +48,8 @@ pub(crate) fn append_v5_records(
         rec.raw_bytes = flow.d_octets as u64;
         rec.raw_packets = flow.d_pkts as u64;
         rec.set_sampling_rate(sampling as u64);
+        rec.flow_start_usec = flow_start_usec;
+        rec.flow_end_usec = flow_end_usec;
         finalize_record(&mut rec);
 
         out.push(DecodedFlow {
@@ -112,6 +114,8 @@ pub(crate) fn append_v7_records(
         rec.raw_bytes = flow.d_octets as u64;
         rec.raw_packets = flow.d_pkts as u64;
         // V7 has no sampling_interval in header (unlike V5)
+        rec.flow_start_usec = flow_start_usec;
+        rec.flow_end_usec = flow_end_usec;
         finalize_record(&mut rec);
 
         out.push(DecodedFlow {

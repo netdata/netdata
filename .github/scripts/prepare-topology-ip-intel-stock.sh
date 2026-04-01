@@ -94,7 +94,7 @@ prepare_synthetic() {
   trap "rm -rf -- $(printf '%q' "${tmpdir}")" EXIT
 
   run tee "${tmpdir}/asn.csv" >/dev/null <<'EOF'
-1.1.1.0,1.1.1.255,13335,Cloudflare, Inc.
+1.1.1.0,1.1.1.255,13335,"Cloudflare, Inc."
 8.8.8.0,8.8.8.255,15169,Google LLC
 203.0.113.0,203.0.113.255,64500,Example Transit
 EOF

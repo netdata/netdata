@@ -397,6 +397,113 @@ fn emits_flow_records_for_v5_fixture() {
 }
 
 #[test]
+fn legacy_v5_records_populate_flow_window_timestamps() {
+    let source = SocketAddr::from((Ipv4Addr::new(192, 0, 2, 1), 2055));
+    let packet = netflow_parser::static_versions::v5::V5 {
+        header: netflow_parser::static_versions::v5::Header {
+            version: 5,
+            count: 1,
+            sys_up_time: 50_000,
+            unix_secs: 100,
+            unix_nsecs: 0,
+            flow_sequence: 1,
+            engine_type: 0,
+            engine_id: 0,
+            sampling_interval: 0,
+        },
+        flowsets: vec![netflow_parser::static_versions::v5::FlowSet {
+            src_addr: Ipv4Addr::new(10, 0, 0, 1),
+            dst_addr: Ipv4Addr::new(10, 0, 0, 2),
+            next_hop: Ipv4Addr::new(10, 0, 0, 254),
+            input: 3,
+            output: 4,
+            d_pkts: 7,
+            d_octets: 420,
+            first: 49_000,
+            last: 50_000,
+            src_port: 12345,
+            dst_port: 443,
+            pad1: 0,
+            tcp_flags: 0x12,
+            protocol_number: 6,
+            protocol_type: netflow_parser::protocol::ProtocolTypes::Tcp,
+            tos: 0,
+            src_as: 64512,
+            dst_as: 64513,
+            src_mask: 24,
+            dst_mask: 24,
+            pad2: 0,
+        }],
+    };
+
+    let mut out = Vec::new();
+    super::append_v5_records(
+        source,
+        &mut out,
+        packet,
+        TimestampSource::Input,
+        TEST_INPUT_REALTIME_USEC,
+    );
+
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].record.flow_start_usec, 99_000_000);
+    assert_eq!(out[0].record.flow_end_usec, 100_000_000);
+}
+
+#[test]
+fn legacy_v7_records_populate_flow_window_timestamps() {
+    let source = SocketAddr::from((Ipv4Addr::new(192, 0, 2, 2), 2055));
+    let packet = netflow_parser::static_versions::v7::V7 {
+        header: netflow_parser::static_versions::v7::Header {
+            version: 7,
+            count: 1,
+            sys_up_time: 80_000,
+            unix_secs: 120,
+            unix_nsecs: 0,
+            flow_sequence: 1,
+            reserved: 0,
+        },
+        flowsets: vec![netflow_parser::static_versions::v7::FlowSet {
+            src_addr: Ipv4Addr::new(10, 0, 1, 1),
+            dst_addr: Ipv4Addr::new(10, 0, 1, 2),
+            next_hop: Ipv4Addr::new(0, 0, 0, 0),
+            input: 0,
+            output: 7,
+            d_pkts: 9,
+            d_octets: 512,
+            first: 79_000,
+            last: 80_000,
+            src_port: 2055,
+            dst_port: 53,
+            flags_fields_valid: 0,
+            tcp_flags: 0,
+            protocol_number: 17,
+            protocol_type: netflow_parser::protocol::ProtocolTypes::Udp,
+            tos: 0,
+            src_as: 0,
+            dst_as: 0,
+            src_mask: 0,
+            dst_mask: 0,
+            flags_fields_invalid: 0,
+            router_src: Ipv4Addr::new(192, 0, 2, 2),
+        }],
+    };
+
+    let mut out = Vec::new();
+    super::append_v7_records(
+        source,
+        &mut out,
+        packet,
+        TimestampSource::Input,
+        TEST_INPUT_REALTIME_USEC,
+    );
+
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].record.flow_start_usec, 119_000_000);
+    assert_eq!(out[0].record.flow_end_usec, 120_000_000);
+}
+
+#[test]
 fn akvorado_v9_data_fixture_core_fields_match_including_sampling_rate() {
     let base = fixture_dir();
     let mut decoders = FlowDecoders::new();
@@ -1047,6 +1154,56 @@ fn merge_enrichment_keeps_asn_names_and_geo_coordinates() {
         fields.get("DST_GEO_LONGITUDE").map(String::as_str),
         Some("8.682100")
     );
+}
+
+#[test]
+fn merge_enrichment_synchronizes_asn_name_when_asn_is_backfilled() {
+    let mut dst = vec![canonical_test_flow(&[
+        ("SRC_AS", "0"),
+        ("SRC_AS_NAME", "AS0 Unknown ASN"),
+    ])];
+    let incoming = canonical_test_flow(&[
+        ("SRC_AS", "64512"),
+        ("SRC_AS_NAME", "AS64512 EXAMPLE TRANSIT"),
+    ]);
+
+    append_unique_flows(&mut dst, vec![incoming]);
+
+    assert_eq!(dst.len(), 1);
+    let fields = dst[0].record.to_fields();
+    assert_eq!(fields.get("SRC_AS").map(String::as_str), Some("64512"));
+    assert_eq!(
+        fields.get("SRC_AS_NAME").map(String::as_str),
+        Some("AS64512 EXAMPLE TRANSIT")
+    );
+}
+
+#[test]
+fn merge_enrichment_keeps_same_batch_dedup_stable_after_raw_counter_backfill() {
+    let mut dst = vec![canonical_test_flow(&[
+        ("BYTES", "89"),
+        ("PACKETS", "1"),
+        ("RAW_BYTES", "0"),
+        ("RAW_PACKETS", "0"),
+        ("IPTTL", "0"),
+        ("MPLS_LABELS", ""),
+    ])];
+    let incoming = canonical_test_flow(&[
+        ("BYTES", "89"),
+        ("PACKETS", "1"),
+        ("RAW_BYTES", "89"),
+        ("RAW_PACKETS", "1"),
+        ("IPTTL", "255"),
+        ("MPLS_LABELS", "20005,524250"),
+    ]);
+
+    append_unique_flows(&mut dst, vec![incoming.clone(), incoming]);
+
+    assert_eq!(dst.len(), 1);
+    let fields = dst[0].record.to_fields();
+    assert_eq!(fields.get("RAW_BYTES").map(String::as_str), Some("89"));
+    assert_eq!(fields.get("RAW_PACKETS").map(String::as_str), Some("1"));
+    assert_eq!(fields.get("IPTTL").map(String::as_str), Some("255"));
 }
 
 #[test]
