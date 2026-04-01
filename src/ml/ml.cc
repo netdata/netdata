@@ -28,19 +28,23 @@ static void __attribute__((destructor)) destroy_mutex(void) {
     netdata_mutex_destroy(&db_mutex);
 }
 
+namespace {
+
 template <bool TimeTNarrowerThanSqliteInt64>
-static inline bool ml_sqlite_int64_fits_time_t(sqlite3_int64 value)
+inline bool ml_sqlite_int64_fits_time_t(sqlite3_int64 value)
 {
     (void)value;
     return true;
 }
 
 template <>
-static inline bool ml_sqlite_int64_fits_time_t<true>(sqlite3_int64 value)
+inline bool ml_sqlite_int64_fits_time_t<true>(sqlite3_int64 value)
 {
     const sqlite3_int64 kTimeMin = (sqlite3_int64) std::numeric_limits<time_t>::min();
     const sqlite3_int64 kTimeMax = (sqlite3_int64) std::numeric_limits<time_t>::max();
     return value >= kTimeMin && value <= kTimeMax;
+}
+
 }
 
 static inline size_t ml_dimension_smoothing_window(const ml_dimension_t *dim)

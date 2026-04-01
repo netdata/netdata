@@ -12,16 +12,20 @@ using std::isinf;
 using std::isnan;
 #endif
 
+namespace {
+
 template <bool TimeTNarrowerThanInt64>
-static inline bool ml_int64_fits_nonnegative_time_t(int64_t value)
+inline bool ml_int64_fits_nonnegative_time_t(int64_t value)
 {
     return value >= 0;
 }
 
 template <>
-static inline bool ml_int64_fits_nonnegative_time_t<true>(int64_t value)
+inline bool ml_int64_fits_nonnegative_time_t<true>(int64_t value)
 {
     return value >= 0 && value <= (int64_t) std::numeric_limits<time_t>::max();
+}
+
 }
 
 void
