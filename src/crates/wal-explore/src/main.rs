@@ -1,4 +1,5 @@
 mod otap_dump;
+mod otap_dump_index;
 mod otap_frame;
 mod otap_index;
 mod otap_read;
@@ -33,6 +34,14 @@ enum Command {
         /// Path to .sfst file.
         file: PathBuf,
     },
+    /// Print reconstructed log entries from an .sfst index file.
+    DumpIndex {
+        /// Path to .sfst file.
+        file: PathBuf,
+        /// Max log entries to print (default: all).
+        #[arg(short = 'n', long)]
+        limit: Option<u32>,
+    },
     /// Build a roaring bitmap index for every key=value pair.
     Index {
         /// Path to WAL file.
@@ -64,6 +73,12 @@ fn main() {
         }
         Command::Read { file } => {
             if let Err(e) = otap_read::run(&file) {
+                eprintln!("{}: {e}", file.display());
+                std::process::exit(1);
+            }
+        }
+        Command::DumpIndex { file, limit } => {
+            if let Err(e) = otap_dump_index::run(&file, limit) {
                 eprintln!("{}: {e}", file.display());
                 std::process::exit(1);
             }
