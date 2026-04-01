@@ -36,7 +36,7 @@ static inline bool ml_sqlite_int64_fits_time_t(sqlite3_int64 value)
 }
 
 template <>
-inline bool ml_sqlite_int64_fits_time_t<true>(sqlite3_int64 value)
+static inline bool ml_sqlite_int64_fits_time_t<true>(sqlite3_int64 value)
 {
     const sqlite3_int64 kTimeMin = (sqlite3_int64) std::numeric_limits<time_t>::min();
     const sqlite3_int64 kTimeMax = (sqlite3_int64) std::numeric_limits<time_t>::max();

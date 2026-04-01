@@ -19,7 +19,7 @@ static inline bool ml_int64_fits_nonnegative_time_t(int64_t value)
 }
 
 template <>
-inline bool ml_int64_fits_nonnegative_time_t<true>(int64_t value)
+static inline bool ml_int64_fits_nonnegative_time_t<true>(int64_t value)
 {
     return value >= 0 && value <= (int64_t) std::numeric_limits<time_t>::max();
 }
