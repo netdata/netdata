@@ -28,6 +28,21 @@ static void __attribute__((destructor)) destroy_mutex(void) {
     netdata_mutex_destroy(&db_mutex);
 }
 
+template <bool TimeTNarrowerThanSqliteInt64>
+static inline bool ml_time_t_fits_sqlite_int64(sqlite3_int64 value)
+{
+    (void)value;
+    return true;
+}
+
+template <>
+inline bool ml_time_t_fits_sqlite_int64<true>(sqlite3_int64 value)
+{
+    const sqlite3_int64 kTimeMin = (sqlite3_int64) std::numeric_limits<time_t>::min();
+    const sqlite3_int64 kTimeMax = (sqlite3_int64) std::numeric_limits<time_t>::max();
+    return value >= kTimeMin && value <= kTimeMax;
+}
+
 static inline size_t ml_dimension_smoothing_window(const ml_dimension_t *dim)
 {
     unsigned chart_update_every = dim->rd->rrdset->update_every;
@@ -434,10 +449,8 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
 
         // Protect against silent truncation when time_t is narrower than int64_t
         // (e.g. 32-bit builds, corrupted DB, or far-future timestamps).
-        static constexpr sqlite3_int64 kTimeMin = std::numeric_limits<time_t>::min();
-        static constexpr sqlite3_int64 kTimeMax = std::numeric_limits<time_t>::max();
-        if (raw_after  < kTimeMin || raw_after  > kTimeMax ||
-            raw_before < kTimeMin || raw_before > kTimeMax) {
+        if (!ml_time_t_fits_sqlite_int64<(sizeof(time_t) < sizeof(sqlite3_int64))>(raw_after) ||
+            !ml_time_t_fits_sqlite_int64<(sizeof(time_t) < sizeof(sqlite3_int64))>(raw_before)) {
             error_report("Skipping ML model row with out-of-range timestamps: after=%" PRId64 " before=%" PRId64,
                          (int64_t) raw_after, (int64_t) raw_before);
             continue;
