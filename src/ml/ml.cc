@@ -28,6 +28,39 @@ static void __attribute__((destructor)) destroy_mutex(void) {
     netdata_mutex_destroy(&db_mutex);
 }
 
+namespace {
+
+template <bool NeedLowerBound, bool NeedUpperBound>
+inline bool ml_sqlite_int64_fits_time_t(sqlite3_int64 value)
+{
+    (void)value;
+    return true;
+}
+
+template <>
+inline bool ml_sqlite_int64_fits_time_t<true, false>(sqlite3_int64 value)
+{
+    const sqlite3_int64 kTimeMin = (sqlite3_int64) std::numeric_limits<time_t>::min();
+    return value >= kTimeMin;
+}
+
+template <>
+inline bool ml_sqlite_int64_fits_time_t<false, true>(sqlite3_int64 value)
+{
+    const sqlite3_int64 kTimeMax = (sqlite3_int64) std::numeric_limits<time_t>::max();
+    return value <= kTimeMax;
+}
+
+template <>
+inline bool ml_sqlite_int64_fits_time_t<true, true>(sqlite3_int64 value)
+{
+    const sqlite3_int64 kTimeMin = (sqlite3_int64) std::numeric_limits<time_t>::min();
+    const sqlite3_int64 kTimeMax = (sqlite3_int64) std::numeric_limits<time_t>::max();
+    return value >= kTimeMin && value <= kTimeMax;
+}
+
+}
+
 static inline size_t ml_dimension_smoothing_window(const ml_dimension_t *dim)
 {
     unsigned chart_update_every = dim->rd->rrdset->update_every;
@@ -431,13 +464,16 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
 
         sqlite3_int64 raw_after  = sqlite3_column_int64(res, 0);
         sqlite3_int64 raw_before = sqlite3_column_int64(res, 1);
+        constexpr bool kNeedLowerBound =
+            !std::numeric_limits<time_t>::is_signed ||
+            std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits;
+        constexpr bool kNeedUpperBound =
+            std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits;
 
         // Protect against silent truncation when time_t is narrower than int64_t
         // (e.g. 32-bit builds, corrupted DB, or far-future timestamps).
-        static constexpr sqlite3_int64 kTimeMin = std::numeric_limits<time_t>::min();
-        static constexpr sqlite3_int64 kTimeMax = std::numeric_limits<time_t>::max();
-        if (raw_after  < kTimeMin || raw_after  > kTimeMax ||
-            raw_before < kTimeMin || raw_before > kTimeMax) {
+        if (!ml_sqlite_int64_fits_time_t<kNeedLowerBound, kNeedUpperBound>(raw_after) ||
+            !ml_sqlite_int64_fits_time_t<kNeedLowerBound, kNeedUpperBound>(raw_before)) {
             error_report("Skipping ML model row with out-of-range timestamps: after=%" PRId64 " before=%" PRId64,
                          (int64_t) raw_after, (int64_t) raw_before);
             continue;

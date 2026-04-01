@@ -179,9 +179,9 @@ static void test_features_zero_smooth_matches_one()
 
     ML_TEST_ASSERT(pf0.size() == pf1.size(), "smooth_n=0 and smooth_n=1 should produce the same number of vectors");
     for (size_t i = 0; i < pf0.size() && i < pf1.size(); i++) {
-        for (long j = 0; j < pf0[i].size(); j++) {
+        for (size_t j = 0; j < features0.lag_n + 1; j++) {
             char msg[128];
-            snprintf(msg, sizeof(msg), "smooth_n=0 should match smooth_n=1 at feature[%zu](%ld)", i, j);
+            snprintf(msg, sizeof(msg), "smooth_n=0 should match smooth_n=1 at feature[%zu](%zu)", i, j);
             ML_TEST_ASSERT_DOUBLE_EQ(pf0[i](j), pf1[i](j), 1e-12, msg);
         }
     }
