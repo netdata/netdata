@@ -47,6 +47,7 @@ func (s *l2BuildState) registerObservation(obs L2Observation) error {
 	}
 	observedProtocols := observationProtocolsUsed(obs)
 	if existing, ok := s.devices[device.ID]; ok {
+		device = mergeObservedDevice(existing, device)
 		for protocol := range csvToTopologySet(existing.Labels["protocols_observed"]) {
 			observedProtocols[protocol] = struct{}{}
 		}
@@ -151,4 +152,68 @@ func (s *l2BuildState) registerObservation(obs L2Observation) error {
 	}
 
 	return nil
+}
+
+func mergeObservedDevice(existing, incoming Device) Device {
+	out := existing
+	if strings.TrimSpace(out.ID) == "" {
+		out.ID = incoming.ID
+	}
+	if strings.TrimSpace(incoming.Hostname) != "" && (strings.TrimSpace(out.Hostname) == "" || out.Hostname == out.ID) {
+		out.Hostname = incoming.Hostname
+	}
+	if strings.TrimSpace(out.SysObject) == "" {
+		out.SysObject = incoming.SysObject
+	}
+	if strings.TrimSpace(out.ChassisID) == "" {
+		out.ChassisID = incoming.ChassisID
+	}
+	out.Addresses = mergeObservedDeviceAddresses(existing.Addresses, incoming.Addresses)
+	out.Labels = mergeObservedDeviceLabels(existing.Labels, incoming.Labels)
+	if strings.TrimSpace(out.Hostname) == "" {
+		out.Hostname = out.ID
+	}
+	return out
+}
+
+func mergeObservedDeviceAddresses(existing, incoming []netip.Addr) []netip.Addr {
+	if len(existing) == 0 && len(incoming) == 0 {
+		return nil
+	}
+	merged := make(map[string]netip.Addr, len(existing)+len(incoming))
+	for _, addr := range existing {
+		if addr.IsValid() {
+			merged[addr.String()] = addr
+		}
+	}
+	for _, addr := range incoming {
+		if addr.IsValid() {
+			merged[addr.String()] = addr
+		}
+	}
+	return sortedAddrValues(merged)
+}
+
+func mergeObservedDeviceLabels(existing, incoming map[string]string) map[string]string {
+	if len(existing) == 0 && len(incoming) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(existing)+len(incoming))
+	for key, value := range existing {
+		if value != "" {
+			out[key] = value
+		}
+	}
+	for key, value := range incoming {
+		if value == "" {
+			continue
+		}
+		if strings.TrimSpace(out[key]) == "" {
+			out[key] = value
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

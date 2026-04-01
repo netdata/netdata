@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -92,8 +93,10 @@ func (d GoldenDocument) CanonicalJSON() ([]byte, error) {
 // Canonical returns a deterministic ordering for slices in the document.
 func (d GoldenDocument) Canonical() GoldenDocument {
 	out := d
-	out.Devices = append([]GoldenDevice(nil), d.Devices...)
-	out.Adjacencies = append([]GoldenAdjacency(nil), d.Adjacencies...)
+	out.Devices = make([]GoldenDevice, 0, len(d.Devices))
+	out.Devices = append(out.Devices, d.Devices...)
+	out.Adjacencies = make([]GoldenAdjacency, 0, len(d.Adjacencies))
+	out.Adjacencies = append(out.Adjacencies, d.Adjacencies...)
 
 	sort.Slice(out.Devices, func(i, j int) bool {
 		if out.Devices[i].ID != out.Devices[j].ID {
@@ -186,9 +189,93 @@ func (d GoldenDocument) validate() error {
 	if d.Expectations.DirectionalAdjacencies != len(d.Adjacencies) {
 		return fmt.Errorf("expectations.directional_adjacencies=%d does not match adjacencies=%d", d.Expectations.DirectionalAdjacencies, len(d.Adjacencies))
 	}
+	if d.Expectations.BidirectionalPairs != countGoldenBidirectionalPairs(d.Adjacencies) {
+		return fmt.Errorf("expectations.bidirectional_pairs=%d does not match bidirectional_pairs=%d", d.Expectations.BidirectionalPairs, countGoldenBidirectionalPairs(d.Adjacencies))
+	}
 	if d.Expectations.Devices != len(d.Devices) {
 		return fmt.Errorf("expectations.devices=%d does not match devices=%d", d.Expectations.Devices, len(d.Devices))
 	}
 
 	return nil
+}
+
+func countGoldenBidirectionalPairs(adjacencies []GoldenAdjacency) int {
+	directed := make(map[string]struct{}, len(adjacencies))
+	for _, adj := range adjacencies {
+		directed[goldenAdjacencyPairKey(adj)] = struct{}{}
+	}
+
+	counted := make(map[string]struct{}, len(directed))
+	pairs := 0
+	for _, adj := range adjacencies {
+		forward := goldenAdjacencyPairKey(adj)
+		reverse := goldenAdjacencyPairKey(GoldenAdjacency{
+			Protocol:     adj.Protocol,
+			SourceDevice: adj.TargetDevice,
+			SourcePort:   adj.TargetPort,
+			TargetDevice: adj.SourceDevice,
+			TargetPort:   adj.SourcePort,
+		})
+
+		canonical := forward
+		if reverse < canonical {
+			canonical = reverse
+		}
+		if _, done := counted[canonical]; done {
+			continue
+		}
+		if _, ok := directed[reverse]; !ok {
+			continue
+		}
+
+		counted[canonical] = struct{}{}
+		pairs++
+	}
+
+	return pairs
+}
+
+func goldenAdjacencyKey(parts ...string) string {
+	return strings.Join(parts, "|")
+}
+
+func goldenAdjacencyPairKey(adj GoldenAdjacency) string {
+	return goldenAdjacencyKey(
+		adj.Protocol,
+		adj.SourceDevice,
+		normalizeGoldenPortForPairing(adj.SourcePort),
+		adj.TargetDevice,
+		normalizeGoldenPortForPairing(adj.TargetPort),
+	)
+}
+
+func normalizeGoldenPortForPairing(port string) string {
+	port = strings.ToLower(strings.TrimSpace(port))
+	if port == "" {
+		return ""
+	}
+
+	port = strings.NewReplacer(" ", "", "\t", "", "\n", "", "\r", "").Replace(port)
+
+	for _, alias := range []struct {
+		short string
+		long  string
+	}{
+		{short: "gi", long: "gigabitethernet"},
+		{short: "fa", long: "fastethernet"},
+		{short: "te", long: "tengigabitethernet"},
+		{short: "po", long: "portchannel"},
+	} {
+		if strings.HasPrefix(port, alias.long) {
+			return port
+		}
+		if rest, ok := strings.CutPrefix(port, alias.short); ok && rest != "" {
+			switch rest[0] {
+			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '/':
+				return alias.long + rest
+			}
+		}
+	}
+
+	return port
 }

@@ -266,6 +266,9 @@ func matchLLDPLinksEnlinkdPassOrder(links []lldpMatchLink) []lldpMatchedPair {
 		if _, ok := parsed[source.index]; ok {
 			continue
 		}
+		if strings.TrimSpace(source.remotePortDescr) == "" || strings.TrimSpace(source.localPortDescr) == "" {
+			continue
+		}
 		key := lldpCompositeKey(
 			lldpIdentityTokenForMatch(source.localMatchID, source.localChassisID),
 			lldpIdentityTokenForMatch(source.remoteMatchID, source.remoteChassisID),

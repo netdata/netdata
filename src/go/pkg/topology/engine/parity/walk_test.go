@@ -49,3 +49,16 @@ func TestLoadWalkFile_NMS8003Fixture(t *testing.T) {
 	require.NotEmpty(t, oids)
 	require.Equal(t, "1.0.8802.1.1.2.1.3.1.0", oids[0])
 }
+
+func TestWalkDatasetLookupCachesByOID(t *testing.T) {
+	ds := WalkDataset{
+		Records: []WalkRecord{
+			{OID: "1.3.6.1.2.1.1.5.0", Type: "STRING", Value: "test-host"},
+		},
+	}
+
+	record, ok := ds.Lookup(".1.3.6.1.2.1.1.5.0")
+	require.True(t, ok)
+	require.Equal(t, "test-host", record.Value)
+	require.Contains(t, ds.byOID, "1.3.6.1.2.1.1.5.0")
+}

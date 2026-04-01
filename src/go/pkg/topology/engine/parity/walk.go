@@ -136,7 +136,10 @@ func ParseWalk(r io.Reader) ([]WalkRecord, error) {
 }
 
 // Lookup returns one record by OID. OID matching ignores leading dots.
-func (d WalkDataset) Lookup(oid string) (WalkRecord, bool) {
+func (d *WalkDataset) Lookup(oid string) (WalkRecord, bool) {
+	if d == nil {
+		return WalkRecord{}, false
+	}
 	if len(d.byOID) == 0 {
 		index := make(map[string]WalkRecord, len(d.Records))
 		for _, rec := range d.Records {

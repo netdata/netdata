@@ -70,6 +70,43 @@ func TestBuildBridgeDomainModel_AttachesMacsToMatchingBridgeSegments(t *testing.
 	require.Contains(t, standalone.endpointIDs, "mac:aa:bb:cc:dd:ee:ff")
 }
 
+func TestMergeRootDomainSets_MergesNodeMemberIntoExistingDesignatedRoot(t *testing.T) {
+	rootToNodes := map[string]bridgeNodeSet{
+		"designated-root": {"leaf-a": {}},
+		"other-root":      {"node-x": {}, "leaf-b": {}},
+	}
+
+	mergeRootDomainSets(rootToNodes, "designated-root", "node-x")
+
+	require.Len(t, rootToNodes, 1)
+	require.Contains(t, rootToNodes, "designated-root")
+	require.Equal(t, bridgeNodeSet{
+		"leaf-a":     {},
+		"other-root": {},
+		"node-x":     {},
+		"leaf-b":     {},
+	}, rootToNodes["designated-root"])
+}
+
+func TestMergeRootDomainSets_MergesTwoNonRootMembersAcrossDomains(t *testing.T) {
+	rootToNodes := map[string]bridgeNodeSet{
+		"root-a": {"designated-member": {}, "leaf-a": {}},
+		"root-b": {"node-member": {}, "leaf-b": {}},
+	}
+
+	mergeRootDomainSets(rootToNodes, "designated-member", "node-member")
+
+	require.Len(t, rootToNodes, 1)
+	require.Contains(t, rootToNodes, "root-a")
+	require.Equal(t, bridgeNodeSet{
+		"designated-member": {},
+		"leaf-a":            {},
+		"root-b":            {},
+		"node-member":       {},
+		"leaf-b":            {},
+	}, rootToNodes["root-a"])
+}
+
 func TestCollectBridgeLinkRecords_DeduplicatesUndirectedAdjacencies(t *testing.T) {
 	records := collectBridgeLinkRecords([]Adjacency{
 		{

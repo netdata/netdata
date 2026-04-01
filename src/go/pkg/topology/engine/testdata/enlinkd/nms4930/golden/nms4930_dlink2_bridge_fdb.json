@@ -8,7 +8,7 @@
       "hostname": "dlink2"
     }
   ],
-  "adjacencies": null,
+  "adjacencies": [],
   "expectations": {
     "directional_adjacencies": 0,
     "bidirectional_pairs": 0,

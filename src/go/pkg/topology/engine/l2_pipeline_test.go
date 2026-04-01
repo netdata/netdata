@@ -164,6 +164,42 @@ func TestBuildL2ResultFromObservations_DeviceProtocolsObservedLabel(t *testing.T
 	require.Equal(t, "arp,bridge,fdb,stp", result.Devices[0].Labels["protocols_observed"])
 }
 
+func TestBuildL2ResultFromObservations_MergesDuplicateDeviceObservations(t *testing.T) {
+	observations := []L2Observation{
+		{
+			DeviceID:     "switch-a",
+			Hostname:     "switch-a.example.net",
+			ManagementIP: "10.0.0.1",
+			SysObjectID:  "1.3.6.1.4.1.9.1.1",
+			ChassisID:    "aa:bb:cc:dd:ee:ff",
+			BridgePorts: []BridgePortObservation{
+				{BasePort: "3", IfIndex: 3},
+			},
+		},
+		{
+			DeviceID:     "switch-a",
+			ManagementIP: "10.0.0.2",
+			ARPNDEntries: []ARPNDObservation{
+				{IfIndex: 3, IP: "10.0.0.20", MAC: "70:49:a2:65:72:cd", Protocol: "arp"},
+			},
+		},
+	}
+
+	result, err := BuildL2ResultFromObservations(observations, DiscoverOptions{
+		EnableBridge: true,
+		EnableARP:    true,
+	})
+	require.NoError(t, err)
+
+	device := findDeviceByID(result.Devices, "switch-a")
+	require.NotNil(t, device)
+	require.Equal(t, "switch-a.example.net", device.Hostname)
+	require.Equal(t, "1.3.6.1.4.1.9.1.1", device.SysObject)
+	require.Equal(t, "aa:bb:cc:dd:ee:ff", device.ChassisID)
+	require.Equal(t, []string{"10.0.0.1", "10.0.0.2"}, deviceAddressStrings(*device))
+	require.Equal(t, "arp,bridge", device.Labels["protocols_observed"])
+}
+
 func TestBuildL2ResultFromObservations_SkipsSelfAdjacencies(t *testing.T) {
 	observations := []L2Observation{
 		{
@@ -1203,6 +1239,89 @@ func TestResolveKnownRemote_RejectsHostnameMatchWhenMACMismatchesWithoutMgmtIP(t
 	state.hostToID["shared-host"] = "known-device"
 
 	require.Empty(t, state.resolveKnownRemote("shared-host", "", "", "00:11:22:33:44:66"))
+}
+
+func TestResolveRemote_UsesMACDerivedIDWhenManagedHostnameCollidesWithoutMgmtIP(t *testing.T) {
+	state := newL2BuildState(1)
+	state.devices["known-device"] = Device{
+		ID:        "known-device",
+		Hostname:  "shared-host",
+		ChassisID: "00:11:22:33:44:55",
+	}
+	state.managedObservationByDeviceID["known-device"] = true
+	state.hostToID["shared-host"] = "known-device"
+
+	id := state.resolveRemote("shared-host", "00:11:22:33:44:66", "", "")
+
+	require.Equal(t, "chassis-001122334466", id)
+	require.Equal(t, "known-device", state.hostToID["shared-host"])
+	require.Equal(t, id, state.macToID["00:11:22:33:44:66"])
+}
+
+func TestResolveRemote_ReusesHostnameIDForUnmanagedRemoteCollisions(t *testing.T) {
+	state := newL2BuildState(1)
+
+	firstID := state.resolveRemote("shared-host", "00:11:22:33:44:55", "", "")
+	secondID := state.resolveRemote("shared-host", "00:11:22:33:44:66", "", "")
+
+	require.Equal(t, "shared-host", firstID)
+	require.Equal(t, "shared-host", secondID)
+	require.Equal(t, "shared-host", state.hostToID["shared-host"])
+}
+
+func TestMatchLLDPLinksEnlinkdPassOrder_SkipsEmptyPortDescriptions(t *testing.T) {
+	links := []lldpMatchLink{
+		{
+			index:               0,
+			sourceDeviceID:      "a",
+			localChassisID:      "A",
+			remoteChassisID:     "B",
+			localPortID:         "A-1",
+			localPortIDSubtype:  "5",
+			remotePortID:        "wrong-b-1",
+			remotePortIDSubtype: "5",
+		},
+		{
+			index:               1,
+			sourceDeviceID:      "a",
+			localChassisID:      "A",
+			remoteChassisID:     "B",
+			localPortID:         "A-2",
+			localPortIDSubtype:  "5",
+			remotePortID:        "wrong-b-2",
+			remotePortIDSubtype: "5",
+		},
+		{
+			index:               2,
+			sourceDeviceID:      "b",
+			localChassisID:      "B",
+			remoteChassisID:     "A",
+			localPortID:         "B-2",
+			localPortIDSubtype:  "5",
+			remotePortID:        "A-2",
+			remotePortIDSubtype: "5",
+		},
+		{
+			index:               3,
+			sourceDeviceID:      "b",
+			localChassisID:      "B",
+			remoteChassisID:     "A",
+			localPortID:         "B-1",
+			localPortIDSubtype:  "5",
+			remotePortID:        "A-1",
+			remotePortIDSubtype: "5",
+		},
+	}
+
+	pairs := matchLLDPLinksEnlinkdPassOrder(links)
+
+	require.Len(t, pairs, 2)
+	require.Equal(t, lldpMatchPassChassisPort, pairs[0].pass)
+	require.Equal(t, 0, pairs[0].sourceIndex)
+	require.Equal(t, 3, pairs[0].targetIndex)
+	require.Equal(t, lldpMatchPassChassisPort, pairs[1].pass)
+	require.Equal(t, 1, pairs[1].sourceIndex)
+	require.Equal(t, 2, pairs[1].targetIndex)
 }
 
 func TestMatchCDPLinksEnlinkdPassOrder_DefaultAndParsedTarget(t *testing.T) {

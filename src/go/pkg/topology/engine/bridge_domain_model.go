@@ -180,43 +180,53 @@ func buildBridgeDomainModel(
 }
 
 func mergeRootDomainSets(rootToNodes map[string]bridgeNodeSet, designatedNodeID, nodeID string) {
-	designatedSet, designatedExists := rootToNodes[designatedNodeID]
-	if designatedExists {
-		designatedSet.add(nodeID)
-		if nodeSet, ok := rootToNodes[nodeID]; ok {
-			for id := range nodeSet {
-				designatedSet.add(id)
+	designatedNodeID = strings.TrimSpace(designatedNodeID)
+	nodeID = strings.TrimSpace(nodeID)
+	if designatedNodeID == "" || nodeID == "" {
+		return
+	}
+
+	targetRoot := findRootForNode(rootToNodes, designatedNodeID)
+	if targetRoot == "" {
+		targetRoot = designatedNodeID
+	}
+	targetSet := rootToNodes[targetRoot]
+	if targetSet == nil {
+		targetSet = make(bridgeNodeSet)
+	}
+	if designatedNodeID != targetRoot {
+		targetSet.add(designatedNodeID)
+	}
+
+	sourceRoot := findRootForNode(rootToNodes, nodeID)
+	if sourceRoot != "" && sourceRoot != targetRoot {
+		if sourceSet, ok := rootToNodes[sourceRoot]; ok {
+			for id := range sourceSet {
+				targetSet.add(id)
 			}
-			delete(rootToNodes, nodeID)
+			delete(rootToNodes, sourceRoot)
 		}
-		rootToNodes[designatedNodeID] = designatedSet
-		return
+		targetSet.add(sourceRoot)
+	}
+	if nodeID != targetRoot {
+		targetSet.add(nodeID)
 	}
 
-	if nodeSet, nodeExists := rootToNodes[nodeID]; nodeExists {
-		delete(rootToNodes, nodeID)
-		nodeSet.add(nodeID)
-		rootOfDesignated := findRootContaining(rootToNodes, designatedNodeID)
-		if rootOfDesignated != "" {
-			nodeSet.add(designatedNodeID)
-			for id := range nodeSet {
-				rootToNodes[rootOfDesignated].add(id)
-			}
-			return
-		}
-		rootToNodes[designatedNodeID] = nodeSet
-		return
-	}
+	rootToNodes[targetRoot] = targetSet
+}
 
-	rootOfDesignated := findRootContaining(rootToNodes, designatedNodeID)
-	if rootOfDesignated != "" {
-		rootToNodes[rootOfDesignated].add(nodeID)
-		return
+func findRootForNode(rootToNodes map[string]bridgeNodeSet, nodeID string) string {
+	nodeID = strings.TrimSpace(nodeID)
+	if nodeID == "" {
+		return ""
 	}
-
-	set := make(bridgeNodeSet)
-	set.add(nodeID)
-	rootToNodes[designatedNodeID] = set
+	if _, ok := rootToNodes[nodeID]; ok {
+		return nodeID
+	}
+	if rootID := findRootContaining(rootToNodes, nodeID); rootID != "" {
+		return rootID
+	}
+	return ""
 }
 
 func findRootContaining(rootToNodes map[string]bridgeNodeSet, nodeID string) string {

@@ -153,5 +153,5 @@ adjacencies:
     target_port: FastEthernet0/24
 expectations:
   directional_adjacencies: 26
-  bidirectional_pairs: 0
+  bidirectional_pairs: 11
   devices: 9
