@@ -1,0 +1,47 @@
+version: v1
+scenario_id: nms0000_ms16_lldp
+description: Enlinkd NMS-0000 LLDP single-device parity slice (ms16).
+devices:
+    - id: axis-accc8eef78f8
+      hostname: axis-accc8eef78f8
+    - id: axis-accc8eef7a21
+      hostname: axis-accc8eef7a21
+    - id: microsens-g6-mac-00:60:a7:0a:cb:d3
+      hostname: MICROSENS-G6-MAC-00:60:A7:0A:CB:D3
+    - id: microsens-g6-mac-00:60:a7:0a:cc:09
+      hostname: MICROSENS-G6-MAC-00:60:A7:0A:CC:09
+    - id: microsens-g6-mac-00:60:a7:0a:cc:1b
+      hostname: MICROSENS-G6-MAC-00:60:A7:0A:CC:1B
+    - id: ms16
+      hostname: SW_A1_BDA_16_M
+adjacencies:
+    - protocol: lldp
+      source_device: ms16
+      source_port: 2/5
+      target_device: microsens-g6-mac-00:60:a7:0a:cc:1b
+      target_port: 2/6
+    - protocol: lldp
+      source_device: ms16
+      source_port: 3/1
+      target_device: axis-accc8eef7a21
+      target_port: ac:cc:8e:ef:7a:21
+    - protocol: lldp
+      source_device: ms16
+      source_port: 3/2
+      target_device: axis-accc8eef78f8
+      target_port: ac:cc:8e:ef:78:f8
+    - protocol: lldp
+      source_device: ms16
+      source_port: 3/5
+      target_device: microsens-g6-mac-00:60:a7:0a:cb:d3
+      target_port: 2/5
+    - protocol: lldp
+      source_device: ms16
+      source_port: 3/6
+      target_device: microsens-g6-mac-00:60:a7:0a:cc:09
+      target_port: 2/5
+expectations:
+    directional_adjacencies: 5
+    bidirectional_pairs: 0
+    devices: 6
+

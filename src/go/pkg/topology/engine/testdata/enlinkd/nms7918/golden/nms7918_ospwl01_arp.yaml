@@ -1,0 +1,11 @@
+version: v1
+scenario_id: nms7918_ospwl01_arp
+description: Enlinkd NMS-7918 ARP/ND parity slice for OSPWL01 collection.
+devices:
+    - id: ospwl01
+      hostname: ospedale-wl1
+adjacencies: []
+expectations:
+    directional_adjacencies: 0
+    bidirectional_pairs: 0
+    devices: 1
