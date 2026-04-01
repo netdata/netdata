@@ -47,6 +47,7 @@ int do_PerflibADCS(int update_every, usec_t dt);
 int do_PerflibADFS(int update_every, usec_t dt);
 int do_PerflibHyperV(int update_every, usec_t dt);
 int do_PerflibExchange(int update_every, usec_t dt __maybe_unused);
+int do_PerflibMSMQ(int update_every, usec_t dt __maybe_unused);
 int do_PerflibNUMA(int update_every, usec_t dt __maybe_unused);
 int do_PerflibASP(int update_every, usec_t dt __maybe_unused);
 
@@ -233,6 +234,11 @@ enum PERFLIB_PRIO {
     PRIO_EXCHANGE_PROXY_REQUESTS_TOTAL,
     PRIO_EXCHANGE_AUTO_DISCOVER_REQUESTS,
     PRIO_EXCHANGE_AUTO_AVAILABILITY_SERVICES,
+
+    PRIO_MSMQ_QUEUE_MESSAGES,
+    PRIO_MSMQ_QUEUE_BYTES,
+    PRIO_MSMQ_JOURNAL_MESSAGES,
+    PRIO_MSMQ_JOURNAL_BYTES,
 
     PRIO_ASPNET_APPLICATION_RESTART,
     PRIO_ASPNET_WORKER_PROCESS_RESTART,
