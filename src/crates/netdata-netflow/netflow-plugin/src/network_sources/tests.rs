@@ -171,12 +171,16 @@ fn build_client_fails_on_missing_ca_file_when_tls_enabled() {
 }
 
 #[test]
-fn build_client_accepts_explicit_insecure_tls_opt_out() {
+fn build_client_rejects_explicit_insecure_tls_opt_out() {
     let tls = RemoteNetworkSourceTlsConfig {
         enable: true,
         verify: false,
         skip_verify: true,
         ..Default::default()
     };
-    build_client(true, &tls).expect("explicit insecure client should initialize");
+    let err = build_client(true, &tls).expect_err("expected insecure TLS error");
+    assert!(
+        err.to_string()
+            .contains("certificate verification cannot be disabled")
+    );
 }

@@ -135,7 +135,6 @@ enrichment:
       tls:
         enable: true
         verify: true
-        skip_verify: false
         ca_file: ""
         cert_file: ""
         key_file: ""
@@ -194,9 +193,8 @@ should emit objects with fields compatible with:
 `network_sources.*.tls` follows Akvorado-style source TLS controls:
 
 - `enable` toggles TLS settings for this source.
-- `verify` (`true` by default) keeps certificate verification enabled.
-- `skip_verify` is an explicit insecure opt-out acknowledgement.
-- certificate verification is disabled only when `verify: false` and `skip_verify: true`.
+- `verify` must remain `true`; disabling TLS certificate verification is not supported.
+- `skip_verify` is accepted only for compatibility with earlier drafts and must remain `false`.
 - `ca_file` sets a custom CA bundle.
 - `cert_file` and `key_file` set optional client identity (if `key_file` is empty, `cert_file` is reused).
 

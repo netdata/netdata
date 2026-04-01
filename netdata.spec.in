@@ -464,6 +464,12 @@ advanced correlations and fast root cause analysis, native horizontal scalabilit
 	-DENABLE_PLUGIN_SYSTEMD_UNITS=Off \
 	%endif
 	%if 0%{_have_rust}
+	-DENABLE_PLUGIN_NETFLOW=On \
+	$([ -d "%{_topdir}/SOURCES/%{name}-%{version}/.topology-ip-intel-stock" ] && echo -DNETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR=%{_topdir}/SOURCES/%{name}-%{version}/.topology-ip-intel-stock) \
+	%else
+	-DENABLE_PLUGIN_NETFLOW=Off \
+	%endif
+	%if 0%{_have_rust}
 	-DENABLE_PLUGIN_OTEL=On \
 	%else
 	-DENABLE_PLUGIN_OTEL=Off \
@@ -729,6 +735,15 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 # Network viewer belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
+
+%if %{_have_rust}
+# NetFlow belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/netflow-plugin
+%exclude %{_sbindir}/topology-ip-intel-downloader
+%exclude %{_libdir}/%{name}/conf.d/netflow.yaml
+%exclude %{_libdir}/%{name}/conf.d/topology-ip-intel.yaml
+%exclude %{_datadir}/%{name}/topology-ip-intel
+%endif
 
 %exclude %{_sysusersdir}/%{name}.conf
 
@@ -3245,6 +3260,34 @@ Requires(pre): %{name}-user >= %{version}
 %defattr(0750,root,netdata,0750)
 # CAP_SYS_ADMIN, CAP_SYS_PTRACE and CAP_DAC_READ_SEARCH needed for data collection.
 %caps(cap_sys_admin,cap_sys_ptrace,cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
+
+%if %{_have_rust}
+%package plugin-netflow
+Summary: The NetFlow/IPFIX/sFlow flow analysis plugin for the Netdata Agent
+Group: Applications/System
+Requires: %{name} = %{version}
+Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
+
+%description plugin-netflow
+ This plugin ingests, stores, and serves NetFlow/IPFIX/sFlow flow data for
+ traffic analysis functions.
+
+%files plugin-netflow
+%defattr(0750,root,netdata,0750)
+%attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/netflow-plugin
+%attr(0750,root,netdata) %{_sbindir}/topology-ip-intel-downloader
+%defattr(0644,root,netdata,0755)
+%{_libdir}/%{name}/conf.d/netflow.yaml
+%{_libdir}/%{name}/conf.d/topology-ip-intel.yaml
+%dir %{_datadir}/%{name}/topology-ip-intel
+%{_datadir}/%{name}/topology-ip-intel/README.md
+%{_datadir}/%{name}/topology-ip-intel/topology-ip-asn.mmdb
+%{_datadir}/%{name}/topology-ip-intel/topology-ip-geo.mmdb
+%{_datadir}/%{name}/topology-ip-intel/topology-ip-intel.json
+%endif
 
 %package dashboard
 Summary: The local dashboard for the Netdata Agent

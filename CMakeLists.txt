@@ -270,6 +270,8 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
       # engine), we can simply skip the check.
       if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         list(APPEND NETFLOW_PLUGIN_RUSTFLAGS --cfg=io_uring_skip_arch_check)
+        # Fat LTO + single-codegen-unit + debuginfo exhausts 32-bit package builders.
+        list(APPEND NETFLOW_PLUGIN_RUSTFLAGS "-C" "debuginfo=0" "-C" "lto=off" "-C" "codegen-units=8")
       endif()
 
       if(STATIC_BUILD)
@@ -3405,13 +3407,13 @@ if(ENABLE_PLUGIN_NETFLOW)
             ${CMAKE_BINARY_DIR}/${TOPOLOGY_IP_INTEL_DOWNLOADER_BIN}
             COMPONENT plugin-netflow
             DESTINATION "${BINDIR}")
-    install(CODE "file(REMOVE \"\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader\")"
+    install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader\")"
             COMPONENT plugin-netflow)
-    install(CODE "file(REMOVE \"\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.plugin\")"
+    install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.plugin\")"
             COMPONENT plugin-netflow)
-    install(CODE "file(REMOVE \"\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.exe\")"
+    install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.exe\")"
             COMPONENT plugin-netflow)
-    install(CODE "file(REMOVE \"\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.plugin.exe\")"
+    install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.plugin.exe\")"
             COMPONENT plugin-netflow)
 
     install(FILES src/go/tools/topology-ip-intel-downloader/configs/topology-ip-intel.yaml

@@ -54,13 +54,10 @@ pub(super) fn build_client(use_proxy: bool, tls: &RemoteNetworkSourceTlsConfig) 
     };
 
     if tls.enable {
-        let skip_verify = !tls.verify && tls.skip_verify;
-        if skip_verify {
-            // Only disable peer verification when the config explicitly opts out.
-            tracing::warn!(
-                "network-sources TLS certificate verification is disabled for a remote source; this is insecure"
+        if !tls.verify || tls.skip_verify {
+            anyhow::bail!(
+                "network source TLS certificate verification cannot be disabled; keep tls.verify enabled and use tls.ca_file for custom trust roots"
             );
-            builder = builder.danger_accept_invalid_certs(true);
         }
 
         if !tls.ca_file.trim().is_empty() {

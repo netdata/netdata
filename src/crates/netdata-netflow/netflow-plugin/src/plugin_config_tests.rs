@@ -58,7 +58,7 @@ fn validate_accepts_enabled_bioris_with_instance() {
 }
 
 #[test]
-fn validate_rejects_network_source_verify_false_without_explicit_skip_verify() {
+fn validate_rejects_network_source_verify_false() {
     let mut cfg = PluginConfig::default();
     cfg.enrichment.network_sources.insert(
         "source".to_string(),
@@ -77,12 +77,12 @@ fn validate_rejects_network_source_verify_false_without_explicit_skip_verify() {
     let err = cfg.validate().expect_err("expected validation error");
     assert!(
         err.to_string()
-            .contains("tls.skip_verify must be true when tls.verify is false")
+            .contains("tls.verify must remain true")
     );
 }
 
 #[test]
-fn validate_rejects_network_source_skip_verify_without_verify_false() {
+fn validate_rejects_network_source_skip_verify() {
     let mut cfg = PluginConfig::default();
     cfg.enrichment.network_sources.insert(
         "source".to_string(),
@@ -101,12 +101,12 @@ fn validate_rejects_network_source_skip_verify_without_verify_false() {
     let err = cfg.validate().expect_err("expected validation error");
     assert!(
         err.to_string()
-            .contains("tls.verify must be false when tls.skip_verify is true")
+            .contains("tls.skip_verify is not supported")
     );
 }
 
 #[test]
-fn validate_accepts_network_source_explicit_insecure_tls_opt_out() {
+fn validate_rejects_network_source_explicit_insecure_tls_opt_out() {
     let mut cfg = PluginConfig::default();
     cfg.enrichment.network_sources.insert(
         "source".to_string(),
@@ -122,7 +122,8 @@ fn validate_accepts_network_source_explicit_insecure_tls_opt_out() {
         },
     );
 
-    cfg.validate().expect("configuration should be valid");
+    let err = cfg.validate().expect_err("expected validation error");
+    assert!(err.to_string().contains("tls.verify must remain true"));
 }
 
 #[test]
