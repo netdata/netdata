@@ -15,7 +15,7 @@
 #include <errno.h>
 
 #define AUDIT_STATUS_MIN_PAYLOAD 32  // 8 fields (mask through backlog) = 32 bytes
-#define AUDIT_RECV_TIMEOUT_SEC   2   // netlink receive timeout
+#define AUDIT_RECV_TIMEOUT_MS    500 // netlink receive timeout in milliseconds
 #define AUDIT_RECV_MAX_ATTEMPTS  5   // max recvfrom attempts per query
 #define AUDIT_STARTUP_RETRIES    3   // startup failures before permanent disable
 
@@ -84,7 +84,7 @@ static int audit_netlink_query(struct audit_reply *reply) {
     char buf[8192];
 
     // set a 2-second timeout to avoid blocking forever
-    struct timeval tv = { .tv_sec = AUDIT_RECV_TIMEOUT_SEC, .tv_usec = 0 };
+    struct timeval tv = { .tv_sec = 0, .tv_usec = AUDIT_RECV_TIMEOUT_MS * 1000 };
     if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
         close(fd);
         return -1;
