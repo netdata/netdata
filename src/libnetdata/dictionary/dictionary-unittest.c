@@ -1162,10 +1162,10 @@ static int dictionary_destroy_race_unittest(void) {
     // Give the child a generous timeout so a hang doesn't stall the suite.
     int timeout_sec = 120;
     int status = 0;
-    bool timed_out = false;
+    bool reaped = false;
     for(int elapsed = 0; elapsed < timeout_sec; elapsed++) {
         pid_t rc = waitpid(pid, &status, WNOHANG);
-        if(rc > 0) break;           // child finished
+        if(rc > 0) { reaped = true; break; }
         if(rc < 0) {
             fprintf(stderr, "dictionary_destroy() TOCTOU race test: waitpid() failed: %s\n",
                     strerror(errno));
@@ -1173,13 +1173,9 @@ static int dictionary_destroy_race_unittest(void) {
         }
         sleep_usec(USEC_PER_SEC);
     }
-    if(!WIFEXITED(status) && !WIFSIGNALED(status)) {
-        timed_out = true;
+    if(!reaped) {
         kill(pid, SIGKILL);
         waitpid(pid, &status, 0);
-    }
-
-    if(timed_out) {
         fprintf(stderr, "dictionary_destroy() TOCTOU race test: FAILED — "
                 "child hung (killed after %d seconds)\n", timeout_sec);
         return 1;
