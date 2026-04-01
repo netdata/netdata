@@ -320,7 +320,7 @@ func NewDiscovererPayload(typ string, cfg any) (DiscovererPayload, error) {
 func (c Config) MarshalYAML() (any, error) {
 	type output struct {
 		Disabled   bool                `yaml:"disabled,omitempty"`
-		Name       string              `yaml:"name"`
+		Name       string              `yaml:"name,omitempty"`
 		Discoverer DiscovererPayload   `yaml:"discoverer,omitempty"`
 		Services   []ServiceRuleConfig `yaml:"services,omitempty"`
 	}

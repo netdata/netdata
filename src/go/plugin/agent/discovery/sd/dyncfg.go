@@ -39,6 +39,13 @@ func dyncfgSDTemplateCmds() string {
 	)
 }
 
+func dyncfgTemplateJobName(fn dyncfg.Function) string {
+	if name := fn.JobName(); name != "" {
+		return name
+	}
+	return "test"
+}
+
 func (d *ServiceDiscovery) dyncfgSDTemplateCreate(discovererType string) {
 	d.dyncfgApi.ConfigCreate(netdataapi.ConfigOpts{
 		ID:                d.dyncfgTemplateID(discovererType),
@@ -78,7 +85,7 @@ func (cb *sdCallbacks) ExtractKey(fn dyncfg.Function) (key, name string, ok bool
 
 func (cb *sdCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (sdConfig, error) {
 	dt, _, _ := cb.sd.extractDiscovererAndName(fn.ID())
-	if _, err := parseDyncfgPayload(fn.Payload(), dt, cb.sd.configDefaults, cb.sd.discovererRegistry(), true); err != nil {
+	if _, err := parseDyncfgPayload(fn.Payload(), dt, name, cb.sd.configDefaults, cb.sd.discovererRegistry(), true); err != nil {
 		return nil, err
 	}
 	pkey := pipelineKey(dt, name)
@@ -241,8 +248,17 @@ func (d *ServiceDiscovery) dyncfgCmdTest(fn dyncfg.Function) {
 		return
 	}
 
+	if !isJob {
+		name = dyncfgTemplateJobName(fn)
+	}
+	if err := dyncfg.ValidateJobName(name); err != nil {
+		d.Warningf("dyncfg: test: unacceptable job name '%s' for '%s': %v", name, dt, err)
+		d.dyncfgApi.SendCodef(fn, 400, "Unacceptable job name '%s': %v.", name, err)
+		return
+	}
+
 	// Parse and validate the config without storing it
-	_, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults, d.discovererRegistry(), true)
+	_, err := parseDyncfgPayload(fn.Payload(), dt, name, d.configDefaults, d.discovererRegistry(), true)
 	if err != nil {
 		d.Warningf("dyncfg: test: failed to parse config for '%s': %v", dt, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
@@ -261,7 +277,7 @@ func (d *ServiceDiscovery) dyncfgCmdTest(fn dyncfg.Function) {
 // Returns YAML representation of the config for user-friendly file format
 func (d *ServiceDiscovery) dyncfgCmdUserconfig(fn dyncfg.Function) {
 	id := fn.ID()
-	dt, _, _ := d.extractDiscovererAndName(id)
+	dt, name, isJob := d.extractDiscovererAndName(id)
 
 	if !d.hasDiscovererType(dt) {
 		d.Warningf("dyncfg: userconfig: invalid discoverer type in ID '%s'", id)
@@ -275,13 +291,16 @@ func (d *ServiceDiscovery) dyncfgCmdUserconfig(fn dyncfg.Function) {
 		return
 	}
 
-	if _, err := parseDyncfgPayload(fn.Payload(), dt, d.configDefaults, d.discovererRegistry(), false); err != nil {
+	jobName := name
+	if !isJob || jobName == "" {
+		jobName = dyncfgTemplateJobName(fn)
+	}
+
+	if _, err := parseDyncfgPayload(fn.Payload(), dt, jobName, d.configDefaults, d.discovererRegistry(), false); err != nil {
 		d.Warningf("dyncfg: userconfig: failed to parse config for '%s': %v", id, err)
 		d.dyncfgApi.SendCodef(fn, 400, "Failed to parse config: %v", err)
 		return
 	}
-
-	jobName := fn.JobName() // May be empty - userConfigFromPayload will use name from payload or default
 
 	bs, err := userConfigFromPayload(fn.Payload(), dt, jobName)
 	if err != nil {

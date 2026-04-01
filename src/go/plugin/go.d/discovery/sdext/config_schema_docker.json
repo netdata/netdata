@@ -5,12 +5,6 @@
     "description": "Discovers services running in Docker containers.",
     "type": "object",
     "properties": {
-      "name": {
-        "title": "Name",
-        "description": "Pipeline name (must be unique).",
-        "type": "string",
-        "minLength": 1
-      },
       "discoverer": {
         "title": "Discoverer",
         "type": "object",
@@ -71,7 +65,6 @@
       }
     },
     "required": [
-      "name",
       "discoverer",
       "services"
     ]
@@ -86,7 +79,6 @@
         {
           "title": "Base",
           "fields": [
-            "name",
             "discoverer"
           ]
         },
