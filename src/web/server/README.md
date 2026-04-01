@@ -151,7 +151,7 @@ Restart your Agent to apply changes. After restart, the Agent's web server (defa
 
 :::warning
 
-This disables inbound connections, including streams from child agents.
+This disables inbound connections, including streams from Child Agents.
 **Do not use this setting on Parent Agents.**
 
 :::
