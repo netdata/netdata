@@ -23,10 +23,34 @@ func (c *Collector) validateConfig() error {
 			return fmt.Errorf("invalid Vnode GUID: %v", err)
 		}
 	}
+	if c.Topology.RefreshEvery.Duration() < 0 {
+		return errors.New("topology.refresh_every must not be negative")
+	}
+	if c.Topology.StaleAfter.Duration() < 0 {
+		return errors.New("topology.stale_after must not be negative")
+	}
+	if staleAfter := c.Topology.StaleAfter.Duration(); staleAfter > 0 {
+		refreshEvery := c.topologyRefreshEvery()
+		if staleAfter < refreshEvery {
+			return fmt.Errorf("topology.stale_after (%s) must be greater than or equal to topology.refresh_every (%s)",
+				c.Topology.StaleAfter.String(), c.topologyRefreshEveryString())
+		}
+	}
 	return nil
 }
 
 func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
+	client, err := c.newConfiguredSNMPClient()
+	if err != nil {
+		return nil, err
+	}
+
+	c.Info(snmputils.SnmpClientConnInfo(client))
+
+	return client, nil
+}
+
+func (c *Collector) newConfiguredSNMPClient() (gosnmp.Handler, error) {
 	client := c.newSnmpClient()
 
 	client.SetTarget(c.Hostname)
@@ -63,8 +87,6 @@ func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
 	default:
 		return nil, fmt.Errorf("invalid SNMP version: %s", c.Options.Version)
 	}
-
-	c.Info(snmputils.SnmpClientConnInfo(client))
 
 	return client, nil
 }

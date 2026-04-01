@@ -202,6 +202,35 @@
         },
         "uniqueItems": true
       },
+      "topology": {
+        "title": "Topology",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "autoprobe": {
+            "title": "Autoprobe LLDP/CDP",
+            "description": "If set, Netdata will attempt LLDP/CDP discovery using standard profiles. Missing OIDs are cached in-memory to avoid repeated overhead.",
+            "type": "boolean",
+            "default": true
+          },
+          "refresh_every": {
+            "title": "Refresh every",
+            "description": "How often to refresh topology snapshots independently from normal SNMP metric collection.",
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?(ms|s|m|h|d|w|mo|y)?$",
+            "default": "30m"
+          },
+          "stale_after": {
+            "title": "Stale after",
+            "description": "How long to keep the last successful topology snapshot after refresh failures before excluding it. Defaults to 2x refresh_every.",
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?(ms|s|m|h|d|w|mo|y)?$",
+            "default": "1h"
+          }
+        }
+      },
       "ping": {
         "title": "Ping",
         "type": [
@@ -269,6 +298,11 @@
       "ui:listFlavour": "list",
       "ui:help": "**Profiles are always applied automatically** based on the device sysObjectID. **If no sysObjectID is provided** (rare case, e.g. some printers), the profiles listed here will be applied instead. In most cases, **leave this empty**."
     },
+    "topology": {
+      "autoprobe": {
+        "ui:help": "Autoprobe attempts LLDP/CDP discovery once and caches missing OIDs in-memory to avoid repeated overhead."
+      }
+    },
     "community": {
       "ui:widget": "password"
     },
@@ -329,7 +363,8 @@
             "update_every",
             "hostname",
             "community",
-            "manual_profiles"
+            "manual_profiles",
+            "topology"
           ]
         },
         {

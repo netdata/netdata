@@ -5,11 +5,15 @@ package funcapi
 // MethodConfig describes a function method provided by a module.
 type MethodConfig struct {
 	ID             string        // Method ID (e.g., "top-queries")
+	Aliases        []string      // Additional function names to register for this method
 	Name           string        // Display name (e.g., "Top Queries")
 	UpdateEvery    int           // Default UI refresh interval
 	Help           string        // Description for UI
 	RequireCloud   bool          // Indicates whether the method requires cloud connection
+	ResponseType   string        // Response schema type (default "table")
+	AgentWide      bool          // Method is agent-wide (does not require __job selector)
 	RequiredParams []ParamConfig // Required parameters for this method (including __sort if used)
+	Presentation   any           // Topology presentation metadata (included in info response when non-nil)
 }
 
 // FunctionResponse is the response from a module's HandleMethod.
@@ -17,6 +21,7 @@ type FunctionResponse struct {
 	Status            int            // HTTP-like status code (200, 400, 403, 500, 503)
 	Message           string         // Error message (if Status != 200)
 	Help              string         // Help text for this response
+	ResponseType      string         // Override response schema type (defaults to MethodConfig.ResponseType)
 	Columns           map[string]any // Column definitions for the table
 	Data              any            // Row data: [][]any (array of arrays, ordered by column index)
 	DefaultSortColumn string         // Default sort column ID

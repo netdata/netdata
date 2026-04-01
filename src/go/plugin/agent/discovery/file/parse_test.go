@@ -222,6 +222,136 @@ func TestParse(t *testing.T) {
 				assert.Equal(t, expected, group)
 			},
 		},
+		"static, module-wide defaults: inherit top-level nested config into jobs": {
+			test: func(t *testing.T, tmp *tmpDir) {
+				reg := confgroup.Registry{
+					"module": {},
+				}
+				cfg := staticConfig{
+					Jobs: []confgroup.Config{
+						{
+							"name":      "edge-sw",
+							"hostname":  "10.20.4.84",
+							"community": "atadteN",
+						},
+					},
+					ModuleDefaults: confgroup.Config{
+						"topology": confgroup.Config{
+							"autoprobe": false,
+						},
+					},
+				}
+				filename := tmp.join("module.conf")
+				tmp.writeYAML(filename, cfg)
+
+				expected := &confgroup.Group{
+					Source: filename,
+					Configs: []confgroup.Config{
+						{
+							"name":                "edge-sw",
+							"module":              "module",
+							"hostname":            "10.20.4.84",
+							"community":           "atadteN",
+							"topology":            map[string]any{"autoprobe": false},
+							"autodetection_retry": collectorapi.AutoDetectionRetry,
+							"priority":            collectorapi.Priority,
+							"update_every":        collectorapi.UpdateEvery,
+						},
+					},
+				}
+
+				group, err := parse(reg, filename)
+
+				require.NoError(t, err)
+				assert.Equal(t, expected, group)
+			},
+		},
+		"static, module-wide defaults: per-job nested config overrides and keeps missing defaults": {
+			test: func(t *testing.T, tmp *tmpDir) {
+				reg := confgroup.Registry{
+					"module": {},
+				}
+				cfg := staticConfig{
+					Jobs: []confgroup.Config{
+						{
+							"name":      "core-router",
+							"hostname":  "10.20.4.1",
+							"community": "atadteN",
+							"topology": confgroup.Config{
+								"autoprobe": true,
+							},
+						},
+					},
+					ModuleDefaults: confgroup.Config{
+						"topology": confgroup.Config{
+							"autoprobe": false,
+							"protocols": []any{"lldp", "cdp", "fdb"},
+						},
+					},
+				}
+				filename := tmp.join("module.conf")
+				tmp.writeYAML(filename, cfg)
+
+				expected := &confgroup.Group{
+					Source: filename,
+					Configs: []confgroup.Config{
+						{
+							"name":                "core-router",
+							"module":              "module",
+							"hostname":            "10.20.4.1",
+							"community":           "atadteN",
+							"topology":            map[string]any{"autoprobe": true, "protocols": []any{"lldp", "cdp", "fdb"}},
+							"update_every":        collectorapi.UpdateEvery,
+							"autodetection_retry": collectorapi.AutoDetectionRetry,
+							"priority":            collectorapi.Priority,
+						},
+					},
+				}
+
+				group, err := parse(reg, filename)
+
+				require.NoError(t, err)
+				assert.Equal(t, expected, group)
+			},
+		},
+		"static, module-wide defaults: inherit top-level scalar config into jobs when missing": {
+			test: func(t *testing.T, tmp *tmpDir) {
+				reg := confgroup.Registry{
+					"module": {},
+				}
+				cfg := staticConfig{
+					Jobs: []confgroup.Config{
+						{
+							"name": "name",
+						},
+					},
+					ModuleDefaults: confgroup.Config{
+						"community": "public",
+					},
+				}
+				filename := tmp.join("module.conf")
+				tmp.writeYAML(filename, cfg)
+
+				expected := &confgroup.Group{
+					Source: filename,
+					Configs: []confgroup.Config{
+						{
+							"name":                "name",
+							"module":              "module",
+							"community":           "public",
+							"autodetection_retry": collectorapi.AutoDetectionRetry,
+							"priority":            collectorapi.Priority,
+							"update_every":        collectorapi.UpdateEvery,
+						},
+					},
+				}
+
+				group, err := parse(reg, filename)
+
+				require.NoError(t, err)
+				assert.Equal(t, expected, group)
+			},
+		},
 		"sd, default: +job +module": {
 			test: func(t *testing.T, tmp *tmpDir) {
 				reg := confgroup.Registry{

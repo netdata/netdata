@@ -3,6 +3,7 @@
 package snmp
 
 import (
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
 )
@@ -23,11 +24,19 @@ type (
 		ManualProfiles []string `yaml:"manual_profiles,omitempty" json:"manual_profiles"`
 
 		Ping PingConfig `yaml:"ping,omitempty" json:"ping"`
+
+		Topology TopologyConfig `yaml:"topology,omitempty" json:"topology"`
 	}
 
 	PingConfig struct {
 		Enabled           bool `yaml:"enabled" json:"enabled"`
 		ping.ProberConfig `yaml:",inline" json:",inline"`
+	}
+
+	TopologyConfig struct {
+		Autoprobe    bool                 `yaml:"autoprobe,omitempty" json:"autoprobe"`
+		RefreshEvery confopt.LongDuration `yaml:"refresh_every,omitempty" json:"refresh_every,omitempty"`
+		StaleAfter   confopt.LongDuration `yaml:"stale_after,omitempty" json:"stale_after,omitempty"`
 	}
 
 	UserConfig struct {
