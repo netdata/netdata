@@ -360,7 +360,7 @@ endmeta-->
         elif mode == "secretstore":
             meta_yaml = integration["edit_link"].replace("blob", "edit")
             sidebar_label = integration["meta"]["name"]
-            learn_rel_path = "Collecting Metrics/Secret Stores"
+            learn_rel_path = "Collecting Metrics/Secrets Management/Secret Stores"
             keywords = integration["keywords"] if "keywords" in integration else None
 
             md = f"""<!--startmeta
