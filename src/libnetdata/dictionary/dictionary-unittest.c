@@ -1102,6 +1102,18 @@ static void dict_destroy_race_child(int iterations) {
             "race-trav", NETDATA_THREAD_OPTION_DONT_LOG,
             dict_destroy_race_traverser_thread, &traverser_data);
 
+        if(!getter || !setter || !traverser) {
+            // Thread creation failed — stop any that did start and clean up.
+            __atomic_store_n(&getter_data.stop, 1, __ATOMIC_RELEASE);
+            __atomic_store_n(&setter_data.stop, 1, __ATOMIC_RELEASE);
+            __atomic_store_n(&traverser_data.stop, 1, __ATOMIC_RELEASE);
+            if(getter) nd_thread_join(getter);
+            if(setter) nd_thread_join(setter);
+            if(traverser) nd_thread_join(traverser);
+            dictionary_destroy(dict);
+            _exit(2);
+        }
+
         // wait for all workers to be running
         while(!__atomic_load_n(&getter_data.ready, __ATOMIC_ACQUIRE) ||
               !__atomic_load_n(&setter_data.ready, __ATOMIC_ACQUIRE) ||
