@@ -2783,6 +2783,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: other
+            - name: ad.atq_current_threads_total
+              description: Current ATQ total threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: total
             - name: ad.database_operations
               description: AD database operations
               unit: operations/s

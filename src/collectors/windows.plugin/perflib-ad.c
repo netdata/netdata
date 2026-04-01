@@ -1525,7 +1525,7 @@ static void netdata_ad_security_descriptor_propagation_items_queued(
             RRDSET_TYPE_LINE);
 
         rd_security_descriptor_propagation_items_queued = rrddim_add(
-            st_security_descriptor_propagation_items_queued, "queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            st_security_descriptor_propagation_items_queued, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -2053,10 +2053,45 @@ static void netdata_ad_atq_current_threads_other(
     rrdset_done(st_atq_current_threads_other);
 }
 
+static void netdata_ad_atq_current_threads_total(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA atqThreadsTotal = {.key = "ATQ Threads Total"};
+    static RRDSET *st_atq_current_threads_total = NULL;
+    static RRDDIM *rd_atq_current_threads_total = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &atqThreadsTotal))
+        return;
+
+    if (unlikely(!st_atq_current_threads_total)) {
+        st_atq_current_threads_total = rrdset_create_localhost(
+            "ad",
+            "atq_current_threads_total",
+            NULL,
+            "threads",
+            "ad.atq_current_threads_total",
+            "Current ATQ total threads",
+            "threads",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_ATQ_CURRENT_THREADS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_atq_current_threads_total =
+            rrddim_add(st_atq_current_threads_total, "total", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        st_atq_current_threads_total, rd_atq_current_threads_total, (collected_number)atqThreadsTotal.current.Data);
+    rrdset_done(st_atq_current_threads_total);
+}
+
 static void netdata_ad_atq_current_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     netdata_ad_atq_current_threads_ldap(pDataBlock, pObjectType, update_every);
     netdata_ad_atq_current_threads_other(pDataBlock, pObjectType, update_every);
+    netdata_ad_atq_current_threads_total(pDataBlock, pObjectType, update_every);
 }
 
 static void netdata_ad_atq_latency(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
