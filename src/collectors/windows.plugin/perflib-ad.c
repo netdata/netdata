@@ -1389,6 +1389,161 @@ static void netdata_ad_directory_search_suboperations(
     rrdset_done(st_directory_search_suboperations_total);
 }
 
+static void netdata_ad_security_descriptor_propagation_events(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA securityDescriptorSubOperationsPerSec = {.key = "DS Security Descriptor sub-operations/sec"};
+    static RRDSET *st_security_descriptor_propagation_events = NULL;
+    static RRDDIM *rd_security_descriptor_propagation_events = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &securityDescriptorSubOperationsPerSec))
+        return;
+
+    if (unlikely(!st_security_descriptor_propagation_events)) {
+        st_security_descriptor_propagation_events = rrdset_create_localhost(
+            "ad",
+            "security_descriptor_propagation_events",
+            NULL,
+            "directory",
+            "ad.security_descriptor_propagation_events",
+            "Security descriptor propagation events",
+            "events/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SECURITY_DESCRIPTOR_PROPAGATION_EVENTS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_security_descriptor_propagation_events = rrddim_add(
+            st_security_descriptor_propagation_events, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_security_descriptor_propagation_events,
+        rd_security_descriptor_propagation_events,
+        (collected_number)securityDescriptorSubOperationsPerSec.current.Data);
+    rrdset_done(st_security_descriptor_propagation_events);
+}
+
+static void netdata_ad_security_descriptor_propagation_events_queued(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA securityDescriptorPropagationsEvents = {.key = "DS Security Descriptor Propagations Events"};
+    static RRDSET *st_security_descriptor_propagation_events_queued = NULL;
+    static RRDDIM *rd_security_descriptor_propagation_events_queued = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &securityDescriptorPropagationsEvents))
+        return;
+
+    if (unlikely(!st_security_descriptor_propagation_events_queued)) {
+        st_security_descriptor_propagation_events_queued = rrdset_create_localhost(
+            "ad",
+            "security_descriptor_propagation_events_queued",
+            NULL,
+            "directory",
+            "ad.security_descriptor_propagation_events_queued",
+            "Security descriptor propagation events queued",
+            "events",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SECURITY_DESCRIPTOR_PROPAGATION_EVENTS_QUEUED,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_security_descriptor_propagation_events_queued = rrddim_add(
+            st_security_descriptor_propagation_events_queued, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        st_security_descriptor_propagation_events_queued,
+        rd_security_descriptor_propagation_events_queued,
+        (collected_number)securityDescriptorPropagationsEvents.current.Data);
+    rrdset_done(st_security_descriptor_propagation_events_queued);
+}
+
+static void netdata_ad_security_descriptor_propagation_access_wait(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA securityDescriptorPropagatorAverageExclusionTime = {
+        .key = "DS Security Descriptor Propagator Average Exclusion Time"};
+    static RRDSET *st_security_descriptor_propagation_access_wait = NULL;
+    static RRDDIM *rd_security_descriptor_propagation_access_wait = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &securityDescriptorPropagatorAverageExclusionTime))
+        return;
+
+    if (unlikely(!st_security_descriptor_propagation_access_wait)) {
+        st_security_descriptor_propagation_access_wait = rrdset_create_localhost(
+            "ad",
+            "security_descriptor_propagation_access_wait",
+            NULL,
+            "directory",
+            "ad.security_descriptor_propagation_access_wait",
+            "Security descriptor propagation access wait",
+            "seconds",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SECURITY_DESCRIPTOR_PROPAGATION_ACCESS_WAIT_TOTAL_SECONDS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_security_descriptor_propagation_access_wait = rrddim_add(
+            st_security_descriptor_propagation_access_wait, "wait", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        st_security_descriptor_propagation_access_wait,
+        rd_security_descriptor_propagation_access_wait,
+        (collected_number)securityDescriptorPropagatorAverageExclusionTime.current.Data);
+    rrdset_done(st_security_descriptor_propagation_access_wait);
+}
+
+static void netdata_ad_security_descriptor_propagation_items_queued(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA securityDescriptorPropagatorRuntimeQueue = {
+        .key = "DS Security Descriptor Propagator Runtime Queue"};
+    static RRDSET *st_security_descriptor_propagation_items_queued = NULL;
+    static RRDDIM *rd_security_descriptor_propagation_items_queued = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &securityDescriptorPropagatorRuntimeQueue))
+        return;
+
+    if (unlikely(!st_security_descriptor_propagation_items_queued)) {
+        st_security_descriptor_propagation_items_queued = rrdset_create_localhost(
+            "ad",
+            "security_descriptor_propagation_items_queued",
+            NULL,
+            "directory",
+            "ad.security_descriptor_propagation_items_queued",
+            "Security descriptor propagation items queued",
+            "items",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SECURITY_DESCRIPTOR_PROPAGATION_ITEMS_QUEUED_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_security_descriptor_propagation_items_queued = rrddim_add(
+            st_security_descriptor_propagation_items_queued, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        st_security_descriptor_propagation_items_queued,
+        rd_security_descriptor_propagation_items_queued,
+        (collected_number)securityDescriptorPropagatorRuntimeQueue.current.Data);
+    rrdset_done(st_security_descriptor_propagation_items_queued);
+}
+
+static void netdata_ad_security_descriptor_propagation(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    netdata_ad_security_descriptor_propagation_events(pDataBlock, pObjectType, update_every);
+    netdata_ad_security_descriptor_propagation_events_queued(pDataBlock, pObjectType, update_every);
+    netdata_ad_security_descriptor_propagation_access_wait(pDataBlock, pObjectType, update_every);
+    netdata_ad_security_descriptor_propagation_items_queued(pDataBlock, pObjectType, update_every);
+}
+
 static void
 netdata_ad_service_threads_in_use(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
@@ -2444,6 +2599,532 @@ static void netdata_ad_cleanup_metrics(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
     netdata_ad_cleanup_tombstoned_objects_visited(pDataBlock, pObjectType, update_every);
 }
 
+static void netdata_ad_sam_group_membership_evaluations(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA samGlobalGroupMembershipEvaluationsPerSec = {
+        .key = "SAM Global Group Membership Evaluations/sec"};
+    static COUNTER_DATA samDomainLocalGroupMembershipEvaluationsPerSec = {
+        .key = "SAM Domain Local Group Membership Evaluations/sec"};
+    static COUNTER_DATA samUniversalGroupMembershipEvaluationsPerSec = {
+        .key = "SAM Universal Group Membership Evaluations/sec"};
+
+    static RRDSET *st_sam_group_membership_evaluations = NULL;
+    static RRDDIM *rd_sam_group_membership_evaluations_global = NULL;
+    static RRDDIM *rd_sam_group_membership_evaluations_domain_local = NULL;
+    static RRDDIM *rd_sam_group_membership_evaluations_universal = NULL;
+
+    perflibGetObjectCounter(pDataBlock, pObjectType, &samGlobalGroupMembershipEvaluationsPerSec);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &samDomainLocalGroupMembershipEvaluationsPerSec);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &samUniversalGroupMembershipEvaluationsPerSec);
+
+    if (unlikely(!st_sam_group_membership_evaluations)) {
+        st_sam_group_membership_evaluations = rrdset_create_localhost(
+            "ad",
+            "sam_group_membership_evaluations",
+            NULL,
+            "sam",
+            "ad.sam_group_membership_evaluations",
+            "SAM group membership evaluations",
+            "evaluations/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SAM_GROUP_MEMBERSHIP_EVALUATIONS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_sam_group_membership_evaluations_global = rrddim_add(
+            st_sam_group_membership_evaluations, "global", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_sam_group_membership_evaluations_domain_local = rrddim_add(
+            st_sam_group_membership_evaluations, "domain_local", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_sam_group_membership_evaluations_universal = rrddim_add(
+            st_sam_group_membership_evaluations, "universal", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_sam_group_membership_evaluations,
+        rd_sam_group_membership_evaluations_global,
+        (collected_number)samGlobalGroupMembershipEvaluationsPerSec.current.Data);
+    rrddim_set_by_pointer(
+        st_sam_group_membership_evaluations,
+        rd_sam_group_membership_evaluations_domain_local,
+        (collected_number)samDomainLocalGroupMembershipEvaluationsPerSec.current.Data);
+    rrddim_set_by_pointer(
+        st_sam_group_membership_evaluations,
+        rd_sam_group_membership_evaluations_universal,
+        (collected_number)samUniversalGroupMembershipEvaluationsPerSec.current.Data);
+    rrdset_done(st_sam_group_membership_evaluations);
+}
+
+static void netdata_ad_sam_group_membership_global_catalog_evaluations(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA samGCEvaluationsPerSec = {.key = "SAM GC Evaluations/sec"};
+    static RRDSET *st_sam_group_membership_global_catalog_evaluations = NULL;
+    static RRDDIM *rd_sam_group_membership_global_catalog_evaluations = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samGCEvaluationsPerSec))
+        return;
+
+    if (unlikely(!st_sam_group_membership_global_catalog_evaluations)) {
+        st_sam_group_membership_global_catalog_evaluations = rrdset_create_localhost(
+            "ad",
+            "sam_group_membership_global_catalog_evaluations",
+            NULL,
+            "sam",
+            "ad.sam_group_membership_global_catalog_evaluations",
+            "SAM group membership global catalog evaluations",
+            "evaluations/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SAM_GROUP_MEMBERSHIP_GLOBAL_CATALOG_EVALUATIONS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_sam_group_membership_global_catalog_evaluations = rrddim_add(
+            st_sam_group_membership_global_catalog_evaluations,
+            "global_catalog",
+            NULL,
+            1,
+            1,
+            RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_sam_group_membership_global_catalog_evaluations,
+        rd_sam_group_membership_global_catalog_evaluations,
+        (collected_number)samGCEvaluationsPerSec.current.Data);
+    rrdset_done(st_sam_group_membership_global_catalog_evaluations);
+}
+
+static void netdata_ad_sam_group_membership_evaluations_nontransitive(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA samNonTransitiveMembershipEvaluationsPerSec = {
+        .key = "SAM Non-Transitive Membership Evaluations/sec"};
+    static RRDSET *st_sam_group_membership_evaluations_nontransitive = NULL;
+    static RRDDIM *rd_sam_group_membership_evaluations_nontransitive = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samNonTransitiveMembershipEvaluationsPerSec))
+        return;
+
+    if (unlikely(!st_sam_group_membership_evaluations_nontransitive)) {
+        st_sam_group_membership_evaluations_nontransitive = rrdset_create_localhost(
+            "ad",
+            "sam_group_membership_evaluations_nontransitive",
+            NULL,
+            "sam",
+            "ad.sam_group_membership_evaluations_nontransitive",
+            "SAM non-transitive membership evaluations",
+            "evaluations/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SAM_GROUP_MEMBERSHIP_EVALUATIONS_NONTRANSITIVE_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_sam_group_membership_evaluations_nontransitive = rrddim_add(
+            st_sam_group_membership_evaluations_nontransitive,
+            "nontransitive",
+            NULL,
+            1,
+            1,
+            RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_sam_group_membership_evaluations_nontransitive,
+        rd_sam_group_membership_evaluations_nontransitive,
+        (collected_number)samNonTransitiveMembershipEvaluationsPerSec.current.Data);
+    rrdset_done(st_sam_group_membership_evaluations_nontransitive);
+}
+
+static void netdata_ad_sam_group_membership_evaluations_transitive(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA samTransitiveMembershipEvaluationsPerSec = {
+        .key = "SAM Transitive Membership Evaluations/sec"};
+    static RRDSET *st_sam_group_membership_evaluations_transitive = NULL;
+    static RRDDIM *rd_sam_group_membership_evaluations_transitive = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samTransitiveMembershipEvaluationsPerSec))
+        return;
+
+    if (unlikely(!st_sam_group_membership_evaluations_transitive)) {
+        st_sam_group_membership_evaluations_transitive = rrdset_create_localhost(
+            "ad",
+            "sam_group_membership_evaluations_transitive",
+            NULL,
+            "sam",
+            "ad.sam_group_membership_evaluations_transitive",
+            "SAM transitive membership evaluations",
+            "evaluations/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SAM_GROUP_MEMBERSHIP_EVALUATIONS_TRANSITIVE_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_sam_group_membership_evaluations_transitive = rrddim_add(
+            st_sam_group_membership_evaluations_transitive, "transitive", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_sam_group_membership_evaluations_transitive,
+        rd_sam_group_membership_evaluations_transitive,
+        (collected_number)samTransitiveMembershipEvaluationsPerSec.current.Data);
+    rrdset_done(st_sam_group_membership_evaluations_transitive);
+}
+
+static void netdata_ad_sam_group_evaluation_latency(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA samAccountGroupEvaluationLatency = {.key = "SAM Account Group Evaluation Latency"};
+    static COUNTER_DATA samResourceGroupEvaluationLatency = {.key = "SAM Resource Group Evaluation Latency"};
+
+    static RRDSET *st_sam_group_evaluation_latency = NULL;
+    static RRDDIM *rd_sam_group_evaluation_latency_account_group = NULL;
+    static RRDDIM *rd_sam_group_evaluation_latency_resource_group = NULL;
+
+    perflibGetObjectCounter(pDataBlock, pObjectType, &samAccountGroupEvaluationLatency);
+    perflibGetObjectCounter(pDataBlock, pObjectType, &samResourceGroupEvaluationLatency);
+
+    if (unlikely(!st_sam_group_evaluation_latency)) {
+        st_sam_group_evaluation_latency = rrdset_create_localhost(
+            "ad",
+            "sam_group_evaluation_latency",
+            NULL,
+            "sam",
+            "ad.sam_group_evaluation_latency",
+            "SAM group evaluation latency",
+            "latency",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SAM_GROUP_EVALUATION_LATENCY,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_sam_group_evaluation_latency_account_group = rrddim_add(
+            st_sam_group_evaluation_latency, "account_group", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_sam_group_evaluation_latency_resource_group = rrddim_add(
+            st_sam_group_evaluation_latency, "resource_group", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        st_sam_group_evaluation_latency,
+        rd_sam_group_evaluation_latency_account_group,
+        (collected_number)samAccountGroupEvaluationLatency.current.Data);
+    rrddim_set_by_pointer(
+        st_sam_group_evaluation_latency,
+        rd_sam_group_evaluation_latency_resource_group,
+        (collected_number)samResourceGroupEvaluationLatency.current.Data);
+    rrdset_done(st_sam_group_evaluation_latency);
+}
+
+static void netdata_ad_sam_computer_creation_requests(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA samSuccessfulComputerCreationsPerSecIncludesAllRequests = {
+        .key = "SAM Successful Computer Creations/sec: Includes all requests"};
+    static RRDSET *st_sam_computer_creation_requests = NULL;
+    static RRDDIM *rd_sam_computer_creation_requests = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samSuccessfulComputerCreationsPerSecIncludesAllRequests))
+        return;
+
+    if (unlikely(!st_sam_computer_creation_requests)) {
+        st_sam_computer_creation_requests = rrdset_create_localhost(
+            "ad",
+            "sam_computer_creation_requests",
+            NULL,
+            "sam",
+            "ad.sam_computer_creation_requests",
+            "SAM computer creation requests",
+            "requests/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SAM_COMPUTER_CREATION_REQUESTS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_sam_computer_creation_requests = rrddim_add(
+            st_sam_computer_creation_requests, "request", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_sam_computer_creation_requests,
+        rd_sam_computer_creation_requests,
+        (collected_number)samSuccessfulComputerCreationsPerSecIncludesAllRequests.current.Data);
+    rrdset_done(st_sam_computer_creation_requests);
+}
+
+static void netdata_ad_sam_computer_creation_successful_requests(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA samMachineCreationAttemptsPerSec = {.key = "SAM Machine Creation Attempts/sec"};
+    static RRDSET *st_sam_computer_creation_successful_requests = NULL;
+    static RRDDIM *rd_sam_computer_creation_successful_requests = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samMachineCreationAttemptsPerSec))
+        return;
+
+    if (unlikely(!st_sam_computer_creation_successful_requests)) {
+        st_sam_computer_creation_successful_requests = rrdset_create_localhost(
+            "ad",
+            "sam_computer_creation_successful_requests",
+            NULL,
+            "sam",
+            "ad.sam_computer_creation_successful_requests",
+            "SAM successful computer creation requests",
+            "requests/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SAM_COMPUTER_CREATION_SUCCESSFUL_REQUESTS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_sam_computer_creation_successful_requests = rrddim_add(
+            st_sam_computer_creation_successful_requests, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_sam_computer_creation_successful_requests,
+        rd_sam_computer_creation_successful_requests,
+        (collected_number)samMachineCreationAttemptsPerSec.current.Data);
+    rrdset_done(st_sam_computer_creation_successful_requests);
+}
+
+static void netdata_ad_sam_user_creation_requests(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA samUserCreationAttemptsPerSec = {.key = "SAM User Creation Attempts/sec"};
+    static RRDSET *st_sam_user_creation_requests = NULL;
+    static RRDDIM *rd_sam_user_creation_requests = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samUserCreationAttemptsPerSec))
+        return;
+
+    if (unlikely(!st_sam_user_creation_requests)) {
+        st_sam_user_creation_requests = rrdset_create_localhost(
+            "ad",
+            "sam_user_creation_requests",
+            NULL,
+            "sam",
+            "ad.sam_user_creation_requests",
+            "SAM user creation requests",
+            "requests/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SAM_USER_CREATION_REQUESTS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_sam_user_creation_requests =
+            rrddim_add(st_sam_user_creation_requests, "request", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_sam_user_creation_requests,
+        rd_sam_user_creation_requests,
+        (collected_number)samUserCreationAttemptsPerSec.current.Data);
+    rrdset_done(st_sam_user_creation_requests);
+}
+
+static void netdata_ad_sam_user_creation_successful_requests(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA samSuccessfulUserCreationsPerSec = {.key = "SAM Successful User Creations/sec"};
+    static RRDSET *st_sam_user_creation_successful_requests = NULL;
+    static RRDDIM *rd_sam_user_creation_successful_requests = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samSuccessfulUserCreationsPerSec))
+        return;
+
+    if (unlikely(!st_sam_user_creation_successful_requests)) {
+        st_sam_user_creation_successful_requests = rrdset_create_localhost(
+            "ad",
+            "sam_user_creation_successful_requests",
+            NULL,
+            "sam",
+            "ad.sam_user_creation_successful_requests",
+            "SAM successful user creation requests",
+            "requests/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SAM_USER_CREATION_SUCCESSFUL_REQUESTS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_sam_user_creation_successful_requests = rrddim_add(
+            st_sam_user_creation_successful_requests, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_sam_user_creation_successful_requests,
+        rd_sam_user_creation_successful_requests,
+        (collected_number)samSuccessfulUserCreationsPerSec.current.Data);
+    rrdset_done(st_sam_user_creation_successful_requests);
+}
+
+static void netdata_ad_sam_query_display_requests(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA samDisplayInformationQueriesPerSec = {.key = "SAM Display Information Queries/sec"};
+    static RRDSET *st_sam_query_display_requests = NULL;
+    static RRDDIM *rd_sam_query_display_requests = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samDisplayInformationQueriesPerSec))
+        return;
+
+    if (unlikely(!st_sam_query_display_requests)) {
+        st_sam_query_display_requests = rrdset_create_localhost(
+            "ad",
+            "sam_query_display_requests",
+            NULL,
+            "sam",
+            "ad.sam_query_display_requests",
+            "SAM query display requests",
+            "requests/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SAM_QUERY_DISPLAY_REQUESTS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_sam_query_display_requests =
+            rrddim_add(st_sam_query_display_requests, "query", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_sam_query_display_requests,
+        rd_sam_query_display_requests,
+        (collected_number)samDisplayInformationQueriesPerSec.current.Data);
+    rrdset_done(st_sam_query_display_requests);
+}
+
+static void netdata_ad_sam_enumerations(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA samEnumerationsPerSec = {.key = "SAM Enumerations/sec"};
+    static RRDSET *st_sam_enumerations = NULL;
+    static RRDDIM *rd_sam_enumerations = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samEnumerationsPerSec))
+        return;
+
+    if (unlikely(!st_sam_enumerations)) {
+        st_sam_enumerations = rrdset_create_localhost(
+            "ad",
+            "sam_enumerations",
+            NULL,
+            "sam",
+            "ad.sam_enumerations",
+            "SAM enumerations",
+            "enumerations/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SAM_ENUMERATIONS_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_sam_enumerations = rrddim_add(st_sam_enumerations, "enumeration", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_sam_enumerations,
+        rd_sam_enumerations,
+        (collected_number)samEnumerationsPerSec.current.Data);
+    rrdset_done(st_sam_enumerations);
+}
+
+static void netdata_ad_sam_membership_changes(
+    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA samMembershipChangesPerSec = {.key = "SAM Membership Changes/sec"};
+    static RRDSET *st_sam_membership_changes = NULL;
+    static RRDDIM *rd_sam_membership_changes = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samMembershipChangesPerSec))
+        return;
+
+    if (unlikely(!st_sam_membership_changes)) {
+        st_sam_membership_changes = rrdset_create_localhost(
+            "ad",
+            "sam_membership_changes",
+            NULL,
+            "sam",
+            "ad.sam_membership_changes",
+            "SAM membership changes",
+            "changes/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SAM_MEMBERSHIP_CHANGES_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_sam_membership_changes =
+            rrddim_add(st_sam_membership_changes, "change", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_sam_membership_changes,
+        rd_sam_membership_changes,
+        (collected_number)samMembershipChangesPerSec.current.Data);
+    rrdset_done(st_sam_membership_changes);
+}
+
+static void netdata_ad_sam_password_changes(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA samPasswordChangesPerSec = {.key = "SAM Password Changes/sec"};
+    static RRDSET *st_sam_password_changes = NULL;
+    static RRDDIM *rd_sam_password_changes = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &samPasswordChangesPerSec))
+        return;
+
+    if (unlikely(!st_sam_password_changes)) {
+        st_sam_password_changes = rrdset_create_localhost(
+            "ad",
+            "sam_password_changes",
+            NULL,
+            "sam",
+            "ad.sam_password_changes",
+            "SAM password changes",
+            "changes/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_SAM_PASSWORD_CHANGES_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_sam_password_changes =
+            rrddim_add(st_sam_password_changes, "change", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_sam_password_changes,
+        rd_sam_password_changes,
+        (collected_number)samPasswordChangesPerSec.current.Data);
+    rrdset_done(st_sam_password_changes);
+}
+
+static void netdata_ad_sam(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    netdata_ad_sam_group_membership_evaluations(pDataBlock, pObjectType, update_every);
+    netdata_ad_sam_group_membership_global_catalog_evaluations(pDataBlock, pObjectType, update_every);
+    netdata_ad_sam_group_membership_evaluations_nontransitive(pDataBlock, pObjectType, update_every);
+    netdata_ad_sam_group_membership_evaluations_transitive(pDataBlock, pObjectType, update_every);
+    netdata_ad_sam_group_evaluation_latency(pDataBlock, pObjectType, update_every);
+    netdata_ad_sam_computer_creation_requests(pDataBlock, pObjectType, update_every);
+    netdata_ad_sam_computer_creation_successful_requests(pDataBlock, pObjectType, update_every);
+    netdata_ad_sam_user_creation_requests(pDataBlock, pObjectType, update_every);
+    netdata_ad_sam_user_creation_successful_requests(pDataBlock, pObjectType, update_every);
+    netdata_ad_sam_query_display_requests(pDataBlock, pObjectType, update_every);
+    netdata_ad_sam_enumerations(pDataBlock, pObjectType, update_every);
+    netdata_ad_sam_membership_changes(pDataBlock, pObjectType, update_every);
+    netdata_ad_sam_password_changes(pDataBlock, pObjectType, update_every);
+}
+
 static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "DirectoryServices");
@@ -2467,11 +3148,13 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every)
         netdata_ad_name_translations,
         netdata_ad_change_monitors,
         netdata_ad_directory_search_suboperations,
+        netdata_ad_security_descriptor_propagation,
         netdata_ad_service_threads_in_use,
         netdata_ad_bind,
         netdata_ad_searches,
         netdata_ad_ldap,
         netdata_ad_cleanup_metrics,
+        netdata_ad_sam,
         netdata_ad_atq_queue_requests,
         netdata_ad_atq_estimated_delay,
         netdata_ad_atq_latency,
