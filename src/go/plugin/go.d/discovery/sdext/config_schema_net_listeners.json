@@ -113,7 +113,7 @@
         "match": {
           "ui:widget": "textarea",
           "ui:placeholder": "{{ eq .Comm \"nginx\" }}",
-          "ui:help": "| Field | Description |\n|-------|-------------|\n| `.Protocol` | TCP, TCP6, UDP, UDP6 |\n| `.IPAddress` | IP address |\n| `.Port` | Port number |\n| `.Address` | IP:Port combined |\n| `.Comm` | Process name |\n| `.Cmdline` | Full command line |\n\n**Functions:** eq, ne, glob, regexp, and, or, not"
+          "ui:help": "| Field | Description |\n|-------|-------------|\n| `.Protocol` | TCP, TCP6, UDP, UDP6 |\n| `.IPAddress` | IP address |\n| `.Port` | Port number |\n| `.Address` | IP:Port combined |\n| `.Comm` | Process name |\n| `.Cmdline` | Full command line |\n| `.TUID` | Unique target ID (`protocol_port_hash`) |\n\n**Functions:** eq, ne, glob, regexp, and, or, not"
         },
         "config_template": {
           "ui:widget": "textarea",
