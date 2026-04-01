@@ -652,9 +652,9 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
                             char *u = strstr(status_buf, "Uid:");
                             if(u) {
                                 u += 4;
-                                while(isspace(*u)) u++;                     // skip spaces
+                                while(isspace((unsigned char)*u)) u++;     // skip spaces
                                 while(*u >= '0' && *u <= '9') u++;          // skip the first number (real uid)
-                                while(isspace(*u)) u++;                     // skip spaces again
+                                while(isspace((unsigned char)*u)) u++;     // skip spaces again
                                 uid = strtol(u, NULL, 10);   // parse the 2nd number (effective uid)
                             }
                         }
@@ -664,7 +664,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
                             ppid_checked = true;
                             if(p) {
                                 p += 5;
-                                while(isspace(*p)) p++;                     // skip spaces
+                                while(isspace((unsigned char)*p)) p++;     // skip spaces
                                 ppid = (pid_t)strtol(p, NULL, 10);          // parse parent pid
                             }
                         }

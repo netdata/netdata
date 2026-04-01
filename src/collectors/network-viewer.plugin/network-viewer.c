@@ -1986,7 +1986,7 @@ static void network_viewer_topology_function(
                         {
                             buffer_json_member_add_string(wb, "hostname", ctx.hostname);
                             if(ctx.machine_guid[0])
-                                buffer_json_member_add_string(wb, "machine_guid", ctx.machine_guid);
+                                buffer_json_member_add_string(wb, "netdata_machine_guid", ctx.machine_guid);
                             buffer_json_member_add_string(wb, "source", NETWORK_TOPOLOGY_SOURCE);
                             buffer_json_member_add_string(wb, "display_name", ctx.hostname);
                             buffer_json_member_add_string(wb, "actor_class", "self");
@@ -3127,6 +3127,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     // ----------------------------------------------------------------------------------------------------------------
 
+    // Manual debug mode only; normal plugins.d execution never takes this path.
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
 //        for(int i = 0; i < 100; i++) {
             bool cancelled = false;
