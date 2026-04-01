@@ -677,8 +677,11 @@ modules:
               required: true
               default: ip
               options:
-                - ip
-                - mac
+                - id: ip
+                  name: IP
+                  default: true
+                - id: mac
+                  name: MAC
             - id: map_type
               name: Map
               description: Select the topology map mode. Defaults to the managed-device LLDP/CDP view. Other modes progressively include inferred devices and lower-confidence links.
@@ -686,9 +689,13 @@ modules:
               required: true
               default: lldp_cdp_managed
               options:
-                - lldp_cdp_managed
-                - high_confidence_inferred
-                - all_devices_low_confidence
+                - id: lldp_cdp_managed
+                  name: LLDP/CDP/Managed Devices Map
+                  default: true
+                - id: high_confidence_inferred
+                  name: High Confidence Inferred Map
+                - id: all_devices_low_confidence
+                  name: All Devices (Low Confidence)
             - id: inference_strategy
               name: Infer Strategy
               description: Select the inference algorithm used for FDB/STP/CDP correlation.
@@ -696,11 +703,17 @@ modules:
               required: true
               default: fdb_minimum_knowledge
               options:
-                - fdb_minimum_knowledge
-                - stp_parent_tree
-                - fdb_pairwise_minimum_knowledge
-                - stp_fdb_correlated
-                - cdp_fdb_hybrid
+                - id: fdb_minimum_knowledge
+                  name: FDB Minimum-Knowledge (Baseline)
+                  default: true
+                - id: stp_parent_tree
+                  name: STP Parent Tree
+                - id: fdb_pairwise_minimum_knowledge
+                  name: FDB Pairwise Minimum-Knowledge
+                - id: stp_fdb_correlated
+                  name: STP + FDB Correlated
+                - id: cdp_fdb_hybrid
+                  name: CDP + FDB Hybrid
             - id: managed_snmp_device_focus
               name: Focus On
               description: Limit depth filtering to selected managed SNMP roots. The static default is `all_devices`; additional `ip:<address>` options are supplied dynamically from the current managed SNMP jobs.
@@ -708,7 +721,9 @@ modules:
               required: true
               default: all_devices
               options:
-                - all_devices
+                - id: all_devices
+                  name: All Devices
+                  default: true
             - id: depth
               name: Focus Depth
               description: Limit topology expansion hops from the focus roots. `all` disables depth filtering.
@@ -716,18 +731,31 @@ modules:
               required: true
               default: all
               options:
-                - all
-                - "0"
-                - "1"
-                - "2"
-                - "3"
-                - "4"
-                - "5"
-                - "6"
-                - "7"
-                - "8"
-                - "9"
-                - "10"
+                - id: all
+                  name: All
+                  default: true
+                - id: "0"
+                  name: "0"
+                - id: "1"
+                  name: "1"
+                - id: "2"
+                  name: "2"
+                - id: "3"
+                  name: "3"
+                - id: "4"
+                  name: "4"
+                - id: "5"
+                  name: "5"
+                - id: "6"
+                  name: "6"
+                - id: "7"
+                  name: "7"
+                - id: "8"
+                  name: "8"
+                - id: "9"
+                  name: "9"
+                - id: "10"
+                  name: "10"
           returns:
             description: Agent-wide topology data in a JSON schema suitable for cross-agent aggregation.
             columns:
