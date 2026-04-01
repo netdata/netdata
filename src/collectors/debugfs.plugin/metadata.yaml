@@ -428,8 +428,9 @@ modules:
       additional_permissions:
         description: >
           This integration requires root privileges or CAP_AUDIT_CONTROL capability
-          to query the kernel audit subsystem via netlink. The debugfs.plugin
-          already runs with elevated privileges.
+          to query the kernel audit subsystem via netlink. The Netdata installer
+          grants this capability to debugfs.plugin automatically. The module
+          detects missing privileges and disables itself gracefully.
       default_behavior:
         auto_detection:
           description: >
@@ -477,19 +478,15 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/audit.conf
         metric: audit.backlog_utilization
         info: >
-          Linux audit backlog utilization has exceeded the warning threshold.
-          When audit failure mode is set to 2, a full backlog causes a kernel panic.
-      - name: audit_failure_mode_panic
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/audit.conf
-        metric: audit.status
-        info: >
-          Linux audit failure mode is set to 2 (panic). Any audit backlog overflow
-          will cause an immediate kernel panic.
+          Linux audit backlog utilization has exceeded the warning threshold
+          while failure mode is set to panic. Kernel panic is imminent if
+          backlog overflows.
       - name: audit_lost_events
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/audit.conf
         metric: audit.lost
         info: >
-          Linux audit subsystem is losing events due to backlog overflow.
+          Linux audit subsystem is losing events (backlog overflow, rate
+          limiting, or memory pressure).
     metrics:
       folding:
         title: Metrics
@@ -504,33 +501,35 @@ modules:
             - name: audit.backlog
               description: Audit Backlog
               unit: "events"
-              chart_type: line
+              chart_type: stacked
               dimensions:
-                - name: backlog
+                - name: used
+                - name: free
             - name: audit.backlog_utilization
               description: Audit Backlog Utilization
               unit: "%"
               chart_type: area
               dimensions:
                 - name: utilization
-            - name: audit.backlog_limit
-              description: Audit Backlog Limit
-              unit: "events"
-              chart_type: line
-              dimensions:
-                - name: backlog_limit
             - name: audit.lost
               description: Audit Lost Events
               unit: "events/s"
               chart_type: area
               dimensions:
                 - name: lost
-            - name: audit.status
-              description: Audit Status
+            - name: audit.enabled
+              description: Audit Enabled State
               unit: "state"
               chart_type: line
               dimensions:
+                - name: disabled
                 - name: enabled
-                - name: failure
-                - name: rate_limit
-                - name: pid
+                - name: immutable
+            - name: audit.failure
+              description: Audit Failure Mode
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: silent
+                - name: printk
+                - name: panic
