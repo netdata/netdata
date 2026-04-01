@@ -1497,7 +1497,7 @@ void datafile_delete(
                 // pending_deletion is already set, blocking new acquires.
                 // Bail out and let the next rotation cycle retry - lockers
                 // will drain over time since no new ones can be added.
-                netdata_log_error("DBENGINE: tier %d: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
+                netdata_log_error("DBENGINE: tier %u: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
                                   " could not be acquired for deletion after %zu attempts (%u lockers remain)"
                                   " - will retry on next rotation",
                                   tier, datafile->tier, fileno, attempts, datafile->users.lockers);
@@ -1508,7 +1508,7 @@ void datafile_delete(
                 return;
             }
 
-            netdata_log_info("DBENGINE: tier %d: waiting for " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
+            netdata_log_info("DBENGINE: tier %u: waiting for " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
                          " to be available for deletion, in use by %u users.",
                  tier, datafile->tier, fileno, datafile->users.lockers);
 
@@ -1528,7 +1528,7 @@ void datafile_delete(
 //    }
 
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_deletion_started, 1, __ATOMIC_RELAXED);
-    netdata_log_info("DBENGINE: tier %d: deleting " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " to maintain %s.",
+    netdata_log_info("DBENGINE: tier %u: deleting " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " to maintain %s.",
                      tier, datafile->tier, fileno, disk_time ? "disk quota" : "time retention");
 
     if(worker)
@@ -1586,10 +1586,10 @@ void datafile_delete(
     bool exp_njfv2 = expected_journal_files & JOURNALFILE_DELETED_V2;
 
     if (del_ndf && del_njf && del_njfv2)
-        netdata_log_info("DBENGINE: tier %d: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf, .njfv2), reclaimed %s.",
+        netdata_log_info("DBENGINE: tier %u: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf, .njfv2), reclaimed %s.",
                          tier, datafile_tier, fileno, size_for_humans);
     else if (del_ndf && del_njf && !exp_njfv2)
-        netdata_log_info("DBENGINE: tier %d: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf), reclaimed %s.",
+        netdata_log_info("DBENGINE: tier %u: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf), reclaimed %s.",
                          tier, datafile_tier, fileno, size_for_humans);
     else if (del_ndf || del_njf || del_njfv2) {
         BUFFER *removed = buffer_create(0, NULL);
@@ -1607,18 +1607,18 @@ void datafile_delete(
         if (exp_njfv2 && !del_njfv2) { buffer_strcat(failed, sep); buffer_strcat(failed, ".njfv2"); }
 
         if(buffer_strlen(failed))
-            netdata_log_error("DBENGINE: tier %d: partial delete of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
+            netdata_log_error("DBENGINE: tier %u: partial delete of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
                               " - removed: %s, failed: %s, reclaimed %s.",
                               tier, datafile_tier, fileno,
                               buffer_tostring(removed), buffer_tostring(failed), size_for_humans);
         else
-            netdata_log_info("DBENGINE: tier %d: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (%s), reclaimed %s.",
+            netdata_log_info("DBENGINE: tier %u: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (%s), reclaimed %s.",
                              tier, datafile_tier, fileno, buffer_tostring(removed), size_for_humans);
         buffer_free(removed);
         buffer_free(failed);
     }
     else
-        netdata_log_error("DBENGINE: tier %d: failed to delete " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " to maintain %s.",
+        netdata_log_error("DBENGINE: tier %u: failed to delete " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " to maintain %s.",
                           tier, datafile_tier, fileno, disk_time ? "disk quota" : "time retention");
 }
 
