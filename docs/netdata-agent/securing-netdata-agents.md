@@ -49,7 +49,7 @@ Restart your Agent to apply changes. After restart, the Agent's web server (defa
 
 :::note
 
-Setting `mode = none` disables the web server listener — the Agent will not accept any inbound HTTP connections, including inbound streams from Child Agents. Do not use this for Parent Agents.
+Do not use this for Parent Agents.
 
 :::
 
