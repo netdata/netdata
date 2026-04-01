@@ -5,12 +5,6 @@
     "description": "Discovers services by scanning local listening network ports.",
     "type": "object",
     "properties": {
-      "name": {
-        "title": "Name",
-        "description": "Pipeline name (must be unique).",
-        "type": "string",
-        "minLength": 1
-      },
       "discoverer": {
         "title": "Discoverer",
         "type": "object",
@@ -72,7 +66,6 @@
       }
     },
     "required": [
-      "name",
       "discoverer",
       "services"
     ]
@@ -87,7 +80,6 @@
         {
           "title": "Base",
           "fields": [
-            "name",
             "discoverer"
           ]
         },
@@ -125,7 +117,7 @@
         },
         "config_template": {
           "ui:widget": "textarea",
-          "ui:placeholder": "module: nginx\nname: {{.Name}}-{{.Address}}\nurl: http://{{.Address}}/stub_status"
+          "ui:placeholder": "module: nginx\nname: {{.TUID}}\nurl: http://{{.Address}}/stub_status"
         }
       }
     }
