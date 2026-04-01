@@ -224,6 +224,15 @@
 - Improve journal file logging ([#22086](https://github.com/netdata/netdata/issues/22086))
 - Regenerate integrations docs ([#22092](https://github.com/netdata/netdata/issues/22092))
 - Remove VLA (variable-length arrays) from collectors ([#22066](https://github.com/netdata/netdata/issues/22066))
+- Build(deps): bump azure/artifact-signing-action from 1.1.0 to 1.2.0 ([#22048](https://github.com/netdata/netdata/issues/22048))
+- Docs: add section on changing the default port ([#22084](https://github.com/netdata/netdata/issues/22084))
+- Refactor(go.d/azure_monitor): redesign discovery and profile selection ([#22095](https://github.com/netdata/netdata/issues/22095))
+- Regenerate integrations docs ([#22096](https://github.com/netdata/netdata/issues/22096))
+- Fix PID cleanup loop in EBPF to avoid use-after-free errors ([#22098](https://github.com/netdata/netdata/issues/22098))
+- Docs(secretstore): improve secret store backend documentation ([#22099](https://github.com/netdata/netdata/issues/22099))
+- Fix UB in tzif_read_be64() ([#22097](https://github.com/netdata/netdata/issues/22097))
+- Fix Coverity ([#22094](https://github.com/netdata/netdata/issues/22094))
+- Remove compilation warning (Windows) ([#22091](https://github.com/netdata/netdata/issues/22091))
 
 ## [2.9.0] - 2026-02-16
 
