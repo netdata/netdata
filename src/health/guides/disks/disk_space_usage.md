@@ -22,6 +22,7 @@ Netdata strongly suggests that you are careful when cleaning up drives, and remo
 
 1. [Disk space collector](/src/collectors/diskspace.plugin/README.md)
 
-2. Use `du` and `df` commands to analyze disk usage: [Linux disk usage commands](https://www.redhat.com/sysadmin/Linux-disk-usage)
+2. [Linux disk usage commands](https://www.redhat.com/sysadmin/Linux-disk-usage)
 
-3. If a mount point fails to mount automatically after reboot, see: [systemd mount unit failed state](/src/health/guides/systemdunits/systemd_mount_unit_failed_state.md)
+3. [systemd mount unit failed state](/src/health/guides/systemdunits/systemd_mount_unit_failed_state.md)
+
