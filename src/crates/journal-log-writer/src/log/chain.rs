@@ -47,15 +47,17 @@ pub(super) struct OwnedChain {
 }
 
 impl OwnedChain {
-    pub(super) fn new(path: PathBuf, machine_id: Uuid) -> Result<Self> {
+    pub(super) fn new(path: PathBuf, machine_id: Uuid, machine_id_suffix: bool) -> Result<Self> {
         #[cfg(debug_assertions)]
         {
             use std::os::unix::ffi::OsStrExt;
 
             debug_assert!(path.exists() && path.is_dir());
 
-            let filename = path.file_name().unwrap().as_bytes();
-            debug_assert_eq!(Ok(machine_id), Uuid::try_parse_ascii(filename));
+            if machine_id_suffix {
+                let filename = path.file_name().unwrap().as_bytes();
+                debug_assert_eq!(Ok(machine_id), Uuid::try_parse_ascii(filename));
+            }
         }
 
         let mut chain = Self {
@@ -114,6 +116,28 @@ impl OwnedChain {
         }
     }
 
+    pub(super) fn tail_monotonic_for_boot(&self, boot_id: Uuid) -> Result<Option<u64>> {
+        let Some(file) = self.inner.back() else {
+            return Ok(None);
+        };
+
+        let window_size = 4096;
+        let jf = JournalFile::<Mmap>::open(file, window_size)?;
+        let header = jf.journal_header_ref();
+
+        let tail_boot_id = Uuid::from_bytes(header.tail_entry_boot_id);
+        if tail_boot_id != boot_id {
+            return Ok(None);
+        }
+
+        let monotonic = header.tail_entry_monotonic;
+        if monotonic == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(monotonic))
+        }
+    }
+
     /// Registers a new journal file with the directory.
     pub(super) fn create_file(
         &mut self,
@@ -144,13 +168,20 @@ impl OwnedChain {
 
     /// Retains the files that satisfy retention policy limits.
     #[tracing::instrument(skip_all, fields(reason))]
-    pub(super) fn retain(&mut self, retention_policy: &RetentionPolicy) -> Result<()> {
+    pub(super) fn retain(
+        &mut self,
+        retention_policy: &RetentionPolicy,
+    ) -> Result<Vec<std::path::PathBuf>> {
+        let mut deleted_paths = Vec::new();
+
         // Remove by file count limit
         if let Some(max_files) = retention_policy.number_of_journal_files {
             while self.inner.len() > max_files {
                 let reason = format!("num_files({}) > max_files({})", self.inner.len(), max_files);
                 tracing::Span::current().record("reason", reason);
-                self.delete_oldest_file()?;
+                if let Some(path) = self.delete_oldest_file()? {
+                    deleted_paths.push(path);
+                }
             }
         }
 
@@ -162,49 +193,61 @@ impl OwnedChain {
                     self.total_size, max_total_size
                 );
                 tracing::Span::current().record("reason", reason);
-                self.delete_oldest_file()?;
+                if let Some(path) = self.delete_oldest_file()? {
+                    deleted_paths.push(path);
+                }
             }
         }
 
         // Remove by entry age limit
         if let Some(max_entry_age) = retention_policy.duration_of_journal_files {
-            self.delete_files_older_than(max_entry_age)?;
+            deleted_paths.extend(self.delete_files_older_than(max_entry_age)?);
         }
 
-        Ok(())
+        Ok(deleted_paths)
     }
 
     /// Remove the oldest file
     #[tracing::instrument(skip_all)]
-    fn delete_oldest_file(&mut self) -> Result<()> {
+    fn delete_oldest_file(&mut self) -> Result<Option<std::path::PathBuf>> {
         let Some(file) = self.inner.pop_front() else {
-            return Ok(());
+            return Ok(None);
         };
 
         info!("deleting {}", file.path());
+        let deleted_path = std::path::PathBuf::from(file.path());
 
         let file_size = self.file_sizes.get(&file).copied().unwrap_or(0);
 
         // Remove from filesystem
-        if let Err(e) = std::fs::remove_file(file.path()) {
-            // Log error but continue cleanup - file might already be deleted
-            error!("failed to remove journal file {:?}: {}", file.path(), e);
-        }
+        let removed = match std::fs::remove_file(file.path()) {
+            Ok(()) => true,
+            Err(e) => {
+                // Log error but continue cleanup - file might already be deleted
+                error!("failed to remove journal file {:?}: {}", file.path(), e);
+                false
+            }
+        };
 
         self.file_sizes.remove(&file);
         self.total_size = self.total_size.saturating_sub(file_size);
-        Ok(())
+        Ok(removed.then_some(deleted_path))
     }
 
     /// Remove files older than the specified cutoff time
     #[tracing::instrument(skip(self))]
-    fn delete_files_older_than(&mut self, max_entry_age: std::time::Duration) -> Result<()> {
+    fn delete_files_older_than(
+        &mut self,
+        max_entry_age: std::time::Duration,
+    ) -> Result<Vec<std::path::PathBuf>> {
         let cutoff_time = Microseconds::now()
             .get()
             .saturating_sub(max_entry_age.as_micros() as u64);
+        let mut deleted_paths = Vec::new();
 
         for file in self.inner.drain(cutoff_time) {
             info!("deleting {}", file.path());
+            let deleted_path = std::path::PathBuf::from(file.path());
             let file_size = self.file_sizes.get(&file).copied().unwrap_or(0);
 
             if let Err(e) = std::fs::remove_file(file.path()) {
@@ -212,10 +255,11 @@ impl OwnedChain {
                 continue;
             }
 
+            deleted_paths.push(deleted_path);
             self.file_sizes.remove(&file);
             self.total_size = self.total_size.saturating_sub(file_size);
         }
 
-        Ok(())
+        Ok(deleted_paths)
     }
 }

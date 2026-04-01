@@ -1183,7 +1183,13 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
                     }
                 };
 
-                let data_offset = NonZeroU64::new(data_offset)?;
+                let data_offset = match NonZeroU64::new(data_offset) {
+                    Some(offset) => offset,
+                    None => {
+                        self.current_index = self.total_items;
+                        return Some(Err(JournalError::InvalidOffset));
+                    }
+                };
 
                 // Drop the entry guard before obtaining the data object
                 drop(entry_guard);
@@ -1204,5 +1210,66 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
                 Some(Err(e))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::file::writer::JournalWriter;
+    use tempfile::TempDir;
+
+    fn test_uuid(seed: u8) -> uuid::Uuid {
+        uuid::Uuid::from_bytes([seed; 16])
+    }
+
+    #[test]
+    fn entry_data_iterator_reports_zero_offsets_as_invalid() {
+        let dir = TempDir::new().expect("create temp dir");
+        let journal_dir = dir.path().join("journals");
+        std::fs::create_dir_all(&journal_dir).expect("create journal dir");
+        let path = journal_dir.join("system.journal");
+        let repo_file =
+            crate::repository::File::from_path(&path).expect("test journal path should parse");
+
+        let mut journal_file = JournalFile::create(
+            &repo_file,
+            JournalFileOptions::new(test_uuid(1), test_uuid(2), test_uuid(3)),
+        )
+        .expect("create journal");
+        let mut writer =
+            JournalWriter::new(&mut journal_file, 1, test_uuid(4)).expect("create writer");
+        let payloads = [b"MESSAGE=test".as_slice(), b"PRIORITY=6".as_slice()];
+        writer
+            .add_entry(&mut journal_file, &payloads, 1_000_000, 100)
+            .expect("write entry");
+
+        let mut entry_offsets = Vec::new();
+        journal_file
+            .entry_offsets(&mut entry_offsets)
+            .expect("collect entry offsets");
+        let entry_offset = *entry_offsets.first().expect("journal entry");
+
+        {
+            let mut entry_guard = journal_file
+                .entry_mut(entry_offset, None)
+                .expect("entry guard");
+            match &mut entry_guard.items {
+                EntryItemsType::Regular(items) => items[0].object_offset = 0,
+                EntryItemsType::Compact(items) => items[0].object_offset = 0,
+            }
+        }
+
+        let mut iter = journal_file
+            .entry_data_objects(entry_offset)
+            .expect("entry iterator");
+        assert!(matches!(
+            iter.next(),
+            Some(Err(JournalError::InvalidOffset))
+        ));
+        assert!(
+            iter.next().is_none(),
+            "iterator should stop after the error"
+        );
     }
 }

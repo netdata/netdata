@@ -57,11 +57,13 @@ jobs:
             .github/data/distros.yml
             .github/workflows/packaging.yml
             .github/scripts/gen-matrix-packaging.py
+            .github/scripts/prepare-topology-ip-intel-stock.sh
             .github/scripts/pkg-test.sh
             packaging/cmake/
             packaging/*.sh
             packaging/*.version
             packaging/*.checksums
+            src/go/tools/topology-ip-intel-downloader/**
             src/crates/
             src/aclk/aclk-schemas/
             src/ml/dlib/
@@ -188,6 +190,80 @@ jobs:
             && github.repository == 'netdata/netdata'
           }}
 
+  prepare-topology-ip-intel-stock:
+    name: Prepare topology-ip-intel stock payload
+    runs-on: ubuntu-latest
+    needs:
+      - file-check
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - name: Checkout
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Setup Go
+        id: setup-go
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: src/go/go.mod
+      - name: Prepare synthetic stock payload
+        id: prepare-synthetic
+        if: needs.file-check.outputs.run == 'true' && github.event_name == 'pull_request'
+        run: |
+          .github/scripts/prepare-topology-ip-intel-stock.sh \
+            --mode synthetic \
+            --output-dir "${GITHUB_WORKSPACE}/.topology-ip-intel-stock"
+      - name: Prepare release stock payload
+        id: prepare-release
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
+        uses: nick-invision/retry@v4
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 30
+          timeout_seconds: 1800
+          command: >
+            .github/scripts/prepare-topology-ip-intel-stock.sh
+            --mode release
+            --output-dir "${GITHUB_WORKSPACE}/.topology-ip-intel-stock"
+      - name: Upload topology-ip-intel stock payload
+        id: upload-stock
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: topology-ip-intel-stock
+          path: ${{ github.workspace }}/.topology-ip-intel-stock/
+          include-hidden-files: true
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Topology stock payload preparation failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to prepare topology-ip-intel stock payload.
+              Checkout: ${{ steps.checkout.outcome }}
+              Setup Go: ${{ steps.setup-go.outcome }}
+              Prepare synthetic payload: ${{ steps.prepare-synthetic.outcome }}
+              Prepare release payload: ${{ steps.prepare-release.outcome }}
+              Upload stock payload: ${{ steps.upload-stock.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
+          }}
+
   build:
     name: Build
     runs-on: ${{ matrix.runner }}
@@ -197,6 +273,7 @@ jobs:
       - matrix
       - version-check
       - file-check
+      - prepare-topology-ip-intel-stock
     strategy:
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
       # We intentiaonally disable the fail-fast behavior so that a
@@ -250,6 +327,13 @@ jobs:
         id: fetch-ibm-mq
         if: (matrix.arch == 'amd64' || matrix.arch == 'x86_64') && needs.file-check.outputs.run == 'true'
         run: .github/scripts/prep-ibm-mq-libs.sh
+      - name: Download topology-ip-intel stock payload
+        id: fetch-topology-stock
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: topology-ip-intel-stock
+          path: ${{ github.workspace }}/.topology-ip-intel-stock
       - name: Build Packages
         id: build
         if: needs.file-check.outputs.run == 'true'
@@ -259,6 +343,7 @@ jobs:
                      -e ENABLE_SENTRY=${{ matrix.bundle_sentry }} -e RELEASE_PIPELINE=${{ env.RELEASE_PIPELINE }} \
                      -e BUILD_DESTINATION=${{ matrix.distro }}${{ matrix.version }}_${{ matrix.arch }} -e UPLOAD_SENTRY=${{ env.UPLOAD_SENTRY }} \
                      -e SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_CLI_TOKEN }} -e NETDATA_SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
+                     -e NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR=/netdata/.topology-ip-intel-stock \
                      -e GOOS=$(echo ${{ matrix.platform }} | cut -f 1 -d '/') -e GOARCH=$(echo ${{ matrix.platform }} | cut -f 2 -d '/') \
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-${{ matrix.builder_rev }}
       - name: Save Packages
@@ -331,6 +416,7 @@ jobs:
               Setup QEMU: ${{ steps.qemu.outcome }}
               Fetch images: ${{ steps.fetch-images.outcome }}
               Fetch IBM MQ libs: ${{ steps.fetch-ibm-mq.outcome }}
+              Fetch topology stock payload: ${{ steps.fetch-topology-stock.outcome }}
               Build: ${{ steps.build.outcome }}
               Test: ${{ steps.test.outcome }}
               Import GPG Keys: ${{ steps.import-keys.outcome }}

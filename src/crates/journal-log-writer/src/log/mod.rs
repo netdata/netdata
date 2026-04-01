@@ -5,7 +5,7 @@ mod config;
 pub use config::{Config, RetentionPolicy, RotationPolicy};
 
 use crate::{Result, WriterError};
-use journal_common::{RealtimeClock, load_boot_id, load_machine_id, monotonic_now};
+use journal_common::{Microseconds, RealtimeClock, load_boot_id, load_machine_id, monotonic_now};
 use journal_core::field_map::{
     FieldMap, REMAPPING_MARKER, extract_field_name, is_systemd_compatible,
 };
@@ -13,11 +13,12 @@ use journal_core::file::mmap::MmapMut;
 use journal_core::file::{JournalFile, JournalFileOptions, JournalWriter};
 use journal_registry::repository;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument, span, warn};
 
-fn create_chain(path: &Path) -> Result<OwnedChain> {
+fn create_chain(path: &Path, machine_id_suffix: bool) -> Result<OwnedChain> {
     let machine_id = load_machine_id()
         .map_err(|e| WriterError::MachineId(format!("failed to load machine ID: {}", e)))?;
 
@@ -31,10 +32,14 @@ fn create_chain(path: &Path) -> Result<OwnedChain> {
         ));
     }
 
-    let path = PathBuf::from(path).join(machine_id.as_simple().to_string());
+    let path = if machine_id_suffix {
+        PathBuf::from(path).join(machine_id.as_simple().to_string())
+    } else {
+        PathBuf::from(path)
+    };
     if path.to_str().is_none() {
         return Err(WriterError::InvalidPath(
-            "path with machine ID contains invalid UTF-8".to_string(),
+            "resolved path contains invalid UTF-8".to_string(),
         ));
     }
 
@@ -48,7 +53,7 @@ fn create_chain(path: &Path) -> Result<OwnedChain> {
         ));
     }
 
-    OwnedChain::new(path, machine_id)
+    OwnedChain::new(path, machine_id, machine_id_suffix)
 }
 
 /// Tracks rotation state for size and count limits
@@ -175,6 +180,50 @@ pub struct Log {
     current_seqnum: u64,
     remapping_registry: FieldMap,
     clock: RealtimeClock,
+    last_monotonic_usec: u64,
+    lifecycle_observer: Option<Arc<dyn LogLifecycleObserver>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LogLifecycleEvent {
+    Rotated {
+        archived_path: PathBuf,
+        active_path: PathBuf,
+    },
+    RetainedDeleted {
+        paths: Vec<PathBuf>,
+    },
+}
+
+pub trait LogLifecycleObserver: Send + Sync {
+    fn on_event(&self, event: &LogLifecycleEvent);
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EntryTimestamps {
+    /// Optional source timestamp for `_SOURCE_REALTIME_TIMESTAMP` field injection.
+    pub source_realtime_usec: Option<u64>,
+    /// Optional journal entry realtime timestamp override.
+    pub entry_realtime_usec: Option<u64>,
+    /// Optional journal entry monotonic timestamp override.
+    pub entry_monotonic_usec: Option<u64>,
+}
+
+impl EntryTimestamps {
+    pub fn with_source_realtime_usec(mut self, ts: u64) -> Self {
+        self.source_realtime_usec = Some(ts);
+        self
+    }
+
+    pub fn with_entry_realtime_usec(mut self, ts: u64) -> Self {
+        self.entry_realtime_usec = Some(ts);
+        self
+    }
+
+    pub fn with_entry_monotonic_usec(mut self, ts: u64) -> Self {
+        self.entry_monotonic_usec = Some(ts);
+        self
+    }
 }
 
 impl Log {
@@ -183,20 +232,41 @@ impl Log {
     /// Returns (realtime_usec, monotonic_usec) where:
     /// - realtime: microseconds since Unix epoch (CLOCK_REALTIME), monotonically increasing
     /// - monotonic: microseconds since boot (CLOCK_MONOTONIC)
-    fn capture_dual_timestamp(&self) -> Result<(u64, u64)> {
-        let realtime = self.clock.now().get();
-        let monotonic = monotonic_now().map_err(|e| WriterError::Io(e))?.get();
+    fn capture_dual_timestamp(
+        &mut self,
+        timestamp_override: Option<&EntryTimestamps>,
+    ) -> Result<(u64, u64)> {
+        let realtime = match timestamp_override.and_then(|ts| ts.entry_realtime_usec) {
+            Some(ts) => self.clock.observe(Microseconds::new(ts)).get(),
+            None => self.clock.now().get(),
+        };
+
+        let desired_monotonic = match timestamp_override.and_then(|ts| ts.entry_monotonic_usec) {
+            Some(ts) => ts,
+            None => monotonic_now().map_err(WriterError::Io)?.get(),
+        };
+
+        let monotonic = if desired_monotonic > self.last_monotonic_usec {
+            desired_monotonic
+        } else {
+            self.last_monotonic_usec.saturating_add(1)
+        };
+        self.last_monotonic_usec = monotonic;
+
         Ok((realtime, monotonic))
     }
 
     /// Creates a new journal log.
     pub fn new(path: &Path, config: Config) -> Result<Self> {
-        let chain = create_chain(path)?;
+        let chain = create_chain(path, config.machine_id_suffix)?;
 
         let current_seqnum = chain.tail_seqnum()?;
         let boot_id = load_boot_id()?;
         let seqnum_id = uuid::Uuid::new_v4();
         let rotation_state = RotationState::new(&config.rotation_policy);
+        // When there is no tail monotonic timestamp for this boot we start at 0.
+        // The first clamped write becomes 1us if an override asks for 0, preserving strict monotonicity.
+        let last_monotonic_usec = chain.tail_monotonic_for_boot(boot_id)?.unwrap_or(0);
 
         // Initialize clock with last entry timestamp if available
         let clock = if let Some(tail_realtime) = chain.tail_realtime()? {
@@ -215,7 +285,14 @@ impl Log {
             current_seqnum,
             remapping_registry: FieldMap::new(),
             clock,
+            last_monotonic_usec,
+            lifecycle_observer: None,
         })
+    }
+
+    pub fn with_lifecycle_observer(mut self, observer: Arc<dyn LogLifecycleObserver>) -> Self {
+        self.lifecycle_observer = Some(observer);
+        self
     }
 
     /// Writes a journal entry.
@@ -227,6 +304,25 @@ impl Log {
         &mut self,
         items: &[&[u8]],
         source_realtime_usec: Option<u64>,
+    ) -> Result<()> {
+        self.write_entry_with_timestamps(
+            items,
+            EntryTimestamps {
+                source_realtime_usec,
+                ..EntryTimestamps::default()
+            },
+        )
+    }
+
+    /// Writes a journal entry with optional source and entry timestamp overrides.
+    ///
+    /// Overrides are safe by construction:
+    /// - entry realtime is clamped to strict monotonic progression (`last + 1us` floor)
+    /// - entry monotonic is also clamped to strict monotonic progression (`last + 1us` floor)
+    pub fn write_entry_with_timestamps(
+        &mut self,
+        items: &[&[u8]],
+        timestamps: EntryTimestamps,
     ) -> Result<()> {
         if items.is_empty() {
             return Ok(());
@@ -260,7 +356,7 @@ impl Log {
 
         // Write remapping entry if we have new mappings
         if !new_mappings.is_empty() {
-            self.write_remapping_entry(&new_mappings)?;
+            self.write_remapping_entry(&new_mappings, &EntryTimestamps::default())?;
 
             // Update registry
             for (otel_name, systemd_name) in new_mappings.iter() {
@@ -280,7 +376,7 @@ impl Log {
         transformed_items.push(boot_id_field.into_bytes());
 
         // Add _SOURCE_REALTIME_TIMESTAMP if provided
-        if let Some(timestamp_usec) = source_realtime_usec {
+        if let Some(timestamp_usec) = timestamps.source_realtime_usec {
             let source_timestamp_field = format!("_SOURCE_REALTIME_TIMESTAMP={}", timestamp_usec);
             transformed_items.push(source_timestamp_field.into_bytes());
         }
@@ -310,7 +406,7 @@ impl Log {
             items_refs.push(item.as_slice());
         }
 
-        let (realtime, monotonic) = self.capture_dual_timestamp()?;
+        let (realtime, monotonic) = self.capture_dual_timestamp(Some(&timestamps))?;
 
         let active_file = self.active_file.as_mut().unwrap();
         active_file.write_entry(&items_refs, realtime, monotonic)?;
@@ -329,7 +425,11 @@ impl Log {
     /// ND_<md5_1>=<otel_key_1>
     /// ND_<md5_2>=<otel_key_2>
     /// ...
-    fn write_remapping_entry(&mut self, mappings: &[(Vec<u8>, String)]) -> Result<()> {
+    fn write_remapping_entry(
+        &mut self,
+        mappings: &[(Vec<u8>, String)],
+        timestamps: &EntryTimestamps,
+    ) -> Result<()> {
         let mut remapping_items: Vec<Vec<u8>> = Vec::with_capacity(mappings.len() + 2);
 
         // Inject _BOOT_ID field first
@@ -351,7 +451,7 @@ impl Log {
         // Build references
         let items_refs: Vec<&[u8]> = remapping_items.iter().map(|v| v.as_slice()).collect();
 
-        let (realtime, monotonic) = self.capture_dual_timestamp()?;
+        let (realtime, monotonic) = self.capture_dual_timestamp(Some(timestamps))?;
 
         let active_file = self.active_file.as_mut().unwrap();
         active_file.write_entry(&items_refs, realtime, monotonic)?;
@@ -373,6 +473,12 @@ impl Log {
         Ok(())
     }
 
+    pub fn active_path(&self) -> Option<&Path> {
+        self.active_file
+            .as_ref()
+            .map(|active_file| Path::new(active_file.repository_file.path()))
+    }
+
     fn should_rotate(&self) -> bool {
         self.active_file.is_none() || self.rotation_state.should_rotate()
     }
@@ -390,32 +496,55 @@ impl Log {
         }
 
         // Respect retention policy
-        self.chain.retain(&self.config.retention_policy)?;
+        let deleted_paths = self.chain.retain(&self.config.retention_policy)?;
+        if !deleted_paths.is_empty()
+            && let Some(observer) = &self.lifecycle_observer
+        {
+            observer.on_event(&LogLifecycleEvent::RetainedDeleted {
+                paths: deleted_paths,
+            });
+        }
 
         // Create new file (either initial or rotated)
         let max_file_size = self.config.rotation_policy.size_of_journal_file;
         let head_realtime = self.clock.now().get();
-        let new_file = if let Some(mut old_file) = self.active_file.take() {
+        let (new_file, rotation_event) = if let Some(mut old_file) = self.active_file.take() {
             // Set the old file's state to ARCHIVED before creating successor
             old_file.journal_file.journal_header_mut().state = JournalState::Archived as u8;
             old_file.journal_file.sync()?;
-
-            old_file.rotate(&mut self.chain, max_file_size, head_realtime)?
+            let archived_path = PathBuf::from(old_file.repository_file.path());
+            let new_file = old_file.rotate(&mut self.chain, max_file_size, head_realtime)?;
+            let active_path = PathBuf::from(new_file.repository_file.path());
+            (
+                new_file,
+                Some(LogLifecycleEvent::Rotated {
+                    archived_path,
+                    active_path,
+                }),
+            )
         } else {
-            ActiveFile::create(
-                &mut self.chain,
-                self.seqnum_id,
-                self.boot_id,
-                self.current_seqnum + 1,
-                max_file_size,
-                head_realtime,
-            )?
+            (
+                ActiveFile::create(
+                    &mut self.chain,
+                    self.seqnum_id,
+                    self.boot_id,
+                    self.current_seqnum + 1,
+                    max_file_size,
+                    head_realtime,
+                )?,
+                None,
+            )
         };
 
         tracing::Span::current().record("new_file", new_file.repository_file.path());
 
         self.active_file = Some(new_file);
         self.rotation_state.reset();
+        if let Some(event) = rotation_event
+            && let Some(observer) = &self.lifecycle_observer
+        {
+            observer.on_event(&event);
+        }
 
         Ok(())
     }

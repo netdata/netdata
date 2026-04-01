@@ -1,0 +1,48 @@
+pub(crate) const INTERNAL_EXPORTER_IP_PRESENT: &str = "_EXPORTER_IP_PRESENT";
+pub(crate) const INTERNAL_NEXT_HOP_PRESENT: &str = "_NEXT_HOP_PRESENT";
+pub(crate) const INTERNAL_DIRECTION_PRESENT: &str = "_DIRECTION_PRESENT";
+pub(super) const INTERNAL_ETYPE_PRESENT: &str = "_ETYPE_PRESENT";
+pub(super) const INTERNAL_FORWARDING_STATUS_PRESENT: &str = "_FORWARDING_STATUS_PRESENT";
+pub(super) const INTERNAL_IPTOS_PRESENT: &str = "_IPTOS_PRESENT";
+pub(super) const INTERNAL_TCP_FLAGS_PRESENT: &str = "_TCP_FLAGS_PRESENT";
+pub(super) const INTERNAL_ICMPV4_TYPE_PRESENT: &str = "_ICMPV4_TYPE_PRESENT";
+pub(super) const INTERNAL_ICMPV4_CODE_PRESENT: &str = "_ICMPV4_CODE_PRESENT";
+pub(super) const INTERNAL_ICMPV6_TYPE_PRESENT: &str = "_ICMPV6_TYPE_PRESENT";
+pub(super) const INTERNAL_ICMPV6_CODE_PRESENT: &str = "_ICMPV6_CODE_PRESENT";
+pub(super) const INTERNAL_IN_IF_SPEED_PRESENT: &str = "_IN_IF_SPEED_PRESENT";
+pub(super) const INTERNAL_OUT_IF_SPEED_PRESENT: &str = "_OUT_IF_SPEED_PRESENT";
+pub(super) const INTERNAL_IN_IF_BOUNDARY_PRESENT: &str = "_IN_IF_BOUNDARY_PRESENT";
+pub(super) const INTERNAL_OUT_IF_BOUNDARY_PRESENT: &str = "_OUT_IF_BOUNDARY_PRESENT";
+pub(super) const INTERNAL_SRC_VLAN_PRESENT: &str = "_SRC_VLAN_PRESENT";
+pub(super) const INTERNAL_DST_VLAN_PRESENT: &str = "_DST_VLAN_PRESENT";
+
+pub(crate) const ROLLUP_PRESENCE_FIELDS: &[(&str, &str)] = &[
+    ("DIRECTION", INTERNAL_DIRECTION_PRESENT),
+    ("ETYPE", INTERNAL_ETYPE_PRESENT),
+    ("FORWARDING_STATUS", INTERNAL_FORWARDING_STATUS_PRESENT),
+    ("IPTOS", INTERNAL_IPTOS_PRESENT),
+    ("TCP_FLAGS", INTERNAL_TCP_FLAGS_PRESENT),
+    ("ICMPV4_TYPE", INTERNAL_ICMPV4_TYPE_PRESENT),
+    ("ICMPV4_CODE", INTERNAL_ICMPV4_CODE_PRESENT),
+    ("ICMPV6_TYPE", INTERNAL_ICMPV6_TYPE_PRESENT),
+    ("ICMPV6_CODE", INTERNAL_ICMPV6_CODE_PRESENT),
+    ("IN_IF_SPEED", INTERNAL_IN_IF_SPEED_PRESENT),
+    ("OUT_IF_SPEED", INTERNAL_OUT_IF_SPEED_PRESENT),
+    ("IN_IF_BOUNDARY", INTERNAL_IN_IF_BOUNDARY_PRESENT),
+    ("OUT_IF_BOUNDARY", INTERNAL_OUT_IF_BOUNDARY_PRESENT),
+    ("SRC_VLAN", INTERNAL_SRC_VLAN_PRESENT),
+    ("DST_VLAN", INTERNAL_DST_VLAN_PRESENT),
+];
+
+#[cfg(test)]
+pub(crate) fn rollup_presence_field(field: &str) -> Option<&'static str> {
+    ROLLUP_PRESENCE_FIELDS
+        .iter()
+        .find_map(|(actual, internal)| (*actual == field).then_some(*internal))
+}
+
+pub(crate) fn is_internal_rollup_presence_field(field: &str) -> bool {
+    ROLLUP_PRESENCE_FIELDS
+        .iter()
+        .any(|(_, internal)| *internal == field)
+}

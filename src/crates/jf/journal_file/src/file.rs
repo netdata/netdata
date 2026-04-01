@@ -1120,7 +1120,13 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
                     }
                 };
 
-                let data_offset = NonZeroU64::new(data_offset)?;
+                let data_offset = match NonZeroU64::new(data_offset) {
+                    Some(offset) => offset,
+                    None => {
+                        self.current_index = self.total_items;
+                        return Some(Err(JournalError::InvalidOffset));
+                    }
+                };
 
                 // Drop the entry guard before obtaining the data object
                 drop(entry_guard);

@@ -108,6 +108,28 @@ dump_log() {
   cat ./netdata.log
 }
 
+check_topology_ip_intel_stock() {
+  stock_root="/usr/share/netdata/topology-ip-intel"
+
+  for path in \
+    "${stock_root}/README.md" \
+    "${stock_root}/topology-ip-asn.mmdb" \
+    "${stock_root}/topology-ip-geo.mmdb" \
+    "${stock_root}/topology-ip-intel.json"
+  do
+    if [ ! -s "${path}" ]; then
+      printf "ERROR: missing packaged topology IP intelligence payload file: %s\n" "${path}"
+      exit 1
+    fi
+  done
+
+  if [ -e "${stock_root}/topology-ip-country.mmdb" ]; then
+    printf "ERROR: obsolete packaged topology IP intelligence file still present: %s\n" \
+      "${stock_root}/topology-ip-country.mmdb"
+    exit 1
+  fi
+}
+
 case "${DISTRO}" in
   debian | ubuntu)
     install_debian_like
@@ -133,6 +155,8 @@ esac
 echo "::group::Netdata buildinfo"
 /usr/sbin/netdata -W buildinfo
 echo "::endgroup::"
+
+check_topology_ip_intel_stock
 
 trap dump_log EXIT
 

@@ -28,3 +28,4 @@ serde-api = ["serde", "serde_json", "flatten-serde-json"]
 
 [dev-dependencies]
 tempfile = { workspace = true }
+serde_json = { workspace = true }
