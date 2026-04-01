@@ -83,7 +83,7 @@ static int audit_netlink_query(struct audit_reply *reply) {
     // receive response
     char buf[8192];
 
-    // set a 2-second timeout to avoid blocking forever
+    // set a timeout to avoid blocking the plugin's collection loop
     struct timeval tv = { .tv_sec = 0, .tv_usec = AUDIT_RECV_TIMEOUT_MS * 1000 };
     if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
         close(fd);
@@ -160,8 +160,8 @@ static void audit_send_charts(int update_every, const char *name) {
 
     // chart: audit backlog (stacked: used + free = backlog_limit)
     printf(PLUGINSD_KEYWORD_CHART
-        " audit.backlog '' 'Audit Backlog' 'events' 'audit' 'audit.backlog' stacked %d %d '' 'debugfs.plugin' '%s'\n",
-        NETDATA_CHART_PRIO_AUDIT_BACKLOG, update_every, name);
+        " audit.backlog '' 'Audit Backlog' 'events' 'audit' 'audit.backlog' %s %d %d '' 'debugfs.plugin' '%s'\n",
+        debugfs_rrdset_type_name(RRDSET_TYPE_STACKED), NETDATA_CHART_PRIO_AUDIT_BACKLOG, update_every, name);
     printf(PLUGINSD_KEYWORD_DIMENSION " 'used' 'used' %s 1 1 ''\n",
         RRD_ALGORITHM_ABSOLUTE_NAME);
     printf(PLUGINSD_KEYWORD_DIMENSION " 'free' 'free' %s 1 1 'hidden'\n",
@@ -169,22 +169,22 @@ static void audit_send_charts(int update_every, const char *name) {
 
     // chart: audit backlog utilization (percentage)
     printf(PLUGINSD_KEYWORD_CHART
-        " audit.backlog_utilization '' 'Audit Backlog Utilization' '%%' 'audit' 'audit.backlog_utilization' area %d %d '' 'debugfs.plugin' '%s'\n",
-        NETDATA_CHART_PRIO_AUDIT_BACKLOG_UTIL, update_every, name);
+        " audit.backlog_utilization '' 'Audit Backlog Utilization' '%%' 'audit' 'audit.backlog_utilization' %s %d %d '' 'debugfs.plugin' '%s'\n",
+        debugfs_rrdset_type_name(RRDSET_TYPE_AREA), NETDATA_CHART_PRIO_AUDIT_BACKLOG_UTIL, update_every, name);
     printf(PLUGINSD_KEYWORD_DIMENSION " 'utilization' 'utilization' %s 1 100 ''\n",
         RRD_ALGORITHM_ABSOLUTE_NAME);
 
     // chart: audit lost events
     printf(PLUGINSD_KEYWORD_CHART
-        " audit.lost '' 'Audit Lost Events' 'events/s' 'audit' 'audit.lost' area %d %d '' 'debugfs.plugin' '%s'\n",
-        NETDATA_CHART_PRIO_AUDIT_LOST, update_every, name);
+        " audit.lost '' 'Audit Lost Events' 'events/s' 'audit' 'audit.lost' %s %d %d '' 'debugfs.plugin' '%s'\n",
+        debugfs_rrdset_type_name(RRDSET_TYPE_AREA), NETDATA_CHART_PRIO_AUDIT_LOST, update_every, name);
     printf(PLUGINSD_KEYWORD_DIMENSION " 'lost' 'lost' %s 1 1 ''\n",
         RRD_ALGORITHM_INCREMENTAL_NAME);
 
     // chart: audit enabled state (exactly one dimension is 1 at any time)
     printf(PLUGINSD_KEYWORD_CHART
-        " audit.enabled '' 'Audit Enabled State' 'state' 'audit' 'audit.enabled' line %d %d '' 'debugfs.plugin' '%s'\n",
-        NETDATA_CHART_PRIO_AUDIT_ENABLED, update_every, name);
+        " audit.enabled '' 'Audit Enabled State' 'state' 'audit' 'audit.enabled' %s %d %d '' 'debugfs.plugin' '%s'\n",
+        debugfs_rrdset_type_name(RRDSET_TYPE_LINE), NETDATA_CHART_PRIO_AUDIT_ENABLED, update_every, name);
     printf(PLUGINSD_KEYWORD_DIMENSION " 'disabled' 'disabled' %s 1 1 ''\n",
         RRD_ALGORITHM_ABSOLUTE_NAME);
     printf(PLUGINSD_KEYWORD_DIMENSION " 'enabled' 'enabled' %s 1 1 ''\n",
@@ -194,8 +194,8 @@ static void audit_send_charts(int update_every, const char *name) {
 
     // chart: audit failure mode (exactly one dimension is 1 at any time)
     printf(PLUGINSD_KEYWORD_CHART
-        " audit.failure '' 'Audit Failure Mode' 'state' 'audit' 'audit.failure' line %d %d '' 'debugfs.plugin' '%s'\n",
-        NETDATA_CHART_PRIO_AUDIT_FAILURE, update_every, name);
+        " audit.failure '' 'Audit Failure Mode' 'state' 'audit' 'audit.failure' %s %d %d '' 'debugfs.plugin' '%s'\n",
+        debugfs_rrdset_type_name(RRDSET_TYPE_LINE), NETDATA_CHART_PRIO_AUDIT_FAILURE, update_every, name);
     printf(PLUGINSD_KEYWORD_DIMENSION " 'silent' 'silent' %s 1 1 ''\n",
         RRD_ALGORITHM_ABSOLUTE_NAME);
     printf(PLUGINSD_KEYWORD_DIMENSION " 'printk' 'printk' %s 1 1 ''\n",
