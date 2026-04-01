@@ -78,6 +78,10 @@ ALWAYS_INLINE void *dictionary_foreach_next(DICTFE *dfe) {
         dfe->locked = true;
 
         if(unlikely(is_dictionary_destroyed(dfe->dict))) {
+            // Unlock before foreach_done — in reentrant mode, foreach_done
+            // does not release the lock (it assumes the caller manages it).
+            ll_recursive_unlock(dfe->dict, dfe->rw);
+            dfe->locked = false;
             dictionary_foreach_done(dfe);
             return NULL;
         }
