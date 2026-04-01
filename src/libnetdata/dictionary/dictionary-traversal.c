@@ -235,14 +235,14 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough
         return 0;
     }
 
-    DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
-
     ll_recursive_lock(dict, rw);
 
     if(unlikely(is_dictionary_destroyed(dict))) {
         ll_recursive_unlock(dict, rw);
         return 0;
     }
+
+    DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
 
     size_t entries = __atomic_load_n(&dict->entries, __ATOMIC_RELAXED);
     DICTIONARY_ITEM **array = mallocz(sizeof(DICTIONARY_ITEM *) * entries);

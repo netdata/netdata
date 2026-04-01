@@ -88,6 +88,7 @@ extern const char *netdata_configured_host_prefix;
 
 // this may include windows.h
 #include "os/os.h"
+#include "os/ci.h"
 
 #include "socket/socket.h"
 #include "socket/nd-sock.h"

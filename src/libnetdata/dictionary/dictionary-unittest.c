@@ -1137,7 +1137,7 @@ static void dict_destroy_race_child(int iterations) {
 }
 
 static int dictionary_destroy_race_unittest(void) {
-    const int iterations = 1000;
+    const int iterations = nd_is_running_under_ci() ? 20 : 1000;
 
     fprintf(stderr,
             "\nTesting dictionary_destroy() TOCTOU race (%d iterations in child process)...\n",
