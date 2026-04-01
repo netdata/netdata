@@ -2352,7 +2352,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors Active Directory directory operations, replication, LDAP activity, binds, queueing, database, and cleanup metrics.
+          This collector monitors Active Directory directory operations, replication, LDAP activity, binds, queueing, database, cleanup, security descriptor propagation, and SAM metrics.
         method_description: |
           It queries DirectoryServices object from Perflib in order to gather the metrics.
       supported_platforms:
@@ -2621,6 +2621,30 @@ modules:
               chart_type: line
               dimensions:
                 - name: suboperations
+            - name: ad.security_descriptor_propagation_events
+              description: Security descriptor propagation events
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: events
+            - name: ad.security_descriptor_propagation_events_queued
+              description: Security descriptor propagation events queued
+              unit: events
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: ad.security_descriptor_propagation_access_wait
+              description: Security descriptor propagation access wait
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: wait
+            - name: ad.security_descriptor_propagation_items_queued
+              description: Security descriptor propagation items queued
+              unit: items
+              chart_type: line
+              dimensions:
+                - name: queued
             - name: ad.ds_threads
               description: Directory Service threads
               unit: threads
@@ -2798,6 +2822,87 @@ modules:
               chart_type: line
               dimensions:
                 - name: visited
+            - name: ad.sam_group_membership_evaluations
+              description: SAM group membership evaluations
+              unit: evaluations/s
+              chart_type: line
+              dimensions:
+                - name: global
+                - name: domain_local
+                - name: universal
+            - name: ad.sam_group_membership_global_catalog_evaluations
+              description: SAM group membership global catalog evaluations
+              unit: evaluations/s
+              chart_type: line
+              dimensions:
+                - name: global_catalog
+            - name: ad.sam_group_membership_evaluations_nontransitive
+              description: SAM non-transitive membership evaluations
+              unit: evaluations/s
+              chart_type: line
+              dimensions:
+                - name: nontransitive
+            - name: ad.sam_group_membership_evaluations_transitive
+              description: SAM transitive membership evaluations
+              unit: evaluations/s
+              chart_type: line
+              dimensions:
+                - name: transitive
+            - name: ad.sam_group_evaluation_latency
+              description: SAM group evaluation latency
+              unit: latency
+              chart_type: line
+              dimensions:
+                - name: account_group
+                - name: resource_group
+            - name: ad.sam_computer_creation_requests
+              description: SAM computer creation requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: request
+            - name: ad.sam_computer_creation_successful_requests
+              description: SAM successful computer creation requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: ad.sam_user_creation_requests
+              description: SAM user creation requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: request
+            - name: ad.sam_user_creation_successful_requests
+              description: SAM successful user creation requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: ad.sam_query_display_requests
+              description: SAM query display requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: query
+            - name: ad.sam_enumerations
+              description: SAM enumerations
+              unit: enumerations/s
+              chart_type: line
+              dimensions:
+                - name: enumeration
+            - name: ad.sam_membership_changes
+              description: SAM membership changes
+              unit: changes/s
+              chart_type: line
+              dimensions:
+                - name: change
+            - name: ad.sam_password_changes
+              description: SAM password changes
+              unit: changes/s
+              chart_type: line
+              dimensions:
+                - name: change
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibADCS
