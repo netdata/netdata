@@ -96,7 +96,7 @@ static int audit_netlink_query(struct audit_reply *reply) {
 
         ssize_t len = recvfrom(fd, buf, sizeof(buf), 0, (struct sockaddr *)&from, &fromlen);
         if (len < 0) {
-            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
+            if (errno == EINTR)
                 continue;
             close(fd);
             return -1;
