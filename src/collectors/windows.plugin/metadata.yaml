@@ -3305,6 +3305,114 @@ modules:
                 - name: serviced
   - meta:
       plugin_name: windows.plugin
+      module_name: PerflibMSMQ
+      monitored_instance:
+        name: Microsoft Message Queuing
+        link: "https://learn.microsoft.com/en-us/previous-versions/windows/desktop/msmq/ms711472(v=vs.85)"
+        categories:
+          - data-collection.applications
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - msmq
+        - message queue
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Microsoft Message Queuing (MSMQ) queues on Windows.
+        method_description: |
+          It queries the MSMQ Queue object from Perflib to gather per-queue message and byte counts,
+          including journal queue statistics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects all MSMQ queues. No further configuration is required.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Microsoft Message Queuing (MSMQ) installed
+            description: |
+              MSMQ must be installed and running on the Windows host. The collector will return no data
+              if the MSMQ Queue performance object is not present in the registry.
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:PerflibMSMQ]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: queue
+          description: "These metrics refer to a single MSMQ queue."
+          labels:
+            - name: queue
+              description: The name of the MSMQ queue.
+          metrics:
+            - name: msmq.queue_messages
+              description: MSMQ messages in queue
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: msmq.queue_bytes
+              description: MSMQ bytes in queue
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: msmq.queue_journal_messages
+              description: MSMQ messages in journal queue
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: msmq.queue_journal_bytes
+              description: MSMQ bytes in journal queue
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: queued
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibNUMA
       monitored_instance:
         name: NUMA Architecture
