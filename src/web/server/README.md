@@ -149,9 +149,10 @@ Edit `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/configu
 Restart your Agent to apply changes. After restart, the Agent's web server (default port `19999`) will no longer accept inbound connections.
 
 
-:::note
+:::warning
 
-Do not use this for Parent Agents.
+This disables inbound connections, including streams from child agents.
+**Do not use this setting on Parent Agents.**
 
 :::
 
