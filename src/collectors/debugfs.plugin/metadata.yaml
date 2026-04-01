@@ -416,7 +416,7 @@ modules:
         metrics_description: >
           Monitors Linux kernel audit subsystem status via NETLINK_AUDIT.
           Tracks audit backlog depth, backlog utilization, lost events,
-          and configuration (failure mode, rate limit, enabled state).
+          and configuration (failure mode, enabled state).
           Critical for detecting audit backlog overflow conditions that
           cause kernel panics when failure mode is set to 2 (panic).
         method_description: 'Query kernel audit status via NETLINK_AUDIT socket (AUDIT_GET)'

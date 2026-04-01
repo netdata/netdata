@@ -42,10 +42,10 @@ static int audit_netlink_query(struct audit_reply *reply) {
     if (fd < 0)
         return -1;
 
-    // bind to the netlink socket
+    // bind to the netlink socket (nl_pid=0 lets kernel auto-assign a unique port ID)
     struct sockaddr_nl addr = {
         .nl_family = AF_NETLINK,
-        .nl_pid    = (uint32_t)getpid(),
+        .nl_pid    = 0,
         .nl_groups = 0,
     };
     if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
@@ -63,7 +63,7 @@ static int audit_netlink_query(struct audit_reply *reply) {
             .nlmsg_type  = AUDIT_GET,
             .nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK,
             .nlmsg_seq   = 1,
-            .nlmsg_pid   = (uint32_t)getpid(),
+            .nlmsg_pid   = 0,
         },
         .s = { 0 },
     };
@@ -96,7 +96,7 @@ static int audit_netlink_query(struct audit_reply *reply) {
 
         ssize_t len = recvfrom(fd, buf, sizeof(buf), 0, (struct sockaddr *)&from, &fromlen);
         if (len < 0) {
-            if (errno == EINTR)
+            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
                 continue;
             close(fd);
             return -1;

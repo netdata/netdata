@@ -213,7 +213,7 @@ int main(int argc, char **argv)
 #ifdef HAVE_CAPABILITY
         netdata_log_error(
             "debugfs.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities. "
-            "Without these, debugfs.plugin cannot access /sys/kernel/debug. "
+            "cap_dac_read_search is needed for /sys/kernel/debug access, cap_audit_control for audit subsystem monitoring. "
             "To enable capabilities run: sudo setcap cap_dac_read_search,cap_audit_control+ep %s; "
             "To enable setuid to root run: sudo chown root:netdata %s; sudo chmod 4750 %s; ",
             uid,
