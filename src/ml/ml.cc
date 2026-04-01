@@ -29,14 +29,14 @@ static void __attribute__((destructor)) destroy_mutex(void) {
 }
 
 template <bool TimeTNarrowerThanSqliteInt64>
-static inline bool ml_time_t_fits_sqlite_int64(sqlite3_int64 value)
+static inline bool ml_sqlite_int64_fits_time_t(sqlite3_int64 value)
 {
     (void)value;
     return true;
 }
 
 template <>
-inline bool ml_time_t_fits_sqlite_int64<true>(sqlite3_int64 value)
+inline bool ml_sqlite_int64_fits_time_t<true>(sqlite3_int64 value)
 {
     const sqlite3_int64 kTimeMin = (sqlite3_int64) std::numeric_limits<time_t>::min();
     const sqlite3_int64 kTimeMax = (sqlite3_int64) std::numeric_limits<time_t>::max();
@@ -449,8 +449,8 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
 
         // Protect against silent truncation when time_t is narrower than int64_t
         // (e.g. 32-bit builds, corrupted DB, or far-future timestamps).
-        if (!ml_time_t_fits_sqlite_int64<(sizeof(time_t) < sizeof(sqlite3_int64))>(raw_after) ||
-            !ml_time_t_fits_sqlite_int64<(sizeof(time_t) < sizeof(sqlite3_int64))>(raw_before)) {
+        if (!ml_sqlite_int64_fits_time_t<(sizeof(time_t) < sizeof(sqlite3_int64))>(raw_after) ||
+            !ml_sqlite_int64_fits_time_t<(sizeof(time_t) < sizeof(sqlite3_int64))>(raw_before)) {
             error_report("Skipping ML model row with out-of-range timestamps: after=%" PRId64 " before=%" PRId64,
                          (int64_t) raw_after, (int64_t) raw_before);
             continue;

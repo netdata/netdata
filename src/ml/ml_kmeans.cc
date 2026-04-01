@@ -13,13 +13,13 @@ using std::isnan;
 #endif
 
 template <bool TimeTNarrowerThanInt64>
-static inline bool ml_nonnegative_time_t_fits_int64(int64_t value)
+static inline bool ml_int64_fits_nonnegative_time_t(int64_t value)
 {
     return value >= 0;
 }
 
 template <>
-inline bool ml_nonnegative_time_t_fits_int64<true>(int64_t value)
+inline bool ml_int64_fits_nonnegative_time_t<true>(int64_t value)
 {
     return value >= 0 && value <= (int64_t) std::numeric_limits<time_t>::max();
 }
@@ -200,7 +200,7 @@ bool ml_kmeans_deserialize(ml_kmeans_inlined_t *inlined_km, struct json_object *
     }
     int64_t raw_after = json_object_get_int64(value);
     // Timestamps must be non-negative Unix epoch seconds and fit in time_t.
-    if (!ml_nonnegative_time_t_fits_int64<(sizeof(time_t) < sizeof(int64_t))>(raw_after)) {
+    if (!ml_int64_fits_nonnegative_time_t<(sizeof(time_t) < sizeof(int64_t))>(raw_after)) {
         netdata_log_error("Failed to deserialize kmeans: out-of-range value for 'after': %" PRId64, raw_after);
         return false;
     }
@@ -216,7 +216,7 @@ bool ml_kmeans_deserialize(ml_kmeans_inlined_t *inlined_km, struct json_object *
     }
     int64_t raw_before = json_object_get_int64(value);
     // Same contract as 'after': non-negative and fits in time_t.
-    if (!ml_nonnegative_time_t_fits_int64<(sizeof(time_t) < sizeof(int64_t))>(raw_before)) {
+    if (!ml_int64_fits_nonnegative_time_t<(sizeof(time_t) < sizeof(int64_t))>(raw_before)) {
         netdata_log_error("Failed to deserialize kmeans: out-of-range value for 'before': %" PRId64, raw_before);
         return false;
     }
