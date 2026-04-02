@@ -624,6 +624,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
         }
         pid_t ppid = 0;
         bool ppid_checked = false;
+        bool status_checked = false;
         net_ns_inode = 0;
         uid_t uid = UID_UNSET;
 
@@ -642,8 +643,13 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
             SIMPLE_HASHTABLE_SLOT_PID_SOCKET *sl = simple_hashtable_get_slot_PID_SOCKET(&ls->pid_sockets_hashtable, inode_hash, &inode, true);
             struct pid_socket *ps = SIMPLE_HASHTABLE_SLOT_DATA(sl);
             if(!ps || (ps->pid == 1 && pid != 1)) {
-                if((uid == UID_UNSET && ls->config.uid) || (!ppid_checked && ls->config.pid)) {
+                if(!status_checked &&
+                   ((uid == UID_UNSET && ls->config.uid) || (!ppid_checked && ls->config.pid))) {
                     char status_buf[512];
+                    status_checked = true;
+                    if(ls->config.pid)
+                        ppid_checked = true;
+
                     snprintfz(filename, sizeof(filename), "%s/%s/status", proc_filename, proc_entry->d_name);
                     if (read_txt_file(filename, status_buf, sizeof(status_buf)))
                         local_sockets_log(ls, "cannot open file: %s\n", filename);
@@ -661,7 +667,6 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
 
                         if(ls->config.pid) {
                             char *p = strstr(status_buf, "PPid:");
-                            ppid_checked = true;
                             if(p) {
                                 p += 5;
                                 while(isspace((unsigned char)*p)) p++;     // skip spaces

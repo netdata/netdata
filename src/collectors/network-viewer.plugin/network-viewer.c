@@ -115,7 +115,6 @@ typedef struct {
     bool protocols_ipv6_tcp;
     bool protocols_ipv4_udp;
     bool protocols_ipv6_udp;
-    bool endpoints_by_as;
 } NV_TOPOLOGY_OPTIONS;
 
 typedef struct {
@@ -237,7 +236,6 @@ static inline void topology_options_defaults(NV_TOPOLOGY_OPTIONS *opts) {
     opts->protocols_ipv6_tcp = true;
     opts->protocols_ipv4_udp = true;
     opts->protocols_ipv6_udp = true;
-    opts->endpoints_by_as = false; // default: by_ip
 }
 
 static inline bool topology_sockets_any_enabled(const NV_TOPOLOGY_OPTIONS *opts) {
@@ -258,15 +256,6 @@ static inline bool topology_protocols_any_enabled(const NV_TOPOLOGY_OPTIONS *opt
             opts->protocols_ipv6_tcp ||
             opts->protocols_ipv4_udp ||
             opts->protocols_ipv6_udp);
-}
-
-static inline bool topology_endpoint_address_space_is_private(const char *address_space) {
-    if(!address_space || !*address_space)
-        return false;
-
-    return (strcmp(address_space, "private") == 0 ||
-            strcmp(address_space, "loopback") == 0 ||
-            strcmp(address_space, "zero") == 0);
 }
 
 static void topology_parse_options(const char *function, NV_TOPOLOGY_OPTIONS *opts) {
@@ -296,15 +285,6 @@ static void topology_parse_options(const char *function, NV_TOPOLOGY_OPTIONS *op
         }
         if(strcmp(param, "processes:by_pid") == 0 || strcmp(param, "processes:by-pid") == 0) {
             opts->processes_by_pid = true;
-            continue;
-        }
-
-        if(strcmp(param, "endpoints:by_as") == 0 || strcmp(param, "endpoints:by-as") == 0) {
-            opts->endpoints_by_as = false;
-            continue;
-        }
-        if(strcmp(param, "endpoints:by_ip") == 0 || strcmp(param, "endpoints:by-ip") == 0) {
-            opts->endpoints_by_as = false;
             continue;
         }
 
