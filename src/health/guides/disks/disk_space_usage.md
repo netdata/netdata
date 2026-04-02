@@ -18,9 +18,3 @@ If your storage device is full and the alert is raised, there are two paths you 
 
 Netdata strongly suggests that you are careful when cleaning up drives, and removing files, make sure that you are certain that you delete only unnecessary files.
 
-### Useful resources
-
-1. [Linux disk usage commands](https://www.redhat.com/sysadmin/Linux-disk-usage)
-
-2. [systemd.mount — Mount unit configuration](https://www.freedesktop.org/software/systemd/man/systemd.mount.html)
-
