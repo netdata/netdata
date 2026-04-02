@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
@@ -20,7 +21,12 @@ var (
 	reAzureSafeName = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
 )
 
-type Config = cloudauth.AzureADAuthConfig
+var defaultTimeout = confopt.Duration(3 * time.Second)
+
+type Config struct {
+	cloudauth.AzureADAuthConfig `yaml:",inline" json:",inline"`
+	Timeout                     confopt.Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+}
 
 type provider struct {
 	apiClient  *http.Client
@@ -40,8 +46,8 @@ type publishedStore struct {
 
 func New() secretstore.Creator {
 	p := &provider{
-		apiClient:  httpx.APIClient(10 * time.Second),
-		imdsClient: httpx.NoProxyClient(2 * time.Second),
+		apiClient:  httpx.APIClient(defaultTimeout.Duration()),
+		imdsClient: httpx.NoProxyClient(defaultTimeout.Duration()),
 	}
 
 	return secretstore.Creator{
@@ -53,7 +59,15 @@ func New() secretstore.Creator {
 }
 
 func (p *provider) create() secretstore.Store {
-	return &store{provider: p}
+	return &store{
+		Config: Config{
+			Timeout: defaultTimeout,
+		},
+		provider: &provider{
+			apiClient:  httpx.CloneClientWithTimeout(p.apiClient, defaultTimeout.Duration()),
+			imdsClient: httpx.CloneClientWithTimeout(p.imdsClient, defaultTimeout.Duration()),
+		},
+	}
 }
 
 func (s *store) Configuration() any { return &s.Config }

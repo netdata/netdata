@@ -15,6 +15,21 @@ func (s *store) init(_ context.Context) error {
 		provider: s.provider,
 	}
 
+	switch {
+	case s.Config.Timeout.Duration() < 0:
+		return fmt.Errorf("timeout cannot be negative")
+	case s.Config.Timeout.Duration() == 0:
+		s.Config.Timeout = defaultTimeout
+	}
+	if s.provider != nil {
+		if s.provider.httpClient != nil {
+			s.provider.httpClient.Timeout = s.Config.Timeout.Duration()
+		}
+		if s.provider.httpClientInsecure != nil {
+			s.provider.httpClientInsecure.Timeout = s.Config.Timeout.Duration()
+		}
+	}
+
 	switch strings.TrimSpace(s.Config.Mode) {
 	case "token":
 		if s.Config.ModeToken == nil {

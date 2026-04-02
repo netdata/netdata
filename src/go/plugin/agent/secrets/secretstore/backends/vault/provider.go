@@ -8,12 +8,15 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
 
 //go:embed config_schema.json
 var configSchema string
+
+var defaultTimeout = confopt.Duration(3 * time.Second)
 
 type Config struct {
 	Mode          string               `json:"mode" yaml:"mode"`
@@ -22,6 +25,7 @@ type Config struct {
 	Addr          string               `json:"addr" yaml:"addr"`
 	Namespace     string               `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	TLSSkipVerify bool                 `json:"tls_skip_verify,omitempty" yaml:"tls_skip_verify,omitempty"`
+	Timeout       confopt.Duration     `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
 
 type ModeTokenConfig struct {
@@ -55,8 +59,8 @@ type publishedStore struct {
 
 func New() secretstore.Creator {
 	p := &provider{
-		httpClient:         httpx.VaultClient(10 * time.Second),
-		httpClientInsecure: httpx.VaultInsecureClient(10 * time.Second),
+		httpClient:         httpx.VaultClient(defaultTimeout.Duration()),
+		httpClientInsecure: httpx.VaultInsecureClient(defaultTimeout.Duration()),
 	}
 
 	return secretstore.Creator{
@@ -68,7 +72,15 @@ func New() secretstore.Creator {
 }
 
 func (p *provider) create() secretstore.Store {
-	return &store{provider: p}
+	return &store{
+		Config: Config{
+			Timeout: defaultTimeout,
+		},
+		provider: &provider{
+			httpClient:         httpx.CloneClientWithTimeout(p.httpClient, defaultTimeout.Duration()),
+			httpClientInsecure: httpx.CloneClientWithTimeout(p.httpClientInsecure, defaultTimeout.Duration()),
+		},
+	}
 }
 
 func (s *store) Configuration() any { return &s.Config }

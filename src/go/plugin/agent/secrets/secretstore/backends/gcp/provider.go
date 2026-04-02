@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
@@ -20,9 +21,12 @@ var (
 	reGCPSafeName      = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 )
 
+var defaultTimeout = confopt.Duration(3 * time.Second)
+
 type Config struct {
 	Mode                   string                        `json:"mode" yaml:"mode"`
 	ModeServiceAccountFile *ModeServiceAccountFileConfig `json:"mode_service_account_file,omitempty" yaml:"mode_service_account_file,omitempty"`
+	Timeout                confopt.Duration              `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
 
 type ModeServiceAccountFileConfig struct {
@@ -50,8 +54,8 @@ type publishedStore struct {
 
 func New() secretstore.Creator {
 	p := &provider{
-		apiClient:      httpx.APIClient(10 * time.Second),
-		metadataClient: httpx.NoProxyClient(2 * time.Second),
+		apiClient:      httpx.APIClient(defaultTimeout.Duration()),
+		metadataClient: httpx.NoProxyClient(defaultTimeout.Duration()),
 		now:            time.Now,
 	}
 
@@ -64,7 +68,17 @@ func New() secretstore.Creator {
 }
 
 func (p *provider) create() secretstore.Store {
-	return &store{provider: p}
+	return &store{
+		Config: Config{
+			Timeout: defaultTimeout,
+		},
+		provider: &provider{
+			apiClient:      httpx.CloneClientWithTimeout(p.apiClient, defaultTimeout.Duration()),
+			metadataClient: httpx.CloneClientWithTimeout(p.metadataClient, defaultTimeout.Duration()),
+			secretEndpoint: p.secretEndpoint,
+			now:            p.now,
+		},
+	}
 }
 
 func (s *store) Configuration() any { return &s.Config }

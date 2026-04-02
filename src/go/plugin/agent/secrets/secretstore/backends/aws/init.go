@@ -24,6 +24,21 @@ func (s *store) init(_ context.Context) error {
 	}
 	s.Config.Region = region
 
+	switch {
+	case s.Config.Timeout.Duration() < 0:
+		return fmt.Errorf("timeout cannot be negative")
+	case s.Config.Timeout.Duration() == 0:
+		s.Config.Timeout = defaultTimeout
+	}
+	if s.provider != nil {
+		if s.provider.apiClient != nil {
+			s.provider.apiClient.Timeout = s.Config.Timeout.Duration()
+		}
+		if s.provider.imdsClient != nil {
+			s.provider.imdsClient.Timeout = s.Config.Timeout.Duration()
+		}
+	}
+
 	published := &publishedStore{
 		provider:    s.provider,
 		mode:        s.Config.AuthMode,
