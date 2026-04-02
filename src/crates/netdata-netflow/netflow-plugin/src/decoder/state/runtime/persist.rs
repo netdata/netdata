@@ -87,8 +87,22 @@ impl FlowDecoders {
         namespace: &DecoderStateNamespace,
         source: SocketAddr,
     ) -> Result<(), String> {
-        for packet in build_namespace_restore_packets(key, namespace)? {
-            let _ = self.netflow.parse_from_source(source, &packet);
+        for (packet_index, packet) in build_namespace_restore_packets(key, namespace)?
+            .into_iter()
+            .enumerate()
+        {
+            self.netflow
+                .parse_from_source(source, &packet)
+                .map_err(|err| {
+                    format!(
+                        "failed to replay persisted namespace packet {} for {} / {} from {}: {}",
+                        packet_index,
+                        key.exporter_ip,
+                        key.observation_domain_id,
+                        source,
+                        err
+                    )
+                })?;
         }
         Ok(())
     }

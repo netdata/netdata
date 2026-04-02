@@ -28,10 +28,8 @@ pub(crate) fn append_unique_flows(dst: &mut Vec<DecodedFlow>, incoming: Vec<Deco
                         handled = true;
                         break;
                     }
-                    // Merge found nothing to update. If the records are identical,
-                    // it's an exact duplicate — drop regardless of timestamp
-                    // (different decode paths can compute different timestamps
-                    // for the same logical flow).
+                    // Merge found nothing to update. If the full records are
+                    // identical, it's an exact duplicate — drop it.
                     if dst[idx].record == flow.record {
                         handled = true;
                         break;
@@ -52,9 +50,10 @@ pub(crate) fn append_unique_flows(dst: &mut Vec<DecodedFlow>, incoming: Vec<Deco
 }
 
 /// Hash identity fields directly from FlowRecord — zero string allocation.
-/// observation_time_millis is intentionally excluded: it derives from packet
-/// arrival time, not flow identity, so two records for the same logical flow
-/// from different decode paths may have different observation timestamps.
+/// observation_time_millis is intentionally excluded because it derives from
+/// packet arrival time, not stable flow identity. Records that differ only in
+/// observation timestamp still reach identity-based merge handling below, but
+/// they are only dropped when the full records are otherwise identical.
 pub(crate) fn flow_identity_hash(flow: &DecodedFlow) -> u64 {
     use std::hash::Hasher;
     let mut hasher = twox_hash::XxHash64::default();
