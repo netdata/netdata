@@ -21,12 +21,10 @@ impl SamplingState {
             return;
         }
 
-        let scope_key = V9TemplateScopeKey {
-            exporter_ip: exporter_ip.to_string(),
-            observation_domain_id,
-        };
         self.v9_sampling_templates
-            .entry(scope_key)
+            .entry(exporter_ip.to_string())
+            .or_default()
+            .entry(observation_domain_id)
             .or_default()
             .insert(
                 template_id,
@@ -52,12 +50,10 @@ impl SamplingState {
             return;
         }
 
-        let scope_key = V9TemplateScopeKey {
-            exporter_ip: exporter_ip.to_string(),
-            observation_domain_id,
-        };
         self.v9_datalink_templates
-            .entry(scope_key)
+            .entry(exporter_ip.to_string())
+            .or_default()
+            .entry(observation_domain_id)
             .or_default()
             .insert(template_id, V9DataLinkTemplate { fields });
     }
@@ -68,13 +64,10 @@ impl SamplingState {
         observation_domain_id: u32,
         template_id: u16,
     ) -> Option<V9SamplingTemplate> {
-        let scope_key = V9TemplateScopeKey {
-            exporter_ip: exporter_ip.to_string(),
-            observation_domain_id,
-        };
         self.v9_sampling_templates
-            .get(&scope_key)
-            .and_then(|m| m.get(&template_id))
+            .get(exporter_ip)
+            .and_then(|domains| domains.get(&observation_domain_id))
+            .and_then(|templates| templates.get(&template_id))
             .cloned()
     }
 
@@ -84,13 +77,10 @@ impl SamplingState {
         observation_domain_id: u32,
         template_id: u16,
     ) -> Option<V9DataLinkTemplate> {
-        let scope_key = V9TemplateScopeKey {
-            exporter_ip: exporter_ip.to_string(),
-            observation_domain_id,
-        };
         self.v9_datalink_templates
-            .get(&scope_key)
-            .and_then(|m| m.get(&template_id))
+            .get(exporter_ip)
+            .and_then(|domains| domains.get(&observation_domain_id))
+            .and_then(|templates| templates.get(&template_id))
             .cloned()
     }
 
@@ -111,12 +101,10 @@ impl SamplingState {
             return;
         }
 
-        let scope_key = IPFixTemplateScopeKey {
-            exporter_ip: exporter_ip.to_string(),
-            observation_domain_id,
-        };
         self.ipfix_datalink_templates
-            .entry(scope_key)
+            .entry(exporter_ip.to_string())
+            .or_default()
+            .entry(observation_domain_id)
             .or_default()
             .insert(template_id, IPFixDataLinkTemplate { fields });
     }
@@ -127,13 +115,10 @@ impl SamplingState {
         observation_domain_id: u32,
         template_id: u16,
     ) -> Option<IPFixDataLinkTemplate> {
-        let scope_key = IPFixTemplateScopeKey {
-            exporter_ip: exporter_ip.to_string(),
-            observation_domain_id,
-        };
         self.ipfix_datalink_templates
-            .get(&scope_key)
-            .and_then(|m| m.get(&template_id))
+            .get(exporter_ip)
+            .and_then(|domains| domains.get(&observation_domain_id))
+            .and_then(|templates| templates.get(&template_id))
             .cloned()
     }
 
@@ -145,5 +130,95 @@ impl SamplingState {
         self.ipfix_datalink_templates
             .values()
             .any(|m| !m.is_empty())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn v9_templates_round_trip_and_clear_per_namespace() {
+        let mut state = SamplingState::default();
+        let field = V9TemplateField {
+            field_type: 1,
+            field_length: 8,
+        };
+
+        state.set_v9_sampling_template("10.0.0.1", 100, 256, vec![field], vec![field]);
+        state.set_v9_datalink_template(
+            "10.0.0.1",
+            100,
+            257,
+            vec![V9TemplateField {
+                field_type: V9_FIELD_LAYER2_PACKET_SECTION_DATA,
+                field_length: 32,
+            }],
+        );
+        state.set_v9_sampling_template("10.0.0.1", 200, 300, vec![field], vec![field]);
+
+        assert!(
+            state
+                .get_v9_sampling_template("10.0.0.1", 100, 256)
+                .is_some()
+        );
+        assert!(
+            state
+                .get_v9_datalink_template("10.0.0.1", 100, 257)
+                .is_some()
+        );
+        assert!(
+            state
+                .get_v9_sampling_template("10.0.0.1", 200, 300)
+                .is_some()
+        );
+
+        state.clear_namespace("10.0.0.1", 100);
+
+        assert!(
+            state
+                .get_v9_sampling_template("10.0.0.1", 100, 256)
+                .is_none()
+        );
+        assert!(
+            state
+                .get_v9_datalink_template("10.0.0.1", 100, 257)
+                .is_none()
+        );
+        assert!(
+            state
+                .get_v9_sampling_template("10.0.0.1", 200, 300)
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn ipfix_templates_round_trip_and_clear_per_namespace() {
+        let mut state = SamplingState::default();
+
+        state.set_ipfix_datalink_template(
+            "10.0.0.2",
+            400,
+            512,
+            vec![IPFixTemplateField {
+                field_type: IPFIX_FIELD_DATALINK_FRAME_SECTION,
+                field_length: 64,
+                enterprise_number: None,
+            }],
+        );
+
+        assert!(
+            state
+                .get_ipfix_datalink_template("10.0.0.2", 400, 512)
+                .is_some()
+        );
+
+        state.clear_namespace("10.0.0.2", 400);
+
+        assert!(
+            state
+                .get_ipfix_datalink_template("10.0.0.2", 400, 512)
+                .is_none()
+        );
     }
 }

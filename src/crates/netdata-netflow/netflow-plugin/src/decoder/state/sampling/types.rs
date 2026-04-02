@@ -3,10 +3,12 @@ use super::*;
 #[derive(Debug, Default)]
 pub(crate) struct SamplingState {
     pub(crate) by_exporter: HashMap<String, HashMap<SamplingKey, u64>>,
-    pub(crate) v9_sampling_templates: HashMap<V9TemplateScopeKey, HashMap<u16, V9SamplingTemplate>>,
-    pub(crate) v9_datalink_templates: HashMap<V9TemplateScopeKey, HashMap<u16, V9DataLinkTemplate>>,
+    pub(crate) v9_sampling_templates:
+        HashMap<String, HashMap<u32, HashMap<u16, V9SamplingTemplate>>>,
+    pub(crate) v9_datalink_templates:
+        HashMap<String, HashMap<u32, HashMap<u16, V9DataLinkTemplate>>>,
     pub(crate) ipfix_datalink_templates:
-        HashMap<IPFixTemplateScopeKey, HashMap<u16, IPFixDataLinkTemplate>>,
+        HashMap<String, HashMap<u32, HashMap<u16, IPFixDataLinkTemplate>>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -14,12 +16,6 @@ pub(crate) struct SamplingKey {
     pub(crate) version: u16,
     pub(crate) observation_domain_id: u32,
     pub(crate) sampler_id: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct V9TemplateScopeKey {
-    pub(crate) exporter_ip: String,
-    pub(crate) observation_domain_id: u32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -38,12 +34,6 @@ pub(crate) struct V9SamplingTemplate {
 #[derive(Debug, Clone)]
 pub(crate) struct V9DataLinkTemplate {
     pub(crate) fields: Vec<V9TemplateField>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct IPFixTemplateScopeKey {
-    pub(crate) exporter_ip: String,
-    pub(crate) observation_domain_id: u32,
 }
 
 #[derive(Debug, Clone, Copy)]

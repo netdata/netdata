@@ -9,18 +9,21 @@ impl SamplingState {
             }
         }
 
-        let v9_scope = V9TemplateScopeKey {
-            exporter_ip: exporter_ip.to_string(),
+        clear_template_namespace(
+            &mut self.v9_sampling_templates,
+            exporter_ip,
             observation_domain_id,
-        };
-        let ipfix_scope = IPFixTemplateScopeKey {
-            exporter_ip: exporter_ip.to_string(),
+        );
+        clear_template_namespace(
+            &mut self.v9_datalink_templates,
+            exporter_ip,
             observation_domain_id,
-        };
-
-        self.v9_sampling_templates.remove(&v9_scope);
-        self.v9_datalink_templates.remove(&v9_scope);
-        self.ipfix_datalink_templates.remove(&ipfix_scope);
+        );
+        clear_template_namespace(
+            &mut self.ipfix_datalink_templates,
+            exporter_ip,
+            observation_domain_id,
+        );
     }
 
     pub(crate) fn set(
@@ -129,6 +132,19 @@ impl SamplingState {
                     })
                     .collect(),
             );
+        }
+    }
+}
+
+fn clear_template_namespace<T>(
+    templates: &mut HashMap<String, HashMap<u32, HashMap<u16, T>>>,
+    exporter_ip: &str,
+    observation_domain_id: u32,
+) {
+    if let Some(domains) = templates.get_mut(exporter_ip) {
+        domains.remove(&observation_domain_id);
+        if domains.is_empty() {
+            templates.remove(exporter_ip);
         }
     }
 }

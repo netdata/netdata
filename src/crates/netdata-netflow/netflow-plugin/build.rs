@@ -12,6 +12,7 @@ fn configure_protoc() -> Result<(), Box<dyn std::error::Error>> {
         Ok(protoc) => {
             // SAFETY: build scripts run in a single process and this process does not
             // concurrently read `PROTOC` while we set it.
+            #[allow(unused_unsafe)]
             unsafe {
                 std::env::set_var("PROTOC", protoc);
             }

@@ -82,8 +82,9 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     /// After `add_match` / `add_disjunction` calls, the filter is stored inside
     /// the reader in an unresolved form.  This method resolves it against
     /// `journal_file`'s hash table and returns the resulting [`FilterExpr`].
-    /// The internal pending filter is consumed; subsequent calls return `Ok(None)`
-    /// until new matches are added.
+    /// On success, the internal pending filter is consumed; subsequent calls
+    /// return `Ok(None)` until new matches are added. If resolution fails, the
+    /// pending filter remains installed so the caller can retry or fall back.
     ///
     /// This is useful when the caller wants to drive iteration through
     /// [`JournalCursor`] directly rather than through [`JournalReader::step`].
