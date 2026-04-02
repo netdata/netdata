@@ -1,4 +1,5 @@
 use super::*;
+use crate::tiering::{FlowMetrics, OpenTierRow, TierFlowRef};
 
 #[test]
 fn chart_metadata_uses_honest_contexts_and_units() {
@@ -55,4 +56,48 @@ fn snapshot_collects_current_metric_totals_and_open_rows() {
     assert_eq!(snapshot.open_tiers.minute_1, 1);
     assert_eq!(snapshot.open_tiers.minute_5, 2);
     assert_eq!(snapshot.open_tiers.hour_1, 0);
+}
+
+#[test]
+fn try_sample_open_tier_counts_reads_current_lengths() {
+    let state = RwLock::new(OpenTierState {
+        generation: 1,
+        minute_1: vec![
+            OpenTierRow {
+                timestamp_usec: 1,
+                flow_ref: TierFlowRef {
+                    hour_start_usec: 1,
+                    flow_id: 1,
+                },
+                metrics: FlowMetrics::default(),
+            },
+            OpenTierRow {
+                timestamp_usec: 2,
+                flow_ref: TierFlowRef {
+                    hour_start_usec: 2,
+                    flow_id: 2,
+                },
+                metrics: FlowMetrics::default(),
+            },
+        ],
+        minute_5: vec![OpenTierRow {
+            timestamp_usec: 3,
+            flow_ref: TierFlowRef {
+                hour_start_usec: 3,
+                flow_id: 3,
+            },
+            metrics: FlowMetrics::default(),
+        }],
+        hour_1: Vec::new(),
+    });
+
+    assert_eq!(try_sample_open_tier_counts(&state), Some((2, 1, 0)));
+}
+
+#[test]
+fn try_sample_open_tier_counts_skips_when_write_lock_is_contended() {
+    let state = RwLock::new(OpenTierState::default());
+    let _guard = state.write().expect("take write lock");
+
+    assert_eq!(try_sample_open_tier_counts(&state), None);
 }

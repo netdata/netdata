@@ -3,11 +3,13 @@ use super::{
     DECODER_STATE_SCHEMA_VERSION, DIRECTION_EGRESS, DIRECTION_INGRESS, DecapsulationMode,
     DecodeStats, DecodedFlow, DecoderStateNamespace, ETYPE_IPV4, ETYPE_IPV6, FlowDecoders,
     FlowFields, FlowRecord, SamplingState, TimestampSource, append_mpls_label, append_unique_flows,
-    apply_icmp_port_fallback, decode_persisted_namespace_file, decode_v9_special_from_raw_payload,
-    default_exporter_name, field_tracks_presence, finalize_canonical_flow_fields,
-    normalize_direction_value, observe_v9_templates_from_raw_payload, to_field_token, xxhash64,
+    apply_icmp_port_fallback, apply_v9_special_mappings, decode_persisted_namespace_file,
+    decode_v9_special_from_raw_payload, default_exporter_name, field_tracks_presence,
+    finalize_canonical_flow_fields, normalize_direction_value,
+    observe_v9_templates_from_raw_payload, to_field_token, xxhash64,
 };
 use etherparse::{NetSlice, SlicedPacket, TransportSlice};
+use netflow_parser::variable_versions::v9_lookup::V9Field;
 use pcap_file::pcap::PcapReader;
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -1281,6 +1283,16 @@ fn merge_enrichment_deduplicates_within_first_incoming_batch() {
         fields.get("MPLS_LABELS").map(String::as_str),
         Some("20005,524250")
     );
+}
+
+#[test]
+fn v9_icmp_type_invalid_value_does_not_insert_ipv6_fields() {
+    let mut fields = FlowFields::default();
+
+    apply_v9_special_mappings(&mut fields, V9Field::IcmpType, "invalid");
+
+    assert!(!fields.contains_key("ICMPV6_TYPE"));
+    assert!(!fields.contains_key("ICMPV6_CODE"));
 }
 
 #[test]

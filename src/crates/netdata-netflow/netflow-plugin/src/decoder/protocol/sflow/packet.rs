@@ -38,12 +38,6 @@ pub(crate) fn extract_sflow_flows(
                     out_if = Some(0);
                 }
 
-                let flow_records: Vec<FlowData> = sample_data
-                    .flow_records
-                    .into_iter()
-                    .map(|record| record.flow_data)
-                    .collect();
-
                 if let Some(flow) = build_sflow_flow(
                     source,
                     exporter_ip_override,
@@ -51,7 +45,7 @@ pub(crate) fn extract_sflow_flows(
                     in_if,
                     out_if,
                     forwarding_status,
-                    &flow_records,
+                    &sample_data.flow_records,
                     source_realtime_usec,
                     decapsulation_mode,
                     need_decap,
@@ -84,12 +78,6 @@ pub(crate) fn extract_sflow_flows(
                     out_if = Some(0);
                 }
 
-                let flow_records: Vec<FlowData> = sample_data
-                    .flow_records
-                    .into_iter()
-                    .map(|record| record.flow_data)
-                    .collect();
-
                 if let Some(flow) = build_sflow_flow(
                     source,
                     exporter_ip_override,
@@ -97,7 +85,7 @@ pub(crate) fn extract_sflow_flows(
                     in_if,
                     out_if,
                     forwarding_status,
-                    &flow_records,
+                    &sample_data.flow_records,
                     source_realtime_usec,
                     decapsulation_mode,
                     need_decap,

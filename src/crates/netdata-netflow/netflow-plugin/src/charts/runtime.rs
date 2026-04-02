@@ -54,31 +54,8 @@ impl NetflowCharts {
                 tokio::select! {
                     _ = shutdown.cancelled() => break,
                     _ = interval.tick() => {
-                        let open_tier_counts = match open_tiers.read() {
-                            Ok(guard) => (
-                                guard.minute_1.len() as u64,
-                                guard.minute_5.len() as u64,
-                                guard.hour_1.len() as u64,
-                            ),
-                            Err(poisoned) => {
-                                static OPEN_TIERS_POISON_WARNED: std::sync::Once =
-                                    std::sync::Once::new();
-
-                                let err = poisoned.to_string();
-                                OPEN_TIERS_POISON_WARNED.call_once(|| {
-                                    tracing::warn!(
-                                        "netflow charts sampler: open tier state lock poisoned: {}; using recovered state",
-                                        err
-                                    );
-                                });
-
-                                let guard = poisoned.into_inner();
-                                (
-                                    guard.minute_1.len() as u64,
-                                    guard.minute_5.len() as u64,
-                                    guard.hour_1.len() as u64,
-                                )
-                            }
+                        let Some(open_tier_counts) = try_sample_open_tier_counts(open_tiers.as_ref()) else {
+                            continue;
                         };
                         let snapshot =
                             NetflowChartsSnapshot::collect(metrics.as_ref(), open_tier_counts);
@@ -107,5 +84,36 @@ impl NetflowCharts {
             .update(|chart| *chart = snapshot.journal_io_ops);
         self.journal_io_bytes
             .update(|chart| *chart = snapshot.journal_io_bytes);
+    }
+}
+
+pub(super) fn try_sample_open_tier_counts(
+    open_tiers: &RwLock<OpenTierState>,
+) -> Option<(u64, u64, u64)> {
+    match open_tiers.try_read() {
+        Ok(guard) => Some((
+            guard.minute_1.len() as u64,
+            guard.minute_5.len() as u64,
+            guard.hour_1.len() as u64,
+        )),
+        Err(std::sync::TryLockError::WouldBlock) => None,
+        Err(std::sync::TryLockError::Poisoned(poisoned)) => {
+            static OPEN_TIERS_POISON_WARNED: std::sync::Once = std::sync::Once::new();
+
+            let err = poisoned.to_string();
+            OPEN_TIERS_POISON_WARNED.call_once(|| {
+                tracing::warn!(
+                    "netflow charts sampler: open tier state lock poisoned: {}; using recovered state",
+                    err
+                );
+            });
+
+            let guard = poisoned.into_inner();
+            Some((
+                guard.minute_1.len() as u64,
+                guard.minute_5.len() as u64,
+                guard.hour_1.len() as u64,
+            ))
+        }
     }
 }

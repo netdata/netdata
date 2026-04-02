@@ -23,7 +23,9 @@ use netflow_parser::variable_versions::v9::{
 };
 use netflow_parser::variable_versions::v9_lookup::V9Field;
 use serde::{Deserialize, Serialize};
-use sflow_parser::models::{Address, FlowData, HeaderProtocol, SFlowDatagram, SampleData};
+use sflow_parser::models::{
+    Address, FlowData, FlowRecord as SFlowRecord, HeaderProtocol, SFlowDatagram, SampleData,
+};
 use sflow_parser::parse_datagram;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::{Hash, Hasher};

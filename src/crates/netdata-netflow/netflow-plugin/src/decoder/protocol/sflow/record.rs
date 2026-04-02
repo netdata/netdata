@@ -7,7 +7,7 @@ pub(crate) fn build_sflow_flow(
     in_if: Option<u32>,
     out_if: Option<u32>,
     forwarding_status: u32,
-    flow_records: &[FlowData],
+    flow_records: &[SFlowRecord],
     source_realtime_usec: Option<u64>,
     decapsulation_mode: DecapsulationMode,
     need_decap: bool,
@@ -27,20 +27,20 @@ pub(crate) fn build_sflow_flow(
 
     let has_sampled_ipv4 = flow_records
         .iter()
-        .any(|record| matches!(record, FlowData::SampledIpv4(_)));
+        .any(|record| matches!(&record.flow_data, FlowData::SampledIpv4(_)));
     let has_sampled_ipv6 = flow_records
         .iter()
-        .any(|record| matches!(record, FlowData::SampledIpv6(_)));
+        .any(|record| matches!(&record.flow_data, FlowData::SampledIpv6(_)));
     let has_sampled_ethernet = flow_records
         .iter()
-        .any(|record| matches!(record, FlowData::SampledEthernet(_)));
+        .any(|record| matches!(&record.flow_data, FlowData::SampledEthernet(_)));
     let has_extended_switch = flow_records
         .iter()
-        .any(|record| matches!(record, FlowData::ExtendedSwitch(_)));
+        .any(|record| matches!(&record.flow_data, FlowData::ExtendedSwitch(_)));
 
     let mut l3_length = 0_u64;
-    for flow_data in flow_records {
-        match flow_data {
+    for flow_record in flow_records {
+        match &flow_record.flow_data {
             FlowData::SampledHeader(sampled) => {
                 let needs_ip_data = !(has_sampled_ipv4 || has_sampled_ipv6);
                 let needs_l2_data = !(has_sampled_ethernet && has_extended_switch);

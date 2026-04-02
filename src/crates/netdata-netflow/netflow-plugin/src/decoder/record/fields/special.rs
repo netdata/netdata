@@ -10,22 +10,10 @@ pub(crate) fn apply_v9_special_mappings(fields: &mut FlowFields, field: V9Field,
         V9Field::IcmpType => {
             if let Some((icmp_type, icmp_code)) = decode_type_code(value) {
                 // Field 32 appears in both v4/v6 paths in some exporters.
-                fields.entry("ICMPV4_TYPE").or_insert(icmp_type);
-                fields.entry("ICMPV4_CODE").or_insert(icmp_code);
-                fields.entry("ICMPV6_TYPE").or_insert_with(|| {
-                    value
-                        .parse::<u64>()
-                        .ok()
-                        .map(|v| (v >> 8).to_string())
-                        .unwrap_or_default()
-                });
-                fields.entry("ICMPV6_CODE").or_insert_with(|| {
-                    value
-                        .parse::<u64>()
-                        .ok()
-                        .map(|v| (v & 0xff).to_string())
-                        .unwrap_or_default()
-                });
+                fields.entry("ICMPV4_TYPE").or_insert(icmp_type.clone());
+                fields.entry("ICMPV4_CODE").or_insert(icmp_code.clone());
+                fields.entry("ICMPV6_TYPE").or_insert(icmp_type);
+                fields.entry("ICMPV6_CODE").or_insert(icmp_code);
             }
         }
         V9Field::IcmpTypeValue => {
