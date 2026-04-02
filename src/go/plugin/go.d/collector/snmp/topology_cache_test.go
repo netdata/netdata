@@ -1084,7 +1084,7 @@ func TestTopologyCache_BuildEngineObservations_SeparatesProtocolSpecificRemoteOb
 	require.Equal(t, "10.0.0.2", lldpObservation.ManagementIP)
 	require.Equal(t, "10.0.0.2", cdpObservation.ManagementIP)
 	require.Equal(t, "sw-b", lldpObservation.Hostname)
-	require.Equal(t, "sw-b", cdpObservation.Hostname)
+	require.Equal(t, "switch-b", cdpObservation.Hostname)
 	require.Len(t, lldpObservation.LLDPRemotes, 1)
 	require.Len(t, cdpObservation.CDPRemotes, 1)
 }

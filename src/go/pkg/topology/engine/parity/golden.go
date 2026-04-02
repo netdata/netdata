@@ -216,6 +216,9 @@ func countGoldenBidirectionalPairs(adjacencies []GoldenAdjacency) int {
 			TargetDevice: adj.SourceDevice,
 			TargetPort:   adj.SourcePort,
 		})
+		if forward == reverse {
+			continue
+		}
 
 		canonical := forward
 		if reverse < canonical {

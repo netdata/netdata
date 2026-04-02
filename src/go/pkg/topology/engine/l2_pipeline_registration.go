@@ -48,6 +48,9 @@ func (s *l2BuildState) registerObservation(obs L2Observation) error {
 	observedProtocols := observationProtocolsUsed(obs)
 	if existing, ok := s.devices[device.ID]; ok {
 		device = mergeObservedDevice(existing, device)
+		if device.Labels == nil {
+			device.Labels = make(map[string]string)
+		}
 		for protocol := range csvToTopologySet(existing.Labels["protocols_observed"]) {
 			observedProtocols[protocol] = struct{}{}
 		}

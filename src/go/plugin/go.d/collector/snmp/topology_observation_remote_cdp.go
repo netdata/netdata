@@ -55,7 +55,7 @@ func (b *topologyRemoteObservationBuilder) collectCDPRemoteObservations() {
 		remoteObservation := b.ensureRemoteObservation(
 			"cdp",
 			remoteDeviceID,
-			firstNonEmpty(remoteDeviceToken, remoteSysName, remoteDeviceID),
+			firstNonEmpty(remoteSysName, remoteDeviceToken, remoteDeviceID),
 			remoteManagementIP,
 			"",
 		)

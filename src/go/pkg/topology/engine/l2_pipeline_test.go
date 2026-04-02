@@ -1269,6 +1269,33 @@ func TestResolveRemote_ReusesHostnameIDForUnmanagedRemoteCollisions(t *testing.T
 	require.Equal(t, "shared-host", state.hostToID["shared-host"])
 }
 
+func TestResolveRemoteEnforcingHostnameMACGuard_SplitsUnmanagedHostnameCollisions(t *testing.T) {
+	state := newL2BuildState(1)
+
+	firstID := state.resolveRemoteEnforcingHostnameMACGuard("shared-host", "00:11:22:33:44:55", "", "")
+	secondID := state.resolveRemoteEnforcingHostnameMACGuard("shared-host", "00:11:22:33:44:66", "", "")
+
+	require.Equal(t, "shared-host", firstID)
+	require.Equal(t, "chassis-001122334466", secondID)
+	require.Equal(t, "shared-host", state.hostToID["shared-host"])
+	require.Equal(t, secondID, state.macToID["00:11:22:33:44:66"])
+}
+
+func TestRegisterObservation_ReinitializesLabelsAfterEmptyMerge(t *testing.T) {
+	state := newL2BuildState(1)
+	state.devices["switch-a"] = Device{ID: "switch-a", Hostname: "switch-a"}
+
+	err := state.registerObservation(L2Observation{
+		DeviceID: "switch-a",
+		LLDPRemotes: []LLDPRemoteObservation{
+			{LocalPortNum: "1", ChassisID: "00:11:22:33:44:55"},
+		},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "lldp", state.devices["switch-a"].Labels["protocols_observed"])
+}
+
 func TestMatchLLDPLinksEnlinkdPassOrder_SkipsEmptyPortDescriptions(t *testing.T) {
 	links := []lldpMatchLink{
 		{

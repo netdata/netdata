@@ -42,7 +42,7 @@ func (s *l2BuildState) applyCDP(observations []L2Observation) {
 		targetID := strings.TrimSpace(cdpTargetOverrides[link.index])
 		if targetID == "" {
 			targetIP := canonicalIP(rawAddress)
-			targetID = s.resolveRemote(link.remoteHost, link.remoteDeviceID, targetIP, link.remoteDeviceID)
+			targetID = s.resolveRemoteEnforcingHostnameMACGuard(link.remoteHost, link.remoteDeviceID, targetIP, link.remoteDeviceID)
 		}
 
 		adj := Adjacency{

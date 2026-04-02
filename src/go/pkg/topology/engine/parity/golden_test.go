@@ -338,6 +338,28 @@ func TestGoldenYAMLValidation_AcceptsBidirectionalDevicePairsWithPortAliases(t *
 	require.NoError(t, doc.validate())
 }
 
+func TestGoldenYAMLValidation_SelfLoopsDoNotCountAsBidirectionalPairs(t *testing.T) {
+	doc := GoldenDocument{
+		Version:    GoldenVersion,
+		ScenarioID: "self-loop",
+		Devices: []GoldenDevice{
+			{ID: "a", Hostname: "a"},
+		},
+		Adjacencies: []GoldenAdjacency{
+			{Protocol: "lldp", SourceDevice: "a", SourcePort: "Gi0/1", TargetDevice: "a", TargetPort: "Gi0/1"},
+		},
+		Expectations: GoldenCounts{
+			DirectionalAdjacencies: 1,
+			BidirectionalPairs:     1,
+			Devices:                1,
+		},
+	}
+
+	err := doc.validate()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "expectations.bidirectional_pairs")
+}
+
 func TestGoldenCanonicalJSON_UsesEmptyArrayForEmptyAdjacencies(t *testing.T) {
 	doc := GoldenDocument{
 		Version:     GoldenVersion,
