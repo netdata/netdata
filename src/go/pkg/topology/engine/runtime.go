@@ -124,6 +124,10 @@ func emptyResult(collectedAt time.Time) Result {
 			"enrichments_arp_nd":   0,
 			"bridge_domains_total": 0,
 			"endpoints_total":      0,
+			"identity_alias_endpoints_mapped":        0,
+			"identity_alias_endpoints_ambiguous_mac": 0,
+			"identity_alias_ips_merged":              0,
+			"identity_alias_ips_conflict_skipped":    0,
 		},
 	}
 }

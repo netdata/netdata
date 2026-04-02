@@ -152,6 +152,10 @@ func TestRuntimeEngine_EmptyObservationsReturnEmptyResult(t *testing.T) {
 	require.Empty(t, result.Devices)
 	require.Empty(t, result.Adjacencies)
 	require.Equal(t, 0, result.Stats["links_total"])
+	require.Equal(t, 0, result.Stats["identity_alias_endpoints_mapped"])
+	require.Equal(t, 0, result.Stats["identity_alias_endpoints_ambiguous_mac"])
+	require.Equal(t, 0, result.Stats["identity_alias_ips_merged"])
+	require.Equal(t, 0, result.Stats["identity_alias_ips_conflict_skipped"])
 }
 
 func TestRuntimeEngine_DiscoverByDevices_NilProvider(t *testing.T) {
