@@ -13,7 +13,7 @@ type MethodConfig struct {
 	ResponseType   string        // Response schema type (default "table")
 	AgentWide      bool          // Method is agent-wide (does not require __job selector)
 	RequiredParams []ParamConfig // Required parameters for this method (including __sort if used)
-	Presentation   any           // Topology presentation metadata (included in info response when non-nil)
+	Presentation   any           // Presentation metadata included in the info response when non-nil
 }
 
 // FunctionResponse is the response from a module's HandleMethod.

@@ -1386,6 +1386,29 @@ func TestMatchCDPLinksEnlinkdPassOrder_DefaultAndParsedTarget(t *testing.T) {
 	require.Equal(t, cdpMatchPassDefault, pairs[0].pass)
 }
 
+func TestBuildCDPLookupMap_PreservesFirstDuplicateKey(t *testing.T) {
+	links := []cdpMatchLink{
+		{
+			index:              0,
+			sourceGlobalID:     "A-GID",
+			localInterfaceName: "Gi0/0",
+			remoteDeviceID:     "B-GID",
+			remoteDevicePort:   "Gi0/1",
+		},
+		{
+			index:              1,
+			sourceGlobalID:     "A-GID",
+			localInterfaceName: "Gi0/0",
+			remoteDeviceID:     "B-GID",
+			remoteDevicePort:   "Gi0/1",
+		},
+	}
+
+	lookup := buildCDPLookupMap(links)
+	key := lldpCompositeKey("Gi0/1", "Gi0/0", "A-GID", "B-GID")
+	require.Equal(t, 0, lookup[key])
+}
+
 func TestMatchCDPLinksEnlinkdPassOrder_SkipsSelfTarget(t *testing.T) {
 	links := []cdpMatchLink{
 		{

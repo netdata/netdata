@@ -2,9 +2,11 @@
 
 package engine
 
-import "testing"
+import (
+	"testing"
 
-import "github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/require"
+)
 
 func TestCSVToTopologySet_NormalizesAndDeduplicates(t *testing.T) {
 	set := csvToTopologySet(" LLDP, cdp , , lldp, STP ")

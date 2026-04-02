@@ -82,6 +82,9 @@ func buildCDPLookupMap(links []cdpMatchLink) map[string]int {
 			link.sourceGlobalID,
 			link.remoteDeviceID,
 		)
+		if _, ok := lookup[key]; ok {
+			continue
+		}
 		lookup[key] = link.index
 	}
 	return lookup
