@@ -802,17 +802,6 @@ chart labels: mount_point=/mnt/disk1 device=sda
 
 This requires BOTH conditions to be true (AND logic).
 
-**Important Notes:**
-
-- Space-separated list with [simple patterns](/src/libnetdata/simple_pattern/README.md) support
-- If a specified label doesn't exist on the chart, the chart won't match
-- Multiple labels use AND logic
-
-:::important
-
-Alerts based on `chart labels` require the underlying chart to exist. For example, a `disk.space` chart is only created when a mount point is actively mounted. If a CIFS mount fails to mount after a system reboot, no `disk.space` chart will exist for that mount point, and the alert will not activate.
-
-
 :::important
 
 - Space-separated list with [simple patterns](/src/libnetdata/simple_pattern/README.md) support
