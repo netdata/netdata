@@ -108,6 +108,7 @@ impl FlowEnricher {
         if !self.classify_interface(
             &exporter_info,
             &context.out_interface,
+            &context.exporter_classification,
             &mut context.out_classification,
         ) {
             return false;
@@ -115,6 +116,7 @@ impl FlowEnricher {
         if !self.classify_interface(
             &exporter_info,
             &context.in_interface,
+            &context.exporter_classification,
             &mut context.in_classification,
         ) {
             return false;

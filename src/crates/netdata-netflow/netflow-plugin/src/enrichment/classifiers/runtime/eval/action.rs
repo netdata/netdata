@@ -81,6 +81,7 @@ impl ActionExpr {
         &self,
         exporter: &ExporterInfo,
         interface: &InterfaceInfo,
+        exporter_classification: &ExporterClassification,
         classification: &mut InterfaceClassification,
     ) -> Result<bool> {
         match self {
@@ -89,8 +90,12 @@ impl ActionExpr {
                 Ok(false)
             }
             ActionExpr::ClassifyInterface(target, value) => {
-                let value =
-                    value.resolve(Some(exporter), Some(interface), None, Some(classification))?;
+                let value = value.resolve(
+                    Some(exporter),
+                    Some(interface),
+                    Some(exporter_classification),
+                    Some(classification),
+                )?;
                 let slot = classification.interface_target_mut(target);
                 if slot.is_empty() {
                     *slot = normalize_classifier_value(&value.to_string_value());
@@ -99,13 +104,28 @@ impl ActionExpr {
             }
             ActionExpr::ClassifyInterfaceRegex(target, input, pattern, template, compiled) => {
                 let input = input
-                    .resolve(Some(exporter), Some(interface), None, Some(classification))?
+                    .resolve(
+                        Some(exporter),
+                        Some(interface),
+                        Some(exporter_classification),
+                        Some(classification),
+                    )?
                     .to_string_value();
                 let pattern = pattern
-                    .resolve(Some(exporter), Some(interface), None, Some(classification))?
+                    .resolve(
+                        Some(exporter),
+                        Some(interface),
+                        Some(exporter_classification),
+                        Some(classification),
+                    )?
                     .to_string_value();
                 let template = template
-                    .resolve(Some(exporter), Some(interface), None, Some(classification))?
+                    .resolve(
+                        Some(exporter),
+                        Some(interface),
+                        Some(exporter_classification),
+                        Some(classification),
+                    )?
                     .to_string_value();
 
                 let slot = classification.interface_target_mut(target);
@@ -123,7 +143,12 @@ impl ActionExpr {
             ActionExpr::SetName(value) => {
                 if classification.name.is_empty() {
                     classification.name = value
-                        .resolve(Some(exporter), Some(interface), None, Some(classification))?
+                        .resolve(
+                            Some(exporter),
+                            Some(interface),
+                            Some(exporter_classification),
+                            Some(classification),
+                        )?
                         .to_string_value();
                 }
                 Ok(true)
@@ -131,7 +156,12 @@ impl ActionExpr {
             ActionExpr::SetDescription(value) => {
                 if classification.description.is_empty() {
                     classification.description = value
-                        .resolve(Some(exporter), Some(interface), None, Some(classification))?
+                        .resolve(
+                            Some(exporter),
+                            Some(interface),
+                            Some(exporter_classification),
+                            Some(classification),
+                        )?
                         .to_string_value();
                 }
                 Ok(true)

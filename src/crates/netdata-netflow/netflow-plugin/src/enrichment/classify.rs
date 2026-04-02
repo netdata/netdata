@@ -139,6 +139,7 @@ impl FlowEnricher {
         &self,
         exporter: &ExporterInfo,
         interface: &InterfaceInfo,
+        exporter_classification: &ExporterClassification,
         classification: &mut InterfaceClassification,
     ) -> bool {
         // Akvorado parity: metadata-provided classification has priority.
@@ -161,7 +162,7 @@ impl FlowEnricher {
 
         for rule in &self.interface_classifiers {
             if rule
-                .evaluate_interface(exporter, interface, classification)
+                .evaluate_interface(exporter, interface, exporter_classification, classification)
                 .is_err()
             {
                 break;

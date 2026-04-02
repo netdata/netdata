@@ -113,10 +113,11 @@ impl ClassifierRule {
         &self,
         exporter: &ExporterInfo,
         interface: &InterfaceInfo,
+        exporter_classification: &ExporterClassification,
         classification: &mut InterfaceClassification,
     ) -> Result<bool> {
         self.expression
-            .eval_interface(exporter, interface, classification)
+            .eval_interface(exporter, interface, exporter_classification, classification)
     }
 }
 

@@ -123,6 +123,15 @@ func (a *accumulator) finalSend(ctx context.Context, in chan<- []model.TargetGro
 	a.mux.Unlock()
 
 	select {
+	case in <- tggs:
+		a.mux.Lock()
+		a.groupsReset()
+		a.mux.Unlock()
+		return
+	default:
+	}
+
+	select {
 	case <-ctx.Done():
 	case in <- tggs:
 		a.mux.Lock()

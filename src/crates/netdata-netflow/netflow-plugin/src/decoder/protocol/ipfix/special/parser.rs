@@ -32,6 +32,9 @@ pub(crate) fn parse_ipfix_record_from_template<'a>(
             field.field_length as usize
         };
 
+        if value_len == 0 {
+            return None;
+        }
         if consumed.saturating_add(value_len) > body.len() {
             return None;
         }

@@ -228,7 +228,7 @@ fn exporter_classifier_format_uses_exporter_name() {
     let cfg = EnrichmentConfig {
         metadata_static: metadata_config_without_exporter_classification(),
         exporter_classifiers: vec![
-            r#"ClassifyTenant(Format("tenant-%s", Exporter.Name))"#.to_string()
+            r#"ClassifyTenant(Format("tenant-%s", Exporter.Name))"#.to_string(),
         ],
         ..Default::default()
     };
@@ -245,11 +245,34 @@ fn exporter_classifier_format_uses_exporter_name() {
 }
 
 #[test]
+fn interface_classifier_can_read_exporter_classification_fields() {
+    let cfg = EnrichmentConfig {
+        metadata_static: metadata_config_without_interface_classification(),
+        exporter_classifiers: vec![r#"ClassifyGroup("core")"#.to_string()],
+        interface_classifiers: vec![
+            r#"CurrentClassification.Group == "core" && ClassifyProvider("from-exporter")"#
+                .to_string(),
+        ],
+        ..Default::default()
+    };
+    let mut enricher = FlowEnricher::from_config(&cfg)
+        .expect("build enricher")
+        .expect("enricher must be enabled");
+    let mut fields = base_fields("192.0.2.10", 10, 20, 100, 10, 300);
+
+    assert!(enricher.enrich_fields(&mut fields));
+    assert_eq!(
+        fields.get("IN_IF_PROVIDER").map(String::as_str),
+        Some("from-exporter")
+    );
+}
+
+#[test]
 fn exporter_classifier_matches_operator_assigns_group() {
     let cfg = EnrichmentConfig {
         metadata_static: metadata_config_without_exporter_classification(),
         exporter_classifiers: vec![
-            r#"Exporter.Name matches "^edge-.*" && Classify("europe")"#.to_string()
+            r#"Exporter.Name matches "^edge-.*" && Classify("europe")"#.to_string(),
         ],
         ..Default::default()
     };
@@ -271,7 +294,7 @@ fn exporter_classifier_regex_with_character_class_extracts_group() {
     let cfg = EnrichmentConfig {
         metadata_static: metadata_config_without_exporter_classification(),
         exporter_classifiers: vec![
-            r#"ClassifyRegex(Exporter.Name, "^(\\w+).r", "europe-$1")"#.to_string()
+            r#"ClassifyRegex(Exporter.Name, "^(\\w+).r", "europe-$1")"#.to_string(),
         ],
         ..Default::default()
     };
@@ -400,7 +423,7 @@ fn exporter_classifier_invalid_regex_is_rejected_during_config_parse() {
     let cfg = EnrichmentConfig {
         metadata_static: metadata_config_without_exporter_classification(),
         exporter_classifiers: vec![
-            r#"ClassifyRegex(Exporter.Name, "^(ebp+.r", "europe-$1")"#.to_string()
+            r#"ClassifyRegex(Exporter.Name, "^(ebp+.r", "europe-$1")"#.to_string(),
         ],
         ..Default::default()
     };
@@ -444,7 +467,7 @@ fn exporter_classifier_non_matching_regex_does_not_set_value() {
     let cfg = EnrichmentConfig {
         metadata_static: metadata_config_without_exporter_classification(),
         exporter_classifiers: vec![
-            r#"ClassifyRegex(Exporter.Name, "^(ebp+).r", "europe-$1")"#.to_string()
+            r#"ClassifyRegex(Exporter.Name, "^(ebp+).r", "europe-$1")"#.to_string(),
         ],
         ..Default::default()
     };
@@ -849,7 +872,7 @@ fn interface_classifier_classify_provider_with_format_works() {
     let cfg = EnrichmentConfig {
         metadata_static: metadata_config_without_interface_classification(),
         interface_classifiers: vec![
-            r#"ClassifyProvider(Format("II-%s", Interface.Name))"#.to_string()
+            r#"ClassifyProvider(Format("II-%s", Interface.Name))"#.to_string(),
         ],
         ..Default::default()
     };

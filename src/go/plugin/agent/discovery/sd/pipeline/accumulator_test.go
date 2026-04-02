@@ -91,3 +91,23 @@ func TestAccumulator_Run_ExitsOnCancelWhenFinalFlushBlocks(t *testing.T) {
 		t.Fatal("accumulator did not exit after cancellation")
 	}
 }
+
+func TestAccumulator_FinalSend_PrefersReadyReceiverAfterCancel(t *testing.T) {
+	accum := newAccumulator()
+	accum.groupsUpdate([]model.TargetGroup{newMockTargetGroup("test", "mock1")})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	updates := make(chan []model.TargetGroup, 1)
+
+	accum.finalSend(ctx, updates)
+
+	select {
+	case got := <-updates:
+		require.Len(t, got, 1)
+		assert.Equal(t, "test", got[0].Source())
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for canceled finalSend delivery")
+	}
+}

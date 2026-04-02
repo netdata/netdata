@@ -44,9 +44,15 @@ impl ConditionExpr {
         &self,
         exporter: &ExporterInfo,
         interface: &InterfaceInfo,
+        exporter_classification: &ExporterClassification,
         classification: &InterfaceClassification,
     ) -> Result<bool> {
-        self.eval_with_context(Some(exporter), Some(interface), None, Some(classification))
+        self.eval_with_context(
+            Some(exporter),
+            Some(interface),
+            Some(exporter_classification),
+            Some(classification),
+        )
     }
 
     pub(crate) fn eval_with_context(

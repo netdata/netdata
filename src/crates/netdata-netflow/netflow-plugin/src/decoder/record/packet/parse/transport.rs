@@ -9,22 +9,22 @@ pub(crate) fn parse_transport_record(
     rec: &mut FlowRecord,
     decapsulation_mode: DecapsulationMode,
 ) -> u64 {
-    if !decapsulation_mode.is_none() {
-        return match decapsulation_mode {
-            DecapsulationMode::Vxlan => {
-                if proto == 17
-                    && data.len() > 16
-                    && u16::from_be_bytes([data[2], data[3]]) == VXLAN_UDP_PORT
-                {
-                    parse_datalink_frame_section_record(&data[16..], rec, DecapsulationMode::None)
-                        .unwrap_or(0)
-                } else {
-                    0
-                }
-            }
-            DecapsulationMode::Srv6 => parse_srv6_inner_record(proto, data, rec).unwrap_or(0),
-            DecapsulationMode::None => 0,
-        };
+    match decapsulation_mode {
+        DecapsulationMode::None => {}
+        DecapsulationMode::Vxlan => {
+            return if proto == 17
+                && data.len() > 16
+                && u16::from_be_bytes([data[2], data[3]]) == VXLAN_UDP_PORT
+            {
+                parse_datalink_frame_section_record(&data[16..], rec, DecapsulationMode::None)
+                    .unwrap_or(0)
+            } else {
+                0
+            };
+        }
+        DecapsulationMode::Srv6 => {
+            return parse_srv6_inner_record(proto, data, rec).unwrap_or(0);
+        }
     }
 
     match proto {

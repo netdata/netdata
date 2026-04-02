@@ -28,25 +28,41 @@ impl BoolExpr {
         &self,
         exporter: &ExporterInfo,
         interface: &InterfaceInfo,
+        exporter_classification: &ExporterClassification,
         classification: &mut InterfaceClassification,
     ) -> Result<bool> {
         match self {
-            BoolExpr::Term(term) => term.eval_interface(exporter, interface, classification),
+            BoolExpr::Term(term) => {
+                term.eval_interface(exporter, interface, exporter_classification, classification)
+            }
             BoolExpr::And(left, right) => {
-                if !left.eval_interface(exporter, interface, classification)? {
+                if !left.eval_interface(
+                    exporter,
+                    interface,
+                    exporter_classification,
+                    classification,
+                )? {
                     return Ok(false);
                 }
-                right.eval_interface(exporter, interface, classification)
+                right.eval_interface(exporter, interface, exporter_classification, classification)
             }
             BoolExpr::Or(left, right) => {
-                if left.eval_interface(exporter, interface, classification)? {
+                if left.eval_interface(
+                    exporter,
+                    interface,
+                    exporter_classification,
+                    classification,
+                )? {
                     return Ok(true);
                 }
-                right.eval_interface(exporter, interface, classification)
+                right.eval_interface(exporter, interface, exporter_classification, classification)
             }
-            BoolExpr::Not(inner) => {
-                Ok(!inner.eval_interface(exporter, interface, classification)?)
-            }
+            BoolExpr::Not(inner) => Ok(!inner.eval_interface(
+                exporter,
+                interface,
+                exporter_classification,
+                classification,
+            )?),
         }
     }
 }
@@ -67,13 +83,19 @@ impl RuleTerm {
         &self,
         exporter: &ExporterInfo,
         interface: &InterfaceInfo,
+        exporter_classification: &ExporterClassification,
         classification: &mut InterfaceClassification,
     ) -> Result<bool> {
         match self {
-            RuleTerm::Condition(condition) => {
-                condition.eval_interface(exporter, interface, classification)
+            RuleTerm::Condition(condition) => condition.eval_interface(
+                exporter,
+                interface,
+                exporter_classification,
+                classification,
+            ),
+            RuleTerm::Action(action) => {
+                action.eval_interface(exporter, interface, exporter_classification, classification)
             }
-            RuleTerm::Action(action) => action.eval_interface(exporter, interface, classification),
         }
     }
 }
