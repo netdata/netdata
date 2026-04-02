@@ -315,7 +315,7 @@ static void streaming_topology_emit_streaming_path_table(BUFFER *wb, uint64_t or
         {
             streaming_topology_emit_col(wb, "hostname", "Agent", NULL);
             streaming_topology_emit_col(wb, "hops", "Hops", "number");
-            streaming_topology_emit_col(wb, "since", "Since", "timestamp");
+            streaming_topology_emit_col(wb, "since", "Since", "number");
             streaming_topology_emit_col(wb, "flags", "Flags", NULL);
         }
         buffer_json_array_close(wb);
