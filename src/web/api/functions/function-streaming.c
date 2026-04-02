@@ -119,6 +119,8 @@ static void streaming_topology_agent_id_for_host(RRDHOST *host, char *dst, size_
     char host_guid[UUID_STR_LEN];
     if(streaming_topology_host_guid(host, host_guid, sizeof(host_guid)))
         snprintf(dst, dst_size, "%s", host_guid);
+    else if(host && host->machine_guid[0])
+        snprintf(dst, dst_size, "%s", host->machine_guid);
     else if(host)
         snprintf(dst, dst_size, "%s", rrdhost_hostname(host));
     else
@@ -211,6 +213,8 @@ static void streaming_topology_actor_id_for_host(RRDHOST *host, char *dst, size_
     char host_guid[UUID_STR_LEN];
     if(streaming_topology_host_guid(host, host_guid, sizeof(host_guid)))
         streaming_topology_actor_id_from_guid(host_guid, dst, dst_size);
+    else if(host && host->machine_guid[0])
+        streaming_topology_actor_id_from_guid(host->machine_guid, dst, dst_size);
     else if(host)
         snprintf(dst, dst_size, "hostname:%s", rrdhost_hostname(host));
     else
