@@ -288,6 +288,9 @@ static void topology_parse_options(const char *function, NV_TOPOLOGY_OPTIONS *op
             continue;
         }
 
+        if(strcmp(param, "endpoints:by_ip") == 0 || strcmp(param, "endpoints:by-ip") == 0)
+            continue;
+
         if(strncmp(param, "sockets:", 8) == 0) {
             if(!sockets_selected_explicitly) {
                 opts->sockets_listening = false;
@@ -1521,6 +1524,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
     buffer_json_member_add_string(wb, "help", NETWORK_TOPOLOGY_VIEWER_HELP);
     buffer_json_member_add_array(wb, "accepted_params");
     {
+        buffer_json_add_array_item_string(wb, "info");
         buffer_json_add_array_item_string(wb, "processes");
         buffer_json_add_array_item_string(wb, "sockets");
         buffer_json_add_array_item_string(wb, "protocols");
