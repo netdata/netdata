@@ -167,6 +167,8 @@ AutoReqProv: yes
 Summary:	Netdata - X-Ray Vision for your infrastructure!
 Name:		netdata
 Version:	%{version}
+%global _topology_ip_intel_stock_dir %{_topdir}/SOURCES/%{name}-%{version}/.topology-ip-intel-stock
+%global _have_topology_ip_intel_stock %([ -d "%{_topology_ip_intel_stock_dir}" ] && echo 1 || echo 0)
 Release:	1%{?dist}
 License:	GPLv3+
 Group:		Applications/System
@@ -463,12 +465,14 @@ advanced correlations and fast root cause analysis, native horizontal scalabilit
 	%else
 	-DENABLE_PLUGIN_SYSTEMD_UNITS=Off \
 	%endif
-	%if 0%{_have_rust}
-	-DENABLE_PLUGIN_NETFLOW=On \
-	$([ -d "%{_topdir}/SOURCES/%{name}-%{version}/.topology-ip-intel-stock" ] && echo -DNETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR=%{_topdir}/SOURCES/%{name}-%{version}/.topology-ip-intel-stock) \
-	%else
-	-DENABLE_PLUGIN_NETFLOW=Off \
-	%endif
+		%if 0%{_have_rust}
+		-DENABLE_PLUGIN_NETFLOW=On \
+		%if 0%{?_have_topology_ip_intel_stock}
+		-DNETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR=%{_topology_ip_intel_stock_dir} \
+		%endif
+		%else
+		-DENABLE_PLUGIN_NETFLOW=Off \
+		%endif
 	%if 0%{_have_rust}
 	-DENABLE_PLUGIN_OTEL=On \
 	%else
@@ -3282,11 +3286,13 @@ Requires(pre): %{name}-user >= %{version}
 %defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/netflow.yaml
 %{_libdir}/%{name}/conf.d/topology-ip-intel.yaml
+%if 0%{?_have_topology_ip_intel_stock}
 %dir %{_datadir}/%{name}/topology-ip-intel
 %{_datadir}/%{name}/topology-ip-intel/README.md
 %{_datadir}/%{name}/topology-ip-intel/topology-ip-asn.mmdb
 %{_datadir}/%{name}/topology-ip-intel/topology-ip-geo.mmdb
 %{_datadir}/%{name}/topology-ip-intel/topology-ip-intel.json
+%endif
 %endif
 
 %package dashboard
