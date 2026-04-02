@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 )
 
@@ -24,17 +25,13 @@ func (s *store) init(_ context.Context) error {
 	case s.Config.Timeout.Duration() == 0:
 		s.Config.Timeout = defaultTimeout
 	}
-	if s.provider != nil {
-		if s.provider.apiClient != nil {
-			s.provider.apiClient.Timeout = s.Config.Timeout.Duration()
-		}
-		if s.provider.imdsClient != nil {
-			s.provider.imdsClient.Timeout = s.Config.Timeout.Duration()
-		}
-	}
 
 	if err := s.Config.ValidateWithPath(""); err != nil {
 		return err
+	}
+	s.runtime = &runtime{
+		apiClient:  httpx.APIClient(s.Config.Timeout.Duration()),
+		imdsClient: httpx.NoProxyClient(s.Config.Timeout.Duration()),
 	}
 
 	cred, err := s.Config.NewCredentialWithOptions(s.credentialOptions())
@@ -56,7 +53,7 @@ func (s *store) init(_ context.Context) error {
 	}
 
 	s.published = &publishedStore{
-		provider:      s.provider,
+		runtime:       s.runtime,
 		tokenProvider: tokenProvider,
 	}
 	return nil
@@ -65,19 +62,19 @@ func (s *store) init(_ context.Context) error {
 func (s *store) authTimeout() time.Duration {
 	switch s.Config.NormalizedMode() {
 	case cloudauth.AzureADAuthModeServicePrincipal:
-		if s.provider.apiClient != nil {
-			return s.provider.apiClient.Timeout
+		if s.runtime.apiClient != nil {
+			return s.runtime.apiClient.Timeout
 		}
 	case cloudauth.AzureADAuthModeManagedIdentity:
-		if s.provider.imdsClient != nil {
-			return s.provider.imdsClient.Timeout
+		if s.runtime.imdsClient != nil {
+			return s.runtime.imdsClient.Timeout
 		}
 	case cloudauth.AzureADAuthModeDefault:
-		if s.provider.apiClient != nil && s.provider.apiClient.Timeout > 0 {
-			return s.provider.apiClient.Timeout
+		if s.runtime.apiClient != nil && s.runtime.apiClient.Timeout > 0 {
+			return s.runtime.apiClient.Timeout
 		}
-		if s.provider.imdsClient != nil {
-			return s.provider.imdsClient.Timeout
+		if s.runtime.imdsClient != nil {
+			return s.runtime.imdsClient.Timeout
 		}
 	}
 
@@ -89,17 +86,17 @@ func (s *store) credentialOptions() *cloudauth.AzureADCredentialOptions {
 
 	switch s.Config.NormalizedMode() {
 	case cloudauth.AzureADAuthModeServicePrincipal:
-		if s.provider.apiClient != nil && s.provider.apiClient.Transport != nil {
-			opts.ClientOptions.Transport = transportAdapter{s.provider.apiClient.Transport}
+		if s.runtime.apiClient != nil && s.runtime.apiClient.Transport != nil {
+			opts.ClientOptions.Transport = transportAdapter{s.runtime.apiClient.Transport}
 		}
 	case cloudauth.AzureADAuthModeManagedIdentity:
-		if s.provider.imdsClient != nil && s.provider.imdsClient.Transport != nil {
-			opts.ClientOptions.Transport = transportAdapter{s.provider.imdsClient.Transport}
+		if s.runtime.imdsClient != nil && s.runtime.imdsClient.Transport != nil {
+			opts.ClientOptions.Transport = transportAdapter{s.runtime.imdsClient.Transport}
 		}
 	case cloudauth.AzureADAuthModeDefault:
 		opts.ClientOptions.Transport = routingTransportAdapter{
-			defaultRoundTripper: roundTripperForClient(s.provider.apiClient),
-			noProxyRoundTripper: roundTripperForClient(s.provider.imdsClient),
+			defaultRoundTripper: roundTripperForClient(s.runtime.apiClient),
+			noProxyRoundTripper: roundTripperForClient(s.runtime.imdsClient),
 		}
 	}
 

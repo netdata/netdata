@@ -11,7 +11,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
 
 var (
@@ -33,50 +32,34 @@ type ModeServiceAccountFileConfig struct {
 	Path string `json:"path" yaml:"path"`
 }
 
-type provider struct {
+type runtime struct {
 	apiClient      *http.Client
 	metadataClient *http.Client
-	secretEndpoint string
-	now            func() time.Time
 }
 
 type store struct {
 	Config    `yaml:",inline" json:""`
-	provider  *provider
+	runtime   *runtime
 	published *publishedStore
 }
 
 type publishedStore struct {
-	provider               *provider
+	runtime                *runtime
 	mode                   string
 	serviceAccountFilePath string
 }
 
 func New() secretstore.Creator {
-	p := &provider{
-		apiClient:      httpx.APIClient(defaultTimeout.Duration()),
-		metadataClient: httpx.NoProxyClient(defaultTimeout.Duration()),
-		now:            time.Now,
-	}
-
 	return secretstore.Creator{
 		Kind:        secretstore.KindGCPSM,
 		DisplayName: "Google Secret Manager",
 		Schema:      configSchema,
-		Create:      p.create,
-	}
-}
-
-func (p *provider) create() secretstore.Store {
-	return &store{
-		Config: Config{
-			Timeout: defaultTimeout,
-		},
-		provider: &provider{
-			apiClient:      httpx.CloneClientWithTimeout(p.apiClient, defaultTimeout.Duration()),
-			metadataClient: httpx.CloneClientWithTimeout(p.metadataClient, defaultTimeout.Duration()),
-			secretEndpoint: p.secretEndpoint,
-			now:            p.now,
+		Create: func() secretstore.Store {
+			return &store{
+				Config: Config{
+					Timeout: defaultTimeout,
+				},
+			}
 		},
 	}
 }

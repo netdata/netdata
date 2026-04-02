@@ -8,27 +8,22 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
 
 func (s *store) init(_ context.Context) error {
-	published := &publishedStore{
-		provider: s.provider,
-	}
-
 	switch {
 	case s.Config.Timeout.Duration() < 0:
 		return fmt.Errorf("timeout cannot be negative")
 	case s.Config.Timeout.Duration() == 0:
 		s.Config.Timeout = defaultTimeout
 	}
-	if s.provider != nil {
-		if s.provider.httpClient != nil {
-			s.provider.httpClient.Timeout = s.Config.Timeout.Duration()
-		}
-		if s.provider.httpClientInsecure != nil {
-			s.provider.httpClientInsecure.Timeout = s.Config.Timeout.Duration()
-		}
+	s.runtime = &runtime{
+		httpClient:         httpx.VaultClient(s.Config.Timeout.Duration()),
+		httpClientInsecure: httpx.VaultInsecureClient(s.Config.Timeout.Duration()),
 	}
+
+	published := &publishedStore{runtime: s.runtime}
 
 	switch strings.TrimSpace(s.Config.Mode) {
 	case "token":

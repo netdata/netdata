@@ -4,7 +4,6 @@ package vault
 
 import (
 	"context"
-	"net/http"
 	"testing"
 	"time"
 
@@ -43,10 +42,6 @@ func TestStoreInitTimeout(t *testing.T) {
 					Addr:    "https://vault.example",
 					Timeout: tc.timeout,
 				},
-				provider: &provider{
-					httpClient:         &http.Client{},
-					httpClientInsecure: &http.Client{},
-				},
 			}
 
 			err := s.init(context.Background())
@@ -57,14 +52,14 @@ func TestStoreInitTimeout(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tc.wantTimeout, s.provider.httpClient.Timeout)
-			assert.Equal(t, tc.wantTimeout, s.provider.httpClientInsecure.Timeout)
+			assert.Equal(t, tc.wantTimeout, s.runtime.httpClient.Timeout)
+			assert.Equal(t, tc.wantTimeout, s.runtime.httpClientInsecure.Timeout)
 			assert.Equal(t, confopt.Duration(tc.wantTimeout), s.Config.Timeout)
 		})
 	}
 }
 
-func TestCreateReturnsStoreScopedClients(t *testing.T) {
+func TestInitBuildsStoreScopedRuntime(t *testing.T) {
 	creator := New()
 
 	first, ok := creator.Create().(*store)
@@ -72,12 +67,22 @@ func TestCreateReturnsStoreScopedClients(t *testing.T) {
 	second, ok := creator.Create().(*store)
 	require.True(t, ok)
 
-	require.NotNil(t, first.provider)
-	require.NotNil(t, second.provider)
-	assert.NotSame(t, first.provider, second.provider)
-	assert.NotSame(t, first.provider.httpClient, second.provider.httpClient)
-	assert.NotSame(t, first.provider.httpClientInsecure, second.provider.httpClientInsecure)
 	assert.Equal(t, defaultTimeout, first.Config.Timeout)
-	assert.Equal(t, defaultTimeout.Duration(), first.provider.httpClient.Timeout)
-	assert.Equal(t, defaultTimeout.Duration(), first.provider.httpClientInsecure.Timeout)
+	first.Mode = "token"
+	first.ModeToken = &ModeTokenConfig{Token: "vault-token"}
+	first.Addr = "https://vault.example"
+	second.Mode = "token"
+	second.ModeToken = &ModeTokenConfig{Token: "vault-token"}
+	second.Addr = "https://vault.example"
+
+	require.NoError(t, first.init(context.Background()))
+	require.NoError(t, second.init(context.Background()))
+
+	require.NotNil(t, first.runtime)
+	require.NotNil(t, second.runtime)
+	assert.NotSame(t, first.runtime, second.runtime)
+	assert.NotSame(t, first.runtime.httpClient, second.runtime.httpClient)
+	assert.NotSame(t, first.runtime.httpClientInsecure, second.runtime.httpClientInsecure)
+	assert.Equal(t, defaultTimeout.Duration(), first.runtime.httpClient.Timeout)
+	assert.Equal(t, defaultTimeout.Duration(), first.runtime.httpClientInsecure.Timeout)
 }

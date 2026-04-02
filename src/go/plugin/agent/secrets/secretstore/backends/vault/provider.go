@@ -10,7 +10,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
 
 //go:embed config_schema.json
@@ -36,19 +35,19 @@ type ModeTokenFileConfig struct {
 	Path string `json:"path" yaml:"path"`
 }
 
-type provider struct {
+type runtime struct {
 	httpClient         *http.Client
 	httpClientInsecure *http.Client
 }
 
 type store struct {
 	Config    `yaml:",inline" json:""`
-	provider  *provider
+	runtime   *runtime
 	published *publishedStore
 }
 
 type publishedStore struct {
-	provider       *provider
+	runtime        *runtime
 	mode           string
 	tokenValue     string
 	tokenFilePath  string
@@ -58,27 +57,16 @@ type publishedStore struct {
 }
 
 func New() secretstore.Creator {
-	p := &provider{
-		httpClient:         httpx.VaultClient(defaultTimeout.Duration()),
-		httpClientInsecure: httpx.VaultInsecureClient(defaultTimeout.Duration()),
-	}
-
 	return secretstore.Creator{
 		Kind:        secretstore.KindVault,
 		DisplayName: "Vault",
 		Schema:      configSchema,
-		Create:      p.create,
-	}
-}
-
-func (p *provider) create() secretstore.Store {
-	return &store{
-		Config: Config{
-			Timeout: defaultTimeout,
-		},
-		provider: &provider{
-			httpClient:         httpx.CloneClientWithTimeout(p.httpClient, defaultTimeout.Duration()),
-			httpClientInsecure: httpx.CloneClientWithTimeout(p.httpClientInsecure, defaultTimeout.Duration()),
+		Create: func() secretstore.Store {
+			return &store{
+				Config: Config{
+					Timeout: defaultTimeout,
+				},
+			}
 		},
 	}
 }

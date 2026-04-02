@@ -11,7 +11,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 )
 
@@ -28,44 +27,33 @@ type Config struct {
 	Timeout                     confopt.Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
-type provider struct {
+type runtime struct {
 	apiClient  *http.Client
 	imdsClient *http.Client
 }
 
 type store struct {
 	Config    `yaml:",inline" json:""`
-	provider  *provider
+	runtime   *runtime
 	published *publishedStore
 }
 
 type publishedStore struct {
-	provider      *provider
+	runtime       *runtime
 	tokenProvider *cloudauth.TokenProvider
 }
 
 func New() secretstore.Creator {
-	p := &provider{
-		apiClient:  httpx.APIClient(defaultTimeout.Duration()),
-		imdsClient: httpx.NoProxyClient(defaultTimeout.Duration()),
-	}
-
 	return secretstore.Creator{
 		Kind:        secretstore.KindAzureKV,
 		DisplayName: "Azure Key Vault",
 		Schema:      configSchema,
-		Create:      p.create,
-	}
-}
-
-func (p *provider) create() secretstore.Store {
-	return &store{
-		Config: Config{
-			Timeout: defaultTimeout,
-		},
-		provider: &provider{
-			apiClient:  httpx.CloneClientWithTimeout(p.apiClient, defaultTimeout.Duration()),
-			imdsClient: httpx.CloneClientWithTimeout(p.imdsClient, defaultTimeout.Duration()),
+		Create: func() secretstore.Store {
+			return &store{
+				Config: Config{
+					Timeout: defaultTimeout,
+				},
+			}
 		},
 	}
 }

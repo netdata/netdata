@@ -17,21 +17,6 @@ func APIClient(timeout time.Duration) *http.Client {
 	return &http.Client{Timeout: timeout}
 }
 
-func CloneClientWithTimeout(client *http.Client, timeout time.Duration) *http.Client {
-	if client == nil {
-		return &http.Client{Timeout: timeout}
-	}
-
-	cloned := *client
-	cloned.Timeout = timeout
-
-	if transport, ok := client.Transport.(*http.Transport); ok && transport != nil {
-		cloned.Transport = transport.Clone()
-	}
-
-	return &cloned
-}
-
 func NoProxyClient(timeout time.Duration) *http.Client {
 	transport := cloneDefaultTransport()
 	transport.Proxy = nil

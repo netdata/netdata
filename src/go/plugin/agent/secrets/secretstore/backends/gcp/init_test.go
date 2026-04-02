@@ -4,7 +4,6 @@ package gcp
 
 import (
 	"context"
-	"net/http"
 	"testing"
 	"time"
 
@@ -39,10 +38,6 @@ func TestStoreInitTimeout(t *testing.T) {
 					Mode:    "metadata",
 					Timeout: tc.timeout,
 				},
-				provider: &provider{
-					apiClient:      &http.Client{},
-					metadataClient: &http.Client{},
-				},
 			}
 
 			err := s.init(context.Background())
@@ -53,14 +48,14 @@ func TestStoreInitTimeout(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tc.wantTimeout, s.provider.apiClient.Timeout)
-			assert.Equal(t, tc.wantTimeout, s.provider.metadataClient.Timeout)
+			assert.Equal(t, tc.wantTimeout, s.runtime.apiClient.Timeout)
+			assert.Equal(t, tc.wantTimeout, s.runtime.metadataClient.Timeout)
 			assert.Equal(t, confopt.Duration(tc.wantTimeout), s.Config.Timeout)
 		})
 	}
 }
 
-func TestCreateReturnsStoreScopedClients(t *testing.T) {
+func TestInitBuildsStoreScopedRuntime(t *testing.T) {
 	creator := New()
 
 	first, ok := creator.Create().(*store)
@@ -68,12 +63,18 @@ func TestCreateReturnsStoreScopedClients(t *testing.T) {
 	second, ok := creator.Create().(*store)
 	require.True(t, ok)
 
-	require.NotNil(t, first.provider)
-	require.NotNil(t, second.provider)
-	assert.NotSame(t, first.provider, second.provider)
-	assert.NotSame(t, first.provider.apiClient, second.provider.apiClient)
-	assert.NotSame(t, first.provider.metadataClient, second.provider.metadataClient)
 	assert.Equal(t, defaultTimeout, first.Config.Timeout)
-	assert.Equal(t, defaultTimeout.Duration(), first.provider.apiClient.Timeout)
-	assert.Equal(t, defaultTimeout.Duration(), first.provider.metadataClient.Timeout)
+	first.Mode = "metadata"
+	second.Mode = "metadata"
+
+	require.NoError(t, first.init(context.Background()))
+	require.NoError(t, second.init(context.Background()))
+
+	require.NotNil(t, first.runtime)
+	require.NotNil(t, second.runtime)
+	assert.NotSame(t, first.runtime, second.runtime)
+	assert.NotSame(t, first.runtime.apiClient, second.runtime.apiClient)
+	assert.NotSame(t, first.runtime.metadataClient, second.runtime.metadataClient)
+	assert.Equal(t, defaultTimeout.Duration(), first.runtime.apiClient.Timeout)
+	assert.Equal(t, defaultTimeout.Duration(), first.runtime.metadataClient.Timeout)
 }

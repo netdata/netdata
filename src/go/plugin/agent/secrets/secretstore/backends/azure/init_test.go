@@ -72,10 +72,6 @@ func TestStoreInit(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s := &store{
 				Config: tc.cfg,
-				provider: &provider{
-					apiClient:  &http.Client{},
-					imdsClient: &http.Client{},
-				},
 			}
 
 			err := s.init(context.Background())
@@ -88,8 +84,8 @@ func TestStoreInit(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, s.published)
 			assert.NotNil(t, s.published.tokenProvider)
-			assert.Equal(t, tc.wantTimeout, s.provider.apiClient.Timeout)
-			assert.Equal(t, tc.wantTimeout, s.provider.imdsClient.Timeout)
+			assert.Equal(t, tc.wantTimeout, s.runtime.apiClient.Timeout)
+			assert.Equal(t, tc.wantTimeout, s.runtime.imdsClient.Timeout)
 		})
 	}
 }
@@ -127,7 +123,7 @@ func TestStoreAuthTimeout(t *testing.T) {
 						Mode: tc.mode,
 					},
 				},
-				provider: &provider{
+				runtime: &runtime{
 					apiClient:  &http.Client{Timeout: tc.apiTimeout},
 					imdsClient: &http.Client{Timeout: tc.imdsTimeout},
 				},
@@ -252,7 +248,7 @@ func TestDefaultCredentialTransportRouting(t *testing.T) {
 						Mode: cloudauth.AzureADAuthModeDefault,
 					},
 				},
-				provider: &provider{
+				runtime: &runtime{
 					apiClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 						defaultCalls++
 						return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Header: make(http.Header)}, nil
@@ -279,7 +275,7 @@ func TestDefaultCredentialTransportRouting(t *testing.T) {
 	}
 }
 
-func TestCreateReturnsStoreScopedClients(t *testing.T) {
+func TestInitBuildsStoreScopedRuntime(t *testing.T) {
 	creator := New()
 
 	first, ok := creator.Create().(*store)
@@ -287,12 +283,18 @@ func TestCreateReturnsStoreScopedClients(t *testing.T) {
 	second, ok := creator.Create().(*store)
 	require.True(t, ok)
 
-	require.NotNil(t, first.provider)
-	require.NotNil(t, second.provider)
-	assert.NotSame(t, first.provider, second.provider)
-	assert.NotSame(t, first.provider.apiClient, second.provider.apiClient)
-	assert.NotSame(t, first.provider.imdsClient, second.provider.imdsClient)
 	assert.Equal(t, defaultTimeout, first.Config.Timeout)
-	assert.Equal(t, defaultTimeout.Duration(), first.provider.apiClient.Timeout)
-	assert.Equal(t, defaultTimeout.Duration(), first.provider.imdsClient.Timeout)
+	first.AzureADAuthConfig.Mode = cloudauth.AzureADAuthModeDefault
+	second.AzureADAuthConfig.Mode = cloudauth.AzureADAuthModeDefault
+
+	require.NoError(t, first.init(context.Background()))
+	require.NoError(t, second.init(context.Background()))
+
+	require.NotNil(t, first.runtime)
+	require.NotNil(t, second.runtime)
+	assert.NotSame(t, first.runtime, second.runtime)
+	assert.NotSame(t, first.runtime.apiClient, second.runtime.apiClient)
+	assert.NotSame(t, first.runtime.imdsClient, second.runtime.imdsClient)
+	assert.Equal(t, defaultTimeout.Duration(), first.runtime.apiClient.Timeout)
+	assert.Equal(t, defaultTimeout.Duration(), first.runtime.imdsClient.Timeout)
 }
