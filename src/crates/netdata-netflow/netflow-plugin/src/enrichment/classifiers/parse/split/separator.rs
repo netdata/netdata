@@ -1,3 +1,16 @@
+fn skip_to_byte_boundary(
+    iter: &mut std::iter::Peekable<std::str::CharIndices<'_>>,
+    next_index: usize,
+) {
+    while let Some(&(index, _)) = iter.peek() {
+        if index < next_index {
+            iter.next();
+        } else {
+            break;
+        }
+    }
+}
+
 pub(in super::super) fn split_top_level(input: &str, sep: &str) -> Vec<String> {
     let mut parts = Vec::new();
     let mut start = 0_usize;
@@ -6,12 +19,9 @@ pub(in super::super) fn split_top_level(input: &str, sep: &str) -> Vec<String> {
     let mut brace_depth = 0_i32;
     let mut in_string = false;
     let mut escaped = false;
-    let bytes = input.as_bytes();
-    let sep_bytes = sep.as_bytes();
-    let mut i = 0_usize;
+    let mut chars = input.char_indices().peekable();
 
-    while i < bytes.len() {
-        let ch = bytes[i] as char;
+    while let Some((i, ch)) = chars.next() {
         if in_string {
             if escaped {
                 escaped = false;
@@ -20,7 +30,6 @@ pub(in super::super) fn split_top_level(input: &str, sep: &str) -> Vec<String> {
             } else if ch == '"' {
                 in_string = false;
             }
-            i += 1;
             continue;
         }
 
@@ -35,17 +44,14 @@ pub(in super::super) fn split_top_level(input: &str, sep: &str) -> Vec<String> {
             _ => {}
         }
 
-        if paren_depth == 0
-            && bracket_depth == 0
-            && brace_depth == 0
-            && bytes[i..].starts_with(sep_bytes)
+        if paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 && input[i..].starts_with(sep)
         {
             parts.push(input[start..i].trim().to_string());
-            i += sep.len();
-            start = i;
+            let next_index = i + sep.len();
+            skip_to_byte_boundary(&mut chars, next_index);
+            start = next_index;
             continue;
         }
-        i += 1;
     }
 
     parts.push(input[start..].trim().to_string());
@@ -61,12 +67,9 @@ pub(in super::super) fn split_once_top_level<'a>(
     let mut brace_depth = 0_i32;
     let mut in_string = false;
     let mut escaped = false;
-    let bytes = input.as_bytes();
-    let sep_bytes = sep.as_bytes();
-    let mut i = 0_usize;
+    let mut chars = input.char_indices().peekable();
 
-    while i < bytes.len() {
-        let ch = bytes[i] as char;
+    while let Some((i, ch)) = chars.next() {
         if in_string {
             if escaped {
                 escaped = false;
@@ -75,7 +78,6 @@ pub(in super::super) fn split_once_top_level<'a>(
             } else if ch == '"' {
                 in_string = false;
             }
-            i += 1;
             continue;
         }
 
@@ -90,17 +92,31 @@ pub(in super::super) fn split_once_top_level<'a>(
             _ => {}
         }
 
-        if paren_depth == 0
-            && bracket_depth == 0
-            && brace_depth == 0
-            && bytes[i..].starts_with(sep_bytes)
+        if paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 && input[i..].starts_with(sep)
         {
             let left = &input[..i];
             let right = &input[i + sep.len()..];
             return Some((left, right));
         }
-        i += 1;
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{split_once_top_level, split_top_level};
+
+    #[test]
+    fn split_top_level_handles_utf8_input() {
+        assert_eq!(
+            split_top_level("α,β,\"γ,δ\"", ","),
+            vec!["α".to_string(), "β".to_string(), "\"γ,δ\"".to_string()]
+        );
+    }
+
+    #[test]
+    fn split_once_top_level_handles_utf8_input() {
+        assert_eq!(split_once_top_level("α == β", " == "), Some(("α", "β")));
+    }
 }

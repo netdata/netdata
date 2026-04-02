@@ -1,3 +1,16 @@
+fn skip_to_byte_boundary(
+    iter: &mut std::iter::Peekable<std::str::CharIndices<'_>>,
+    next_index: usize,
+) {
+    while let Some(&(index, _)) = iter.peek() {
+        if index < next_index {
+            iter.next();
+        } else {
+            break;
+        }
+    }
+}
+
 pub(in super::super) fn split_top_level_keyword(input: &str, keyword: &str) -> Vec<String> {
     let mut parts = Vec::new();
     let mut start = 0_usize;
@@ -6,12 +19,9 @@ pub(in super::super) fn split_top_level_keyword(input: &str, keyword: &str) -> V
     let mut brace_depth = 0_i32;
     let mut in_string = false;
     let mut escaped = false;
-    let bytes = input.as_bytes();
-    let keyword_bytes = keyword.as_bytes();
-    let mut i = 0_usize;
+    let mut chars = input.char_indices().peekable();
 
-    while i < bytes.len() {
-        let ch = bytes[i] as char;
+    while let Some((i, ch)) = chars.next() {
         if in_string {
             if escaped {
                 escaped = false;
@@ -20,7 +30,6 @@ pub(in super::super) fn split_top_level_keyword(input: &str, keyword: &str) -> V
             } else if ch == '"' {
                 in_string = false;
             }
-            i += 1;
             continue;
         }
 
@@ -38,16 +47,15 @@ pub(in super::super) fn split_top_level_keyword(input: &str, keyword: &str) -> V
         if paren_depth == 0
             && bracket_depth == 0
             && brace_depth == 0
-            && bytes[i..].starts_with(keyword_bytes)
-            && is_keyword_boundary(input, i, keyword_bytes.len())
+            && input[i..].starts_with(keyword)
+            && is_keyword_boundary(input, i, keyword.len())
         {
             parts.push(input[start..i].trim().to_string());
-            i += keyword.len();
-            start = i;
+            let next_index = i + keyword.len();
+            skip_to_byte_boundary(&mut chars, next_index);
+            start = next_index;
             continue;
         }
-
-        i += 1;
     }
 
     parts.push(input[start..].trim().to_string());
@@ -63,12 +71,9 @@ pub(in super::super) fn split_once_top_level_keyword<'a>(
     let mut brace_depth = 0_i32;
     let mut in_string = false;
     let mut escaped = false;
-    let bytes = input.as_bytes();
-    let keyword_bytes = keyword.as_bytes();
-    let mut i = 0_usize;
+    let mut chars = input.char_indices().peekable();
 
-    while i < bytes.len() {
-        let ch = bytes[i] as char;
+    while let Some((i, ch)) = chars.next() {
         if in_string {
             if escaped {
                 escaped = false;
@@ -77,7 +82,6 @@ pub(in super::super) fn split_once_top_level_keyword<'a>(
             } else if ch == '"' {
                 in_string = false;
             }
-            i += 1;
             continue;
         }
 
@@ -95,14 +99,13 @@ pub(in super::super) fn split_once_top_level_keyword<'a>(
         if paren_depth == 0
             && bracket_depth == 0
             && brace_depth == 0
-            && bytes[i..].starts_with(keyword_bytes)
-            && is_keyword_boundary(input, i, keyword_bytes.len())
+            && input[i..].starts_with(keyword)
+            && is_keyword_boundary(input, i, keyword.len())
         {
             let left = &input[..i];
             let right = &input[i + keyword.len()..];
             return Some((left, right));
         }
-        i += 1;
     }
     None
 }
@@ -144,4 +147,29 @@ pub(in super::super) fn is_keyword_boundary(input: &str, start: usize, len: usiz
 
 fn is_identifier_char(ch: char) -> bool {
     ch.is_ascii_alphanumeric() || ch == '_' || ch == '.'
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{split_once_top_level_keyword, split_top_level_keyword};
+
+    #[test]
+    fn split_top_level_keyword_handles_utf8_input() {
+        assert_eq!(
+            split_top_level_keyword("α or β or contains(\"γ or δ\")", "or"),
+            vec![
+                "α".to_string(),
+                "β".to_string(),
+                "contains(\"γ or δ\")".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn split_once_top_level_keyword_handles_utf8_input() {
+        assert_eq!(
+            split_once_top_level_keyword("όνομα in λίστα", "in"),
+            Some(("όνομα ", " λίστα"))
+        );
+    }
 }

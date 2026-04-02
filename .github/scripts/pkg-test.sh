@@ -111,6 +111,8 @@ dump_log() {
 check_topology_ip_intel_stock() {
   stock_root="/usr/share/netdata/topology-ip-intel"
 
+  [ -d "${stock_root}" ] || return 0
+
   for path in \
     "${stock_root}/README.md" \
     "${stock_root}/topology-ip-asn.mmdb" \
