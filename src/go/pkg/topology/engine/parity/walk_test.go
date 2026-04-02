@@ -75,3 +75,19 @@ func TestWalkDatasetLookupCachesByOID(t *testing.T) {
 	require.Equal(t, "test-host", record.Value)
 	require.Contains(t, ds.byOID, "1.3.6.1.2.1.1.5.0")
 }
+
+func TestWalkDatasetSortedOIDs_UsesNumericOIDOrdering(t *testing.T) {
+	ds := WalkDataset{
+		Records: []WalkRecord{
+			{OID: "1.3.6.1.2.1.1.10.0"},
+			{OID: "1.3.6.1.2.1.1.2.0"},
+			{OID: "1.3.6.1.2.1.1.2.1"},
+		},
+	}
+
+	require.Equal(t, []string{
+		"1.3.6.1.2.1.1.2.0",
+		"1.3.6.1.2.1.1.2.1",
+		"1.3.6.1.2.1.1.10.0",
+	}, ds.SortedOIDs())
+}

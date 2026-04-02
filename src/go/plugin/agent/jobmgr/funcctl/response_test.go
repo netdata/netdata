@@ -143,3 +143,26 @@ func TestHandleJobMethodFuncInfo_UsesResponseType(t *testing.T) {
 
 	assert.Equal(t, "flows", (*resp)["type"])
 }
+
+func TestHandleMethodFuncInfo_IncludesPresentation(t *testing.T) {
+	controller, resp := newTestControllerWithCapture(t)
+
+	controller.registry.registerModule("snmp", collectorapi.Creator{
+		Methods: func() []funcapi.MethodConfig {
+			return []funcapi.MethodConfig{
+				funcapi.MethodConfig{
+					ID:           "topology:snmp",
+					ResponseType: "topology",
+				}.WithPresentation(map[string]any{
+					"actor_click_behavior": "highlight_connections",
+				}),
+			}
+		},
+	})
+
+	controller.handleMethodFuncInfo("snmp", "topology:snmp", functions.Function{})
+
+	presentation, ok := (*resp)["presentation"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "highlight_connections", presentation["actor_click_behavior"])
+}

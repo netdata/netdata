@@ -208,8 +208,8 @@ func (c *Controller) handleMethodFuncInfo(moduleName, methodID string, fn functi
 		"required_params": c.buildRequiredParams(moduleName, methodParams, includeJobParam),
 	}
 
-	if methodCfg.Presentation != nil {
-		resp["presentation"] = methodCfg.Presentation
+	if presentation := methodCfg.Presentation(); presentation != nil {
+		resp["presentation"] = presentation
 	}
 
 	c.respondJSON(fn, resp)
@@ -497,8 +497,8 @@ func (c *Controller) handleJobMethodFuncInfo(moduleName, jobName, methodID strin
 		"required_params": buildJobMethodRequiredParams(methodParams),
 	}
 
-	if methodCfg.Presentation != nil {
-		resp["presentation"] = methodCfg.Presentation
+	if presentation := methodCfg.Presentation(); presentation != nil {
+		resp["presentation"] = presentation
 	}
 
 	c.respondJSON(fn, resp)

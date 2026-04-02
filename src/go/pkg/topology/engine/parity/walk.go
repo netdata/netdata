@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -179,8 +180,52 @@ func (d WalkDataset) SortedOIDs() []string {
 	for _, rec := range d.Records {
 		oids = append(oids, rec.OID)
 	}
-	sort.Strings(oids)
+	sort.Slice(oids, func(i, j int) bool {
+		return compareOID(oids[i], oids[j]) < 0
+	})
 	return oids
+}
+
+func compareOID(a, b string) int {
+	partsA := strings.Split(a, ".")
+	partsB := strings.Split(b, ".")
+	limit := len(partsA)
+	if len(partsB) < limit {
+		limit = len(partsB)
+	}
+
+	for i := 0; i < limit; i++ {
+		if partsA[i] == partsB[i] {
+			continue
+		}
+
+		numA, errA := strconv.Atoi(partsA[i])
+		numB, errB := strconv.Atoi(partsB[i])
+		if errA == nil && errB == nil {
+			switch {
+			case numA < numB:
+				return -1
+			case numA > numB:
+				return 1
+			default:
+				continue
+			}
+		}
+
+		if partsA[i] < partsB[i] {
+			return -1
+		}
+		return 1
+	}
+
+	switch {
+	case len(partsA) < len(partsB):
+		return -1
+	case len(partsA) > len(partsB):
+		return 1
+	default:
+		return 0
+	}
 }
 
 func normalizeOID(v string) string {

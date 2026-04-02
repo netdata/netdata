@@ -47,6 +47,5 @@ func topologyMethodConfig() funcapi.MethodConfig {
 			topologyManagedFocusParamConfig(nil),
 			topologyDepthParamConfig(),
 		},
-		Presentation: snmpTopologyPresentation(),
-	}
+	}.WithPresentation(snmpTopologyPresentation())
 }

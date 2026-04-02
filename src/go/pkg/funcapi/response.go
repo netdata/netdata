@@ -13,7 +13,18 @@ type MethodConfig struct {
 	ResponseType   string        // Response schema type (default "table")
 	AgentWide      bool          // Method is agent-wide (does not require __job selector)
 	RequiredParams []ParamConfig // Required parameters for this method (including __sort if used)
-	Presentation   any           // Presentation metadata included in the info response when non-nil
+	presentation   any
+}
+
+// WithPresentation attaches optional presentation metadata to the method info response.
+func (cfg MethodConfig) WithPresentation(v any) MethodConfig {
+	cfg.presentation = v
+	return cfg
+}
+
+// Presentation returns optional presentation metadata for the method info response.
+func (cfg MethodConfig) Presentation() any {
+	return cfg.presentation
 }
 
 // FunctionResponse is the response from a module's HandleMethod.
