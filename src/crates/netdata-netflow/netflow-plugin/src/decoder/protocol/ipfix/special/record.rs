@@ -6,7 +6,7 @@ pub(crate) fn decode_ipfix_special_record(
     input_realtime_usec: u64,
     packet_realtime_usec: Option<u64>,
     sampling: &SamplingState,
-    exporter_ip: &str,
+    exporter_ip: IpAddr,
     observation_domain_id: u32,
     template: &IPFixDataLinkTemplate,
     values: &[&[u8]],

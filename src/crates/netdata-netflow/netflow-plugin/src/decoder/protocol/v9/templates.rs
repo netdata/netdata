@@ -29,7 +29,7 @@ pub(crate) fn observe_v9_templates_from_raw_payload(
         return false;
     }
 
-    let exporter_ip = source.ip().to_string();
+    let exporter_ip = source.ip();
     let observation_domain_id =
         u32::from_be_bytes([payload[16], payload[17], payload[18], payload[19]]);
     let mut offset = 20_usize;
@@ -49,7 +49,7 @@ pub(crate) fn observe_v9_templates_from_raw_payload(
 
         if flowset_id == 0 {
             changed |= observe_v9_data_templates(
-                &exporter_ip,
+                exporter_ip,
                 observation_domain_id,
                 body,
                 sampling,
@@ -64,7 +64,7 @@ pub(crate) fn observe_v9_templates_from_raw_payload(
 }
 
 pub(crate) fn observe_v9_data_templates(
-    exporter_ip: &str,
+    exporter_ip: IpAddr,
     observation_domain_id: u32,
     body: &[u8],
     sampling: &mut SamplingState,

@@ -10,7 +10,7 @@ pub(crate) fn append_v9_records(
     input_realtime_usec: u64,
 ) {
     let export_usec = unix_timestamp_to_usec(packet.header.unix_secs as u64, 0);
-    let exporter_ip = source.ip().to_string();
+    let exporter_ip = source.ip();
     let observation_domain_id = packet.header.source_id;
     let version = 9_u16;
     let system_init_usec = netflow_v9_system_init_usec(
@@ -61,7 +61,7 @@ pub(crate) fn append_v9_records(
 
                     apply_sampling_state_record(
                         &mut rec,
-                        &exporter_ip,
+                        exporter_ip,
                         version,
                         observation_domain_id,
                         sampler_id,
@@ -101,7 +101,7 @@ pub(crate) fn append_v9_records(
             }
             V9FlowSetBody::OptionsData(options_data) => {
                 observe_v9_sampling_options(
-                    &exporter_ip,
+                    exporter_ip,
                     version,
                     observation_domain_id,
                     sampling,

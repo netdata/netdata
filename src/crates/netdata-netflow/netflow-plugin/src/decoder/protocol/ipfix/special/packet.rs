@@ -17,7 +17,7 @@ pub(crate) fn decode_ipfix_special_from_raw_payload(
 
     let export_time = u32::from_be_bytes([payload[4], payload[5], payload[6], payload[7]]) as u64;
     let packet_realtime_usec = Some(unix_timestamp_to_usec(export_time, 0));
-    let exporter_ip = source.ip().to_string();
+    let exporter_ip = source.ip();
     let observation_domain_id =
         u32::from_be_bytes([payload[12], payload[13], payload[14], payload[15]]);
     let packet_length = u16::from_be_bytes([payload[2], payload[3]]) as usize;
@@ -38,11 +38,8 @@ pub(crate) fn decode_ipfix_special_from_raw_payload(
         let body = &payload[offset + 4..end];
 
         if flowset_id >= 256
-            && let Some(template) = sampling.get_ipfix_datalink_template(
-                &exporter_ip,
-                observation_domain_id,
-                flowset_id,
-            )
+            && let Some(template) =
+                sampling.get_ipfix_datalink_template(exporter_ip, observation_domain_id, flowset_id)
         {
             let mut cursor = body;
             while !cursor.is_empty() {
@@ -60,7 +57,7 @@ pub(crate) fn decode_ipfix_special_from_raw_payload(
                     input_realtime_usec,
                     packet_realtime_usec,
                     sampling,
-                    &exporter_ip,
+                    exporter_ip,
                     observation_domain_id,
                     &template,
                     &record_values,
@@ -87,7 +84,7 @@ mod tests {
     fn zero_length_ipfix_special_records_do_not_loop_forever() {
         let mut sampling = SamplingState::default();
         sampling.set_ipfix_datalink_template(
-            "192.0.2.10",
+            "192.0.2.10".parse().unwrap(),
             7,
             256,
             vec![IPFixTemplateField {

@@ -43,23 +43,25 @@ pub(crate) fn format_with_percent_placeholders(
     while let Some(ch) = chars.next() {
         if ch == '%' {
             match chars.peek().copied() {
-                Some('s') | Some('v') => {
+                Some(spec @ ('s' | 'v')) => {
                     chars.next();
-                    if let Some(arg) = args.get(arg_idx) {
-                        out.push_str(&arg.to_string_value());
-                        arg_idx += 1;
-                    }
+                    let arg = args.get(arg_idx).with_context(|| {
+                        format!("placeholder %{} is missing argument {}", spec, arg_idx)
+                    })?;
+                    out.push_str(&arg.to_string_value());
+                    arg_idx += 1;
                     continue;
                 }
                 Some('d') => {
                     chars.next();
-                    if let Some(arg) = args.get(arg_idx) {
-                        let value = arg.to_i64().with_context(|| {
-                            format!("placeholder %{} expects a numeric value", 'd')
-                        })?;
-                        out.push_str(&value.to_string());
-                        arg_idx += 1;
-                    }
+                    let arg = args.get(arg_idx).with_context(|| {
+                        format!("placeholder %{} is missing argument {}", 'd', arg_idx)
+                    })?;
+                    let value = arg
+                        .to_i64()
+                        .with_context(|| format!("placeholder %{} expects a numeric value", 'd'))?;
+                    out.push_str(&value.to_string());
+                    arg_idx += 1;
                     continue;
                 }
                 Some('%') => {
@@ -110,5 +112,14 @@ mod tests {
                 .unwrap_err();
 
         assert!(err.to_string().contains("expects a numeric value"));
+    }
+
+    #[test]
+    fn format_with_percent_placeholders_rejects_missing_arguments() {
+        let err =
+            format_with_percent_placeholders("asn-%s-%d", &[ResolvedValue::String("edge".into())])
+                .unwrap_err();
+
+        assert!(err.to_string().contains("missing argument"));
     }
 }

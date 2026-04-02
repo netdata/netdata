@@ -9,7 +9,7 @@ fn has_positive_sampling_rate_field(fields: &FlowFields) -> bool {
 
 pub(crate) fn apply_sampling_state_record(
     rec: &mut FlowRecord,
-    exporter_ip: &str,
+    exporter_ip: IpAddr,
     version: u16,
     observation_domain_id: u32,
     sampler_id: Option<u64>,
@@ -37,7 +37,7 @@ pub(crate) fn apply_sampling_state_record(
 
 pub(crate) fn apply_sampling_state_fields(
     fields: &mut FlowFields,
-    exporter_ip: &str,
+    exporter_ip: IpAddr,
     version: u16,
     observation_domain_id: u32,
     sampler_id: Option<u64>,
@@ -85,9 +85,10 @@ mod tests {
     fn apply_sampling_state_fields_replaces_zero_with_learned_rate() {
         let mut fields = BTreeMap::from([("SAMPLING_RATE", "0".to_string())]);
         let mut sampling = SamplingState::default();
-        sampling.set("192.0.2.10", 9, 20, 7, 4000);
+        let exporter_ip = "192.0.2.10".parse().unwrap();
+        sampling.set(exporter_ip, 9, 20, 7, 4000);
 
-        apply_sampling_state_fields(&mut fields, "192.0.2.10", 9, 20, Some(7), None, &sampling);
+        apply_sampling_state_fields(&mut fields, exporter_ip, 9, 20, Some(7), None, &sampling);
 
         assert_eq!(
             fields.get("SAMPLING_RATE").map(String::as_str),
@@ -99,9 +100,10 @@ mod tests {
     fn apply_sampling_state_fields_replaces_invalid_with_learned_rate() {
         let mut fields = BTreeMap::from([("SAMPLING_RATE", "invalid".to_string())]);
         let mut sampling = SamplingState::default();
-        sampling.set("192.0.2.10", 9, 20, 7, 4000);
+        let exporter_ip = "192.0.2.10".parse().unwrap();
+        sampling.set(exporter_ip, 9, 20, 7, 4000);
 
-        apply_sampling_state_fields(&mut fields, "192.0.2.10", 9, 20, Some(7), None, &sampling);
+        apply_sampling_state_fields(&mut fields, exporter_ip, 9, 20, Some(7), None, &sampling);
 
         assert_eq!(
             fields.get("SAMPLING_RATE").map(String::as_str),
@@ -115,9 +117,10 @@ mod tests {
         rec.set_sampling_rate(0);
 
         let mut sampling = SamplingState::default();
-        sampling.set("192.0.2.10", 9, 20, 7, 4000);
+        let exporter_ip = "192.0.2.10".parse().unwrap();
+        sampling.set(exporter_ip, 9, 20, 7, 4000);
 
-        apply_sampling_state_record(&mut rec, "192.0.2.10", 9, 20, Some(7), None, &sampling);
+        apply_sampling_state_record(&mut rec, exporter_ip, 9, 20, Some(7), None, &sampling);
 
         assert!(rec.has_sampling_rate());
         assert_eq!(rec.sampling_rate, 4000);

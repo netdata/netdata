@@ -43,7 +43,7 @@ fn build_reverse_ipfix_flow(
 pub(crate) fn finalize_ipfix_record(
     mut rec: FlowRecord,
     mut state: IPFixRecordBuildState,
-    exporter_ip: &str,
+    exporter_ip: IpAddr,
     version: u16,
     observation_domain_id: u32,
     sampling: &mut SamplingState,

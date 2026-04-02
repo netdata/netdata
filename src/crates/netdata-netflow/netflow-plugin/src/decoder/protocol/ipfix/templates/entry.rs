@@ -27,7 +27,7 @@ pub(crate) fn observe_ipfix_templates_from_raw_payload(
         return false;
     }
 
-    let exporter_ip = source.ip().to_string();
+    let exporter_ip = source.ip();
     let observation_domain_id =
         u32::from_be_bytes([payload[12], payload[13], payload[14], payload[15]]);
     let packet_length = u16::from_be_bytes([payload[2], payload[3]]) as usize;
@@ -49,7 +49,7 @@ pub(crate) fn observe_ipfix_templates_from_raw_payload(
 
         if flowset_id == IPFIX_SET_ID_TEMPLATE {
             changed |= observe_ipfix_data_templates(
-                &exporter_ip,
+                exporter_ip,
                 observation_domain_id,
                 body,
                 sampling,

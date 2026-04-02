@@ -16,7 +16,7 @@ pub(crate) fn observe_v9_sampling_from_raw_payload(
         return false;
     }
 
-    let exporter_ip = source.ip().to_string();
+    let exporter_ip = source.ip();
     let observation_domain_id =
         u32::from_be_bytes([payload[16], payload[17], payload[18], payload[19]]);
     let mut offset = 20_usize;
@@ -36,7 +36,7 @@ pub(crate) fn observe_v9_sampling_from_raw_payload(
 
         if flowset_id == 1 {
             changed |= observe_v9_sampling_templates(
-                &exporter_ip,
+                exporter_ip,
                 observation_domain_id,
                 body,
                 sampling,
@@ -44,10 +44,10 @@ pub(crate) fn observe_v9_sampling_from_raw_payload(
             );
         } else if flowset_id >= 256
             && let Some(template) =
-                sampling.get_v9_sampling_template(&exporter_ip, observation_domain_id, flowset_id)
+                sampling.get_v9_sampling_template(exporter_ip, observation_domain_id, flowset_id)
         {
             changed |= observe_v9_sampling_data(
-                &exporter_ip,
+                exporter_ip,
                 observation_domain_id,
                 &template,
                 body,
@@ -63,7 +63,7 @@ pub(crate) fn observe_v9_sampling_from_raw_payload(
 }
 
 pub(crate) fn observe_v9_sampling_templates(
-    exporter_ip: &str,
+    exporter_ip: IpAddr,
     observation_domain_id: u32,
     body: &[u8],
     sampling: &mut SamplingState,
@@ -135,7 +135,7 @@ pub(crate) fn observe_v9_sampling_templates(
 }
 
 pub(crate) fn observe_v9_sampling_data(
-    exporter_ip: &str,
+    exporter_ip: IpAddr,
     observation_domain_id: u32,
     template: &V9SamplingTemplate,
     body: &[u8],

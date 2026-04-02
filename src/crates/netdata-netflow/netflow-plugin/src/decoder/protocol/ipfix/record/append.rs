@@ -10,7 +10,7 @@ pub(crate) fn append_ipfix_records(
     input_realtime_usec: u64,
 ) {
     let export_usec = unix_timestamp_to_usec(packet.header.export_time as u64, 0);
-    let exporter_ip = source.ip().to_string();
+    let exporter_ip = source.ip();
     let observation_domain_id = packet.header.observation_domain_id;
     let version = 10_u16;
 
@@ -36,7 +36,7 @@ pub(crate) fn append_ipfix_records(
                     let Some((forward, reverse)) = finalize_ipfix_record(
                         rec,
                         state,
-                        &exporter_ip,
+                        exporter_ip,
                         version,
                         observation_domain_id,
                         sampling,
@@ -56,7 +56,7 @@ pub(crate) fn append_ipfix_records(
             }
             IPFixFlowSetBody::OptionsData(options_data) => {
                 observe_ipfix_sampling_options(
-                    &exporter_ip,
+                    exporter_ip,
                     version,
                     observation_domain_id,
                     sampling,

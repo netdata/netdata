@@ -3,7 +3,7 @@ use super::*;
 impl SamplingState {
     pub(crate) fn set_v9_sampling_template(
         &mut self,
-        exporter_ip: &str,
+        exporter_ip: IpAddr,
         observation_domain_id: u32,
         template_id: u16,
         scope_fields: Vec<V9TemplateField>,
@@ -22,7 +22,7 @@ impl SamplingState {
         }
 
         self.v9_sampling_templates
-            .entry(exporter_ip.to_string())
+            .entry(exporter_ip)
             .or_default()
             .entry(observation_domain_id)
             .or_default()
@@ -38,7 +38,7 @@ impl SamplingState {
 
     pub(crate) fn set_v9_datalink_template(
         &mut self,
-        exporter_ip: &str,
+        exporter_ip: IpAddr,
         observation_domain_id: u32,
         template_id: u16,
         fields: Vec<V9TemplateField>,
@@ -51,7 +51,7 @@ impl SamplingState {
         }
 
         self.v9_datalink_templates
-            .entry(exporter_ip.to_string())
+            .entry(exporter_ip)
             .or_default()
             .entry(observation_domain_id)
             .or_default()
@@ -60,12 +60,12 @@ impl SamplingState {
 
     pub(crate) fn get_v9_sampling_template(
         &self,
-        exporter_ip: &str,
+        exporter_ip: IpAddr,
         observation_domain_id: u32,
         template_id: u16,
     ) -> Option<V9SamplingTemplate> {
         self.v9_sampling_templates
-            .get(exporter_ip)
+            .get(&exporter_ip)
             .and_then(|domains| domains.get(&observation_domain_id))
             .and_then(|templates| templates.get(&template_id))
             .cloned()
@@ -73,12 +73,12 @@ impl SamplingState {
 
     pub(crate) fn get_v9_datalink_template(
         &self,
-        exporter_ip: &str,
+        exporter_ip: IpAddr,
         observation_domain_id: u32,
         template_id: u16,
     ) -> Option<V9DataLinkTemplate> {
         self.v9_datalink_templates
-            .get(exporter_ip)
+            .get(&exporter_ip)
             .and_then(|domains| domains.get(&observation_domain_id))
             .and_then(|templates| templates.get(&template_id))
             .cloned()
@@ -86,7 +86,7 @@ impl SamplingState {
 
     pub(crate) fn set_ipfix_datalink_template(
         &mut self,
-        exporter_ip: &str,
+        exporter_ip: IpAddr,
         observation_domain_id: u32,
         template_id: u16,
         fields: Vec<IPFixTemplateField>,
@@ -102,7 +102,7 @@ impl SamplingState {
         }
 
         self.ipfix_datalink_templates
-            .entry(exporter_ip.to_string())
+            .entry(exporter_ip)
             .or_default()
             .entry(observation_domain_id)
             .or_default()
@@ -111,12 +111,12 @@ impl SamplingState {
 
     pub(crate) fn get_ipfix_datalink_template(
         &self,
-        exporter_ip: &str,
+        exporter_ip: IpAddr,
         observation_domain_id: u32,
         template_id: u16,
     ) -> Option<IPFixDataLinkTemplate> {
         self.ipfix_datalink_templates
-            .get(exporter_ip)
+            .get(&exporter_ip)
             .and_then(|domains| domains.get(&observation_domain_id))
             .and_then(|templates| templates.get(&template_id))
             .cloned()
@@ -140,14 +140,15 @@ mod tests {
     #[test]
     fn v9_templates_round_trip_and_clear_per_namespace() {
         let mut state = SamplingState::default();
+        let exporter_ip = "10.0.0.1".parse().unwrap();
         let field = V9TemplateField {
             field_type: 1,
             field_length: 8,
         };
 
-        state.set_v9_sampling_template("10.0.0.1", 100, 256, vec![field], vec![field]);
+        state.set_v9_sampling_template(exporter_ip, 100, 256, vec![field], vec![field]);
         state.set_v9_datalink_template(
-            "10.0.0.1",
+            exporter_ip,
             100,
             257,
             vec![V9TemplateField {
@@ -155,39 +156,39 @@ mod tests {
                 field_length: 32,
             }],
         );
-        state.set_v9_sampling_template("10.0.0.1", 200, 300, vec![field], vec![field]);
+        state.set_v9_sampling_template(exporter_ip, 200, 300, vec![field], vec![field]);
 
         assert!(
             state
-                .get_v9_sampling_template("10.0.0.1", 100, 256)
+                .get_v9_sampling_template(exporter_ip, 100, 256)
                 .is_some()
         );
         assert!(
             state
-                .get_v9_datalink_template("10.0.0.1", 100, 257)
+                .get_v9_datalink_template(exporter_ip, 100, 257)
                 .is_some()
         );
         assert!(
             state
-                .get_v9_sampling_template("10.0.0.1", 200, 300)
+                .get_v9_sampling_template(exporter_ip, 200, 300)
                 .is_some()
         );
 
-        state.clear_namespace("10.0.0.1", 100);
+        state.clear_namespace(exporter_ip, 100);
 
         assert!(
             state
-                .get_v9_sampling_template("10.0.0.1", 100, 256)
+                .get_v9_sampling_template(exporter_ip, 100, 256)
                 .is_none()
         );
         assert!(
             state
-                .get_v9_datalink_template("10.0.0.1", 100, 257)
+                .get_v9_datalink_template(exporter_ip, 100, 257)
                 .is_none()
         );
         assert!(
             state
-                .get_v9_sampling_template("10.0.0.1", 200, 300)
+                .get_v9_sampling_template(exporter_ip, 200, 300)
                 .is_some()
         );
     }
@@ -195,9 +196,10 @@ mod tests {
     #[test]
     fn ipfix_templates_round_trip_and_clear_per_namespace() {
         let mut state = SamplingState::default();
+        let exporter_ip = "10.0.0.2".parse().unwrap();
 
         state.set_ipfix_datalink_template(
-            "10.0.0.2",
+            exporter_ip,
             400,
             512,
             vec![IPFixTemplateField {
@@ -209,15 +211,15 @@ mod tests {
 
         assert!(
             state
-                .get_ipfix_datalink_template("10.0.0.2", 400, 512)
+                .get_ipfix_datalink_template(exporter_ip, 400, 512)
                 .is_some()
         );
 
-        state.clear_namespace("10.0.0.2", 400);
+        state.clear_namespace(exporter_ip, 400);
 
         assert!(
             state
-                .get_ipfix_datalink_template("10.0.0.2", 400, 512)
+                .get_ipfix_datalink_template(exporter_ip, 400, 512)
                 .is_none()
         );
     }

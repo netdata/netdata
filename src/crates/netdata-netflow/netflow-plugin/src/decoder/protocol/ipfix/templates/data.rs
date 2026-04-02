@@ -5,7 +5,7 @@ fn bounded_ipfix_data_field_capacity(field_count: usize, remaining_bytes: usize)
 }
 
 pub(crate) fn observe_ipfix_data_templates(
-    exporter_ip: &str,
+    exporter_ip: IpAddr,
     observation_domain_id: u32,
     body: &[u8],
     sampling: &mut SamplingState,
@@ -85,9 +85,10 @@ mod tests {
         let mut sampling = SamplingState::default();
         let mut namespace = DecoderStateNamespace::default();
         let body = [0x01, 0x00, 0xff, 0xff];
+        let exporter_ip = "192.0.2.1".parse().unwrap();
 
         let changed =
-            observe_ipfix_data_templates("192.0.2.1", 42, &body, &mut sampling, &mut namespace);
+            observe_ipfix_data_templates(exporter_ip, 42, &body, &mut sampling, &mut namespace);
 
         assert!(!changed);
         assert!(namespace.ipfix_templates.is_empty());
@@ -99,6 +100,7 @@ mod tests {
         let mut sampling = SamplingState::default();
         let mut namespace = DecoderStateNamespace::default();
         let template_id = 0x0100;
+        let exporter_ip = "192.0.2.1".parse().unwrap();
         assert!(namespace.set_ipfix_template(
             template_id,
             vec![PersistedIPFixTemplateField {
@@ -110,7 +112,7 @@ mod tests {
 
         let body = [0x01, 0x00, 0x00, 0x00];
         let changed =
-            observe_ipfix_data_templates("192.0.2.1", 42, &body, &mut sampling, &mut namespace);
+            observe_ipfix_data_templates(exporter_ip, 42, &body, &mut sampling, &mut namespace);
 
         assert!(!changed);
         assert_eq!(

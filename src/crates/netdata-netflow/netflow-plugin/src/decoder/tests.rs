@@ -682,7 +682,12 @@ fn akvorado_v9_data_fixture_all_flows_match_expected_projection() {
 #[test]
 fn akvorado_v9_data_fixture_vxlan_mode_keeps_standard_records() {
     let flows = decode_fixture_sequence_with_mode(
-        &["options-template.pcap", "options-data.pcap", "template.pcap", "data.pcap"],
+        &[
+            "options-template.pcap",
+            "options-data.pcap",
+            "template.pcap",
+            "data.pcap",
+        ],
         DecapsulationMode::Vxlan,
     );
 
@@ -1005,7 +1010,7 @@ fn icmp_fallback_uses_dst_port_when_src_port_missing() {
 
 #[test]
 fn sampling_state_is_scoped_by_version_and_observation_domain() {
-    let exporter = "203.0.113.10";
+    let exporter = "203.0.113.10".parse().unwrap();
     let mut sampling = SamplingState::default();
     sampling.set(exporter, 9, 11, 7, 100);
     sampling.set(exporter, 9, 12, 7, 200);

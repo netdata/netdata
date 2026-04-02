@@ -19,7 +19,7 @@ pub(crate) fn decode_v9_special_from_raw_payload(
         u32::from_be_bytes([payload[4], payload[5], payload[6], payload[7]]) as u64;
     let export_time = u32::from_be_bytes([payload[8], payload[9], payload[10], payload[11]]) as u64;
     let packet_realtime_usec = Some(unix_timestamp_to_usec(export_time, 0));
-    let exporter_ip = source.ip().to_string();
+    let exporter_ip = source.ip();
     let observation_domain_id =
         u32::from_be_bytes([payload[16], payload[17], payload[18], payload[19]]);
     let mut offset = 20_usize;
@@ -39,7 +39,7 @@ pub(crate) fn decode_v9_special_from_raw_payload(
 
         if flowset_id >= 256
             && let Some(template) =
-                sampling.get_v9_datalink_template(&exporter_ip, observation_domain_id, flowset_id)
+                sampling.get_v9_datalink_template(exporter_ip, observation_domain_id, flowset_id)
         {
             let mut cursor = body;
             while !cursor.is_empty() {
@@ -56,7 +56,7 @@ pub(crate) fn decode_v9_special_from_raw_payload(
                     export_time,
                     sys_uptime_millis,
                     sampling,
-                    &exporter_ip,
+                    exporter_ip,
                     observation_domain_id,
                     &template,
                     &record_values,
@@ -103,7 +103,7 @@ pub(crate) fn decode_v9_special_record(
     export_time_seconds: u64,
     sys_uptime_millis: u64,
     sampling: &SamplingState,
-    exporter_ip: &str,
+    exporter_ip: IpAddr,
     observation_domain_id: u32,
     template: &V9DataLinkTemplate,
     values: &[&[u8]],

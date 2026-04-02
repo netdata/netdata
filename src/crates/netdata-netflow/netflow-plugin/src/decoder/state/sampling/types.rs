@@ -2,13 +2,13 @@ use super::*;
 
 #[derive(Debug, Default)]
 pub(crate) struct SamplingState {
-    pub(crate) by_exporter: HashMap<String, HashMap<SamplingKey, u64>>,
+    pub(crate) by_exporter: HashMap<IpAddr, HashMap<SamplingKey, u64>>,
     pub(crate) v9_sampling_templates:
-        HashMap<String, HashMap<u32, HashMap<u16, V9SamplingTemplate>>>,
+        HashMap<IpAddr, HashMap<u32, HashMap<u16, V9SamplingTemplate>>>,
     pub(crate) v9_datalink_templates:
-        HashMap<String, HashMap<u32, HashMap<u16, V9DataLinkTemplate>>>,
+        HashMap<IpAddr, HashMap<u32, HashMap<u16, V9DataLinkTemplate>>>,
     pub(crate) ipfix_datalink_templates:
-        HashMap<String, HashMap<u32, HashMap<u16, IPFixDataLinkTemplate>>>,
+        HashMap<IpAddr, HashMap<u32, HashMap<u16, IPFixDataLinkTemplate>>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

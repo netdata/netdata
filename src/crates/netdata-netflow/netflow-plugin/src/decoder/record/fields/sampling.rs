@@ -1,7 +1,7 @@
 use super::*;
 
 pub(crate) fn observe_v9_sampling_options(
-    exporter_ip: &str,
+    exporter_ip: IpAddr,
     version: u16,
     observation_domain_id: u32,
     sampling: &mut SamplingState,
@@ -41,7 +41,7 @@ pub(crate) fn observe_v9_sampling_options(
 }
 
 pub(crate) fn observe_ipfix_sampling_options(
-    exporter_ip: &str,
+    exporter_ip: IpAddr,
     version: u16,
     observation_domain_id: u32,
     sampling: &mut SamplingState,
