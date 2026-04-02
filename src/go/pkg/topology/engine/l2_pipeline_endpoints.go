@@ -101,7 +101,7 @@ func (s *l2BuildState) applyARP(observations []L2Observation) {
 				}
 			}
 
-			protocol := canonicalProtocol(entry.Protocol)
+			protocol := canonicalARPProtocol(entry.Protocol)
 			acc.Protocols[protocol] = struct{}{}
 			acc.DeviceIDs[sourceID] = struct{}{}
 			if entry.IfIndex > 0 {

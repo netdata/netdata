@@ -4,7 +4,7 @@ package engine
 
 import "strings"
 
-func canonicalProtocol(protocol string) string {
+func canonicalARPProtocol(protocol string) string {
 	protocol = strings.TrimSpace(strings.ToLower(protocol))
 	if protocol == "" {
 		return "arp"

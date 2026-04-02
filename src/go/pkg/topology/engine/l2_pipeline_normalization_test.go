@@ -24,6 +24,11 @@ func TestCanonicalAddrType_PrefersIPFamilyAndFallsBack(t *testing.T) {
 	require.Equal(t, "", canonicalAddrType("", "not-an-ip"))
 }
 
+func TestCanonicalARPProtocol_DefaultsToARP(t *testing.T) {
+	require.Equal(t, "arp", canonicalARPProtocol(""))
+	require.Equal(t, "nd", canonicalARPProtocol(" ND "))
+}
+
 func TestDeriveRemoteDeviceID_PreferenceOrder(t *testing.T) {
 	require.Equal(t, "switch-a", deriveRemoteDeviceID("Switch-A.", "00:11:22:33:44:55", "10.0.0.1", "fallback"))
 	require.Equal(t, "chassis-001122334455", deriveRemoteDeviceID("", "00:11:22:33:44:55", "10.0.0.1", "fallback"))
