@@ -289,7 +289,7 @@ int netdata_main(int argc, char **argv) {
     // parse options
     {
         int num_opts = sizeof(option_definitions) / sizeof(struct option_def);
-        char optstring[(num_opts * 2) + 1];
+        char optstring[(sizeof(option_definitions) / sizeof(option_definitions[0]) * 2) + 1];
 
         int string_i = 0;
         for( i = 0; i < num_opts; i++ ) {
@@ -667,7 +667,7 @@ int netdata_main(int argc, char **argv) {
                             const char *haystack = argv[optind];
                             const char *needle = argv[optind + 1];
                             size_t len = strlen(needle) + 1;
-                            char wildcarded[len];
+                            CLEAN_CHAR_P *wildcarded = mallocz(len);
 
                             SIMPLE_PATTERN *p = simple_pattern_create(haystack, NULL, SIMPLE_PATTERN_EXACT, true);
                             SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_extract(p, needle, wildcarded, len);

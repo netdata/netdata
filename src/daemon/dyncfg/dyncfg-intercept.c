@@ -110,8 +110,9 @@ static void dyncfg_log_user_action(DYNCFG *df, struct dyncfg_call *dc) {
 // we intercept the config function calls of the plugin
 
 static void dyncfg_function_intercept_job_successfully_added(DYNCFG *df_template, int code, struct dyncfg_call *dc) {
-    char id[strlen(dc->id) + 1 + strlen(dc->add_name) + 1];
-    snprintfz(id, sizeof(id), "%s:%s", dc->id, dc->add_name);
+    size_t id_size = strlen(dc->id) + strlen(dc->add_name) + 2;
+    CLEAN_CHAR_P *id = mallocz(id_size);
+    snprintfz(id, id_size, "%s:%s", dc->id, dc->add_name);
 
     RRDHOST *host = dyncfg_rrdhost(df_template);
     if(!host) {
@@ -274,8 +275,7 @@ static int dyncfg_intercept_early_error(struct rrd_function_execute *rfe, int rc
 }
 
 const DICTIONARY_ITEM *dyncfg_get_template_of_new_job(const char *job_id) {
-    char id_copy[strlen(job_id) + 1];
-    memcpy(id_copy, job_id, sizeof(id_copy));
+    CLEAN_CHAR_P *id_copy = strdupz(job_id);
 
     char *colon = strrchr(id_copy, ':');
     if(!colon) return NULL;
@@ -305,8 +305,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
     DYNCFG_CMDS cmd;
     const DICTIONARY_ITEM *item = NULL;
 
-    char buf[strlen(rfe->function) + 1];
-    memcpy(buf, rfe->function, sizeof(buf));
+    CLEAN_CHAR_P *buf = strdupz(rfe->function);
 
     char *words[20];
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, 20);
@@ -346,8 +345,9 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
                 "dyncfg functions intercept: this action requires a name");
 
         if(!called_from_dyncfg_echo) {
-            char nid[strlen(id) + strlen(add_name) + 2];
-            snprintfz(nid, sizeof(nid), "%s:%s", id, add_name);
+            size_t nid_size = strlen(id) + strlen(add_name) + 2;
+            CLEAN_CHAR_P *nid = mallocz(nid_size);
+            snprintfz(nid, nid_size, "%s:%s", id, add_name);
 
             if (cmd == DYNCFG_CMD_ADD && dictionary_get(dyncfg_globals.nodes, nid))
                 return dyncfg_intercept_early_error(
@@ -538,4 +538,3 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
     return rc;
 }
-
