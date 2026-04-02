@@ -242,7 +242,7 @@ Self-signed certificates are suitable for testing and development environments. 
 
 1. **Let's Encrypt (Recommended for public-facing instances)**
    - Free, automated certificate authority
-   - Requires public DNS resolution and port 80/443 access
+   - For HTTP-01/TLS-ALPN-01, requires public DNS plus inbound ports 80/443, or use DNS-01 if those ports aren’t available
    - Certificates auto-renew with proper configuration
    - Install using [Certbot](https://certbot.eff.org/) or other ACME clients
    - Certificates are issued in PEM format, compatible with Netdata
