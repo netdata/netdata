@@ -148,6 +148,19 @@ typedef struct {
     char host_actor_id[NV_TOPOLOGY_KEY_MAX];
 } NV_TOPOLOGY_RENDER_STATE;
 
+typedef struct nv_process_socket_row {
+    char remote[128];
+    char protocol[8];
+    char direction[16];
+    char state[32];
+    struct nv_process_socket_row *next;
+} NV_PROCESS_SOCKET_ROW;
+
+typedef struct {
+    NV_PROCESS_SOCKET_ROW *head;
+    NV_PROCESS_SOCKET_ROW *tail;
+} NV_PROCESS_SOCKET_ROWS;
+
 #define SIMPLE_HASHTABLE_VALUE_TYPE LOCAL_SOCKET *
 #define SIMPLE_HASHTABLE_NAME _AGGREGATED_SOCKETS
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
@@ -224,7 +237,7 @@ static inline void topology_options_defaults(NV_TOPOLOGY_OPTIONS *opts) {
     opts->protocols_ipv6_tcp = true;
     opts->protocols_ipv4_udp = true;
     opts->protocols_ipv6_udp = true;
-    opts->endpoints_by_as = true; // default: by_as
+    opts->endpoints_by_as = false; // default: by_ip
 }
 
 static inline bool topology_sockets_any_enabled(const NV_TOPOLOGY_OPTIONS *opts) {
@@ -287,7 +300,7 @@ static void topology_parse_options(const char *function, NV_TOPOLOGY_OPTIONS *op
         }
 
         if(strcmp(param, "endpoints:by_as") == 0 || strcmp(param, "endpoints:by-as") == 0) {
-            opts->endpoints_by_as = true;
+            opts->endpoints_by_as = false;
             continue;
         }
         if(strcmp(param, "endpoints:by_ip") == 0 || strcmp(param, "endpoints:by-ip") == 0) {
@@ -791,13 +804,8 @@ static void topology_actor_id_for_remote_endpoint(const NV_TOPOLOGY_CONTEXT *ctx
     if(!dst || !dst_size)
         return;
 
-    bool private_endpoint = topology_endpoint_address_space_is_private(address_space);
-    bool endpoint_by_as = (ctx && ctx->options.endpoints_by_as);
-
-    // AS grouping is intentionally staged with the shared IP->AS resolver rollout.
-    // Until AS data is available in this plugin, fall back to IP identity for non-private endpoints too.
-    (void)private_endpoint;
-    (void)endpoint_by_as;
+    (void)ctx;
+    (void)address_space;
     if(ip && *ip)
         snprintf(dst, dst_size, "ip:%s", ip);
     else
@@ -1371,6 +1379,66 @@ static void topology_context_destroy(NV_TOPOLOGY_CONTEXT *ctx) {
         dictionary_destroy(ctx->process_actors);
 }
 
+static DICTIONARY *topology_build_process_socket_index(const NV_TOPOLOGY_CONTEXT *ctx) {
+    if(!ctx || !ctx->links)
+        return NULL;
+
+    DICTIONARY *index = dictionary_create_advanced(
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+        NULL,
+        sizeof(NV_PROCESS_SOCKET_ROWS));
+    if(!index)
+        return NULL;
+
+    NV_TOPOLOGY_LINK *link;
+    dfe_start_read(ctx->links, link) {
+        char process_actor_id[NV_TOPOLOGY_KEY_MAX];
+        topology_actor_id_for_process(ctx, link->pid, link->uid, link->net_ns_inode, link->process, process_actor_id, sizeof(process_actor_id));
+
+        NV_PROCESS_SOCKET_ROWS *rows = dictionary_get(index, process_actor_id);
+        if(!rows) {
+            NV_PROCESS_SOCKET_ROWS tmp = { 0 };
+            rows = dictionary_set(index, process_actor_id, &tmp, sizeof(tmp));
+        }
+
+        if(!rows)
+            continue;
+
+        NV_PROCESS_SOCKET_ROW *row = callocz(1, sizeof(*row));
+        snprintf(row->remote, sizeof(row->remote), "%s:%u", link->remote_ip, link->remote_port);
+        snprintf(row->protocol, sizeof(row->protocol), "%s", link->protocol);
+        snprintf(row->direction, sizeof(row->direction), "%s", link->direction);
+        snprintf(row->state, sizeof(row->state), "%s", link->state);
+
+        if(rows->tail)
+            rows->tail->next = row;
+        else
+            rows->head = row;
+        rows->tail = row;
+    }
+    dfe_done(link);
+
+    return index;
+}
+
+static void topology_destroy_process_socket_index(DICTIONARY *index) {
+    if(!index)
+        return;
+
+    NV_PROCESS_SOCKET_ROWS *rows;
+    dfe_start_read(index, rows) {
+        NV_PROCESS_SOCKET_ROW *row = rows->head;
+        while(row) {
+            NV_PROCESS_SOCKET_ROW *next = row->next;
+            freez(row);
+            row = next;
+        }
+    }
+    dfe_done(rows);
+
+    dictionary_destroy(index);
+}
+
 static bool topology_prepare_context(NV_TOPOLOGY_CONTEXT *ctx, usec_t now_ut, const NV_TOPOLOGY_OPTIONS *options) {
     if(!ctx)
         return false;
@@ -1592,22 +1660,16 @@ static void topology_write_response_metadata(BUFFER *wb) {
         {
             buffer_json_member_add_string(wb, "id", "endpoints");
             buffer_json_member_add_string(wb, "name", "Endpoints");
-            buffer_json_member_add_string(wb, "help", "Group non-private endpoints by AS or keep endpoints by IP.");
+            buffer_json_member_add_string(wb, "help", "Keep non-private endpoints by IP until AS grouping is available.");
             buffer_json_member_add_boolean(wb, "unique_view", true);
             buffer_json_member_add_string(wb, "type", "select");
             buffer_json_member_add_array(wb, "options");
             {
                 buffer_json_add_array_item_object(wb);
                 {
-                    buffer_json_member_add_string(wb, "id", "by_as");
-                    buffer_json_member_add_string(wb, "name", "Non-Private Endpoints by AS");
-                    buffer_json_member_add_boolean(wb, "defaultSelected", true);
-                }
-                buffer_json_object_close(wb);
-                buffer_json_add_array_item_object(wb);
-                {
                     buffer_json_member_add_string(wb, "id", "by_ip");
                     buffer_json_member_add_string(wb, "name", "Non-Private Endpoints by IP");
+                    buffer_json_member_add_boolean(wb, "defaultSelected", true);
                 }
                 buffer_json_object_close(wb);
             }
@@ -2004,6 +2066,8 @@ static void topology_write_presentation(BUFFER *wb) {
 }
 
 static void topology_write_actors(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx, NV_TOPOLOGY_RENDER_STATE *state) {
+    DICTIONARY *process_socket_index = topology_build_process_socket_index(ctx);
+
     buffer_json_member_add_array(wb, "actors");
     {
         buffer_json_add_array_item_object(wb);
@@ -2092,31 +2156,15 @@ static void topology_write_actors(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx, NV
                 {
                     buffer_json_member_add_array(wb, "sockets");
                     {
-                        NV_TOPOLOGY_LINK *link;
-                        dfe_start_read(ctx->links, link) {
-                            bool match;
-                            if(ctx->options.processes_by_pid)
-                                match = (link->pid == (uint64_t)pa->pid &&
-                                         link->uid == (uint64_t)pa->uid &&
-                                         link->net_ns_inode == pa->net_ns_inode &&
-                                         strcmp(link->process, pa->process) == 0);
-                            else
-                                match = (strcmp(link->process, pa->process) == 0);
-
-                            if(!match)
-                                continue;
-
-                            char remote[128];
-                            snprintf(remote, sizeof(remote), "%s:%u", link->remote_ip, link->remote_port);
-
+                        NV_PROCESS_SOCKET_ROWS *rows = process_socket_index ? dictionary_get(process_socket_index, process_actor_id) : NULL;
+                        for(NV_PROCESS_SOCKET_ROW *row = rows ? rows->head : NULL; row; row = row->next) {
                             buffer_json_add_array_item_object(wb);
-                            buffer_json_member_add_string(wb, "remote", remote);
-                            buffer_json_member_add_string(wb, "protocol", link->protocol);
-                            buffer_json_member_add_string(wb, "direction", link->direction);
-                            buffer_json_member_add_string(wb, "state", link->state);
+                            buffer_json_member_add_string(wb, "remote", row->remote);
+                            buffer_json_member_add_string(wb, "protocol", row->protocol);
+                            buffer_json_member_add_string(wb, "direction", row->direction);
+                            buffer_json_member_add_string(wb, "state", row->state);
                             buffer_json_object_close(wb);
                         }
-                        dfe_done(link);
                     }
                     buffer_json_array_close(wb);
                 }
@@ -2176,6 +2224,8 @@ static void topology_write_actors(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx, NV
         dfe_done(ra);
     }
     buffer_json_array_close(wb);
+
+    topology_destroy_process_socket_index(process_socket_index);
 }
 
 static void topology_write_links_and_stats(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx, NV_TOPOLOGY_RENDER_STATE *state) {
@@ -2548,7 +2598,7 @@ static void topology_write_links_and_stats(BUFFER *wb, const NV_TOPOLOGY_CONTEXT
         buffer_json_member_add_boolean(wb, "sockets_local", ctx->options.sockets_local);
         buffer_json_member_add_boolean(wb, "sockets_inbound", ctx->options.sockets_inbound);
         buffer_json_member_add_boolean(wb, "sockets_outbound", ctx->options.sockets_outbound);
-        buffer_json_member_add_string(wb, "endpoints_mode_selected", ctx->options.endpoints_by_as ? "by_as" : "by_ip");
+        buffer_json_member_add_string(wb, "endpoints_mode_selected", "by_ip");
         buffer_json_member_add_string(wb, "endpoints_mode_effective", "by_ip");
         buffer_json_member_add_boolean(wb, "protocol_ipv4_tcp", ctx->options.protocols_ipv4_tcp);
         buffer_json_member_add_boolean(wb, "protocol_ipv6_tcp", ctx->options.protocols_ipv6_tcp);
