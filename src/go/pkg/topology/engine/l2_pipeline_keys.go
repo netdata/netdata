@@ -9,7 +9,13 @@ import (
 )
 
 func adjacencyKey(adj Adjacency) string {
-	return strings.Join([]string{adj.Protocol, adj.SourceID, adj.SourcePort, adj.TargetID, adj.TargetPort}, "|")
+	protocol := strings.ToLower(strings.TrimSpace(adj.Protocol))
+	sourceID := strings.TrimSpace(adj.SourceID)
+	sourcePort := strings.TrimSpace(adj.SourcePort)
+	targetID := strings.TrimSpace(adj.TargetID)
+	targetPort := strings.TrimSpace(adj.TargetPort)
+
+	return strings.Join([]string{protocol, sourceID, sourcePort, targetID, targetPort}, "|")
 }
 
 func attachmentKey(attachment Attachment) string {
