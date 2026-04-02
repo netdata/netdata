@@ -30,6 +30,7 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #define NETWORK_CONNECTIONS_VIEWER_HELP "Shows active network connections with protocol details, states, addresses, ports, and performance metrics."
 #define NETWORK_TOPOLOGY_VIEWER_FUNCTION "topology:network-connections"
 #define NETWORK_TOPOLOGY_VIEWER_HELP "Shows live network-connections topology with self/process/endpoint actors and ownership/socket links."
+#define NETWORK_VIEWER_RESPONSE_UPDATE_EVERY 5
 // Keep in sync with the topology schema contract used across topology producers.
 #define NETWORK_TOPOLOGY_SCHEMA_VERSION "2.0"
 #define NETWORK_TOPOLOGY_SOURCE "network-connections"
@@ -1518,13 +1519,13 @@ static void topology_render_state_init(NV_TOPOLOGY_RENDER_STATE *state, const NV
 }
 
 static void topology_finalize_response(const char *transaction, BUFFER *wb, time_t now_s) {
-    buffer_json_member_add_time_t(wb, "expires", now_s + 1);
+    buffer_json_member_add_time_t(wb, "expires", now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY);
     buffer_json_finalize(wb);
 
     netdata_mutex_lock(&stdout_mutex);
     wb->response_code = HTTP_RESP_OK;
     wb->content_type = CT_APPLICATION_JSON;
-    wb->expires = now_s + 1;
+    wb->expires = now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY;
     pluginsd_function_result_to_stdout(transaction, wb);
     netdata_mutex_unlock(&stdout_mutex);
 }
@@ -1532,7 +1533,7 @@ static void topology_finalize_response(const char *transaction, BUFFER *wb, time
 static void topology_write_response_metadata(BUFFER *wb) {
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "topology");
-    buffer_json_member_add_time_t(wb, "update_every", 5);
+    buffer_json_member_add_time_t(wb, "update_every", NETWORK_VIEWER_RESPONSE_UPDATE_EVERY);
     buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", NETWORK_TOPOLOGY_VIEWER_HELP);
     buffer_json_member_add_array(wb, "accepted_params");
@@ -2683,7 +2684,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
-    buffer_json_member_add_time_t(wb, "update_every", 5);
+    buffer_json_member_add_time_t(wb, "update_every", NETWORK_VIEWER_RESPONSE_UPDATE_EVERY);
     buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", NETWORK_CONNECTIONS_VIEWER_HELP);
 
@@ -3208,13 +3209,13 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
     }
 
 close_and_send:
-    buffer_json_member_add_time_t(wb, "expires", now_s + 1);
+    buffer_json_member_add_time_t(wb, "expires", now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY);
     buffer_json_finalize(wb);
 
     netdata_mutex_lock(&stdout_mutex);
     wb->response_code = HTTP_RESP_OK;
     wb->content_type = CT_APPLICATION_JSON;
-    wb->expires = now_s + 1;
+    wb->expires = now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY;
     pluginsd_function_result_to_stdout(transaction, wb);
     netdata_mutex_unlock(&stdout_mutex);
 }
