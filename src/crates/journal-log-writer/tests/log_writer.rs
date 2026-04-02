@@ -382,14 +382,13 @@ fn test_boot_id_injection() {
 }
 
 #[test]
-fn test_write_without_machine_id_suffix() {
+fn test_write_uses_machine_id_subdirectory() {
     let dir = TempDir::new().unwrap();
     let target_dir = dir.path().join("flows_raw");
     fs::create_dir_all(&target_dir).unwrap();
-    let config = test_config().with_machine_id_suffix(false);
-    let mut log = Log::new(&target_dir, config).unwrap();
+    let mut log = Log::new(&target_dir, test_config()).unwrap();
 
-    let entry = [b"MESSAGE=no machine id suffix" as &[u8], b"PRIORITY=6"];
+    let entry = [b"MESSAGE=machine id suffix" as &[u8], b"PRIORITY=6"];
     log.write_entry(&entry, None).unwrap();
     log.sync().unwrap();
 
@@ -406,15 +405,32 @@ fn test_write_without_machine_id_suffix() {
         .collect();
     assert_eq!(
         root_files.len(),
-        1,
-        "expected one .journal file directly in configured directory"
+        0,
+        "expected no .journal files directly in configured directory"
     );
 
     let machine_id = load_machine_id().unwrap();
     let machine_id_dir = target_dir.join(machine_id.as_simple().to_string());
     assert!(
-        !machine_id_dir.exists(),
-        "machine-id subdirectory must not be created when suffix is disabled"
+        machine_id_dir.is_dir(),
+        "machine-id subdirectory should be created under configured directory"
+    );
+
+    let machine_id_files: Vec<_> = fs::read_dir(&machine_id_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path()
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|s| s == "journal")
+                .unwrap_or(false)
+        })
+        .collect();
+    assert_eq!(
+        machine_id_files.len(),
+        1,
+        "expected one .journal file under the machine-id directory"
     );
 }
 

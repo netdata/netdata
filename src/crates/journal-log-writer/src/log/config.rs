@@ -77,8 +77,6 @@ pub struct Config {
     pub rotation_policy: RotationPolicy,
     /// Policy for when to remove old files
     pub retention_policy: RetentionPolicy,
-    /// Whether journal files are written under a machine-id subdirectory.
-    pub machine_id_suffix: bool,
 }
 
 impl Config {
@@ -92,7 +90,6 @@ impl Config {
             origin,
             rotation_policy,
             retention_policy,
-            machine_id_suffix: true,
         }
     }
 
@@ -105,15 +102,6 @@ impl Config {
     /// Specifies the retention policy of the log directory
     pub fn with_retention_policy(mut self, policy: RetentionPolicy) -> Self {
         self.retention_policy = policy;
-        self
-    }
-
-    /// Enables or disables machine-id suffix in the storage path.
-    ///
-    /// When enabled (default), files are written under `<path>/<machine-id>/`.
-    /// When disabled, files are written directly under `<path>/`.
-    pub fn with_machine_id_suffix(mut self, enabled: bool) -> Self {
-        self.machine_id_suffix = enabled;
         self
     }
 }

@@ -40,7 +40,7 @@ impl IngestService {
                 .with_number_of_journal_files(retention.number_of_journal_files)
                 .with_size_of_journal_files(retention.size_of_journal_files.as_u64())
                 .with_duration_of_journal_files(retention.duration_of_journal_files);
-            Config::new(origin, rotation_policy, retention_policy).with_machine_id_suffix(false)
+            Config::new(origin, rotation_policy, retention_policy)
         };
         let raw_journal =
             Self::build_raw_journal(&cfg, &build_journal_cfg, Arc::clone(&lifecycle_observer))?;

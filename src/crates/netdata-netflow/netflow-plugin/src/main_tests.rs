@@ -785,8 +785,16 @@ async fn e2e_city_map_reuses_tuple_table_shape_with_city_and_coordinate_keys() {
         response.data.columns["DST_GEO_LONGITUDE"]["visible"],
         serde_json::json!(false)
     );
-    assert!(response.data.columns["SRC_GEO_CITY"].get("visible").is_none());
-    assert!(response.data.columns["DST_GEO_CITY"].get("visible").is_none());
+    assert!(
+        response.data.columns["SRC_GEO_CITY"]
+            .get("visible")
+            .is_none()
+    );
+    assert!(
+        response.data.columns["DST_GEO_CITY"]
+            .get("visible")
+            .is_none()
+    );
     assert!(
         !response.data.flows.is_empty(),
         "expected non-empty city-map rows"
@@ -1596,14 +1604,24 @@ fn assert_tier_dir_exists(path: &Path, tier_name: &str) {
 }
 
 fn tier_file_count(path: &Path) -> usize {
-    fs::read_dir(path)
-        .unwrap_or_else(|err| panic!("read tier dir {}: {}", path.display(), err))
-        .filter_map(Result::ok)
-        .filter(|entry| {
-            entry
-                .file_type()
-                .map(|file_type| file_type.is_file())
-                .unwrap_or(false)
-        })
-        .count()
+    fn count_journal_files(path: &Path) -> usize {
+        fs::read_dir(path)
+            .unwrap_or_else(|err| panic!("read tier dir {}: {}", path.display(), err))
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .map(|entry_path| {
+                if entry_path.is_dir() {
+                    return count_journal_files(&entry_path);
+                }
+
+                entry_path
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .map(|ext| usize::from(ext == "journal"))
+                    .unwrap_or(0)
+            })
+            .sum()
+    }
+
+    count_journal_files(path)
 }
