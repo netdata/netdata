@@ -169,6 +169,7 @@ impl<'a> LogQuery<'a> {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
+        self.output_fields = None;
         let mut output_fields = HashSet::new();
         for field in fields {
             let field = field.into();
@@ -237,6 +238,35 @@ impl<'a> LogQuery<'a> {
 
         let data = extract_entry_data(&log_entry_ids, output_fields.as_ref())?;
         Ok((data, new_state))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn with_output_fields_empty_input_clears_existing_projection() {
+        let indexes: [FileIndex; 0] = [];
+
+        let query = LogQuery::new(&indexes, Anchor::Head, Direction::Forward)
+            .with_output_fields(["MESSAGE"])
+            .with_output_fields(std::iter::empty::<&str>());
+
+        assert!(query.output_fields.is_none());
+    }
+
+    #[test]
+    fn with_output_fields_keeps_only_non_empty_fields() {
+        let indexes: [FileIndex; 0] = [];
+
+        let query = LogQuery::new(&indexes, Anchor::Head, Direction::Forward)
+            .with_output_fields(["", "MESSAGE", "_PID"]);
+
+        let fields = query.output_fields.expect("output fields should be set");
+        assert_eq!(fields.len(), 2);
+        assert!(fields.contains("MESSAGE"));
+        assert!(fields.contains("_PID"));
     }
 }
 
@@ -611,8 +641,8 @@ fn extract_entry_data(
 
                 if let Some(mut pair) = FieldValuePair::parse(&payload_str) {
                     let raw_field_name = pair.field();
-                    let raw_projection_match = output_fields
-                        .is_some_and(|projected| projected.contains(raw_field_name));
+                    let raw_projection_match =
+                        output_fields.is_some_and(|projected| projected.contains(raw_field_name));
 
                     // Reverse-map systemd field name back to OTEL name if needed
                     if let Some(otel_name) = reverse_map.get(raw_field_name) {
