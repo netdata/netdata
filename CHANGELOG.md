@@ -233,6 +233,11 @@
 - Fix UB in tzif_read_be64() ([#22097](https://github.com/netdata/netdata/issues/22097))
 - Fix Coverity ([#22094](https://github.com/netdata/netdata/issues/22094))
 - Remove compilation warning (Windows) ([#22091](https://github.com/netdata/netdata/issues/22091))
+- Fix(go.d): derive sd pipeline names from source context ([#22105](https://github.com/netdata/netdata/issues/22105))
+- Docs: nest secretstore integrations under Secrets Management in sidebar ([#22106](https://github.com/netdata/netdata/issues/22106))
+- Remove DBENGINE Warnings (Linux compilation) ([#22103](https://github.com/netdata/netdata/issues/22103))
+- Fix coverity report ([#22104](https://github.com/netdata/netdata/issues/22104))
+- Docs: put collectors under Collecting Metrics/Collectors ([#22107](https://github.com/netdata/netdata/issues/22107))
 
 ## [2.9.0] - 2026-02-16
 
