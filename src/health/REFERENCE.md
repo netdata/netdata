@@ -812,8 +812,6 @@ This requires BOTH conditions to be true (AND logic).
 
 Alerts based on `chart labels` require the underlying chart to exist. For example, a `disk.space` chart is only created when a mount point is actively mounted. If a CIFS mount fails to mount after a system reboot, no `disk.space` chart will exist for that mount point, and the alert will not activate.
 
-To monitor mount failures (when a mount should exist but doesn't), see [systemd.mount — Mount unit configuration](https://www.freedesktop.org/software/systemd/man/systemd.mount.html) for troubleshooting mount unit states.
-
 :::
 
 #### Alert Line `summary`
