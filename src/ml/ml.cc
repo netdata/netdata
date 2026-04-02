@@ -28,6 +28,39 @@ static void __attribute__((destructor)) destroy_mutex(void) {
     netdata_mutex_destroy(&db_mutex);
 }
 
+namespace {
+
+template <bool NeedLowerBound, bool NeedUpperBound>
+inline bool ml_sqlite_int64_fits_time_t(sqlite3_int64 value)
+{
+    (void)value;
+    return true;
+}
+
+template <>
+inline bool ml_sqlite_int64_fits_time_t<true, false>(sqlite3_int64 value)
+{
+    const sqlite3_int64 kTimeMin = (sqlite3_int64) std::numeric_limits<time_t>::min();
+    return value >= kTimeMin;
+}
+
+template <>
+inline bool ml_sqlite_int64_fits_time_t<false, true>(sqlite3_int64 value)
+{
+    const sqlite3_int64 kTimeMax = (sqlite3_int64) std::numeric_limits<time_t>::max();
+    return value <= kTimeMax;
+}
+
+template <>
+inline bool ml_sqlite_int64_fits_time_t<true, true>(sqlite3_int64 value)
+{
+    const sqlite3_int64 kTimeMin = (sqlite3_int64) std::numeric_limits<time_t>::min();
+    const sqlite3_int64 kTimeMax = (sqlite3_int64) std::numeric_limits<time_t>::max();
+    return value >= kTimeMin && value <= kTimeMax;
+}
+
+}
+
 static inline size_t ml_dimension_smoothing_window(const ml_dimension_t *dim)
 {
     unsigned chart_update_every = dim->rd->rrdset->update_every;
@@ -222,11 +255,11 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, (int) inlined_km->after);
+    rc = sqlite3_bind_int64(res, ++param, (sqlite3_int64) inlined_km->after);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, (int) inlined_km->before);
+    rc = sqlite3_bind_int64(res, ++param, (sqlite3_int64) inlined_km->before);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -297,7 +330,7 @@ ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, (int) before);
+    rc = sqlite3_bind_int64(res, ++param, (sqlite3_int64) before);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -344,9 +377,9 @@ ml_prune_old_models(size_t num_models_to_prune)
         }
     }
 
-    int after = (int) (now_realtime_sec() - Cfg.delete_models_older_than);
+    time_t after = now_realtime_sec() - (time_t) Cfg.delete_models_older_than;
 
-    rc = sqlite3_bind_int(res, ++param, after);
+    rc = sqlite3_bind_int64(res, ++param, (sqlite3_int64) after);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -429,8 +462,25 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
         ml_kmeans_t km;
 
-        km.after = sqlite3_column_int(res, 0);
-        km.before = sqlite3_column_int(res, 1);
+        sqlite3_int64 raw_after  = sqlite3_column_int64(res, 0);
+        sqlite3_int64 raw_before = sqlite3_column_int64(res, 1);
+        constexpr bool kNeedLowerBound =
+            !std::numeric_limits<time_t>::is_signed ||
+            std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits;
+        constexpr bool kNeedUpperBound =
+            std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits;
+
+        // Protect against silent truncation when time_t is narrower than int64_t
+        // (e.g. 32-bit builds, corrupted DB, or far-future timestamps).
+        if (!ml_sqlite_int64_fits_time_t<kNeedLowerBound, kNeedUpperBound>(raw_after) ||
+            !ml_sqlite_int64_fits_time_t<kNeedLowerBound, kNeedUpperBound>(raw_before)) {
+            error_report("Skipping ML model row with out-of-range timestamps: after=%" PRId64 " before=%" PRId64,
+                         (int64_t) raw_after, (int64_t) raw_before);
+            continue;
+        }
+
+        km.after  = (time_t) raw_after;
+        km.before = (time_t) raw_before;
 
         km.min_dist = sqlite3_column_double(res, 2);
         km.max_dist = sqlite3_column_double(res, 3);

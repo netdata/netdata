@@ -23,71 +23,116 @@ modules:
     overview: &overview
       data_collection:
         metrics_description: |
-          This collector monitors Azure resources through the Azure Monitor Metrics API. It automatically discovers
-          resources in your subscription and collects platform metrics based on configurable profiles, providing
-          visibility into the health and performance of over 35 Azure service types.
+          This collector provides real-time visibility into your Azure infrastructure by collecting platform metrics from the Azure Monitor Metrics API.
+
+          **Key capabilities:**
+
+          - **Multi-subscription** -- monitor resources across one or more Azure subscriptions in a single job
+          - **Automatic service detection** -- discovers resources and enables matching metric profiles without manual configuration
+          - **38 built-in service profiles** -- covers databases, compute, networking, storage, AI, analytics, and more
+          - **Flexible discovery** -- use structured filters (resource groups, regions, tags) or a custom Azure Resource Graph KQL query
         method_description: &method_description |
-          The collector uses Azure SDK clients for:
-          - Authentication via Entra ID (service principal, managed identity, or default credentials)
-          - Resource discovery via Azure Resource Graph queries
-          - Metrics collection via Azure Monitor Metrics batch API, grouped by region and time grain
+          It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/migrate-to-batch-api) to collect metrics, grouping requests by subscription, region, and time grain. Resources are discovered via [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) queries at startup and refreshed periodically. Authentication is handled through [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/identity/) (service principal, managed identity, or default credentials).
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
         description: |
-          The monitoring principal needs read access to Azure Resource Graph and Azure Monitor metrics for target resources.
+          The service principal or managed identity requires these Azure RBAC roles:
+
+          | Role | Purpose | Scope |
+          |:-----|:--------|:------|
+          | **Monitoring Reader** | Read Azure Monitor metrics | Subscription or resource group |
+          | **Reader** | Query Azure Resource Graph for resource discovery | Subscription or resource group |
       default_behavior:
         auto_detection:
           description: |
-            When `profile_selection_mode` is `auto` (the default), the collector queries Azure Resource Graph
-            to discover which resource types exist in the subscription and enables matching built-in profiles automatically.
+            The collector has two discovery phases:
+
+            **Bootstrap (first run)**
+
+            - With the default `profiles.mode: auto`, the collector queries Azure Resource Graph within the configured `subscription_ids` to find candidate resources.
+            - It matches discovered resource types against built-in profiles and automatically enables the relevant ones.
+            - Discovery scope can be narrowed using `discovery.mode: filters` (resource groups, regions, tags) or replaced entirely with `discovery.mode: query` for a custom KQL query.
+            - A single job can monitor multiple subscriptions.
+
+            **Runtime (periodic refresh)**
+
+            - Periodically re-discovers resources for **already-active profile types only**.
+            - Controlled by `discovery.refresh_every` (default: 300 seconds, set to 0 to disable).
+
+            > **Important:** Runtime refresh does not activate new profiles. If a new resource type appears after bootstrap, restart the collector to pick it up.
         limits:
           description: |
-            Azure Monitor metrics granularity is typically 1 minute.
-            The collector enforces a minimum collection interval of 60 seconds.
+            - **Minimum collection interval:** 60 seconds (enforced). Azure Monitor metrics granularity is typically 1 minute.
+            - **Metrics reporting delay:** Azure Monitor metrics have a 1-3 minute reporting delay. The collector uses `query_offset` (default: 180s) as a minimum offset and automatically uses a larger effective offset for slower time-grain batches when needed.
+            - **API throttling:** Azure Monitor applies per-subscription rate limits. The collector uses bounded concurrency and batching to stay within limits, but monitoring many resources in a single subscription may require tuning `limits.*` options.
         performance_impact:
           description: |
-            The collector uses bounded request concurrency and batches resources and metrics to minimize API calls.
-            Default limits: 4 concurrent queries, 50 resources per batch, 20 metrics per query.
+            The collector batches resources and metrics to minimize Azure API calls and uses bounded concurrency to avoid overwhelming the API.
+
+            **Default concurrency and batching limits:**
+
+            | Setting | Default | Description |
+            |:--------|:--------|:------------|
+            | `limits.max_concurrency` | 4 | Maximum concurrent batch queries |
+            | `limits.max_batch_resources` | 50 | Maximum resources per batch request |
+            | `limits.max_metrics_per_query` | 20 | Maximum metrics per batch request |
+
+            For large deployments, consider splitting resources across multiple jobs. If you hit Azure API rate limits, reduce `max_concurrency`.
     setup: &setup
       prerequisites:
         list:
           - title: Create an Azure monitoring principal
             description: |
-              Create a service principal or use a managed identity with the following permissions:
+              The collector requires a service principal or managed identity with two Azure RBAC roles:
 
-              1. **Monitoring Reader** role on the target subscription or resource groups (for Azure Monitor metrics access)
-              2. **Reader** role for Azure Resource Graph queries (for resource discovery)
+              | Role | Purpose |
+              |:-----|:--------|
+              | **Monitoring Reader** | Access Azure Monitor metrics for target resources |
+              | **Reader** | Query Azure Resource Graph for resource discovery |
 
-              For service principal authentication:
+              **Option A: Service principal**
+
               ```bash
-              # Create the service principal
+              # Create service principal with Monitoring Reader role
               az ad sp create-for-rbac --name "netdata-monitor" --role "Monitoring Reader" \
                 --scopes /subscriptions/<subscription-id>
+
+              # Add the Reader role for resource discovery
+              az role assignment create --assignee <appId-from-above> \
+                --role "Reader" --scope /subscriptions/<subscription-id>
 
               # Note the appId (client_id), password (client_secret), and tenant
               ```
 
-              For managed identity (on Azure VMs, VMSS, or AKS):
+              **Option B: Managed identity** (Azure VMs, VMSS, or AKS)
+
               ```bash
-              # Assign Monitoring Reader role to the VM's managed identity
+              # Assign both roles to the VM's managed identity
               az role assignment create --assignee <managed-identity-principal-id> \
                 --role "Monitoring Reader" --scope /subscriptions/<subscription-id>
+
+              az role assignment create --assignee <managed-identity-principal-id> \
+                --role "Reader" --scope /subscriptions/<subscription-id>
               ```
       configuration:
         file:
           name: go.d/azure_monitor.conf
         options:
           description: |
-            The following options can be defined globally: update_every, autodetection_retry.
+            The following options can be defined globally: `update_every`, `autodetection_retry`.
 
-            Profile files are loaded from:
-            - Stock: `/usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/`
-            - User: `/etc/netdata/go.d/azure_monitor.profiles/`
+            **Profile file locations:**
 
-            User profile files with the same filename override stock profiles.
+            | Type | Path |
+            |:-----|:-----|
+            | Stock profiles | `/usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/` |
+            | User overrides | `/etc/netdata/go.d/azure_monitor.profiles/` |
+
+            User profile files with the same `id` as a stock profile override it.
+            Custom profiles extend the collector's catalog -- they do not replace the discovery mechanism.
           folding:
             title: Config options
             enabled: true
@@ -102,71 +147,48 @@ modules:
               default_value: 0
               required: false
               group: Collection
-            - name: subscription_id
-              description: Azure subscription ID.
+            - name: subscription_ids
+              description: List of Azure subscription IDs to monitor. Used as the scope for resource discovery.
               default_value: ""
               required: true
-              group: Target
+              group: Collection
             - name: cloud
               description: "Azure cloud environment: `public`, `government`, or `china`."
               default_value: public
               required: false
-              group: Target
-            - name: discovery_every
-              description: Resource discovery interval in seconds.
-              default_value: 300
-              required: false
               group: Collection
             - name: query_offset
-              description: Offset in seconds for metric query windows. Increase if metrics appear incomplete.
+              description: Minimum offset (seconds) subtracted from metric query windows. Increase if metrics appear incomplete.
               default_value: 180
               required: false
               group: Collection
+              detailed_description: |
+                Azure Monitor metrics have a built-in reporting delay of 1-3 minutes. The collector subtracts this offset from the current time when building metric query windows to avoid fetching incomplete data points.
+
+                The configured `query_offset` acts as a minimum floor. For slower metric batches, the collector automatically uses a larger effective offset when the batch time grain is longer than the configured value.
+
+                - **Default (180s)** works for most services.
+                - **Longer time grains** (for example `PT5M`) automatically use at least one full time grain as the effective offset.
+                - **Increase to 240-300s** if you still see gaps or missing data points.
+                - **Do not set below 60s** -- metrics will likely be incomplete.
             - name: timeout
               description: Timeout for Azure Resource Graph and Azure Monitor API requests, in seconds.
               default_value: 30
               required: false
               group: Collection
-            - name: max_concurrency
-              description: Maximum concurrent batch queries to Azure Monitor.
-              default_value: 4
-              required: false
-              group: Limits
-            - name: max_batch_resources
-              description: Maximum resources per Azure Monitor batch request.
-              default_value: 50
-              required: false
-              group: Limits
-            - name: max_metrics_per_query
-              description: Maximum metrics per Azure Monitor batch request.
-              default_value: 20
-              required: false
-              group: Limits
-            - name: profile_selection_mode
-              description: "Profile selection mode: `auto` discovers matching profiles via Azure Resource Graph, `exact` uses only listed profile ids, `combined` merges listed ids with auto-discovered profiles."
-              default_value: "auto"
-              required: false
-              group: Profiles
-            - name: profile_selection_mode_exact.profiles
-              description: Profile ids to enable (used when `profile_selection_mode` is `exact`).
-              default_value: "[]"
-              required: false
-              group: Profiles
-            - name: profile_selection_mode_combined.profiles
-              description: Profile ids to merge with auto-discovered profiles (used when `profile_selection_mode` is `combined`).
-              default_value: "[]"
-              required: false
-              group: Profiles
-            - name: resource_groups
-              description: Optional list of resource group names to restrict monitoring scope.
-              default_value: "[]"
-              required: false
-              group: Filters
             - name: auth.mode
-              description: "Authentication mode: `service_principal`, `managed_identity`, or `default`."
+              description: "Authentication method: `service_principal`, `managed_identity`, or `default`."
               default_value: ""
               required: true
               group: Authentication
+              detailed_description: |
+                Determines how the collector authenticates with Azure.
+
+                | Mode | When to use | Required options |
+                |:-----|:------------|:-----------------|
+                | `service_principal` | Running outside Azure, or when you need explicit credentials | `tenant_id`, `client_id`, `client_secret` |
+                | `managed_identity` | Running on Azure VMs, VMSS, or AKS with a managed identity | Optionally `client_id` for user-assigned identity |
+                | `default` | Uses the Azure SDK default credential chain (environment variables, managed identity, Azure CLI, etc.) | None |
             - name: auth.mode_service_principal.tenant_id
               description: Entra ID tenant ID (required for `service_principal` mode).
               default_value: ""
@@ -187,6 +209,103 @@ modules:
               default_value: ""
               required: false
               group: Authentication
+            - name: discovery.refresh_every
+              description: Interval (seconds) for refreshing discovered resources. Set `0` to disable runtime re-discovery after bootstrap.
+              default_value: 300
+              required: false
+              group: Discovery
+            - name: discovery.mode
+              description: "Resource discovery method: `filters` (structured filters) or `query` (custom KQL)."
+              default_value: filters
+              required: false
+              group: Discovery
+              detailed_description: |
+                Controls how the collector finds candidate Azure resources.
+
+                | Mode | Behavior |
+                |:-----|:---------|
+                | `filters` | Builds an Azure Resource Graph query from the structured `mode_filters.*` options (resource groups, regions, tags). This is the default. |
+                | `query` | Uses the raw KQL you provide in `discovery.mode_query.kql`. The query must project `id`, `name`, `type`, `resourceGroup`, and `location`. |
+            - name: discovery.mode_filters.resource_groups
+              description: Optional list of Azure resource groups to include in `filters` mode.
+              default_value: "[]"
+              required: false
+              group: Discovery
+            - name: discovery.mode_filters.regions
+              description: Optional list of Azure regions to include in `filters` mode.
+              default_value: "[]"
+              required: false
+              group: Discovery
+            - name: discovery.mode_filters.tags
+              description: Optional exact-match tag filters for `filters` mode. Keys are matched case-insensitively and values case-sensitively.
+              default_value: "{}"
+              required: false
+              group: Discovery
+            - name: discovery.mode_query.kql
+              description: Custom Azure Resource Graph KQL for `query` mode. Must project `id`, `name`, `type`, `resourceGroup`, `location`.
+              default_value: ""
+              required: false
+              group: Discovery
+              detailed_description: |
+                A raw Azure Resource Graph KQL query used when `discovery.mode` is `query`.
+
+                The query **must** project these five columns:
+
+                | Column | Description |
+                |:-------|:------------|
+                | `id` | Full Azure resource ID (ARM format) |
+                | `name` | Resource name |
+                | `type` | Resource type (e.g., `microsoft.sql/servers/databases`) |
+                | `resourceGroup` | Resource group name |
+                | `location` | Azure region |
+
+                Example:
+
+                ```
+                resources
+                | where tags.env =~ "prod"
+                | project id, name, type, resourceGroup, location
+                ```
+            - name: profiles.mode
+              description: "How profiles are selected: `auto` (discover from resources), `exact` (explicit list), or `combined` (both)."
+              default_value: auto
+              required: false
+              group: Profiles
+              detailed_description: |
+                Controls how the collector decides which metric profiles to activate.
+
+                | Mode | Behavior |
+                |:-----|:---------|
+                | `auto` | Discovers resource types in your subscriptions and enables matching built-in profiles automatically. This is the default. |
+                | `exact` | Uses only the profile basenames listed under `profiles.mode_exact.names`. No auto-discovery. |
+                | `combined` | Merges auto-discovered profiles with the basenames listed under `profiles.mode_combined.names`. |
+
+                Profile basename matching is case-insensitive. A basename is the profile filename without the `.yaml` / `.yml` suffix.
+            - name: profiles.mode_exact.names
+              description: Explicit profile file basenames used by `exact` mode. Matching is case-insensitive.
+              default_value: "[]"
+              required: false
+              group: Profiles
+            - name: profiles.mode_combined.names
+              description: Explicit profile file basenames merged with auto-discovered profiles in `combined` mode. Matching is case-insensitive.
+              default_value: "[]"
+              required: false
+              group: Profiles
+            - name: limits.max_concurrency
+              description: Maximum concurrent batch queries to Azure Monitor.
+              default_value: 4
+              required: false
+              group: Limits
+            - name: limits.max_batch_resources
+              description: Maximum resources per Azure Monitor batch request.
+              default_value: 50
+              required: false
+              group: Limits
+            - name: limits.max_metrics_per_query
+              description: Maximum metrics per Azure Monitor batch request.
+              default_value: 20
+              required: false
+              group: Limits
             - name: vnode
               description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
               default_value: ""
@@ -197,61 +316,74 @@ modules:
             title: Config
             enabled: true
           list:
-            - name: Service principal (auto-discover all resources)
-              description: Authenticate with a service principal and auto-discover all supported Azure resource types in the subscription.
+            - name: Service principal with structured discovery
+              description: Authenticate with a service principal and auto-discover resources across two subscriptions, filtered to the `production-rg` resource group in `eastus` with the tag `env=prod`.
               folding:
                 enabled: false
               config: |
                 jobs:
                   - name: prod
-                    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    subscription_ids:
+                      - "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+                      - "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+                    discovery:
+                      mode: filters
+                      mode_filters:
+                        resource_groups:
+                          - production-rg
+                        regions:
+                          - eastus
+                        tags:
+                          env:
+                            - prod
+                    profiles:
+                      mode: auto
                     auth:
                       mode: service_principal
                       mode_service_principal:
                         tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                         client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                         client_secret: "your-client-secret"
-            - name: Managed identity (Azure VM/VMSS/AKS)
-              description: Use the managed identity of the Azure VM, VMSS, or AKS node where Netdata is running.
-              config: |
-                jobs:
-                  - name: prod
-                    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    auth:
-                      mode: managed_identity
-            - name: Specific profiles only
-              description: Monitor only specific Azure services instead of auto-discovering all resource types.
+            - name: Managed identity with exact profiles
+              description: Use a managed identity (on an Azure VM, VMSS, or AKS) and monitor only SQL Database and PostgreSQL Flexible Server resources -- skip auto-discovery of other services.
               config: |
                 jobs:
                   - name: databases
-                    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                     profiles:
-                      - sql_database
-                      - postgres_flexible
-                      - redis_cache
+                      mode: exact
+                      mode_exact:
+                        names:
+                          - sql_database
+                          - postgres_flexible
                     auth:
-                      mode: service_principal
-                      mode_service_principal:
-                        tenant_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                        client_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                        client_secret: "your-client-secret"
-            - name: Filter by resource group
-              description: Only monitor resources in specific resource groups.
+                      mode: managed_identity
+            - name: Custom Azure Resource Graph KQL
+              description: Replace the built-in discovery filters with your own KQL query. Useful when you need joins, computed columns, or filtering logic that structured filters cannot express.
               config: |
                 jobs:
-                  - name: prod-rg
-                    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    resource_groups:
-                      - production-rg
-                      - staging-rg
+                  - name: prod-query
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    discovery:
+                      mode: query
+                      mode_query:
+                        kql: |
+                          resources
+                          | where tags.env =~ "prod"
+                          | project id, name, type, resourceGroup, location
+                    profiles:
+                      mode: auto
                     auth:
                       mode: default
             - name: Azure Government cloud
-              description: Connect to Azure Government cloud environment.
+              description: "Connect to an Azure Government environment. Set `cloud: government` to use the correct authentication and API endpoints."
               config: |
                 jobs:
                   - name: gov
-                    subscription_id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    subscription_ids:
+                      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                     cloud: government
                     auth:
                       mode: service_principal
@@ -264,25 +396,40 @@ modules:
         list:
           - name: No metrics are collected
             description: |
-              Verify the following:
-              1. The service principal or managed identity has **Monitoring Reader** role on the subscription or resource group.
-              2. The `subscription_id` in the configuration matches the subscription containing the target resources.
-              3. Target resources are running and producing metrics (check Azure Portal > Metrics for the resource).
-              4. Check the Netdata error log for authentication or API errors: `grep azure_monitor /var/log/netdata/error.log`.
+              Check the following:
+
+              - **Permissions** -- The principal has both **Monitoring Reader** and **Reader** roles on the target subscription.
+              - **Subscription IDs** -- The `subscription_ids` list includes the correct subscription(s).
+              - **Resources are active** -- Verify in Azure Portal > Metrics that the resources are producing metrics.
+              - **Collector logs** -- Check for authentication or API errors:
+                ```bash
+                # systemd
+                journalctl -u netdata --namespace=netdata --grep azure_monitor --since "5 minutes ago"
+                # non-systemd
+                grep azure_monitor /var/log/netdata/collector.log
+                ```
           - name: Missing metrics for some resource types
             description: |
-              Azure Monitor profiles are matched by resource type. If a resource type exists but no metrics appear:
-              1. Ensure `profiles: [auto]` (default) is set, or the specific profile id is listed.
-              2. Verify the resource type matches a built-in profile. Run `ls /usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/` to see available profiles.
-              3. Some metrics require the resource to be actively processing data (e.g., IoT Hub telemetry metrics only appear when devices send messages).
-          - name: Metrics appear delayed
+              Profiles are matched by Azure resource type. If a resource type exists but metrics are missing:
+
+              - **Check profile mode** -- Ensure `profiles.mode: auto` (default), or explicitly list the profile basename under `profiles.mode_exact.names` or `profiles.mode_combined.names`.
+              - **Verify a built-in profile exists** -- List available profiles:
+                ```bash
+                ls /usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/
+                ```
+              - **Check resource activity** -- Some metrics only appear when the resource is actively processing data (e.g., IoT Hub telemetry metrics require devices to be sending messages).
+              - **New resource types after startup** -- Runtime discovery does not activate new profiles. Restart the collector if new resource types were added after bootstrap.
+          - name: Charts have gaps or incomplete data
             description: |
-              Azure Monitor metrics have a built-in reporting delay of 1-3 minutes. The collector uses a `query_offset` (default: 180 seconds) to account for this.
-              If metrics are missing or incomplete, try increasing `query_offset` to 240 or 300 seconds.
-              Some metrics with longer time grains (e.g., PT5M) may take up to 5 minutes to appear.
+              Azure Monitor metrics have a built-in reporting delay of **1-3 minutes**.
+
+              - The collector uses `query_offset` (default: **180 seconds**) as the minimum offset for metric query windows.
+              - Slower time-grain batches automatically use a larger effective offset when needed.
+              - If metrics are still missing or incomplete, increase `query_offset` to **240** or **300** seconds.
           - name: Authentication errors in sovereign clouds
             description: |
               For Azure Government or Azure China clouds, set the `cloud` parameter:
+
               - Azure Government: `cloud: government`
               - Azure China (21Vianet): `cloud: china`
 
@@ -293,11 +440,11 @@ modules:
         title: Metrics
         enabled: false
       description: |
-        Metrics depend on which Azure Monitor profiles are enabled. Each profile corresponds to an Azure
-        service type and defines the specific metrics collected. With the default `profiles: [auto]` setting,
-        profiles are automatically enabled for resource types found in your subscription.
+        The metrics collected depend on which Azure Monitor profiles are active. Each profile corresponds to an Azure service (e.g., SQL Database, Virtual Machines) and defines the specific charts and metrics for that service.
 
-        See the service-specific integrations below for detailed metrics lists.
+        With the default `profiles.mode: auto`, profiles are activated automatically based on the resource types found in your subscriptions.
+
+        **See the service-specific integrations below for detailed metric lists per Azure service.**
       availability: []
       scopes: []
   - <<: *module
@@ -321,7 +468,17 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor SQL Managed Instance performance including virtual core CPU utilization, storage consumption, IO throughput, and average request wait times.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure SQL Managed Instance with metrics covering:
+
+          - **Compute** -- CPU utilization (average/max), virtual core count
+          - **Storage** -- reserved and used storage
+          - **I/O** -- read/write throughput, I/O request rate
         method_description: *method_description
     alerts:
       - name: am_sql_managed_instance_cpu
@@ -356,6 +513,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -412,7 +571,21 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor SQL Database performance including CPU and DTU utilization, storage consumption, active sessions and workers, deadlocks, IO rates, tempdb usage, in-memory OLTP storage, and serverless auto-pause and billing metrics.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure SQL Database with metrics covering:
+
+          - **CPU and DTU** -- CPU utilization (average/max), instance CPU, DTU consumption, vCore usage
+          - **Memory** -- instance memory utilization
+          - **Storage** -- data and allocated storage, storage utilization, tempdb size, in-memory OLTP storage
+          - **I/O** -- data read and log write utilization, tempdb log utilization
+          - **Connections** -- successful, failed, and firewall-blocked connections, active sessions and workers
+          - **Availability** -- database availability percentage
+          - **Advanced** -- deadlocks, replication lag, serverless CPU/memory/billing, ledger digest, free tier usage
         method_description: *method_description
     alerts:
       - name: am_sql_database_availability
@@ -511,6 +684,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -680,7 +855,23 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor PostgreSQL Flexible Server including active connections, transaction rates, replication lag, storage and backup utilization, CPU and memory usage, IO throughput, autovacuum activity, PgBouncer connection pooling, database sessions, and burstable instance CPU credits.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure PostgreSQL Flexible Server with metrics covering:
+
+          - **Compute** -- CPU utilization, burstable CPU credits (consumed/remaining)
+          - **Memory** -- memory utilization
+          - **Storage** -- storage used/free, backup storage, WAL storage, database size, disk queue depth and saturation
+          - **I/O** -- IOPS (read/write), disk throughput, temp bytes/files
+          - **Connections** -- active connections, connection rate, max connections, PgBouncer client/server/pooled connections
+          - **Database** -- transaction rate, commits/rollbacks, tuple reads/writes, replication lag (time/bytes), deadlocks
+          - **Maintenance** -- autovacuum operations, table coverage, bloat percentage, buffer cache hit rate
+          - **Sessions** -- sessions by state and wait event type, backend count
+          - **Availability** -- database alive state
         method_description: *method_description
     alerts:
       - name: am_postgres_flexible_availability
@@ -779,6 +970,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -1089,7 +1282,20 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Cosmos DB accounts including request unit consumption and throttling, document counts and storage, data and index sizes, replication latency, availability percentages, provisioned throughput utilization, and normalized RU consumption per partition.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Cosmos DB with metrics covering:
+
+          - **Request units** -- RU consumption, provisioned throughput (provisioned/autoscale), normalized RU per partition
+          - **Storage** -- data, index, and quota storage, physical partition size
+          - **Latency** -- server-side latency (direct/gateway), replication latency
+          - **Requests** -- total requests, API requests (Mongo/Cassandra/Gremlin), metadata requests, dedicated gateway requests
+          - **Availability** -- service availability percentage
+          - **Advanced** -- document count, partition count, dedicated gateway CPU/memory, integrated cache hit rate
         method_description: *method_description
     alerts:
       - name: am_cosmos_db_availability
@@ -1152,6 +1358,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -1306,7 +1514,20 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Logic Apps workflow execution including run completions and failures, action execution counts, trigger firing rates, run and action latency, billable executions, and action-level success and failure breakdowns.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Logic Apps with metrics covering:
+
+          - **Runs** -- run lifecycle (started/completed/succeeded/failed/cancelled), run failure rate
+          - **Actions** -- action lifecycle (started/completed/succeeded/failed/skipped)
+          - **Triggers** -- trigger lifecycle (started/completed/succeeded/fired/failed/skipped)
+          - **Latency** -- run, action, and trigger latency
+          - **Billing** -- billable executions (total/actions/triggers), billing by type (native/connector/storage)
+          - **Throttling** -- run, action, and trigger throttling events
         method_description: *method_description
     alerts:
       - name: am_logic_apps_run_failure_rate
@@ -1377,6 +1598,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -1503,7 +1726,22 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Azure Virtual Machines including CPU utilization, available memory percentage, disk IOPS and throughput for OS, data, temp, and premium cache disks, disk burst and VM-level burst credit balances, network traffic, and inbound/outbound flow creation rates.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Virtual Machines with metrics covering:
+
+          - **Compute** -- CPU utilization, CPU credits (consumed/remaining)
+          - **Memory** -- available memory (bytes and percentage)
+          - **Disk** -- IOPS, throughput, latency, and queue depth for OS, data, and temp disks
+          - **Disk burst** -- burst credits and capacity for OS and data disks, VM-level cached/uncached burst credits
+          - **Disk cache** -- premium OS and data disk cache hit/miss rates
+          - **Network** -- traffic in/out, network flows, flow creation rate
+          - **Availability** -- VM availability state
+          - **Throttling** -- cached and uncached I/O bandwidth/IOPS throttling
         method_description: *method_description
     alerts:
       - name: am_vm_cpu
@@ -1622,6 +1860,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -1888,7 +2128,18 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor AKS cluster health including API server and etcd resource usage, pod scheduling status and readiness, node capacity and conditions, cluster autoscaler behavior, and per-node CPU, memory, disk, and network utilization.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Kubernetes Service (AKS) with metrics covering:
+
+          - **Control plane** -- API server CPU/memory, etcd CPU/memory/database utilization, inflight requests
+          - **Nodes** -- allocatable CPU/memory, per-node CPU (millicores and %), memory (RSS, working set), disk usage, network traffic
+          - **Pods** -- pods by phase, pods in ready state, node conditions
+          - **Autoscaler** -- autoscaler health, unneeded nodes, unschedulable pods
         method_description: *method_description
     alerts:
       - name: am_aks_apiserver_cpu
@@ -1959,6 +2210,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -2137,7 +2390,19 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Azure Storage Account operations including transaction counts, availability percentages, success and end-to-end latency, ingress and egress throughput, and used capacity.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Storage Account with metrics covering:
+
+          - **Transactions** -- transaction count
+          - **Latency** -- end-to-end latency and server latency (average/max)
+          - **Throughput** -- ingress and egress bytes per second
+          - **Availability** -- service availability percentage
+          - **Capacity** -- used storage capacity
         method_description: *method_description
     alerts:
       - name: am_storage_accounts_availability
@@ -2180,6 +2445,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -2242,7 +2509,18 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Azure Load Balancer health and throughput including data path and health probe availability, SYN and SNAT connection counts, byte and packet throughput, allocated and used SNAT ports, and connection attempt rates.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Load Balancer with metrics covering:
+
+          - **Availability** -- data path availability, health probe status, global backend availability
+          - **Throughput** -- byte and packet throughput
+          - **Connections** -- SNAT connections, SYN packet count
+          - **SNAT ports** -- allocated and used SNAT ports
         method_description: *method_description
     alerts:
       - name: am_load_balancers_vip_availability
@@ -2281,6 +2559,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -2354,7 +2634,23 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor App Service web applications including HTTP request rates and response status codes, response times, CPU and memory usage, network throughput, file IO operations, .NET runtime statistics (threads, GC, assemblies), Azure Functions execution counts and units, and Flex Consumption plan metrics.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure App Service with metrics covering:
+
+          - **Requests** -- HTTP request rate, response status codes (2xx/3xx/4xx/5xx), error detail (401/403/404/406)
+          - **Performance** -- response time, request queue depth
+          - **Compute** -- CPU utilization, CPU time consumed
+          - **Memory** -- memory usage (average working set, working set, private bytes)
+          - **Network** -- network traffic (received/sent), I/O throughput (read/write/other)
+          - **I/O** -- I/O operations (read/write/other), file handles
+          - **.NET runtime** -- threads, GC collections (gen0/gen1/gen2), loaded assemblies, app domains
+          - **Functions** -- function executions and execution units (MB-ms), always-ready and on-demand units
+          - **Health** -- health check status
         method_description: *method_description
     alerts:
       - name: am_app_service_health_check
@@ -2409,6 +2705,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -2605,7 +2903,21 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Azure Functions execution including function invocation counts, execution units (MB-milliseconds), HTTP request rates and response codes, CPU and memory consumption, and Flex Consumption plan metrics for always-ready and on-demand instances. Uses the same underlying metrics as App Service since Azure Functions runs on the App Service platform.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Functions with metrics covering:
+
+          - **Executions** -- function invocation counts, execution units (MB-milliseconds)
+          - **HTTP** -- request rates, response status codes
+          - **Compute** -- CPU utilization, CPU time consumed
+          - **Memory** -- memory usage (working set, private bytes)
+          - **Flex Consumption** -- always-ready and on-demand function executions and units
+
+          Azure Functions runs on the App Service platform and shares the same underlying metrics.
         method_description: *method_description
     metrics:
       folding:
@@ -2627,6 +2939,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -2823,7 +3137,23 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Azure Cache for Redis including cache hit and miss rates, read and write throughput, server load and CPU utilization, memory usage, connected clients, operations per second, command processing rates, latency percentiles, key eviction and expiration, and geo-replication health and sync status. Provides per-shard breakdowns for clustered deployments.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Cache for Redis with metrics covering:
+
+          - **Performance** -- operations/second, command processing rates (get/set), cache hit/miss rates
+          - **Latency** -- average latency, P99 latency
+          - **Compute** -- CPU utilization, server load
+          - **Memory** -- memory usage (used/RSS), memory utilization
+          - **Connections** -- connected clients, connection rate (created/closed)
+          - **Keys** -- total keys, evicted keys, expired keys, miss rate
+          - **Throughput** -- read/write bytes per second
+          - **Geo-replication** -- replication health, connectivity lag, sync events, data sync offset
+          - **Per-shard** -- instance-level breakdowns for hit rate, clients, commands, server load, keys, operations, throughput
         method_description: *method_description
     alerts:
       - name: am_redis_cache_server_load
@@ -2890,6 +3220,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -3120,7 +3452,21 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Event Hubs namespaces including incoming and outgoing message rates, byte throughput, captured messages and bytes, throttled and quota-exceeded request counts, active connections, and total connection counts.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Event Hubs with metrics covering:
+
+          - **Messages** -- message flow (in/out), captured messages and bytes
+          - **Throughput** -- data throughput (in/out bytes per second)
+          - **Connections** -- active connections, connection events (opened/closed)
+          - **Requests** -- incoming and successful request rates
+          - **Errors** -- server errors, user errors, throttled requests, quota exceeded
+          - **Replication** -- replication lag (messages and duration)
+          - **Resources** -- namespace size, CPU and memory utilization
         method_description: *method_description
     alerts:
       - name: am_event_hubs_server_errors
@@ -3183,6 +3529,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -3293,7 +3641,22 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Service Bus namespaces including incoming and outgoing message rates, active connections, active and dead-lettered message counts, scheduled message counts, completed and abandoned requests, server errors, throttled requests, CPU and memory utilization, and pending checkpoint operations.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Service Bus with metrics covering:
+
+          - **Messages** -- message flow (in/out), active messages, dead-lettered messages, scheduled messages, queue depth
+          - **Throughput** -- data throughput (in/out bytes per second)
+          - **Operations** -- completed and abandoned message operations, send latency
+          - **Connections** -- active connections, connection events (opened/closed)
+          - **Requests** -- incoming and successful request rates
+          - **Errors** -- server errors, user errors, throttled requests
+          - **Replication** -- replication lag (messages and duration)
+          - **Resources** -- namespace size, CPU and memory utilization, pending checkpoint operations
         method_description: *method_description
     alerts:
       - name: am_service_bus_server_errors
@@ -3364,6 +3727,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -3493,7 +3858,21 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Application Gateway performance including throughput and traffic volume, request rates and response status codes, backend health and latency breakdown (connect, first byte, last byte), client latency, current and new connections, WebSocket sessions, capacity and compute units, CPU utilization, TLS connections, and WAF security events including rule matches, challenges, and penalty box activity.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Application Gateway with metrics covering:
+
+          - **Traffic** -- throughput, traffic volume (received/sent), request rates (total/failed)
+          - **Response** -- gateway and backend response status codes
+          - **Backend** -- backend health (healthy/unhealthy hosts), backend latency (connect, first byte, last byte)
+          - **Client** -- client latency (total time, client RTT)
+          - **Connections** -- current and new connections, TLS connections, WebSocket connections
+          - **Capacity** -- capacity units, compute units, billed/fixed billed, CPU utilization
+          - **WAF** -- WAF requests (total/blocked/matched), rule matches (managed/custom/bot), challenges, penalty box
         method_description: *method_description
     alerts:
       - name: am_appgw_failed_requests
@@ -3544,6 +3923,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -3703,7 +4084,17 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Key Vault including overall vault availability, API saturation approaching service limits, and service API hit and latency metrics.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Key Vault with metrics covering:
+
+          - **Availability** -- overall vault availability percentage
+          - **API** -- API activity (hits/results), API latency
+          - **Saturation** -- API saturation approaching service limits
         method_description: *method_description
     alerts:
       - name: am_key_vault_availability
@@ -3738,6 +4129,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -3786,7 +4179,21 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor API Management gateway performance including request throughput, response status codes, gateway and backend response times, failed request counts, capacity utilization, event hub events, websocket message counts, and network connection status.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure API Management with metrics covering:
+
+          - **Requests** -- gateway request rate
+          - **Latency** -- request duration (overall and backend response time)
+          - **Compute** -- gateway CPU and memory utilization
+          - **Capacity** -- capacity utilization percentage
+          - **Events** -- EventHub events (successful/failed/dropped/rejected/throttled/timed out), EventHub bytes sent
+          - **WebSockets** -- WebSocket connection attempts, WebSocket messages
+          - **Network** -- network connectivity status
         method_description: *method_description
     alerts:
       - name: am_api_management_capacity
@@ -3853,6 +4260,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -3944,7 +4353,21 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Azure Front Door including request counts and rates, response sizes, total latency, origin health probe percentages, origin request counts, origin latency, WAF request counts by action and rule, and WebSocket connection metrics.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Front Door with metrics covering:
+
+          - **Requests** -- client and origin request rates, origin shield requests (to shield/to origin/rate limited)
+          - **Latency** -- total latency, origin latency
+          - **Data transfer** -- request and response data transfer, origin shield data transfer, byte hit ratio
+          - **Errors** -- 4xx and 5xx error rates
+          - **Origin** -- origin health probe percentage
+          - **WAF** -- WAF requests, challenges (CAPTCHA/JS challenge)
+          - **WebSocket** -- WebSocket connections (requested/active), connection duration
         method_description: *method_description
     alerts:
       - name: am_front_door_origin_health
@@ -3995,6 +4418,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -4100,7 +4525,24 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Virtual Machine Scale Sets including CPU utilization, available memory percentage, disk IOPS and throughput for OS, data, temp, and premium cache disks, disk burst and VM-level burst credit balances, network traffic, and inbound/outbound flow creation rates across all instances in the scale set.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Virtual Machine Scale Sets with metrics covering:
+
+          - **Compute** -- CPU utilization, CPU credits (consumed/remaining)
+          - **Memory** -- available memory (bytes and percentage)
+          - **Disk** -- IOPS, throughput, latency, and queue depth for OS, data, and temp disks
+          - **Disk burst** -- burst credits and capacity for OS and data disks, VM-level cached/uncached burst credits
+          - **Disk cache** -- premium OS and data disk cache hit/miss rates
+          - **Network** -- traffic in/out, network flows, flow creation rate
+          - **Availability** -- VMSS availability state
+          - **Throttling** -- cached and uncached I/O bandwidth/IOPS throttling
+
+          Metrics are aggregated across all instances in the scale set.
         method_description: *method_description
     alerts:
       - name: am_vmss_cpu
@@ -4227,6 +4669,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -4493,7 +4937,22 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor SQL Elastic Pool resource consumption including eDTU and CPU utilization, storage usage, active sessions and workers, IO rates, tempdb usage, and in-memory OLTP storage across all databases in the pool.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure SQL Elastic Pool with metrics covering:
+
+          - **CPU and DTU** -- CPU utilization (average/max), instance CPU, DTU consumption, eDTU and vCore usage
+          - **Memory** -- instance memory utilization
+          - **Storage** -- data and allocated storage, storage utilization, tempdb size, in-memory OLTP storage
+          - **I/O** -- data read and log write utilization, tempdb log utilization
+          - **Sessions** -- active sessions and workers count, serverless CPU/memory utilization
+          - **Billing** -- serverless billing (vCore-seconds)
+
+          Metrics are aggregated across all databases in the pool.
         method_description: *method_description
     alerts:
       - name: am_sql_elastic_pool_cpu
@@ -4572,6 +5031,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -4700,7 +5161,23 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor MySQL Flexible Server including active connections, aborted connections, query rates, replication lag, storage utilization, CPU and memory usage, IO operations, InnoDB buffer pool efficiency, network throughput, and HA replication status.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure MySQL Flexible Server with metrics covering:
+
+          - **Compute** -- CPU utilization, CPU credits (consumed/remaining)
+          - **Memory** -- memory utilization
+          - **Storage** -- storage used/limit, storage breakdown (data/ibdata1/binlog), backup storage, server log storage, I/O utilization
+          - **Connections** -- active connections, aborted connections, total connections, threads running
+          - **Queries** -- queries (total/slow), DML statements (select/insert/update/delete), DDL statements
+          - **InnoDB** -- buffer pool I/O (read requests/disk reads), buffer pool pages, data writes, row lock time/waits
+          - **Replication** -- replication lag (replica/HA), HA status (I/O/SQL), replica status
+          - **Network** -- network traffic (in/out)
+          - **Health** -- uptime, deadlocks, lock timeouts
         method_description: *method_description
     alerts:
       - name: am_mysql_flexible_cpu
@@ -4799,6 +5276,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -5042,7 +5521,21 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Container Apps including CPU and memory usage, network traffic, replica counts, request processing rates, response times, restart frequency, and resource reservation utilization.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Container Apps with metrics covering:
+
+          - **Compute** -- CPU usage (nanocores and percentage), GPU utilization
+          - **Memory** -- memory working set, memory percentage, JVM memory (total/pool/buffer)
+          - **Requests** -- request rate, response time
+          - **Network** -- network traffic (received/sent), resiliency pending connections and timeouts
+          - **Replicas** -- replica count, restart count, reserved cores
+          - **JVM** -- thread count, GC collections and duration, buffer count
+          - **Resiliency** -- host ejections, request retries
         method_description: *method_description
     alerts:
       - name: am_container_apps_cpu_utilization
@@ -5109,6 +5602,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -5278,7 +5773,20 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Azure Firewall including data processed, throughput, application and network rule hit counts, SNAT port utilization, health state percentage, and latency probes.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Firewall with metrics covering:
+
+          - **Traffic** -- data processed, throughput (bits/s)
+          - **Rules** -- application and network rule hit counts
+          - **SNAT** -- SNAT port utilization
+          - **Health** -- firewall health state percentage
+          - **Latency** -- latency probe
+          - **Capacity** -- observed capacity units
         method_description: *method_description
     alerts:
       - name: am_firewall_health
@@ -5313,6 +5821,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -5380,7 +5890,26 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Azure AI and Cognitive Services including API call volume, success and client error rates, response latency, token processing rates for language models, content safety filtering, fine-tuning operations, provisioned throughput utilization, rate-limiting events, active inference connections, and context token cache performance.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure AI and Cognitive Services with metrics covering:
+
+          - **API calls** -- total calls (successful/blocked/token), model requests, OpenAI requests
+          - **Errors** -- total, client, and server errors, rate limiting events
+          - **Latency** -- service latency, model latency (time to response/first token/between tokens/last byte)
+          - **Tokens** -- model token usage (input/output/total), OpenAI token usage (prompt/generated), cache tokens (read/write)
+          - **Availability** -- service availability, model availability, OpenAI availability
+          - **Content safety** -- content moderation calls (text/image), safety system events, harmful/blocked requests
+          - **Speech** -- transcription, translation, synthesis, speaker recognition, voice training/hosting
+          - **Vision** -- computer vision and custom vision transactions, images stored, training time
+          - **Translator** -- text and document translation (standard/custom)
+          - **Provisioned** -- model provisioned utilization, OpenAI provisioned-managed utilization
+          - **Fine-tuning** -- training hours
+          - **Personalizer** -- events, rewards, actions, feature cardinality
         method_description: *method_description
     alerts:
       - name: am_cognitive_services_availability
@@ -5471,6 +6000,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -5996,7 +6527,22 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor VPN Gateway including site-to-site bandwidth and BGP peer status, point-to-site connection counts and bandwidth, per-tunnel ingress and egress traffic with packet counts and drops, IPsec security association counts, route table sizes, NAT flow counts and packet translations, and gateway-level bandwidth utilization.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure VPN Gateway with metrics covering:
+
+          - **Site-to-site** -- S2S bandwidth, tunnel bandwidth, tunnel bytes (ingress/egress), tunnel packets and drops
+          - **Point-to-site** -- P2S connection count, P2S bandwidth
+          - **BGP** -- BGP peer status, routes advertised and learned
+          - **ExpressRoute** -- ExpressRoute gateway bandwidth, CPU, packets, active flows, route changes, VMs in VNet
+          - **IPsec** -- MMSA and QMSA security association counts
+          - **NAT** -- NAT flows, NAT allocations, NATed bytes and packets, NAT packet drops
+          - **Routes** -- user VPN and VNet prefix route counts
+          - **Flows** -- gateway inbound/outbound flows, tunnel total flows, peak PPS, TS mismatch drops
         method_description: *method_description
     alerts:
       - name: am_vpn_gateway_tunnel_packet_drops
@@ -6075,6 +6621,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -6343,7 +6891,18 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Event Grid topics including publish success and failure counts, publish latency, event delivery and routing rates, delivery success and failure counts, dead-lettered events, and matched event routing.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Event Grid with metrics covering:
+
+          - **Publishing** -- publish rate (success/failed), publish latency
+          - **Delivery** -- events delivered, failed, dropped, and dead-lettered
+          - **Routing** -- matched and unmatched event routing, destination processing duration
+          - **Filters** -- advanced filter evaluations
         method_description: *method_description
     alerts:
       - name: am_event_grid_publish_failures
@@ -6390,6 +6949,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -6455,7 +7016,23 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor IoT Hub including device telemetry message rates and quota usage, routing delivery and latency, device twin read and write operations, direct method invocations, cloud-to-device messaging and feedback, job completion rates, device connection and authentication events, and event grid publish status.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure IoT Hub with metrics covering:
+
+          - **Telemetry** -- device telemetry messages (attempted/sent), throttling errors, daily message quota usage
+          - **Routing** -- message deliveries by endpoint (Event Hubs, Service Bus, storage), routing latency, delivery status
+          - **Device twins** -- backend and device twin reads/writes (successful/failed), query results
+          - **Direct methods** -- method invocations (successful/failed), request/response sizes
+          - **Cloud-to-device** -- C2D commands (completed/abandoned/rejected), expired messages
+          - **Jobs** -- job completions, cancellations, list calls, twin update and method job creations
+          - **Connections** -- successful connections, connected devices, total devices
+          - **Event Grid** -- Event Grid deliveries, Event Grid latency
+          - **Data** -- device data usage
         method_description: *method_description
     alerts:
       - name: am_iot_hub_d2c_telemetry_throttle
@@ -6546,6 +7123,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -6832,7 +7411,22 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Data Factory including pipeline, activity, and trigger run success and failure counts, integration runtime CPU and memory utilization, available capacity and queue lengths, SSIS package execution rates, copy operations throughput, data flow processing metrics, and overall factory resource utilization.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Data Factory with metrics covering:
+
+          - **Pipeline runs** -- pipeline runs (succeeded/failed/cancelled), elapsed time runs
+          - **Activity runs** -- activity runs (succeeded/failed/cancelled)
+          - **Trigger runs** -- trigger runs (succeeded/failed/cancelled)
+          - **Integration runtime** -- IR CPU and memory utilization, available nodes, queue length, task pickup delay
+          - **SSIS** -- SSIS package executions (succeeded/failed/cancelled), IR start/stop operations
+          - **MVNet IR** -- pipeline and copy capacity/utilization, external capacity, queue lengths
+          - **Airflow IR** -- CPU and memory, DAG processing, task instances, scheduler activity, triggers, pool slots
+          - **Factory** -- entity count, factory size (current/max allowed)
         method_description: *method_description
     alerts:
       - name: am_data_factory_pipeline_failed_runs
@@ -6959,6 +7553,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -7315,7 +7911,18 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor NAT Gateway including byte and packet counts, connection counts, dropped packets, total SNAT connection counts, and datapath availability.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure NAT Gateway with metrics covering:
+
+          - **Throughput** -- byte and packet throughput
+          - **Connections** -- SNAT connections, total SNAT connections
+          - **Drops** -- dropped packets
+          - **Availability** -- datapath availability percentage
         method_description: *method_description
     alerts:
       - name: am_nat_gateway_datapath_availability
@@ -7354,6 +7961,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -7413,7 +8022,17 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Container Instance groups including CPU and memory usage and network bytes transferred in and out.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Container Instances with metrics covering:
+
+          - **Compute** -- CPU usage (average/max)
+          - **Memory** -- memory usage (average/max)
+          - **Network** -- network traffic (received/sent)
         method_description: *method_description
     alerts:
       - name: am_container_instances_cpu_usage
@@ -7452,6 +8071,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -7497,7 +8118,17 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Container Registry including storage usage, successful and failed pull and push operation counts, and task run duration.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Container Registry with metrics covering:
+
+          - **Operations** -- image pulls (successful/total), image pushes (successful/total)
+          - **Storage** -- storage used
+          - **Tasks** -- task run duration, agent pool CPU time
         method_description: *method_description
     alerts:
       - name: am_container_registry_pull_failures
@@ -7528,6 +8159,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -7584,7 +8217,22 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor application performance through Application Insights including availability test results and duration, server request rates and response times, dependency call tracking and failures, exception rates by source, browser page load timing breakdown, process CPU and memory usage, IO rates, HTTP request queue depth, page views, and trace volume.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Application Insights with metrics covering:
+
+          - **Availability** -- availability test percentage, test duration
+          - **Requests** -- server request rate, HTTP request rate, HTTP request execution time, request queue depth
+          - **Responses** -- server response time, server requests (total/failed)
+          - **Dependencies** -- dependency calls (total/failed), dependency duration
+          - **Exceptions** -- exception rate, exceptions by source (total/browser/server)
+          - **Browser** -- page load time, browser timing breakdown (network/send/receive/processing), page views
+          - **Process** -- CPU utilization (process/processor), memory (available/private), I/O rate
+          - **Traces** -- trace volume
         method_description: *method_description
     alerts:
       - name: am_appinsights_availability
@@ -7663,6 +8311,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -7821,7 +8471,19 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor ExpressRoute circuits including bits per second in and out, ARP and BGP availability percentages, packet drops, and QoS bit rate throughput.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure ExpressRoute Circuit with metrics covering:
+
+          - **Throughput** -- circuit throughput (bits/s in/out), GlobalReach throughput
+          - **Availability** -- ARP availability, BGP availability
+          - **Bandwidth** -- bandwidth utilization (ingress/egress)
+          - **QoS** -- QoS dropped bits (in/out)
+          - **Routes** -- FastPath routes count
         method_description: *method_description
     alerts:
       - name: am_express_route_circuit_arp_availability
@@ -7868,6 +8530,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -7938,7 +8602,23 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Azure Machine Learning workspaces including active model deployments and registered models, pipeline run completions and failures, compute node utilization and preemptions, quota usage, managed endpoint request latency and rates, estimated GPU utilization, and storage utilization.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Machine Learning with metrics covering:
+
+          - **Compute** -- CPU utilization and millicores (used/capacity), CPU memory (used/capacity)
+          - **GPU** -- GPU utilization (cluster/node), GPU memory (used/capacity), GPU energy
+          - **Cluster** -- total cores and nodes, cluster cores and nodes by state (active/idle/leaving/preempted/unusable)
+          - **Runs** -- run completion (completed/failed/cancelled), run lifecycle, run issues (errors/warnings)
+          - **Models** -- model registrations (succeeded/failed), model deployments (started/succeeded/failed)
+          - **Quota** -- quota utilization
+          - **Storage** -- disk I/O (read/write), disk usage (used/available), storage API calls
+          - **Network** -- network traffic (in/out), InfiniBand traffic
+          - **AI agents** -- agent runs, messages, tokens, tool calls, events, indexed files
         method_description: *method_description
     alerts:
       - name: am_ml_quota_utilization
@@ -8021,6 +8701,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -8260,7 +8942,24 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Azure Data Explorer (Kusto) clusters including ingestion latency, volume, and success rates, query performance and concurrency, cache utilization, CPU and memory usage, export operations, streaming ingest throughput, materialized view health, instance counts, and follower lag.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Data Explorer (Kusto) with metrics covering:
+
+          - **Ingestion** -- ingestion latency, volume, result (success/failure), queue length, batch processing
+          - **Queries** -- query count, query duration, concurrent queries, throttled queries/commands
+          - **Streaming ingest** -- data rate, duration, result, utilization
+          - **Cache** -- cache and ingestion utilization
+          - **Compute** -- CPU utilization
+          - **Export** -- continuous export records, result, lateness, pending jobs, export utilization
+          - **Materialized views** -- view health, age, data loss, records in delta, extents rebuild
+          - **Cluster** -- instance count (average/max/min), keep alive, total extents
+          - **Events** -- events received/processed/dropped, blobs received/processed/dropped
+          - **Advanced** -- follower latency, discovery latency, weak consistency latency, partitioning percentage
         method_description: *method_description
     alerts:
       - name: am_data_explorer_keep_alive
@@ -8367,6 +9066,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -8663,7 +9364,20 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Stream Analytics jobs including input and output event counts, streaming unit utilization, watermark delay, backlogged input events, runtime and data conversion errors, out-of-order events, and late input events.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Stream Analytics with metrics covering:
+
+          - **Events** -- event flow (in/out), backlogged input events
+          - **Errors** -- runtime errors, data conversion errors, deserialization errors
+          - **Timing** -- late, early, and out-of-order events, watermark delay
+          - **Resources** -- CPU and streaming unit memory utilization
+          - **Input** -- input data throughput, input sources received
+          - **Functions** -- function events and requests (total/failed)
         method_description: *method_description
     alerts:
       - name: am_stream_analytics_su_utilization
@@ -8726,6 +9440,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -8817,7 +9533,19 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Synapse Analytics workspaces including pipeline and activity run metrics, SQL request counts and data processing volumes, data flow activity execution, integration runtime CPU and memory utilization, and link table event processing.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Synapse Analytics with metrics covering:
+
+          - **Pipeline** -- pipeline runs, activity runs, trigger runs
+          - **SQL pool** -- built-in SQL pool requests, login attempts, data processed
+          - **Streaming** -- event flow (in/out), event timing (late/early/out-of-order/backlogged), watermark delay, resource utilization, errors
+          - **Streaming I/O** -- input data throughput, input sources received
+          - **Link** -- connection events, processed data volume, changed rows, processing latency, table events
         method_description: *method_description
     alerts:
       - name: am_synapse_streaming_resource_utilization
@@ -8872,6 +9600,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -9010,7 +9740,18 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor Log Analytics workspaces including ingestion volume and latency, query execution counts and volume, available storage capacity, and per-table breakdowns of ingestion rates and billing volume.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure Log Analytics Workspace with metrics covering:
+
+          - **Ingestion** -- ingestion volume (records/s), ingestion latency (average/max/min)
+          - **Queries** -- query count (total/failed), query availability
+          - **Export** -- exported data (bytes/s), exported records
+          - **Legacy agent** -- CPU utilization (processor/privileged/user/idle), memory (available/used/free), disk (free space/utilization/I/O/queue/latency), network (traffic/packets/errors/throughput), swap, paging, system processes, uptime, events, heartbeats, users
         method_description: *method_description
     alerts:
       - name: am_log_analytics_query_availability
@@ -9089,6 +9830,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:
@@ -9370,7 +10113,19 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor ExpressRoute gateways including bits and packets per second for ingress and egress, connection counts, CPU utilization, active flow counts, and gateway scale unit counts.
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure ExpressRoute Gateway with metrics covering:
+
+          - **Throughput** -- gateway throughput, connection throughput (bits/s in/out), packets per second
+          - **Compute** -- CPU utilization
+          - **Flows** -- active flows, max flow creation rate
+          - **Routes** -- routes advertised to peer, routes learned from peer, route changes
+          - **Scale** -- VMs in VNet
         method_description: *method_description
     alerts:
       - name: am_express_route_gateway_cpu
@@ -9413,6 +10168,8 @@ modules:
               description: "The Azure resource type identifier."
             - name: profile
               description: "The Azure Monitor profile id."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
           metrics:

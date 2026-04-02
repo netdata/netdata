@@ -17,6 +17,12 @@
 | [[ item.resolver ]] | [[ item.syntax ]] | [[ item.best_for ]] | [[ item.notes ]] |
 [% endfor %]
 
+## Choosing a Resolver
+
+[% for item in page.choosing_a_resolver %]
+- [[ item ]]
+[% endfor %]
+
 [% for section in page.sections %]
 [[ section.heading ]]
 
@@ -74,6 +80,16 @@ Each file contains a `jobs` array. The backend kind is determined by the filenam
 [[ page.store.file_note ]]
 
 :::
+
+[[ page.store.file_directory ]]
+
+### Multiple Secretstores
+
+[[ page.store.multiple_stores ]]
+
+### Mixing Resolver Types
+
+[[ page.store.mixing ]]
 
 [[ page.secretstores.heading ]]
 

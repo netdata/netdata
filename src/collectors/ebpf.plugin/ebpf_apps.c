@@ -829,10 +829,12 @@ void ebpf_del_pid_entry(pid_t pid)
 static void ebpf_cleanup_exited_pids()
 {
     ebpf_pid_data_t *p = NULL;
-    for (p = ebpf_pids_link_list; p; p = p->next) {
+    for (p = ebpf_pids_link_list; p;) {
+        ebpf_pid_data_t *next = p->next;
         if (!p->has_proc_file) {
             ebpf_reset_specific_pid_data(p);
         }
+        p = next;
     }
 }
 

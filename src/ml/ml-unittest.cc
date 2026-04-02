@@ -179,9 +179,9 @@ static void test_features_zero_smooth_matches_one()
 
     ML_TEST_ASSERT(pf0.size() == pf1.size(), "smooth_n=0 and smooth_n=1 should produce the same number of vectors");
     for (size_t i = 0; i < pf0.size() && i < pf1.size(); i++) {
-        for (long j = 0; j < pf0[i].size(); j++) {
+        for (size_t j = 0; j < features0.lag_n + 1; j++) {
             char msg[128];
-            snprintf(msg, sizeof(msg), "smooth_n=0 should match smooth_n=1 at feature[%zu](%ld)", i, j);
+            snprintf(msg, sizeof(msg), "smooth_n=0 should match smooth_n=1 at feature[%zu](%zu)", i, j);
             ML_TEST_ASSERT_DOUBLE_EQ(pf0[i](j), pf1[i](j), 1e-12, msg);
         }
     }
@@ -757,6 +757,111 @@ static void test_parameter_combinations()
     }
 }
 
+// Test: timestamps > INT32_MAX must survive serialize -> deserialize unchanged.
+// Before the bounds-check fix, the (time_t) cast of json_object_get_int64()
+// would silently truncate on 32-bit time_t, breaking model ordering/pruning.
+static void test_kmeans_timestamp_roundtrip()
+{
+    fprintf(stderr, "  test_kmeans_timestamp_roundtrip...\n");
+
+    // 3 000 000 000 > INT32_MAX (2 147 483 647). On 32-bit time_t the value
+    // doesn't fit, so skip — the guard would correctly reject it on the way in.
+    if (sizeof(time_t) < 8) {
+        fprintf(stderr, "    skipped (time_t is 32-bit on this platform)\n");
+        return;
+    }
+
+    const time_t large_after  = (time_t) 3000000000LL;
+    const time_t large_before = (time_t) 3000003600LL;
+
+    ml_kmeans_inlined_t original;
+    original.cluster_centers[0].set_size(6);
+    original.cluster_centers[1].set_size(6);
+    for (int i = 0; i < 6; i++) {
+        original.cluster_centers[0](i) = (double)(i + 1);
+        original.cluster_centers[1](i) = (double)(i + 7);
+    }
+    original.min_dist = 1.5;
+    original.max_dist = 9.5;
+    original.after    = large_after;
+    original.before   = large_before;
+
+    BUFFER *wb = buffer_create(0, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    ml_kmeans_serialize(&original, wb);
+    buffer_json_finalize(wb);
+
+    struct json_object *root = json_tokener_parse(buffer_tostring(wb));
+    ML_TEST_ASSERT(root != NULL, "round-trip: serialized output must be valid JSON");
+
+    if (root) {
+        ml_kmeans_inlined_t result;
+        result.cluster_centers[0].set_size(6);
+        result.cluster_centers[1].set_size(6);
+
+        bool ok = ml_kmeans_deserialize(&result, root);
+        ML_TEST_ASSERT(ok, "round-trip: deserialize must succeed for large timestamp");
+
+        if (ok) {
+            ML_TEST_ASSERT(result.after  == large_after,
+                           "round-trip: 'after' must survive unchanged (> INT32_MAX)");
+            ML_TEST_ASSERT(result.before == large_before,
+                           "round-trip: 'before' must survive unchanged (> INT32_MAX)");
+        }
+
+        json_object_put(root);
+    }
+
+    buffer_free(wb);
+}
+
+// Test: deserialize must reject models carrying negative timestamps.
+// Negative Unix timestamps are never valid for ML model windows.
+static void test_kmeans_timestamp_rejection()
+{
+    fprintf(stderr, "  test_kmeans_timestamp_rejection...\n");
+
+    // Build a fully-valid kmeans JSON object and then override one timestamp
+    // field to an invalid value, verifying that ml_kmeans_deserialize rejects it.
+    auto make_full_root = [](int64_t after_val, int64_t before_val) -> struct json_object * {
+        struct json_object *r = json_object_new_object();
+        json_object_object_add(r, "after",    json_object_new_int64(after_val));
+        json_object_object_add(r, "before",   json_object_new_int64(before_val));
+        json_object_object_add(r, "min_dist", json_object_new_double(1.0));
+        json_object_object_add(r, "max_dist", json_object_new_double(9.0));
+
+        struct json_object *cc = json_object_new_array();
+        for (int c = 0; c < 2; c++) {
+            struct json_object *cv = json_object_new_array();
+            for (int i = 0; i < 6; i++)
+                json_object_array_add(cv, json_object_new_double((double)(c * 6 + i + 1)));
+            json_object_array_add(cc, cv);
+        }
+        json_object_object_add(r, "cluster_centers", cc);
+        return r;
+    };
+
+    {
+        struct json_object *r = make_full_root(-1LL, 100LL);
+        ml_kmeans_inlined_t km;
+        km.cluster_centers[0].set_size(6);
+        km.cluster_centers[1].set_size(6);
+        bool ok = ml_kmeans_deserialize(&km, r);
+        ML_TEST_ASSERT(!ok, "negative 'after' must be rejected");
+        json_object_put(r);
+    }
+
+    {
+        struct json_object *r = make_full_root(100LL, -1LL);
+        ml_kmeans_inlined_t km;
+        km.cluster_centers[0].set_size(6);
+        km.cluster_centers[1].set_size(6);
+        bool ok = ml_kmeans_deserialize(&km, r);
+        ML_TEST_ASSERT(!ok, "negative 'before' must be rejected");
+        json_object_put(r);
+    }
+}
+
 extern "C" int ml_unittest()
 {
     fprintf(stderr, "\nML unit tests:\n");
@@ -781,6 +886,8 @@ extern "C" int ml_unittest()
     test_preprocess_predict_equivalence();
     test_constant_input();
     test_parameter_combinations();
+    test_kmeans_timestamp_roundtrip();
+    test_kmeans_timestamp_rejection();
 
     fprintf(stderr, "\nML tests: %d run, %d failed\n", tests_run, tests_failed);
 

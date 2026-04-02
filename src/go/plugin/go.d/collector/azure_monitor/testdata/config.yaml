@@ -1,18 +1,24 @@
 update_every: 60
-subscription_id: sub-1
+subscription_ids:
+  - sub-1
 cloud: public
-discovery_every: 300
+discovery:
+  refresh_every: 300
+  mode: filters
+  mode_filters:
+    resource_groups:
+      - rg-a
+profiles:
+  mode: exact
+  mode_exact:
+    names:
+      - sql_managed_instance
 query_offset: 180
 timeout: 30
-max_concurrency: 4
-max_batch_resources: 50
-max_metrics_per_query: 20
-profile_selection_mode: exact
-profile_selection_mode_exact:
-  profiles:
-    - sql_managed_instance
-resource_groups:
-  - rg-a
+limits:
+  max_concurrency: 4
+  max_batch_resources: 50
+  max_metrics_per_query: 20
 auth:
   mode: service_principal
   mode_service_principal:

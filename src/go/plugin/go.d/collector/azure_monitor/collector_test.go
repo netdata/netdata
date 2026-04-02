@@ -4,8 +4,10 @@ package azure_monitor
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -39,6 +41,72 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
+func TestConfigSchema_RuntimeContract(t *testing.T) {
+	raw, err := os.ReadFile("config_schema.json")
+	require.NoError(t, err)
+
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal(raw, &doc))
+
+	schema := requireMapField(t, doc, "jsonSchema")
+	assert.ElementsMatch(t, []string{"subscription_ids", "auth"}, requireStringSliceField(t, schema, "required"))
+
+	properties := requireMapField(t, schema, "properties")
+
+	discovery := requireMapField(t, properties, "discovery")
+	assert.NotContains(t, discovery, "required")
+	discoveryProps := requireMapField(t, discovery, "properties")
+	assert.Contains(t, discoveryProps, "refresh_every")
+	assert.Contains(t, discoveryProps, "mode")
+	assert.NotContains(t, discoveryProps, "mode_filters")
+	assert.NotContains(t, discoveryProps, "mode_query")
+
+	profiles := requireMapField(t, properties, "profiles")
+	assert.NotContains(t, profiles, "required")
+	profileProps := requireMapField(t, profiles, "properties")
+	assert.Contains(t, profileProps, "mode")
+	assert.NotContains(t, profileProps, "mode_exact")
+	assert.NotContains(t, profileProps, "mode_combined")
+
+	uiSchema := requireMapField(t, doc, "uiSchema")
+	uiProfiles := requireMapField(t, uiSchema, "profiles")
+	_, hasIDs := uiProfiles["ids"]
+	assert.False(t, hasIDs)
+	_, hasNames := uiProfiles["names"]
+	assert.False(t, hasNames)
+	_, hasModeExact := uiProfiles["mode_exact"]
+	assert.True(t, hasModeExact)
+	_, hasModeCombined := uiProfiles["mode_combined"]
+	assert.True(t, hasModeCombined)
+}
+
+func requireMapField(t *testing.T, m map[string]any, key string) map[string]any {
+	t.Helper()
+
+	value, ok := m[key]
+	require.Truef(t, ok, "missing key %q", key)
+	out, ok := value.(map[string]any)
+	require.Truef(t, ok, "key %q is not an object", key)
+	return out
+}
+
+func requireStringSliceField(t *testing.T, m map[string]any, key string) []string {
+	t.Helper()
+
+	value, ok := m[key]
+	require.Truef(t, ok, "missing key %q", key)
+	items, ok := value.([]any)
+	require.Truef(t, ok, "key %q is not an array", key)
+
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		s, ok := item.(string)
+		require.Truef(t, ok, "key %q contains a non-string item", key)
+		out = append(out, s)
+	}
+	return out
+}
+
 func TestCollector_ConfigurationSerialize(t *testing.T) {
 	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
@@ -60,11 +128,11 @@ func TestCollector_Init(t *testing.T) {
 		},
 		"fails on negative timeout": {
 			cfg: Config{
-				SubscriptionID:       "sub-1",
-				Timeout:              confopt.Duration(-time.Second),
-				ProfileSelectionMode: profileSelectionModeExact,
-				ProfileSelectionModeExact: &ProfileSelectionModeExactConfig{
-					Profiles: []string{"postgres_flexible"},
+				SubscriptionIDs: []string{"sub-1"},
+				Timeout:         confopt.Duration(-time.Second),
+				Profiles: ProfilesConfig{
+					Mode:      profilesModeExact,
+					ModeExact: &ProfilesModeConfig{Names: []string{"postgres_flexible"}},
 				},
 				Auth: cloudauth.AzureADAuthConfig{
 					Mode: cloudauth.AzureADAuthModeDefault,
@@ -153,14 +221,24 @@ func TestCollector_UsesConfiguredTimeout(t *testing.T) {
 			setup: func(c *Collector, rg *mockResourceGraph, mx *mockMetricsClient) {
 				c.Config = testConfig()
 				c.Config.Timeout = confopt.Duration(timeout)
-				c.Config.ProfileSelectionMode = profileSelectionModeAuto
-				c.Config.ProfileSelectionModeExact = nil
+				c.Config.Profiles.Mode = profilesModeAuto
+				c.Config.Profiles.ModeExact = nil
+				c.Config.Profiles.ModeCombined = nil
 				rg.resources = []map[string]any{
-					{"type": "microsoft.dbforpostgresql/flexibleservers", "count_": int64(1)},
+					{
+						"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+						"name":          "pg-a",
+						"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+						"resourceGroup": "rg-a",
+						"location":      "eastus",
+					},
 				}
 			},
 			act: func(ctx context.Context, c *Collector) error {
-				return c.Init(ctx)
+				if err := c.Init(ctx); err != nil {
+					return err
+				}
+				return c.Check(ctx)
 			},
 			deadline: func(rg *mockResourceGraph, _ *mockMetricsClient) (time.Duration, bool) {
 				return rg.lastTimeout()
@@ -182,6 +260,9 @@ func TestCollector_UsesConfiguredTimeout(t *testing.T) {
 			},
 			act: func(ctx context.Context, c *Collector) error {
 				if err := c.Init(ctx); err != nil {
+					return err
+				}
+				if err := c.Check(ctx); err != nil {
 					return err
 				}
 				_, err := c.refreshDiscovery(ctx, true)
@@ -261,6 +342,7 @@ func TestCollector_ChartTemplateYAML(t *testing.T) {
 	}
 
 	require.NoError(t, c.Init(context.Background()))
+	require.NoError(t, c.Check(context.Background()))
 
 	tpl := c.ChartTemplateYAML()
 	collecttest.AssertChartTemplateSchema(t, tpl)
@@ -273,7 +355,36 @@ func TestCollector_ChartTemplateYAML(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCollector_Collect(t *testing.T) {
+func TestCollector_InitThenCheckRunsSingleDiscoveryBootstrap(t *testing.T) {
+	rg := &mockResourceGraph{
+		resources: []map[string]any{
+			{
+				"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+				"name":          "pg-a",
+				"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+				"resourceGroup": "rg-a",
+				"location":      "eastus",
+			},
+		},
+	}
+
+	c := New()
+	c.Config = testConfig()
+	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
+		return rg, nil
+	}
+	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
+		return &mockMetricsClient{}, nil
+	}
+
+	require.NoError(t, c.Init(context.Background()))
+	assert.Equal(t, 0, rg.calls())
+
+	require.NoError(t, c.Check(context.Background()))
+	assert.Equal(t, 1, rg.calls())
+}
+
+func TestCollector_RefreshDiscoveryDisabledWhenRefreshEveryZero(t *testing.T) {
 	now := time.Date(2026, 3, 7, 12, 0, 0, 0, time.UTC)
 
 	rg := &mockResourceGraph{
@@ -285,53 +396,301 @@ func TestCollector_Collect(t *testing.T) {
 				"resourceGroup": "rg-a",
 				"location":      "eastus",
 			},
-			{
-				"id":            "/subscriptions/sub-1/resourceGroups/rg-b/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-b",
-				"name":          "pg-b",
-				"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
-				"resourceGroup": "rg-b",
-				"location":      "eastus",
-			},
 		},
 	}
-
 	mx := &mockMetricsClient{
 		queryResponse: azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
 			{
 				ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
 				Values: []azmetrics.Metric{
 					metricWithAvg("cpu_percent", now, 21.5),
-					metricWithAvg("storage_percent", now, 61.2),
-				},
-			},
-			{
-				ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-b/providers/microsoft.dbforpostgresql/flexibleservers/pg-b"),
-				Values: []azmetrics.Metric{
-					metricWithAvg("cpu_percent", now, 33.1),
-					metricWithAvg("storage_percent", now, 72.8),
 				},
 			},
 		}}},
 	}
 
-	c := New()
+	c := newTestCollectorWithMocks(rg, mx)
 	c.Config = testConfig()
+	c.Config.Discovery.RefreshEvery = 0
 	c.now = func() time.Time { return now }
-	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
-		return rg, nil
-	}
-	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
-		return mx, nil
-	}
 
 	require.NoError(t, c.Init(context.Background()))
+	require.NoError(t, c.Check(context.Background()))
+	assert.Equal(t, 1, rg.calls())
 
-	series, err := collecttest.CollectScalarSeries(c, metrix.ReadRaw())
+	now = now.Add(10 * time.Minute)
+
+	_, err := collecttest.CollectScalarSeries(c, metrix.ReadRaw())
 	require.NoError(t, err)
+	assert.Equal(t, 1, rg.calls())
+}
 
-	assert.GreaterOrEqual(t, len(series), 4)
-	assert.GreaterOrEqual(t, rg.calls(), 1)
-	assert.GreaterOrEqual(t, mx.calls(), 1)
+func TestCollector_CollectScenarios(t *testing.T) {
+	now := time.Date(2026, 3, 7, 12, 0, 0, 0, time.UTC)
+
+	tests := map[string]struct {
+		prepare func(*Collector, *mockResourceGraph, *mockMetricsClient)
+		check   func(*testing.T, map[string]metrix.SampleValue, error, *mockResourceGraph, *mockMetricsClient)
+	}{
+		"success on discovered resources": {
+			prepare: func(c *Collector, rg *mockResourceGraph, mx *mockMetricsClient) {
+				c.Config = testConfig()
+				c.now = func() time.Time { return now }
+				rg.resources = []map[string]any{
+					{
+						"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+						"name":          "pg-a",
+						"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+						"resourceGroup": "rg-a",
+						"location":      "eastus",
+					},
+					{
+						"id":            "/subscriptions/sub-1/resourceGroups/rg-b/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-b",
+						"name":          "pg-b",
+						"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+						"resourceGroup": "rg-b",
+						"location":      "eastus",
+					},
+				}
+				mx.queryResponse = azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
+					{
+						ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
+						Values: []azmetrics.Metric{
+							metricWithAvg("cpu_percent", now, 21.5),
+							metricWithAvg("storage_percent", now, 61.2),
+						},
+					},
+					{
+						ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-b/providers/microsoft.dbforpostgresql/flexibleservers/pg-b"),
+						Values: []azmetrics.Metric{
+							metricWithAvg("cpu_percent", now, 33.1),
+							metricWithAvg("storage_percent", now, 72.8),
+						},
+					},
+				}}}
+			},
+			check: func(t *testing.T, series map[string]metrix.SampleValue, err error, rg *mockResourceGraph, mx *mockMetricsClient) {
+				require.NoError(t, err)
+				assert.GreaterOrEqual(t, len(series), 4)
+				assert.Equal(t, 1, rg.calls())
+				assert.GreaterOrEqual(t, mx.calls(), 1)
+			},
+		},
+		"collects across multiple subscriptions": {
+			prepare: func(c *Collector, rg *mockResourceGraph, mx *mockMetricsClient) {
+				c.Config = testConfig()
+				c.Config.SubscriptionIDs = []string{"sub-1", "sub-2"}
+				c.now = func() time.Time { return now }
+				rg.resources = []map[string]any{
+					{
+						"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+						"name":          "pg-a",
+						"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+						"resourceGroup": "rg-a",
+						"location":      "eastus",
+					},
+					{
+						"id":            "/subscriptions/sub-2/resourceGroups/rg-b/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-b",
+						"name":          "pg-b",
+						"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+						"resourceGroup": "rg-b",
+						"location":      "eastus",
+					},
+				}
+				mx.queryResponse = azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
+					{
+						ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
+						Values: []azmetrics.Metric{
+							metricWithAvg("cpu_percent", now, 21.5),
+						},
+					},
+					{
+						ResourceID: ptrString("/subscriptions/sub-2/resourcegroups/rg-b/providers/microsoft.dbforpostgresql/flexibleservers/pg-b"),
+						Values: []azmetrics.Metric{
+							metricWithAvg("cpu_percent", now, 33.1),
+						},
+					},
+				}}}
+			},
+			check: func(t *testing.T, series map[string]metrix.SampleValue, err error, rg *mockResourceGraph, mx *mockMetricsClient) {
+				require.NoError(t, err)
+
+				var keys []string
+				for key := range series {
+					keys = append(keys, key)
+				}
+
+				assert.Equal(t, 1, rg.calls())
+				assert.ElementsMatch(t, []string{"sub-1", "sub-2"}, rg.lastSubscriptions())
+				assert.GreaterOrEqual(t, mx.calls(), 2)
+				assert.ElementsMatch(t, []string{"sub-1", "sub-2"}, uniqueStrings(mx.subscriptionCalls()))
+				assert.Contains(t, strings.Join(keys, "\n"), `subscription_id="sub-1"`)
+				assert.Contains(t, strings.Join(keys, "\n"), `subscription_id="sub-2"`)
+			},
+		},
+		"idle when no resources match": {
+			prepare: func(c *Collector, rg *mockResourceGraph, mx *mockMetricsClient) {
+				c.Config = testConfig()
+			},
+			check: func(t *testing.T, series map[string]metrix.SampleValue, err error, rg *mockResourceGraph, mx *mockMetricsClient) {
+				require.NoError(t, err)
+				assert.Empty(t, series)
+			},
+		},
+		"partial batch failure still succeeds": {
+			prepare: func(c *Collector, rg *mockResourceGraph, mx *mockMetricsClient) {
+				c.Config = testConfig()
+				c.Config.SubscriptionIDs = []string{"sub-1", "sub-2"}
+				c.now = func() time.Time { return now }
+				rg.resources = []map[string]any{
+					{
+						"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+						"name":          "pg-a",
+						"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+						"resourceGroup": "rg-a",
+						"location":      "eastus",
+					},
+					{
+						"id":            "/subscriptions/sub-2/resourceGroups/rg-b/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-b",
+						"name":          "pg-b",
+						"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+						"resourceGroup": "rg-b",
+						"location":      "eastus",
+					},
+				}
+				mx.queryResponses = map[string]azmetrics.QueryResourcesResponse{
+					"sub-1": {MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
+						{
+							ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
+							Values: []azmetrics.Metric{
+								metricWithAvg("cpu_percent", now, 21.5),
+							},
+						},
+					}}},
+				}
+				mx.queryErrors = map[string]error{
+					"sub-2": assert.AnError,
+				}
+			},
+			check: func(t *testing.T, series map[string]metrix.SampleValue, err error, rg *mockResourceGraph, mx *mockMetricsClient) {
+				require.NoError(t, err)
+				assert.NotEmpty(t, series)
+				assert.Contains(t, strings.Join(keysFromSeries(series), "\n"), `subscription_id="sub-1"`)
+			},
+		},
+		"all batches fail": {
+			prepare: func(c *Collector, rg *mockResourceGraph, mx *mockMetricsClient) {
+				c.Config = testConfig()
+				c.Config.SubscriptionIDs = []string{"sub-1", "sub-2"}
+				rg.resources = []map[string]any{
+					{
+						"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+						"name":          "pg-a",
+						"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+						"resourceGroup": "rg-a",
+						"location":      "eastus",
+					},
+					{
+						"id":            "/subscriptions/sub-2/resourceGroups/rg-b/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-b",
+						"name":          "pg-b",
+						"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+						"resourceGroup": "rg-b",
+						"location":      "eastus",
+					},
+				}
+				mx.queryErrors = map[string]error{
+					"sub-1": assert.AnError,
+					"sub-2": assert.AnError,
+				}
+			},
+			check: func(t *testing.T, series map[string]metrix.SampleValue, err error, rg *mockResourceGraph, mx *mockMetricsClient) {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, "all Azure Monitor batch queries failed")
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			rg := &mockResourceGraph{}
+			mx := &mockMetricsClient{}
+			c := newTestCollectorWithMocks(rg, mx)
+			tc.prepare(c, rg, mx)
+
+			require.NoError(t, c.Init(context.Background()))
+
+			series, err := collecttest.CollectScalarSeries(c, metrix.ReadRaw())
+			tc.check(t, series, err, rg, mx)
+		})
+	}
+}
+
+func TestCollector_RefreshDiscovery_PushesModeFiltersIntoQuery(t *testing.T) {
+	tests := map[string]struct {
+		resources  []map[string]any
+		filters    *DiscoveryFiltersConfig
+		wantQuery  string
+		wantCounts int
+	}{
+		"resource groups only": {
+			resources: []map[string]any{
+				{
+					"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+					"name":          "pg-a",
+					"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+					"resourceGroup": "rg-a",
+					"location":      "eastus",
+				},
+				{
+					"id":            "/subscriptions/sub-1/resourceGroups/rg-b/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-b",
+					"name":          "pg-b",
+					"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+					"resourceGroup": "rg-b",
+					"location":      "eastus",
+				},
+			},
+			filters:    &DiscoveryFiltersConfig{ResourceGroups: []string{"RG-B", " rg-a ", "rg-b"}},
+			wantCounts: 2,
+			wantQuery:  "resources | where type in~ ('Microsoft.DBforPostgreSQL/flexibleServers') | where resourceGroup in~ ('rg-a', 'rg-b') | project id, name, type, resourceGroup, location",
+		},
+		"resource groups regions and tags": {
+			resources: []map[string]any{
+				{
+					"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+					"name":          "pg-a",
+					"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+					"resourceGroup": "rg-a",
+					"location":      "eastus",
+				},
+			},
+			filters: &DiscoveryFiltersConfig{
+				ResourceGroups: []string{"RG-B", " rg-a ", "rg-b"},
+				Regions:        []string{" WestEurope ", "eastus", "EASTUS"},
+				Tags: map[string][]string{
+					"ROLE":  {"worker", "api", "worker"},
+					" env ": {"prod"},
+				},
+			},
+			wantQuery: "resources | where type in~ ('Microsoft.DBforPostgreSQL/flexibleServers') | where resourceGroup in~ ('rg-a', 'rg-b') | where location in~ ('eastus', 'westeurope') | mv-expand bagexpansion=array tags | where isnotempty(tags) | extend tagKey = tostring(tags[0]), tagValue = tostring(tags[1]) | where (tagKey =~ 'env' and tagValue == 'prod') or (tagKey =~ 'role' and tagValue in ('api', 'worker')) | summarize by id, name, type, resourceGroup, location, matchedTagKey = tolower(tagKey) | summarize matchedTagKeys = count() by id, name, type, resourceGroup, location | where matchedTagKeys == 2 | project id, name, type, resourceGroup, location",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			rg := &mockResourceGraph{resources: tc.resources}
+			c := newTestCollectorWithMocks(rg, &mockMetricsClient{})
+			c.Config = testConfig()
+			c.Config.Discovery.ModeFilters = tc.filters
+
+			require.NoError(t, c.Init(context.Background()))
+			require.NoError(t, c.Check(context.Background()))
+
+			if tc.wantCounts > 0 {
+				require.Len(t, c.discovery.Resources, tc.wantCounts)
+			}
+			assert.Equal(t, tc.wantQuery, rg.lastQuery())
+		})
+	}
 }
 
 func TestCollector_TimeGrainScheduling(t *testing.T) {
@@ -361,7 +720,7 @@ func TestCollector_TimeGrainScheduling(t *testing.T) {
 	}
 
 	cfg := testConfig()
-	cfg.ProfileSelectionModeExact = &ProfileSelectionModeExactConfig{Profiles: []string{"storage_slow"}}
+	cfg.Profiles.ModeExact = &ProfilesModeConfig{Names: []string{"storage_slow"}}
 
 	catalog := mustLoadStockCatalog(t, map[string]string{
 		"storage_slow.yaml": `
@@ -419,97 +778,484 @@ template:
 	assert.Equal(t, 1, mx.calls())
 }
 
-func TestCollector_InitAutoDiscover(t *testing.T) {
+func TestCollector_QueryOffsetUsesEffectivePerBatchOffset(t *testing.T) {
+	now := time.Date(2026, 3, 7, 12, 0, 0, 0, time.UTC)
+
 	rg := &mockResourceGraph{
 		resources: []map[string]any{
-			{"type": "microsoft.dbforpostgresql/flexibleservers", "count_": int64(2)},
+			{
+				"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.Storage/storageAccounts/st-a",
+				"name":          "st-a",
+				"type":          "Microsoft.Storage/storageAccounts",
+				"resourceGroup": "rg-a",
+				"location":      "eastus",
+			},
 		},
 	}
 
+	mx := &mockMetricsClient{
+		queryResponse: azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{}},
+	}
+
+	cfg := testConfig()
+	cfg.Profiles.ModeExact = &ProfilesModeConfig{Names: []string{"storage_mixed"}}
+
+	catalog := mustLoadStockCatalog(t, map[string]string{
+		"storage_mixed.yaml": `
+id: storage_mixed
+name: Azure Storage Mixed Grains
+resource_type: Microsoft.Storage/storageAccounts
+metrics:
+  - id: transactions
+    azure_name: Transactions
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: used_capacity
+    azure_name: UsedCapacity
+    time_grain: PT5M
+    series:
+      - aggregation: average
+        kind: gauge
+template:
+  family: Azure Storage Mixed
+  context_namespace: storage_mixed
+  charts:
+    - id: am_storage_mixed_transactions
+      title: Azure Storage Mixed Transactions
+      context: transactions
+      family: Throughput
+      type: line
+      units: ops/s
+      algorithm: absolute
+      dimensions:
+        - selector: ` + azureprofiles.ExportedSeriesName("storage_mixed", "transactions", "average") + `
+          name: average
+    - id: am_storage_mixed_used_capacity
+      title: Azure Storage Mixed Used Capacity
+      context: used_capacity
+      family: Capacity
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: ` + azureprofiles.ExportedSeriesName("storage_mixed", "used_capacity", "average") + `
+          name: average
+`,
+	})
+
 	c := New()
-	c.Config = testConfig()
-	c.Config.ProfileSelectionMode = profileSelectionModeAuto
-	c.Config.ProfileSelectionModeExact = nil
+	c.Config = cfg
+	c.now = func() time.Time { return now }
+	c.loadProfileCatalog = func() (azureprofiles.Catalog, error) {
+		return catalog, nil
+	}
 	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
 		return rg, nil
 	}
 	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
-		return &mockMetricsClient{}, nil
+		return mx, nil
 	}
 
 	require.NoError(t, c.Init(context.Background()))
-	require.NotEmpty(t, c.runtime.Profiles)
-	assert.Equal(t, "postgres_flexible", c.runtime.Profiles[0].ID)
+
+	_, err := collecttest.CollectScalarSeries(c, metrix.ReadRaw())
+	require.NoError(t, err)
+
+	calls := mx.queryCalls()
+	require.Len(t, calls, 2)
+
+	byInterval := make(map[string]metricsQueryCall, len(calls))
+	for _, call := range calls {
+		byInterval[call.Interval] = call
+	}
+
+	require.Contains(t, byInterval, "PT1M")
+	require.Contains(t, byInterval, "PT5M")
+
+	assert.Equal(t, "2026-03-07T11:56:00Z", byInterval["PT1M"].StartTime)
+	assert.Equal(t, "2026-03-07T11:57:00Z", byInterval["PT1M"].EndTime)
+	assert.Equal(t, []string{"Transactions"}, byInterval["PT1M"].MetricNames)
+
+	assert.Equal(t, "2026-03-07T11:50:00Z", byInterval["PT5M"].StartTime)
+	assert.Equal(t, "2026-03-07T11:55:00Z", byInterval["PT5M"].EndTime)
+	assert.Equal(t, []string{"UsedCapacity"}, byInterval["PT5M"].MetricNames)
 }
 
-func TestCollector_InitAutoDiscoverWithExplicit(t *testing.T) {
-	rg := &mockResourceGraph{
-		resources: []map[string]any{
-			{"type": "microsoft.dbforpostgresql/flexibleservers", "count_": int64(2)},
+func TestCollector_CheckBootstrapProfileScenarios(t *testing.T) {
+	tests := map[string]struct {
+		resources       []map[string]any
+		prepare         func(*Collector)
+		wantErrContains string
+		check           func(*testing.T, *Collector, *mockResourceGraph)
+	}{
+		"auto discover": {
+			resources: []map[string]any{
+				{
+					"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+					"name":          "pg-a",
+					"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+					"resourceGroup": "rg-a",
+					"location":      "eastus",
+				},
+			},
+			prepare: func(c *Collector) {
+				c.Config = testConfig()
+				c.Config.Profiles.Mode = profilesModeAuto
+				c.Config.Profiles.ModeExact = nil
+				c.Config.Profiles.ModeCombined = nil
+			},
+			check: func(t *testing.T, c *Collector, rg *mockResourceGraph) {
+				require.NotEmpty(t, c.runtime.Profiles)
+				assert.Equal(t, "postgres_flexible", c.runtime.Profiles[0].ID)
+			},
+		},
+		"combined with explicit profiles": {
+			resources: []map[string]any{
+				{
+					"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+					"name":          "pg-a",
+					"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+					"resourceGroup": "rg-a",
+					"location":      "eastus",
+				},
+			},
+			prepare: func(c *Collector) {
+				c.Config = testConfig()
+				c.Config.Profiles.Mode = profilesModeCombined
+				c.Config.Profiles.ModeExact = nil
+				c.Config.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"cosmos_db"}}
+			},
+			check: func(t *testing.T, c *Collector, rg *mockResourceGraph) {
+				var ids []string
+				for _, p := range c.runtime.Profiles {
+					ids = append(ids, p.ID)
+				}
+				assert.Contains(t, ids, "cosmos_db")
+				assert.Contains(t, ids, "postgres_flexible")
+			},
+		},
+		"combined mode allows no auto matches": {
+			prepare: func(c *Collector) {
+				c.Config = testConfig()
+				c.Config.Profiles.Mode = profilesModeCombined
+				c.Config.Profiles.ModeExact = nil
+				c.Config.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"cosmos_db"}}
+			},
+			check: func(t *testing.T, c *Collector, rg *mockResourceGraph) {
+				require.Len(t, c.runtime.Profiles, 1)
+				assert.Equal(t, "cosmos_db", c.runtime.Profiles[0].ID)
+			},
+		},
+		"default mode resolves to auto and fails with no matches": {
+			prepare: func(c *Collector) {
+				c.Config = testConfig()
+				c.Config.Profiles.Mode = ""
+				c.Config.Profiles.ModeExact = nil
+				c.Config.Profiles.ModeCombined = nil
+			},
+			wantErrContains: "auto-discovery found no Azure resources",
+		},
+		"auto discover fails when no resources match": {
+			prepare: func(c *Collector) {
+				c.Config = testConfig()
+				c.Config.Profiles.Mode = profilesModeAuto
+				c.Config.Profiles.ModeExact = nil
+				c.Config.Profiles.ModeCombined = nil
+			},
+			wantErrContains: "auto-discovery found no Azure resources",
 		},
 	}
 
-	c := New()
-	c.Config = testConfig()
-	c.Config.ProfileSelectionMode = profileSelectionModeCombined
-	c.Config.ProfileSelectionModeExact = nil
-	c.Config.ProfileSelectionModeCombined = &ProfileSelectionModeCombinedConfig{
-		Profiles: []string{"cosmos_db"},
-	}
-	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
-		return rg, nil
-	}
-	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
-		return &mockMetricsClient{}, nil
-	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			rg := &mockResourceGraph{resources: tc.resources}
+			c := newTestCollectorWithMocks(rg, &mockMetricsClient{})
+			tc.prepare(c)
 
-	require.NoError(t, c.Init(context.Background()))
-	var ids []string
-	for _, p := range c.runtime.Profiles {
-		ids = append(ids, p.ID)
+			require.NoError(t, c.Init(context.Background()))
+			err := c.Check(context.Background())
+			if tc.wantErrContains != "" {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tc.wantErrContains)
+				return
+			}
+
+			require.NoError(t, err)
+			if tc.check != nil {
+				tc.check(t, c, rg)
+			}
+		})
 	}
-	assert.Contains(t, ids, "cosmos_db")
-	assert.Contains(t, ids, "postgres_flexible")
 }
 
-func TestCollector_InitDefaultModeIsAuto(t *testing.T) {
-	c := New()
-	c.Config = testConfig()
-	c.Config.ProfileSelectionMode = ""
-	c.Config.ProfileSelectionModeExact = nil
-	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
-		return &mockResourceGraph{}, nil
-	}
-	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
-		return &mockMetricsClient{}, nil
-	}
+func TestCollector_CheckBootstrapQueryModeScenarios(t *testing.T) {
+	const kql = "resources | project id, name, type, resourceGroup, location"
 
-	err := c.Init(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "auto-discovery found no Azure resources")
-}
-
-func TestCollector_InitAutoDiscoverNoMatchFails(t *testing.T) {
-	rg := &mockResourceGraph{
-		resources: []map[string]any{
-			{"type": "microsoft.fakeservice/fakeresources", "count_": int64(3)},
+	tests := map[string]struct {
+		resources []map[string]any
+		prepare   func(*Collector)
+		check     func(*testing.T, *Collector, *mockResourceGraph)
+	}{
+		"auto discover from custom query": {
+			resources: []map[string]any{
+				{
+					"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+					"name":          "pg-a",
+					"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+					"resourceGroup": "rg-a",
+					"location":      "eastus",
+				},
+			},
+			prepare: func(c *Collector) {
+				c.Config = testConfig()
+				c.Config.Profiles.Mode = profilesModeAuto
+				c.Config.Profiles.ModeExact = nil
+				c.Config.Profiles.ModeCombined = nil
+				c.Config.Discovery.Mode = discoveryModeQuery
+				c.Config.Discovery.ModeFilters = nil
+				c.Config.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: kql}
+			},
+			check: func(t *testing.T, c *Collector, rg *mockResourceGraph) {
+				require.NotEmpty(t, c.runtime.Profiles)
+				assert.Equal(t, "postgres_flexible", c.runtime.Profiles[0].ID)
+				assert.Equal(t, kql, rg.lastQuery())
+			},
+		},
+		"normalizes empty location to global": {
+			resources: []map[string]any{
+				{
+					"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+					"name":          "pg-a",
+					"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+					"resourceGroup": "rg-a",
+					"location":      "",
+				},
+			},
+			prepare: func(c *Collector) {
+				c.Config = testConfig()
+				c.Config.Discovery.Mode = discoveryModeQuery
+				c.Config.Discovery.ModeFilters = nil
+				c.Config.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: kql}
+			},
+			check: func(t *testing.T, c *Collector, rg *mockResourceGraph) {
+				require.Len(t, c.discovery.Resources, 1)
+				assert.Equal(t, "global", c.discovery.Resources[0].Region)
+			},
+		},
+		"exact mode ignores unsupported discovered types": {
+			resources: []map[string]any{
+				{
+					"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.FakeService/fakeResources/fake-a",
+					"name":          "fake-a",
+					"type":          "Microsoft.FakeService/fakeResources",
+					"resourceGroup": "rg-a",
+					"location":      "eastus",
+				},
+			},
+			prepare: func(c *Collector) {
+				c.Config = testConfig()
+				c.Config.Discovery.Mode = discoveryModeQuery
+				c.Config.Discovery.ModeFilters = nil
+				c.Config.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: kql}
+			},
+			check: func(t *testing.T, c *Collector, rg *mockResourceGraph) {
+				require.Len(t, c.runtime.Profiles, 1)
+				assert.Equal(t, "postgres_flexible", c.runtime.Profiles[0].ID)
+				assert.Empty(t, c.discovery.Resources)
+			},
 		},
 	}
 
-	c := New()
-	c.Config = testConfig()
-	c.Config.ProfileSelectionMode = profileSelectionModeAuto
-	c.Config.ProfileSelectionModeExact = nil
-	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
-		return rg, nil
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			rg := &mockResourceGraph{resources: tc.resources}
+			c := newTestCollectorWithMocks(rg, &mockMetricsClient{})
+			tc.prepare(c)
+
+			require.NoError(t, c.Init(context.Background()))
+			require.NoError(t, c.Check(context.Background()))
+			tc.check(t, c, rg)
+		})
 	}
-	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
-		return &mockMetricsClient{}, nil
+}
+
+func TestCollector_InitQueryModeRejectsMalformedRows(t *testing.T) {
+	const kql = "resources | project id, name, type, resourceGroup, location"
+
+	tests := map[string]struct {
+		rows           []map[string]any
+		wantErrContain string
+	}{
+		"missing required column": {
+			rows: []map[string]any{
+				{
+					"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+					"name":          "pg-a",
+					"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+					"resourceGroup": "rg-a",
+				},
+			},
+			wantErrContain: `missing required column "location"`,
+		},
+		"duplicate id": {
+			rows: []map[string]any{
+				{
+					"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+					"name":          "pg-a",
+					"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+					"resourceGroup": "rg-a",
+					"location":      "eastus",
+				},
+				{
+					"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+					"name":          "pg-a-dup",
+					"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+					"resourceGroup": "rg-a",
+					"location":      "eastus",
+				},
+			},
+			wantErrContain: `duplicate id "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a"`,
+		},
+		"invalid arm id": {
+			rows: []map[string]any{
+				{
+					"id":            "not-an-arm-id",
+					"name":          "pg-a",
+					"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+					"resourceGroup": "rg-a",
+					"location":      "eastus",
+				},
+			},
+			wantErrContain: `invalid ARM resource id "not-an-arm-id"`,
+		},
 	}
 
-	err := c.Init(context.Background())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "auto-discovery found no Azure resources")
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			rg := &mockResourceGraph{resources: tc.rows}
+
+			c := New()
+			c.Config = testConfig()
+			c.Config.Profiles.Mode = profilesModeAuto
+			c.Config.Profiles.ModeExact = nil
+			c.Config.Profiles.ModeCombined = nil
+			c.Config.Discovery.Mode = discoveryModeQuery
+			c.Config.Discovery.ModeFilters = nil
+			c.Config.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: kql}
+			c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
+				return rg, nil
+			}
+			c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
+				return &mockMetricsClient{}, nil
+			}
+
+			require.NoError(t, c.Init(context.Background()))
+			err := c.Check(context.Background())
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.wantErrContain)
+		})
+	}
+}
+
+func TestConfig_ValidateDiscoveryContracts(t *testing.T) {
+	tests := map[string]struct {
+		cfg            Config
+		wantErr        bool
+		wantErrContain string
+	}{
+		"filters mode ignores query block": {
+			cfg: func() Config {
+				cfg := testConfig()
+				cfg.Discovery.Mode = discoveryModeFilters
+				cfg.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: "resources | project id, name, type, resourceGroup, location"}
+				return cfg
+			}(),
+			wantErr: false,
+		},
+		"query mode ignores filters block": {
+			cfg: func() Config {
+				cfg := testConfig()
+				cfg.Discovery.Mode = discoveryModeQuery
+				cfg.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: "resources | project id, name, type, resourceGroup, location"}
+				cfg.Discovery.ModeFilters = &DiscoveryFiltersConfig{ResourceGroups: []string{"rg-a"}}
+				return cfg
+			}(),
+			wantErr: false,
+		},
+		"query mode requires kql": {
+			cfg: func() Config {
+				cfg := testConfig()
+				cfg.Discovery.Mode = discoveryModeQuery
+				cfg.Discovery.ModeFilters = nil
+				cfg.Discovery.ModeQuery = &DiscoveryQueryConfig{}
+				return cfg
+			}(),
+			wantErr:        true,
+			wantErrContain: "'discovery.mode_query.kql' must not be empty when discovery.mode is 'query'",
+		},
+		"filters mode rejects empty resource group item": {
+			cfg: func() Config {
+				cfg := testConfig()
+				cfg.Discovery.Mode = discoveryModeFilters
+				cfg.Discovery.ModeFilters = &DiscoveryFiltersConfig{ResourceGroups: []string{""}}
+				return cfg
+			}(),
+			wantErr:        true,
+			wantErrContain: "'discovery.mode_filters.resource_groups[0]' must not be empty",
+		},
+		"filters mode rejects empty region item": {
+			cfg: func() Config {
+				cfg := testConfig()
+				cfg.Discovery.Mode = discoveryModeFilters
+				cfg.Discovery.ModeFilters = &DiscoveryFiltersConfig{Regions: []string{"  "}}
+				return cfg
+			}(),
+			wantErr:        true,
+			wantErrContain: "'discovery.mode_filters.regions[0]' must not be empty",
+		},
+		"auto mode ignores explicit names": {
+			cfg: func() Config {
+				cfg := testConfig()
+				cfg.Profiles.Mode = profilesModeAuto
+				cfg.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"cosmos_db"}}
+				return cfg
+			}(),
+			wantErr: false,
+		},
+		"exact mode ignores combined block": {
+			cfg: func() Config {
+				cfg := testConfig()
+				cfg.Profiles.Mode = profilesModeExact
+				cfg.Profiles.ModeCombined = &ProfilesModeConfig{Names: []string{"cosmos_db"}}
+				return cfg
+			}(),
+			wantErr: false,
+		},
+		"exact mode rejects duplicate names ignoring case": {
+			cfg: func() Config {
+				cfg := testConfig()
+				cfg.Profiles.Mode = profilesModeExact
+				cfg.Profiles.ModeExact = &ProfilesModeConfig{Names: []string{"POSTGRES_FLEXIBLE", "postgres_flexible"}}
+				return cfg
+			}(),
+			wantErr:        true,
+			wantErrContain: "'profiles.mode_exact.names' contains duplicate value 'postgres_flexible'",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := tc.cfg.validate()
+			if !tc.wantErr {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.wantErrContain)
+		})
+	}
 }
 
 func TestMergeProfileIDs(t *testing.T) {
@@ -549,7 +1295,7 @@ func TestBuildCollectorRuntime_DetectsChartIDCollision(t *testing.T) {
 	catalog := mustLoadStockCatalog(t, map[string]string{
 		"redis_upper.yaml": `
 id: redis_upper
-name: Azure Redis Cache
+name: Azure Redis Cache Upper
 resource_type: Microsoft.Cache/Redis
 metrics:
   - id: connectedclients
@@ -575,7 +1321,7 @@ template:
 `,
 		"redis_lower.yaml": `
 id: redis_lower
-name: azure redis cache
+name: Azure Redis Cache Lower
 resource_type: Microsoft.Cache/Redis
 metrics:
   - id: cachehits
@@ -607,19 +1353,24 @@ template:
 
 func testConfig() Config {
 	return Config{
-		UpdateEvery:          60,
-		AutoDetectionRetry:   0,
-		SubscriptionID:       "sub-1",
-		Cloud:                "public",
-		DiscoveryEvery:       300,
-		QueryOffset:          180,
-		Timeout:              defaultTimeout,
-		MaxConcurrency:       4,
-		MaxBatchResources:    50,
-		MaxMetricsPerQuery:   20,
-		ProfileSelectionMode: profileSelectionModeExact,
-		ProfileSelectionModeExact: &ProfileSelectionModeExactConfig{
-			Profiles: []string{"postgres_flexible"},
+		UpdateEvery:        60,
+		AutoDetectionRetry: 0,
+		SubscriptionIDs:    []string{"sub-1"},
+		Cloud:              "public",
+		Discovery: DiscoveryConfig{
+			RefreshEvery: 300,
+			Mode:         discoveryModeFilters,
+		},
+		Profiles: ProfilesConfig{
+			Mode:      profilesModeExact,
+			ModeExact: &ProfilesModeConfig{Names: []string{"postgres_flexible"}},
+		},
+		QueryOffset: 180,
+		Timeout:     defaultTimeout,
+		Limits: LimitsConfig{
+			MaxConcurrency:     4,
+			MaxBatchResources:  50,
+			MaxMetricsPerQuery: 20,
 		},
 		Auth: cloudauth.AzureADAuthConfig{
 			Mode: cloudauth.AzureADAuthModeDefault,
@@ -642,19 +1393,44 @@ func mustLoadStockCatalog(t *testing.T, files map[string]string) azureprofiles.C
 	return catalog
 }
 
+func newTestCollectorWithMocks(rg *mockResourceGraph, mx *mockMetricsClient) *Collector {
+	c := New()
+	c.newResourceGraph = func(string, azcore.TokenCredential, azcloud.Configuration) (resourceGraphClient, error) {
+		return rg, nil
+	}
+	c.newMetricsClient = func(string, azcore.TokenCredential, azcloud.Configuration) (metricsQueryClient, error) {
+		return mx, nil
+	}
+	return c
+}
+
 type mockResourceGraph struct {
 	mu        sync.Mutex
 	resources []map[string]any
 	count     int
+	query     string
+	subs      []string
 	timeout   time.Duration
 	hasDL     bool
 }
 
-func (m *mockResourceGraph) Resources(ctx context.Context, _ armresourcegraph.QueryRequest, _ *armresourcegraph.ClientResourcesOptions) (armresourcegraph.ClientResourcesResponse, error) {
+func (m *mockResourceGraph) Resources(ctx context.Context, req armresourcegraph.QueryRequest, _ *armresourcegraph.ClientResourcesOptions) (armresourcegraph.ClientResourcesResponse, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.count++
+	if req.Query != nil {
+		m.query = *req.Query
+	} else {
+		m.query = ""
+	}
+	m.subs = m.subs[:0]
+	for _, sub := range req.Subscriptions {
+		if sub == nil {
+			continue
+		}
+		m.subs = append(m.subs, *sub)
+	}
 	deadline, ok := ctx.Deadline()
 	m.hasDL = ok
 	if ok {
@@ -682,19 +1458,60 @@ func (m *mockResourceGraph) lastTimeout() (time.Duration, bool) {
 	return m.timeout, m.hasDL
 }
 
-type mockMetricsClient struct {
-	mu            sync.Mutex
-	queryResponse azmetrics.QueryResourcesResponse
-	queryErr      error
-	count         int
-	timeout       time.Duration
-	hasDL         bool
+func (m *mockResourceGraph) lastQuery() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.query
 }
 
-func (m *mockMetricsClient) QueryResources(ctx context.Context, _ string, _ string, _ []string, _ azmetrics.ResourceIDList, _ *azmetrics.QueryResourcesOptions) (azmetrics.QueryResourcesResponse, error) {
+func (m *mockResourceGraph) lastSubscriptions() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]string(nil), m.subs...)
+}
+
+type mockMetricsClient struct {
+	mu             sync.Mutex
+	queryResponse  azmetrics.QueryResourcesResponse
+	queryResponses map[string]azmetrics.QueryResourcesResponse
+	queryErr       error
+	queryErrors    map[string]error
+	queryCallsLog  []metricsQueryCall
+	count          int
+	subs           []string
+	timeout        time.Duration
+	hasDL          bool
+}
+
+type metricsQueryCall struct {
+	SubscriptionID string
+	MetricNames    []string
+	StartTime      string
+	EndTime        string
+	Interval       string
+	Aggregation    string
+}
+
+func (m *mockMetricsClient) QueryResources(ctx context.Context, subscriptionID string, _ string, metricNames []string, _ azmetrics.ResourceIDList, opts *azmetrics.QueryResourcesOptions) (azmetrics.QueryResourcesResponse, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.count++
+	m.subs = append(m.subs, subscriptionID)
+	var startTime, endTime, interval, aggregation string
+	if opts != nil {
+		startTime = derefString(opts.StartTime)
+		endTime = derefString(opts.EndTime)
+		interval = derefString(opts.Interval)
+		aggregation = derefString(opts.Aggregation)
+	}
+	m.queryCallsLog = append(m.queryCallsLog, metricsQueryCall{
+		SubscriptionID: subscriptionID,
+		MetricNames:    append([]string(nil), metricNames...),
+		StartTime:      startTime,
+		EndTime:        endTime,
+		Interval:       interval,
+		Aggregation:    aggregation,
+	})
 	deadline, ok := ctx.Deadline()
 	m.hasDL = ok
 	if ok {
@@ -702,8 +1519,14 @@ func (m *mockMetricsClient) QueryResources(ctx context.Context, _ string, _ stri
 	} else {
 		m.timeout = 0
 	}
+	if err, ok := m.queryErrors[subscriptionID]; ok && err != nil {
+		return azmetrics.QueryResourcesResponse{}, err
+	}
 	if m.queryErr != nil {
 		return azmetrics.QueryResourcesResponse{}, m.queryErr
+	}
+	if resp, ok := m.queryResponses[subscriptionID]; ok {
+		return resp, nil
 	}
 	return m.queryResponse, nil
 }
@@ -720,6 +1543,18 @@ func (m *mockMetricsClient) lastTimeout() (time.Duration, bool) {
 	return m.timeout, m.hasDL
 }
 
+func (m *mockMetricsClient) subscriptionCalls() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]string(nil), m.subs...)
+}
+
+func (m *mockMetricsClient) queryCalls() []metricsQueryCall {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]metricsQueryCall(nil), m.queryCallsLog...)
+}
+
 func metricWithAvg(name string, ts time.Time, value float64) azmetrics.Metric {
 	return azmetrics.Metric{
 		Name: &azmetrics.LocalizableString{Value: ptrString(name)},
@@ -731,7 +1566,35 @@ func metricWithAvg(name string, ts time.Time, value float64) azmetrics.Metric {
 
 func ptrString(v string) *string { return &v }
 
+func derefString(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
+}
+
 func assertTimeoutClose(t *testing.T, got, want time.Duration) {
 	t.Helper()
 	assert.InDelta(t, want.Seconds(), got.Seconds(), 1.0)
+}
+
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
+}
+
+func keysFromSeries(series map[string]metrix.SampleValue) []string {
+	out := make([]string, 0, len(series))
+	for key := range series {
+		out = append(out, key)
+	}
+	return out
 }

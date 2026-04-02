@@ -27,6 +27,7 @@ SECRETS_PAGE = {
     ],
     "jump_to": [
         {"label": "Resolver Quick Reference", "anchor": "resolver-quick-reference"},
+        {"label": "Choosing a Resolver", "anchor": "choosing-a-resolver"},
         {"label": "Environment Variables", "anchor": "environment-variables"},
         {"label": "Files", "anchor": "files"},
         {"label": "Commands", "anchor": "commands"},
@@ -61,6 +62,12 @@ SECRETS_PAGE = {
             "notes": "Configure the secretstore first, then reference it from collector configs.",
         },
     ],
+    "choosing_a_resolver": [
+        "Use `${env:...}` or `${file:...}` for simple setups where secrets are already available locally on the Netdata host.",
+        "Use `${cmd:...}` when you need dynamic secret retrieval via a trusted local command, such as 1Password CLI or a custom script.",
+        "Use `${store:...}` when your organization manages secrets centrally in a cloud provider or Vault and you want Netdata to pull from that source directly.",
+        "You can use different resolver types across different collectors, different jobs within the same collector, or even within the same configuration value. See [Mixing resolver types](#mixing-resolver-types).",
+    ],
     "sections": {
         "env": {
             "heading": "## Environment Variables",
@@ -87,6 +94,8 @@ jobs:
                 "The file path must be absolute.",
                 "Netdata trims leading and trailing whitespace from the file contents.",
                 "The file must exist on the Netdata host and be readable by the `netdata` user.",
+                "**Docker Secrets**: Docker mounts secrets as files under `/run/secrets/` inside the container. Use `${file:/run/secrets/<secret-name>}` to read them.",
+                "**Kubernetes Secrets**: If you mount Kubernetes Secrets as volume files in the Netdata pod, reference them with `${file:/path/to/mounted/secret}`.",
             ],
         },
         "cmd": {
@@ -130,6 +139,32 @@ jobs:
         ],
         "file_intro": "Each secretstore backend has its own file under `/etc/netdata/go.d/ss/`:",
         "file_note": "File-based secretstores are loaded at agent startup. If you edit these files, restart the Netdata Agent to apply the changes.",
+        "file_directory": (
+            "If the `/etc/netdata/go.d/ss/` directory does not exist, create it:\n\n"
+            "```bash\n"
+            "sudo mkdir -p /etc/netdata/go.d/ss\n"
+            "sudo chown netdata:netdata /etc/netdata/go.d/ss\n"
+            "sudo chmod 0750 /etc/netdata/go.d/ss\n"
+            "```\n\n"
+            "Secretstore configuration files may contain sensitive values such as tokens or client secrets. "
+            "Restrict directory and file permissions to the `netdata` user."
+        ),
+        "mixing": (
+            "You can mix different resolver types in the same configuration value or the same config file. "
+            "For example, you might read the username from an environment variable and the password from a secretstore:\n\n"
+            "```yaml\n"
+            "jobs:\n"
+            "  - name: mysql_prod\n"
+            '    dsn: "${env:MYSQL_USER}:${store:vault:vault_prod:secret/data/netdata/mysql#password}@tcp(127.0.0.1:3306)/"\n'
+            "```\n\n"
+            "Different jobs within the same collector config file can also use different resolver types."
+        ),
+        "multiple_stores": (
+            "Each secretstore config file can contain multiple `jobs` entries, each with a unique store name. "
+            "You can use different secretstore backends simultaneously. "
+            "For example, you might configure a Vault store for database credentials and an AWS Secrets Manager store for API keys, "
+            "then reference each one using its `${store:<kind>:<name>:<operand>}` syntax in the relevant collector configs."
+        ),
     },
     "secretstores": {
         "heading": "## Supported Secretstore Backends",
@@ -145,6 +180,7 @@ jobs:
     "security_notes": [
         "Prefer secret references over plain-text credentials in collector configs.",
         "Prefer platform-native identity modes for production when a backend supports them, such as instance roles, managed identities, or metadata-based credentials.",
+        "Secretstore configuration values (such as tokens and client secrets) also support `${env:...}`, `${file:...}`, and `${cmd:...}` resolvers. Use them to avoid storing backend credentials in plain text. Note that `${store:...}` references are not supported inside secretstore configurations.",
         "Keep local secret material readable only by the `netdata` user, including token files, service account files, and any files used with `${file:...}`.",
         "Use `${cmd:...}` only with trusted local commands and absolute paths.",
     ],
@@ -288,6 +324,7 @@ def build_page_context() -> Dict[str, Any]:
             f'[{jump["label"]}](#{jump["anchor"]})' for jump in SECRETS_PAGE["jump_to"]
         ),
         "quick_reference": SECRETS_PAGE["quick_reference"],
+        "choosing_a_resolver": SECRETS_PAGE["choosing_a_resolver"],
         "sections": [
             SECRETS_PAGE["sections"]["env"],
             SECRETS_PAGE["sections"]["file"],
