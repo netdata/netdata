@@ -16,7 +16,8 @@ type MethodConfig struct {
 	presentation   any
 }
 
-// WithPresentation attaches optional presentation metadata to the method info response.
+// WithPresentation returns an updated copy with optional presentation metadata attached.
+// This uses builder-style value semantics so it can be chained from composite literals.
 func (cfg MethodConfig) WithPresentation(v any) MethodConfig {
 	cfg.presentation = v
 	return cfg
