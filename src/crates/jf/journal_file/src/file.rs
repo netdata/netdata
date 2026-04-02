@@ -1145,3 +1145,64 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cursor::Location;
+    use crate::offset_array::Direction;
+    use crate::reader::JournalReader;
+    use crate::writer::JournalWriter;
+    use tempfile::NamedTempFile;
+
+    fn test_uuid(seed: u8) -> [u8; 16] {
+        [seed; 16]
+    }
+
+    #[test]
+    fn entry_data_iterator_reports_zero_offsets_as_invalid() {
+        let temp_file = NamedTempFile::new().expect("create temp file");
+        let path = temp_file.path();
+
+        let options =
+            JournalFileOptions::new(test_uuid(1), test_uuid(2), test_uuid(3), test_uuid(4));
+        let mut journal_file = JournalFile::create(path, options).expect("create journal");
+        let mut writer = JournalWriter::new(&mut journal_file).expect("create writer");
+        let payloads = [b"MESSAGE=test".as_slice(), b"PRIORITY=6".as_slice()];
+        writer
+            .add_entry(&mut journal_file, &payloads, 1_000_000, 100, test_uuid(5))
+            .expect("write entry");
+
+        let mut reader = JournalReader::default();
+        reader.set_location(Location::Head);
+        assert!(
+            reader
+                .step(&journal_file, Direction::Forward)
+                .expect("advance to first entry"),
+            "expected written entry"
+        );
+        let entry_offset = reader.get_entry_offset().expect("entry offset");
+
+        {
+            let mut entry_guard = journal_file
+                .entry_mut(entry_offset, None)
+                .expect("entry guard");
+            match &mut entry_guard.items {
+                EntryItemsType::Regular(items) => items[0].object_offset = 0,
+                EntryItemsType::Compact(items) => items[0].object_offset = 0,
+            }
+        }
+
+        let mut iter = journal_file
+            .entry_data_objects(entry_offset)
+            .expect("entry iterator");
+        assert!(matches!(
+            iter.next(),
+            Some(Err(JournalError::InvalidOffset))
+        ));
+        assert!(
+            iter.next().is_none(),
+            "iterator should stop after the error"
+        );
+    }
+}

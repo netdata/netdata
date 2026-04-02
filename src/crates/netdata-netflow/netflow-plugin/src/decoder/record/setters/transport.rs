@@ -51,11 +51,11 @@ pub(super) fn set_record_transport_field(rec: &mut FlowRecord, key: &str, value:
             true
         }
         "SRC_MAC" => {
-            rec.src_mac = parse_mac(&value.to_ascii_lowercase());
+            rec.src_mac = parse_mac(value);
             true
         }
         "DST_MAC" => {
-            rec.dst_mac = parse_mac(&value.to_ascii_lowercase());
+            rec.dst_mac = parse_mac(value);
             true
         }
         "IPTTL" => {
@@ -103,5 +103,22 @@ pub(super) fn set_record_transport_field(rec: &mut FlowRecord, key: &str, value:
             true
         }
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mac_setter_accepts_uppercase_hex() {
+        let mut rec = FlowRecord::default();
+
+        assert!(set_record_transport_field(
+            &mut rec,
+            "SRC_MAC",
+            "AA:BB:CC:DD:EE:FF"
+        ));
+        assert_eq!(rec.src_mac, [0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff]);
     }
 }

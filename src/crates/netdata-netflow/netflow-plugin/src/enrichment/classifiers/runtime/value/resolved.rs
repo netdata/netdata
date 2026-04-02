@@ -19,13 +19,19 @@ impl ResolvedValue {
         match self {
             ResolvedValue::String(value) => Cow::Borrowed(value.as_str()),
             ResolvedValue::Number(value) => Cow::Owned(value.to_string()),
-            ResolvedValue::List(values) => Cow::Owned(
-                values
-                    .iter()
-                    .map(ResolvedValue::as_cow_str)
-                    .collect::<Vec<_>>()
-                    .join(","),
-            ),
+            ResolvedValue::List(values) => {
+                let mut result = String::new();
+
+                for (index, value) in values.iter().enumerate() {
+                    if index > 0 {
+                        result.push(',');
+                    }
+                    let value = value.as_cow_str();
+                    result.push_str(value.as_ref());
+                }
+
+                Cow::Owned(result)
+            }
         }
     }
 
@@ -46,5 +52,21 @@ impl ResolvedValue {
             ResolvedValue::List(values) => Some(values.as_slice()),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn list_to_string_value_joins_items_in_order() {
+        let value = ResolvedValue::List(vec![
+            ResolvedValue::String("alpha".to_string()),
+            ResolvedValue::Number(42),
+            ResolvedValue::String("beta".to_string()),
+        ]);
+
+        assert_eq!(value.to_string_value(), "alpha,42,beta");
     }
 }
