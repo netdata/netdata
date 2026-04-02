@@ -812,8 +812,6 @@ This requires BOTH conditions to be true (AND logic).
 
 Alerts based on `chart labels` require the underlying chart to exist. For example, a `disk.space` chart is only created when a mount point is actively mounted. If a CIFS mount fails to mount after a system reboot, no `disk.space` chart will exist for that mount point, and the alert will not activate.
 
-To understand what disk monitoring capabilities Netdata provides, see the [Collectors overview](/src/collectors/COLLECTORS.md).
-
 :::
 
 #### Alert Line `summary`
