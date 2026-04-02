@@ -44,12 +44,7 @@ pub(crate) fn append_u32_list_field(fields: &mut FlowFields, key: &'static str, 
     if values.is_empty() {
         return;
     }
-    let serialized = values
-        .iter()
-        .map(u32::to_string)
-        .collect::<Vec<_>>()
-        .join(",");
-    append_csv_field(fields, key, &serialized);
+    append_u32_csv(fields.entry(key).or_default(), values);
 }
 
 pub(crate) fn append_large_communities_field(
@@ -60,24 +55,5 @@ pub(crate) fn append_large_communities_field(
     if values.is_empty() {
         return;
     }
-    let serialized = values
-        .iter()
-        .map(StaticRoutingLargeCommunity::format)
-        .collect::<Vec<_>>()
-        .join(",");
-    append_csv_field(fields, key, &serialized);
-}
-
-fn append_csv_field(fields: &mut FlowFields, key: &'static str, suffix: &str) {
-    if suffix.is_empty() {
-        return;
-    }
-
-    let entry = fields.entry(key).or_default();
-    if entry.is_empty() {
-        *entry = suffix.to_string();
-    } else {
-        entry.push(',');
-        entry.push_str(suffix);
-    }
+    append_large_communities_csv(fields.entry(key).or_default(), values);
 }

@@ -194,8 +194,4 @@ impl StaticRoutingLargeCommunity {
             local_data2: config.local_data2,
         }
     }
-
-    pub(crate) fn format(&self) -> String {
-        format!("{}:{}:{}", self.asn, self.local_data1, self.local_data2)
-    }
 }
