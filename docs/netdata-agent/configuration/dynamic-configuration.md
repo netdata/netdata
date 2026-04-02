@@ -273,7 +273,7 @@ If you receive an **HTTP 412 error** with a message like "Request failed with st
 
 :::important
 
-In Netdata, HTTP 412 specifically means "An authorization bearer token is required but was not found in the request." This is different from the generic HTTP 412 "Precondition Failed" meaning.
+In Netdata, HTTP 412 is used to indicate that an authorization bearer token was required but was not present in the request. This differs from the generic HTTP 412 "Precondition Failed" response.
 
 :::
 
@@ -291,13 +291,7 @@ In Netdata, HTTP 412 specifically means "An authorization bearer token is requir
 3. **Check permissions**: Ensure you have Admin or Manager role in the space containing the agent
 4. **Verify bearer token protection setting**: If enabled in `netdata.conf`, ensure you're accessing via Cloud-authenticated session
 
-```ini
-# Check if bearer token protection is enabled
-[web]
-    bearer token protection = yes  # Requires Cloud authentication
-```
-
-For more information on bearer token protection, see [Secure Your Netdata Agent with Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
+    
 
 ---
 
