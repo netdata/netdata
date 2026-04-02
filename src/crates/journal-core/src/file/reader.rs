@@ -87,10 +87,11 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     ///
     /// This is useful when the caller wants to drive iteration through
     /// [`JournalCursor`] directly rather than through [`JournalReader::step`].
+    /// The returned filter is not installed on the reader cursor; callers that
+    /// need cursor-based iteration should set it on their own cursor.
     pub fn build_filter(&mut self, journal_file: &JournalFile<M>) -> Result<Option<FilterExpr>> {
         if let Some(filter) = self.filter.as_mut() {
             let expr = filter.build(journal_file)?;
-            self.cursor.set_filter(expr.clone());
             self.filter = None;
             Ok(Some(expr))
         } else {

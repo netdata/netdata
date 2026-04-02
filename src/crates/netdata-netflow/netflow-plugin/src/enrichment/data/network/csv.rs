@@ -5,11 +5,11 @@ pub(crate) fn append_u32_csv(target: &mut String, values: &[u32]) {
     if values.is_empty() {
         return;
     }
+    let mut buf = itoa::Buffer::new();
     for v in values {
         if !target.is_empty() {
             target.push(',');
         }
-        let mut buf = itoa::Buffer::new();
         target.push_str(buf.format(*v));
     }
 }
@@ -22,15 +22,14 @@ pub(crate) fn append_large_communities_csv(
     if values.is_empty() {
         return;
     }
+    let mut asn = itoa::Buffer::new();
+    let mut local_data1 = itoa::Buffer::new();
+    let mut local_data2 = itoa::Buffer::new();
 
     for lc in values {
         if !target.is_empty() {
             target.push(',');
         }
-
-        let mut asn = itoa::Buffer::new();
-        let mut local_data1 = itoa::Buffer::new();
-        let mut local_data2 = itoa::Buffer::new();
 
         target.push_str(asn.format(lc.asn));
         target.push(':');

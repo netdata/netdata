@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 #[derive(Debug, Clone)]
 pub(crate) enum ResolvedValue {
     String(String),
@@ -6,16 +8,29 @@ pub(crate) enum ResolvedValue {
 }
 
 impl ResolvedValue {
-    pub(crate) fn to_string_value(&self) -> String {
+    pub(crate) fn as_str(&self) -> Option<&str> {
         match self {
-            ResolvedValue::String(value) => value.clone(),
-            ResolvedValue::Number(value) => value.to_string(),
-            ResolvedValue::List(values) => values
-                .iter()
-                .map(ResolvedValue::to_string_value)
-                .collect::<Vec<_>>()
-                .join(","),
+            ResolvedValue::String(value) => Some(value.as_str()),
+            _ => None,
         }
+    }
+
+    pub(crate) fn as_cow_str(&self) -> Cow<'_, str> {
+        match self {
+            ResolvedValue::String(value) => Cow::Borrowed(value.as_str()),
+            ResolvedValue::Number(value) => Cow::Owned(value.to_string()),
+            ResolvedValue::List(values) => Cow::Owned(
+                values
+                    .iter()
+                    .map(ResolvedValue::as_cow_str)
+                    .collect::<Vec<_>>()
+                    .join(","),
+            ),
+        }
+    }
+
+    pub(crate) fn to_string_value(&self) -> String {
+        self.as_cow_str().into_owned()
     }
 
     pub(crate) fn to_i64(&self) -> Option<i64> {

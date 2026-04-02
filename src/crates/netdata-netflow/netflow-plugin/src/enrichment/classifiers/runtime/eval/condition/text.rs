@@ -9,7 +9,9 @@ pub(super) fn eval_contains(
     right: &ValueExpr,
 ) -> Result<bool> {
     let (left, right) = context.resolve_binary(left, right)?;
-    Ok(left.to_string_value().contains(&right.to_string_value()))
+    let left = left.as_cow_str();
+    let right = right.as_cow_str();
+    Ok(left.contains(right.as_ref()))
 }
 
 pub(super) fn eval_starts_with(
@@ -18,7 +20,9 @@ pub(super) fn eval_starts_with(
     right: &ValueExpr,
 ) -> Result<bool> {
     let (left, right) = context.resolve_binary(left, right)?;
-    Ok(left.to_string_value().starts_with(&right.to_string_value()))
+    let left = left.as_cow_str();
+    let right = right.as_cow_str();
+    Ok(left.starts_with(right.as_ref()))
 }
 
 pub(super) fn eval_ends_with(
@@ -27,7 +31,9 @@ pub(super) fn eval_ends_with(
     right: &ValueExpr,
 ) -> Result<bool> {
     let (left, right) = context.resolve_binary(left, right)?;
-    Ok(left.to_string_value().ends_with(&right.to_string_value()))
+    let left = left.as_cow_str();
+    let right = right.as_cow_str();
+    Ok(left.ends_with(right.as_ref()))
 }
 
 pub(super) fn eval_matches(
@@ -37,14 +43,14 @@ pub(super) fn eval_matches(
     compiled: Option<&Regex>,
 ) -> Result<bool> {
     let (left, right) = context.resolve_binary(left, right)?;
-    let left = left.to_string_value();
+    let left = left.as_cow_str();
     match compiled {
-        Some(regex) => Ok(regex.is_match(&left)),
+        Some(regex) => Ok(regex.is_match(left.as_ref())),
         None => {
             let pattern = right.to_string_value();
             let regex = Regex::new(&pattern)
                 .with_context(|| format!("invalid regex '{pattern}' for 'matches'"))?;
-            Ok(regex.is_match(&left))
+            Ok(regex.is_match(left.as_ref()))
         }
     }
 }
