@@ -17,6 +17,7 @@
     buffer_json_object_close(wb);
 
 static bool streaming_topology_host_guid(RRDHOST *host, char *dst, size_t dst_size);
+static bool streaming_topology_uuid_guid(ND_UUID host_id, char *dst, size_t dst_size);
 static void streaming_topology_actor_id_from_guid(const char *guid, char *dst, size_t dst_size);
 static void streaming_topology_actor_id_for_uuid(ND_UUID host_id, char *dst, size_t dst_size);
 static uint32_t *streaming_topology_parent_child_count_get(DICTIONARY *parent_child_count, RRDHOST *host);
@@ -76,22 +77,28 @@ static bool streaming_topology_host_guid(RRDHOST *host, char *dst, size_t dst_si
     if(!host)
         return false;
 
-    if(!UUIDiszero(host->host_id)) {
-        uuid_unparse_lower(host->host_id.uuid, dst);
+    if(streaming_topology_uuid_guid(host->host_id, dst, dst_size))
         return true;
-    }
 
     if(host->machine_guid[0]) {
         ND_UUID machine_guid = UUID_ZERO;
         if(!uuid_parse(host->machine_guid, machine_guid.uuid))
-            uuid_unparse_lower(machine_guid.uuid, dst);
-        else
-            snprintfz(dst, dst_size, "%s", host->machine_guid);
-
-        return true;
+            return streaming_topology_uuid_guid(machine_guid, dst, dst_size);
     }
 
     return false;
+}
+
+static bool streaming_topology_uuid_guid(ND_UUID host_id, char *dst, size_t dst_size) {
+    if(!dst || dst_size < UUID_STR_LEN)
+        return false;
+
+    dst[0] = '\0';
+    if(UUIDiszero(host_id))
+        return false;
+
+    uuid_unparse_lower(host_id.uuid, dst);
+    return true;
 }
 
 static void streaming_topology_actor_id_from_guid(const char *guid, char *dst, size_t dst_size) {
@@ -106,8 +113,10 @@ static void streaming_topology_actor_id_from_guid(const char *guid, char *dst, s
 
 static void streaming_topology_actor_id_for_uuid(ND_UUID host_id, char *dst, size_t dst_size) {
     char guid[UUID_STR_LEN];
-    uuid_unparse_lower(host_id.uuid, guid);
-    streaming_topology_actor_id_from_guid(guid, dst, dst_size);
+    if(streaming_topology_uuid_guid(host_id, guid, sizeof(guid)))
+        streaming_topology_actor_id_from_guid(guid, dst, dst_size);
+    else
+        streaming_topology_actor_id_from_guid(NULL, dst, dst_size);
 }
 
 static uint32_t *streaming_topology_parent_child_count_get(DICTIONARY *parent_child_count, RRDHOST *host) {
@@ -130,7 +139,8 @@ static struct streaming_topology_descendant_list *streaming_topology_descendants
 
 static struct streaming_topology_descendant_list *streaming_topology_descendants_get_or_create(DICTIONARY *parent_descendants, ND_UUID host_id) {
     char host_guid[UUID_STR_LEN];
-    uuid_unparse_lower(host_id.uuid, host_guid);
+    if(!streaming_topology_uuid_guid(host_id, host_guid, sizeof(host_guid)))
+        return NULL;
 
     struct streaming_topology_descendant_list *list = dictionary_get(parent_descendants, host_guid);
     if(list)
@@ -198,15 +208,20 @@ static void streaming_topology_actor_id_for_host(RRDHOST *host, char *dst, size_
 // to detect hosts without an active path
 static uint16_t streaming_topology_get_path_ids(RRDHOST *host, uint16_t from, ND_UUID *host_ids, uint16_t max) {
     uint16_t n = rrdhost_stream_path_get_host_ids(host, from, host_ids, max);
+    uint16_t filtered_n = 0;
 
     // check if localhost is already in the path
     bool found_localhost = false;
     for(uint16_t i = 0; i < n; i++) {
+        if(UUIDiszero(host_ids[i]))
+            continue;
+
+        host_ids[filtered_n++] = host_ids[i];
         if(UUIDeq(host_ids[i], localhost->host_id)) {
             found_localhost = true;
-            break;
         }
     }
+    n = filtered_n;
 
     // append localhost if not found (same as rrdhost_stream_path_to_json)
     if(!found_localhost && n < max && n > 0)
@@ -744,7 +759,8 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                     uint16_t n = streaming_topology_get_path_ids(host, 1, path_ids, 128);
                     for(uint16_t i = 0; i < n; i++) {
                         char guid[UUID_STR_LEN];
-                        uuid_unparse_lower(path_ids[i].uuid, guid);
+                        if(!streaming_topology_uuid_guid(path_ids[i], guid, sizeof(guid)))
+                            continue;
 
                         uint32_t *count = dictionary_get(parent_child_count, guid);
                         if(count)
