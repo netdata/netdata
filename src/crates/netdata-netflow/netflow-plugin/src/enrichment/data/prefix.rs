@@ -1,4 +1,5 @@
 use super::*;
+use ipnet_trie::IpnetTrie;
 
 #[derive(Debug, Clone)]
 pub(crate) struct PrefixMapEntry<T> {
@@ -11,11 +12,38 @@ pub(crate) struct PrefixMapEntry<T> {
 /// Entries are separated by address family (IPv4 vs IPv6) and sorted by prefix length
 /// descending. Lookup returns the first match, which is the longest prefix match.
 /// This avoids scanning entries of the wrong address family and terminates early.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone)]
 pub(crate) struct PrefixMap<T> {
     // Sorted by prefix_len descending after finalize() for longest-match-first.
     pub(crate) v4_entries: Vec<PrefixMapEntry<T>>,
     pub(crate) v6_entries: Vec<PrefixMapEntry<T>>,
+    lookup_index: IpnetTrie<PrefixLookupRef>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PrefixLookupRef {
+    V4(usize),
+    V6(usize),
+}
+
+impl<T> Default for PrefixMap<T> {
+    fn default() -> Self {
+        Self {
+            v4_entries: Vec::new(),
+            v6_entries: Vec::new(),
+            lookup_index: IpnetTrie::new(),
+        }
+    }
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for PrefixMap<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PrefixMap")
+            .field("v4_entries", &self.v4_entries)
+            .field("v6_entries", &self.v6_entries)
+            .field("lookup_index", &"<IpnetTrie>")
+            .finish()
+    }
 }
 
 impl<T> PrefixMap<T> {
@@ -33,6 +61,15 @@ impl<T> PrefixMap<T> {
             .sort_by(|a, b| b.prefix.prefix_len().cmp(&a.prefix.prefix_len()));
         self.v6_entries
             .sort_by(|a, b| b.prefix.prefix_len().cmp(&a.prefix.prefix_len()));
+
+        let mut lookup_index = IpnetTrie::new();
+        for (index, entry) in self.v4_entries.iter().enumerate() {
+            lookup_index.insert(entry.prefix, PrefixLookupRef::V4(index));
+        }
+        for (index, entry) in self.v6_entries.iter().enumerate() {
+            lookup_index.insert(entry.prefix, PrefixLookupRef::V6(index));
+        }
+        self.lookup_index = lookup_index;
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -40,18 +77,15 @@ impl<T> PrefixMap<T> {
     }
 
     /// Longest-prefix-match: returns the value associated with the most specific prefix.
-    /// O(n) worst case but terminates on first match due to descending sort order.
+    /// Uses a trie-backed index for direct lookups while preserving the sorted vectors for
+    /// ordered multi-match walks.
     pub(crate) fn lookup(&self, address: IpAddr) -> Option<&T> {
-        let entries = match address {
-            IpAddr::V4(_) => &self.v4_entries,
-            IpAddr::V6(_) => &self.v6_entries,
-        };
-        for entry in entries {
-            if entry.prefix.contains(&address) {
-                return Some(&entry.value);
-            }
+        let host_prefix = IpNet::from(address);
+        let (_, entry_ref) = self.lookup_index.longest_match(&host_prefix)?;
+        match entry_ref {
+            PrefixLookupRef::V4(index) => self.v4_entries.get(*index).map(|entry| &entry.value),
+            PrefixLookupRef::V6(index) => self.v6_entries.get(*index).map(|entry| &entry.value),
         }
-        None
     }
 
     /// Iterate all matching entries in ascending prefix length order (least specific first).
@@ -101,4 +135,37 @@ pub(crate) fn build_sampling_map(
 
 pub(crate) fn parse_prefix(prefix: &str) -> Result<IpNet> {
     IpNet::from_str(prefix).with_context(|| format!("invalid prefix '{prefix}'"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lookup_returns_longest_prefix_match() {
+        let mut map = PrefixMap::default();
+        map.insert(parse_prefix("198.51.0.0/16").expect("prefix"), "region");
+        map.insert(parse_prefix("198.51.100.0/24").expect("prefix"), "site");
+        map.finalize();
+
+        assert_eq!(
+            map.lookup("198.51.100.42".parse().expect("address")),
+            Some(&"site")
+        );
+    }
+
+    #[test]
+    fn matching_entries_ascending_keeps_less_specific_prefix_first() {
+        let mut map = PrefixMap::default();
+        map.insert(parse_prefix("198.51.0.0/16").expect("prefix"), "region");
+        map.insert(parse_prefix("198.51.100.0/24").expect("prefix"), "site");
+        map.finalize();
+
+        let matches: Vec<_> = map
+            .matching_entries_ascending("198.51.100.42".parse().expect("address"))
+            .map(|entry| entry.value)
+            .collect();
+
+        assert_eq!(matches, vec!["region", "site"]);
+    }
 }

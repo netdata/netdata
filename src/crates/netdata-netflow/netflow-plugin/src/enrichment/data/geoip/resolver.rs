@@ -35,7 +35,6 @@ impl GeoIpResolver {
         if self.last_reload_check.elapsed() < GEOIP_RELOAD_CHECK_INTERVAL {
             return;
         }
-        self.last_reload_check = Instant::now();
 
         let next_signature =
             match build_geoip_signature(&self.asn_paths, &self.geo_paths, self.optional) {
@@ -45,6 +44,7 @@ impl GeoIpResolver {
                     return;
                 }
             };
+        self.last_reload_check = Instant::now();
 
         if next_signature == self.signature {
             return;
@@ -102,5 +102,31 @@ impl GeoIpResolver {
         }
 
         if out.is_empty() { None } else { Some(out) }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn refresh_if_needed_keeps_retry_window_open_after_signature_error() {
+        let old_check = Instant::now() - GEOIP_RELOAD_CHECK_INTERVAL - Duration::from_secs(1);
+        let mut resolver = GeoIpResolver {
+            asn_paths: vec!["/path/that/does/not/exist/asn.mmdb".to_string()],
+            geo_paths: Vec::new(),
+            optional: false,
+            asn_databases: Vec::new(),
+            geo_databases: Vec::new(),
+            signature: GeoIpDatabasesSignature {
+                asn: Vec::new(),
+                geo: Vec::new(),
+            },
+            last_reload_check: old_check,
+        };
+
+        resolver.refresh_if_needed();
+
+        assert_eq!(resolver.last_reload_check, old_check);
     }
 }

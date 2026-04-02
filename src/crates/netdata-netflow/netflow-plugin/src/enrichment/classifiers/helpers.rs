@@ -34,42 +34,64 @@ pub(crate) fn apply_regex_template(
 
 pub(crate) fn format_with_percent_placeholders(pattern: &str, args: &[ResolvedValue]) -> String {
     let mut out = String::new();
-    let chars: Vec<char> = pattern.chars().collect();
-    let mut idx = 0_usize;
+    let mut chars = pattern.chars().peekable();
     let mut arg_idx = 0_usize;
 
-    while idx < chars.len() {
-        let ch = chars[idx];
-        if ch == '%' && idx + 1 < chars.len() {
-            let spec = chars[idx + 1];
-            match spec {
-                's' | 'v' => {
+    while let Some(ch) = chars.next() {
+        if ch == '%' {
+            match chars.peek().copied() {
+                Some('s') | Some('v') => {
+                    chars.next();
                     if let Some(arg) = args.get(arg_idx) {
                         out.push_str(&arg.to_string_value());
                         arg_idx += 1;
                     }
-                    idx += 2;
                     continue;
                 }
-                'd' => {
+                Some('d') => {
+                    chars.next();
                     if let Some(arg) = args.get(arg_idx) {
                         out.push_str(&arg.to_i64().unwrap_or(0).to_string());
                         arg_idx += 1;
                     }
-                    idx += 2;
                     continue;
                 }
-                '%' => {
+                Some('%') => {
+                    chars.next();
                     out.push('%');
-                    idx += 2;
                     continue;
                 }
                 _ => {}
             }
         }
         out.push(ch);
-        idx += 1;
     }
 
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_with_percent_placeholders_formats_known_specs() {
+        let rendered = format_with_percent_placeholders(
+            "π-%s-%d-%%",
+            &[
+                ResolvedValue::String("edge".to_string()),
+                ResolvedValue::Number(42),
+            ],
+        );
+
+        assert_eq!(rendered, "π-edge-42-%");
+    }
+
+    #[test]
+    fn format_with_percent_placeholders_preserves_unknown_specs() {
+        let rendered =
+            format_with_percent_placeholders("keep-%x", &[ResolvedValue::String("unused".into())]);
+
+        assert_eq!(rendered, "keep-%x");
+    }
 }

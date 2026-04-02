@@ -50,14 +50,38 @@ pub(super) fn set_record_exporter_field(rec: &mut FlowRecord, key: &str, value: 
             true
         }
         "DIRECTION" => {
-            let normalized = FlowDirection::from_str_value(value);
-            if value == DIRECTION_UNDEFINED {
+            let direction = FlowDirection::from_str_value(value);
+            if direction == FlowDirection::Undefined {
                 rec.clear_direction();
             } else {
-                rec.set_direction(normalized);
+                rec.set_direction(direction);
             }
             true
         }
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn direction_setter_clears_unrecognized_values() {
+        let mut rec = FlowRecord::default();
+        rec.set_direction(FlowDirection::Egress);
+
+        assert!(set_record_exporter_field(&mut rec, "DIRECTION", ""));
+        assert_eq!(rec.direction, FlowDirection::Undefined);
+        assert!(!rec.has_direction());
+    }
+
+    #[test]
+    fn direction_setter_keeps_numeric_direction_values() {
+        let mut rec = FlowRecord::default();
+
+        assert!(set_record_exporter_field(&mut rec, "DIRECTION", "0"));
+        assert_eq!(rec.direction, FlowDirection::Ingress);
+        assert!(rec.has_direction());
     }
 }
