@@ -78,6 +78,9 @@ func decodeHexBytes(v string) []byte {
 		if len(parts) == 0 {
 			return nil
 		}
+		if bs := decodeGroupedHexParts(parts); len(bs) != 0 {
+			return bs
+		}
 
 		out := make([]byte, 0, len(parts))
 		for _, part := range parts {
@@ -108,6 +111,35 @@ func decodeHexBytes(v string) []byte {
 	}
 	bs, err := hex.DecodeString(clean)
 	if err != nil {
+		return nil
+	}
+	return bs
+}
+
+func decodeGroupedHexParts(parts []string) []byte {
+	var joined strings.Builder
+	anyWidePart := false
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if len(part)%2 != 0 {
+			return nil
+		}
+		if len(part) > 2 {
+			anyWidePart = true
+		}
+		joined.WriteString(part)
+	}
+
+	if !anyWidePart || joined.Len() == 0 {
+		return nil
+	}
+
+	bs, err := hex.DecodeString(joined.String())
+	if err != nil || len(bs) == 0 {
 		return nil
 	}
 	return bs

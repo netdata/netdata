@@ -116,6 +116,20 @@ func TestRuntimeEngine_DiscoverByCIDRs_InvalidRequest(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidRequest)
 }
 
+func TestRuntimeEngine_DiscoverByCIDRs_InvalidPrefix(t *testing.T) {
+	provider := &fakeObservationProvider{}
+	eng, err := NewRuntimeEngine(provider)
+	require.NoError(t, err)
+
+	_, err = eng.DiscoverByCIDRs(context.Background(), CIDRRequest{
+		CIDRs: []netip.Prefix{{}},
+	})
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrInvalidRequest)
+	require.ErrorContains(t, err, "cidrs[0] has invalid prefix")
+	require.Empty(t, provider.cidrReqs)
+}
+
 func TestRuntimeEngine_DiscoverByDevices_InvalidRequest(t *testing.T) {
 	eng, err := NewRuntimeEngine(&fakeObservationProvider{})
 	require.NoError(t, err)

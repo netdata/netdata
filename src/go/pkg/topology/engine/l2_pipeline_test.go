@@ -794,6 +794,7 @@ func TestNormalizeMAC_PadsSingleNibbleTokens(t *testing.T) {
 	require.Equal(t, "00:15:99:9f:07:ef", normalizeMAC("0:15:99:9f:7:ef"))
 	require.Equal(t, "60:33:4b:08:17:a8", normalizeMAC("60:33:4b:8:17:a8"))
 	require.Equal(t, "00:90:1a:42:22:f8", normalizeMAC("0:90:1a:42:22:f8"))
+	require.Equal(t, "00:11:22:33:44:55", normalizeMAC("0011.2233.4455"))
 }
 
 func TestBuildL2ResultFromObservations_DeterministicOrderingAndDedup(t *testing.T) {

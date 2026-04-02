@@ -81,6 +81,11 @@ func validateCIDRRequest(req CIDRRequest) error {
 	if len(req.CIDRs) == 0 {
 		return fmt.Errorf("%w: cidrs are required", ErrInvalidRequest)
 	}
+	for i := range req.CIDRs {
+		if !req.CIDRs[i].IsValid() {
+			return fmt.Errorf("%w: cidrs[%d] has invalid prefix", ErrInvalidRequest, i)
+		}
+	}
 	return nil
 }
 
