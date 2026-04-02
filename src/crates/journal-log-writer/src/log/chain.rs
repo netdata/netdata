@@ -1,9 +1,9 @@
 use crate::error::{Result, WriterError};
 use crate::log::RetentionPolicy;
 use journal_common::Microseconds;
-use journal_core::JournalFile;
 use journal_core::collections::HashMap;
 use journal_core::file::Mmap;
+use journal_core::JournalFile;
 use journal_registry::repository;
 use journal_registry::repository::File;
 use std::path::PathBuf;
@@ -217,18 +217,21 @@ impl OwnedChain {
         let file_size = self.file_sizes.get(&file).copied().unwrap_or(0);
 
         // Remove from filesystem
-        let removed = match std::fs::remove_file(file.path()) {
-            Ok(()) => true,
-            Err(e) => {
-                // Log error but continue cleanup - file might already be deleted
-                error!("failed to remove journal file {:?}: {}", file.path(), e);
-                false
+        match std::fs::remove_file(file.path()) {
+            Ok(()) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                info!("journal file {:?} was already removed", file.path());
             }
-        };
+            Err(err) => {
+                error!("failed to remove journal file {:?}: {}", file.path(), err);
+                self.inner.insert_file(file);
+                return Err(err.into());
+            }
+        }
 
         self.file_sizes.remove(&file);
         self.total_size = self.total_size.saturating_sub(file_size);
-        Ok(removed.then_some(file))
+        Ok(Some(file))
     }
 
     /// Remove files older than the specified cutoff time
@@ -257,5 +260,46 @@ impl OwnedChain {
         }
 
         Ok(deleted_files)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn delete_oldest_file_preserves_accounting_on_remove_error() {
+        use std::fs;
+        use std::os::unix::fs::PermissionsExt;
+
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let machine_id = Uuid::new_v4();
+        let path = tmp.path().join(machine_id.to_string());
+        fs::create_dir(&path).expect("create machine-id dir");
+
+        let mut chain = OwnedChain::new(path.clone(), machine_id).expect("create chain");
+        let file = create_chain_file(&path, machine_id, 1, 1).expect("create chain file");
+        fs::write(file.path(), b"journal").expect("write journal file");
+
+        let file_size = fs::metadata(file.path()).expect("stat journal file").len();
+        chain.inner.insert_file(file.clone());
+        chain.file_sizes.insert(file.clone(), file_size);
+        chain.total_size = file_size;
+
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o555))
+            .expect("make directory read-only");
+
+        let err = chain
+            .delete_oldest_file()
+            .expect_err("directory permissions should block removal");
+        assert!(matches!(err, WriterError::Io(_)));
+
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755))
+            .expect("restore directory permissions");
+
+        assert_eq!(chain.inner.len(), 1);
+        assert_eq!(chain.file_sizes.get(&file), Some(&file_size));
+        assert_eq!(chain.total_size, file_size);
     }
 }

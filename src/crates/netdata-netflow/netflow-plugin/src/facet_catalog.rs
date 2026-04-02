@@ -59,9 +59,27 @@ pub(crate) static FACET_ALLOWED_OPTIONS: LazyLock<Vec<String>> = LazyLock::new(|
         .collect()
 });
 
-pub(crate) fn facet_field_spec(field: &str) -> Option<&'static FacetFieldSpec> {
-    let normalized = field.trim().to_ascii_uppercase();
+const FACET_FIELD_STACK_BUF_CAP: usize = 64;
+
+fn facet_field_spec_lookup(trimmed: &str) -> Option<&'static FacetFieldSpec> {
+    if trimmed.len() <= FACET_FIELD_STACK_BUF_CAP {
+        let mut buf = [0_u8; FACET_FIELD_STACK_BUF_CAP];
+        let bytes = trimmed.as_bytes();
+        for (idx, &byte) in bytes.iter().enumerate() {
+            buf[idx] = byte.to_ascii_uppercase();
+        }
+
+        let normalized = std::str::from_utf8(&buf[..bytes.len()])
+            .expect("ASCII uppercasing preserves UTF-8 validity");
+        return FACET_FIELD_SPEC_INDEX.get(normalized);
+    }
+
+    let normalized = trimmed.to_ascii_uppercase();
     FACET_FIELD_SPEC_INDEX.get(normalized.as_str())
+}
+
+pub(crate) fn facet_field_spec(field: &str) -> Option<&'static FacetFieldSpec> {
+    facet_field_spec_lookup(field.trim())
 }
 
 pub(crate) fn facet_field_enabled(field: &str) -> bool {
@@ -108,4 +126,22 @@ fn facet_field_spec_for_name(field: &'static str) -> Option<FacetFieldSpec> {
                 | FacetValueKind::DenseU16
         ),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::facet_field_spec;
+
+    #[test]
+    fn facet_field_spec_trims_and_matches_case_insensitively() {
+        assert_eq!(
+            facet_field_spec(" src_as ").map(|spec| spec.name),
+            Some("SRC_AS")
+        );
+    }
+
+    #[test]
+    fn facet_field_spec_rejects_unknown_fields() {
+        assert!(facet_field_spec(" definitely_not_a_facet ").is_none());
+    }
 }

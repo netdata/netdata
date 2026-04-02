@@ -1,5 +1,6 @@
 use super::runtime::ResolvedValue;
 use super::*;
+use regex::Regex;
 
 pub(crate) fn normalize_classifier_value(input: &str) -> String {
     input
@@ -13,8 +14,16 @@ pub(crate) fn apply_regex_template(
     input: &str,
     pattern: &str,
     template: &str,
+    compiled: Option<&Regex>,
 ) -> Result<Option<String>> {
-    let regex = Regex::new(pattern).with_context(|| format!("invalid regex '{pattern}'"))?;
+    let owned_regex;
+    let regex = if let Some(compiled) = compiled {
+        compiled
+    } else {
+        owned_regex = Regex::new(pattern).with_context(|| format!("invalid regex '{pattern}'"))?;
+        &owned_regex
+    };
+
     if let Some(captures) = regex.captures(input) {
         let mut output = String::new();
         captures.expand(template, &mut output);

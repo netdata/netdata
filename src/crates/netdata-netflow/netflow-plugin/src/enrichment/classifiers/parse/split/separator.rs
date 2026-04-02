@@ -11,6 +11,10 @@ fn skip_to_byte_boundary(
     }
 }
 
+fn has_negative_depth(paren_depth: i32, bracket_depth: i32, brace_depth: i32) -> bool {
+    paren_depth < 0 || bracket_depth < 0 || brace_depth < 0
+}
+
 pub(in super::super) fn split_top_level(input: &str, sep: &str) -> Vec<String> {
     let mut parts = Vec::new();
     let mut start = 0_usize;
@@ -42,6 +46,15 @@ pub(in super::super) fn split_top_level(input: &str, sep: &str) -> Vec<String> {
             '{' => brace_depth += 1,
             '}' => brace_depth -= 1,
             _ => {}
+        }
+
+        if has_negative_depth(paren_depth, bracket_depth, brace_depth) {
+            let trimmed = input.trim();
+            return if trimmed.is_empty() {
+                Vec::new()
+            } else {
+                vec![trimmed.to_string()]
+            };
         }
 
         if paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 && input[i..].starts_with(sep)
@@ -92,6 +105,10 @@ pub(in super::super) fn split_once_top_level<'a>(
             _ => {}
         }
 
+        if has_negative_depth(paren_depth, bracket_depth, brace_depth) {
+            return None;
+        }
+
         if paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 && input[i..].starts_with(sep)
         {
             let left = &input[..i];
@@ -118,5 +135,18 @@ mod tests {
     #[test]
     fn split_once_top_level_handles_utf8_input() {
         assert_eq!(split_once_top_level("α == β", " == "), Some(("α", "β")));
+    }
+
+    #[test]
+    fn split_top_level_does_not_split_after_negative_depth() {
+        assert_eq!(
+            split_top_level("foo), bar", ","),
+            vec!["foo), bar".to_string()]
+        );
+    }
+
+    #[test]
+    fn split_once_top_level_returns_none_after_negative_depth() {
+        assert_eq!(split_once_top_level("foo) == bar", " == "), None);
     }
 }

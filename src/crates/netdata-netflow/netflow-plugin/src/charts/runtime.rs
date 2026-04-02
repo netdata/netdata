@@ -54,17 +54,32 @@ impl NetflowCharts {
                 tokio::select! {
                     _ = shutdown.cancelled() => break,
                     _ = interval.tick() => {
-                        let open_tier_counts = open_tiers
-                            .read()
-                            .ok()
-                            .map(|guard| {
+                        let open_tier_counts = match open_tiers.read() {
+                            Ok(guard) => (
+                                guard.minute_1.len() as u64,
+                                guard.minute_5.len() as u64,
+                                guard.hour_1.len() as u64,
+                            ),
+                            Err(poisoned) => {
+                                static OPEN_TIERS_POISON_WARNED: std::sync::Once =
+                                    std::sync::Once::new();
+
+                                let err = poisoned.to_string();
+                                OPEN_TIERS_POISON_WARNED.call_once(|| {
+                                    tracing::warn!(
+                                        "netflow charts sampler: open tier state lock poisoned: {}; using recovered state",
+                                        err
+                                    );
+                                });
+
+                                let guard = poisoned.into_inner();
                                 (
                                     guard.minute_1.len() as u64,
                                     guard.minute_5.len() as u64,
                                     guard.hour_1.len() as u64,
                                 )
-                            })
-                            .unwrap_or((0, 0, 0));
+                            }
+                        };
                         let snapshot =
                             NetflowChartsSnapshot::collect(metrics.as_ref(), open_tier_counts);
                         self.apply_snapshot(snapshot);

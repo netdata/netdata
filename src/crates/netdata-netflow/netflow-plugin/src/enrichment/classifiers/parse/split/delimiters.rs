@@ -13,9 +13,8 @@ pub(in super::super) fn is_wrapped_by_top_level_delimiters(
     let mut brace_depth = 0_i32;
     let mut in_string = false;
     let mut escaped = false;
-    let chars: Vec<(usize, char)> = input.char_indices().collect();
 
-    for (idx, ch) in chars.iter().copied() {
+    for (idx, ch) in input.char_indices() {
         if in_string {
             if escaped {
                 escaped = false;
@@ -53,4 +52,19 @@ pub(in super::super) fn is_wrapped_by_top_level_delimiters(
     }
 
     paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 && !in_string && !escaped
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_wrapped_by_top_level_delimiters;
+
+    #[test]
+    fn wrapped_by_top_level_delimiters_handles_utf8_without_allocation_changes() {
+        assert!(is_wrapped_by_top_level_delimiters("(α, [β, γ])", '(', ')'));
+    }
+
+    #[test]
+    fn wrapped_by_top_level_delimiters_rejects_negative_depth() {
+        assert!(!is_wrapped_by_top_level_delimiters("(α))", '(', ')'));
+    }
 }

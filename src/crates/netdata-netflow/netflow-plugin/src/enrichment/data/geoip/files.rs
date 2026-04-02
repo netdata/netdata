@@ -101,7 +101,25 @@ pub(crate) fn read_geoip_file_signature(
             ));
         }
     };
-    let modified_usec = modified_duration.as_micros() as u64;
+    let modified_micros = modified_duration.as_micros();
+    let modified_usec = match u64::try_from(modified_micros) {
+        Ok(value) => value,
+        Err(_) if optional => {
+            tracing::warn!(
+                "geoip: modification time for optional database '{}' exceeds u64 microsecond range: {}",
+                path,
+                modified_micros
+            );
+            return Ok(None);
+        }
+        Err(_) => {
+            return Err(anyhow::anyhow!(
+                "geoip: modification time for database '{}' exceeds u64 microsecond range: {}",
+                path,
+                modified_micros
+            ));
+        }
+    };
     Ok(Some(GeoIpFileSignature {
         modified_usec,
         size: metadata.len(),

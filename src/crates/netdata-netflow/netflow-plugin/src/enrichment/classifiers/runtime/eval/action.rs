@@ -1,12 +1,25 @@
 use super::*;
+use regex::Regex;
 
 #[derive(Debug, Clone)]
 pub(crate) enum ActionExpr {
     Reject,
     ClassifyExporter(ExporterTarget, ValueExpr),
-    ClassifyExporterRegex(ExporterTarget, ValueExpr, ValueExpr, ValueExpr),
+    ClassifyExporterRegex(
+        ExporterTarget,
+        ValueExpr,
+        ValueExpr,
+        ValueExpr,
+        Option<Regex>,
+    ),
     ClassifyInterface(InterfaceTarget, ValueExpr),
-    ClassifyInterfaceRegex(InterfaceTarget, ValueExpr, ValueExpr, ValueExpr),
+    ClassifyInterfaceRegex(
+        InterfaceTarget,
+        ValueExpr,
+        ValueExpr,
+        ValueExpr,
+        Option<Regex>,
+    ),
     SetName(ValueExpr),
     SetDescription(ValueExpr),
     ClassifyExternal,
@@ -32,7 +45,7 @@ impl ActionExpr {
                 }
                 Ok(true)
             }
-            ActionExpr::ClassifyExporterRegex(target, input, pattern, template) => {
+            ActionExpr::ClassifyExporterRegex(target, input, pattern, template, compiled) => {
                 let input = input
                     .resolve(Some(exporter), None, Some(classification), None)?
                     .to_string_value();
@@ -45,7 +58,9 @@ impl ActionExpr {
 
                 let slot = classification.exporter_target_mut(target);
                 if slot.is_empty() {
-                    if let Some(mapped) = apply_regex_template(&input, &pattern, &template)? {
+                    if let Some(mapped) =
+                        apply_regex_template(&input, &pattern, &template, compiled.as_ref())?
+                    {
                         *slot = normalize_classifier_value(&mapped);
                         return Ok(true);
                     }
@@ -54,7 +69,7 @@ impl ActionExpr {
                 Ok(true)
             }
             ActionExpr::ClassifyInterface(_, _)
-            | ActionExpr::ClassifyInterfaceRegex(_, _, _, _)
+            | ActionExpr::ClassifyInterfaceRegex(_, _, _, _, _)
             | ActionExpr::SetName(_)
             | ActionExpr::SetDescription(_)
             | ActionExpr::ClassifyExternal
@@ -82,7 +97,7 @@ impl ActionExpr {
                 }
                 Ok(true)
             }
-            ActionExpr::ClassifyInterfaceRegex(target, input, pattern, template) => {
+            ActionExpr::ClassifyInterfaceRegex(target, input, pattern, template, compiled) => {
                 let input = input
                     .resolve(Some(exporter), Some(interface), None, Some(classification))?
                     .to_string_value();
@@ -95,7 +110,9 @@ impl ActionExpr {
 
                 let slot = classification.interface_target_mut(target);
                 if slot.is_empty() {
-                    if let Some(mapped) = apply_regex_template(&input, &pattern, &template)? {
+                    if let Some(mapped) =
+                        apply_regex_template(&input, &pattern, &template, compiled.as_ref())?
+                    {
                         *slot = normalize_classifier_value(&mapped);
                         return Ok(true);
                     }
@@ -131,7 +148,8 @@ impl ActionExpr {
                 }
                 Ok(true)
             }
-            ActionExpr::ClassifyExporter(_, _) | ActionExpr::ClassifyExporterRegex(_, _, _, _) => {
+            ActionExpr::ClassifyExporter(_, _)
+            | ActionExpr::ClassifyExporterRegex(_, _, _, _, _) => {
                 anyhow::bail!("exporter action in interface rule")
             }
         }
