@@ -27,3 +27,27 @@ func TestAdjacencyKey_NormalizesProtocolAndEndpointWhitespace(t *testing.T) {
 
 	require.Equal(t, adjacencyKey(normalized), adjacencyKey(raw))
 }
+
+func TestAttachmentKey_NormalizesIDsAndMethod(t *testing.T) {
+	raw := Attachment{
+		DeviceID:   " sw1 ",
+		IfIndex:    10,
+		EndpointID: " endpoint-1 ",
+		Method:     " FDB ",
+		Labels: map[string]string{
+			"vlan_id": " 100 ",
+		},
+	}
+
+	normalized := Attachment{
+		DeviceID:   "sw1",
+		IfIndex:    10,
+		EndpointID: "endpoint-1",
+		Method:     "fdb",
+		Labels: map[string]string{
+			"vlan_id": "100",
+		},
+	}
+
+	require.Equal(t, attachmentKey(normalized), attachmentKey(raw))
+}

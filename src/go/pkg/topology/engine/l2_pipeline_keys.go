@@ -19,6 +19,9 @@ func adjacencyKey(adj Adjacency) string {
 }
 
 func attachmentKey(attachment Attachment) string {
+	deviceID := strings.TrimSpace(attachment.DeviceID)
+	endpointID := strings.TrimSpace(attachment.EndpointID)
+	method := strings.ToLower(strings.TrimSpace(attachment.Method))
 	vlanID := ""
 	if len(attachment.Labels) > 0 {
 		vlanID = strings.TrimSpace(attachment.Labels["vlan_id"])
@@ -27,10 +30,10 @@ func attachmentKey(attachment Attachment) string {
 		}
 	}
 	return strings.Join([]string{
-		attachment.DeviceID,
+		deviceID,
 		strconv.Itoa(attachment.IfIndex),
-		attachment.EndpointID,
-		attachment.Method,
+		endpointID,
+		method,
 		strings.ToLower(vlanID),
 	}, "|")
 }
