@@ -259,7 +259,7 @@ int do_module_audit(int update_every, const char *name) {
         if (startup_retries > 0) {
             startup_retries--;
             if (startup_retries == 0) {
-                netdata_log_info("audit: netlink AUDIT_GET query failed, audit module disabled");
+                netdata_log_info("audit: netlink AUDIT_GET query failed (%s), audit module disabled", strerror(errno));
                 return 1; // permanently disable after exhausting retries
             }
             return 0; // retry next cycle
