@@ -13,6 +13,10 @@ pub(crate) fn append_v9_records(
     let exporter_ip = source.ip().to_string();
     let observation_domain_id = packet.header.source_id;
     let version = 9_u16;
+    let system_init_usec = netflow_v9_system_init_usec(
+        packet.header.unix_secs as u64,
+        packet.header.sys_up_time as u64,
+    );
 
     for flowset in packet.flowsets {
         match flowset.body {
@@ -23,10 +27,6 @@ pub(crate) fn append_v9_records(
                     let mut observed_sampling_rate: Option<u64> = None;
                     let mut first_switched_millis: Option<u64> = None;
                     let mut last_switched_millis: Option<u64> = None;
-                    let system_init_usec = netflow_v9_system_init_usec(
-                        packet.header.unix_secs as u64,
-                        packet.header.sys_up_time as u64,
-                    );
 
                     for (field, value) in record {
                         let value_str = field_value_to_string(&value);

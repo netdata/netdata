@@ -32,7 +32,10 @@ pub(crate) fn apply_regex_template(
     Ok(None)
 }
 
-pub(crate) fn format_with_percent_placeholders(pattern: &str, args: &[ResolvedValue]) -> String {
+pub(crate) fn format_with_percent_placeholders(
+    pattern: &str,
+    args: &[ResolvedValue],
+) -> Result<String> {
     let mut out = String::new();
     let mut chars = pattern.chars().peekable();
     let mut arg_idx = 0_usize;
@@ -51,7 +54,10 @@ pub(crate) fn format_with_percent_placeholders(pattern: &str, args: &[ResolvedVa
                 Some('d') => {
                     chars.next();
                     if let Some(arg) = args.get(arg_idx) {
-                        out.push_str(&arg.to_i64().unwrap_or(0).to_string());
+                        let value = arg.to_i64().with_context(|| {
+                            format!("placeholder %{} expects a numeric value", 'd')
+                        })?;
+                        out.push_str(&value.to_string());
                         arg_idx += 1;
                     }
                     continue;
@@ -67,7 +73,7 @@ pub(crate) fn format_with_percent_placeholders(pattern: &str, args: &[ResolvedVa
         out.push(ch);
     }
 
-    out
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -82,7 +88,8 @@ mod tests {
                 ResolvedValue::String("edge".to_string()),
                 ResolvedValue::Number(42),
             ],
-        );
+        )
+        .unwrap();
 
         assert_eq!(rendered, "π-edge-42-%");
     }
@@ -90,8 +97,18 @@ mod tests {
     #[test]
     fn format_with_percent_placeholders_preserves_unknown_specs() {
         let rendered =
-            format_with_percent_placeholders("keep-%x", &[ResolvedValue::String("unused".into())]);
+            format_with_percent_placeholders("keep-%x", &[ResolvedValue::String("unused".into())])
+                .unwrap();
 
         assert_eq!(rendered, "keep-%x");
+    }
+
+    #[test]
+    fn format_with_percent_placeholders_rejects_non_numeric_percent_d() {
+        let err =
+            format_with_percent_placeholders("asn-%d", &[ResolvedValue::String("edge".into())])
+                .unwrap_err();
+
+        assert!(err.to_string().contains("expects a numeric value"));
     }
 }

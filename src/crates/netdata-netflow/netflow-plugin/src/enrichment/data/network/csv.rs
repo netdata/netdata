@@ -44,6 +44,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn append_u32_csv_formats_into_empty_target() {
+        let mut target = String::new();
+
+        append_u32_csv(&mut target, &[10, 20, 30]);
+
+        assert_eq!(target, "10,20,30");
+    }
+
+    #[test]
+    fn append_u32_csv_appends_after_existing_csv() {
+        let mut target = String::from("5");
+
+        append_u32_csv(&mut target, &[10, 20]);
+
+        assert_eq!(target, "5,10,20");
+    }
+
+    #[test]
+    fn append_u32_csv_ignores_empty_input() {
+        let mut target = String::from("existing");
+
+        append_u32_csv(&mut target, &[]);
+
+        assert_eq!(target, "existing");
+    }
+
+    #[test]
     fn append_large_communities_csv_formats_without_replacing_existing_csv() {
         let mut target = String::from("64512:1:1");
         let values = [

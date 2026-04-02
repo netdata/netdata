@@ -76,7 +76,7 @@ impl ValueExpr {
                 Ok(ResolvedValue::String(format_with_percent_placeholders(
                     &pattern,
                     &resolved_args,
-                )))
+                )?))
             }
         }
     }
