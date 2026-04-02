@@ -18,6 +18,26 @@ static bool streaming_topology_host_guid(RRDHOST *host, char *dst, size_t dst_si
 static void streaming_topology_actor_id_from_guid(const char *guid, char *dst, size_t dst_size);
 static void streaming_topology_actor_id_for_uuid(ND_UUID host_id, char *dst, size_t dst_size);
 static uint32_t *streaming_topology_parent_child_count_get(DICTIONARY *parent_child_count, RRDHOST *host);
+static struct streaming_topology_descendant_list *streaming_topology_descendants_get(DICTIONARY *parent_descendants, RRDHOST *host);
+
+enum streaming_topology_received_type {
+    STREAMING_TOPOLOGY_RECEIVED_STREAMING = 0,
+    STREAMING_TOPOLOGY_RECEIVED_VIRTUAL,
+    STREAMING_TOPOLOGY_RECEIVED_STALE,
+};
+
+struct streaming_topology_descendant {
+    RRDHOST *host;
+    ND_UUID source_uuid;
+    bool source_local;
+    uint8_t type;
+};
+
+struct streaming_topology_descendant_list {
+    struct streaming_topology_descendant *items;
+    size_t used;
+    size_t size;
+};
 
 static void streaming_topology_add_host_match(BUFFER *wb, RRDHOST *host) {
     buffer_json_member_add_object(wb, "match");
@@ -82,6 +102,67 @@ static uint32_t *streaming_topology_parent_child_count_get(DICTIONARY *parent_ch
         return NULL;
 
     return dictionary_get(parent_child_count, host_guid);
+}
+
+static struct streaming_topology_descendant_list *streaming_topology_descendants_get(DICTIONARY *parent_descendants, RRDHOST *host) {
+    char host_guid[UUID_STR_LEN];
+
+    if(!streaming_topology_host_guid(host, host_guid, sizeof(host_guid)))
+        return NULL;
+
+    return dictionary_get(parent_descendants, host_guid);
+}
+
+static struct streaming_topology_descendant_list *streaming_topology_descendants_get_or_create(DICTIONARY *parent_descendants, ND_UUID host_id) {
+    char host_guid[UUID_STR_LEN];
+    uuid_unparse_lower(host_id.uuid, host_guid);
+
+    struct streaming_topology_descendant_list *list = dictionary_get(parent_descendants, host_guid);
+    if(list)
+        return list;
+
+    struct streaming_topology_descendant_list empty = {0};
+    return dictionary_set(parent_descendants, host_guid, &empty, sizeof(empty));
+}
+
+static void streaming_topology_descendants_append(
+    DICTIONARY *parent_descendants,
+    ND_UUID parent_id,
+    RRDHOST *host,
+    enum streaming_topology_received_type type,
+    bool source_local,
+    ND_UUID source_uuid
+) {
+    struct streaming_topology_descendant_list *list = streaming_topology_descendants_get_or_create(parent_descendants, parent_id);
+    if(!list)
+        return;
+
+    if(list->used == list->size) {
+        size_t new_size = list->size ? list->size * 2 : 4;
+        list->items = reallocz(list->items, new_size * sizeof(*list->items));
+        list->size = new_size;
+    }
+
+    list->items[list->used++] = (struct streaming_topology_descendant) {
+        .host = host,
+        .source_uuid = source_uuid,
+        .source_local = source_local,
+        .type = (uint8_t)type,
+    };
+}
+
+static const char *streaming_topology_received_type_to_string(enum streaming_topology_received_type type) {
+    switch(type) {
+        case STREAMING_TOPOLOGY_RECEIVED_VIRTUAL:
+            return "virtual";
+
+        case STREAMING_TOPOLOGY_RECEIVED_STALE:
+            return "stale";
+
+        case STREAMING_TOPOLOGY_RECEIVED_STREAMING:
+        default:
+            return "streaming";
+    }
 }
 
 static void streaming_topology_actor_id_for_host(RRDHOST *host, char *dst, size_t dst_size) {
@@ -598,6 +679,9 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
         DICTIONARY *parent_child_count = dictionary_create_advanced(
             DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
             NULL, sizeof(uint32_t));
+        DICTIONARY *parent_descendants = dictionary_create_advanced(
+            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+            NULL, sizeof(struct streaming_topology_descendant_list));
 
         {
             RRDHOST *host;
@@ -616,6 +700,34 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                         uint32_t one = 1;
                         dictionary_set(parent_child_count, guid, &one, sizeof(one));
                     }
+                }
+
+                ND_UUID full_path_ids[128];
+                uint16_t full_path_n = streaming_topology_get_path_ids(host, 0, full_path_ids, 128);
+                ND_UUID empty_uuid = {};
+
+                if(rrdhost_is_virtual(host)) {
+                    if(full_path_n > 0) {
+                        streaming_topology_descendants_append(parent_descendants,
+                            full_path_ids[0], host, STREAMING_TOPOLOGY_RECEIVED_VIRTUAL, true, empty_uuid);
+
+                        for(uint16_t i = 1; i < full_path_n; i++) {
+                            streaming_topology_descendants_append(parent_descendants,
+                                full_path_ids[i], host, STREAMING_TOPOLOGY_RECEIVED_STREAMING, false, full_path_ids[i - 1]);
+                        }
+                    }
+                }
+                else if(full_path_n > 0) {
+                    for(uint16_t i = 0; i < full_path_n; i++) {
+                        bool source_local = (i == 0);
+                        ND_UUID source_uuid = source_local ? empty_uuid : full_path_ids[i - 1];
+                        streaming_topology_descendants_append(parent_descendants,
+                            full_path_ids[i], host, STREAMING_TOPOLOGY_RECEIVED_STREAMING, source_local, source_uuid);
+                    }
+                }
+                else if(host != localhost) {
+                    streaming_topology_descendants_append(parent_descendants,
+                        localhost->host_id, host, STREAMING_TOPOLOGY_RECEIVED_STALE, false, empty_uuid);
                 }
             }
             dfe_done(host);
@@ -771,45 +883,23 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                         // received_nodes: all nodes this parent receives data for (drives bullet count + type)
                         if(child_count > 0) {
                             buffer_json_member_add_array(wb, "received_nodes");
-                            RRDHOST *rn_host;
-                            dfe_start_read(rrdhost_root_index, rn_host) {
-                                if(rn_host == host) continue;
+                            struct streaming_topology_descendant_list *received_nodes =
+                                streaming_topology_descendants_get(parent_descendants, host);
+                            if(received_nodes) {
+                                for(size_t i = 0; i < received_nodes->used; i++) {
+                                    struct streaming_topology_descendant *descendant = &received_nodes->items[i];
+                                    RRDHOST *rn_host = descendant->host;
 
-                                const char *rn_type = NULL;
+                                    if(rn_host == host)
+                                        continue;
 
-                                if(rrdhost_is_virtual(rn_host)) {
-                                    ND_UUID origin_id[1];
-                                    uint16_t on = streaming_topology_get_path_ids(rn_host, 0, origin_id, 1);
-                                    if(on >= 1 && UUIDeq(origin_id[0], host->host_id))
-                                        rn_type = "virtual";
-                                }
-
-                                if(!rn_type) {
-                                    ND_UUID rn_path_ids[128];
-                                    uint16_t rn_n = streaming_topology_get_path_ids(rn_host, 1, rn_path_ids, 128);
-                                    for(uint16_t ri = 0; ri < rn_n; ri++) {
-                                        if(UUIDeq(rn_path_ids[ri], host->host_id)) {
-                                            rn_type = "streaming";
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                if(!rn_type && host == localhost && !rrdhost_is_virtual(rn_host)) {
-                                    ND_UUID rn_path_ids[1];
-                                    uint16_t rn_n = streaming_topology_get_path_ids(rn_host, 1, rn_path_ids, 1);
-                                    if(rn_n == 0)
-                                        rn_type = "stale";
-                                }
-
-                                if(rn_type) {
                                     buffer_json_add_array_item_object(wb);
                                     buffer_json_member_add_string(wb, "name", rrdhost_hostname(rn_host));
-                                    buffer_json_member_add_string(wb, "type", rn_type);
+                                    buffer_json_member_add_string(wb, "type",
+                                        streaming_topology_received_type_to_string((enum streaming_topology_received_type)descendant->type));
                                     buffer_json_object_close(wb);
                                 }
                             }
-                            dfe_done(rn_host);
                             buffer_json_array_close(wb);
                         }
 
@@ -894,74 +984,51 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                                     buffer_json_array_close(wb); // inbound
                                 }
                                 else {
-                                    // non-observer parent: derive inbound from streaming paths
+                                    // non-observer parent: use precomputed descendants
                                     buffer_json_member_add_array(wb, "inbound");
                                     {
-                                        RRDHOST *ih;
-                                        dfe_start_read(rrdhost_root_index, ih) {
-                                            ND_UUID ih_path[128];
-                                            uint16_t ih_pn = streaming_topology_get_path_ids(ih, 0, ih_path, 128);
+                                        struct streaming_topology_descendant_list *inbound_nodes =
+                                            streaming_topology_descendants_get(parent_descendants, host);
+                                        if(inbound_nodes) {
+                                            for(size_t i = 0; i < inbound_nodes->used; i++) {
+                                                struct streaming_topology_descendant *descendant = &inbound_nodes->items[i];
+                                                RRDHOST *ih = descendant->host;
+                                                const char *src_hostname = NULL;
+                                                char src_actor_id[256] = "";
 
-                                            // check if this parent appears in the node's path
-                                            bool found = false;
-                                            const char *src_hostname = NULL;
-                                            char src_actor_id[256] = "";
-
-                                            if(ih == host) {
-                                                found = true;
-                                                src_hostname = "local";
-                                            }
-                                            else if(rrdhost_is_virtual(ih)) {
-                                                // vnodes: check if origin is this parent
-                                                ND_UUID origin_id[1];
-                                                uint16_t on = streaming_topology_get_path_ids(ih, 0, origin_id, 1);
-                                                if(on > 0 && UUIDeq(origin_id[0], host->host_id)) {
-                                                    found = true;
+                                                if(descendant->source_local)
                                                     src_hostname = "local";
+                                                else if(!UUIDiszero(descendant->source_uuid)) {
+                                                    char src_guid[UUID_STR_LEN];
+                                                    uuid_unparse_lower(descendant->source_uuid.uuid, src_guid);
+                                                    streaming_topology_actor_id_from_guid(src_guid, src_actor_id, sizeof(src_actor_id));
+                                                    RRDHOST *src = rrdhost_find_by_guid(src_guid);
+                                                    src_hostname = src ? rrdhost_hostname(src) : src_guid;
                                                 }
-                                            }
-                                            else {
-                                                for(uint16_t pi = 0; pi < ih_pn; pi++) {
-                                                    if(UUIDeq(ih_path[pi], host->host_id)) {
-                                                        found = true;
-                                                        if(pi > 0) {
-                                                            char src_guid[UUID_STR_LEN];
-                                                            uuid_unparse_lower(ih_path[pi - 1].uuid, src_guid);
-                                                            streaming_topology_actor_id_from_guid(src_guid, src_actor_id, sizeof(src_actor_id));
-                                                            RRDHOST *src = rrdhost_find_by_guid(src_guid);
-                                                            src_hostname = src ? rrdhost_hostname(src) : src_guid;
-                                                        }
-                                                        else {
-                                                            src_hostname = "local";
-                                                        }
-                                                        break;
-                                                    }
+                                                else
+                                                    src_hostname = "unknown";
+
+                                                char ih_actor_id[256];
+                                                streaming_topology_actor_id_for_host(ih, ih_actor_id, sizeof(ih_actor_id));
+
+                                                const char *ih_node_type;
+                                                if(rrdhost_is_virtual(ih))
+                                                    ih_node_type = "vnode";
+                                                else {
+                                                    uint32_t *cc = streaming_topology_parent_child_count_get(parent_child_count, ih);
+                                                    ih_node_type = (cc && *cc > 0) ? "parent" : "child";
                                                 }
+
+                                                buffer_json_add_array_item_object(wb);
+                                                buffer_json_member_add_string(wb, "name", rrdhost_hostname(ih));
+                                                buffer_json_member_add_string(wb, "name_id", ih_actor_id);
+                                                buffer_json_member_add_string(wb, "received_from", src_hostname);
+                                                if(src_actor_id[0])
+                                                    buffer_json_member_add_string(wb, "received_from_id", src_actor_id);
+                                                buffer_json_member_add_string(wb, "node_type", ih_node_type);
+                                                buffer_json_object_close(wb);
                                             }
-
-                                            if(!found) continue;
-
-                                            char ih_actor_id[256];
-                                            streaming_topology_actor_id_for_host(ih, ih_actor_id, sizeof(ih_actor_id));
-
-                                            const char *ih_node_type;
-                                            if(rrdhost_is_virtual(ih))
-                                                ih_node_type = "vnode";
-                                            else {
-                                                uint32_t *cc = streaming_topology_parent_child_count_get(parent_child_count, ih);
-                                                ih_node_type = (cc && *cc > 0) ? "parent" : "child";
-                                            }
-
-                                            buffer_json_add_array_item_object(wb);
-                                            buffer_json_member_add_string(wb, "name", rrdhost_hostname(ih));
-                                            buffer_json_member_add_string(wb, "name_id", ih_actor_id);
-                                            buffer_json_member_add_string(wb, "received_from", src_hostname);
-                                            if(src_actor_id[0])
-                                                buffer_json_member_add_string(wb, "received_from_id", src_actor_id);
-                                            buffer_json_member_add_string(wb, "node_type", ih_node_type);
-                                            buffer_json_object_close(wb);
                                         }
-                                        dfe_done(ih);
                                     }
                                     buffer_json_array_close(wb); // inbound
                                 }
@@ -1075,7 +1142,7 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                                 buffer_json_array_close(wb); // outbound
                             }
                             else if(!is_observer && child_count > 0) {
-                                // non-observer parent: derive outbound from streaming paths
+                                // non-observer parent: use precomputed descendants
                                 // find this parent's outbound destination (next hop in its own path)
                                 const char *dst_hostname = NULL;
 
@@ -1095,55 +1162,34 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                                         }
                                     }
 
-                                    RRDHOST *oh;
-                                    dfe_start_read(rrdhost_root_index, oh) {
-                                        bool found = false;
+                                    struct streaming_topology_descendant_list *outbound_nodes =
+                                        streaming_topology_descendants_get(parent_descendants, host);
+                                    if(outbound_nodes) {
+                                        for(size_t i = 0; i < outbound_nodes->used; i++) {
+                                            RRDHOST *oh = outbound_nodes->items[i].host;
+                                            char oh_actor_id[256];
+                                            streaming_topology_actor_id_for_host(oh, oh_actor_id, sizeof(oh_actor_id));
 
-                                        if(oh == host) {
-                                            found = true;
-                                        }
-                                        else if(rrdhost_is_virtual(oh)) {
-                                            ND_UUID origin_id[1];
-                                            uint16_t on = streaming_topology_get_path_ids(oh, 0, origin_id, 1);
-                                            if(on > 0 && UUIDeq(origin_id[0], host->host_id))
-                                                found = true;
-                                        }
-                                        else {
-                                            ND_UUID oh_path[128];
-                                            uint16_t oh_pn = streaming_topology_get_path_ids(oh, 0, oh_path, 128);
-                                            for(uint16_t pi = 0; pi < oh_pn; pi++) {
-                                                if(UUIDeq(oh_path[pi], host->host_id)) {
-                                                    found = true;
-                                                    break;
-                                                }
+                                            const char *oh_node_type;
+                                            if(rrdhost_is_virtual(oh))
+                                                oh_node_type = "vnode";
+                                            else {
+                                                uint32_t *cc = streaming_topology_parent_child_count_get(parent_child_count, oh);
+                                                oh_node_type = (cc && *cc > 0) ? "parent" : "child";
                                             }
+
+                                            buffer_json_add_array_item_object(wb);
+                                            buffer_json_member_add_string(wb, "name", rrdhost_hostname(oh));
+                                            buffer_json_member_add_string(wb, "name_id", oh_actor_id);
+                                            if(dst_hostname) {
+                                                buffer_json_member_add_string(wb, "streamed_to", dst_hostname);
+                                                if(dst_actor_id[0])
+                                                    buffer_json_member_add_string(wb, "streamed_to_id", dst_actor_id);
+                                            }
+                                            buffer_json_member_add_string(wb, "node_type", oh_node_type);
+                                            buffer_json_object_close(wb);
                                         }
-
-                                        if(!found) continue;
-
-                                        char oh_actor_id[256];
-                                        streaming_topology_actor_id_for_host(oh, oh_actor_id, sizeof(oh_actor_id));
-
-                                        const char *oh_node_type;
-                                        if(rrdhost_is_virtual(oh))
-                                            oh_node_type = "vnode";
-                                        else {
-                                            uint32_t *cc = streaming_topology_parent_child_count_get(parent_child_count, oh);
-                                            oh_node_type = (cc && *cc > 0) ? "parent" : "child";
-                                        }
-
-                                        buffer_json_add_array_item_object(wb);
-                                        buffer_json_member_add_string(wb, "name", rrdhost_hostname(oh));
-                                        buffer_json_member_add_string(wb, "name_id", oh_actor_id);
-                                        if(dst_hostname) {
-                                            buffer_json_member_add_string(wb, "streamed_to", dst_hostname);
-                                            if(dst_actor_id[0])
-                                                buffer_json_member_add_string(wb, "streamed_to_id", dst_actor_id);
-                                        }
-                                        buffer_json_member_add_string(wb, "node_type", oh_node_type);
-                                        buffer_json_object_close(wb);
                                     }
-                                    dfe_done(oh);
                                 }
                                 buffer_json_array_close(wb); // outbound
                             }
@@ -1301,6 +1347,15 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
         }
         buffer_json_object_close(wb); // data
 
+        struct streaming_topology_descendant_list *descendants;
+        dfe_start_write(parent_descendants, descendants) {
+            freez(descendants->items);
+            descendants->items = NULL;
+            descendants->used = 0;
+            descendants->size = 0;
+        }
+        dfe_done(descendants);
+        dictionary_destroy(parent_descendants);
         dictionary_destroy(parent_child_count);
     }
 
