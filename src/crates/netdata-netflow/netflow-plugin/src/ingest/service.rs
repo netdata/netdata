@@ -19,16 +19,16 @@ struct FacetLifecycleObserver {
 impl LogLifecycleObserver for FacetLifecycleObserver {
     fn on_event(&self, event: &LogLifecycleEvent) {
         match event {
-            LogLifecycleEvent::Rotated {
-                archived_path,
-                active_path,
-            } => {
+            LogLifecycleEvent::Rotated { archived, active } => {
+                let archived_path = Path::new(archived.path());
+                let active_path = Path::new(active.path());
                 if let Err(err) = self.runtime.observe_rotation(archived_path, active_path) {
                     tracing::warn!("facet runtime rotation update failed: {}", err);
                 }
             }
-            LogLifecycleEvent::RetainedDeleted { paths } => {
-                if let Err(err) = self.runtime.observe_deleted_paths(paths) {
+            LogLifecycleEvent::RetainedDeleted { files } => {
+                let paths: Vec<PathBuf> = files.iter().map(|f| PathBuf::from(f.path())).collect();
+                if let Err(err) = self.runtime.observe_deleted_paths(&paths) {
                     tracing::warn!("facet runtime retention update failed: {}", err);
                 }
             }

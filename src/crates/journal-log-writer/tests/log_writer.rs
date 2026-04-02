@@ -699,10 +699,10 @@ fn test_lifecycle_observer_reports_rotation_and_retention_deletion() {
         .iter()
         .filter(|event| matches!(event, LogLifecycleEvent::Rotated { .. }))
         .count();
-    let deleted_paths = events
+    let deleted_files = events
         .iter()
         .find_map(|event| match event {
-            LogLifecycleEvent::RetainedDeleted { paths } => Some(paths.clone()),
+            LogLifecycleEvent::RetainedDeleted { files } => Some(files.clone()),
             _ => None,
         })
         .unwrap_or_default();
@@ -711,11 +711,11 @@ fn test_lifecycle_observer_reports_rotation_and_retention_deletion() {
         rotation_count, 2,
         "expected two rotations after three writes"
     );
-    assert_eq!(deleted_paths.len(), 1, "expected one retained deletion");
+    assert_eq!(deleted_files.len(), 1, "expected one retained deletion");
     assert!(
-        !deleted_paths[0].exists(),
+        !Path::new(deleted_files[0].path()).exists(),
         "retained file should be gone from disk: {}",
-        deleted_paths[0].display()
+        deleted_files[0].path()
     );
 }
 
@@ -754,15 +754,16 @@ fn test_lifecycle_observer_skips_missing_retention_deletions() {
     let retained = events
         .iter()
         .filter_map(|event| match event {
-            LogLifecycleEvent::RetainedDeleted { paths } => Some(paths),
+            LogLifecycleEvent::RetainedDeleted { files } => Some(files),
             _ => None,
         })
         .flatten()
-        .cloned()
         .collect::<Vec<_>>();
 
     assert!(
-        !retained.iter().any(|path| path == &archived_path),
+        !retained
+            .iter()
+            .any(|file| Path::new(file.path()) == archived_path),
         "missing files must not be reported as successful retention deletions"
     );
 }

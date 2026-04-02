@@ -180,14 +180,14 @@ pub struct Log {
     lifecycle_observer: Option<Arc<dyn LogLifecycleObserver>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum LogLifecycleEvent {
     Rotated {
-        archived_path: PathBuf,
-        active_path: PathBuf,
+        archived: repository::File,
+        active: repository::File,
     },
     RetainedDeleted {
-        paths: Vec<PathBuf>,
+        files: Vec<repository::File>,
     },
 }
 
@@ -492,12 +492,12 @@ impl Log {
         }
 
         // Respect retention policy
-        let deleted_paths = self.chain.retain(&self.config.retention_policy)?;
-        if !deleted_paths.is_empty()
+        let deleted_files = self.chain.retain(&self.config.retention_policy)?;
+        if !deleted_files.is_empty()
             && let Some(observer) = &self.lifecycle_observer
         {
             observer.on_event(&LogLifecycleEvent::RetainedDeleted {
-                paths: deleted_paths,
+                files: deleted_files,
             });
         }
 
@@ -508,15 +508,12 @@ impl Log {
             // Set the old file's state to ARCHIVED before creating successor
             old_file.journal_file.journal_header_mut().state = JournalState::Archived as u8;
             old_file.journal_file.sync()?;
-            let archived_path = PathBuf::from(old_file.repository_file.path());
+            let archived = old_file.repository_file.clone();
             let new_file = old_file.rotate(&mut self.chain, max_file_size, head_realtime)?;
-            let active_path = PathBuf::from(new_file.repository_file.path());
+            let active = new_file.repository_file.clone();
             (
                 new_file,
-                Some(LogLifecycleEvent::Rotated {
-                    archived_path,
-                    active_path,
-                }),
+                Some(LogLifecycleEvent::Rotated { archived, active }),
             )
         } else {
             (
