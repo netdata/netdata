@@ -35,6 +35,7 @@ pub(crate) use data::*;
 const GEOIP_RELOAD_CHECK_INTERVAL: Duration = Duration::from_secs(30);
 pub(crate) const PRIVATE_IP_ADDRESS_SPACE_LABEL: &str = "Private IP Address Space";
 pub(crate) const UNKNOWN_ASN_LABEL: &str = "Unknown ASN";
+const CLASSIFIER_CACHE_PRUNE_INTERVAL: Duration = Duration::from_secs(30);
 
 #[derive(Debug)]
 pub(crate) struct FlowEnricher {
@@ -61,9 +62,24 @@ struct TimedClassifierEntry<T> {
     last_access: Instant,
 }
 
-type ExporterClassifierCache = HashMap<ExporterInfo, TimedClassifierEntry<ExporterClassification>>;
+#[derive(Debug)]
+struct TimedClassifierCache<K, V> {
+    entries: HashMap<K, TimedClassifierEntry<V>>,
+    last_prune: Instant,
+}
+
+impl<K, V> Default for TimedClassifierCache<K, V> {
+    fn default() -> Self {
+        Self {
+            entries: HashMap::new(),
+            last_prune: Instant::now(),
+        }
+    }
+}
+
+type ExporterClassifierCache = TimedClassifierCache<ExporterInfo, ExporterClassification>;
 type InterfaceClassifierCache =
-    HashMap<ExporterAndInterfaceInfo, TimedClassifierEntry<InterfaceClassification>>;
+    TimedClassifierCache<ExporterAndInterfaceInfo, InterfaceClassification>;
 
 #[cfg(test)]
 mod tests;

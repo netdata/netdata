@@ -148,7 +148,7 @@ fn exporter_classifier_cache_hit_is_used_before_re_evaluation() {
             .exporter_classifier_cache
             .lock()
             .expect("lock exporter cache");
-        let entry = cache.get_mut(&key).expect("cache entry");
+        let entry = cache.entries.get_mut(&key).expect("cache entry");
         entry.value.region = "cached".to_string();
     }
 
@@ -188,7 +188,7 @@ fn exporter_classifier_cache_entry_expires_by_ttl() {
             .exporter_classifier_cache
             .lock()
             .expect("lock exporter cache");
-        let entry = cache.get_mut(&key).expect("cache entry");
+        let entry = cache.entries.get_mut(&key).expect("cache entry");
         entry.value.region = "stale-cache".to_string();
     }
 
@@ -228,7 +228,7 @@ fn exporter_classifier_format_uses_exporter_name() {
     let cfg = EnrichmentConfig {
         metadata_static: metadata_config_without_exporter_classification(),
         exporter_classifiers: vec![
-            r#"ClassifyTenant(Format("tenant-%s", Exporter.Name))"#.to_string(),
+            r#"ClassifyTenant(Format("tenant-%s", Exporter.Name))"#.to_string()
         ],
         ..Default::default()
     };
@@ -249,7 +249,7 @@ fn exporter_classifier_matches_operator_assigns_group() {
     let cfg = EnrichmentConfig {
         metadata_static: metadata_config_without_exporter_classification(),
         exporter_classifiers: vec![
-            r#"Exporter.Name matches "^edge-.*" && Classify("europe")"#.to_string(),
+            r#"Exporter.Name matches "^edge-.*" && Classify("europe")"#.to_string()
         ],
         ..Default::default()
     };
@@ -271,7 +271,7 @@ fn exporter_classifier_regex_with_character_class_extracts_group() {
     let cfg = EnrichmentConfig {
         metadata_static: metadata_config_without_exporter_classification(),
         exporter_classifiers: vec![
-            r#"ClassifyRegex(Exporter.Name, "^(\\w+).r", "europe-$1")"#.to_string(),
+            r#"ClassifyRegex(Exporter.Name, "^(\\w+).r", "europe-$1")"#.to_string()
         ],
         ..Default::default()
     };
@@ -400,7 +400,7 @@ fn exporter_classifier_invalid_regex_is_rejected_during_config_parse() {
     let cfg = EnrichmentConfig {
         metadata_static: metadata_config_without_exporter_classification(),
         exporter_classifiers: vec![
-            r#"ClassifyRegex(Exporter.Name, "^(ebp+.r", "europe-$1")"#.to_string(),
+            r#"ClassifyRegex(Exporter.Name, "^(ebp+.r", "europe-$1")"#.to_string()
         ],
         ..Default::default()
     };
@@ -444,7 +444,7 @@ fn exporter_classifier_non_matching_regex_does_not_set_value() {
     let cfg = EnrichmentConfig {
         metadata_static: metadata_config_without_exporter_classification(),
         exporter_classifiers: vec![
-            r#"ClassifyRegex(Exporter.Name, "^(ebp+).r", "europe-$1")"#.to_string(),
+            r#"ClassifyRegex(Exporter.Name, "^(ebp+).r", "europe-$1")"#.to_string()
         ],
         ..Default::default()
     };
@@ -735,7 +735,7 @@ fn interface_classifier_cache_hit_is_used_before_re_evaluation() {
             .interface_classifier_cache
             .lock()
             .expect("lock interface cache");
-        let entry = cache.get_mut(&key).expect("cache entry");
+        let entry = cache.entries.get_mut(&key).expect("cache entry");
         entry.value.provider = "cached".to_string();
     }
 
@@ -748,11 +748,108 @@ fn interface_classifier_cache_hit_is_used_before_re_evaluation() {
 }
 
 #[test]
+fn exporter_classifier_cache_prunes_expired_entries_on_insert() {
+    let cfg = EnrichmentConfig {
+        metadata_static: metadata_config_without_exporter_classification(),
+        exporter_classifiers: vec![r#"ClassifyRegion("live")"#.to_string()],
+        classifier_cache_duration: Duration::from_millis(1),
+        ..Default::default()
+    };
+    let mut enricher = FlowEnricher::from_config(&cfg)
+        .expect("build enricher")
+        .expect("enricher must be enabled");
+
+    let mut first_fields = base_fields("192.0.2.10", 10, 20, 100, 10, 300);
+    assert!(enricher.enrich_fields(&mut first_fields));
+
+    std::thread::sleep(Duration::from_millis(20));
+
+    let mut second_fields = base_fields("192.0.2.11", 10, 20, 100, 10, 300);
+    assert!(enricher.enrich_fields(&mut second_fields));
+
+    let cache = enricher
+        .exporter_classifier_cache
+        .lock()
+        .expect("lock exporter cache");
+    assert_eq!(cache.entries.len(), 1);
+    assert!(
+        !cache.entries.contains_key(&ExporterInfo {
+            ip: "192.0.2.10".to_string(),
+            name: "edge-router".to_string(),
+        }),
+        "expired exporter cache entry should be pruned on the next insert"
+    );
+}
+
+#[test]
+fn interface_classifier_cache_prunes_expired_entries_on_insert() {
+    let cfg = EnrichmentConfig {
+        metadata_static: metadata_config_without_interface_classification(),
+        interface_classifiers: vec![r#"ClassifyProvider("live")"#.to_string()],
+        classifier_cache_duration: Duration::from_millis(1),
+        ..Default::default()
+    };
+    let mut enricher = FlowEnricher::from_config(&cfg)
+        .expect("build enricher")
+        .expect("enricher must be enabled");
+
+    let mut first_fields = base_fields("192.0.2.10", 10, 20, 100, 10, 300);
+    assert!(enricher.enrich_fields(&mut first_fields));
+
+    std::thread::sleep(Duration::from_millis(20));
+
+    let mut second_fields = base_fields("192.0.2.10", 30, 40, 100, 10, 300);
+    assert!(enricher.enrich_fields(&mut second_fields));
+
+    let cache = enricher
+        .interface_classifier_cache
+        .lock()
+        .expect("lock interface cache");
+    assert_eq!(
+        cache.entries.len(),
+        2,
+        "the fresh flow should repopulate only the current interface keys"
+    );
+    assert!(
+        !cache.entries.contains_key(&ExporterAndInterfaceInfo {
+            exporter: ExporterInfo {
+                ip: "192.0.2.10".to_string(),
+                name: "edge-router".to_string(),
+            },
+            interface: InterfaceInfo {
+                index: 10,
+                name: "Gi10".to_string(),
+                description: "10th interface".to_string(),
+                speed: 1000,
+                vlan: 10,
+            },
+        }),
+        "stale interface cache entries should be pruned before new ones are inserted"
+    );
+    assert!(
+        cache.entries.contains_key(&ExporterAndInterfaceInfo {
+            exporter: ExporterInfo {
+                ip: "192.0.2.10".to_string(),
+                name: "edge-router".to_string(),
+            },
+            interface: InterfaceInfo {
+                index: 30,
+                name: "Default0".to_string(),
+                description: "Default interface".to_string(),
+                speed: 1000,
+                vlan: 10,
+            },
+        }),
+        "new default-interface cache entries should remain after pruning"
+    );
+}
+
+#[test]
 fn interface_classifier_classify_provider_with_format_works() {
     let cfg = EnrichmentConfig {
         metadata_static: metadata_config_without_interface_classification(),
         interface_classifiers: vec![
-            r#"ClassifyProvider(Format("II-%s", Interface.Name))"#.to_string(),
+            r#"ClassifyProvider(Format("II-%s", Interface.Name))"#.to_string()
         ],
         ..Default::default()
     };
@@ -1966,8 +2063,8 @@ fn test_enricher_for_provider_order() -> FlowEnricher {
         exporter_classifiers: Vec::new(),
         interface_classifiers: Vec::new(),
         classifier_cache_duration: Duration::from_secs(5 * 60),
-        exporter_classifier_cache: Arc::new(Mutex::new(HashMap::new())),
-        interface_classifier_cache: Arc::new(Mutex::new(HashMap::new())),
+        exporter_classifier_cache: Arc::new(Mutex::new(ExporterClassifierCache::default())),
+        interface_classifier_cache: Arc::new(Mutex::new(InterfaceClassifierCache::default())),
         asn_providers: vec![
             AsnProviderConfig::Flow,
             AsnProviderConfig::Routing,

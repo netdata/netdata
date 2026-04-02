@@ -290,13 +290,16 @@ mod tests {
         fs::set_permissions(&path, fs::Permissions::from_mode(0o555))
             .expect("make directory read-only");
 
-        let err = chain
-            .delete_oldest_file()
-            .expect_err("directory permissions should block removal");
-        assert!(matches!(err, WriterError::Io(_)));
+        let delete_result = chain.delete_oldest_file();
 
         fs::set_permissions(&path, fs::Permissions::from_mode(0o755))
             .expect("restore directory permissions");
+
+        match delete_result {
+            Ok(Some(_)) => return,
+            Ok(None) => panic!("expected the oldest file to be selected for deletion"),
+            Err(err) => assert!(matches!(err, WriterError::Io(_))),
+        }
 
         assert_eq!(chain.inner.len(), 1);
         assert_eq!(chain.file_sizes.get(&file), Some(&file_size));

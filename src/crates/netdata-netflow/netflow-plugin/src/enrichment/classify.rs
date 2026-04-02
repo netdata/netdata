@@ -1,5 +1,22 @@
 use super::*;
 
+fn maybe_prune_classifier_cache<K, V>(
+    cache: &mut TimedClassifierCache<K, V>,
+    ttl: Duration,
+    now: Instant,
+) where
+    K: Eq + std::hash::Hash,
+{
+    if now.duration_since(cache.last_prune) < ttl.min(CLASSIFIER_CACHE_PRUNE_INTERVAL) {
+        return;
+    }
+
+    cache
+        .entries
+        .retain(|_, entry| now.duration_since(entry.last_access) <= ttl);
+    cache.last_prune = now;
+}
+
 impl FlowEnricher {
     pub(super) fn get_cached_exporter_classification(
         &self,
@@ -9,13 +26,14 @@ impl FlowEnricher {
             return None;
         };
         let now = Instant::now();
-        if let Some(entry) = cache.get_mut(exporter) {
+        maybe_prune_classifier_cache(&mut cache, self.classifier_cache_duration, now);
+        if let Some(entry) = cache.entries.get_mut(exporter) {
             if now.duration_since(entry.last_access) <= self.classifier_cache_duration {
                 entry.last_access = now;
                 return Some(entry.value.clone());
             }
         }
-        cache.remove(exporter);
+        cache.entries.remove(exporter);
         None
     }
 
@@ -27,11 +45,13 @@ impl FlowEnricher {
         let Ok(mut cache) = self.exporter_classifier_cache.lock() else {
             return;
         };
-        cache.insert(
+        let now = Instant::now();
+        maybe_prune_classifier_cache(&mut cache, self.classifier_cache_duration, now);
+        cache.entries.insert(
             exporter.clone(),
             TimedClassifierEntry {
                 value: classification.clone(),
-                last_access: Instant::now(),
+                last_access: now,
             },
         );
     }
@@ -49,13 +69,14 @@ impl FlowEnricher {
             return None;
         };
         let now = Instant::now();
-        if let Some(entry) = cache.get_mut(&key) {
+        maybe_prune_classifier_cache(&mut cache, self.classifier_cache_duration, now);
+        if let Some(entry) = cache.entries.get_mut(&key) {
             if now.duration_since(entry.last_access) <= self.classifier_cache_duration {
                 entry.last_access = now;
                 return Some(entry.value.clone());
             }
         }
-        cache.remove(&key);
+        cache.entries.remove(&key);
         None
     }
 
@@ -72,11 +93,13 @@ impl FlowEnricher {
         let Ok(mut cache) = self.interface_classifier_cache.lock() else {
             return;
         };
-        cache.insert(
+        let now = Instant::now();
+        maybe_prune_classifier_cache(&mut cache, self.classifier_cache_duration, now);
+        cache.entries.insert(
             key,
             TimedClassifierEntry {
                 value: classification.clone(),
-                last_access: Instant::now(),
+                last_access: now,
             },
         );
     }
