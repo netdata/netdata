@@ -18,6 +18,7 @@
 
 static bool streaming_topology_host_guid(RRDHOST *host, char *dst, size_t dst_size);
 static bool streaming_topology_uuid_guid(ND_UUID host_id, char *dst, size_t dst_size);
+static void streaming_topology_agent_id_for_host(RRDHOST *host, char *dst, size_t dst_size);
 static void streaming_topology_actor_id_from_guid(const char *guid, char *dst, size_t dst_size);
 static void streaming_topology_actor_id_for_uuid(ND_UUID host_id, char *dst, size_t dst_size);
 static uint32_t *streaming_topology_parent_child_count_get(DICTIONARY *parent_child_count, RRDHOST *host);
@@ -109,6 +110,19 @@ static void streaming_topology_actor_id_from_guid(const char *guid, char *dst, s
         snprintf(dst, dst_size, "netdata-machine-guid:%s", guid);
     else
         snprintf(dst, dst_size, "host:unknown");
+}
+
+static void streaming_topology_agent_id_for_host(RRDHOST *host, char *dst, size_t dst_size) {
+    if(!dst || !dst_size)
+        return;
+
+    char host_guid[UUID_STR_LEN];
+    if(streaming_topology_host_guid(host, host_guid, sizeof(host_guid)))
+        snprintf(dst, dst_size, "%s", host_guid);
+    else if(host)
+        snprintf(dst, dst_size, "%s", rrdhost_hostname(host));
+    else
+        dst[0] = '\0';
 }
 
 static void streaming_topology_actor_id_for_uuid(ND_UUID host_id, char *dst, size_t dst_size) {
@@ -810,11 +824,9 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
             buffer_json_member_add_string(wb, "schema_version", "2.0");
             buffer_json_member_add_string(wb, "source", "streaming");
             buffer_json_member_add_string(wb, "layer", "infra");
-            char localhost_guid[UUID_STR_LEN];
-            if(streaming_topology_host_guid(localhost, localhost_guid, sizeof(localhost_guid)))
-                buffer_json_member_add_string(wb, "agent_id", localhost_guid);
-            else
-                buffer_json_member_add_string(wb, "agent_id", localhost->machine_guid);
+            char localhost_agent_id[256];
+            streaming_topology_agent_id_for_host(localhost, localhost_agent_id, sizeof(localhost_agent_id));
+            buffer_json_member_add_string(wb, "agent_id", localhost_agent_id);
             buffer_json_member_add_datetime_rfc3339(wb, "collected_at", now_ut, true);
 
             // --- Phase 3: emit actors ---
@@ -931,8 +943,13 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                             buffer_json_member_add_string(wb, "ml_status", rrdhost_ml_status_to_string(s.ml.status));
                             buffer_json_member_add_string(wb, "display_name", hostname);
 
-                            // host labels from the agent
-                            rrdlabels_to_buffer_json_members(host->rrdlabels, wb);
+                            // Host labels are nested to avoid collisions with reserved
+                            // topology label keys such as hostname/node_type/severity.
+                            buffer_json_member_add_object(wb, "host_labels");
+                            {
+                                rrdlabels_to_buffer_json_members(host->rrdlabels, wb);
+                            }
+                            buffer_json_object_close(wb); // host_labels
                         }
                         buffer_json_object_close(wb); // labels
 

@@ -401,6 +401,19 @@ static bool socket_endpoint_to_ip_text(const struct socket_endpoint *ep, char *d
     return false;
 }
 
+static inline void topology_format_ip_port(const char *ip, uint16_t port, char *dst, size_t dst_size) {
+    if(!dst || !dst_size)
+        return;
+
+    if(!ip)
+        ip = "";
+
+    if(strchr(ip, ':'))
+        snprintf(dst, dst_size, "[%s]:%u", ip, port);
+    else
+        snprintf(dst, dst_size, "%s:%u", ip, port);
+}
+
 static inline bool topology_ip_is_unspecified(const char *ip) {
     if(!ip || !*ip)
         return true;
@@ -1388,7 +1401,7 @@ static DICTIONARY *topology_build_process_socket_index(const NV_TOPOLOGY_CONTEXT
             continue;
 
         NV_PROCESS_SOCKET_ROW *row = callocz(1, sizeof(*row));
-        snprintf(row->remote, sizeof(row->remote), "%s:%u", link->remote_ip, link->remote_port);
+        topology_format_ip_port(link->remote_ip, link->remote_port, row->remote, sizeof(row->remote));
         snprintf(row->protocol, sizeof(row->protocol), "%s", link->protocol);
         snprintf(row->direction, sizeof(row->direction), "%s", link->direction);
         snprintf(row->state, sizeof(row->state), "%s", link->state);
@@ -2411,7 +2424,7 @@ static void topology_write_links_and_stats(BUFFER *wb, const NV_TOPOLOGY_CONTEXT
             topology_actor_id_for_process(ctx, link->pid, link->uid, link->net_ns_inode, link->process, process_actor_id, sizeof(process_actor_id));
             topology_actor_id_for_remote_endpoint(ctx, link->remote_ip, link->remote_address_space, endpoint_actor_id, sizeof(endpoint_actor_id));
             snprintf(local_bind_port, sizeof(local_bind_port), "%u", link->local_port);
-            snprintf(remote_endpoint_port, sizeof(remote_endpoint_port), "%s:%u", link->remote_ip, link->remote_port);
+            topology_format_ip_port(link->remote_ip, link->remote_port, remote_endpoint_port, sizeof(remote_endpoint_port));
             topology_process_display_name(ctx, link->process, link->pid, process_display_name, sizeof(process_display_name));
 
             if(remote_is_self && link->direction_id != SOCKET_DIRECTION_LISTEN) {
