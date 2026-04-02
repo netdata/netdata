@@ -597,10 +597,10 @@ void rrdhost_system_info_to_json_object_fields(BUFFER *wb, struct rrdhost_system
     buffer_json_member_add_string(wb, "os_version",             si && si->host_os_version ? si->host_os_version : "");
     buffer_json_member_add_string(wb, "os_version_id",          si && si->host_os_version_id ? si->host_os_version_id : "");
     buffer_json_member_add_string(wb, "os_detection",           si && si->host_os_detection ? si->host_os_detection : "");
-    buffer_json_member_add_string(wb, "cpu_cores",              si && si->host_cores ? si->host_cores : "");
-    buffer_json_member_add_string(wb, "disk_space",             si && si->host_disk_space ? si->host_disk_space : "");
-    buffer_json_member_add_string(wb, "cpu_freq",               si && si->host_cpu_freq ? si->host_cpu_freq : "");
-    buffer_json_member_add_string(wb, "ram_total",              si && si->host_ram_total ? si->host_ram_total : "");
+    buffer_json_member_add_uint64(wb, "cpu_cores",              si && si->host_cores ? str2uint64_t(si->host_cores, NULL) : 0);
+    buffer_json_member_add_uint64(wb, "disk_space",             si && si->host_disk_space ? str2uint64_t(si->host_disk_space, NULL) : 0);
+    buffer_json_member_add_uint64(wb, "cpu_freq",               si && si->host_cpu_freq ? str2uint64_t(si->host_cpu_freq, NULL) : 0);
+    buffer_json_member_add_uint64(wb, "ram_total",              si && si->host_ram_total ? str2uint64_t(si->host_ram_total, NULL) : 0);
     buffer_json_member_add_string(wb, "container_os_name",      si && si->container_os_name ? si->container_os_name : "");
     buffer_json_member_add_string(wb, "container_os_id",        si && si->container_os_id ? si->container_os_id : "");
     buffer_json_member_add_string(wb, "container_os_id_like",   si && si->container_os_id_like ? si->container_os_id_like : "");

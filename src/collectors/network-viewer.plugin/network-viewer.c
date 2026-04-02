@@ -149,10 +149,7 @@ typedef struct {
 } NV_TOPOLOGY_RENDER_STATE;
 
 typedef struct nv_process_socket_row {
-    char remote[128];
-    char protocol[8];
-    char direction[16];
-    char state[32];
+    const NV_TOPOLOGY_LINK *link;
     struct nv_process_socket_row *next;
 } NV_PROCESS_SOCKET_ROW;
 
@@ -788,13 +785,16 @@ static void topology_actor_id_for_process(
         snprintf(dst, dst_size, "process:%s|comm=%s", node_identity, safe_process);
     }
     else {
-        snprintf(dst, dst_size, "process:%s|pid=%llu|uid=%llu|ns=%llu|comm=%s",
+        snprintf(dst, dst_size, "process:%s|pid=%llu|uid=%llu|ns=%llu",
                  node_identity,
                  (unsigned long long)pid,
                  (unsigned long long)uid,
-                 (unsigned long long)net_ns_inode,
-                 safe_process);
+                 (unsigned long long)net_ns_inode);
     }
+}
+
+static bool topology_process_name_is_unknown(const char *process_name) {
+    return !process_name || !*process_name || strcmp(process_name, "[unknown]") == 0;
 }
 
 static void topology_actor_id_for_remote_endpoint(const NV_TOPOLOGY_CONTEXT *ctx, const char *ip, const char *address_space, char *dst, size_t dst_size) {
@@ -1202,11 +1202,10 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
 
     char process_key[NV_TOPOLOGY_KEY_MAX];
     if(ctx->options.processes_by_pid) {
-        snprintf(process_key, sizeof(process_key), "pid=%d|uid=%u|ns=%llu|comm=%s",
+        snprintf(process_key, sizeof(process_key), "pid=%d|uid=%u|ns=%llu",
                  n->pid,
                  (unsigned)n->uid,
-                 (unsigned long long)n->net_ns_inode,
-                 process_name);
+                 (unsigned long long)n->net_ns_inode);
     }
     else {
         snprintf(process_key, sizeof(process_key), "comm=%s", process_name);
@@ -1231,6 +1230,10 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
     pa->sockets++;
     if(!pa->ppid && n->ppid)
         pa->ppid = n->ppid;
+    if(topology_process_name_is_unknown(pa->process) && !topology_process_name_is_unknown(process_name))
+        snprintf(pa->process, sizeof(pa->process), "%s", process_name);
+    if(!pa->cmdline[0] && cmdline && *cmdline)
+        snprintf(pa->cmdline, sizeof(pa->cmdline), "%s", cmdline);
     if((!pa->local_ip[0] || topology_ip_is_unspecified(pa->local_ip)) && local_ip[0] && !topology_ip_is_unspecified(local_ip))
         snprintf(pa->local_ip, sizeof(pa->local_ip), "%s", local_ip);
 
@@ -1402,10 +1405,7 @@ static DICTIONARY *topology_build_process_socket_index(const NV_TOPOLOGY_CONTEXT
             continue;
 
         NV_PROCESS_SOCKET_ROW *row = callocz(1, sizeof(*row));
-        topology_format_ip_port(link->remote_ip, link->remote_port, row->remote, sizeof(row->remote));
-        snprintf(row->protocol, sizeof(row->protocol), "%s", link->protocol);
-        snprintf(row->direction, sizeof(row->direction), "%s", link->direction);
-        snprintf(row->state, sizeof(row->state), "%s", link->state);
+        row->link = link;
 
         if(rows->tail)
             rows->tail->next = row;
@@ -2156,11 +2156,13 @@ static void topology_write_actors(BUFFER *wb, const NV_TOPOLOGY_CONTEXT *ctx, NV
                     {
                         NV_PROCESS_SOCKET_ROWS *rows = process_socket_index ? dictionary_get(process_socket_index, process_actor_id) : NULL;
                         for(NV_PROCESS_SOCKET_ROW *row = rows ? rows->head : NULL; row; row = row->next) {
+                            char remote_endpoint[128];
+                            topology_format_ip_port(row->link->remote_ip, row->link->remote_port, remote_endpoint, sizeof(remote_endpoint));
                             buffer_json_add_array_item_object(wb);
-                            buffer_json_member_add_string(wb, "remote", row->remote);
-                            buffer_json_member_add_string(wb, "protocol", row->protocol);
-                            buffer_json_member_add_string(wb, "direction", row->direction);
-                            buffer_json_member_add_string(wb, "state", row->state);
+                            buffer_json_member_add_string(wb, "remote", remote_endpoint);
+                            buffer_json_member_add_string(wb, "protocol", row->link->protocol);
+                            buffer_json_member_add_string(wb, "direction", row->link->direction);
+                            buffer_json_member_add_string(wb, "state", row->link->state);
                             buffer_json_object_close(wb);
                         }
                     }

@@ -2,6 +2,8 @@
 
 #include "function-streaming.h"
 
+#include <ctype.h>
+
 #define STREAMING_FUNCTION_UPDATE_EVERY 10
 
 #define GROUP_BY_COLUMN(name, descr) \
@@ -298,6 +300,12 @@ static bool value_in_csv(const char *csv, const char *value) {
     while(*p) {
         const char *comma = strchr(p, ',');
         size_t len = comma ? (size_t)(comma - p) : strlen(p);
+        while(len && isspace((unsigned char)*p)) {
+            p++;
+            len--;
+        }
+        while(len && isspace((unsigned char)p[len - 1]))
+            len--;
         if(len == vlen && strncmp(p, value, len) == 0)
             return true;
         if(!comma) break;
