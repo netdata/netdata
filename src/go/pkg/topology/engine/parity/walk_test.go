@@ -33,6 +33,19 @@ func TestParseWalk(t *testing.T) {
 	require.Equal(t, ".1.3.6.1.4.1.9.1.1045", records[2].Value)
 }
 
+func TestParseWalk_MultilineQuotedValueWithEscapes(t *testing.T) {
+	input := strings.Join([]string{
+		`.1.3.6.1.2.1.1.6.0 = STRING: "line1\\`,
+		`line2\"`,
+		`line3"`,
+	}, "\n")
+
+	records, err := ParseWalk(strings.NewReader(input))
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+	require.Equal(t, "line1\\\\\nline2\"\nline3", records[0].Value)
+}
+
 func TestLoadWalkFile_NMS8003Fixture(t *testing.T) {
 	ds, err := LoadWalkFile("../testdata/enlinkd/nms8003/fixtures/NMM-R1.snmpwalk.txt")
 	require.NoError(t, err)

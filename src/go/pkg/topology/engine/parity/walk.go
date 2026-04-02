@@ -58,6 +58,7 @@ func ParseWalk(r io.Reader) ([]WalkRecord, error) {
 		typ       string
 		value     strings.Builder
 		quoteOpen bool
+		escaped   bool
 	}
 
 	var (
@@ -84,6 +85,7 @@ func ParseWalk(r io.Reader) ([]WalkRecord, error) {
 		if strings.TrimSpace(line) == "" {
 			if cur != nil {
 				cur.value.WriteByte('\n')
+				cur.quoteOpen, cur.escaped = updateQuoteState("\n", cur.quoteOpen, cur.escaped)
 			}
 			continue
 		}
@@ -91,9 +93,11 @@ func ParseWalk(r io.Reader) ([]WalkRecord, error) {
 		if cur != nil {
 			if cur.value.Len() > 0 {
 				cur.value.WriteByte('\n')
+				cur.quoteOpen, cur.escaped = updateQuoteState("\n", cur.quoteOpen, cur.escaped)
 			}
 			cur.value.WriteString(line)
-			if hasBalancedQuotes(cur.value.String()) {
+			cur.quoteOpen, cur.escaped = updateQuoteState(line, cur.quoteOpen, cur.escaped)
+			if !cur.quoteOpen {
 				cur.quoteOpen = false
 				flush()
 			}
@@ -113,8 +117,9 @@ func ParseWalk(r io.Reader) ([]WalkRecord, error) {
 			continue
 		}
 
-		if !hasBalancedQuotes(value) {
-			cur = &partial{oid: oid, typ: typ, quoteOpen: true}
+		quoteOpen, escaped := updateQuoteState(value, false, false)
+		if quoteOpen {
+			cur = &partial{oid: oid, typ: typ, quoteOpen: quoteOpen, escaped: escaped}
 			cur.value.WriteString(value)
 			continue
 		}
@@ -192,9 +197,7 @@ func normalizeWalkValue(v string) string {
 	return s
 }
 
-func hasBalancedQuotes(v string) bool {
-	escaped := false
-	count := 0
+func updateQuoteState(v string, quoteOpen, escaped bool) (bool, bool) {
 	for i := 0; i < len(v); i++ {
 		ch := v[i]
 		if escaped {
@@ -206,8 +209,8 @@ func hasBalancedQuotes(v string) bool {
 			continue
 		}
 		if ch == '"' {
-			count++
+			quoteOpen = !quoteOpen
 		}
 	}
-	return count%2 == 0
+	return quoteOpen, escaped
 }

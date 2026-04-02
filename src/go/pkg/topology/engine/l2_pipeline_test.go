@@ -4,6 +4,7 @@ package engine
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -94,6 +95,19 @@ func TestBuildL2ResultFromObservations_DefaultProtocols(t *testing.T) {
 	require.Equal(t, "switch-b", result.Adjacencies[0].TargetID)
 	require.Equal(t, 0, result.Stats["links_lldp"])
 	require.Equal(t, 1, result.Stats["links_cdp"])
+}
+
+func TestBuildL2ResultFromObservations_UsesProvidedCollectedAt(t *testing.T) {
+	collectedAt := time.Date(2026, time.April, 2, 0, 0, 0, 0, time.UTC)
+
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID: "switch-a",
+			Hostname: "switch-a.example.net",
+		},
+	}, DiscoverOptions{CollectedAt: collectedAt})
+	require.NoError(t, err)
+	require.Equal(t, collectedAt, result.CollectedAt)
 }
 
 func TestBuildL2ResultFromObservations_InterfaceStatusLabels(t *testing.T) {
@@ -1406,7 +1420,9 @@ func TestBuildCDPLookupMap_PreservesFirstDuplicateKey(t *testing.T) {
 
 	lookup := buildCDPLookupMap(links)
 	key := lldpCompositeKey("Gi0/1", "Gi0/0", "A-GID", "B-GID")
-	require.Equal(t, 0, lookup[key])
+	value, ok := lookup[key]
+	require.True(t, ok)
+	require.Equal(t, 0, value)
 }
 
 func TestMatchCDPLinksEnlinkdPassOrder_SkipsSelfTarget(t *testing.T) {

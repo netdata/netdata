@@ -11,7 +11,8 @@ const (
 )
 
 // BuildL2ResultFromObservations converts normalized L2 observations into a
-// deterministic engine result.
+// deterministic engine result. Callers that need a stable timestamp should set
+// DiscoverOptions.CollectedAt explicitly.
 func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOptions) (Result, error) {
 	if len(observations) == 0 {
 		return Result{}, fmt.Errorf("at least one observation is required")
@@ -44,5 +45,5 @@ func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOp
 	identityAliasStats := reconcileDeviceIdentityAliases(state.devices, state.interfaces, state.enrichments)
 	state.markManagedDevices()
 
-	return state.buildResult(identityAliasStats), nil
+	return state.buildResult(identityAliasStats, opts.CollectedAt), nil
 }

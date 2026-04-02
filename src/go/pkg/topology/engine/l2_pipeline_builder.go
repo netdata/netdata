@@ -88,9 +88,13 @@ func (s *l2BuildState) markManagedDevices() {
 	}
 }
 
-func (s *l2BuildState) buildResult(identityAliasStats identityAliasReconcileStats) Result {
+func (s *l2BuildState) buildResult(identityAliasStats identityAliasReconcileStats, collectedAt time.Time) Result {
+	if !collectedAt.IsZero() {
+		collectedAt = collectedAt.UTC()
+	}
+
 	return Result{
-		CollectedAt: time.Now().UTC(),
+		CollectedAt: collectedAt,
 		Devices:     sortedDevices(s.devices),
 		Interfaces:  sortedInterfaces(s.interfaces),
 		Adjacencies: sortedAdjacencies(s.adjacencies),

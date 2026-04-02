@@ -31,6 +31,7 @@ type DiscoverOptions struct {
 	EnableSTP    bool
 	MaxDepth     int
 	Concurrency  int
+	CollectedAt  time.Time
 }
 
 // CIDRRequest starts discovery from CIDR ranges.

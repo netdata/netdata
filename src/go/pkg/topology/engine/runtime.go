@@ -35,12 +35,14 @@ func (e *RuntimeEngine) DiscoverByCIDRs(ctx context.Context, req CIDRRequest) (R
 		return Result{}, err
 	}
 
+	req.Options = ensureCollectedAt(req.Options)
+
 	observations, err := e.provider.ObserveByCIDRs(ctx, req)
 	if err != nil {
 		return Result{}, fmt.Errorf("observe cidr discovery request: %w", err)
 	}
 	if len(observations) == 0 {
-		return emptyResult(), nil
+		return emptyResult(req.Options.CollectedAt), nil
 	}
 
 	result, err := BuildL2ResultFromObservations(observations, req.Options)
@@ -58,12 +60,14 @@ func (e *RuntimeEngine) DiscoverByDevices(ctx context.Context, req DeviceRequest
 		return Result{}, err
 	}
 
+	req.Options = ensureCollectedAt(req.Options)
+
 	observations, err := e.provider.ObserveByDevices(ctx, req)
 	if err != nil {
 		return Result{}, fmt.Errorf("observe device discovery request: %w", err)
 	}
 	if len(observations) == 0 {
-		return emptyResult(), nil
+		return emptyResult(req.Options.CollectedAt), nil
 	}
 
 	result, err := BuildL2ResultFromObservations(observations, req.Options)
@@ -92,9 +96,22 @@ func validateDeviceRequest(req DeviceRequest) error {
 	return nil
 }
 
-func emptyResult() Result {
+func ensureCollectedAt(opts DiscoverOptions) DiscoverOptions {
+	if opts.CollectedAt.IsZero() {
+		opts.CollectedAt = time.Now().UTC()
+	} else {
+		opts.CollectedAt = opts.CollectedAt.UTC()
+	}
+	return opts
+}
+
+func emptyResult(collectedAt time.Time) Result {
+	if !collectedAt.IsZero() {
+		collectedAt = collectedAt.UTC()
+	}
+
 	return Result{
-		CollectedAt: time.Now().UTC(),
+		CollectedAt: collectedAt,
 		Stats: map[string]any{
 			"devices_total":        0,
 			"links_total":          0,

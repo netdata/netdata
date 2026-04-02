@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/netip"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -79,6 +80,31 @@ func TestRuntimeEngine_DiscoverByDevices_BuildsResult(t *testing.T) {
 	require.Equal(t, "lldp", result.Adjacencies[0].Protocol)
 	require.Equal(t, "switch-a", result.Adjacencies[0].SourceID)
 	require.Equal(t, "switch-b", result.Adjacencies[0].TargetID)
+}
+
+func TestRuntimeEngine_DiscoverByDevices_PropagatesCollectedAt(t *testing.T) {
+	collectedAt := time.Date(2026, time.April, 2, 0, 0, 0, 0, time.UTC)
+	provider := &fakeObservationProvider{
+		deviceObs: []L2Observation{
+			{
+				DeviceID: "switch-a",
+				Hostname: "switch-a.example.net",
+			},
+		},
+	}
+	eng, err := NewRuntimeEngine(provider)
+	require.NoError(t, err)
+
+	req := DeviceRequest{
+		Devices: []DeviceTarget{{Address: netip.MustParseAddr("10.0.0.1")}},
+		Options: DiscoverOptions{CollectedAt: collectedAt},
+	}
+
+	result, err := eng.DiscoverByDevices(context.Background(), req)
+	require.NoError(t, err)
+	require.Len(t, provider.deviceReqs, 1)
+	require.Equal(t, collectedAt, provider.deviceReqs[0].Options.CollectedAt)
+	require.Equal(t, collectedAt, result.CollectedAt)
 }
 
 func TestRuntimeEngine_DiscoverByCIDRs_InvalidRequest(t *testing.T) {
