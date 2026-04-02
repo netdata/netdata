@@ -21,9 +21,10 @@ pub(crate) struct InterfaceInfo {
 pub(crate) struct ExporterAndInterfaceInfo {
     pub(crate) exporter: ExporterInfo,
     pub(crate) interface: InterfaceInfo,
+    pub(crate) exporter_classification: ExporterClassification,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub(crate) struct ExporterClassification {
     pub(crate) group: String,
     pub(crate) role: String,

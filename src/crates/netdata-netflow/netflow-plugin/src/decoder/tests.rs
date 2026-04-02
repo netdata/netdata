@@ -1267,6 +1267,23 @@ fn merge_enrichment_keeps_same_batch_dedup_stable_after_raw_counter_backfill() {
 }
 
 #[test]
+fn merge_enrichment_deduplicates_within_first_incoming_batch() {
+    let mut dst = Vec::new();
+    let base = canonical_test_flow(&[]);
+    let incoming = canonical_test_flow(&[("IPTTL", "255"), ("MPLS_LABELS", "20005,524250")]);
+
+    append_unique_flows(&mut dst, vec![base, incoming]);
+
+    assert_eq!(dst.len(), 1);
+    let fields = dst[0].record.to_fields();
+    assert_eq!(fields.get("IPTTL").map(String::as_str), Some("255"));
+    assert_eq!(
+        fields.get("MPLS_LABELS").map(String::as_str),
+        Some("20005,524250")
+    );
+}
+
+#[test]
 fn akvorado_samplingrate_fixture_matches_expected_flow() {
     let flows = decode_fixture_sequence(&["samplingrate-template.pcap", "samplingrate-data.pcap"]);
     assert!(

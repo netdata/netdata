@@ -60,10 +60,12 @@ impl FlowEnricher {
         &self,
         exporter: &ExporterInfo,
         interface: &InterfaceInfo,
+        exporter_classification: &ExporterClassification,
     ) -> Option<InterfaceClassification> {
         let key = ExporterAndInterfaceInfo {
             exporter: exporter.clone(),
             interface: interface.clone(),
+            exporter_classification: exporter_classification.clone(),
         };
         let Ok(mut cache) = self.interface_classifier_cache.lock() else {
             return None;
@@ -84,11 +86,13 @@ impl FlowEnricher {
         &self,
         exporter: &ExporterInfo,
         interface: &InterfaceInfo,
+        exporter_classification: &ExporterClassification,
         classification: &InterfaceClassification,
     ) {
         let key = ExporterAndInterfaceInfo {
             exporter: exporter.clone(),
             interface: interface.clone(),
+            exporter_classification: exporter_classification.clone(),
         };
         let Ok(mut cache) = self.interface_classifier_cache.lock() else {
             return;
@@ -155,7 +159,9 @@ impl FlowEnricher {
             return true;
         }
 
-        if let Some(cached) = self.get_cached_interface_classification(exporter, interface) {
+        if let Some(cached) =
+            self.get_cached_interface_classification(exporter, interface, exporter_classification)
+        {
             *classification = cached;
             return !classification.reject;
         }
@@ -182,7 +188,12 @@ impl FlowEnricher {
             classification.description = interface.description.clone();
         }
 
-        self.set_cached_interface_classification(exporter, interface, classification);
+        self.set_cached_interface_classification(
+            exporter,
+            interface,
+            exporter_classification,
+            classification,
+        );
         !classification.reject
     }
 }

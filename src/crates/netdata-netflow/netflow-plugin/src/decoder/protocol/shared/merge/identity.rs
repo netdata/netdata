@@ -4,13 +4,12 @@ pub(crate) fn append_unique_flows(dst: &mut Vec<DecodedFlow>, incoming: Vec<Deco
     if incoming.is_empty() {
         return;
     }
-    if dst.is_empty() {
-        dst.extend(incoming);
-        return;
-    }
 
     // Build a hash index over existing flows for O(1) identity lookups instead of O(n) scans.
     let mut identity_index: HashMap<u64, Vec<usize>> = HashMap::new();
+    if dst.is_empty() {
+        dst.reserve(incoming.len());
+    }
     for (idx, flow) in dst.iter().enumerate() {
         identity_index
             .entry(flow_identity_hash(flow))

@@ -752,6 +752,7 @@ fn interface_classifier_cache_hit_is_used_before_re_evaluation() {
             speed: 1000,
             vlan: 10,
         },
+        exporter_classification: ExporterClassification::default(),
     };
     {
         let mut cache = enricher
@@ -846,6 +847,7 @@ fn interface_classifier_cache_prunes_expired_entries_on_insert() {
                 speed: 1000,
                 vlan: 10,
             },
+            exporter_classification: ExporterClassification::default(),
         }),
         "stale interface cache entries should be pruned before new ones are inserted"
     );
@@ -862,8 +864,60 @@ fn interface_classifier_cache_prunes_expired_entries_on_insert() {
                 speed: 1000,
                 vlan: 10,
             },
+            exporter_classification: ExporterClassification::default(),
         }),
         "new default-interface cache entries should remain after pruning"
+    );
+}
+
+#[test]
+fn interface_classifier_cache_key_includes_exporter_classification() {
+    let cfg = EnrichmentConfig {
+        metadata_static: metadata_config_without_interface_classification(),
+        interface_classifiers: vec![r#"ClassifyProvider("live")"#.to_string()],
+        ..Default::default()
+    };
+    let enricher = FlowEnricher::from_config(&cfg)
+        .expect("build enricher")
+        .expect("enricher must be enabled");
+    let exporter = ExporterInfo {
+        ip: "192.0.2.10".to_string(),
+        name: "edge-router".to_string(),
+    };
+    let interface = InterfaceInfo {
+        index: 10,
+        name: "Gi10".to_string(),
+        description: "10th interface".to_string(),
+        speed: 1000,
+        vlan: 10,
+    };
+    let cached = InterfaceClassification {
+        provider: "cached".to_string(),
+        ..Default::default()
+    };
+    let core = ExporterClassification {
+        group: "core".to_string(),
+        ..Default::default()
+    };
+    let edge = ExporterClassification {
+        group: "edge".to_string(),
+        ..Default::default()
+    };
+
+    enricher.set_cached_interface_classification(&exporter, &interface, &core, &cached);
+
+    assert_eq!(
+        enricher
+            .get_cached_interface_classification(&exporter, &interface, &core)
+            .expect("matching exporter classification should hit")
+            .provider,
+        "cached"
+    );
+    assert!(
+        enricher
+            .get_cached_interface_classification(&exporter, &interface, &edge)
+            .is_none(),
+        "different exporter classification must not reuse the cached interface result"
     );
 }
 
