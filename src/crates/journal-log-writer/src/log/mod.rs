@@ -469,10 +469,10 @@ impl Log {
         Ok(())
     }
 
-    pub fn active_path(&self) -> Option<&Path> {
+    pub fn active_file(&self) -> Option<&repository::File> {
         self.active_file
             .as_ref()
-            .map(|active_file| Path::new(active_file.repository_file.path()))
+            .map(|active_file| &active_file.repository_file)
     }
 
     fn should_rotate(&self) -> bool {

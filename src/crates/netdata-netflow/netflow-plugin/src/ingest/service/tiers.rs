@@ -109,12 +109,12 @@ impl IngestService {
                     tracing::warn!("tier writer {:?} write failed: {}", tier, err);
                     continue;
                 }
-                if let Some(active_path) = self.tier_writers.get_mut(tier).active_path() {
+                if let Some(active_file) = self.tier_writers.get_mut(tier).active_file() {
                     let contribution =
                         crate::facet_runtime::facet_contribution_from_flow_fields(&fields);
                     if let Err(err) = self
                         .facet_runtime
-                        .observe_active_contribution(active_path, contribution)
+                        .observe_active_contribution(Path::new(active_file.path()), contribution)
                     {
                         tracing::warn!(
                             "facet runtime tier {:?} write update failed: {}",

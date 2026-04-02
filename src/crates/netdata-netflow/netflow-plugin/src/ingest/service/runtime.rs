@@ -98,11 +98,11 @@ impl IngestService {
                 continue;
             }
 
-            if let Some(active_path) = self.raw_journal.active_path() {
+            if let Some(active_file) = self.raw_journal.active_file() {
                 let contribution = self.encode_buf.facet_contribution();
                 if let Err(err) = self
                     .facet_runtime
-                    .observe_active_contribution(active_path, contribution)
+                    .observe_active_contribution(Path::new(active_file.path()), contribution)
                 {
                     tracing::warn!("facet runtime raw write update failed: {}", err);
                 }
