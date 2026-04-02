@@ -247,6 +247,9 @@ void stream_path_send_to_child(RRDHOST *host) {
 }
 
 uint16_t rrdhost_stream_path_get_host_ids(struct rrdhost *host, uint16_t from, ND_UUID *host_ids, uint16_t max) {
+    if(!host || !host_ids || !max)
+        return 0;
+
     uint16_t count = 0;
     rw_spinlock_read_lock(&host->stream.path.spinlock);
     for(uint16_t i = from; i < host->stream.path.used && count < max; i++)

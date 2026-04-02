@@ -39,6 +39,14 @@ struct streaming_topology_descendant_list {
     size_t size;
 };
 
+struct streaming_topology_filters {
+    bool info_only;
+    const char *node_type;
+    const char *ingest_status;
+    const char *stream_status;
+    char *function_copy;
+};
+
 static void streaming_topology_add_host_match(BUFFER *wb, RRDHOST *host) {
     buffer_json_member_add_object(wb, "match");
     {
@@ -59,7 +67,7 @@ static void streaming_topology_add_host_match(BUFFER *wb, RRDHOST *host) {
 }
 
 static bool streaming_topology_host_guid(RRDHOST *host, char *dst, size_t dst_size) {
-    if(!dst || !dst_size)
+    if(!dst || dst_size < UUID_STR_LEN)
         return false;
 
     dst[0] = '\0';
@@ -72,7 +80,12 @@ static bool streaming_topology_host_guid(RRDHOST *host, char *dst, size_t dst_si
     }
 
     if(host->machine_guid[0]) {
-        snprintf(dst, dst_size, "%s", host->machine_guid);
+        ND_UUID machine_guid = UUID_ZERO;
+        if(!uuid_parse(host->machine_guid, machine_guid.uuid))
+            uuid_unparse_lower(machine_guid.uuid, dst);
+        else
+            snprintfz(dst, dst_size, "%s", host->machine_guid);
+
         return true;
     }
 
@@ -198,6 +211,30 @@ static uint16_t streaming_topology_get_path_ids(RRDHOST *host, uint16_t from, ND
         host_ids[n++] = localhost->host_id;
 
     return n;
+}
+
+static void streaming_topology_parse_filters(const char *function, struct streaming_topology_filters *filters) {
+    if(!filters)
+        return;
+
+    *filters = (struct streaming_topology_filters){ 0 };
+    if(!function || !*function)
+        return;
+
+    filters->function_copy = strdupz(function);
+    char *words[1024];
+    size_t num_words = quoted_strings_splitter_whitespace(filters->function_copy, words, 1024);
+    for(size_t i = 1; i < num_words; i++) {
+        char *param = get_word(words, num_words, i);
+        if(strcmp(param, "info") == 0)
+            filters->info_only = true;
+        else if(strncmp(param, "node_type:", 10) == 0)
+            filters->node_type = param + 10;
+        else if(strncmp(param, "ingest_status:", 14) == 0)
+            filters->ingest_status = param + 14;
+        else if(strncmp(param, "stream_status:", 14) == 0)
+            filters->stream_status = param + 14;
+    }
 }
 
 // check if a value appears in a comma-separated list (NULL list matches everything)
@@ -434,29 +471,13 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
     time_t now = now_realtime_sec();
     usec_t now_ut = now_realtime_usec();
 
-    // parse parameters
-    bool info_only = false;
-    const char *filter_node_type = NULL;
-    const char *filter_ingest_status = NULL;
-    const char *filter_stream_status = NULL;
-    char *function_copy = NULL;
-
-    if(function && *function) {
-        function_copy = strdupz(function);
-        char *words[1024];
-        size_t num_words = quoted_strings_splitter_whitespace(function_copy, words, 1024);
-        for(size_t i = 1; i < num_words; i++) {
-            char *param = get_word(words, num_words, i);
-            if(strcmp(param, "info") == 0)
-                info_only = true;
-            else if(strncmp(param, "node_type:", 10) == 0)
-                filter_node_type = param + 10;
-            else if(strncmp(param, "ingest_status:", 14) == 0)
-                filter_ingest_status = param + 14;
-            else if(strncmp(param, "stream_status:", 14) == 0)
-                filter_stream_status = param + 14;
-        }
-    }
+    struct streaming_topology_filters filters = { 0 };
+    streaming_topology_parse_filters(function, &filters);
+    bool info_only = filters.info_only;
+    const char *filter_node_type = filters.node_type;
+    const char *filter_ingest_status = filters.ingest_status;
+    const char *filter_stream_status = filters.stream_status;
+    char *function_copy = filters.function_copy;
 
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
@@ -1289,7 +1310,7 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                     }
                     else {
                         // no active path — stale link to localhost
-                        memcpy(target_actor_id, localhost_actor_id, sizeof(target_actor_id));
+                        snprintfz(target_actor_id, sizeof(target_actor_id), "%s", localhost_actor_id);
                         link_type = "stale";
                     }
 

@@ -1245,7 +1245,9 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
         return;
     }
 
-    if(!topology_ip_belongs_to_self(ctx, remote_ip, remote_address_space)) {
+    bool remote_is_self = topology_ip_belongs_to_self(ctx, remote_ip, remote_address_space);
+    bool create_endpoint_actor = (!remote_is_self || n->direction == SOCKET_DIRECTION_LISTEN);
+    if(create_endpoint_actor) {
         char endpoint_actor_key[NV_TOPOLOGY_KEY_MAX];
         topology_actor_id_for_remote_endpoint(ctx, remote_ip, remote_address_space, endpoint_actor_key, sizeof(endpoint_actor_key));
         NV_REMOTE_ACTOR *ra = dictionary_get(ctx->remote_actors, endpoint_actor_key);
@@ -2086,8 +2088,7 @@ static void network_viewer_topology_function(
 
                     NV_REMOTE_ACTOR *ra;
                     dfe_start_read(ctx.remote_actors, ra) {
-                        if(topology_ip_belongs_to_self(&ctx, ra->ip, ra->address_space))
-                            continue;
+                        bool endpoint_is_self = topology_ip_belongs_to_self(&ctx, ra->ip, ra->address_space);
 
                         char endpoint_actor_id[NV_TOPOLOGY_KEY_MAX];
                         topology_actor_id_for_remote_endpoint(&ctx, ra->ip, ra->address_space, endpoint_actor_id, sizeof(endpoint_actor_id));
@@ -2100,12 +2101,22 @@ static void network_viewer_topology_function(
                             buffer_json_member_add_string(wb, "source", NETWORK_TOPOLOGY_SOURCE);
                             topology_add_remote_match(wb, ra->ip);
 
+                            if(endpoint_is_self) {
+                                buffer_json_member_add_object(wb, "parent_match");
+                                {
+                                    if(ctx.machine_guid[0])
+                                        buffer_json_member_add_string(wb, "netdata_machine_guid", ctx.machine_guid);
+                                    topology_add_single_item_string_array(wb, "hostnames", ctx.hostname);
+                                }
+                                buffer_json_object_close(wb);
+                            }
+
                             buffer_json_member_add_object(wb, "attributes");
                             {
                                 buffer_json_member_add_uint64(wb, "socket_count", ra->sockets);
-                                buffer_json_member_add_uint64(wb, "local_socket_count", 0);
-                                buffer_json_member_add_uint64(wb, "remote_socket_count", ra->sockets);
-                                buffer_json_member_add_string(wb, "endpoint_scope", "remote");
+                                buffer_json_member_add_uint64(wb, "local_socket_count", endpoint_is_self ? ra->sockets : 0);
+                                buffer_json_member_add_uint64(wb, "remote_socket_count", endpoint_is_self ? 0 : ra->sockets);
+                                buffer_json_member_add_string(wb, "endpoint_scope", endpoint_is_self ? "self" : "remote");
                                 buffer_json_member_add_string(wb, "display_name", ra->ip);
                                 buffer_json_member_add_string(wb, "actor_class", "endpoint");
                             }
@@ -2114,7 +2125,7 @@ static void network_viewer_topology_function(
                             buffer_json_member_add_object(wb, "labels");
                             {
                                 buffer_json_member_add_string(wb, "address_space", ra->address_space);
-                                buffer_json_member_add_string(wb, "endpoint_scope", "remote");
+                                buffer_json_member_add_string(wb, "endpoint_scope", endpoint_is_self ? "self" : "remote");
                                 buffer_json_member_add_string(wb, "display_name", ra->ip);
                                 buffer_json_member_add_string(wb, "actor_class", "endpoint");
                             }
@@ -2327,7 +2338,7 @@ static void network_viewer_topology_function(
                         snprintf(remote_endpoint_port, sizeof(remote_endpoint_port), "%s:%u", link->remote_ip, link->remote_port);
                         topology_process_display_name(&ctx, link->process, link->pid, process_display_name, sizeof(process_display_name));
 
-                        if(remote_is_self) {
+                        if(remote_is_self && link->direction_id != SOCKET_DIRECTION_LISTEN) {
                             const char *peer_ip = link->peer_ip[0] ? link->peer_ip : link->remote_ip;
                             bool allow_service_fallback = true;
                             NV_ENDPOINT_OWNER *owner = topology_lookup_endpoint_owner(&ctx, link->net_ns_inode, link->protocol_id, peer_ip, link->peer_port, allow_service_fallback);
