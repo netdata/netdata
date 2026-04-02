@@ -3,13 +3,16 @@
 package file
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -376,4 +379,70 @@ func TestWatcher_Run(t *testing.T) {
 			test.createSim(tmp).run(t)
 		})
 	}
+}
+
+func TestWatcher_Refresh_ReparsesWhenSizeChangesWithoutModTimeChange(t *testing.T) {
+	tmp := newTmpDir(t, "watch-refresh-*")
+	defer tmp.cleanup()
+
+	filename := tmp.join("module.conf")
+	fixedTime := time.Unix(1_700_000_000, 0)
+	reg := confgroup.Registry{
+		"module": {},
+	}
+	w := NewWatcher(reg, []string{tmp.join("*.conf")})
+
+	fsWatcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		t.Fatalf("new fsnotify watcher: %v", err)
+	}
+	w.watcher = fsWatcher
+	defer w.stop()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	updates := make(chan []*confgroup.Group, 4)
+
+	tmp.writeString(filename, "")
+	err = os.Chtimes(filename, fixedTime, fixedTime)
+	assert.NoError(t, err)
+
+	w.refresh(ctx, updates)
+
+	first := <-updates
+	assert.Equal(t, []*confgroup.Group{
+		{
+			Source: filename,
+		},
+	}, first)
+
+	tmp.writeYAML(filename, sdConfig{
+		{
+			"name":   "name",
+			"module": "module",
+		},
+	})
+	err = os.Chtimes(filename, fixedTime, fixedTime)
+	assert.NoError(t, err)
+
+	w.refresh(ctx, updates)
+
+	second := <-updates
+	assert.Equal(t, []*confgroup.Group{
+		{
+			Source: filename,
+			Configs: []confgroup.Config{
+				{
+					"name":                "name",
+					"module":              "module",
+					"update_every":        collectorapi.UpdateEvery,
+					"autodetection_retry": collectorapi.AutoDetectionRetry,
+					"priority":            collectorapi.Priority,
+					"__provider__":        "file watcher",
+					"__source_type__":     confgroup.TypeStock,
+					"__source__":          fmt.Sprintf("discoverer=file_watcher,file=%s", filename),
+				},
+			},
+		},
+	}, second)
 }
