@@ -356,7 +356,7 @@ impl Log {
 
         // Write remapping entry if we have new mappings
         if !new_mappings.is_empty() {
-            self.write_remapping_entry(&new_mappings, &EntryTimestamps::default())?;
+            self.write_remapping_entry(&new_mappings, &timestamps)?;
 
             // Update registry
             for (otel_name, systemd_name) in new_mappings.iter() {

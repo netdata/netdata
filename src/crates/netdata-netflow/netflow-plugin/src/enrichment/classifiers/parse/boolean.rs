@@ -109,7 +109,16 @@ fn parse_rule_term(term: &str) -> Result<RuleTerm> {
         let left = parse_value_expr(left.trim())?;
         let right = parse_value_expr(right.trim())?;
         validate_literal_regex_value(&right, "matches")?;
-        return Ok(RuleTerm::Condition(ConditionExpr::Matches(left, right)));
+        let compiled = match &right {
+            ValueExpr::StringLiteral(pattern) => Some(
+                regex::Regex::new(pattern)
+                    .with_context(|| format!("invalid regex '{pattern}' in matches expression"))?,
+            ),
+            _ => None,
+        };
+        return Ok(RuleTerm::Condition(ConditionExpr::Matches(
+            left, right, compiled,
+        )));
     }
     if let Some((left, right)) = split_once_top_level(term, " contains ") {
         return Ok(RuleTerm::Condition(ConditionExpr::Contains(

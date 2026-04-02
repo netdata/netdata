@@ -1,5 +1,15 @@
 use super::*;
 
+fn ipv4_prefix_addr(ip: Ipv4Addr, prefix_len: u8) -> Ipv4Addr {
+    let prefix_len = prefix_len.min(32);
+    let mask = if prefix_len == 0 {
+        0
+    } else {
+        u32::MAX << (32 - prefix_len)
+    };
+    Ipv4Addr::from(u32::from(ip) & mask)
+}
+
 pub(crate) fn append_v5_records(
     source: SocketAddr,
     out: &mut Vec<DecodedFlow>,
@@ -27,8 +37,8 @@ pub(crate) fn append_v5_records(
         let mut rec = base_record("v5", source);
         rec.src_addr = Some(IpAddr::V4(flow.src_addr));
         rec.dst_addr = Some(IpAddr::V4(flow.dst_addr));
-        rec.src_prefix = Some(IpAddr::V4(flow.src_addr));
-        rec.dst_prefix = Some(IpAddr::V4(flow.dst_addr));
+        rec.src_prefix = Some(IpAddr::V4(ipv4_prefix_addr(flow.src_addr, flow.src_mask)));
+        rec.dst_prefix = Some(IpAddr::V4(ipv4_prefix_addr(flow.dst_addr, flow.dst_mask)));
         rec.src_mask = flow.src_mask;
         rec.dst_mask = flow.dst_mask;
         rec.src_port = flow.src_port;
@@ -93,8 +103,8 @@ pub(crate) fn append_v7_records(
         let mut rec = base_record("v7", source);
         rec.src_addr = Some(IpAddr::V4(flow.src_addr));
         rec.dst_addr = Some(IpAddr::V4(flow.dst_addr));
-        rec.src_prefix = Some(IpAddr::V4(flow.src_addr));
-        rec.dst_prefix = Some(IpAddr::V4(flow.dst_addr));
+        rec.src_prefix = Some(IpAddr::V4(ipv4_prefix_addr(flow.src_addr, flow.src_mask)));
+        rec.dst_prefix = Some(IpAddr::V4(ipv4_prefix_addr(flow.dst_addr, flow.dst_mask)));
         rec.src_mask = flow.src_mask;
         rec.dst_mask = flow.dst_mask;
         rec.src_port = flow.src_port;

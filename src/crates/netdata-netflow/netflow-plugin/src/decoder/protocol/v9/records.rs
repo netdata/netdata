@@ -5,7 +5,7 @@ pub(crate) fn append_v9_records(
     out: &mut Vec<DecodedFlow>,
     packet: V9,
     sampling: &mut SamplingState,
-    decapsulation_mode: DecapsulationMode,
+    _decapsulation_mode: DecapsulationMode,
     timestamp_source: TimestampSource,
     input_realtime_usec: u64,
 ) {
@@ -70,9 +70,6 @@ pub(crate) fn append_v9_records(
                     );
 
                     if looks_like_sampling_option_record_from_rec(&rec, observed_sampling_rate) {
-                        continue;
-                    }
-                    if !decapsulation_mode.is_none() {
                         continue;
                     }
 

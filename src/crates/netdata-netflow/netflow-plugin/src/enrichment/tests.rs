@@ -1832,6 +1832,24 @@ fn network_asn_override_prefers_network_asn_when_present() {
     assert_eq!(apply_network_asn_override(0, 64_500), 64_500);
 }
 
+#[test]
+fn private_asn_classification_matches_akvorado_special_range_boundaries() {
+    assert!(is_private_as(23_456));
+    assert!(!is_private_as(64_495));
+    assert!(is_private_as(64_496));
+    assert!(is_private_as(64_511));
+    assert!(is_private_as(64_512));
+    assert!(is_private_as(65_534));
+    assert!(is_private_as(65_535));
+    assert!(is_private_as(65_536));
+    assert!(is_private_as(65_551));
+    assert!(!is_private_as(65_552));
+    assert!(!is_private_as(4_199_999_999));
+    assert!(is_private_as(4_200_000_000));
+    assert!(is_private_as(4_294_967_294));
+    assert!(is_private_as(4_294_967_295));
+}
+
 fn metadata_config_for_192() -> StaticMetadataConfig {
     StaticMetadataConfig {
         exporters: BTreeMap::from([(

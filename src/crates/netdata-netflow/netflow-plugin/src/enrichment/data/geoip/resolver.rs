@@ -37,12 +37,14 @@ impl GeoIpResolver {
         }
         self.last_reload_check = Instant::now();
 
-        let Ok(next_signature) =
-            build_geoip_signature(&self.asn_paths, &self.geo_paths, self.optional)
-        else {
-            tracing::warn!("geoip: failed to check database signatures");
-            return;
-        };
+        let next_signature =
+            match build_geoip_signature(&self.asn_paths, &self.geo_paths, self.optional) {
+                Ok(signature) => signature,
+                Err(err) => {
+                    tracing::warn!("geoip: failed to check database signatures: {}", err);
+                    return;
+                }
+            };
 
         if next_signature == self.signature {
             return;

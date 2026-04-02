@@ -57,7 +57,7 @@ pub(crate) fn append_unique_flows(dst: &mut Vec<DecodedFlow>, incoming: Vec<Deco
 /// from different decode paths may have different observation timestamps.
 pub(crate) fn flow_identity_hash(flow: &DecodedFlow) -> u64 {
     use std::hash::Hasher;
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    let mut hasher = twox_hash::XxHash64::default();
     let r = &flow.record;
     let identity_bytes = identity_counter_value(r.raw_bytes, r.bytes);
     let identity_packets = identity_counter_value(r.raw_packets, r.packets);

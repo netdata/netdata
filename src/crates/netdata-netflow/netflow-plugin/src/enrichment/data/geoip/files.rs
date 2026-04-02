@@ -65,11 +65,43 @@ pub(crate) fn read_geoip_file_signature(
         }
     };
 
-    let modified = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
-    let modified_usec = modified
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_micros() as u64;
+    let modified = match metadata.modified() {
+        Ok(time) => time,
+        Err(err) if optional => {
+            tracing::warn!(
+                "geoip: failed to read modification time for optional database '{}': {}",
+                path,
+                err
+            );
+            return Ok(None);
+        }
+        Err(err) => {
+            return Err(anyhow::anyhow!(
+                "geoip: failed to read modification time for database '{}': {}",
+                path,
+                err
+            ));
+        }
+    };
+    let modified_duration = match modified.duration_since(UNIX_EPOCH) {
+        Ok(duration) => duration,
+        Err(err) if optional => {
+            tracing::warn!(
+                "geoip: modification time is before UNIX_EPOCH for optional database '{}': {:?}",
+                path,
+                err
+            );
+            return Ok(None);
+        }
+        Err(err) => {
+            return Err(anyhow::anyhow!(
+                "geoip: modification time is before UNIX_EPOCH for database '{}': {:?}",
+                path,
+                err
+            ));
+        }
+    };
+    let modified_usec = modified_duration.as_micros() as u64;
     Ok(Some(GeoIpFileSignature {
         modified_usec,
         size: metadata.len(),

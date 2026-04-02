@@ -448,6 +448,14 @@ fn legacy_v5_records_populate_flow_window_timestamps() {
     assert_eq!(out.len(), 1);
     assert_eq!(out[0].record.flow_start_usec, 99_000_000);
     assert_eq!(out[0].record.flow_end_usec, 100_000_000);
+    assert_eq!(
+        out[0].record.src_prefix,
+        Some(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 0)))
+    );
+    assert_eq!(
+        out[0].record.dst_prefix,
+        Some(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 0)))
+    );
 }
 
 #[test]
@@ -501,6 +509,14 @@ fn legacy_v7_records_populate_flow_window_timestamps() {
     assert_eq!(out.len(), 1);
     assert_eq!(out[0].record.flow_start_usec, 119_000_000);
     assert_eq!(out[0].record.flow_end_usec, 120_000_000);
+    assert_eq!(
+        out[0].record.src_prefix,
+        Some(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))
+    );
+    assert_eq!(
+        out[0].record.dst_prefix,
+        Some(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))
+    );
 }
 
 #[test]
@@ -661,6 +677,29 @@ fn akvorado_v9_data_fixture_all_flows_match_expected_projection() {
     sort_projected_flows(&mut got, key_fields);
     sort_projected_flows(&mut want, key_fields);
     assert_eq!(got, want);
+}
+
+#[test]
+fn akvorado_v9_data_fixture_vxlan_mode_keeps_standard_records() {
+    let flows = decode_fixture_sequence_with_mode(
+        &["options-template.pcap", "options-data.pcap", "template.pcap", "data.pcap"],
+        DecapsulationMode::Vxlan,
+    );
+
+    assert!(
+        !flows.is_empty(),
+        "standard v9 records should still be emitted when decapsulation mode is enabled"
+    );
+
+    let first = &flows[0].record.to_fields();
+    assert_eq!(
+        first.get("SRC_ADDR").map(String::as_str),
+        Some("198.38.121.178")
+    );
+    assert_eq!(
+        first.get("DST_ADDR").map(String::as_str),
+        Some("91.170.143.87")
+    );
 }
 
 #[test]
@@ -1176,6 +1215,22 @@ fn merge_enrichment_synchronizes_asn_name_when_asn_is_backfilled() {
         fields.get("SRC_AS_NAME").map(String::as_str),
         Some("AS64512 EXAMPLE TRANSIT")
     );
+}
+
+#[test]
+fn merge_enrichment_does_not_attach_mismatched_asn_name() {
+    let mut dst = vec![canonical_test_flow(&[("DST_AS", "64500")])];
+    let incoming = canonical_test_flow(&[
+        ("DST_AS", "64501"),
+        ("DST_AS_NAME", "AS64501 OTHER TRANSIT"),
+    ]);
+
+    append_unique_flows(&mut dst, vec![incoming]);
+
+    assert_eq!(dst.len(), 2);
+    let fields = dst[0].record.to_fields();
+    assert_eq!(fields.get("DST_AS").map(String::as_str), Some("64500"));
+    assert_eq!(fields.get("DST_AS_NAME").map(String::as_str), Some(""));
 }
 
 #[test]

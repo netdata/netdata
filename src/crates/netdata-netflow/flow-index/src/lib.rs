@@ -570,10 +570,14 @@ impl PackedIpAddr {
                 bytes[..4].copy_from_slice(&ip.octets());
                 Self { family: 4, bytes }
             }
-            IpAddr::V6(ip) => Self {
-                family: 6,
-                bytes: ip.octets(),
-            },
+            IpAddr::V6(ip) => ip
+                .to_ipv4_mapped()
+                .map(IpAddr::V4)
+                .map(Self::from_ip)
+                .unwrap_or_else(|| Self {
+                    family: 6,
+                    bytes: ip.octets(),
+                }),
         }
     }
 
@@ -994,6 +998,33 @@ mod tests {
                 OwnedFieldValue::U64(123456),
                 OwnedFieldValue::Text("CLOUDFLARENET".into()),
             ])
+        );
+    }
+
+    #[test]
+    fn ipv6_mapped_ipv4_addresses_reuse_ipv4_field_ids() {
+        let mut index = FlowIndex::new([FieldSpec::new("SRC_ADDR", FieldKind::IpAddr)])
+            .expect("index");
+
+        let v4 = index
+            .get_or_insert_field_value(
+                0,
+                FieldValue::IpAddr(IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4))),
+            )
+            .expect("v4 field");
+        let mapped = index
+            .get_or_insert_field_value(
+                0,
+                FieldValue::IpAddr(IpAddr::V6(
+                    "::ffff:1.2.3.4".parse::<Ipv6Addr>().expect("mapped ipv6"),
+                )),
+            )
+            .expect("mapped field");
+
+        assert_eq!(v4, mapped);
+        assert_eq!(
+            index.field_value(0, mapped),
+            Some(FieldValue::IpAddr(IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4))))
         );
     }
 

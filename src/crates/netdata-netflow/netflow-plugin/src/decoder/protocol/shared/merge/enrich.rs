@@ -56,7 +56,10 @@ pub(crate) fn merge_enriched_records(existing: &mut DecodedFlow, incoming: &Deco
             }
         }
 
-        if !src_name.is_empty() && dst_name.is_empty() {
+        if !src_name.is_empty()
+            && dst_name.is_empty()
+            && (*dst_as == 0 || (src_as != 0 && *dst_as == src_as))
+        {
             *dst_name = src_name.to_string();
             *changed = true;
         }

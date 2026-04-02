@@ -36,6 +36,8 @@ pub(crate) fn apply_network_asn_override(current_asn: u32, network_asn: u32) -> 
 }
 
 pub(crate) fn is_private_as(asn: u32) -> bool {
+    // Akvorado parity: the *ExceptPrivate provider chain excludes the private ranges
+    // plus reserved/documentation ASNs from the IANA special-purpose registry.
     if asn == 0 || asn == 23_456 {
         return true;
     }

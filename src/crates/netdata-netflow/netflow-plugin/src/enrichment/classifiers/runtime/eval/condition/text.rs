@@ -34,10 +34,16 @@ pub(super) fn eval_matches(
     context: &EvalContext<'_>,
     left: &ValueExpr,
     right: &ValueExpr,
+    compiled: Option<&Regex>,
 ) -> Result<bool> {
     let (left, right) = context.resolve_binary(left, right)?;
     let pattern = right.to_string_value();
-    let regex =
-        Regex::new(&pattern).with_context(|| format!("invalid regex '{pattern}' for 'matches'"))?;
+    let regex = match compiled {
+        Some(regex) => regex.clone(),
+        None => {
+            Regex::new(&pattern)
+                .with_context(|| format!("invalid regex '{pattern}' for 'matches'"))?
+        }
+    };
     Ok(regex.is_match(&left.to_string_value()))
 }

@@ -81,7 +81,9 @@ impl ConditionExpr {
             ConditionExpr::Contains(left, right) => text::eval_contains(&context, left, right),
             ConditionExpr::StartsWith(left, right) => text::eval_starts_with(&context, left, right),
             ConditionExpr::EndsWith(left, right) => text::eval_ends_with(&context, left, right),
-            ConditionExpr::Matches(left, right) => text::eval_matches(&context, left, right),
+            ConditionExpr::Matches(left, right, compiled) => {
+                text::eval_matches(&context, left, right, compiled.as_ref())
+            }
         }
     }
 }

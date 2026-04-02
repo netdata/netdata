@@ -1,4 +1,5 @@
 use crate::enrichment::ValueExpr;
+use regex::Regex;
 
 #[derive(Debug, Clone)]
 pub(crate) enum ConditionExpr {
@@ -13,5 +14,5 @@ pub(crate) enum ConditionExpr {
     Contains(ValueExpr, ValueExpr),
     StartsWith(ValueExpr, ValueExpr),
     EndsWith(ValueExpr, ValueExpr),
-    Matches(ValueExpr, ValueExpr),
+    Matches(ValueExpr, ValueExpr, Option<Regex>),
 }

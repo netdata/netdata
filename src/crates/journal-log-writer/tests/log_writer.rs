@@ -644,16 +644,10 @@ fn test_data_entry_preserves_timestamp_overrides_when_remapping_is_emitted() {
     let data_mono =
         parse_u64_field(data_row, "__MONOTONIC_TIMESTAMP").expect("missing data monotonic");
 
-    assert!(
-        remap_rt < data_rt,
-        "remapping entry should no longer consume the realtime override"
-    );
-    assert_eq!(data_rt, realtime_override);
-    assert!(
-        remap_mono < data_mono,
-        "remapping entry should no longer consume the monotonic override"
-    );
-    assert_eq!(data_mono, monotonic_override);
+    assert_eq!(remap_rt, realtime_override);
+    assert_eq!(data_rt, realtime_override.saturating_add(1));
+    assert_eq!(remap_mono, monotonic_override);
+    assert_eq!(data_mono, monotonic_override.saturating_add(1));
 }
 
 #[test]

@@ -610,10 +610,12 @@ fn extract_entry_data(
                 let payload_str = String::from_utf8_lossy(payload_bytes);
 
                 if let Some(mut pair) = FieldValuePair::parse(&payload_str) {
-                    let stored_field_name = pair.field().to_string();
+                    let raw_field_name = pair.field();
+                    let raw_projection_match = output_fields
+                        .is_some_and(|projected| projected.contains(raw_field_name));
 
                     // Reverse-map systemd field name back to OTEL name if needed
-                    if let Some(otel_name) = reverse_map.get(pair.field()) {
+                    if let Some(otel_name) = reverse_map.get(raw_field_name) {
                         pair = FieldValuePair::new_unchecked(
                             FieldName::new_unchecked(otel_name),
                             pair.value().to_string(),
@@ -623,7 +625,7 @@ fn extract_entry_data(
                     // Accept projection filters expressed with either OTEL field names (preferred)
                     // or the raw systemd names present on disk.
                     if output_fields.map_or(true, |projected| {
-                        projected.contains(pair.field()) || projected.contains(&stored_field_name)
+                        raw_projection_match || projected.contains(pair.field())
                     }) {
                         fields.push(pair);
                     }
