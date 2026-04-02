@@ -3531,7 +3531,7 @@ func dot1qIndexFromOID(oid, prefix string) (key string, mac string, ok bool) {
 
 	macBuilder := strings.Builder{}
 	for _, octet := range octets {
-		macBuilder.WriteString(fmt.Sprintf("%02x", octet))
+		_, _ = fmt.Fprintf(&macBuilder, "%02x", octet)
 	}
 
 	return strings.Join(parts, "."), macBuilder.String(), true

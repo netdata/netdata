@@ -109,7 +109,7 @@ func (s *l2BuildState) resolveRemoteWithHostnameMACGuard(hostname, chassisID, mg
 		s.chassisToID[canonicalToken(remoteMAC)] = generatedID
 		if host := canonicalHost(hostname); host != "" {
 			if existingID := strings.TrimSpace(s.hostToID[host]); existingID == "" ||
-				(!(enforceHostnameMACGuard || s.shouldEnforceHostnameMACGuard(existingID, mgmtIP))) ||
+				(!enforceHostnameMACGuard && !s.shouldEnforceHostnameMACGuard(existingID, mgmtIP)) ||
 				s.isMACCompatibleWithDevice(existingID, remoteMAC) {
 				s.hostToID[host] = generatedID
 			}

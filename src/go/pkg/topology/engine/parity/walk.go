@@ -35,9 +35,11 @@ func LoadWalkFile(path string) (WalkDataset, error) {
 	if err != nil {
 		return WalkDataset{}, fmt.Errorf("open walk file %q: %w", path, err)
 	}
-	defer f.Close()
 
 	records, err := ParseWalk(f)
+	if closeErr := f.Close(); err == nil && closeErr != nil {
+		return WalkDataset{}, fmt.Errorf("close walk file %q: %w", path, closeErr)
+	}
 	if err != nil {
 		return WalkDataset{}, fmt.Errorf("parse walk file %q: %w", path, err)
 	}

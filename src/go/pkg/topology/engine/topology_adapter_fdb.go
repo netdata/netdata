@@ -148,23 +148,3 @@ func buildFDBAliasOwnerMap(reporterAliases map[string][]string) map[string]map[s
 	}
 	return aliasOwners
 }
-
-func buildManagedAliasEndpointIDSet(reporterAliases map[string][]string) map[string]struct{} {
-	if len(reporterAliases) == 0 {
-		return nil
-	}
-	out := make(map[string]struct{})
-	for _, aliases := range reporterAliases {
-		for _, alias := range aliases {
-			alias = normalizeFDBEndpointID(alias)
-			if alias == "" {
-				continue
-			}
-			out[alias] = struct{}{}
-		}
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}

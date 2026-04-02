@@ -7,36 +7,6 @@ import (
 	"strings"
 )
 
-func filterBridgeMacLinkRecordsBySwitchFacing(
-	macLinks []bridgeMacLinkRecord,
-	switchFacingPortKeys map[string]struct{},
-	managedAliasEndpointIDs map[string]struct{},
-) []bridgeMacLinkRecord {
-	if len(macLinks) == 0 || len(switchFacingPortKeys) == 0 {
-		return macLinks
-	}
-	out := make([]bridgeMacLinkRecord, 0, len(macLinks))
-	for _, link := range macLinks {
-		if strings.ToLower(strings.TrimSpace(link.method)) == "fdb" {
-			endpointID := normalizeFDBEndpointID(link.endpointID)
-			if endpointID != "" {
-				if _, keepManagedAlias := managedAliasEndpointIDs[endpointID]; keepManagedAlias {
-					out = append(out, link)
-					continue
-				}
-			}
-			if _, isSwitchFacing := switchFacingPortKeys[bridgePortObservationKey(link.port)]; isSwitchFacing {
-				continue
-			}
-			if _, isSwitchFacing := switchFacingPortKeys[bridgePortObservationVLANKey(link.port)]; isSwitchFacing {
-				continue
-			}
-		}
-		out = append(out, link)
-	}
-	return out
-}
-
 func inferFDBEndpointOwners(
 	observations fdbReporterObservation,
 	reporterAliases map[string][]string,

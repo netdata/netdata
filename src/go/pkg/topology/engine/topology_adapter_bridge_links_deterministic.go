@@ -104,29 +104,3 @@ func buildDeterministicTransitPortKeySet(
 	}
 	return out
 }
-
-func mergeBridgePortObservationKeySets(left, right map[string]struct{}) map[string]struct{} {
-	if len(left) == 0 && len(right) == 0 {
-		return nil
-	}
-
-	out := make(map[string]struct{}, len(left)+len(right))
-	for key := range left {
-		key = strings.TrimSpace(key)
-		if key == "" {
-			continue
-		}
-		out[key] = struct{}{}
-	}
-	for key := range right {
-		key = strings.TrimSpace(key)
-		if key == "" {
-			continue
-		}
-		out[key] = struct{}{}
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}

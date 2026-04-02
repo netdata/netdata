@@ -73,10 +73,7 @@ func buildDeviceActorAttributes(
 	ifaceSummary topologyDeviceInterfaceSummary,
 	match topology.Match,
 ) map[string]any {
-	discovered := true
-	if strings.TrimSpace(localDeviceID) != "" && dev.ID == localDeviceID {
-		discovered = false
-	}
+	discovered := strings.TrimSpace(localDeviceID) == "" || dev.ID != localDeviceID
 
 	attrs := map[string]any{
 		"device_id":              dev.ID,

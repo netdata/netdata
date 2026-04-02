@@ -11,10 +11,7 @@ func topologyPortVLANAttributes(vlanIDs []string, vlanNames map[string]string, l
 	if len(vlanIDs) == 0 {
 		return nil
 	}
-	tagged := true
-	if len(vlanIDs) == 1 && strings.EqualFold(strings.TrimSpace(linkMode), "access") {
-		tagged = false
-	}
+	tagged := len(vlanIDs) != 1 || !strings.EqualFold(strings.TrimSpace(linkMode), "access")
 	out := make([]map[string]any, 0, len(vlanIDs))
 	for _, vlanID := range vlanIDs {
 		vlanID = normalizeTopologyVLANID(vlanID)

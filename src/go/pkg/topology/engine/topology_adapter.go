@@ -55,20 +55,6 @@ type endpointActorAccumulator struct {
 	ifNames    map[string]struct{}
 }
 
-type segmentAccumulator struct {
-	id               string
-	designatedPortID string
-	ports            map[string]bridgePortRef
-	portByLooseKey   map[string]string
-	endpointIDs      map[string]struct{}
-	deviceIDs        map[string]struct{}
-	ifNames          map[string]struct{}
-	ifIndexes        map[string]struct{}
-	bridgePorts      map[string]struct{}
-	vlanIDs          map[string]struct{}
-	methods          map[string]struct{}
-}
-
 type projectedSegments struct {
 	actors                        []topology.Actor
 	links                         []topology.Link
