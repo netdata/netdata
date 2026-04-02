@@ -20,9 +20,7 @@ Netdata strongly suggests that you are careful when cleaning up drives, and remo
 
 ### Useful resources
 
-1. [Disk space collector](/src/collectors/diskspace.plugin/README.md)
+1. [Linux disk usage commands](https://www.redhat.com/sysadmin/Linux-disk-usage)
 
-2. [Linux disk usage commands](https://www.redhat.com/sysadmin/Linux-disk-usage)
-
-3. [systemd mount unit failed state](/src/health/guides/systemdunits/systemd_mount_unit_failed_state.md)
+2. [systemd.mount — Mount unit configuration](https://www.freedesktop.org/software/systemd/man/systemd.mount.html)
 
