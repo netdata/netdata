@@ -2791,6 +2791,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: authentications
+            - name: adfs.extranet_account_lockouts
+              description: Extranet account lockouts
+              unit: lockouts/s
+              chart_type: line
+              dimensions:
+                - name: lockouts
             - name: adfs.external_authentications
               description: Authentications from external MFA providers
               unit: authentications/s
