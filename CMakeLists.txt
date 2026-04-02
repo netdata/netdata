@@ -2992,8 +2992,12 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 # GCC still performs LTO when linking slim LTO static archives into a
                 # non-LTO target. Build these archives as fat objects and force a
                 # regular final link to avoid exhausting the i386 linker.
-                target_compile_options(judy PRIVATE -ffat-lto-objects)
-                target_compile_options(libnetdata PRIVATE -ffat-lto-objects)
+                if(TARGET judy)
+                        target_compile_options(judy PRIVATE -ffat-lto-objects)
+                endif()
+                if(TARGET libnetdata)
+                        target_compile_options(libnetdata PRIVATE -ffat-lto-objects)
+                endif()
         endif()
 
         set(NETWORK_VIEWER_FILES

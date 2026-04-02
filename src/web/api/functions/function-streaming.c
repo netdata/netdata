@@ -2,6 +2,8 @@
 
 #include "function-streaming.h"
 
+#define STREAMING_FUNCTION_UPDATE_EVERY 10
+
 #define GROUP_BY_COLUMN(name, descr) \
     buffer_json_member_add_object(wb, name);\
     {\
@@ -235,6 +237,23 @@ static void streaming_topology_parse_filters(const char *function, struct stream
         else if(strncmp(param, "stream_status:", 14) == 0)
             filters->stream_status = param + 14;
     }
+}
+
+static int streaming_topology_return_error(BUFFER *wb, char *function_copy, int status, const char *error) {
+    buffer_flush(wb);
+    wb->content_type = CT_APPLICATION_JSON;
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    buffer_json_member_add_uint64(wb, "status", status);
+    buffer_json_member_add_string(wb, "type", "topology");
+    buffer_json_member_add_time_t(wb, "update_every", STREAMING_FUNCTION_UPDATE_EVERY);
+    buffer_json_member_add_boolean(wb, "has_history", false);
+    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_STREAMING_TOPOLOGY_HELP);
+    buffer_json_member_add_string(wb, "error", error);
+    buffer_json_finalize(wb);
+
+    freez(function_copy);
+    return status;
 }
 
 // check if a value appears in a comma-separated list (NULL list matches everything)
@@ -485,7 +504,7 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "topology");
-    buffer_json_member_add_time_t(wb, "update_every", 1);
+    buffer_json_member_add_time_t(wb, "update_every", STREAMING_FUNCTION_UPDATE_EVERY);
     buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_STREAMING_TOPOLOGY_HELP);
     buffer_json_member_add_array(wb, "accepted_params");
@@ -711,7 +730,9 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
             if(parent_child_count)
                 dictionary_destroy(parent_child_count);
 
-            buffer_json_member_add_string(wb, "error", "failed to allocate streaming topology dictionaries");
+            return streaming_topology_return_error(wb, function_copy,
+                HTTP_RESP_INTERNAL_SERVER_ERROR,
+                "failed to allocate streaming topology dictionaries");
         }
         else {
 
@@ -1423,7 +1444,7 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
         }
     }
 
-    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
+    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + STREAMING_FUNCTION_UPDATE_EVERY);
     buffer_json_finalize(wb);
     freez(function_copy);
     return HTTP_RESP_OK;
@@ -1441,7 +1462,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
     buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(localhost));
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
-    buffer_json_member_add_time_t(wb, "update_every", 1);
+    buffer_json_member_add_time_t(wb, "update_every", STREAMING_FUNCTION_UPDATE_EVERY);
     buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_STREAMING_HELP);
     buffer_json_member_add_array(wb, "data");
@@ -2386,7 +2407,7 @@ int function_streaming(BUFFER *wb, const char *function __maybe_unused, BUFFER *
     }
     buffer_json_object_close(wb); // group_by
 
-    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
+    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + STREAMING_FUNCTION_UPDATE_EVERY);
     buffer_json_finalize(wb);
 
     return HTTP_RESP_OK;
