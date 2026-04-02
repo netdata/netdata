@@ -270,8 +270,14 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
       # engine), we can simply skip the check.
       if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
         list(APPEND NETFLOW_PLUGIN_RUSTFLAGS --cfg=io_uring_skip_arch_check)
-        # Fat LTO + single-codegen-unit + debuginfo exhausts 32-bit package builders.
-        list(APPEND NETFLOW_PLUGIN_RUSTFLAGS "-C" "debuginfo=0" "-C" "lto=off" "-C" "codegen-units=8")
+        # The workspace release profile still propagates fat LTO, single-codegen-unit,
+        # and debuginfo settings through Rust dependencies on 32-bit builds. Override
+        # Cargo's release profile too so the entire dependency graph stays linkable.
+        corrosion_set_env_vars(
+                netflow-plugin
+                "CARGO_PROFILE_RELEASE_DEBUG=0"
+                "CARGO_PROFILE_RELEASE_LTO=off"
+                "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=8")
       endif()
 
       if(STATIC_BUILD)
