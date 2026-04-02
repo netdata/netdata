@@ -15,7 +15,7 @@ const (
 // DiscoverOptions.CollectedAt explicitly.
 func BuildL2ResultFromObservations(observations []L2Observation, opts DiscoverOptions) (Result, error) {
 	if len(observations) == 0 {
-		return Result{}, fmt.Errorf("at least one observation is required")
+		return Result{}, fmt.Errorf("%w: at least one observation is required", ErrInvalidRequest)
 	}
 	if !opts.EnableLLDP && !opts.EnableCDP && !opts.EnableBridge && !opts.EnableARP && !opts.EnableSTP {
 		opts.EnableLLDP = true

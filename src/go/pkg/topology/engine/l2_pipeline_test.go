@@ -1544,6 +1544,7 @@ func TestBuildL2ResultFromObservations_AnnotatesPairMetadata(t *testing.T) {
 func TestBuildL2ResultFromObservations_ErrorsOnEmptyInput(t *testing.T) {
 	_, err := BuildL2ResultFromObservations(nil, DiscoverOptions{EnableLLDP: true})
 	require.Error(t, err)
+	require.ErrorIs(t, err, ErrInvalidRequest)
 }
 
 func findDeviceByHostname(devices []Device, hostname string) *Device {
