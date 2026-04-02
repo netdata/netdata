@@ -5144,6 +5144,7 @@ dependencies = [
  "roaring 0.11.2",
  "serde",
  "serde_json",
+ "split-fst",
  "wal",
 ]
 

@@ -20,6 +20,7 @@ chrono = { workspace = true }
 clap = { workspace = true }
 hashbrown = { workspace = true }
 log-index = { workspace = true }
+split-fst = { workspace = true }
 otel-flatten = { workspace = true }
 roaring = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

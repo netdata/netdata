@@ -4,6 +4,7 @@ mod otap_frame;
 mod otap_index;
 mod otap_read;
 mod otap_schema;
+mod otap_sections;
 mod process_frame;
 
 use std::path::PathBuf;
@@ -42,6 +43,11 @@ enum Command {
         #[arg(short = 'n', long)]
         limit: Option<u32>,
     },
+    /// Print section sizes of an .sfst index file.
+    Sections {
+        /// Path to .sfst file.
+        file: PathBuf,
+    },
     /// Build a roaring bitmap index for every key=value pair.
     Index {
         /// Path to WAL file.
@@ -73,6 +79,12 @@ fn main() {
         }
         Command::Read { file } => {
             if let Err(e) = otap_read::run(&file) {
+                eprintln!("{}: {e}", file.display());
+                std::process::exit(1);
+            }
+        }
+        Command::Sections { file } => {
+            if let Err(e) = otap_sections::run(&file) {
                 eprintln!("{}: {e}", file.display());
                 std::process::exit(1);
             }

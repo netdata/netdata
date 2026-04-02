@@ -28,6 +28,15 @@ where T is a configurable cardinality threshold (default 100).
 ## File Layout
 
     ┌───────────────────────────────────────────────┐
+    │  Header (12 bytes)                            │
+    │    magic: "SFST" (4 bytes)                    │
+    │    version: u32 LE                            │
+    │    num_chunks: u32 LE                         │
+    ├───────────────────────────────────────────────┤
+    │  gix-chunk TOC                                │
+    │    12 bytes × (num_chunks + 1)                │
+    │    Provides O(1) offset lookup per chunk.     │
+    ├───────────────────────────────────────────────┤
     │  META chunk                                   │
     │    total_logs: u32                            │
     │    histogram: [(u32 ts, u32 count), ...]      │
@@ -67,10 +76,8 @@ where T is a configurable cardinality threshold (default 100).
     │    bincode + zstd level 1.                    │
     └───────────────────────────────────────────────┘
 
-All sections are independently addressable through a gix-chunk table
-of contents at the start of the file. META and PRIM are always loaded
-on open; all other sections are loaded selectively depending on the
-query.
+META and PRIM are always loaded on open; all other sections are loaded
+selectively depending on the query.
 
 
 ## Tier-Aligned ID Space
