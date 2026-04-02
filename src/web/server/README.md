@@ -264,14 +264,15 @@ Self-signed certificates are suitable for testing and development environments. 
 Regardless of the source, ensure your certificates meet these requirements:
 
 - **Format**: PEM format (most common format, used by Let's Encrypt and compatible with OpenSSL)
+- **Full chain**: For CA-issued certificates, `ssl certificate` must include all intermediate certificates to avoid browser warnings. Let's Encrypt issues `fullchain.pem` (certificate + intermediates) and `privkey.pem` (private key) — use these directly.
 - **Location**: Place certificates in `/etc/netdata/ssl/` or another secure directory
 - **Permissions**: Certificate and key files must be readable by the `netdata` user
 - **Paths**: Configure the paths in `netdata.conf`:
 
 ```text
 [web]
-    ssl key = /etc/netdata/ssl/key.pem
-    ssl certificate = /etc/netdata/ssl/cert.pem
+    ssl key = /etc/netdata/ssl/privkey.pem
+    ssl certificate = /etc/netdata/ssl/fullchain.pem
 ```
 
 </details>
