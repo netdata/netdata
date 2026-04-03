@@ -10,9 +10,30 @@ import (
 )
 
 func TestJobLogSource(t *testing.T) {
-	cfg := confgroup.Config{}
-	cfg.SetSourceType(confgroup.TypeDiscovered)
-	cfg.SetProvider("file watcher")
+	tests := map[string]struct {
+		sourceType string
+		provider   string
+		want       string
+	}{
+		"different source type and provider": {
+			sourceType: confgroup.TypeDiscovered,
+			provider:   "file watcher",
+			want:       "discovered/file watcher",
+		},
+		"same source type and provider": {
+			sourceType: confgroup.TypeDyncfg,
+			provider:   confgroup.TypeDyncfg,
+			want:       confgroup.TypeDyncfg,
+		},
+	}
 
-	assert.Equal(t, "discovered/file watcher", jobLogSource(cfg))
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := confgroup.Config{}
+			cfg.SetSourceType(tc.sourceType)
+			cfg.SetProvider(tc.provider)
+
+			assert.Equal(t, tc.want, jobLogSource(cfg))
+		})
+	}
 }

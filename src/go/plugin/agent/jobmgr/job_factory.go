@@ -22,7 +22,12 @@ import (
 )
 
 func jobLogSource(cfg confgroup.Config) string {
-	return fmt.Sprintf("%s/%s", cfg.SourceType(), cfg.Provider())
+	sourceType := cfg.SourceType()
+	provider := cfg.Provider()
+	if sourceType != "" && sourceType == provider {
+		return sourceType
+	}
+	return fmt.Sprintf("%s/%s", sourceType, provider)
 }
 
 // jobFactory builds runtime jobs from configs without mutating manager-owned runtime maps.
