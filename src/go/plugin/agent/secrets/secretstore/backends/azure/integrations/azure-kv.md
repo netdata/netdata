@@ -79,6 +79,7 @@ The following options can be defined for this secretstore backend.
 |  | mode_service_principal.client_id | Azure application / service principal client ID. Required when `mode` is `service_principal`. |  | yes |
 |  | mode_service_principal.client_secret | Azure application / service principal client secret. Required when `mode` is `service_principal`. |  | yes |
 | **Managed Identity** | mode_managed_identity.client_id | Optional client ID of a user-assigned managed identity when `mode` is `managed_identity`. Leave it empty for the system-assigned identity. |  | no |
+|  | timeout | Timeout in seconds for HTTP requests made by this secretstore backend. | 3 | no |
 
 <a id="option-mode"></a>
 ##### mode
