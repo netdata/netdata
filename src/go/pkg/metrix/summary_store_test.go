@@ -195,7 +195,7 @@ func TestSummaryStoreScenarios(t *testing.T) {
 					WithSummaryReservoirSize(8),
 				)
 				cc.BeginCycle()
-				for i := 0; i < 100; i++ {
+				for i := range 100 {
 					sum.Observe(SampleValue(i))
 				}
 				cc.CommitCycleSuccess()

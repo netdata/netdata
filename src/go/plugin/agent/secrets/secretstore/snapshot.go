@@ -2,6 +2,8 @@
 
 package secretstore
 
+import "maps"
+
 import "time"
 
 type publishedRecord struct {
@@ -55,8 +57,6 @@ func clonePublishedRecords(in map[string]publishedRecord) map[string]publishedRe
 		return map[string]publishedRecord{}
 	}
 	out := make(map[string]publishedRecord, len(in))
-	for id, store := range in {
-		out[id] = store
-	}
+	maps.Copy(out, in)
 	return out
 }

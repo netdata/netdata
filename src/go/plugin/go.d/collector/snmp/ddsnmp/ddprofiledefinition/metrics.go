@@ -48,10 +48,10 @@ type MetricsConfig struct {
 	MIB string `yaml:"MIB,omitempty" json:"MIB,omitempty"`
 
 	// Symbol configs
-	Symbol SymbolConfig `yaml:"symbol,omitempty" json:"symbol,omitempty"`
+	Symbol SymbolConfig `yaml:"symbol,omitempty" json:"symbol"`
 
 	// Table the table OID
-	Table SymbolConfig `yaml:"table,omitempty" json:"table,omitempty"`
+	Table SymbolConfig `yaml:"table,omitempty" json:"table"`
 	// Table configs
 	Symbols []SymbolConfig `yaml:"symbols,omitempty" json:"symbols,omitempty"`
 
@@ -59,7 +59,7 @@ type MetricsConfig struct {
 	StaticTags []StaticMetricTagConfig `yaml:"static_tags,omitempty" json:"-"`
 	MetricTags MetricTagConfigList     `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
 
-	Options MetricsConfigOption `yaml:"options,omitempty" json:"options,omitempty"`
+	Options MetricsConfigOption `yaml:"options,omitempty" json:"options"`
 
 	// DEPRECATED: Use .Symbol instead
 	OID string `yaml:"OID,omitempty" json:"OID,omitempty" jsonschema:"-"`
@@ -135,7 +135,7 @@ type SymbolConfig struct {
 	//   Deprecated types: `counter` (use `rate` instead), percent (use `scale_factor` instead)
 	MetricType ProfileMetricType `yaml:"metric_type,omitempty" json:"metric_type,omitempty"`
 
-	ChartMeta ChartMeta `yaml:"chart_meta,omitempty" json:"chart_meta,omitempty"`
+	ChartMeta ChartMeta `yaml:"chart_meta,omitempty" json:"chart_meta"`
 
 	Mapping           map[string]string  `yaml:"mapping,omitempty" json:"mapping,omitempty"`
 	Transform         string             `yaml:"transform,omitempty" json:"transform,omitempty"`
@@ -174,7 +174,7 @@ type MetricTagConfig struct {
 	// set .Tag to specify the tag name. If a serialized Symbol is a string
 	// instead of an object, it will be treated like {name: <value>}; this use
 	// pattern is deprecated
-	Symbol SymbolConfigCompat `yaml:"symbol,omitempty" json:"symbol,omitempty"`
+	Symbol SymbolConfigCompat `yaml:"symbol,omitempty" json:"symbol"`
 
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
 

@@ -1018,7 +1018,7 @@ func TestSortProfilesBySpecificity_Stable(t *testing.T) {
 	profiles := make([]*Profile, numProfiles)
 	matchedOIDs := make(map[*Profile]string)
 
-	for i := 0; i < numProfiles; i++ {
+	for i := range numProfiles {
 		profiles[i] = &Profile{
 			SourceFile: fmt.Sprintf("profile-%03d.yaml", i),
 		}
@@ -1028,7 +1028,7 @@ func TestSortProfilesBySpecificity_Stable(t *testing.T) {
 	sortProfilesBySpecificity(profiles, matchedOIDs)
 
 	// Verify order is preserved (lexicographic due to same OID)
-	for i := 0; i < numProfiles; i++ {
+	for i := range numProfiles {
 		expected := fmt.Sprintf("profile-%03d.yaml", i)
 		assert.Equal(t, expected, profiles[i].SourceFile)
 	}

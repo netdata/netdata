@@ -139,9 +139,7 @@ func (s *jobV2HostState) commitSuccessfulEmission(plan chartengine.Plan, decisio
 		}
 	}
 
-	for chartID, meta := range createCharts {
-		s.cleanupCharts[chartID] = meta
-	}
+	maps.Copy(s.cleanupCharts, createCharts)
 	for chartID, meta := range dimensionOnlyCharts {
 		if _, ok := s.cleanupCharts[chartID]; ok {
 			continue

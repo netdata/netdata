@@ -113,9 +113,9 @@ func (c *Collector) establishConn() (memcachedConn, error) {
 
 func getStatKeyValue(line string) (string, string) {
 	line = strings.TrimPrefix(line, "STAT ")
-	i := strings.IndexByte(line, ' ')
-	if i < 0 {
+	before, after, ok := strings.Cut(line, " ")
+	if !ok {
 		return "", ""
 	}
-	return line[:i], line[i+1:]
+	return before, after
 }

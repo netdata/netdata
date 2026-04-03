@@ -5,6 +5,7 @@ package metricsaudit
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -418,9 +419,7 @@ func cloneIntMetrics(mx map[string]int64) map[string]int64 {
 		return map[string]int64{}
 	}
 	out := make(map[string]int64, len(mx))
-	for k, v := range mx {
-		out[k] = v
-	}
+	maps.Copy(out, mx)
 	return out
 }
 

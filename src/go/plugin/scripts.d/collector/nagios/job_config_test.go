@@ -32,7 +32,7 @@ func TestJobConfigValidate(t *testing.T) {
 		"arg_values over limit": {
 			cfg: func() JobConfig {
 				cfg := JobConfig{Name: "sample", Plugin: "/bin/true"}
-				for i := 0; i < maxArgMacros+1; i++ {
+				for range maxArgMacros + 1 {
 					cfg.ArgValues = append(cfg.ArgValues, "value")
 				}
 				return cfg

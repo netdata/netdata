@@ -137,8 +137,8 @@ func (c *Collector) getNodesStats(mfs prometheus.MetricFamilies) map[string]*nod
 func (c *Collector) getMetricNamespace(mfs prometheus.MetricFamilies) (string, error) {
 	want := metricPUBLISHError
 	for _, mf := range mfs {
-		if strings.HasSuffix(mf.Name(), want) {
-			s := strings.TrimSuffix(mf.Name(), want)
+		if before, ok := strings.CutSuffix(mf.Name(), want); ok {
+			s := before
 			s = strings.TrimSuffix(s, "_")
 			return s, nil
 		}
@@ -152,9 +152,10 @@ func isSchedulerUtilizationMetric(name string) bool {
 }
 
 func join(a, b string, rest ...string) string {
-	s := a + "_" + b
+	var s strings.Builder
+	s.WriteString(a + "_" + b)
 	for _, v := range rest {
-		s += "_" + v
+		s.WriteString("_" + v)
 	}
-	return s
+	return s.String()
 }

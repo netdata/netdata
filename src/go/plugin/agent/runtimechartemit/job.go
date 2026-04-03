@@ -378,9 +378,7 @@ func applyEffectiveChartSet(known map[string]chartengine.ChartMeta, plan charten
 			delete(out, v.ChartID)
 		}
 	}
-	for chartID, meta := range createCharts {
-		out[chartID] = meta
-	}
+	maps.Copy(out, createCharts)
 	for chartID, meta := range dimensionOnlyCharts {
 		if _, ok := out[chartID]; ok {
 			continue

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"strconv"
 	"strings"
 	"sync"
@@ -620,9 +621,7 @@ func (m *Manager) snapshotFunction(name string) (functionSnapshot, bool) {
 		snap.direct = fs.direct
 		if len(fs.prefixes) > 0 {
 			snap.prefixes = make(map[string]func(Function), len(fs.prefixes))
-			for prefix, handler := range fs.prefixes {
-				snap.prefixes[prefix] = handler
-			}
+			maps.Copy(snap.prefixes, fs.prefixes)
 		}
 	}
 	m.mux.Unlock()

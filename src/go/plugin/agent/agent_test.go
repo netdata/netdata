@@ -137,8 +137,7 @@ func TestAgent_Run(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 
-	wg.Add(1)
-	go func() { defer wg.Done(); a.run(ctx) }()
+	wg.Go(func() { ; a.run(ctx) })
 
 	time.Sleep(time.Second * 2)
 	cancel()
@@ -160,7 +159,6 @@ func TestAgent_Run(t *testing.T) {
 func prepareRegistry(mux *sync.Mutex, stats map[string]int, names ...string) collectorapi.Registry {
 	reg := collectorapi.Registry{}
 	for _, name := range names {
-		name := name
 		reg.Register(name, collectorapi.Creator{
 			Create: func() collectorapi.CollectorV1 {
 				return prepareMockModule(name, mux, stats)

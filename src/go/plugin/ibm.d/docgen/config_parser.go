@@ -22,7 +22,7 @@ import (
 
 // parseConfigFromGoFile parses a Go config file to extract configuration fields
 // and the defaults supplied by defaultConfig().
-func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, map[string]interface{}, error) {
+func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, map[string]any, error) {
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, g.ConfigFile, nil, parser.ParseComments)
 	if err != nil {
@@ -502,8 +502,8 @@ func parseUIOptions(tag string) map[string]string {
 	if tag == "" {
 		return result
 	}
-	parts := strings.Split(tag, ",")
-	for _, part := range parts {
+	parts := strings.SplitSeq(tag, ",")
+	for part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
@@ -558,7 +558,7 @@ func toStringSlice(values []confopt.AutoBool) []string {
 	return result
 }
 
-func normalizeDefaultValue(field ConfigField, value interface{}) interface{} {
+func normalizeDefaultValue(field ConfigField, value any) any {
 	if !isAutoBoolType(field.GoType) {
 		return value
 	}
@@ -599,7 +599,7 @@ func normalizeAutoBoolLiteral(value string) string {
 
 // parseDefaultsFromInitFile parses init.go to find the defaultConfig() function
 // and extract default values from the returned Config struct
-func (g *DocGenerator) parseDefaultsFromInitFile() map[string]interface{} {
+func (g *DocGenerator) parseDefaultsFromInitFile() map[string]any {
 	// Construct path to init.go
 	dir := filepath.Dir(g.ConfigFile)
 	initFile := filepath.Join(dir, "init.go")
@@ -617,7 +617,7 @@ func (g *DocGenerator) parseDefaultsFromInitFile() map[string]interface{} {
 		return nil
 	}
 
-	defaults := make(map[string]interface{})
+	defaults := make(map[string]any)
 	foundDefaultConfig := false
 
 	// Find the defaultConfig function
@@ -665,7 +665,7 @@ func (g *DocGenerator) parseDefaultsFromInitFile() map[string]interface{} {
 }
 
 // extractDefaultsFromLiteral extracts field values from a Config{} literal
-func (g *DocGenerator) extractDefaultsFromLiteral(lit *ast.CompositeLit, defaults map[string]interface{}) {
+func (g *DocGenerator) extractDefaultsFromLiteral(lit *ast.CompositeLit, defaults map[string]any) {
 	for _, elt := range lit.Elts {
 		if kv, ok := elt.(*ast.KeyValueExpr); ok {
 			if ident, ok := kv.Key.(*ast.Ident); ok {
@@ -673,7 +673,7 @@ func (g *DocGenerator) extractDefaultsFromLiteral(lit *ast.CompositeLit, default
 				switch val := kv.Value.(type) {
 				case *ast.CompositeLit:
 					if isArrayLiteral(val) {
-						values := make([]interface{}, 0, len(val.Elts))
+						values := make([]any, 0, len(val.Elts))
 						for _, elt := range val.Elts {
 							if value := g.extractValue(elt); value != nil {
 								values = append(values, value)
@@ -682,7 +682,7 @@ func (g *DocGenerator) extractDefaultsFromLiteral(lit *ast.CompositeLit, default
 						defaults[fieldName] = values
 						continue
 					}
-					nested := make(map[string]interface{})
+					nested := make(map[string]any)
 					g.extractDefaultsFromLiteral(val, nested)
 					// Flatten nested composite literals for embedded configs such as framework.Config.
 					if fieldName == "Config" {
@@ -711,7 +711,7 @@ func (g *DocGenerator) extractDefaultsFromLiteral(lit *ast.CompositeLit, default
 }
 
 // extractValue converts an AST expression to a Go value
-func (g *DocGenerator) extractValue(expr ast.Expr) interface{} {
+func (g *DocGenerator) extractValue(expr ast.Expr) any {
 	switch v := expr.(type) {
 	case *ast.BasicLit:
 		switch v.Kind {
@@ -810,8 +810,8 @@ func isArrayLiteral(lit *ast.CompositeLit) bool {
 	return false
 }
 
-func (g *DocGenerator) extractConstValues(file *ast.File) map[string]interface{} {
-	consts := make(map[string]interface{})
+func (g *DocGenerator) extractConstValues(file *ast.File) map[string]any {
+	consts := make(map[string]any)
 	if file == nil {
 		return consts
 	}
@@ -833,7 +833,7 @@ func (g *DocGenerator) extractConstValues(file *ast.File) map[string]interface{}
 				if name == nil || name.Name == "_" {
 					continue
 				}
-				var value interface{}
+				var value any
 				if len(vs.Values) > i {
 					value = g.extractValue(vs.Values[i])
 				} else if len(vs.Values) > 0 {
@@ -850,7 +850,7 @@ func (g *DocGenerator) extractConstValues(file *ast.File) map[string]interface{}
 	return consts
 }
 
-func evalBinaryExpr(op token.Token, left, right interface{}) (interface{}, bool) {
+func evalBinaryExpr(op token.Token, left, right any) (any, bool) {
 	if li, lok := toInt64(left); lok {
 		if ri, rok := toInt64(right); rok {
 			switch op {
@@ -906,7 +906,7 @@ func evalBinaryExpr(op token.Token, left, right interface{}) (interface{}, bool)
 	return res, true
 }
 
-func toInt64(v interface{}) (int64, bool) {
+func toInt64(v any) (int64, bool) {
 	switch val := v.(type) {
 	case int:
 		return int64(val), true
@@ -939,7 +939,7 @@ func toInt64(v interface{}) (int64, bool) {
 	return 0, false
 }
 
-func toFloat64(v interface{}) (float64, bool) {
+func toFloat64(v any) (float64, bool) {
 	switch val := v.(type) {
 	case int:
 		return float64(val), true

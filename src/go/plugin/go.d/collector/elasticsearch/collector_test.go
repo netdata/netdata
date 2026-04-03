@@ -633,7 +633,7 @@ func TestCollector_Collect(t *testing.T) {
 			defer cleanup()
 
 			var mx map[string]int64
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				mx = collr.Collect(context.Background())
 			}
 

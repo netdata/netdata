@@ -37,7 +37,7 @@ func init() {
 }
 
 func main() {
-	_, _ = maxprocs.Set(maxprocs.Logger(func(string, ...interface{}) {}))
+	_, _ = maxprocs.Set(maxprocs.Logger(func(string, ...any) {}))
 
 	opts := parseCLI()
 

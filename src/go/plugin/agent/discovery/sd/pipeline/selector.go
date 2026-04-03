@@ -66,7 +66,7 @@ func parseSelector(line string) (sr selector, err error) {
 
 func parseOrSelectorWord(orWord string) (sr selector, err error) {
 	var srs []selector
-	for _, word := range strings.Split(orWord, "|") {
+	for word := range strings.SplitSeq(orWord, "|") {
 		if sr, err = parseSingleSelectorWord(word); err != nil {
 			return nil, err
 		}

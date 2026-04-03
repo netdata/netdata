@@ -3,6 +3,7 @@
 package dnsdist
 
 import (
+	"maps"
 	"net/url"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
@@ -26,9 +27,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 }
 
 func (c *Collector) collectStatistic(collected map[string]int64, statistics *statisticMetrics) {
-	for metric, value := range stm.ToMap(statistics) {
-		collected[metric] = value
-	}
+	maps.Copy(collected, stm.ToMap(statistics))
 }
 
 func (c *Collector) scrapeStatistics() (*statisticMetrics, error) {

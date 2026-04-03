@@ -5,6 +5,7 @@ package typesense
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 
@@ -108,9 +109,7 @@ func (c *Collector) collectStats(mx map[string]int64) error {
 
 	c.once.Do(c.addStatsCharts)
 
-	for k, v := range stm.ToMap(resp) {
-		mx[k] = v
-	}
+	maps.Copy(mx, stm.ToMap(resp))
 
 	return nil
 }

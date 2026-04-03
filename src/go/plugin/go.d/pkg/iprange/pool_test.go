@@ -460,7 +460,7 @@ func TestPool_Ranges(t *testing.T) {
 func BenchmarkPool_Contains(b *testing.B) {
 	// Create a pool with multiple ranges
 	pool := NewPool()
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		start := fmt.Sprintf("192.0.%d.0", i)
 		end := fmt.Sprintf("192.0.%d.255", i)
 		r, _ := ParseRange(fmt.Sprintf("%s-%s", start, end))

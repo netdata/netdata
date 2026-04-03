@@ -78,7 +78,6 @@ func (c *Collector) collectSamples(updateJitterState bool) []hostSample {
 	)
 
 	for _, host := range c.Hosts {
-		host := host
 		wg.Go(func() {
 			stats, err := c.prober.Ping(host)
 			if err != nil {

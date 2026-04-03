@@ -166,11 +166,11 @@ func TestManager_Run(t *testing.T) {
 func prepareMockDiscoverer(source string, groups, configs int) mockDiscoverer {
 	d := mockDiscoverer{}
 
-	for i := 0; i < groups; i++ {
+	for i := range groups {
 		group := confgroup.Group{
 			Source: fmt.Sprintf("%s_group_%d", source, i+1),
 		}
-		for j := 0; j < configs; j++ {
+		for j := range configs {
 			group.Configs = append(group.Configs,
 				confgroup.Config{"name": fmt.Sprintf("%s_group_%d_target_%d", source, i+1, j+1)})
 		}

@@ -251,10 +251,8 @@ func TestServiceConcurrentResolveAndMutation(t *testing.T) {
 	var wg sync.WaitGroup
 	errCh := make(chan error, 32)
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for i := 0; i < 100; i++ {
+	wg.Go(func() {
+		for range 100 {
 			snapshot := svc.Capture()
 			val, err := svc.Resolve(context.Background(), snapshot, "vault:vault_prod:secret/data/app#key", "${store:vault:vault_prod:secret/data/app#key}")
 			if err != nil {
@@ -266,12 +264,10 @@ func TestServiceConcurrentResolveAndMutation(t *testing.T) {
 				return
 			}
 		}
-	}()
+	})
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for i := 0; i < 100; i++ {
+	wg.Go(func() {
+		for i := range 100 {
 			updateCfg := baseCfg
 			if i%2 == 0 {
 				updateCfg.Auth = map[string]any{
@@ -284,7 +280,7 @@ func TestServiceConcurrentResolveAndMutation(t *testing.T) {
 				return
 			}
 		}
-	}()
+	})
 
 	wg.Wait()
 	close(errCh)
