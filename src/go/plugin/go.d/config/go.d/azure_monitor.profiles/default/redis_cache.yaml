@@ -1,6 +1,5 @@
 ---
-id: redis_cache
-name: Azure Cache for Redis
+display_name: Azure Cache for Redis
 resource_type: Microsoft.Cache/redis
 metrics:
   - id: cachehits

@@ -1,6 +1,5 @@
 ---
-id: storage_accounts
-name: Azure Storage Account
+display_name: Azure Storage Account
 resource_type: Microsoft.Storage/storageAccounts
 metrics:
   - id: availability

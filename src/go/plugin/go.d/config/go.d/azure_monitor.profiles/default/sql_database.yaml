@@ -1,6 +1,5 @@
 ---
-id: sql_database
-name: Azure SQL Database
+display_name: Azure SQL Database
 resource_type: Microsoft.Sql/servers/databases
 metrics:
   - id: cpu_percent

@@ -1,6 +1,5 @@
 ---
-id: stream_analytics
-name: Azure Stream Analytics Job
+display_name: Azure Stream Analytics Job
 resource_type: Microsoft.StreamAnalytics/streamingjobs
 metrics:
   - id: input_events

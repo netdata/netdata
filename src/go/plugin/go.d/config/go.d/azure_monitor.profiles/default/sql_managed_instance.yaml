@@ -1,6 +1,5 @@
 ---
-id: sql_managed_instance
-name: Azure SQL Managed Instance
+display_name: Azure SQL Managed Instance
 resource_type: Microsoft.Sql/managedInstances
 metrics:
   - id: avg_cpu_percent

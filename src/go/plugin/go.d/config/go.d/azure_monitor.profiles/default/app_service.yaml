@@ -1,6 +1,5 @@
 ---
-id: app_service
-name: Azure App Service
+display_name: Azure App Service
 resource_type: Microsoft.Web/sites
 metrics:
   - id: requests

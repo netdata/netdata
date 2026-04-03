@@ -1,6 +1,5 @@
 ---
-id: express_route_circuit
-name: Azure ExpressRoute Circuit
+display_name: Azure ExpressRoute Circuit
 resource_type: Microsoft.Network/expressRouteCircuits
 metrics:
   - id: arp_availability

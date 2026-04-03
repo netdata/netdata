@@ -1,6 +1,5 @@
 ---
-id: log_analytics
-name: Azure Log Analytics Workspace
+display_name: Azure Log Analytics Workspace
 resource_type: Microsoft.OperationalInsights/workspaces
 metrics:
   - id: availability_rate_query

@@ -1,6 +1,5 @@
 ---
-id: front_door
-name: Azure Front Door
+display_name: Azure Front Door
 resource_type: Microsoft.Cdn/profiles
 metrics:
   - id: total_latency

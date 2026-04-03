@@ -1,6 +1,5 @@
 ---
-id: synapse
-name: Azure Synapse Analytics Workspace
+display_name: Azure Synapse Analytics Workspace
 resource_type: Microsoft.Synapse/workspaces
 metrics:
   - id: builtin_sql_pool_data_processed_bytes

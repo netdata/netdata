@@ -1,6 +1,5 @@
 ---
-id: data_explorer
-name: Azure Data Explorer Cluster
+display_name: Azure Data Explorer Cluster
 resource_type: Microsoft.Kusto/clusters
 metrics:
   - id: cpu

@@ -1,6 +1,5 @@
 ---
-id: container_registry
-name: Azure Container Registry
+display_name: Azure Container Registry
 resource_type: Microsoft.ContainerRegistry/registries
 metrics:
   - id: storage_used

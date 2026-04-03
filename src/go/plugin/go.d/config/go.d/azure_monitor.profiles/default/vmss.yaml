@@ -1,6 +1,5 @@
 ---
-id: vmss
-name: Azure Virtual Machine Scale Set
+display_name: Azure Virtual Machine Scale Set
 resource_type: Microsoft.Compute/virtualMachineScaleSets
 metrics:
   - id: percentage_cpu

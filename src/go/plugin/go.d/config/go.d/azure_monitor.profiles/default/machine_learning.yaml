@@ -1,6 +1,5 @@
 ---
-id: machine_learning
-name: Azure Machine Learning Workspace
+display_name: Azure Machine Learning Workspace
 resource_type: Microsoft.MachineLearningServices/workspaces
 metrics:
   - id: agents
