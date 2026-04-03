@@ -197,7 +197,7 @@ export DISABLE_TELEMETRY=1
 
 :::note
 
-You can also use `DO_NOT_TRACK=1` as an alternative to `DISABLE_TELEMETRY=1`. Netdata supports the `DO_NOT_TRACK` environment variable as a generic opt-out mechanism for telemetry.
+You can also use `DO_NOT_TRACK=1` as an alternative to `DISABLE_TELEMETRY=1` when using Netdata installer scripts.
 
 :::
 
