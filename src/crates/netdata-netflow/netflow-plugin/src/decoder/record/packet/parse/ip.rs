@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn ipv4_record_rejects_total_length_shorter_than_header() {
-        let mut packet = vec![0_u8; 20];
+        let mut packet = vec![0_u8; 24];
         packet[0] = 0x46;
         packet[2] = 0;
         packet[3] = 20;
