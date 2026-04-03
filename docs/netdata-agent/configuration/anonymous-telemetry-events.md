@@ -223,7 +223,11 @@ To confirm that telemetry is disabled:
 1. Check that the `.opt-out-from-anonymous-statistics` file exists in your config directory, **OR**
 2. Verify that either the `DISABLE_TELEMETRY` or `DO_NOT_TRACK` environment variable is set
 
-The Agent dashboard will no longer send PostHog events, and the backend statistics script will not execute.
+:::note 
+
+If you used `DO_NOT_TRACK=1` with Docker or a Netdata installer script, confirm that it resulted in the `.opt-out-from-anonymous-statistics` file being created. The Agent dashboard will no longer send PostHog events, and the backend statistics script will not execute.
+
+:::
 
 ## Related documentation
 
