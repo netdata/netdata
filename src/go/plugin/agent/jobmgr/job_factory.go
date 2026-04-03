@@ -21,6 +21,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
+func jobLogSource(cfg confgroup.Config) string {
+	return fmt.Sprintf("%s/%s", cfg.SourceType(), cfg.Provider())
+}
+
 // jobFactory builds runtime jobs from configs without mutating manager-owned runtime maps.
 type jobFactory struct {
 	logger *logger.Logger
@@ -125,6 +129,7 @@ func (f *jobFactory) createV2(cfg confgroup.Config, creator collectorapi.Creator
 		Name:            cfg.Name(),
 		ModuleName:      cfg.Module(),
 		FullName:        cfg.FullName(),
+		Source:          jobLogSource(cfg),
 		UpdateEvery:     cfg.UpdateEvery(),
 		AutoDetectEvery: cfg.AutoDetectionRetry(),
 		IsStock:         cfg.SourceType() == "stock",
@@ -172,6 +177,7 @@ func (f *jobFactory) createV1(cfg confgroup.Config, creator collectorapi.Creator
 		Name:            cfg.Name(),
 		ModuleName:      cfg.Module(),
 		FullName:        cfg.FullName(),
+		Source:          jobLogSource(cfg),
 		UpdateEvery:     cfg.UpdateEvery(),
 		AutoDetectEvery: cfg.AutoDetectionRetry(),
 		Priority:        cfg.Priority(),
