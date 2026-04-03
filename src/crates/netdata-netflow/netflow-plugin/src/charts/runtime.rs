@@ -109,11 +109,14 @@ pub(super) fn try_sample_open_tier_counts(
             });
 
             let guard = poisoned.into_inner();
-            Some((
+            let counts = (
                 guard.minute_1.len() as u64,
                 guard.minute_5.len() as u64,
                 guard.hour_1.len() as u64,
-            ))
+            );
+            drop(guard);
+            open_tiers.clear_poison();
+            Some(counts)
         }
     }
 }

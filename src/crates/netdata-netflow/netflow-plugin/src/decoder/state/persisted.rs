@@ -49,7 +49,9 @@ pub(crate) fn decode_persisted_namespace_file(
     }
 
     let expected_hash = u64::from_le_bytes(data[8..16].try_into().unwrap());
-    let payload_len = u64::from_le_bytes(data[16..24].try_into().unwrap()) as usize;
+    let payload_len = u64::from_le_bytes(data[16..24].try_into().unwrap());
+    let payload_len = usize::try_from(payload_len)
+        .map_err(|_| "decoder namespace payload length overflows usize".to_string())?;
     let payload = &data[DECODER_STATE_HEADER_LEN..];
     if payload.len() != payload_len {
         return Err(format!(

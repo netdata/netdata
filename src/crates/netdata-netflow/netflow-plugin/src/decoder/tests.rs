@@ -2841,6 +2841,18 @@ fn persisted_decoder_state_rejects_truncated_header() {
     assert!(err.contains("truncated decoder namespace state header"));
 }
 
+#[cfg(target_pointer_width = "32")]
+#[test]
+fn persisted_decoder_state_rejects_payload_length_that_overflows_usize() {
+    let (_key, mut persisted) = sample_persisted_namespace_bytes();
+    let overflowing_payload_len = u64::from(u32::MAX) + 1;
+    persisted[16..24].copy_from_slice(&overflowing_payload_len.to_le_bytes());
+
+    let err = decode_persisted_namespace_file(&persisted)
+        .expect_err("expected payload length usize overflow failure");
+    assert!(err.contains("payload length overflows usize"));
+}
+
 #[test]
 fn persisted_decoder_state_rejects_corrupt_payload_with_valid_hash() {
     let (key, _) = sample_persisted_namespace_bytes();

@@ -1,15 +1,23 @@
 use super::*;
 
 pub(crate) fn append_unique_flows(dst: &mut Vec<DecodedFlow>, incoming: Vec<DecodedFlow>) {
-    if incoming.is_empty() {
+    let incoming_len = incoming.len();
+    if incoming_len == 0 {
         return;
     }
 
-    // Build a hash index over existing flows for O(1) identity lookups instead of O(n) scans.
-    let mut identity_index: HashMap<u64, Vec<usize>> = HashMap::with_capacity(dst.len());
-    if dst.is_empty() {
-        dst.reserve(incoming.len());
+    if dst.is_empty() && incoming_len == 1 {
+        dst.extend(incoming);
+        return;
     }
+
+    dst.reserve(incoming_len);
+
+    // Build a hash index over existing flows for O(1) identity lookups instead of O(n) scans.
+    // The index also tracks flows appended from the current incoming batch so first-batch
+    // dedup/merge keeps working when dst starts empty.
+    let mut identity_index: HashMap<u64, Vec<usize>> =
+        HashMap::with_capacity(dst.len().saturating_add(incoming_len));
     for (idx, flow) in dst.iter().enumerate() {
         identity_index
             .entry(flow_identity_hash(flow))

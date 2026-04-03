@@ -109,3 +109,34 @@ fn sample_open_tier_counts_reuses_previous_lengths_when_write_lock_is_contended(
 
     assert_eq!(sample_open_tier_counts(&state, (7, 8, 9)), (7, 8, 9));
 }
+
+#[test]
+fn try_sample_open_tier_counts_recovers_from_poison_and_clears_poisoned_state() {
+    let state = Arc::new(RwLock::new(OpenTierState {
+        generation: 1,
+        minute_1: vec![OpenTierRow {
+            timestamp_usec: 1,
+            flow_ref: TierFlowRef {
+                hour_start_usec: 1,
+                flow_id: 1,
+            },
+            metrics: FlowMetrics::default(),
+        }],
+        minute_5: Vec::new(),
+        hour_1: Vec::new(),
+    }));
+
+    let poisoned_state = Arc::clone(&state);
+    let join = std::thread::spawn(move || {
+        let _guard = poisoned_state.write().expect("take write lock");
+        panic!("poison open tier state");
+    });
+    assert!(join.join().is_err(), "writer thread should panic");
+    assert!(state.is_poisoned(), "lock should be poisoned after panic");
+
+    assert_eq!(try_sample_open_tier_counts(state.as_ref()), Some((1, 0, 0)));
+    assert!(
+        !state.is_poisoned(),
+        "successful recovery should clear the poison flag"
+    );
+}
