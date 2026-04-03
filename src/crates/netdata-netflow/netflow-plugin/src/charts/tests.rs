@@ -101,3 +101,11 @@ fn try_sample_open_tier_counts_skips_when_write_lock_is_contended() {
 
     assert_eq!(try_sample_open_tier_counts(&state), None);
 }
+
+#[test]
+fn sample_open_tier_counts_reuses_previous_lengths_when_write_lock_is_contended() {
+    let state = RwLock::new(OpenTierState::default());
+    let _guard = state.write().expect("take write lock");
+
+    assert_eq!(sample_open_tier_counts(&state, (7, 8, 9)), (7, 8, 9));
+}

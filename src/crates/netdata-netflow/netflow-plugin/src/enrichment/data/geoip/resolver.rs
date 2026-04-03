@@ -87,9 +87,8 @@ impl GeoIpResolver {
                     return;
                 }
             };
-        self.last_reload_check = Instant::now();
-
         if next_signature == self.signature {
+            self.last_reload_check = Instant::now();
             return;
         }
 
@@ -106,6 +105,7 @@ impl GeoIpResolver {
             ),
         ) {
             (Ok(asn_databases), Ok(geo_databases)) => {
+                self.last_reload_check = Instant::now();
                 self.asn_databases = asn_databases;
                 self.geo_databases = geo_databases;
                 self.signature = next_signature;
@@ -181,5 +181,30 @@ mod tests {
         assert!(!should_ignore_geoip_lookup_error(
             &maxminddb::MaxMindDBError::InvalidDatabaseError("broken".to_string())
         ));
+    }
+
+    #[test]
+    fn refresh_if_needed_keeps_retry_window_open_after_reader_reload_error() {
+        let dir = tempfile::tempdir().expect("create tempdir");
+        let asn_path = dir.path().join("broken-asn.mmdb");
+        std::fs::write(&asn_path, b"not-a-maxmind-database").expect("write invalid db");
+
+        let old_check = Instant::now() - GEOIP_RELOAD_CHECK_INTERVAL - Duration::from_secs(1);
+        let mut resolver = GeoIpResolver {
+            asn_paths: vec![asn_path.to_string_lossy().into_owned()],
+            geo_paths: Vec::new(),
+            optional: false,
+            asn_databases: Vec::new(),
+            geo_databases: Vec::new(),
+            signature: GeoIpDatabasesSignature {
+                asn: Vec::new(),
+                geo: Vec::new(),
+            },
+            last_reload_check: old_check,
+        };
+
+        resolver.refresh_if_needed();
+
+        assert_eq!(resolver.last_reload_check, old_check);
     }
 }

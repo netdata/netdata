@@ -55,6 +55,8 @@ impl FlowEnricher {
             && network_sources_runtime.is_none()
             && exporter_classifiers.is_empty()
             && interface_classifiers.is_empty()
+            && config.asn_providers.is_empty()
+            && config.net_providers.is_empty()
             && static_routing.is_empty()
             && dynamic_routing.is_none()
         {

@@ -16,6 +16,18 @@ fn enricher_is_disabled_when_configuration_is_empty() {
 }
 
 #[test]
+fn enricher_stays_enabled_for_provider_only_configuration() {
+    let cfg = EnrichmentConfig {
+        asn_providers: vec![AsnProviderConfig::Flow],
+        ..Default::default()
+    };
+
+    let enricher = FlowEnricher::from_config(&cfg).expect("build enricher");
+
+    assert!(enricher.is_some());
+}
+
+#[test]
 fn static_sampling_override_uses_most_specific_prefix() {
     let cfg = EnrichmentConfig {
         default_sampling_rate: Some(SamplingRateSetting::PerPrefix(BTreeMap::from([(

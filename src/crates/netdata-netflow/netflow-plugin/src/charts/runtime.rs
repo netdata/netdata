@@ -48,15 +48,15 @@ impl NetflowCharts {
     ) -> JoinHandle<()> {
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(1));
+            let mut open_tier_counts = (0, 0, 0);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
             loop {
                 tokio::select! {
                     _ = shutdown.cancelled() => break,
                     _ = interval.tick() => {
-                        let Some(open_tier_counts) = try_sample_open_tier_counts(open_tiers.as_ref()) else {
-                            continue;
-                        };
+                        open_tier_counts =
+                            sample_open_tier_counts(open_tiers.as_ref(), open_tier_counts);
                         let snapshot =
                             NetflowChartsSnapshot::collect(metrics.as_ref(), open_tier_counts);
                         self.apply_snapshot(snapshot);
@@ -116,4 +116,11 @@ pub(super) fn try_sample_open_tier_counts(
             ))
         }
     }
+}
+
+pub(super) fn sample_open_tier_counts(
+    open_tiers: &RwLock<OpenTierState>,
+    previous: (u64, u64, u64),
+) -> (u64, u64, u64) {
+    try_sample_open_tier_counts(open_tiers).unwrap_or(previous)
 }

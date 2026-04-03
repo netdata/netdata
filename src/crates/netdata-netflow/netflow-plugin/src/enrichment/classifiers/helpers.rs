@@ -75,6 +75,13 @@ pub(crate) fn format_with_percent_placeholders(
         out.push(ch);
     }
 
+    if arg_idx < args.len() {
+        anyhow::bail!(
+            "format pattern has {} unused arguments",
+            args.len() - arg_idx
+        );
+    }
+
     Ok(out)
 }
 
@@ -121,5 +128,19 @@ mod tests {
                 .unwrap_err();
 
         assert!(err.to_string().contains("missing argument"));
+    }
+
+    #[test]
+    fn format_with_percent_placeholders_rejects_unused_arguments() {
+        let err = format_with_percent_placeholders(
+            "asn-%s",
+            &[
+                ResolvedValue::String("edge".into()),
+                ResolvedValue::String("extra".into()),
+            ],
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains("unused arguments"));
     }
 }
