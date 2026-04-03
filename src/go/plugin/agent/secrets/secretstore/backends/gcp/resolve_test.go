@@ -24,7 +24,7 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func TestPublishedStoreResolve_LogsDetailedResolution(t *testing.T) {
 	s := &publishedStore{
-		provider: &provider{
+		runtime: &runtime{
 			apiClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				assert.Equal(t, "/v1/projects/my-project/secrets/my-secret/versions/latest:access", req.URL.Path)
 				return &http.Response{

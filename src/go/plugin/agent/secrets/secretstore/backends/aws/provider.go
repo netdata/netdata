@@ -8,16 +8,19 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
 
 //go:embed config_schema.json
 var configSchema string
 
+var defaultTimeout = confopt.Duration(3 * time.Second)
+
 type Config struct {
-	AuthMode string `json:"auth_mode" yaml:"auth_mode"`
-	Region   string `json:"region" yaml:"region"`
+	AuthMode string           `json:"auth_mode" yaml:"auth_mode"`
+	Region   string           `json:"region" yaml:"region"`
+	Timeout  confopt.Duration `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
 
 type credentials struct {
@@ -26,42 +29,36 @@ type credentials struct {
 	sessionToken    string
 }
 
-type provider struct {
+type runtime struct {
 	apiClient  *http.Client
 	imdsClient *http.Client
-	endpoint   string
-	now        func() time.Time
 }
 
 type store struct {
 	Config    `yaml:",inline" json:""`
-	provider  *provider
+	runtime   *runtime
 	published *publishedStore
 }
 
 type publishedStore struct {
-	provider    *provider
+	runtime     *runtime
 	mode        string
 	regionValue string
 }
 
 func New() secretstore.Creator {
-	p := &provider{
-		apiClient:  httpx.APIClient(10 * time.Second),
-		imdsClient: httpx.NoProxyClient(2 * time.Second),
-		now:        time.Now,
-	}
-
 	return secretstore.Creator{
 		Kind:        secretstore.KindAWSSM,
 		DisplayName: "AWS Secrets Manager",
 		Schema:      configSchema,
-		Create:      p.create,
+		Create: func() secretstore.Store {
+			return &store{
+				Config: Config{
+					Timeout: defaultTimeout,
+				},
+			}
+		},
 	}
-}
-
-func (p *provider) create() secretstore.Store {
-	return &store{provider: p}
 }
 
 func (s *store) Configuration() any { return &s.Config }

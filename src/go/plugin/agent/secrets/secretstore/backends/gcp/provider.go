@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
 
 var (
@@ -20,51 +20,48 @@ var (
 	reGCPSafeName      = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 )
 
+var defaultTimeout = confopt.Duration(3 * time.Second)
+
 type Config struct {
 	Mode                   string                        `json:"mode" yaml:"mode"`
 	ModeServiceAccountFile *ModeServiceAccountFileConfig `json:"mode_service_account_file,omitempty" yaml:"mode_service_account_file,omitempty"`
+	Timeout                confopt.Duration              `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
 
 type ModeServiceAccountFileConfig struct {
 	Path string `json:"path" yaml:"path"`
 }
 
-type provider struct {
+type runtime struct {
 	apiClient      *http.Client
 	metadataClient *http.Client
-	secretEndpoint string
-	now            func() time.Time
 }
 
 type store struct {
 	Config    `yaml:",inline" json:""`
-	provider  *provider
+	runtime   *runtime
 	published *publishedStore
 }
 
 type publishedStore struct {
-	provider               *provider
+	runtime                *runtime
 	mode                   string
 	serviceAccountFilePath string
 }
 
 func New() secretstore.Creator {
-	p := &provider{
-		apiClient:      httpx.APIClient(10 * time.Second),
-		metadataClient: httpx.NoProxyClient(2 * time.Second),
-		now:            time.Now,
-	}
-
 	return secretstore.Creator{
 		Kind:        secretstore.KindGCPSM,
 		DisplayName: "Google Secret Manager",
 		Schema:      configSchema,
-		Create:      p.create,
+		Create: func() secretstore.Store {
+			return &store{
+				Config: Config{
+					Timeout: defaultTimeout,
+				},
+			}
+		},
 	}
-}
-
-func (p *provider) create() secretstore.Store {
-	return &store{provider: p}
 }
 
 func (s *store) Configuration() any { return &s.Config }
