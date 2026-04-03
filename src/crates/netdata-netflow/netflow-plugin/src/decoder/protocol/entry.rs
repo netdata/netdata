@@ -161,8 +161,9 @@ pub(crate) fn decode_netflow(
         }
     }
 
-    append_unique_flows(&mut batch.flows, raw_v9_flows);
-    append_unique_flows(&mut batch.flows, raw_ipfix_flows);
+    let mut raw_flows = raw_v9_flows;
+    raw_flows.extend(raw_ipfix_flows);
+    append_unique_flows(&mut batch.flows, raw_flows);
 
     batch
 }

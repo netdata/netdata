@@ -55,43 +55,43 @@ impl NetworkAttributes {
     pub(crate) fn merge_from(&mut self, overlay: &Self) {
         if overlay.asn != 0 {
             self.asn = overlay.asn;
-            self.asn_name = overlay.asn_name.clone();
+            self.asn_name.clone_from(&overlay.asn_name);
         }
         if overlay.asn == 0 && !overlay.asn_name.is_empty() {
-            self.asn_name = overlay.asn_name.clone();
+            self.asn_name.clone_from(&overlay.asn_name);
         }
         if !overlay.ip_class.is_empty() {
-            self.ip_class = overlay.ip_class.clone();
+            self.ip_class.clone_from(&overlay.ip_class);
         }
         if !overlay.name.is_empty() {
-            self.name = overlay.name.clone();
+            self.name.clone_from(&overlay.name);
         }
         if !overlay.role.is_empty() {
-            self.role = overlay.role.clone();
+            self.role.clone_from(&overlay.role);
         }
         if !overlay.site.is_empty() {
-            self.site = overlay.site.clone();
+            self.site.clone_from(&overlay.site);
         }
         if !overlay.region.is_empty() {
-            self.region = overlay.region.clone();
+            self.region.clone_from(&overlay.region);
         }
         if !overlay.country.is_empty() {
-            self.country = overlay.country.clone();
+            self.country.clone_from(&overlay.country);
         }
         if !overlay.state.is_empty() {
-            self.state = overlay.state.clone();
+            self.state.clone_from(&overlay.state);
         }
         if !overlay.city.is_empty() {
-            self.city = overlay.city.clone();
+            self.city.clone_from(&overlay.city);
         }
         if !overlay.latitude.is_empty() {
-            self.latitude = overlay.latitude.clone();
+            self.latitude.clone_from(&overlay.latitude);
         }
         if !overlay.longitude.is_empty() {
-            self.longitude = overlay.longitude.clone();
+            self.longitude.clone_from(&overlay.longitude);
         }
         if !overlay.tenant.is_empty() {
-            self.tenant = overlay.tenant.clone();
+            self.tenant.clone_from(&overlay.tenant);
         }
     }
 }

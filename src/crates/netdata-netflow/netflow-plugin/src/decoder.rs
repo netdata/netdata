@@ -33,10 +33,12 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::time::{SystemTime, UNIX_EPOCH};
 use twox_hash::XxHash64;
 
+mod common;
 mod protocol;
 mod record;
 mod state;
 
+pub(crate) use common::*;
 pub(crate) use protocol::*;
 pub(crate) use record::*;
 pub(crate) use state::*;
