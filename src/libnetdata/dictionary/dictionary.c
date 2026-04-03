@@ -691,8 +691,9 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     // after we've decided to force-free all items.
     // By destroying the index here, any concurrent dictionary_get_and_acquire_item()
     // that acquires the index lock after this point will find an empty index.
-    // hashtable_destroy_judy() is idempotent (checks JudyHSArray != NULL),
-    // so dictionary_free_all_resources() calling it again is safe.
+    // This uses hashtable_destroy_unsafe(); the later cleanup path in
+    // dictionary_free_all_resources() may invoke the same index teardown
+    // again, so this relies on that full destruction flow being safe to repeat.
     dictionary_index_lock_wrlock(dict);
     hashtable_destroy_unsafe(dict);
     dictionary_index_wrlock_unlock(dict);
