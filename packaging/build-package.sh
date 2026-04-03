@@ -20,10 +20,33 @@ SOURCE_DIR="$(dirname "$(dirname "${SCRIPT_SOURCE}")")"
 
 . /etc/os-release
 
-CMAKE_ARGS="-S ${SOURCE_DIR} -B ${BUILD_DIR}"
+# Keep one argument per line so POSIX sh preserves embedded spaces
+# without relying on arrays or eval.
+CMAKE_ARGS="-S
+${SOURCE_DIR}
+-B
+${BUILD_DIR}
+-G
+Ninja"
+
+add_cmake_arg() {
+    CMAKE_ARGS="${CMAKE_ARGS}
+${1}"
+}
 
 add_cmake_option() {
-    CMAKE_ARGS="${CMAKE_ARGS} -D${1}=${2}"
+    add_cmake_arg "-D${1}=${2}"
+}
+
+run_cmake() {
+    set --
+    while IFS= read -r arg; do
+        [ -n "${arg}" ] || continue
+        set -- "$@" "${arg}"
+    done <<EOF
+${CMAKE_ARGS}
+EOF
+    cmake "$@"
 }
 
 add_cmake_option CMAKE_BUILD_TYPE RelWithDebInfo
@@ -120,8 +143,7 @@ else
     add_cmake_option ENABLE_SENTRY Off
 fi
 
-# shellcheck disable=SC2086
-cmake ${CMAKE_ARGS} -G Ninja
+run_cmake
 cmake --build "${BUILD_DIR}" --parallel "$(nproc)" -- -k 1
 
 if [ "${ENABLE_SENTRY}" = "true" ] && [ "${UPLOAD_SENTRY}" = "true" ]; then

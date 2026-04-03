@@ -1,5 +1,7 @@
 use super::*;
 
+type IdentityIndexHasher = std::hash::BuildHasherDefault<twox_hash::XxHash64>;
+
 pub(crate) fn append_unique_flows(dst: &mut Vec<DecodedFlow>, incoming: Vec<DecodedFlow>) {
     let incoming_len = incoming.len();
     if incoming_len == 0 {
@@ -11,8 +13,11 @@ pub(crate) fn append_unique_flows(dst: &mut Vec<DecodedFlow>, incoming: Vec<Deco
     // Build a hash index over existing flows for O(1) identity lookups instead of O(n) scans.
     // The index also tracks flows appended from the current incoming batch so first-batch
     // dedup/merge keeps working when dst starts empty.
-    let mut identity_index: HashMap<u64, Vec<usize>> =
-        HashMap::with_capacity(dst.len().saturating_add(incoming_len));
+    let mut identity_index: HashMap<u64, Vec<usize>, IdentityIndexHasher> =
+        HashMap::with_capacity_and_hasher(
+            dst.len().saturating_add(incoming_len),
+            IdentityIndexHasher::default(),
+        );
     for (idx, flow) in dst.iter().enumerate() {
         identity_index
             .entry(flow_identity_hash(flow))
