@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
@@ -143,6 +144,14 @@ func (c *Collector) prepareInitConfig() (Config, azureprofiles.Catalog, error) {
 
 	if err := cfg.validate(); err != nil {
 		return Config{}, azureprofiles.Catalog{}, fmt.Errorf("config validation: %w", err)
+	}
+	cfg, ignoredTagPaths := sanitizeIgnoredProfileTagFilters(cfg)
+	if len(ignoredTagPaths) > 0 {
+		c.Warningf(
+			"ignoring profile tag filters in discovery.mode %q; encode per-profile tag filtering in discovery.mode_query.kql: %s",
+			discoveryModeQuery,
+			strings.Join(ignoredTagPaths, ", "),
+		)
 	}
 
 	return cfg, catalog, nil

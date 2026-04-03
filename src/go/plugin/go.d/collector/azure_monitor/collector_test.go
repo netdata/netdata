@@ -83,7 +83,7 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 	assert.True(t, hasModeCombined)
 }
 
-func TestConfigSchema_QueryModeDisallowsProfileTags(t *testing.T) {
+func TestConfigSchema_ProfileTagHelpText(t *testing.T) {
 	raw, err := os.ReadFile("config_schema.json")
 	require.NoError(t, err)
 
@@ -91,25 +91,7 @@ func TestConfigSchema_QueryModeDisallowsProfileTags(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &doc))
 
 	schema := requireMapField(t, doc, "jsonSchema")
-	allOf := requireArrayField(t, schema, "allOf")
-	require.NotEmpty(t, allOf)
-
-	restriction, ok := allOf[0].(map[string]any)
-	require.True(t, ok)
-	ifSchema := requireMapField(t, restriction, "if")
-	assert.ElementsMatch(t, []string{"discovery"}, requireStringSliceField(t, ifSchema, "required"))
-	thenProps := requireMapField(t, requireMapField(t, restriction, "then"), "properties")
-	profiles := requireMapField(t, thenProps, "profiles")
-	profileProps := requireMapField(t, profiles, "properties")
-
-	for _, mode := range []string{"mode_auto", "mode_exact", "mode_combined"} {
-		modeSchema := requireMapField(t, profileProps, mode)
-		entries := requireMapField(t, requireMapField(t, modeSchema, "properties"), "entries")
-		items := requireMapField(t, entries, "items")
-		filters := requireMapField(t, requireMapField(t, items, "properties"), "filters")
-		notSchema := requireMapField(t, filters, "not")
-		assert.ElementsMatch(t, []string{"tags"}, requireStringSliceField(t, notSchema, "required"))
-	}
+	assert.NotContains(t, schema, "allOf")
 
 	uiSchema := requireMapField(t, doc, "uiSchema")
 	uiProfiles := requireMapField(t, uiSchema, "profiles")
@@ -1605,7 +1587,7 @@ func TestConfig_ValidateDiscoveryContracts(t *testing.T) {
 			wantErr:        true,
 			wantErrContain: "'profiles.mode_exact.entries[0].name' must match",
 		},
-		"query mode rejects profile tag filters": {
+		"query mode ignores profile tag filters during validation": {
 			cfg: func() Config {
 				cfg := testConfig()
 				cfg.Discovery.Mode = discoveryModeQuery
@@ -1621,8 +1603,7 @@ func TestConfig_ValidateDiscoveryContracts(t *testing.T) {
 				}
 				return cfg
 			}(),
-			wantErr:        true,
-			wantErrContain: "'profiles.mode_exact.entries[0].filters.tags' is not supported when discovery.mode is 'query'",
+			wantErr: false,
 		},
 	}
 
@@ -1637,6 +1618,53 @@ func TestConfig_ValidateDiscoveryContracts(t *testing.T) {
 			assert.ErrorContains(t, err, tc.wantErrContain)
 		})
 	}
+}
+
+func TestSanitizeIgnoredProfileTagFilters(t *testing.T) {
+	cfg := testConfig()
+	cfg.Discovery.Mode = discoveryModeQuery
+	cfg.Discovery.ModeFilters = nil
+	cfg.Discovery.ModeQuery = &DiscoveryQueryConfig{KQL: "resources | project id, name, type, resourceGroup, location"}
+	cfg.Profiles.Mode = profilesModeExact
+	cfg.Profiles.ModeAuto = nil
+	cfg.Profiles.ModeCombined = nil
+	cfg.Profiles.ModeExact = &ProfilesModeConfig{
+		Entries: []ProfileEntryConfig{
+			{
+				Name: "postgres_flexible",
+				Filters: &ResourceFiltersConfig{
+					ResourceGroups: []string{"rg-a"},
+					Tags:           map[string][]string{"env": {"prod"}},
+				},
+			},
+			{
+				Name: "sql_database",
+				Filters: &ResourceFiltersConfig{
+					Tags: map[string][]string{"tier": {"critical"}},
+				},
+			},
+		},
+	}
+
+	sanitized, warnings := sanitizeIgnoredProfileTagFilters(cfg)
+
+	assert.Equal(t, []string{
+		"profiles.mode_exact.entries[0].filters.tags",
+		"profiles.mode_exact.entries[1].filters.tags",
+	}, warnings)
+	require.NotNil(t, sanitized.Profiles.ModeExact)
+	require.Len(t, sanitized.Profiles.ModeExact.Entries, 2)
+	require.NotNil(t, sanitized.Profiles.ModeExact.Entries[0].Filters)
+	assert.Equal(t, []string{"rg-a"}, sanitized.Profiles.ModeExact.Entries[0].Filters.ResourceGroups)
+	assert.Nil(t, sanitized.Profiles.ModeExact.Entries[0].Filters.Tags)
+	assert.Nil(t, sanitized.Profiles.ModeExact.Entries[1].Filters)
+
+	require.NotNil(t, cfg.Profiles.ModeExact)
+	require.Len(t, cfg.Profiles.ModeExact.Entries, 2)
+	require.NotNil(t, cfg.Profiles.ModeExact.Entries[0].Filters)
+	assert.Equal(t, map[string][]string{"env": {"prod"}}, cfg.Profiles.ModeExact.Entries[0].Filters.Tags)
+	require.NotNil(t, cfg.Profiles.ModeExact.Entries[1].Filters)
+	assert.Equal(t, map[string][]string{"tier": {"critical"}}, cfg.Profiles.ModeExact.Entries[1].Filters.Tags)
 }
 
 func TestMergeProfileIDs(t *testing.T) {

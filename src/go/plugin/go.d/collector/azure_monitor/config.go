@@ -176,10 +176,10 @@ func (c Config) validate() error {
 		errs = append(errs, err)
 	}
 
-	allowProfileTags := false
+	validateProfileTags := false
 	switch stringsLowerTrim(c.Discovery.Mode) {
 	case discoveryModeFilters:
-		allowProfileTags = true
+		validateProfileTags = true
 		errs = append(errs, validateResourceFilters("discovery.mode_filters", c.Discovery.ModeFilters, true)...)
 	case discoveryModeQuery:
 		if c.Discovery.ModeQuery == nil || strings.TrimSpace(c.Discovery.ModeQuery.KQL) == "" {
@@ -191,20 +191,20 @@ func (c Config) validate() error {
 
 	switch stringsLowerTrim(c.Profiles.Mode) {
 	case profilesModeAuto:
-		errs = append(errs, validateProfileEntries("profiles.mode_auto.entries", modeEntries(c.Profiles.ModeAuto), allowProfileTags)...)
+		errs = append(errs, validateProfileEntries("profiles.mode_auto.entries", modeEntries(c.Profiles.ModeAuto), validateProfileTags)...)
 	case profilesModeExact:
 		entries := modeEntries(c.Profiles.ModeExact)
 		if len(entries) == 0 {
 			errs = append(errs, fmt.Errorf("'profiles.mode_exact.entries' must not be empty when profiles.mode is '%s'", c.Profiles.Mode))
 		} else {
-			errs = append(errs, validateProfileEntries("profiles.mode_exact.entries", entries, allowProfileTags)...)
+			errs = append(errs, validateProfileEntries("profiles.mode_exact.entries", entries, validateProfileTags)...)
 		}
 	case profilesModeCombined:
 		entries := modeEntries(c.Profiles.ModeCombined)
 		if len(entries) == 0 {
 			errs = append(errs, fmt.Errorf("'profiles.mode_combined.entries' must not be empty when profiles.mode is '%s'", c.Profiles.Mode))
 		} else {
-			errs = append(errs, validateProfileEntries("profiles.mode_combined.entries", entries, allowProfileTags)...)
+			errs = append(errs, validateProfileEntries("profiles.mode_combined.entries", entries, validateProfileTags)...)
 		}
 	default:
 		errs = append(errs, fmt.Errorf("'profiles.mode' must be one of: %s, %s, %s",
@@ -214,7 +214,7 @@ func (c Config) validate() error {
 	return errors.Join(errs...)
 }
 
-func validateProfileEntries(path string, entries []ProfileEntryConfig, allowTags bool) []error {
+func validateProfileEntries(path string, entries []ProfileEntryConfig, validateTags bool) []error {
 	if len(entries) == 0 {
 		return nil
 	}
@@ -232,12 +232,12 @@ func validateProfileEntries(path string, entries []ProfileEntryConfig, allowTags
 			}
 			seen[name] = struct{}{}
 		}
-		errs = append(errs, validateResourceFilters(entryPath+".filters", entry.Filters, allowTags)...)
+		errs = append(errs, validateResourceFilters(entryPath+".filters", entry.Filters, validateTags)...)
 	}
 	return errs
 }
 
-func validateResourceFilters(path string, filters *ResourceFiltersConfig, allowTags bool) []error {
+func validateResourceFilters(path string, filters *ResourceFiltersConfig, validateTags bool) []error {
 	if filters == nil {
 		return nil
 	}
@@ -253,8 +253,7 @@ func validateResourceFilters(path string, filters *ResourceFiltersConfig, allowT
 			errs = append(errs, fmt.Errorf("'%s.regions[%d]' must not be empty", path, i))
 		}
 	}
-	if !allowTags && len(filters.Tags) > 0 {
-		errs = append(errs, fmt.Errorf("'%s.tags' is not supported when discovery.mode is '%s'", path, discoveryModeQuery))
+	if !validateTags && len(filters.Tags) > 0 {
 		return errs
 	}
 	for key, values := range filters.Tags {
@@ -273,6 +272,67 @@ func validateResourceFilters(path string, filters *ResourceFiltersConfig, allowT
 		}
 	}
 	return errs
+}
+
+func sanitizeIgnoredProfileTagFilters(cfg Config) (Config, []string) {
+	if stringsLowerTrim(cfg.Discovery.Mode) != discoveryModeQuery {
+		return cfg, nil
+	}
+
+	switch stringsLowerTrim(cfg.Profiles.Mode) {
+	case profilesModeAuto:
+		cfg.Profiles.ModeAuto = cloneProfilesModeConfig(cfg.Profiles.ModeAuto)
+		warnings := stripIgnoredProfileTagFilters("profiles.mode_auto.entries", cfg.Profiles.ModeAuto)
+		return cfg, warnings
+	case profilesModeExact:
+		cfg.Profiles.ModeExact = cloneProfilesModeConfig(cfg.Profiles.ModeExact)
+		warnings := stripIgnoredProfileTagFilters("profiles.mode_exact.entries", cfg.Profiles.ModeExact)
+		return cfg, warnings
+	case profilesModeCombined:
+		cfg.Profiles.ModeCombined = cloneProfilesModeConfig(cfg.Profiles.ModeCombined)
+		warnings := stripIgnoredProfileTagFilters("profiles.mode_combined.entries", cfg.Profiles.ModeCombined)
+		return cfg, warnings
+	default:
+		return cfg, nil
+	}
+}
+
+func cloneProfilesModeConfig(src *ProfilesModeConfig) *ProfilesModeConfig {
+	if src == nil {
+		return nil
+	}
+
+	out := &ProfilesModeConfig{
+		Entries: make([]ProfileEntryConfig, len(src.Entries)),
+	}
+	for i, entry := range src.Entries {
+		out.Entries[i] = ProfileEntryConfig{
+			Name:    entry.Name,
+			Filters: cloneResourceFilters(entry.Filters),
+		}
+	}
+	return out
+}
+
+func stripIgnoredProfileTagFilters(path string, cfg *ProfilesModeConfig) []string {
+	if cfg == nil {
+		return nil
+	}
+
+	var warnings []string
+	for i := range cfg.Entries {
+		filters := cfg.Entries[i].Filters
+		if filters == nil || len(filters.Tags) == 0 {
+			continue
+		}
+
+		warnings = append(warnings, fmt.Sprintf("%s[%d].filters.tags", path, i))
+		filters.Tags = nil
+		if len(filters.ResourceGroups) == 0 && len(filters.Regions) == 0 {
+			cfg.Entries[i].Filters = nil
+		}
+	}
+	return warnings
 }
 
 func modeEntries(cfg *ProfilesModeConfig) []ProfileEntryConfig {
