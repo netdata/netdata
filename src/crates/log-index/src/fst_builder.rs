@@ -279,6 +279,8 @@ fn build_high_card_chunks(
             entries.push((key, BitmapValue { desc, data }));
         }
 
+        entries.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+
         let raw = bincode::serde::encode_to_vec(&entries, bincode::config::standard())?;
         let packed = zstd::encode_all(&raw[..], 1)?;
         total_kb += packed.len() / 1024;

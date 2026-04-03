@@ -24,6 +24,17 @@ pub fn run(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     if let Ok(raw) = sfst.fields_raw() {
         print_section("FLDS", raw.len(), file_size);
         total_sections += raw.len();
+        let mut sorted_fields = fields.clone();
+        sorted_fields.sort_by(|a, b| a.cardinality.cmp(&b.cardinality));
+        let max_name = sorted_fields.iter().map(|f| f.name.len()).max().unwrap_or(0);
+        for f in &sorted_fields {
+            let tier = match f.tier {
+                FieldTier::Low => "low",
+                FieldTier::Mid => "mid",
+                FieldTier::High => "high",
+            };
+            println!("  {:<width$}  {:>6}  {tier}", f.name, f.cardinality, width = max_name);
+        }
     }
 
     // PRIM
