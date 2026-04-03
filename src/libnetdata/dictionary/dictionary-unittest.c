@@ -1089,6 +1089,12 @@ static void dict_destroy_race_child(int iterations) {
     for(int i = 0; i < iterations; i++) {
         DICTIONARY *dict = dictionary_create(DICT_OPTION_NONE);
         dictionary_set(dict, "key", "value", 6);
+        DICTIONARY_ITEM *held_item = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(dict, "key");
+
+        if(!held_item) {
+            dictionary_destroy(dict);
+            _exit(2);
+        }
 
         struct dict_destroy_race_data getter_data = { .dict = dict, .ready = 0, .stop = 0 };
         struct dict_destroy_race_data setter_data = { .dict = dict, .ready = 0, .stop = 0 };
@@ -1114,7 +1120,9 @@ static void dict_destroy_race_child(int iterations) {
             if(getter) nd_thread_join(getter);
             if(setter) nd_thread_join(setter);
             if(traverser) nd_thread_join(traverser);
+            dictionary_acquired_item_release(dict, held_item);
             dictionary_destroy(dict);
+            cleanup_destroyed_dictionaries(false);
             _exit(2);
         }
 
@@ -1126,7 +1134,9 @@ static void dict_destroy_race_child(int iterations) {
 
         tinysleep();
 
-        // destroy while all workers are in-flight
+        // Hold one acquired item so destruction takes the delayed path while
+        // workers are still active, instead of freeing the dictionary
+        // immediately out from under the test harness itself.
         dictionary_destroy(dict);
 
         __atomic_store_n(&getter_data.stop, 1, __ATOMIC_RELEASE);
@@ -1136,6 +1146,7 @@ static void dict_destroy_race_child(int iterations) {
         nd_thread_join(setter);
         nd_thread_join(traverser);
 
+        dictionary_acquired_item_release(dict, held_item);
         cleanup_destroyed_dictionaries(false);
     }
 }
