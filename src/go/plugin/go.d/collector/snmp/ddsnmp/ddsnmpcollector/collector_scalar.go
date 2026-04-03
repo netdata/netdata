@@ -68,9 +68,9 @@ func (sc *scalarCollector) identifyScalarOIDs(configs []ddprofiledefinition.Metr
 		oid := trimOID(cfg.Symbol.OID)
 		if sc.missingOIDs[oid] {
 			missingOIDs = append(missingOIDs, cfg.Symbol.OID)
-		} else {
-			oids = append(oids, cfg.Symbol.OID)
+			continue
 		}
+		oids = append(oids, cfg.Symbol.OID)
 
 		for _, tagCfg := range cfg.MetricTags {
 			if tagCfg.Symbol.OID == "" {

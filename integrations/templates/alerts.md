@@ -7,7 +7,7 @@ The following alerts are available:
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
 [% for alert in entry.alerts %]
-| [ [[ strfy(alert.name) ]] ]([[ strfy(alert.link) ]]) | [[ strfy(alert.metric) ]] | [[ strfy(alert.info) ]] |
+| [[ ("[" ~ strfy(alert.name) ~ "](" ~ strfy(alert.link) ~ ")") if alert.link else strfy(alert.name) ]] | [[ strfy(alert.metric) ]] | [[ strfy(alert.info) ]] |
 [% endfor %]
 [% else %]
 There are no alerts configured by default for this integration.

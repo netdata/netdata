@@ -22,7 +22,7 @@ func TestFuncLicensesHandle(t *testing.T) {
 	cache.store(now, []licenseRow{
 		{
 			ID:           "broken-license",
-			Name:         "Broken License",
+			Name:         "Shared License",
 			StateRaw:     "expired",
 			StateBucket:  licenseStateBucketBroken,
 			ExpiryTS:     now.Add(-time.Hour).Unix(),
@@ -33,7 +33,7 @@ func TestFuncLicensesHandle(t *testing.T) {
 		},
 		{
 			ID:             "ignored-license",
-			Name:           "Optional Bundle",
+			Name:           "Unused License",
 			StateRaw:       "not_subscribed",
 			StateBucket:    licenseStateBucketIgnored,
 			IsPerpetual:    true,
@@ -41,7 +41,7 @@ func TestFuncLicensesHandle(t *testing.T) {
 		},
 		{
 			ID:           "healthy-license",
-			Name:         "Healthy License",
+			Name:         "Shared License",
 			StateRaw:     "active",
 			StateBucket:  licenseStateBucketHealthy,
 			ExpiryTS:     now.Add(24 * time.Hour).Unix(),
@@ -59,11 +59,12 @@ func TestFuncLicensesHandle(t *testing.T) {
 	assert.Equal(t, "License", resp.DefaultSortColumn)
 
 	rows := resp.Data.([][]any)
-	assert.Equal(t, "Broken License", rows[0][0])
+	assert.Equal(t, "Shared License", rows[0][0])
 	assert.Equal(t, string(licenseStateBucketBroken), rows[0][1])
-	assert.Equal(t, "Optional Bundle", rows[2][0])
+	assert.Equal(t, "Unused License", rows[2][0])
 	assert.Equal(t, string(licenseStateBucketIgnored), rows[2][1])
-	assert.NotEqual(t, rows[0][4], rows[2][4], "hidden row ID should stay unique even if display labels collide")
+	assert.Equal(t, "Shared License", rows[1][0])
+	assert.NotEqual(t, rows[0][4], rows[1][4], "hidden row ID should stay unique when display labels collide")
 
 	rowOptions, ok := resp.Columns["rowOptions"]
 	require.True(t, ok)
@@ -74,6 +75,29 @@ func TestFuncLicensesHandle(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, false, idCol["visible"])
 	assert.Equal(t, true, idCol["unique_key"])
+}
+
+func TestLicenseRowUniqueKeyEscapesDelimiterContent(t *testing.T) {
+	left := licenseRow{
+		Source:         "source|a",
+		ID:             "id",
+		Name:           "same",
+		Feature:        "feature",
+		Component:      "component",
+		Type:           "type",
+		OriginalMetric: "metric",
+	}
+	right := licenseRow{
+		Source:         "source",
+		ID:             "a|id",
+		Name:           "same",
+		Feature:        "feature",
+		Component:      "component",
+		Type:           "type",
+		OriginalMetric: "metric",
+	}
+
+	assert.NotEqual(t, licenseRowUniqueKey(left), licenseRowUniqueKey(right))
 }
 
 func TestFuncLicensesHandleUnavailable(t *testing.T) {

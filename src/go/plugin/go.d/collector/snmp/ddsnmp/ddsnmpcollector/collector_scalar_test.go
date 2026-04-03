@@ -790,3 +790,31 @@ func TestScalarCollector_Collect(t *testing.T) {
 		})
 	}
 }
+
+func TestScalarCollector_IdentifyScalarOIDs_SkipsTagOIDsWhenPrimaryOIDIsKnownMissing(t *testing.T) {
+	sc := &scalarCollector{
+		missingOIDs: map[string]bool{
+			"1.3.6.1.4.1.2604.5.1.5.1.1.0": true,
+		},
+	}
+
+	oids, missing := sc.identifyScalarOIDs([]ddprofiledefinition.MetricsConfig{
+		{
+			Symbol: ddprofiledefinition.SymbolConfig{
+				OID:  "1.3.6.1.4.1.2604.5.1.5.1.1.0",
+				Name: "_license_row",
+			},
+			MetricTags: []ddprofiledefinition.MetricTagConfig{
+				{
+					Tag: "license_state",
+					Symbol: ddprofiledefinition.SymbolConfigCompat{
+						OID: "1.3.6.1.4.1.2604.5.1.5.1.2.0",
+					},
+				},
+			},
+		},
+	})
+
+	assert.Empty(t, oids)
+	assert.Equal(t, []string{"1.3.6.1.4.1.2604.5.1.5.1.1.0"}, missing)
+}

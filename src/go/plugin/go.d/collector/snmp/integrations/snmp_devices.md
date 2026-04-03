@@ -367,13 +367,13 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ snmp_license_expiring ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.remaining_time | The earliest monitored SNMP license or subscription on this device is close to expiration. |
-| [ snmp_license_authorization_expiring ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.authorization_remaining_time | The license authorization timer on this device is close to expiration. |
-| [ snmp_license_certificate_expiring ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.certificate_remaining_time | The license certificate timer on this device is close to expiration. |
-| [ snmp_license_grace_period_ending ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.grace_remaining_time | The licensing grace or evaluation period on this device is ending or already expired. |
-| [ snmp_license_state_warning ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.state | One or more monitored licenses on this device are degraded, in grace, in evaluation, or otherwise in warning state. |
-| [ snmp_license_state_critical ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.state | One or more monitored licenses on this device are expired, invalid, unauthorized, or otherwise in critical state. |
-| [ snmp_license_usage_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.usage_percent | The most constrained monitored license pool on this device is nearing exhaustion. |
+| [snmp_license_expiring](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.remaining_time | The earliest monitored SNMP license or subscription on this device is close to expiration. |
+| [snmp_license_authorization_expiring](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.authorization_remaining_time | The license authorization timer on this device is close to expiration. |
+| [snmp_license_certificate_expiring](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.certificate_remaining_time | The license certificate timer on this device is close to expiration. |
+| [snmp_license_grace_period_ending](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.grace_remaining_time | The licensing grace or evaluation period on this device is ending or already expired. |
+| [snmp_license_state_warning](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.state | One or more monitored licenses on this device are degraded, in grace, in evaluation, or otherwise in warning state. |
+| [snmp_license_state_critical](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.state | One or more monitored licenses on this device are expired, invalid, unauthorized, or otherwise in critical state. |
+| [snmp_license_usage_high](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.usage_percent | The most constrained monitored license pool on this device is nearing exhaustion. |
 
 
 ## Metrics
@@ -675,5 +675,4 @@ Table metrics are usually the slowest and often determine the total collection t
 1. Do logs show “skipping data collection”?  
 2. Does *Internal → Stats* show collection time > `update_every`?  
 3. Increase `update_every` until skips disappear.
-
 
