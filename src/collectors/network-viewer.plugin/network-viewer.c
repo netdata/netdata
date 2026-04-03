@@ -571,7 +571,7 @@ static uint64_t topology_ppid_cache_get_or_load(DICTIONARY *ppid_cache, uint64_t
     return cached ? cached->ppid : tmp.ppid;
 }
 
-static NV_PROCESS_ACTOR *topology_find_process_parent_actor(
+static NV_ENDPOINT_OWNER *topology_find_process_parent_actor(
     uint64_t ppid,
     uint64_t net_ns_inode,
     DICTIONARY *process_parent_ns_lookup,
@@ -587,7 +587,7 @@ static NV_PROCESS_ACTOR *topology_find_process_parent_actor(
         char parent_key_any[NV_TOPOLOGY_KEY_MAX];
 
         topology_process_parent_lookup_key(parent_key_ns, sizeof(parent_key_ns), current_pid, net_ns_inode, true);
-        NV_PROCESS_ACTOR *parent = dictionary_get(process_parent_ns_lookup, parent_key_ns);
+        NV_ENDPOINT_OWNER *parent = dictionary_get(process_parent_ns_lookup, parent_key_ns);
         if(!parent) {
             topology_process_parent_lookup_key(parent_key_any, sizeof(parent_key_any), current_pid, 0, false);
             parent = dictionary_get(process_parent_any_lookup, parent_key_any);
@@ -755,6 +755,32 @@ static void topology_add_remote_match(BUFFER *wb, const char *ip) {
     buffer_json_object_close(wb);
 }
 
+static void topology_encode_identifier_component(char *dst, size_t dst_size, const char *src) {
+    if(!dst || !dst_size)
+        return;
+
+    const uint8_t *s = (const uint8_t *)((src && *src) ? src : "[unknown]");
+    size_t written = 0;
+
+    while(*s && written + 1 < dst_size) {
+        uint8_t ch = *s++;
+
+        if(isalnum(ch) || ch == '-' || ch == '_' || ch == '.' || ch == '~') {
+            dst[written++] = (char)ch;
+            continue;
+        }
+
+        if(written + 3 >= dst_size)
+            break;
+
+        dst[written++] = '%';
+        dst[written++] = hex_digits_lower[(ch >> 4) & 0x0F];
+        dst[written++] = hex_digits_lower[ch & 0x0F];
+    }
+
+    dst[written] = '\0';
+}
+
 static void topology_actor_id_for_host(const NV_TOPOLOGY_CONTEXT *ctx, char *dst, size_t dst_size) {
     if(!dst || !dst_size)
         return;
@@ -782,7 +808,9 @@ static void topology_actor_id_for_process(
     const char *node_identity = (ctx && ctx->machine_guid[0]) ? ctx->machine_guid : (ctx && ctx->hostname[0] ? ctx->hostname : "unknown");
     const char *safe_process = (process && *process) ? process : "[unknown]";
     if(ctx && !ctx->options.processes_by_pid) {
-        snprintf(dst, dst_size, "process:%s|comm=%s", node_identity, safe_process);
+        char encoded_process[((TASK_COMM_LEN + 1) * 3) + 1];
+        topology_encode_identifier_component(encoded_process, sizeof(encoded_process), safe_process);
+        snprintf(dst, dst_size, "process:%s|comm=%s", node_identity, encoded_process);
     }
     else {
         snprintf(dst, dst_size, "process:%s|pid=%llu|uid=%llu|ns=%llu",
@@ -1087,9 +1115,6 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
         // The number of segments that have been selectively acknowledged
         SUM_THEM_ALL(t->info.tcp.tcpi_sacked, n->info.tcp.tcpi_sacked);
 
-        // The number of segments that have been selectively acknowledged
-        SUM_THEM_ALL(t->info.tcp.tcpi_sacked, n->info.tcp.tcpi_sacked);
-
         // The number of lost segments.
         SUM_THEM_ALL(t->info.tcp.tcpi_lost, n->info.tcp.tcpi_lost);
 
@@ -1208,7 +1233,9 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
                  (unsigned long long)n->net_ns_inode);
     }
     else {
-        snprintf(process_key, sizeof(process_key), "comm=%s", process_name);
+        char encoded_process[((TASK_COMM_LEN + 1) * 3) + 1];
+        topology_encode_identifier_component(encoded_process, sizeof(encoded_process), process_name);
+        snprintf(process_key, sizeof(process_key), "comm=%s", encoded_process);
     }
 
     NV_PROCESS_ACTOR *pa = dictionary_get(ctx->process_actors, process_key);
@@ -2237,10 +2264,10 @@ static void topology_write_links_and_stats(BUFFER *wb, const NV_TOPOLOGY_CONTEXT
         if(ctx->options.processes_by_pid) {
             process_parent_ns_lookup = dictionary_create_advanced(
                 DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-                NULL, sizeof(NV_PROCESS_ACTOR));
+                NULL, sizeof(NV_ENDPOINT_OWNER));
             process_parent_any_lookup = dictionary_create_advanced(
                 DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-                NULL, sizeof(NV_PROCESS_ACTOR));
+                NULL, sizeof(NV_ENDPOINT_OWNER));
             ppid_cache = dictionary_create_advanced(
                 DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                 NULL, sizeof(NV_PPID_CACHE_ENTRY));
@@ -2254,13 +2281,21 @@ static void topology_write_links_and_stats(BUFFER *wb, const NV_TOPOLOGY_CONTEXT
                     if(!pa_index->pid)
                         continue;
 
+                    NV_ENDPOINT_OWNER owner = {
+                        .pid = pa_index->pid,
+                        .ppid = pa_index->ppid,
+                        .uid = pa_index->uid,
+                        .net_ns_inode = pa_index->net_ns_inode,
+                    };
+                    snprintf(owner.process, sizeof(owner.process), "%s", pa_index->process);
+
                     topology_process_parent_lookup_key(parent_key_ns, sizeof(parent_key_ns),
                                                        (uint64_t)pa_index->pid, pa_index->net_ns_inode, true);
-                    dictionary_set(process_parent_ns_lookup, parent_key_ns, pa_index, sizeof(*pa_index));
+                    dictionary_set(process_parent_ns_lookup, parent_key_ns, &owner, sizeof(owner));
 
                     topology_process_parent_lookup_key(parent_key_any, sizeof(parent_key_any),
                                                        (uint64_t)pa_index->pid, 0, false);
-                    dictionary_set(process_parent_any_lookup, parent_key_any, pa_index, sizeof(*pa_index));
+                    dictionary_set(process_parent_any_lookup, parent_key_any, &owner, sizeof(owner));
 
                     if(ppid_cache) {
                         NV_PPID_CACHE_ENTRY ppid_entry = { .ppid = pa_index->ppid };
@@ -2275,8 +2310,8 @@ static void topology_write_links_and_stats(BUFFER *wb, const NV_TOPOLOGY_CONTEXT
         NV_PROCESS_ACTOR *pa;
         dfe_start_read(ctx->process_actors, pa) {
             bool src_is_process = false;
-            NV_PROCESS_ACTOR *parent_pa = NULL;
-            NV_PROCESS_ACTOR parent_resolved = { 0 };
+            NV_ENDPOINT_OWNER *parent_pa = NULL;
+            NV_ENDPOINT_OWNER parent_resolved = { 0 };
             const char *ownership_kind = "self_root";
             char src_actor_id[NV_TOPOLOGY_KEY_MAX];
             char src_display_name[NV_TOPOLOGY_KEY_MAX];
@@ -2327,7 +2362,7 @@ static void topology_write_links_and_stats(BUFFER *wb, const NV_TOPOLOGY_CONTEXT
                 buffer_json_member_add_object(wb, "src");
                 {
                     if(src_is_process) {
-                        topology_add_process_match(wb, ctx, parent_pa);
+                        topology_add_process_identity_match(wb, ctx, parent_pa->pid, parent_pa->uid, parent_pa->net_ns_inode, parent_pa->process);
 
                         buffer_json_member_add_object(wb, "attributes");
                         {
