@@ -75,6 +75,7 @@ var (
 		Fam:      "Licensing/Time",
 		Ctx:      "snmp.license.remaining_time",
 		Priority: prioLicenseRemainingTime,
+		SkipGaps: true,
 		Dims: collectorapi.Dims{
 			{ID: "snmp_device_license_remaining_time", Name: "remaining_time"},
 		},
@@ -86,6 +87,7 @@ var (
 		Fam:      "Licensing/Time",
 		Ctx:      "snmp.license.authorization_remaining_time",
 		Priority: prioLicenseAuthorizationRemainingTime,
+		SkipGaps: true,
 		Dims: collectorapi.Dims{
 			{ID: "snmp_device_license_authorization_remaining_time", Name: "remaining_time"},
 		},
@@ -97,6 +99,7 @@ var (
 		Fam:      "Licensing/Time",
 		Ctx:      "snmp.license.certificate_remaining_time",
 		Priority: prioLicenseCertificateRemainingTime,
+		SkipGaps: true,
 		Dims: collectorapi.Dims{
 			{ID: "snmp_device_license_certificate_remaining_time", Name: "remaining_time"},
 		},
@@ -108,6 +111,7 @@ var (
 		Fam:      "Licensing/Time",
 		Ctx:      "snmp.license.grace_remaining_time",
 		Priority: prioLicenseGraceRemainingTime,
+		SkipGaps: true,
 		Dims: collectorapi.Dims{
 			{ID: "snmp_device_license_grace_remaining_time", Name: "remaining_time"},
 		},
@@ -120,6 +124,7 @@ var (
 		Ctx:      "snmp.license.usage_percent",
 		Priority: prioLicenseUsagePercent,
 		Type:     collectorapi.Area,
+		SkipGaps: true,
 		Dims: collectorapi.Dims{
 			{ID: "snmp_device_license_usage_percent", Name: "usage_percent"},
 		},
@@ -132,6 +137,7 @@ var (
 		Ctx:      "snmp.license.state",
 		Priority: prioLicenseState,
 		Type:     collectorapi.Stacked,
+		SkipGaps: true,
 		Dims: collectorapi.Dims{
 			{ID: metricIDLicenseStateHealthy, Name: string(licenseStateBucketHealthy)},
 			{ID: metricIDLicenseStateDegraded, Name: string(licenseStateBucketDegraded)},

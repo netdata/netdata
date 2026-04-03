@@ -5,6 +5,7 @@ package snmp
 import (
 	"context"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -56,10 +57,11 @@ func (f *funcLicenses) Handle(_ context.Context, method string, _ funcapi.Resolv
 	}
 
 	sortLicenseRows(rows)
+	now := time.Now().UTC()
 	cs := licenseColumnSet(licenseAllColumns)
 	data := make([][]any, 0, len(rows))
 	for _, row := range rows {
-		data = append(data, buildLicenseFunctionRow(row, lastUpdate))
+		data = append(data, buildLicenseFunctionRow(row, now))
 	}
 
 	return &funcapi.FunctionResponse{
@@ -82,10 +84,11 @@ func licenseColumnSet(cols []licenseColumn) funcapi.ColumnSet[licenseColumn] {
 }
 
 var licenseAllColumns = []licenseColumn{
-	{ColumnMeta: funcapi.ColumnMeta{Name: "License", Tooltip: "License", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sticky: true, Sortable: true, UniqueKey: true}, Value: func(r licenseRow, _ time.Time) any { return firstNonEmpty(r.Name, r.ID) }, DefaultSort: true},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "License", Tooltip: "License", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sticky: true, Sortable: true}, Value: func(r licenseRow, _ time.Time) any { return firstNonEmpty(r.Name, r.ID) }, DefaultSort: true},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "Bucket", Tooltip: "Normalized State Bucket", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true, Visualization: funcapi.FieldVisualPill}, Value: func(r licenseRow, _ time.Time) any { return string(r.StateBucket) }},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "State", Tooltip: "Raw vendor state", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, Value: func(r licenseRow, _ time.Time) any { return emptyToNil(r.StateRaw) }},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "Source", Tooltip: "Profile source", Type: funcapi.FieldTypeString, Visible: false, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, Value: func(r licenseRow, _ time.Time) any { return emptyToNil(r.Source) }},
+	{ColumnMeta: funcapi.ColumnMeta{Name: "ID", Tooltip: "Stable row identifier", Type: funcapi.FieldTypeString, Visible: false, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true, UniqueKey: true}, Value: func(r licenseRow, _ time.Time) any { return licenseRowUniqueKey(r) }},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "Feature", Tooltip: "Feature name", Type: funcapi.FieldTypeString, Visible: false, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, Value: func(r licenseRow, _ time.Time) any { return emptyToNil(r.Feature) }},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "Component", Tooltip: "License component", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, Value: func(r licenseRow, _ time.Time) any { return emptyToNil(r.Component) }},
 	{ColumnMeta: funcapi.ColumnMeta{Name: "Type", Tooltip: "License type", Type: funcapi.FieldTypeString, Visible: true, Sort: funcapi.FieldSortAscending, Summary: funcapi.FieldSummaryCount, Filter: funcapi.FieldFilterMultiselect, Sortable: true}, Value: func(r licenseRow, _ time.Time) any { return emptyToNil(r.Type) }},
@@ -186,6 +189,18 @@ func licenseBucketPriority(bucket licenseStateBucket) int {
 	default:
 		return 3
 	}
+}
+
+func licenseRowUniqueKey(row licenseRow) string {
+	return strings.Join([]string{
+		row.Source,
+		row.ID,
+		row.Name,
+		row.Feature,
+		row.Component,
+		row.Type,
+		row.OriginalMetric,
+	}, "|")
 }
 
 func licenseRemainingCell(expiry int64, ok bool, ts time.Time) any {

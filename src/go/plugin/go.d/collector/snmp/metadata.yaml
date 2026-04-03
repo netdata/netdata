@@ -684,7 +684,7 @@ modules:
 
             It follows the same pattern as the SNMP `interfaces` function:
             - the function itself is global for the SNMP collector
-            - the UI selects the target SNMP job/device using the standard `__job` parameter
+            - the Live tab targets the selected SNMP job/device automatically using the standard SNMP function context
             - the returned rows belong only to that selected device
 
             Use cases:
@@ -693,14 +693,7 @@ modules:
             - Review usage/capacity for finite license pools on the selected device
 
             Data is sourced from the last successful SNMP collection. No extra SNMP requests are triggered when calling this function.
-          parameters:
-            - id: __job
-              name: Device
-              description: Standard SNMP job/device selector. The UI uses this to target the SNMP device whose cached licensing rows should be shown.
-              type: string
-              required: true
-              default: selected device
-              options: []
+          parameters: []
           returns:
             description: Normalized licensing rows for the selected SNMP device. Each row represents one cached normalized licensing entry from the collector.
             columns:
@@ -708,6 +701,11 @@ modules:
                 type: string
                 unit: ""
                 description: Human-readable license row name, or the normalized license identifier when no name exists.
+              - name: ID
+                type: string
+                unit: ""
+                visibility: hidden
+                description: Stable row identifier used by the UI to track one normalized licensing row across updates.
               - name: Bucket
                 type: string
                 unit: ""

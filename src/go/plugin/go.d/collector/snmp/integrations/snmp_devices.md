@@ -512,7 +512,7 @@ This function reads the collector's cached licensing rows and shows one row per 
 
 It follows the same pattern as the SNMP `interfaces` function:
 - the function itself is global for the SNMP collector
-- the UI selects the target SNMP job/device using the standard `__job` parameter
+- the Live tab targets the selected SNMP job/device automatically using the standard SNMP function context
 - the returned rows belong only to that selected device
 
 Use cases:
@@ -537,9 +537,7 @@ No additional configuration is required.
 
 #### Parameters
 
-| Parameter | Type | Description | Required | Default | Options |
-|:---------|:-----|:------------|:--------:|:--------|:--------|
-| Device | string | Standard SNMP job/device selector. The UI uses this to target the SNMP device whose cached licensing rows should be shown. | yes | selected device |  |
+This function has no user-configurable parameters.
 
 #### Returns
 
@@ -548,6 +546,7 @@ Normalized licensing rows for the selected SNMP device. Each row represents one 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
 | License | string |  |  | Human-readable license row name, or the normalized license identifier when no name exists. |
+| ID | string |  | hidden | Stable row identifier used by the UI to track one normalized licensing row across updates. |
 | Bucket | string |  |  | Normalized health bucket for the row: healthy, degraded, broken, or ignored. |
 | State | string |  |  | Raw vendor licensing state when the device exposes one. |
 | Component | string |  |  | Normalized component or area associated with the license row. |
@@ -676,6 +675,5 @@ Table metrics are usually the slowest and often determine the total collection t
 1. Do logs show “skipping data collection”?  
 2. Does *Internal → Stats* show collection time > `update_every`?  
 3. Increase `update_every` until skips disappear.
-
 
 

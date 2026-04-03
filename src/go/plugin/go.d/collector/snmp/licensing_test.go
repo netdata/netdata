@@ -374,6 +374,10 @@ func TestNormalizeLicenseStateBucket(t *testing.T) {
 	sev, ok := mapLicenseStateSeverity("inactive")
 	require.True(t, ok)
 	assert.EqualValues(t, 1, sev)
+	sev, ok = mapLicenseStateSeverity("evaluation expired because grace ended")
+	require.True(t, ok)
+	assert.EqualValues(t, 2, sev)
+	assert.Equal(t, licenseStateBucketBroken, normalizeLicenseStateBucket(licenseRow{StateRaw: "authorization expired due to policy"}, now))
 	assert.Equal(t, licenseStateBucketBroken, normalizeLicenseStateBucket(licenseRow{StateRaw: "not_authorized"}, now))
 	assert.Equal(t, licenseStateBucketHealthy, normalizeLicenseStateBucket(licenseRow{StateRaw: "up_to_date"}, now))
 	assert.Equal(t, licenseStateBucketBroken, normalizeLicenseStateBucket(licenseRow{

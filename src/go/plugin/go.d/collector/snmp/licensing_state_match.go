@@ -118,6 +118,22 @@ func licenseStateMatchesAny(raw string, hints map[string]struct{}) bool {
 		return false
 	}
 
-	_, ok := hints[normalized]
-	return ok
+	if _, ok := hints[normalized]; ok {
+		return true
+	}
+
+	// Match normalized phrases on token boundaries so "authorization expired due to policy"
+	// still matches the broken hint "authorization expired", without reintroducing false
+	// positives such as "inactive" matching "active".
+	padded := " " + normalized + " "
+	for hint := range hints {
+		if hint == "" || hint == normalized {
+			continue
+		}
+		if strings.Contains(padded, " "+hint+" ") {
+			return true
+		}
+	}
+
+	return false
 }
