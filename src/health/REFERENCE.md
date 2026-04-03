@@ -1091,6 +1091,11 @@ template: apache_last_collected_secs
 <br/>
 </details>
 
+> [!NOTE]
+> `lookup: sum` adds the stored samples for the selected window.
+> On rate-based charts, such as `RRD_ALGORITHM_INCREMENTAL` dimensions stored in units like `requests/s`, this equals the true event volume only when the chart collects every second.
+> If `update_every` is greater than `1`, multiply `$this` by `$update_every` in `calc` when you need the total volume represented by the window.
+
 <details>
 <summary><strong>Example 2: Disk Space Monitoring</strong></summary><br/>
 

@@ -296,6 +296,11 @@ The following alerts are available:
 | [ web_log_web_slow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.request_processing_time | average HTTP response time over the last 1 minute |
 | [ web_log_5m_requests_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf) | web_log.type_requests | ratio of successful HTTP requests over over the last 5 minutes, compared with the previous 5 minutes |
 
+> [!NOTE]
+> `web_log.requests`, `web_log.excluded_requests`, and `web_log.type_requests` are rate charts with `requests/s` units.
+> The bundled `lookup: sum` alerts report an exact request count only when the collector runs with `update_every: 1`.
+> If you increase `update_every`, multiply `$this` by `$update_every` in `calc` when you need the true request volume for the alert window.
+
 
 ## Metrics
 
@@ -449,5 +454,4 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 ```bash
 docker logs netdata 2>&1 | grep web_log
 ```
-
 
