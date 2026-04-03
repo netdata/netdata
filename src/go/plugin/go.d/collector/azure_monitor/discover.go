@@ -166,10 +166,11 @@ func discoverResources(ctx context.Context, subscriptionIDs []string, timeout ti
 			if id == "" {
 				continue
 			}
-			if _, ok := seenIDs[id]; ok {
+			idKey := stringsLowerTrim(id)
+			if _, ok := seenIDs[idKey]; ok {
 				continue
 			}
-			seenIDs[id] = struct{}{}
+			seenIDs[idKey] = struct{}{}
 
 			rg := stringsTrim(asString(row["resourceGroup"]))
 			if len(resourceGroupsFilter) > 0 {

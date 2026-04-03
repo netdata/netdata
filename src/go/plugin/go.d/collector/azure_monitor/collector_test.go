@@ -757,6 +757,26 @@ func TestCollector_RefreshDiscovery_PushesModeFiltersIntoQuery(t *testing.T) {
 			},
 			wantQuery: "resources | where type in~ ('Microsoft.DBforPostgreSQL/flexibleServers') | where resourceGroup in~ ('rg-a', 'rg-b') | where location in~ ('eastus', 'westeurope') | extend tagsBag = tags | mv-expand bagexpansion=array tags | where isnotempty(tags) | extend tagKey = tostring(tags[0]), tagValue = tostring(tags[1]) | where (tagKey =~ 'env' and tagValue == 'prod') or (tagKey =~ 'role' and tagValue in ('api', 'worker')) | summarize tags = take_any(tagsBag), matchedTagKeys = dcount(tolower(tagKey)) by id, name, type, resourceGroup, location | where matchedTagKeys == 2 | project id, name, type, resourceGroup, location, tags",
 		},
+		"deduplicates ids case insensitively": {
+			resources: []map[string]any{
+				{
+					"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+					"name":          "pg-a",
+					"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+					"resourceGroup": "rg-a",
+					"location":      "eastus",
+				},
+				{
+					"id":            "/SUBSCRIPTIONS/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a",
+					"name":          "pg-a-duplicate",
+					"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+					"resourceGroup": "rg-a",
+					"location":      "eastus",
+				},
+			},
+			wantCounts: 1,
+			wantQuery:  "resources | where type in~ ('Microsoft.DBforPostgreSQL/flexibleServers') | project id, name, type, resourceGroup, location, tags",
+		},
 	}
 
 	for name, tc := range tests {
