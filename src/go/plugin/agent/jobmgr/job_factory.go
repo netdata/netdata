@@ -102,6 +102,9 @@ func (f *jobFactory) create(cfg confgroup.Config) (runtimeJob, error) {
 }
 
 func (f *jobFactory) logApplyConfigError(cfg confgroup.Config, err error) {
+	if f.validationOnly {
+		return
+	}
 	f.logger.Errorf("failed to apply config for %s[%s] job: %v", cfg.Module(), cfg.Name(), err)
 }
 
