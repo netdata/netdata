@@ -88,8 +88,7 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 
 	watchPaths := a.CollectorsConfigWatchPath
 	sdConfDir := a.ServiceDiscoveryConfigDir
-	if a.DisableServiceDiscovery {
-		dummyPaths = nil
+	if !a.serviceDiscoveryEnabled() {
 		sdConfDir = nil
 	}
 

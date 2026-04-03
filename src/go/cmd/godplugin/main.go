@@ -78,6 +78,8 @@ func main() {
 	isInsideK8s := hostinfo.IsInsideK8sCluster()
 	moduleRegistry := moduleRegistryWithSystemdPolicy(collectorapi.DefaultRegistry, hostinfo.SystemdVersion)
 
+	runModePolicy := policy.Agent(isTerminal)
+
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,
 		PluginConfigDir:           pluginconfig.ConfigDir(),
@@ -87,11 +89,7 @@ func main() {
 		VarLibDir:                 pluginconfig.VarLibDir(),
 		ModuleRegistry:            moduleRegistry,
 		IsInsideK8s:               isInsideK8s,
-		RunModePolicy: policy.RunModePolicy{
-			IsTerminal:               isTerminal,
-			AutoEnableDiscovered:     isTerminal,
-			UseFileStatusPersistence: !isTerminal,
-		},
+		RunModePolicy:             runModePolicy,
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discoveryproviders.File(),
 			discoveryproviders.Dummy(),
@@ -202,13 +200,9 @@ func runFunctionCLI(opts *cli.Option) int {
 	defer cancel()
 
 	jobMgr := jobmgr.New(jobmgr.Config{
-		PluginName: executable.Name,
-		Out:        io.Discard,
-		RunModePolicy: policy.RunModePolicy{
-			IsTerminal:               false,
-			AutoEnableDiscovered:     true,
-			UseFileStatusPersistence: true,
-		},
+		PluginName:     executable.Name,
+		Out:            io.Discard,
+		RunModePolicy:  policy.FunctionCLI(),
 		VarLibDir:      pluginconfig.VarLibDir(),
 		Modules:        collectorapi.Registry{moduleName: creator},
 		ConfigDefaults: reg,
