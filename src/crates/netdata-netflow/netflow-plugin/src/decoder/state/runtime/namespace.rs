@@ -15,10 +15,7 @@ impl FlowDecoders {
     pub(crate) fn decoder_state_namespace_filename(key: &DecoderStateNamespaceKey) -> String {
         format!(
             "{}--{:08x}.bin",
-            key.exporter_ip
-                .chars()
-                .map(|ch| if ch == '.' || ch == ':' { '_' } else { ch })
-                .collect::<String>(),
+            sanitize_namespace_filename_component(&key.exporter_ip),
             key.observation_domain_id
         )
     }
@@ -79,5 +76,35 @@ impl FlowDecoders {
                 .then(left.observation_domain_id.cmp(&right.observation_domain_id))
         });
         keys
+    }
+}
+
+fn sanitize_namespace_filename_component(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decoder_state_namespace_filename_sanitizes_untrusted_exporter_ip() {
+        let key = DecoderStateNamespaceKey {
+            exporter_ip: "../fe80::1/../../odd name".to_string(),
+            observation_domain_id: 0x1234_abcd,
+        };
+
+        let filename = FlowDecoders::decoder_state_namespace_filename(&key);
+
+        assert_eq!(filename, "___fe80__1_______odd_name--1234abcd.bin");
     }
 }

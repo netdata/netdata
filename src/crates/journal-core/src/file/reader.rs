@@ -27,6 +27,75 @@ pub struct JournalReader<'a, M: MemoryMap> {
     remapping_registry: FieldMap,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::file::{JournalFileOptions, JournalWriter, MmapMut};
+    use tempfile::TempDir;
+
+    fn test_uuid(seed: u8) -> uuid::Uuid {
+        uuid::Uuid::from_bytes([seed; 16])
+    }
+
+    fn create_test_journal() -> (TempDir, JournalFile<MmapMut>) {
+        let dir = TempDir::new().expect("create temp dir");
+        let journal_dir = dir.path().join("journals");
+        std::fs::create_dir_all(&journal_dir).expect("create journal dir");
+        let path = journal_dir.join("system.journal");
+        let repo_file =
+            crate::repository::File::from_path(&path).expect("test journal path should parse");
+
+        let mut journal_file = JournalFile::create(
+            &repo_file,
+            JournalFileOptions::new(test_uuid(1), test_uuid(2), test_uuid(3)),
+        )
+        .expect("create journal");
+        let mut writer =
+            JournalWriter::new(&mut journal_file, 1, test_uuid(4)).expect("create writer");
+        let payloads = [b"MESSAGE=test".as_slice(), b"PRIORITY=6".as_slice()];
+        writer
+            .add_entry(&mut journal_file, &payloads, 1_000_000, 100)
+            .expect("write entry");
+
+        (dir, journal_file)
+    }
+
+    #[test]
+    fn build_filter_returns_expr_and_consumes_pending_filter() {
+        let (_dir, journal_file) = create_test_journal();
+        let mut reader = JournalReader::<MmapMut>::default();
+        reader.add_match(b"MESSAGE=test");
+
+        let expr = reader
+            .build_filter(&journal_file)
+            .expect("build filter")
+            .expect("resolved filter expr");
+
+        assert!(!matches!(expr, FilterExpr::None));
+        assert!(reader.filter.is_none(), "pending filter should be consumed");
+        assert!(
+            reader
+                .build_filter(&journal_file)
+                .expect("second build")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn build_filter_failure_keeps_pending_filter() {
+        let (_dir, journal_file) = create_test_journal();
+        let mut reader = JournalReader::<MmapMut>::default();
+        reader.filter = Some(JournalFilter::default());
+
+        assert!(reader.build_filter(&journal_file).is_err());
+        assert!(
+            reader.filter.is_some(),
+            "pending filter should remain after build failure"
+        );
+        assert!(reader.build_filter(&journal_file).is_err());
+    }
+}
+
 impl<M: MemoryMap> std::fmt::Debug for JournalReader<'_, M> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("JournalReader")

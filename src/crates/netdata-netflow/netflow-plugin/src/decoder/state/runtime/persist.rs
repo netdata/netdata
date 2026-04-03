@@ -6,7 +6,7 @@ impl FlowDecoders {
         key: &DecoderStateNamespaceKey,
         source: SocketAddr,
     ) -> Result<(), String> {
-        let Some(namespace) = self.decoder_state_namespaces.get(key).cloned() else {
+        let Some(namespace) = self.decoder_state_namespaces.remove(key) else {
             self.hydrated_namespace_sources
                 .entry(key.clone())
                 .or_default()
@@ -15,7 +15,9 @@ impl FlowDecoders {
         };
 
         self.sampling.apply_decoder_state_namespace(key, &namespace);
-        self.replay_namespace_packets(key, &namespace, source)?;
+        let replay_result = self.replay_namespace_packets(key, &namespace, source);
+        self.decoder_state_namespaces.insert(key.clone(), namespace);
+        replay_result?;
         self.hydrated_namespace_sources
             .entry(key.clone())
             .or_default()
@@ -96,11 +98,7 @@ impl FlowDecoders {
                 .map_err(|err| {
                     format!(
                         "failed to replay persisted namespace packet {} for {} / {} from {}: {}",
-                        packet_index,
-                        key.exporter_ip,
-                        key.observation_domain_id,
-                        source,
-                        err
+                        packet_index, key.exporter_ip, key.observation_domain_id, source, err
                     )
                 })?;
         }

@@ -79,6 +79,7 @@ pub(super) fn build_v9_restore_packet(
     let packet = V9 {
         header: NetflowV9Header {
             version: 9,
+            // `netflow_parser::V9::to_be_bytes()` patches the emitted count.
             count: 0,
             sys_up_time: 0,
             unix_secs: 0,

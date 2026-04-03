@@ -55,8 +55,9 @@ pub(crate) fn apply_geo_record(out: &mut NetworkAttributes, record: &GeoLookupRe
         .first()
         .and_then(|s| s.iso_code.as_deref())
         .or(record.region.as_deref())
-        .map(str::to_string)
+        .map(str::trim)
         .filter(|v| !v.is_empty())
+        .map(str::to_string)
     {
         out.state = state;
     }

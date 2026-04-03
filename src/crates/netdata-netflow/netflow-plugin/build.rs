@@ -52,13 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("cargo:rerun-if-changed={}", proto.display());
     }
 
-    tonic_prost_build::configure().compile_protos(
-        &proto_files
-            .iter()
-            .map(|path| path.as_path())
-            .collect::<Vec<_>>(),
-        &[proto_root],
-    )?;
+    tonic_prost_build::configure().compile_protos(&proto_files, &[proto_root.to_path_buf()])?;
 
     Ok(())
 }
