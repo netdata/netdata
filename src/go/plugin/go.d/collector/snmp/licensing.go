@@ -573,61 +573,17 @@ func parseBoolLike(raw string) bool {
 }
 
 func mapLicenseStateSeverity(raw string) (int64, bool) {
-	state := strings.ToLower(strings.TrimSpace(raw))
-	if state == "" {
+	if strings.TrimSpace(raw) == "" {
 		return 0, false
 	}
-
-	criticalHints := []string{
-		"expired",
-		"invalid",
-		"unauthorized",
-		"out-of-compliance",
-		"out_of_compliance",
-		"not-associated",
-		"disabled",
-		"failed",
-		"error",
-		"violation",
-		"broken",
+	if licenseStateMatchesAny(raw, licenseStateBrokenHints) {
+		return 2, true
 	}
-	for _, hint := range criticalHints {
-		if strings.Contains(state, hint) {
-			return 2, true
-		}
+	if licenseStateMatchesAny(raw, licenseStateDegradedHints) {
+		return 1, true
 	}
-
-	warnHints := []string{
-		"about-to-expire",
-		"about_to_expire",
-		"warning",
-		"degrade",
-		"grace",
-		"evaluation",
-		"eval",
-		"overage",
-		"partial",
-		"unknown",
-	}
-	for _, hint := range warnHints {
-		if strings.Contains(state, hint) {
-			return 1, true
-		}
-	}
-
-	healthyHints := []string{
-		"valid",
-		"active",
-		"authorized",
-		"compliant",
-		"ok",
-		"up-to-date",
-		"up_to_date",
-	}
-	for _, hint := range healthyHints {
-		if strings.Contains(state, hint) {
-			return 0, true
-		}
+	if licenseStateMatchesAny(raw, licenseStateHealthyHints) {
+		return 0, true
 	}
 
 	return 1, true

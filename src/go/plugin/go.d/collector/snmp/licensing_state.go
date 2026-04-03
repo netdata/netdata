@@ -89,83 +89,21 @@ func bucketFromSeverity(sev int64) licenseStateBucket {
 }
 
 func mapLicenseStateBucket(raw string) (licenseStateBucket, bool) {
-	state := strings.ToLower(strings.TrimSpace(raw))
-	if state == "" {
+	if strings.TrimSpace(raw) == "" {
 		return "", false
 	}
 
-	ignoredHints := []string{
-		"ignored",
-		"not_subscribed",
-		"not subscribed",
-		"not-applicable",
-		"not_applicable",
-		"not applicable",
-		"none",
-		"n/a",
+	if licenseStateMatchesAny(raw, licenseStateIgnoredHints) {
+		return licenseStateBucketIgnored, true
 	}
-	for _, hint := range ignoredHints {
-		if strings.Contains(state, hint) {
-			return licenseStateBucketIgnored, true
-		}
+	if licenseStateMatchesAny(raw, licenseStateBrokenHints) {
+		return licenseStateBucketBroken, true
 	}
-
-	criticalHints := []string{
-		"expired",
-		"invalid",
-		"unauthorized",
-		"out-of-compliance",
-		"out_of_compliance",
-		"not-associated",
-		"disabled",
-		"deactivated",
-		"failed",
-		"error",
-		"violation",
-		"broken",
+	if licenseStateMatchesAny(raw, licenseStateDegradedHints) {
+		return licenseStateBucketDegraded, true
 	}
-	for _, hint := range criticalHints {
-		if strings.Contains(state, hint) {
-			return licenseStateBucketBroken, true
-		}
-	}
-
-	warnHints := []string{
-		"about-to-expire",
-		"about_to_expire",
-		"warning",
-		"degrade",
-		"grace",
-		"evaluation",
-		"eval",
-		"trial",
-		"overage",
-		"partial",
-		"unknown",
-	}
-	for _, hint := range warnHints {
-		if strings.Contains(state, hint) {
-			return licenseStateBucketDegraded, true
-		}
-	}
-
-	healthyHints := []string{
-		"valid",
-		"active",
-		"authorized",
-		"compliant",
-		"ok",
-		"subscribed",
-		"registered",
-		"in_use",
-		"in-use",
-		"up-to-date",
-		"up_to_date",
-	}
-	for _, hint := range healthyHints {
-		if strings.Contains(state, hint) {
-			return licenseStateBucketHealthy, true
-		}
+	if licenseStateMatchesAny(raw, licenseStateHealthyHints) {
+		return licenseStateBucketHealthy, true
 	}
 
 	return "", false

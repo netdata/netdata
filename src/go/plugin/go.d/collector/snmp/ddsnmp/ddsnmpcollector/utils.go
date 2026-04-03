@@ -130,6 +130,15 @@ func convPduToDateAndTimeUnix(pdu gosnmp.SnmpPDU) (int64, error) {
 		sign := bs[8]
 		tzHours := int(bs[9])
 		tzMinutes := int(bs[10])
+		if sign != '+' && sign != '-' {
+			return 0, fmt.Errorf("invalid SNMP DateAndTime UTC direction %q", sign)
+		}
+		if tzHours > 13 {
+			return 0, fmt.Errorf("invalid SNMP DateAndTime UTC hours offset %d", tzHours)
+		}
+		if tzMinutes > 59 {
+			return 0, fmt.Errorf("invalid SNMP DateAndTime UTC minutes offset %d", tzMinutes)
+		}
 		offset := tzHours*3600 + tzMinutes*60
 		if sign == '-' {
 			offset = -offset
@@ -137,7 +146,14 @@ func convPduToDateAndTimeUnix(pdu gosnmp.SnmpPDU) (int64, error) {
 		loc = time.FixedZone("snmp", offset)
 	}
 
+	if second == 60 {
+		return 0, fmt.Errorf("unsupported SNMP DateAndTime leap second")
+	}
+
 	tm := time.Date(year, month, day, hour, minute, second, deci*100_000_000, loc)
+	if tm.Year() != year || tm.Month() != month || tm.Day() != day || tm.Hour() != hour || tm.Minute() != minute || tm.Second() != second || tm.Nanosecond()/100_000_000 != deci {
+		return 0, fmt.Errorf("invalid SNMP DateAndTime value")
+	}
 	return tm.Unix(), nil
 }
 

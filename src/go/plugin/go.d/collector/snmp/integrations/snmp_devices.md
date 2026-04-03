@@ -537,7 +537,9 @@ No additional configuration is required.
 
 #### Parameters
 
-This function has no parameters.
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Device | string | Standard SNMP job/device selector. The UI uses this to target the SNMP device whose cached licensing rows should be shown. | yes | selected device |  |
 
 #### Returns
 
