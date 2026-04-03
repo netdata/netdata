@@ -20,5 +20,5 @@ func TestJobLoggerAttrs(t *testing.T) {
 	out := buf.String()
 	assert.Contains(t, out, "collector=module")
 	assert.Contains(t, out, "job=job")
-	assert.Contains(t, out, "source=\"stock/file reader\"")
+	assert.Contains(t, out, "config_source=\"stock/file reader\"")
 }
