@@ -16,6 +16,10 @@ pub(crate) fn observe_ipfix_options_templates(
         let scope_field_count = u16::from_be_bytes([cursor[4], cursor[5]]);
         cursor = &cursor[6..];
 
+        if usize::from(scope_field_count) > field_count {
+            return changed;
+        }
+
         let mut fields = Vec::with_capacity(bounded_ipfix_options_field_capacity(
             field_count,
             cursor.len(),
@@ -69,6 +73,17 @@ mod tests {
     fn ipfix_options_templates_ignore_truncated_huge_field_counts() {
         let mut namespace = DecoderStateNamespace::default();
         let body = [0x01, 0x00, 0xff, 0xff, 0x00, 0x00];
+
+        let changed = observe_ipfix_options_templates(&body, &mut namespace);
+
+        assert!(!changed);
+        assert!(namespace.ipfix_options_templates.is_empty());
+    }
+
+    #[test]
+    fn ipfix_options_templates_reject_scope_counts_larger_than_field_count() {
+        let mut namespace = DecoderStateNamespace::default();
+        let body = [0x01, 0x00, 0x00, 0x01, 0x00, 0x02];
 
         let changed = observe_ipfix_options_templates(&body, &mut namespace);
 

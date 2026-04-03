@@ -1,5 +1,48 @@
 use super::*;
 
+fn should_ignore_geoip_lookup_error(err: &maxminddb::MaxMindDBError) -> bool {
+    matches!(err, maxminddb::MaxMindDBError::AddressNotFoundError(_))
+}
+
+fn warn_unexpected_geoip_lookup_error(
+    database_kind: &'static str,
+    err: &maxminddb::MaxMindDBError,
+) {
+    static ASN_LOOKUP_WARNED: std::sync::Once = std::sync::Once::new();
+    static GEO_LOOKUP_WARNED: std::sync::Once = std::sync::Once::new();
+
+    let warned = match database_kind {
+        "asn" => &ASN_LOOKUP_WARNED,
+        _ => &GEO_LOOKUP_WARNED,
+    };
+
+    warned.call_once(|| {
+        tracing::warn!(
+            "geoip: unexpected {} lookup error; ignoring until the next reload: {}",
+            database_kind,
+            err
+        );
+    });
+}
+
+fn lookup_geoip_record<T>(
+    db: &Reader<Vec<u8>>,
+    address: IpAddr,
+    database_kind: &'static str,
+) -> Option<T>
+where
+    T: for<'de> serde::Deserialize<'de>,
+{
+    match db.lookup::<T>(address) {
+        Ok(record) => Some(record),
+        Err(err) if should_ignore_geoip_lookup_error(&err) => None,
+        Err(err) => {
+            warn_unexpected_geoip_lookup_error(database_kind, &err);
+            None
+        }
+    }
+}
+
 impl GeoIpResolver {
     pub(crate) fn from_config(config: &GeoIpConfig) -> Result<Option<Self>> {
         if config.asn_database.is_empty() && config.geo_database.is_empty() {
@@ -82,7 +125,7 @@ impl GeoIpResolver {
         let mut out = NetworkAttributes::default();
 
         for db in &self.asn_databases {
-            if let Ok(record) = db.lookup::<AsnLookupRecord>(address) {
+            if let Some(record) = lookup_geoip_record::<AsnLookupRecord>(db, address, "asn") {
                 if let Some(asn) = decode_asn_record(&record) {
                     out.asn = asn;
                 }
@@ -96,7 +139,7 @@ impl GeoIpResolver {
         }
 
         for db in &self.geo_databases {
-            if let Ok(record) = db.lookup::<GeoLookupRecord>(address) {
+            if let Some(record) = lookup_geoip_record::<GeoLookupRecord>(db, address, "geo") {
                 apply_geo_record(&mut out, &record);
             }
         }
@@ -128,5 +171,15 @@ mod tests {
         resolver.refresh_if_needed();
 
         assert_eq!(resolver.last_reload_check, old_check);
+    }
+
+    #[test]
+    fn geoip_lookup_error_classifier_only_ignores_address_not_found() {
+        assert!(should_ignore_geoip_lookup_error(
+            &maxminddb::MaxMindDBError::AddressNotFoundError("missing".to_string())
+        ));
+        assert!(!should_ignore_geoip_lookup_error(
+            &maxminddb::MaxMindDBError::InvalidDatabaseError("broken".to_string())
+        ));
     }
 }
