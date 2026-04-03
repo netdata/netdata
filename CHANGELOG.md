@@ -238,6 +238,7 @@
 - Remove DBENGINE Warnings (Linux compilation) ([#22103](https://github.com/netdata/netdata/issues/22103))
 - Fix coverity report ([#22104](https://github.com/netdata/netdata/issues/22104))
 - Docs: put collectors under Collecting Metrics/Collectors ([#22107](https://github.com/netdata/netdata/issues/22107))
+- Chore(scripts.d/nagios): add float flag to perfdata fields observation ([#22116](https://github.com/netdata/netdata/issues/22116))
 
 ## [2.9.0] - 2026-02-16
 
