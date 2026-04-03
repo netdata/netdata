@@ -327,11 +327,12 @@ DEFINE_JUDYL_TYPED(STACKTRACE, size_t);
 #endif
 
 static void dictionary_queue_for_destruction(DICTIONARY *dict) {
-    if(is_dictionary_destroyed(dict))
+    if(dict_flag_check(dict, DICT_FLAG_QUEUED_FOR_DESTRUCTION))
         return;
 
     DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
     dict_flag_set(dict, DICT_FLAG_DESTROYED);
+    dict_flag_set(dict, DICT_FLAG_QUEUED_FOR_DESTRUCTION);
 
     netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
 
@@ -661,7 +662,8 @@ void dictionary_flush(DICTIONARY *dict) {
 size_t dictionary_destroy(DICTIONARY *dict) {
     cleanup_destroyed_dictionaries(false);
 
-    if(!dict) return 0;
+    if(!dict || unlikely(is_dictionary_destroyed(dict)))
+        return 0;
 
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
@@ -698,14 +700,8 @@ size_t dictionary_destroy(DICTIONARY *dict) {
     // Re-check: a reader that held the index read lock during the destroy
     // above may have acquired an item before we got the index write lock.
     // If so, fall back to the deferred destruction path.
-    // Note: DICT_FLAG_DESTROYED is already set, so we queue directly
-    // (dictionary_queue_for_destruction would return early).
     if(dictionary_referenced_items(dict)) {
-        DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
-        netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
-        dict->next = dictionaries_waiting_to_be_destroyed;
-        dictionaries_waiting_to_be_destroyed = dict;
-        netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+        dictionary_queue_for_destruction(dict);
 
         ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
         return 0;
