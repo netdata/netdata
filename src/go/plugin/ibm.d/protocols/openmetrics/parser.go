@@ -4,19 +4,19 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	promLabels "github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/model/textparse"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 )
 
 type seriesParser struct {
-	selector selector.Selector
+	selector promselector.Selector
 }
 
-func (p *seriesParser) parse(data []byte) (prometheus.Series, error) {
-	var series prometheus.Series
+func (p *seriesParser) parse(data []byte) (promscrapemodel.Series, error) {
+	var series promscrapemodel.Series
 	parser := textparse.NewPromParser(data, promLabels.NewSymbolTable())
 	var tmp promLabels.Labels
 
@@ -46,7 +46,7 @@ func (p *seriesParser) parse(data []byte) (prometheus.Series, error) {
 
 		_, _, value := parser.Series()
 		labels := append(promLabels.Labels(nil), tmp...)
-		series.Add(prometheus.SeriesSample{Labels: labels, Value: value})
+		series.Add(promscrapemodel.SeriesSample{Labels: labels, Value: value})
 	}
 
 	series.Sort()

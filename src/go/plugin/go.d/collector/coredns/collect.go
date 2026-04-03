@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 
 	"github.com/blang/semver/v4"
@@ -91,7 +91,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return stm.ToMap(mx), nil
 }
 
-func (c *Collector) updateVersionDependentMetrics(raw prometheus.Series) {
+func (c *Collector) updateVersionDependentMetrics(raw promscrapemodel.Series) {
 	version := c.parseVersion(raw)
 	if version == nil {
 		return
@@ -110,7 +110,7 @@ func (c *Collector) updateVersionDependentMetrics(raw prometheus.Series) {
 	}
 }
 
-func (c *Collector) parseVersion(raw prometheus.Series) *semver.Version {
+func (c *Collector) parseVersion(raw promscrapemodel.Series) *semver.Version {
 	var versionStr string
 	for _, metric := range raw.FindByName("coredns_build_info") {
 		versionStr = metric.Labels.Get("version")
@@ -128,11 +128,11 @@ func (c *Collector) parseVersion(raw prometheus.Series) *semver.Version {
 	return &version
 }
 
-func (c *Collector) collectPanic(mx *metrics, raw prometheus.Series) {
+func (c *Collector) collectPanic(mx *metrics, raw promscrapemodel.Series) {
 	mx.Panic.Set(raw.FindByName(c.metricNames.panicCountTotal).Max())
 }
 
-func (c *Collector) collectSummaryRequests(mx *metrics, raw prometheus.Series) {
+func (c *Collector) collectSummaryRequests(mx *metrics, raw promscrapemodel.Series) {
 	for _, metric := range raw.FindByName(c.metricNames.requestCountTotal) {
 		var (
 			family = metric.Labels.Get("family")
@@ -180,7 +180,7 @@ func (c *Collector) collectSummaryRequests(mx *metrics, raw prometheus.Series) {
 //	processRequestDuration(&mx.Summary.RequestConfig)
 //}
 
-func (c *Collector) collectSummaryRequestsPerType(mx *metrics, raw prometheus.Series) {
+func (c *Collector) collectSummaryRequestsPerType(mx *metrics, raw promscrapemodel.Series) {
 	for _, metric := range raw.FindByName(c.metricNames.requestTypeCountTotal) {
 		var (
 			server = metric.Labels.Get("server")
@@ -197,7 +197,7 @@ func (c *Collector) collectSummaryRequestsPerType(mx *metrics, raw prometheus.Se
 	}
 }
 
-func (c *Collector) collectSummaryResponsesPerRcode(mx *metrics, raw prometheus.Series) {
+func (c *Collector) collectSummaryResponsesPerRcode(mx *metrics, raw promscrapemodel.Series) {
 	for _, metric := range raw.FindByName(c.metricNames.responseRcodeCountTotal) {
 		var (
 			rcode  = metric.Labels.Get("rcode")
@@ -216,7 +216,7 @@ func (c *Collector) collectSummaryResponsesPerRcode(mx *metrics, raw prometheus.
 
 // Per Server
 
-func (c *Collector) collectPerServerRequests(mx *metrics, raw prometheus.Series) {
+func (c *Collector) collectPerServerRequests(mx *metrics, raw promscrapemodel.Series) {
 	for _, metric := range raw.FindByName(c.metricNames.requestCountTotal) {
 		var (
 			family = metric.Labels.Get("family")
@@ -298,7 +298,7 @@ func (c *Collector) collectPerServerRequests(mx *metrics, raw prometheus.Series)
 //	}
 //}
 
-func (c *Collector) collectPerServerRequestPerType(mx *metrics, raw prometheus.Series) {
+func (c *Collector) collectPerServerRequestPerType(mx *metrics, raw promscrapemodel.Series) {
 	for _, metric := range raw.FindByName(c.metricNames.requestTypeCountTotal) {
 		var (
 			server = metric.Labels.Get("server")
@@ -332,7 +332,7 @@ func (c *Collector) collectPerServerRequestPerType(mx *metrics, raw prometheus.S
 	}
 }
 
-func (c *Collector) collectPerServerResponsePerRcode(mx *metrics, raw prometheus.Series) {
+func (c *Collector) collectPerServerResponsePerRcode(mx *metrics, raw promscrapemodel.Series) {
 	for _, metric := range raw.FindByName(c.metricNames.responseRcodeCountTotal) {
 		var (
 			rcode  = metric.Labels.Get("rcode")
@@ -368,7 +368,7 @@ func (c *Collector) collectPerServerResponsePerRcode(mx *metrics, raw prometheus
 
 // Per Zone
 
-func (c *Collector) collectPerZoneRequests(mx *metrics, raw prometheus.Series) {
+func (c *Collector) collectPerZoneRequests(mx *metrics, raw promscrapemodel.Series) {
 	for _, metric := range raw.FindByName(c.metricNames.requestCountTotal) {
 		var (
 			family = metric.Labels.Get("family")
@@ -441,7 +441,7 @@ func (c *Collector) collectPerZoneRequests(mx *metrics, raw prometheus.Series) {
 //	}
 //}
 
-func (c *Collector) collectPerZoneRequestsPerType(mx *metrics, raw prometheus.Series) {
+func (c *Collector) collectPerZoneRequestsPerType(mx *metrics, raw promscrapemodel.Series) {
 	for _, metric := range raw.FindByName(c.metricNames.requestTypeCountTotal) {
 		var (
 			typ   = metric.Labels.Get("type")
@@ -474,7 +474,7 @@ func (c *Collector) collectPerZoneRequestsPerType(mx *metrics, raw prometheus.Se
 	}
 }
 
-func (c *Collector) collectPerZoneResponsesPerRcode(mx *metrics, raw prometheus.Series) {
+func (c *Collector) collectPerZoneResponsesPerRcode(mx *metrics, raw promscrapemodel.Series) {
 	for _, metric := range raw.FindByName(c.metricNames.responseRcodeCountTotal) {
 		var (
 			rcode = metric.Labels.Get("rcode")

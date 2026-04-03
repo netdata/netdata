@@ -6,7 +6,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
@@ -23,7 +23,7 @@ const (
 	prefixEntrypointOpenConn  = "entrypoint_open_connections_"
 )
 
-func isTraefikMetrics(pms prometheus.Series) bool {
+func isTraefikMetrics(pms promscrapemodel.Series) bool {
 	for _, pm := range pms {
 		if strings.HasPrefix(pm.Name(), "traefik_") {
 			return true
@@ -53,7 +53,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) collectEntrypointRequestsTotal(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectEntrypointRequestsTotal(mx map[string]int64, pms promscrapemodel.Series) {
 	if pms = pms.FindByName(metricEntrypointRequestsTotal); pms.Len() == 0 {
 		return
 	}
@@ -82,7 +82,7 @@ func (c *Collector) collectEntrypointRequestsTotal(mx map[string]int64, pms prom
 	}
 }
 
-func (c *Collector) collectEntrypointRequestDuration(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectEntrypointRequestDuration(mx map[string]int64, pms promscrapemodel.Series) {
 	if pms = pms.FindByNames(
 		metricEntrypointRequestDurationSecondsCount,
 		metricEntrypointRequestDurationSecondsSum,
@@ -134,7 +134,7 @@ func (c *Collector) collectEntrypointRequestDuration(mx map[string]int64, pms pr
 	}
 }
 
-func (c *Collector) collectEntrypointOpenConnections(mx map[string]int64, pms prometheus.Series) {
+func (c *Collector) collectEntrypointOpenConnections(mx map[string]int64, pms promscrapemodel.Series) {
 	if pms = pms.FindByName(metricEntrypointOpenConnections); pms.Len() == 0 {
 		return
 	}

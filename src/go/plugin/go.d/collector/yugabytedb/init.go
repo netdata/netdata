@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 )
 
 const (
@@ -35,7 +35,7 @@ func (c *Collector) initPrometheusClient(httpClient *http.Client) (prometheus.Pr
 	// Frequently used metrics
 	// https://docs.yugabyte.com/preview/launch-and-manage/monitor-and-alert/metrics/#frequently-used-metrics
 
-	se := selector.Expr{Allow: []string{
+	se := promselector.Expr{Allow: []string{
 		metricPxMasterLatencyMasterClient + "*",
 		metricPxMasterLatencyMasterDdl + "*",
 

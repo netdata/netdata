@@ -1,0 +1,305 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package promscrapemodel
+
+import (
+	"math"
+	"testing"
+
+	"github.com/prometheus/common/model"
+	"github.com/prometheus/prometheus/model/labels"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestAssembler_MetricFamilies(t *testing.T) {
+	tests := map[string]struct {
+		apply  func(t *testing.T, a *Assembler) error
+		verify func(t *testing.T, mfs MetricFamilies)
+	}{
+		"assembles mixed families": {
+			apply: func(t *testing.T, a *Assembler) error {
+				a.beginCycle()
+				a.applyHelp("test_gauge", "Test Gauge")
+				a.applyHelp("test_summary", "Test Summary")
+				a.applyHelp("test_histogram", "Test Histogram")
+
+				for _, sample := range []Sample{
+					{
+						Name:       "test_gauge",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      11,
+						Kind:       SampleKindScalar,
+						FamilyType: model.MetricTypeGauge,
+					},
+					{
+						Name: "test_summary",
+						Labels: labels.Labels{
+							{Name: "label1", Value: "value1"},
+							{Name: "quantile", Value: "0.5"},
+						},
+						Value:      1,
+						Kind:       SampleKindSummaryQuantile,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name:       "test_summary_sum",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      2,
+						Kind:       SampleKindSummarySum,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name:       "test_summary_count",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      3,
+						Kind:       SampleKindSummaryCount,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name: "test_histogram_bucket",
+						Labels: labels.Labels{
+							{Name: "label1", Value: "value1"},
+							{Name: "le", Value: "0.5"},
+						},
+						Value:      4,
+						Kind:       SampleKindHistogramBucket,
+						FamilyType: model.MetricTypeHistogram,
+					},
+					{
+						Name:       "test_histogram_sum",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      5,
+						Kind:       SampleKindHistogramSum,
+						FamilyType: model.MetricTypeHistogram,
+					},
+					{
+						Name:       "test_histogram_count",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      6,
+						Kind:       SampleKindHistogramCount,
+						FamilyType: model.MetricTypeHistogram,
+					},
+				} {
+					if err := a.ApplySample(sample); err != nil {
+						return err
+					}
+				}
+
+				return nil
+			},
+			verify: func(t *testing.T, mfs MetricFamilies) {
+				require.Len(t, mfs, 3)
+
+				gauge := mfs.GetGauge("test_gauge")
+				require.NotNil(t, gauge)
+				assert.Equal(t, "Test Gauge", gauge.Help())
+				require.Len(t, gauge.Metrics(), 1)
+				assert.Equal(t, 11.0, gauge.Metrics()[0].Gauge().Value())
+
+				summary := mfs.GetSummary("test_summary")
+				require.NotNil(t, summary)
+				assert.Equal(t, "Test Summary", summary.Help())
+				require.Len(t, summary.Metrics(), 1)
+				assert.Equal(t, 2.0, summary.Metrics()[0].Summary().Sum())
+				assert.Equal(t, 3.0, summary.Metrics()[0].Summary().Count())
+				assert.Equal(t, []Quantile{{quantile: 0.5, value: 1}}, summary.Metrics()[0].Summary().Quantiles())
+
+				histogram := mfs.GetHistogram("test_histogram")
+				require.NotNil(t, histogram)
+				assert.Equal(t, "Test Histogram", histogram.Help())
+				require.Len(t, histogram.Metrics(), 1)
+				assert.Equal(t, 5.0, histogram.Metrics()[0].Histogram().Sum())
+				assert.Equal(t, 6.0, histogram.Metrics()[0].Histogram().Count())
+				assert.Equal(t, []Bucket{{upperBound: 0.5, cumulativeCount: 4}}, histogram.Metrics()[0].Histogram().Buckets())
+			},
+		},
+		"sealed readout is idempotent and next sample starts new cycle": {
+			apply: func(t *testing.T, a *Assembler) error {
+				a.beginCycle()
+				if err := a.ApplySample(Sample{
+					Name:       "first_metric",
+					Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+					Value:      1,
+					Kind:       SampleKindScalar,
+					FamilyType: model.MetricTypeGauge,
+				}); err != nil {
+					return err
+				}
+
+				first := a.MetricFamilies()
+				require.Len(t, first, 1)
+				assert.NotNil(t, first.GetGauge("first_metric"))
+
+				secondRead := a.MetricFamilies()
+				assert.Equal(t, first, secondRead)
+
+				return a.ApplySample(Sample{
+					Name:       "second_metric",
+					Labels:     labels.Labels{{Name: "label1", Value: "value2"}},
+					Value:      2,
+					Kind:       SampleKindScalar,
+					FamilyType: model.MetricTypeGauge,
+				})
+			},
+			verify: func(t *testing.T, mfs MetricFamilies) {
+				require.Len(t, mfs, 1)
+				assert.Nil(t, mfs.Get("first_metric"))
+				second := mfs.GetGauge("second_metric")
+				require.NotNil(t, second)
+				require.Len(t, second.Metrics(), 1)
+				assert.Equal(t, 2.0, second.Metrics()[0].Gauge().Value())
+			},
+		},
+		"keeps summaries with nan quantile values": {
+			apply: func(t *testing.T, a *Assembler) error {
+				a.beginCycle()
+				a.applyHelp("nan_summary", "Summary With NaN Quantiles")
+
+				for _, sample := range []Sample{
+					{
+						Name: "nan_summary",
+						Labels: labels.Labels{
+							{Name: "label1", Value: "value1"},
+							{Name: "quantile", Value: "0.5"},
+						},
+						Value:      math.NaN(),
+						Kind:       SampleKindSummaryQuantile,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name: "nan_summary",
+						Labels: labels.Labels{
+							{Name: "label1", Value: "value1"},
+							{Name: "quantile", Value: "0.9"},
+						},
+						Value:      math.NaN(),
+						Kind:       SampleKindSummaryQuantile,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name:       "nan_summary_sum",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      0,
+						Kind:       SampleKindSummarySum,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name:       "nan_summary_count",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      0,
+						Kind:       SampleKindSummaryCount,
+						FamilyType: model.MetricTypeSummary,
+					},
+				} {
+					if err := a.ApplySample(sample); err != nil {
+						return err
+					}
+				}
+
+				return nil
+			},
+			verify: func(t *testing.T, mfs MetricFamilies) {
+				summary := mfs.GetSummary("nan_summary")
+				require.NotNil(t, summary)
+				require.Len(t, summary.Metrics(), 1)
+				qs := summary.Metrics()[0].Summary().Quantiles()
+				require.Len(t, qs, 2)
+				assert.True(t, math.IsNaN(qs[0].Value()))
+				assert.True(t, math.IsNaN(qs[1].Value()))
+				assert.Equal(t, 0.0, summary.Metrics()[0].Summary().Sum())
+				assert.Equal(t, 0.0, summary.Metrics()[0].Summary().Count())
+			},
+		},
+		"drops malformed and incomplete typed groups": {
+			apply: func(t *testing.T, a *Assembler) error {
+				a.beginCycle()
+
+				for _, sample := range []Sample{
+					{
+						Name: "bad_summary",
+						Labels: labels.Labels{
+							{Name: "label1", Value: "value1"},
+							{Name: "quantile", Value: "nope"},
+						},
+						Value:      1,
+						Kind:       SampleKindSummaryQuantile,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name:       "bad_summary_sum",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      2,
+						Kind:       SampleKindSummarySum,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name:       "bad_summary_count",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      3,
+						Kind:       SampleKindSummaryCount,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name: "bad_histogram_bucket",
+						Labels: labels.Labels{
+							{Name: "label1", Value: "value1"},
+							{Name: "le", Value: "nope"},
+						},
+						Value:      4,
+						Kind:       SampleKindHistogramBucket,
+						FamilyType: model.MetricTypeHistogram,
+					},
+					{
+						Name:       "bad_histogram_sum",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      5,
+						Kind:       SampleKindHistogramSum,
+						FamilyType: model.MetricTypeHistogram,
+					},
+					{
+						Name:       "bad_histogram_count",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      6,
+						Kind:       SampleKindHistogramCount,
+						FamilyType: model.MetricTypeHistogram,
+					},
+					{
+						Name:       "incomplete_summary",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      7,
+						Kind:       SampleKindScalar,
+						FamilyType: model.MetricTypeSummary,
+					},
+					{
+						Name:       "incomplete_histogram",
+						Labels:     labels.Labels{{Name: "label1", Value: "value1"}},
+						Value:      8,
+						Kind:       SampleKindScalar,
+						FamilyType: model.MetricTypeHistogram,
+					},
+				} {
+					if err := a.ApplySample(sample); err != nil {
+						return err
+					}
+				}
+
+				return nil
+			},
+			verify: func(t *testing.T, mfs MetricFamilies) {
+				assert.Nil(t, mfs.Get("bad_summary"))
+				assert.Nil(t, mfs.Get("bad_histogram"))
+				assert.Nil(t, mfs.Get("incomplete_summary"))
+				assert.Nil(t, mfs.Get("incomplete_histogram"))
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			a := NewAssembler()
+			require.NoError(t, test.apply(t, a))
+			test.verify(t, a.MetricFamilies())
+		})
+	}
+}

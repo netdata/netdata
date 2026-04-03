@@ -6,9 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/prometheus/prometheus/model/labels"
-
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 )
 
 // Server stats: https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/statistics#
@@ -33,7 +32,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) collectServerStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
+func (c *Collector) collectServerStats(mx map[string]int64, mfs promscrapemodel.MetricFamilies) {
 	seen := make(map[string]bool)
 	for _, n := range []string{
 		"envoy_server_uptime",
@@ -43,7 +42,7 @@ func (c *Collector) collectServerStats(mx map[string]int64, mfs prometheus.Metri
 		"envoy_server_parent_connections",
 		"envoy_server_total_connections",
 	} {
-		c.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
+		c.collectGauge(mfs, n, func(name string, m promscrapemodel.Metric) {
 			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
@@ -56,7 +55,7 @@ func (c *Collector) collectServerStats(mx map[string]int64, mfs prometheus.Metri
 		})
 	}
 
-	c.collectGauge(mfs, "envoy_server_state", func(name string, m prometheus.Metric) {
+	c.collectGauge(mfs, "envoy_server_state", func(name string, m promscrapemodel.Metric) {
 		id := c.joinLabels(m.Labels())
 		for _, v := range []string{"live", "draining", "pre_initializing", "initializing"} {
 			mx[join(name, v, id)] = 0
@@ -82,7 +81,7 @@ func (c *Collector) collectServerStats(mx map[string]int64, mfs prometheus.Metri
 	}
 }
 
-func (c *Collector) collectClusterManagerStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
+func (c *Collector) collectClusterManagerStats(mx map[string]int64, mfs promscrapemodel.MetricFamilies) {
 	seen := make(map[string]bool)
 	for _, n := range []string{
 		"envoy_cluster_manager_cluster_added",
@@ -93,7 +92,7 @@ func (c *Collector) collectClusterManagerStats(mx map[string]int64, mfs promethe
 		"envoy_cluster_manager_update_merge_cancelled",
 		"envoy_cluster_manager_update_out_of_merge_window",
 	} {
-		c.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
+		c.collectCounter(mfs, n, func(name string, m promscrapemodel.Metric) {
 			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
@@ -110,7 +109,7 @@ func (c *Collector) collectClusterManagerStats(mx map[string]int64, mfs promethe
 		"envoy_cluster_manager_active_clusters",
 		"envoy_cluster_manager_warming_clusters",
 	} {
-		c.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
+		c.collectGauge(mfs, n, func(name string, m promscrapemodel.Metric) {
 			id := c.joinLabels(m.Labels())
 			mx[join(name, id)] += int64(m.Gauge().Value())
 		})
@@ -124,7 +123,7 @@ func (c *Collector) collectClusterManagerStats(mx map[string]int64, mfs promethe
 	}
 }
 
-func (c *Collector) collectListenerAdminDownstreamStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
+func (c *Collector) collectListenerAdminDownstreamStats(mx map[string]int64, mfs promscrapemodel.MetricFamilies) {
 	seen := make(map[string]bool)
 	for _, n := range []string{
 		"envoy_listener_admin_downstream_cx_total",
@@ -137,7 +136,7 @@ func (c *Collector) collectListenerAdminDownstreamStats(mx map[string]int64, mfs
 		"envoy_listener_admin_downstream_listener_filter_remote_close",
 		"envoy_listener_admin_downstream_listener_filter_error",
 	} {
-		c.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
+		c.collectCounter(mfs, n, func(name string, m promscrapemodel.Metric) {
 			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
@@ -153,7 +152,7 @@ func (c *Collector) collectListenerAdminDownstreamStats(mx map[string]int64, mfs
 		"envoy_listener_admin_downstream_cx_active",
 		"envoy_listener_admin_downstream_pre_cx_active",
 	} {
-		c.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
+		c.collectGauge(mfs, n, func(name string, m promscrapemodel.Metric) {
 			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
@@ -174,7 +173,7 @@ func (c *Collector) collectListenerAdminDownstreamStats(mx map[string]int64, mfs
 	}
 }
 
-func (c *Collector) collectListenerDownstreamStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
+func (c *Collector) collectListenerDownstreamStats(mx map[string]int64, mfs promscrapemodel.MetricFamilies) {
 	seen := make(map[string]bool)
 	for _, n := range []string{
 		"envoy_listener_downstream_cx_total",
@@ -187,7 +186,7 @@ func (c *Collector) collectListenerDownstreamStats(mx map[string]int64, mfs prom
 		"envoy_listener_downstream_listener_filter_remote_close",
 		"envoy_listener_downstream_listener_filter_error",
 	} {
-		c.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
+		c.collectCounter(mfs, n, func(name string, m promscrapemodel.Metric) {
 			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
@@ -203,7 +202,7 @@ func (c *Collector) collectListenerDownstreamStats(mx map[string]int64, mfs prom
 		"envoy_listener_downstream_cx_active",
 		"envoy_listener_downstream_pre_cx_active",
 	} {
-		c.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
+		c.collectGauge(mfs, n, func(name string, m promscrapemodel.Metric) {
 			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
@@ -224,7 +223,7 @@ func (c *Collector) collectListenerDownstreamStats(mx map[string]int64, mfs prom
 	}
 }
 
-func (c *Collector) collectClusterUpstreamStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
+func (c *Collector) collectClusterUpstreamStats(mx map[string]int64, mfs promscrapemodel.MetricFamilies) {
 	seen := make(map[string]bool)
 	for _, n := range []string{
 		"envoy_cluster_upstream_cx_total",
@@ -264,7 +263,7 @@ func (c *Collector) collectClusterUpstreamStats(mx map[string]int64, mfs prometh
 		"envoy_cluster_update_empty",
 		"envoy_cluster_update_no_rebuild",
 	} {
-		c.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
+		c.collectCounter(mfs, n, func(name string, m promscrapemodel.Metric) {
 			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
@@ -287,7 +286,7 @@ func (c *Collector) collectClusterUpstreamStats(mx map[string]int64, mfs prometh
 		"envoy_cluster_membership_degraded",
 		"envoy_cluster_membership_excluded",
 	} {
-		c.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
+		c.collectGauge(mfs, n, func(name string, m promscrapemodel.Metric) {
 			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
@@ -308,7 +307,7 @@ func (c *Collector) collectClusterUpstreamStats(mx map[string]int64, mfs prometh
 	}
 }
 
-func (c *Collector) collectListenerManagerStats(mx map[string]int64, mfs prometheus.MetricFamilies) {
+func (c *Collector) collectListenerManagerStats(mx map[string]int64, mfs promscrapemodel.MetricFamilies) {
 	seen := make(map[string]bool)
 	for _, n := range []string{
 		"envoy_listener_manager_listener_added",
@@ -319,7 +318,7 @@ func (c *Collector) collectListenerManagerStats(mx map[string]int64, mfs prometh
 		"envoy_listener_manager_listener_create_failure",
 		"envoy_listener_manager_listener_in_place_updated",
 	} {
-		c.collectCounter(mfs, n, func(name string, m prometheus.Metric) {
+		c.collectCounter(mfs, n, func(name string, m promscrapemodel.Metric) {
 			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
@@ -337,7 +336,7 @@ func (c *Collector) collectListenerManagerStats(mx map[string]int64, mfs prometh
 		"envoy_listener_manager_total_listeners_active",
 		"envoy_listener_manager_total_listeners_draining",
 	} {
-		c.collectGauge(mfs, n, func(name string, m prometheus.Metric) {
+		c.collectGauge(mfs, n, func(name string, m promscrapemodel.Metric) {
 			id := c.joinLabels(m.Labels())
 			seen[id] = true
 
@@ -358,7 +357,7 @@ func (c *Collector) collectListenerManagerStats(mx map[string]int64, mfs prometh
 	}
 }
 
-func (c *Collector) collectGauge(mfs prometheus.MetricFamilies, metric string, process func(name string, m prometheus.Metric)) {
+func (c *Collector) collectGauge(mfs promscrapemodel.MetricFamilies, metric string, process func(name string, m promscrapemodel.Metric)) {
 	if mf := mfs.GetGauge(metric); mf != nil {
 		for _, m := range mf.Metrics() {
 			process(mf.Name(), m)
@@ -366,7 +365,7 @@ func (c *Collector) collectGauge(mfs prometheus.MetricFamilies, metric string, p
 	}
 }
 
-func (c *Collector) collectCounter(mfs prometheus.MetricFamilies, metric string, process func(name string, m prometheus.Metric)) {
+func (c *Collector) collectCounter(mfs promscrapemodel.MetricFamilies, metric string, process func(name string, m promscrapemodel.Metric)) {
 	if mf := mfs.GetCounter(metric); mf != nil {
 		for _, m := range mf.Metrics() {
 			process(mf.Name(), m)

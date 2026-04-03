@@ -11,10 +11,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/prometheus/common/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -63,6 +65,234 @@ func TestPrometheusPlain(t *testing.T) {
 	verifyTestData(t, res)
 }
 
+func TestPrometheusScrapeStream(t *testing.T) {
+	tests := map[string]struct {
+		selectorExpr string
+		verify       func(t *testing.T, samples promscrapemodel.Samples)
+	}{
+		"plain": {
+			verify: func(t *testing.T, samples promscrapemodel.Samples) {
+				require.NotEmpty(t, samples)
+
+				sample, ok := findScrapeModelSample(samples, "go_gc_duration_seconds", map[string]string{"quantile": "0.25"})
+				require.True(t, ok)
+				assert.Equal(t, "0.25", sample.Labels.Get("quantile"))
+				assert.Equal(t, model.MetricTypeSummary, sample.FamilyType)
+			},
+		},
+		"with selector": {
+			selectorExpr: "go_gc*",
+			verify: func(t *testing.T, samples promscrapemodel.Samples) {
+				require.NotEmpty(t, samples)
+				for _, sample := range samples {
+					assert.Truef(t, strings.HasPrefix(sample.Name, "go_gc"), sample.Name)
+				}
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tsMux := http.NewServeMux()
+			tsMux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write(testData)
+			})
+			ts := httptest.NewServer(tsMux)
+			defer ts.Close()
+
+			req := web.RequestConfig{URL: ts.URL + "/metrics"}
+
+			var prom Prometheus
+			if test.selectorExpr != "" {
+				sr, err := promselector.Parse(test.selectorExpr)
+				require.NoError(t, err)
+				prom = NewWithSelector(http.DefaultClient, req, sr)
+			} else {
+				prom = New(http.DefaultClient, req)
+			}
+
+			var res promscrapemodel.Samples
+			err := prom.ScrapeStream(func(sample promscrapemodel.Sample) error {
+				res.Add(sample)
+				return nil
+			})
+			require.NoError(t, err)
+			test.verify(t, res)
+		})
+	}
+}
+
+func TestPrometheusScrapeStreamWithMeta(t *testing.T) {
+	tsMux := http.NewServeMux()
+	tsMux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`
+# HELP test_metric Test Metric
+# TYPE test_metric gauge
+test_metric{label="value"} 1
+`))
+	})
+	ts := httptest.NewServer(tsMux)
+	defer ts.Close()
+
+	req := web.RequestConfig{URL: ts.URL + "/metrics"}
+	prom := New(http.DefaultClient, req)
+
+	help := make(map[string]string)
+	var samples promscrapemodel.Samples
+	err := prom.ScrapeStreamWithMeta(
+		func(name, text string) {
+			help[name] = text
+		},
+		func(sample promscrapemodel.Sample) error {
+			samples.Add(sample)
+			return nil
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, samples, 1)
+	assert.Equal(t, "Test Metric", help["test_metric"])
+}
+
+func TestPrometheusScrapeMetricFamilies(t *testing.T) {
+	tests := map[string]struct {
+		payload []byte
+		verify  func(t *testing.T, mfs promscrapemodel.MetricFamilies)
+	}{
+		"plain": {
+			payload: testData,
+			verify: func(t *testing.T, mfs promscrapemodel.MetricFamilies) {
+				require.NotEmpty(t, mfs)
+
+				mf := mfs.GetSummary("go_gc_duration_seconds")
+				require.NotNil(t, mf)
+				assert.NotEmpty(t, mf.Help())
+				require.NotEmpty(t, mf.Metrics())
+				assert.NotEmpty(t, mf.Metrics()[0].Summary().Quantiles())
+			},
+		},
+		"help": {
+			payload: []byte(`
+# HELP test_metric Test Metric
+# TYPE test_metric gauge
+test_metric{label="value"} 1
+`),
+			verify: func(t *testing.T, mfs promscrapemodel.MetricFamilies) {
+				require.NotEmpty(t, mfs)
+				mf := mfs.GetGauge("test_metric")
+				require.NotNil(t, mf)
+				assert.Equal(t, "Test Metric", mf.Help())
+			},
+		},
+		"keeps explicit sum and count counters": {
+			payload: []byte(`
+# TYPE handler_latency_test_sum counter
+handler_latency_test_sum{label="value"} 2
+# TYPE handler_latency_test_count counter
+handler_latency_test_count{label="value"} 3
+`),
+			verify: func(t *testing.T, mfs promscrapemodel.MetricFamilies) {
+				require.NotEmpty(t, mfs)
+
+				sum := mfs.GetCounter("handler_latency_test_sum")
+				require.NotNil(t, sum)
+				require.Len(t, sum.Metrics(), 1)
+				assert.Equal(t, 2.0, sum.Metrics()[0].Counter().Value())
+
+				count := mfs.GetCounter("handler_latency_test_count")
+				require.NotNil(t, count)
+				require.Len(t, count.Metrics(), 1)
+				assert.Equal(t, 3.0, count.Metrics()[0].Counter().Value())
+			},
+		},
+		"drops malformed quantile and bucket groups": {
+			payload: []byte(`
+# TYPE bad_summary summary
+bad_summary{label="value",quantile="nope"} 2
+# TYPE bad_histogram histogram
+bad_histogram_bucket{label="value",le="nope"} 3
+`),
+			verify: func(t *testing.T, mfs promscrapemodel.MetricFamilies) {
+				assert.Empty(t, mfs)
+				assert.Nil(t, mfs.Get("bad_summary"))
+				assert.Nil(t, mfs.Get("bad_histogram"))
+			},
+		},
+		"drops incomplete typed summary and histogram bases": {
+			payload: []byte(`
+# TYPE malformed_summary summary
+malformed_summary{label="value"} 4
+# TYPE malformed_histogram histogram
+malformed_histogram{label="value"} 5
+`),
+			verify: func(t *testing.T, mfs promscrapemodel.MetricFamilies) {
+				assert.Empty(t, mfs)
+				assert.Nil(t, mfs.Get("malformed_summary"))
+				assert.Nil(t, mfs.Get("malformed_histogram"))
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tsMux := http.NewServeMux()
+			tsMux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write(test.payload)
+			})
+			ts := httptest.NewServer(tsMux)
+			defer ts.Close()
+
+			req := web.RequestConfig{URL: ts.URL + "/metrics"}
+			prom := New(http.DefaultClient, req)
+
+			res, err := prom.Scrape()
+			require.NoError(t, err)
+			test.verify(t, res)
+		})
+	}
+}
+
+func TestPrometheusScrapeFetchFailurePreservesPreviousResult(t *testing.T) {
+	responses := [][]byte{
+		[]byte(`
+# TYPE test_metric gauge
+test_metric{label="value"} 1
+`),
+		nil,
+	}
+	statuses := []int{http.StatusOK, http.StatusInternalServerError}
+	idx := 0
+
+	tsMux := http.NewServeMux()
+	tsMux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		status := statuses[idx]
+		payload := responses[idx]
+		idx++
+		w.WriteHeader(status)
+		if payload != nil {
+			_, _ = w.Write(payload)
+		}
+	})
+	ts := httptest.NewServer(tsMux)
+	defer ts.Close()
+
+	req := web.RequestConfig{URL: ts.URL + "/metrics"}
+	prom := New(http.DefaultClient, req)
+
+	first, err := prom.Scrape()
+	require.NoError(t, err)
+	require.NotNil(t, first.GetGauge("test_metric"))
+	require.Len(t, first.GetGauge("test_metric").Metrics(), 1)
+	assert.Equal(t, 1.0, first.GetGauge("test_metric").Metrics()[0].Gauge().Value())
+
+	second, err := prom.Scrape()
+	require.Error(t, err)
+	assert.Nil(t, second)
+
+	require.NotNil(t, first.GetGauge("test_metric"))
+	require.Len(t, first.GetGauge("test_metric").Metrics(), 1)
+	assert.Equal(t, 1.0, first.GetGauge("test_metric").Metrics()[0].Gauge().Value())
+}
+
 func TestPrometheusPlainWithSelector(t *testing.T) {
 	tsMux := http.NewServeMux()
 	tsMux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +302,7 @@ func TestPrometheusPlainWithSelector(t *testing.T) {
 	defer ts.Close()
 
 	req := web.RequestConfig{URL: ts.URL + "/metrics"}
-	sr, err := selector.Parse("go_gc*")
+	sr, err := promselector.Parse("go_gc*")
 	require.NoError(t, err)
 	prom := NewWithSelector(http.DefaultClient, req, sr)
 
@@ -131,7 +361,7 @@ func TestPrometheusReadFromFile(t *testing.T) {
 	}
 }
 
-func verifyTestData(t *testing.T, ms Series) {
+func verifyTestData(t *testing.T, ms promscrapemodel.Series) {
 	assert.Equal(t, 410, len(ms))
 	assert.Equal(t, "go_gc_duration_seconds", ms[0].Labels.Get("__name__"))
 	assert.Equal(t, "0.25", ms[0].Labels.Get("quantile"))
@@ -143,4 +373,25 @@ func verifyTestData(t *testing.T, ms Series) {
 
 	targetInterval := ms.FindByName("prometheus_target_interval_length_seconds")
 	assert.Len(t, targetInterval, 5)
+}
+
+func findScrapeModelSample(samples []promscrapemodel.Sample, name string, labelsMatch map[string]string) (promscrapemodel.Sample, bool) {
+	for _, sample := range promscrapemodel.Samples(samples).FindByName(name) {
+		if sample.Name != name {
+			continue
+		}
+
+		matched := true
+		for key, value := range labelsMatch {
+			if sample.Labels.Get(key) != value {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return sample, true
+		}
+	}
+
+	return promscrapemodel.Sample{}, false
 }

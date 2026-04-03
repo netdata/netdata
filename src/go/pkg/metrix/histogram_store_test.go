@@ -244,6 +244,42 @@ func TestHistogramStoreScenarios(t *testing.T) {
 				mustValue(t, s.Read(ReadRaw(), ReadFlatten()), "svc.latency_bucket", Labels{"le": "1"}, 1)
 			},
 		},
+		"stale snapshot scalar does not suppress fresh flattened histogram series in non-raw read": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				h := s.Write().SnapshotMeter("svc").Histogram("latency", WithHistogramBounds(1))
+				c := s.Write().SnapshotMeter("svc").Counter("latency_count")
+
+				cc.BeginCycle()
+				h.ObservePoint(HistogramPoint{
+					Count: 1, Sum: 0.1,
+					Buckets: []BucketPoint{
+						{UpperBound: 1, CumulativeCount: 1},
+					},
+				})
+				c.ObserveTotal(7)
+				cc.CommitCycleSuccess()
+
+				cc.BeginCycle()
+				h.ObservePoint(HistogramPoint{
+					Count: 2, Sum: 0.3,
+					Buckets: []BucketPoint{
+						{UpperBound: 1, CumulativeCount: 2},
+					},
+				})
+				cc.CommitCycleSuccess()
+
+				flat := s.Read(ReadFlatten())
+				mustValue(t, flat, "svc.latency_count", nil, 2)
+				require.Zero(t, flat.CollectMeta().FlattenCollisionCount, "expected stale scalar filtered before flatten collisions")
+
+				rawFlat := s.Read(ReadRaw(), ReadFlatten())
+				_, ok := rawFlat.Value("svc.latency_count", nil)
+				require.False(t, ok, "expected raw flattened read to suppress colliding stale scalar and fresh histogram count")
+				require.Equal(t, uint64(1), rawFlat.CollectMeta().FlattenCollisionCount)
+			},
+		},
 		"histogram flatten label collision panics": {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()

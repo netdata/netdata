@@ -90,9 +90,10 @@ const (
 )
 
 type CollectMeta struct {
-	LastAttemptSeq    uint64
-	LastAttemptStatus CollectStatus
-	LastSuccessSeq    uint64
+	LastAttemptSeq        uint64
+	LastAttemptStatus     CollectStatus
+	LastSuccessSeq        uint64
+	FlattenCollisionCount uint64
 }
 
 type QuantilePoint struct {

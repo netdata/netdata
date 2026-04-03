@@ -187,21 +187,25 @@ func (r *storeReader) CollectMeta() CollectMeta {
 	return r.snap.collectMeta
 }
 
-func flattenSnapshot(src *readSnapshot) *readSnapshot {
+func flattenSnapshot(src *readSnapshot, raw bool) *readSnapshot {
 	series := snapshotSeriesView(src)
 	dst := &readSnapshot{
-		collectMeta: src.collectMeta,
-		series:      make(map[string]*committedSeries, len(series)),
-		byName:      make(map[string][]*committedSeries),
+		collectMeta:       src.collectMeta,
+		series:            make(map[string]*committedSeries, len(series)),
+		byName:            make(map[string][]*committedSeries),
+		flattenSuppressed: make(map[string]struct{}),
 	}
 
 	for _, s := range series {
 		if s.desc == nil {
 			continue
 		}
+		if !visibleSeries(src.collectMeta, raw, s) {
+			continue
+		}
 		switch s.desc.kind {
 		case kindGauge, kindCounter:
-			dst.series[s.key] = cloneCommittedSeries(s)
+			putFlattenedSeries(dst, cloneCommittedSeries(s))
 		case kindHistogram:
 			appendFlattenedHistogramSeries(dst, s)
 		case kindSummary:
@@ -215,6 +219,22 @@ func flattenSnapshot(src *readSnapshot) *readSnapshot {
 
 	dst.byName = buildByName(dst.series)
 	return dst
+}
+
+func putFlattenedSeries(dst *readSnapshot, series *committedSeries) {
+	if dst == nil || series == nil {
+		return
+	}
+	if _, suppressed := dst.flattenSuppressed[series.key]; suppressed {
+		return
+	}
+	if _, exists := dst.series[series.key]; exists {
+		delete(dst.series, series.key)
+		dst.flattenSuppressed[series.key] = struct{}{}
+		dst.collectMeta.FlattenCollisionCount++
+		return
+	}
+	dst.series[series.key] = series
 }
 
 func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
@@ -242,7 +262,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 
 		name := src.name + "_bucket"
 		key := makeSeriesKey(name, labelsKey)
-		dst.series[key] = &committedSeries{
+		putFlattenedSeries(dst, &committedSeries{
 			id:        SeriesID(key),
 			hash64:    seriesIDHash(SeriesID(key)),
 			key:       key,
@@ -264,7 +284,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 				MetricKindHistogram,
 				FlattenRoleHistogramBucket,
 			),
-		}
+		})
 	}
 
 	infMap := make(map[string]string, len(src.labels)+1)
@@ -276,7 +296,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 	if err == nil {
 		infName := src.name + "_bucket"
 		infKey := makeSeriesKey(infName, infLabelsKey)
-		dst.series[infKey] = &committedSeries{
+		putFlattenedSeries(dst, &committedSeries{
 			id:        SeriesID(infKey),
 			hash64:    seriesIDHash(SeriesID(infKey)),
 			key:       infKey,
@@ -298,7 +318,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 				MetricKindHistogram,
 				FlattenRoleHistogramBucket,
 			),
-		}
+		})
 	}
 
 	appendFlattenedHistogramScalar(
@@ -329,7 +349,7 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Lab
 		return
 	}
 	key := makeSeriesKey(name, labelsKey)
-	dst.series[key] = &committedSeries{
+	putFlattenedSeries(dst, &committedSeries{
 		id:        SeriesID(key),
 		hash64:    seriesIDHash(SeriesID(key)),
 		key:       key,
@@ -346,7 +366,7 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, name string, labels []Lab
 		},
 		value: value,
 		meta:  meta,
-	}
+	})
 }
 
 func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
@@ -387,7 +407,7 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 			continue
 		}
 		key := makeSeriesKey(src.name, labelsKey)
-		dst.series[key] = &committedSeries{
+		putFlattenedSeries(dst, &committedSeries{
 			id:        SeriesID(key),
 			hash64:    seriesIDHash(SeriesID(key)),
 			key:       key,
@@ -409,7 +429,7 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 				MetricKindSummary,
 				FlattenRoleSummaryQuantile,
 			),
-		}
+		})
 	}
 }
 
@@ -437,7 +457,7 @@ func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
 		}
 
 		key := makeSeriesKey(src.name, labelsKey)
-		dst.series[key] = &committedSeries{
+		putFlattenedSeries(dst, &committedSeries{
 			id:        SeriesID(key),
 			hash64:    seriesIDHash(SeriesID(key)),
 			key:       key,
@@ -459,7 +479,7 @@ func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
 				MetricKindStateSet,
 				FlattenRoleStateSetState,
 			),
-		}
+		})
 	}
 }
 
@@ -525,7 +545,7 @@ func appendFlattenedMeasureSetSeries(dst *readSnapshot, src *committedSeries) {
 				series.counterPreviousSeq = src.measureSetPreviousSeq
 			}
 		}
-		dst.series[key] = series
+		putFlattenedSeries(dst, series)
 	}
 }
 
@@ -668,7 +688,11 @@ func materializeRuntimeSeries(snap *readSnapshot) map[string]*committedSeries {
 
 // visible applies freshness policy for Read(); Read(ReadRaw()) bypasses it.
 func (r *storeReader) visible(s *committedSeries) bool {
-	if r.raw {
+	return visibleSeries(r.snap.collectMeta, r.raw, s)
+}
+
+func visibleSeries(meta CollectMeta, raw bool, s *committedSeries) bool {
+	if raw {
 		return true
 	}
 	if s.desc == nil {
@@ -677,6 +701,5 @@ func (r *storeReader) visible(s *committedSeries) bool {
 	if s.desc.freshness == FreshnessCommitted {
 		return true
 	}
-	meta := r.snap.collectMeta
 	return meta.LastAttemptStatus == CollectStatusSuccess && s.meta.LastSeenSuccessSeq == meta.LastSuccessSeq
 }

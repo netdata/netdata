@@ -13,16 +13,21 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 type (
 	// Prometheus is a helper for scrape and parse prometheus format metrics.
 	Prometheus interface {
-		// ScrapeSeries and parse prometheus format metrics
-		ScrapeSeries() (Series, error)
-		Scrape() (MetricFamilies, error)
+		// Scrape fetches and returns assembled metric families.
+		Scrape() (promscrapemodel.MetricFamilies, error)
+		// ScrapeStream fetches and streams final-classified samples to the callback.
+		ScrapeStream(func(promscrapemodel.Sample) error) error
+		// ScrapeStreamWithMeta fetches and streams HELP metadata and final-classified samples.
+		ScrapeStreamWithMeta(func(name, help string), func(promscrapemodel.Sample) error) error
+		ScrapeSeries() (promscrapemodel.Series, error)
 		HTTPClient() *http.Client
 	}
 
@@ -31,9 +36,12 @@ type (
 		request  web.RequestConfig
 		filepath string
 
-		sr selector.Selector
+		sr promselector.Selector
 
-		parser promTextParser
+		parser       promscrapemodel.SeriesParser
+		scrapeParser promscrapemodel.Parser
+		fastParser   promscrapemodel.FastParser
+		assembler    promscrapemodel.Assembler
 
 		buf     *bytes.Buffer
 		gzipr   *gzip.Reader
@@ -51,13 +59,15 @@ func New(client *http.Client, request web.RequestConfig) Prometheus {
 }
 
 // NewWithSelector creates a Prometheus instance with the selector.
-func NewWithSelector(client *http.Client, request web.RequestConfig, sr selector.Selector) Prometheus {
+func NewWithSelector(client *http.Client, request web.RequestConfig, sr promselector.Selector) Prometheus {
 	p := &prometheus{
-		client:  client,
-		request: request,
-		sr:      sr,
-		buf:     bytes.NewBuffer(make([]byte, 0, 16000)),
-		parser:  promTextParser{sr: sr},
+		client:       client,
+		request:      request,
+		sr:           sr,
+		buf:          bytes.NewBuffer(make([]byte, 0, 16000)),
+		parser:       promscrapemodel.NewSeriesParser(sr),
+		scrapeParser: promscrapemodel.NewParser(sr),
+		fastParser:   promscrapemodel.NewFastParser(sr),
 	}
 
 	if v, err := url.Parse(request.URL); err == nil && v.Scheme == "file" {
@@ -71,25 +81,57 @@ func (p *prometheus) HTTPClient() *http.Client {
 	return p.client
 }
 
-// ScrapeSeries scrapes metrics, parses and sorts
-func (p *prometheus) ScrapeSeries() (Series, error) {
-	p.buf.Reset()
-
-	if err := p.fetch(p.buf); err != nil {
+func (p *prometheus) Scrape() (promscrapemodel.MetricFamilies, error) {
+	body, err := p.fetchScrapeBody()
+	if err != nil {
 		return nil, err
 	}
 
-	return p.parser.parseToSeries(p.buf.Bytes())
+	p.assembler.BeginCycle()
+
+	if err := p.fastParser.ParseToAssembler(body, &p.assembler); err != nil {
+		return nil, err
+	}
+
+	return p.assembler.MetricFamilies(), nil
 }
 
-func (p *prometheus) Scrape() (MetricFamilies, error) {
+func (p *prometheus) ScrapeStream(onSample func(promscrapemodel.Sample) error) error {
+	return p.scrapeStreamWithMeta(nil, onSample)
+}
+
+func (p *prometheus) ScrapeStreamWithMeta(onHelp func(name, help string), onSample func(promscrapemodel.Sample) error) error {
+	return p.scrapeStreamWithMeta(onHelp, onSample)
+}
+
+// ScrapeSeries scrapes metrics, parses and sorts
+func (p *prometheus) ScrapeSeries() (promscrapemodel.Series, error) {
 	p.buf.Reset()
 
 	if err := p.fetch(p.buf); err != nil {
 		return nil, err
 	}
 
-	return p.parser.parseToMetricFamilies(p.buf.Bytes())
+	return p.parser.Parse(p.buf.Bytes())
+}
+
+func (p *prometheus) scrapeStreamWithMeta(onHelp func(name, help string), onSample func(promscrapemodel.Sample) error) error {
+	body, err := p.fetchScrapeBody()
+	if err != nil {
+		return err
+	}
+
+	return p.scrapeParser.ParseStreamWithMeta(body, onHelp, onSample)
+}
+
+func (p *prometheus) fetchScrapeBody() ([]byte, error) {
+	p.buf.Reset()
+
+	if err := p.fetch(p.buf); err != nil {
+		return nil, err
+	}
+
+	return p.buf.Bytes(), nil
 }
 
 func (p *prometheus) fetch(w io.Writer) error {

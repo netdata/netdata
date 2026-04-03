@@ -11,14 +11,19 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
+
+//go:embed "charts_v2.yaml"
+var chartTemplateYAML string
 
 func init() {
 	collectorapi.Register("prometheus", collectorapi.Creator{
@@ -26,12 +31,13 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		Create: func() collectorapi.CollectorV1 { return New() },
-		Config: func() any { return &Config{} },
+		CreateV2: func() collectorapi.CollectorV2 { return New() },
+		Config:   func() any { return &Config{} },
 	})
 }
 
 func New() *Collector {
+	store := metrix.NewCollectorStore()
 	return &Collector{
 		Config: Config{
 			HTTPConfig: web.HTTPConfig{
@@ -42,24 +48,26 @@ func New() *Collector {
 			MaxTS:          2000,
 			MaxTSPerMetric: 200,
 		},
-		charts: &collectorapi.Charts{},
-		cache:  newCache(),
+		store:              store,
+		loadProfileCatalog: promprofiles.DefaultCatalog,
 	}
 }
 
 type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	web.HTTPConfig     `yaml:",inline" json:""`
-	Name               string        `yaml:"name,omitempty" json:"name"`
-	Application        string        `yaml:"app,omitempty" json:"app"`
-	LabelPrefix        string        `yaml:"label_prefix,omitempty" json:"label_prefix"`
-	Selector           selector.Expr `yaml:"selector,omitempty" json:"selector"`
-	ExpectedPrefix     string        `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
-	MaxTS              int           `yaml:"max_time_series" json:"max_time_series"`
-	MaxTSPerMetric     int           `yaml:"max_time_series_per_metric" json:"max_time_series_per_metric"`
-	FallbackType       struct {
+	Vnode                string `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery          int    `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry   int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	web.HTTPConfig       `yaml:",inline" json:""`
+	Name                 string            `yaml:"name,omitempty" json:"name"`
+	Application          string            `yaml:"app,omitempty" json:"app"`
+	LabelPrefix          string            `yaml:"label_prefix,omitempty" json:"label_prefix"`
+	Selector             promselector.Expr `yaml:"selector,omitempty" json:"selector"`
+	ProfileSelectionMode string            `yaml:"profile_selection_mode,omitempty" json:"profile_selection_mode,omitempty"`
+	Profiles             []string          `yaml:"profiles,omitempty" json:"profiles,omitempty"`
+	ExpectedPrefix       string            `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
+	MaxTS                int               `yaml:"max_time_series" json:"max_time_series"`
+	MaxTSPerMetric       int               `yaml:"max_time_series_per_metric" json:"max_time_series_per_metric"`
+	FallbackType         struct {
 		Gauge   []string `yaml:"gauge,omitempty" json:"gauge"`
 		Counter []string `yaml:"counter,omitempty" json:"counter"`
 	} `yaml:"fallback_type,omitempty" json:"fallback_type"`
@@ -69,15 +77,27 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts *collectorapi.Charts
+	store metrix.CollectorStore
 
-	prom prometheus.Prometheus
+	prom    prometheus.Prometheus
+	scraper *sampleScraper
+	mw      *metricFamilyWriter
 
-	cache        *cache
+	cfgState struct {
+		profileSelectionMode string
+		profiles             []string
+	}
+	probeState struct {
+		expectedPrefix string
+		maxTS          int
+	}
+
+	runtime      *collectorRuntime
 	fallbackType struct {
 		counter matcher.Matcher
 		gauge   matcher.Matcher
 	}
+	loadProfileCatalog func() (promprofiles.Catalog, error)
 }
 
 func (c *Collector) Configuration() any {
@@ -94,6 +114,12 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("init prometheus client: %v", err)
 	}
 	c.prom = prom
+	c.scraper = newSampleScraper(prom)
+	c.mw = newMetricFamilyWriter(c.store, metricFamilyWriterPolicy{
+		maxTSPerMetric:        c.MaxTSPerMetric,
+		isFallbackTypeGauge:   c.isFallbackTypeGauge,
+		isFallbackTypeCounter: c.isFallbackTypeCounter,
+	}, c.Logger)
 
 	m, err := c.initFallbackTypeMatcher(c.FallbackType.Counter)
 	if err != nil {
@@ -111,30 +137,25 @@ func (c *Collector) Init(context.Context) error {
 }
 
 func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
+	count, err := c.check()
 	if err != nil {
 		return err
 	}
-	if len(mx) == 0 {
+	if count == 0 {
 		return errors.New("no metrics collected")
 	}
 	return nil
 }
 
-func (c *Collector) Charts() *collectorapi.Charts {
-	return c.charts
-}
+func (c *Collector) Collect(ctx context.Context) error { return c.collect(ctx) }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
-	if err != nil {
-		c.Error(err)
-	}
+func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
-	if len(mx) == 0 {
-		return nil
+func (c *Collector) ChartTemplateYAML() string {
+	if c.runtime != nil && c.runtime.chartTemplateYAML != "" {
+		return c.runtime.chartTemplateYAML
 	}
-	return mx
+	return chartTemplateYAML
 }
 
 func (c *Collector) Cleanup(context.Context) {

@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -27,7 +27,7 @@ func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
 	return prom, nil
 }
 
-var sr, _ = selector.Expr{
+var sr, _ = promselector.Expr{
 	Allow: []string{
 		metricEntrypointRequestDurationSecondsSum,
 		metricEntrypointRequestDurationSecondsCount,

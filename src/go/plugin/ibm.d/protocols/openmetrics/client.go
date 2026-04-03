@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promselector"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
@@ -77,7 +77,7 @@ func NewClientWithHTTP(cfg Config, httpClient *http.Client) (*Client, error) {
 }
 
 // FetchSeries retrieves the metrics and returns them as a list of series samples.
-func (c *Client) FetchSeries(ctx context.Context, sr selector.Selector) (prometheus.Series, error) {
+func (c *Client) FetchSeries(ctx context.Context, sr promselector.Selector) (promscrapemodel.Series, error) {
 	payload, err := c.fetch(ctx)
 	if err != nil {
 		return nil, err

@@ -1,0 +1,6 @@
+version: v1
+engine:
+  autogen:
+    enabled: true
+groups:
+  - family: prometheus

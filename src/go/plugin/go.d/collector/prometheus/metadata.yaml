@@ -83,7 +83,7 @@ modules:
                 This option allows you to filter out unwanted time series. Only metrics matching the selector will be collected.
 
                 - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
-                - Pattern syntax: [selector](/src/go/pkg/prometheus/selector/README.md).
+                - Pattern syntax: [selector](/src/go/pkg/prometheus/promselector/README.md).
                 - Option syntax:
                 
                 ```yaml
@@ -95,6 +95,29 @@ modules:
                     - pattern3
                     - pattern4
                 ```
+
+            - name: profile_selection_mode
+              description: Curated Prometheus profile selection mode.
+              default_value: auto
+              required: false
+              group: Curated Profiles
+              detailed_description: |
+                This option controls how curated Prometheus profiles are selected.
+
+                - `auto`: use only auto-matched curated profiles and keep `profiles` empty.
+                - `exact`: use only the explicitly listed `profiles`.
+                - `combined`: keep explicit `profiles` first, then append auto-matched curated profiles that were not already selected.
+
+            - name: profiles
+              description: Explicit curated Prometheus profile names.
+              default_value: ""
+              required: false
+              group: Curated Profiles
+              detailed_description: |
+                This option lists explicit curated Prometheus profile names.
+
+                - Must be empty when `profile_selection_mode: auto`.
+                - Required when `profile_selection_mode: exact` or `combined`.
 
             - name: max_time_series
               description: Global time series limit. If an endpoint returns more time series than this, the data is not processed.

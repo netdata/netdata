@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/prometheus/common/model"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	mtx "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
@@ -80,7 +80,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 }
 
 // collectRequests collects apiserver_request_total, apiserver_request_duration_seconds, etc.
-func (c *Collector) collectRequests(mfs prometheus.MetricFamilies, mx *metrics) {
+func (c *Collector) collectRequests(mfs promscrapemodel.MetricFamilies, mx *metrics) {
 	// Total requests and by verb/code/resource
 	// Prefer apiserver_request_total (newer), fall back to apiserver_request_count (legacy)
 	mf := mfs.Get("apiserver_request_total")
@@ -152,7 +152,7 @@ func (c *Collector) collectRequests(mfs prometheus.MetricFamilies, mx *metrics) 
 	c.collectResponseSize(mfs, mx)
 }
 
-func (c *Collector) collectRequestLatency(mfs prometheus.MetricFamilies, mx *metrics) {
+func (c *Collector) collectRequestLatency(mfs promscrapemodel.MetricFamilies, mx *metrics) {
 	mf := mfs.Get("apiserver_request_duration_seconds")
 	if mf == nil || mf.Type() != model.MetricTypeHistogram {
 		return
@@ -172,7 +172,7 @@ func (c *Collector) collectRequestLatency(mfs prometheus.MetricFamilies, mx *met
 	}
 }
 
-func (c *Collector) collectResponseSize(mfs prometheus.MetricFamilies, mx *metrics) {
+func (c *Collector) collectResponseSize(mfs promscrapemodel.MetricFamilies, mx *metrics) {
 	mf := mfs.Get("apiserver_response_sizes")
 	if mf == nil || mf.Type() != model.MetricTypeHistogram {
 		return
@@ -193,7 +193,7 @@ func (c *Collector) collectResponseSize(mfs prometheus.MetricFamilies, mx *metri
 }
 
 // collectInflight collects apiserver_current_inflight_requests and apiserver_longrunning_requests
-func (c *Collector) collectInflight(mfs prometheus.MetricFamilies, mx *metrics) {
+func (c *Collector) collectInflight(mfs promscrapemodel.MetricFamilies, mx *metrics) {
 	if mf := mfs.Get("apiserver_current_inflight_requests"); mf != nil {
 		for _, m := range mf.Metrics() {
 			value := metricValue(mf, m)
@@ -223,7 +223,7 @@ func (c *Collector) collectInflight(mfs prometheus.MetricFamilies, mx *metrics) 
 }
 
 // collectRESTClient collects rest_client_requests_total and rest_client_request_duration_seconds
-func (c *Collector) collectRESTClient(mfs prometheus.MetricFamilies, mx *metrics) {
+func (c *Collector) collectRESTClient(mfs promscrapemodel.MetricFamilies, mx *metrics) {
 	codeChart := c.charts.Get("rest_client_requests_by_code")
 	methodChart := c.charts.Get("rest_client_requests_by_method")
 
@@ -293,7 +293,7 @@ func (c *Collector) collectRESTClient(mfs prometheus.MetricFamilies, mx *metrics
 }
 
 // collectAdmission collects admission controller and webhook metrics
-func (c *Collector) collectAdmission(mfs prometheus.MetricFamilies, mx *metrics) {
+func (c *Collector) collectAdmission(mfs promscrapemodel.MetricFamilies, mx *metrics) {
 	// Admission step latency - aggregate buckets across all operation/rejected label combinations
 	if mf := mfs.Get("apiserver_admission_step_admission_duration_seconds"); mf != nil && mf.Type() == model.MetricTypeHistogram {
 		// Use map[type][le] -> count for proper aggregation
@@ -347,7 +347,7 @@ func (c *Collector) collectAdmission(mfs prometheus.MetricFamilies, mx *metrics)
 	c.collectAdmissionWebhookLatency(mfs, mx)
 }
 
-func (c *Collector) collectAdmissionControllerLatency(mfs prometheus.MetricFamilies, mx *metrics) {
+func (c *Collector) collectAdmissionControllerLatency(mfs promscrapemodel.MetricFamilies, mx *metrics) {
 	mf := mfs.Get("apiserver_admission_controller_admission_duration_seconds")
 	if mf == nil || mf.Type() != model.MetricTypeHistogram {
 		return
@@ -412,7 +412,7 @@ func (c *Collector) collectAdmissionControllerLatency(mfs prometheus.MetricFamil
 	}
 }
 
-func (c *Collector) collectAdmissionWebhookLatency(mfs prometheus.MetricFamilies, mx *metrics) {
+func (c *Collector) collectAdmissionWebhookLatency(mfs promscrapemodel.MetricFamilies, mx *metrics) {
 	mf := mfs.Get("apiserver_admission_webhook_admission_duration_seconds")
 	if mf == nil || mf.Type() != model.MetricTypeHistogram {
 		return
@@ -477,7 +477,7 @@ func (c *Collector) collectAdmissionWebhookLatency(mfs prometheus.MetricFamilies
 }
 
 // collectEtcd collects etcd/storage object count metrics
-func (c *Collector) collectEtcd(mfs prometheus.MetricFamilies, mx *metrics) {
+func (c *Collector) collectEtcd(mfs promscrapemodel.MetricFamilies, mx *metrics) {
 	chart := c.charts.Get("etcd_object_counts")
 	if chart == nil {
 		chart = newEtcdObjectCountsChart()
@@ -522,7 +522,7 @@ func (c *Collector) collectEtcd(mfs prometheus.MetricFamilies, mx *metrics) {
 }
 
 // collectWorkqueues collects controller work queue metrics
-func (c *Collector) collectWorkqueues(mfs prometheus.MetricFamilies, mx *metrics) {
+func (c *Collector) collectWorkqueues(mfs promscrapemodel.MetricFamilies, mx *metrics) {
 	// Pre-index metrics by queue name
 	depthByName := make(map[string]float64)
 	addsByName := make(map[string]float64)
@@ -617,7 +617,7 @@ func (c *Collector) collectWorkqueues(mfs prometheus.MetricFamilies, mx *metrics
 
 		// Queue latency (histogram)
 		if queueLatencyMF != nil && queueLatencyMF.Type() == model.MetricTypeHistogram {
-			hd := collectHistogramBucketsFromMF(queueLatencyMF, func(m prometheus.Metric) bool {
+			hd := collectHistogramBucketsFromMF(queueLatencyMF, func(m promscrapemodel.Metric) bool {
 				return m.Labels().Get("name") == queueName
 			})
 			if len(hd.buckets) > 0 {
@@ -635,7 +635,7 @@ func (c *Collector) collectWorkqueues(mfs prometheus.MetricFamilies, mx *metrics
 
 		// Work duration (histogram)
 		if workDurationMF != nil && workDurationMF.Type() == model.MetricTypeHistogram {
-			hd := collectHistogramBucketsFromMF(workDurationMF, func(m prometheus.Metric) bool {
+			hd := collectHistogramBucketsFromMF(workDurationMF, func(m promscrapemodel.Metric) bool {
 				return m.Labels().Get("name") == queueName
 			})
 			if len(hd.buckets) > 0 {
@@ -654,7 +654,7 @@ func (c *Collector) collectWorkqueues(mfs prometheus.MetricFamilies, mx *metrics
 }
 
 // collectProcess collects Go runtime and process metrics
-func (c *Collector) collectProcess(mfs prometheus.MetricFamilies, mx *metrics) {
+func (c *Collector) collectProcess(mfs promscrapemodel.MetricFamilies, mx *metrics) {
 	mx.Process.Goroutines.Set(getMaxValue(mfs, "go_goroutines"))
 	mx.Process.Threads.Set(getMaxValue(mfs, "go_threads"))
 	mx.Process.CPUSeconds.Set(getMaxValue(mfs, "process_cpu_seconds_total") * precision)
@@ -694,13 +694,13 @@ func (c *Collector) collectProcess(mfs prometheus.MetricFamilies, mx *metrics) {
 }
 
 // collectAudit collects audit event metrics
-func (c *Collector) collectAudit(mfs prometheus.MetricFamilies, mx *metrics) {
+func (c *Collector) collectAudit(mfs promscrapemodel.MetricFamilies, mx *metrics) {
 	mx.Audit.EventsTotal.Set(getMaxValue(mfs, "apiserver_audit_event_total"))
 	mx.Audit.RejectedTotal.Set(getMaxValue(mfs, "apiserver_audit_requests_rejected_total"))
 }
 
 // collectAuth collects authentication metrics
-func (c *Collector) collectAuth(mfs prometheus.MetricFamilies, mx *metrics) {
+func (c *Collector) collectAuth(mfs promscrapemodel.MetricFamilies, mx *metrics) {
 	// Sum across all usernames
 	if mf := mfs.Get("authenticated_user_requests"); mf != nil {
 		for _, m := range mf.Metrics() {
@@ -803,7 +803,7 @@ func simplifyResourceName(resource string) string {
 }
 
 // metricValue extracts the value from a metric based on its type
-func metricValue(mf *prometheus.MetricFamily, m prometheus.Metric) float64 {
+func metricValue(mf *promscrapemodel.MetricFamily, m promscrapemodel.Metric) float64 {
 	switch mf.Type() {
 	case model.MetricTypeGauge:
 		if m.Gauge() != nil {
@@ -825,7 +825,7 @@ func metricValue(mf *prometheus.MetricFamily, m prometheus.Metric) float64 {
 }
 
 // getMaxValue gets the maximum value across all metrics in a family
-func getMaxValue(mfs prometheus.MetricFamilies, name string) float64 {
+func getMaxValue(mfs promscrapemodel.MetricFamilies, name string) float64 {
 	mf := mfs.Get(name)
 	if mf == nil {
 		return 0
@@ -853,7 +853,7 @@ type histogramData struct {
 }
 
 // collectHistogramBucketsFromMF collects histogram buckets from a metric family
-func collectHistogramBucketsFromMF(mf *prometheus.MetricFamily, filter func(prometheus.Metric) bool) histogramData {
+func collectHistogramBucketsFromMF(mf *promscrapemodel.MetricFamily, filter func(promscrapemodel.Metric) bool) histogramData {
 	bucketMap := make(map[float64]float64)
 	var total float64
 

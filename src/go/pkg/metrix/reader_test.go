@@ -29,7 +29,7 @@ func TestFlattenSnapshotScenarios(t *testing.T) {
 					},
 				}
 
-				flat := flattenSnapshot(src)
+				flat := flattenSnapshot(src, true)
 				r := &storeReader{snap: flat}
 
 				_, ok := r.Value("svc.latency_bucket", Labels{"le": "1"})
@@ -58,7 +58,7 @@ func TestFlattenSnapshotScenarios(t *testing.T) {
 					},
 				}
 
-				flat := flattenSnapshot(src)
+				flat := flattenSnapshot(src, true)
 				require.Contains(t, flat.series, "svc.latency_count")
 				require.Contains(t, flat.series, "svc.latency_sum")
 				r := &storeReader{snap: flat, raw: true}
@@ -67,6 +67,47 @@ func TestFlattenSnapshotScenarios(t *testing.T) {
 				mustValue(t, r, "svc.latency_sum", nil, 1.2)
 				_, ok := r.Value("svc.latency", Labels{"quantile": "0.5"})
 				require.False(t, ok, "expected malformed summary quantile series to be skipped")
+			},
+		},
+		"flattened key collision suppresses both outputs and tracks metadata": {
+			run: func(t *testing.T) {
+				histKey := makeSeriesKey("svc.latency", "")
+				countKey := makeSeriesKey("svc.latency_count", "")
+				src := &readSnapshot{
+					collectMeta: CollectMeta{
+						LastAttemptStatus: CollectStatusSuccess,
+						LastAttemptSeq:    1,
+						LastSuccessSeq:    1,
+					},
+					series: map[string]*committedSeries{
+						histKey: {
+							key:                 histKey,
+							name:                "svc.latency",
+							desc:                &instrumentDescriptor{name: "svc.latency", kind: kindHistogram, mode: modeSnapshot, freshness: FreshnessCycle, histogram: &histogramSchema{bounds: []float64{1}}},
+							meta:                SeriesMeta{LastSeenSuccessSeq: 1},
+							histogramCount:      1,
+							histogramSum:        0.1,
+							histogramCumulative: []SampleValue{1},
+						},
+						countKey: {
+							key:   countKey,
+							name:  "svc.latency_count",
+							desc:  &instrumentDescriptor{name: "svc.latency_count", kind: kindCounter, mode: modeSnapshot, freshness: FreshnessCycle},
+							meta:  SeriesMeta{LastSeenSuccessSeq: 1},
+							value: 7,
+						},
+					},
+				}
+
+				flat := flattenSnapshot(src, true)
+				require.Equal(t, uint64(1), flat.collectMeta.FlattenCollisionCount)
+
+				r := &storeReader{snap: flat, raw: true, flattened: true}
+				_, ok := r.Value("svc.latency_count", nil)
+				require.False(t, ok, "expected collided flattened count series to be suppressed")
+				mustValue(t, r, "svc.latency_sum", nil, 0.1)
+				mustValue(t, r, "svc.latency_bucket", Labels{"le": "1"}, 1)
+				mustValue(t, r, "svc.latency_bucket", Labels{"le": "+Inf"}, 1)
 			},
 		},
 	}

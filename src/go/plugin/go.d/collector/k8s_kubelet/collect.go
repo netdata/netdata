@@ -6,7 +6,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/promscrapemodel"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	mtx "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
@@ -30,7 +30,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return stm.ToMap(mx), nil
 }
 
-func (c *Collector) collectLogsUsagePerPod(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectLogsUsagePerPod(raw promscrapemodel.Series, mx *metrics) {
 	chart := c.charts.Get("kubelet_pods_log_filesystem_used_bytes")
 	seen := make(map[string]bool)
 
@@ -65,7 +65,7 @@ func (c *Collector) collectLogsUsagePerPod(raw prometheus.Series, mx *metrics) {
 	}
 }
 
-func (c *Collector) collectVolumeManager(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectVolumeManager(raw promscrapemodel.Series, mx *metrics) {
 	vmPlugins := make(map[string]*volumeManagerPlugin)
 
 	for _, metric := range raw.FindByName("volume_manager_total_volumes") {
@@ -91,7 +91,7 @@ func (c *Collector) collectVolumeManager(raw prometheus.Series, mx *metrics) {
 	mx.VolumeManager.Plugins = vmPlugins
 }
 
-func (c *Collector) collectKubelet(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectKubelet(raw promscrapemodel.Series, mx *metrics) {
 	value := raw.FindByName("kubelet_node_config_error").Max()
 	mx.Kubelet.NodeConfigError.Set(value)
 
@@ -132,7 +132,7 @@ func (c *Collector) collectKubelet(raw prometheus.Series, mx *metrics) {
 	c.collectLogsUsagePerPod(raw, mx)
 }
 
-func (c *Collector) collectAPIServer(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectAPIServer(raw promscrapemodel.Series, mx *metrics) {
 	value := raw.FindByName("apiserver_audit_requests_rejected_total").Max()
 	mx.APIServer.Audit.Requests.Rejected.Set(value)
 
@@ -145,7 +145,7 @@ func (c *Collector) collectAPIServer(raw prometheus.Series, mx *metrics) {
 	c.collectStorageDataKeyGenerationLatencies(raw, mx)
 }
 
-func (c *Collector) collectToken(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectToken(raw promscrapemodel.Series, mx *metrics) {
 	value := raw.FindByName("get_token_count").Max()
 	mx.Token.Count.Set(value)
 
@@ -153,7 +153,7 @@ func (c *Collector) collectToken(raw prometheus.Series, mx *metrics) {
 	mx.Token.FailCount.Set(value)
 }
 
-func (c *Collector) collectPLEGRelisting(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectPLEGRelisting(raw promscrapemodel.Series, mx *metrics) {
 	// Summary
 	for _, metric := range raw.FindByName("kubelet_pleg_relist_interval_microseconds") {
 		if math.IsNaN(metric.Value) {
@@ -185,7 +185,7 @@ func (c *Collector) collectPLEGRelisting(raw prometheus.Series, mx *metrics) {
 	}
 }
 
-func (c *Collector) collectStorageDataKeyGenerationLatencies(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectStorageDataKeyGenerationLatencies(raw promscrapemodel.Series, mx *metrics) {
 	latencies := &mx.APIServer.Storage.DataKeyGeneration.Latencies
 	metricName := "apiserver_storage_data_key_generation_latencies_microseconds_bucket"
 
@@ -242,7 +242,7 @@ func (c *Collector) collectStorageDataKeyGenerationLatencies(raw prometheus.Seri
 	latencies.LE10.Sub(latencies.LE5.Value())
 }
 
-func (c *Collector) collectRESTClientHTTPRequests(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectRESTClientHTTPRequests(raw promscrapemodel.Series, mx *metrics) {
 	metricName := "rest_client_requests_total"
 	chart := c.charts.Get("rest_client_requests_by_code")
 
@@ -275,7 +275,7 @@ func (c *Collector) collectRESTClientHTTPRequests(raw prometheus.Series, mx *met
 	}
 }
 
-func (c *Collector) collectRuntimeOperations(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectRuntimeOperations(raw promscrapemodel.Series, mx *metrics) {
 	chart := c.charts.Get("kubelet_runtime_operations")
 
 	// kubelet_runtime_operations_total
@@ -293,7 +293,7 @@ func (c *Collector) collectRuntimeOperations(raw prometheus.Series, mx *metrics)
 	}
 }
 
-func (c *Collector) collectRuntimeOperationsErrors(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectRuntimeOperationsErrors(raw promscrapemodel.Series, mx *metrics) {
 	chart := c.charts.Get("kubelet_runtime_operations_errors")
 
 	// kubelet_runtime_operations_errors_total
@@ -311,7 +311,7 @@ func (c *Collector) collectRuntimeOperationsErrors(raw prometheus.Series, mx *me
 	}
 }
 
-func (c *Collector) collectDockerOperations(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectDockerOperations(raw promscrapemodel.Series, mx *metrics) {
 	chart := c.charts.Get("kubelet_docker_operations")
 
 	// kubelet_docker_operations_total
@@ -329,7 +329,7 @@ func (c *Collector) collectDockerOperations(raw prometheus.Series, mx *metrics) 
 	}
 }
 
-func (c *Collector) collectDockerOperationsErrors(raw prometheus.Series, mx *metrics) {
+func (c *Collector) collectDockerOperationsErrors(raw promscrapemodel.Series, mx *metrics) {
 	chart := c.charts.Get("kubelet_docker_operations_errors")
 
 	// kubelet_docker_operations_errors_total
