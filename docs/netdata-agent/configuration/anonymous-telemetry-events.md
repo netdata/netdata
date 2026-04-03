@@ -221,7 +221,7 @@ See the [installation documentation](/packaging/installer/README.md) for availab
 To confirm that telemetry is disabled:
 
 1. Check that the `.opt-out-from-anonymous-statistics` file exists in your config directory, **OR**
-2. Verify that either the `DISABLE_TELEMETRY` or `DO_NOT_TRACK` environment variable is set
+2. Verify that the `DISABLE_TELEMETRY` environment variable is set in the environment used to start the Netdata daemon
 
 :::note 
 
