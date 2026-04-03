@@ -13,3 +13,6 @@ pub(crate) use mappings::*;
 pub(crate) use packet::*;
 pub(crate) use setters::*;
 pub(crate) use values::*;
+
+#[cfg(test)]
+mod tests;

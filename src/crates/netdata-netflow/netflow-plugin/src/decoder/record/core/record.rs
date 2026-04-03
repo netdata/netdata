@@ -85,6 +85,7 @@ pub(crate) fn swap_directional_record_fields(rec: &mut FlowRecord) {
     std::mem::swap(&mut rec.src_mask, &mut rec.dst_mask);
     std::mem::swap(&mut rec.src_port, &mut rec.dst_port);
     std::mem::swap(&mut rec.src_as, &mut rec.dst_as);
+    std::mem::swap(&mut rec.src_as_name, &mut rec.dst_as_name);
     std::mem::swap(&mut rec.src_net_name, &mut rec.dst_net_name);
     std::mem::swap(&mut rec.src_net_role, &mut rec.dst_net_role);
     std::mem::swap(&mut rec.src_net_site, &mut rec.dst_net_site);
@@ -93,6 +94,8 @@ pub(crate) fn swap_directional_record_fields(rec: &mut FlowRecord) {
     std::mem::swap(&mut rec.src_country, &mut rec.dst_country);
     std::mem::swap(&mut rec.src_geo_city, &mut rec.dst_geo_city);
     std::mem::swap(&mut rec.src_geo_state, &mut rec.dst_geo_state);
+    std::mem::swap(&mut rec.src_geo_latitude, &mut rec.dst_geo_latitude);
+    std::mem::swap(&mut rec.src_geo_longitude, &mut rec.dst_geo_longitude);
     std::mem::swap(&mut rec.src_addr_nat, &mut rec.dst_addr_nat);
     std::mem::swap(&mut rec.src_port_nat, &mut rec.dst_port_nat);
     std::mem::swap(&mut rec.src_vlan, &mut rec.dst_vlan);

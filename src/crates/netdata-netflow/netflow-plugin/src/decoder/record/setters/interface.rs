@@ -1,19 +1,24 @@
 use super::*;
 
+fn set_record_interface_id(slot: &mut u32, value: &str) {
+    let parsed = value.parse().unwrap_or(0);
+
+    // Multiple exporter fields collapse into the same canonical interface key.
+    // Keep the first non-zero identity observed during normal decode; callers
+    // that need to replace it must use override_record_field().
+    if *slot == 0 {
+        *slot = parsed;
+    }
+}
+
 pub(super) fn set_record_interface_field(rec: &mut FlowRecord, key: &str, value: &str) -> bool {
     match key {
         "IN_IF" => {
-            let v: u32 = value.parse().unwrap_or(0);
-            if rec.in_if == 0 {
-                rec.in_if = v;
-            }
+            set_record_interface_id(&mut rec.in_if, value);
             true
         }
         "OUT_IF" => {
-            let v: u32 = value.parse().unwrap_or(0);
-            if rec.out_if == 0 {
-                rec.out_if = v;
-            }
+            set_record_interface_id(&mut rec.out_if, value);
             true
         }
         "IN_IF_NAME" => {
