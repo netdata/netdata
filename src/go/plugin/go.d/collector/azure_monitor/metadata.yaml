@@ -262,7 +262,9 @@ modules:
 
                 :::info
 
-                Returned resource `type` values should match the Azure resource types expected by the [active profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default). Resources with unsupported or non-matching types are ignored and do not activate profiles. For the stock catalog, see [built-in profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default).
+                - Returned resource `type` values should match the Azure resource types expected by the active profiles. 
+                - Resources with unsupported or non-matching types are ignored and do not activate profiles. 
+                - For the stock catalog, see [built-in profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default).
 
                 :::
 
