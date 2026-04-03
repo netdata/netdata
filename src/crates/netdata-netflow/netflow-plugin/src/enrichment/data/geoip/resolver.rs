@@ -18,7 +18,7 @@ fn warn_unexpected_geoip_lookup_error(
 
     warned.call_once(|| {
         tracing::warn!(
-            "geoip: unexpected {} lookup error; ignoring until the next reload: {}",
+            "geoip: unexpected {} lookup error; ignoring subsequent lookup errors in this process: {}",
             database_kind,
             err
         );
