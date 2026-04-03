@@ -641,12 +641,7 @@ func resourceMatchesTag(resource resourceInfo, filter normalizedTagFilter) bool 
 		if tag.Key != filter.Key {
 			continue
 		}
-		for _, value := range filter.Values {
-			if tag.Value == value {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(filter.Values, tag.Value)
 	}
 	return false
 }
