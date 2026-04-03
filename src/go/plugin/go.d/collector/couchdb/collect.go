@@ -100,14 +100,14 @@ func (c *Collector) scrapeCouchDB() *cdbMetrics {
 	ms := &cdbMetrics{}
 	wg := &sync.WaitGroup{}
 
-	wg.Go(func() { ; c.scrapeNodeStats(ms) })
+	wg.Go(func() { c.scrapeNodeStats(ms) })
 
-	wg.Go(func() { ; c.scrapeSystemStats(ms) })
+	wg.Go(func() { c.scrapeSystemStats(ms) })
 
-	wg.Go(func() { ; c.scrapeActiveTasks(ms) })
+	wg.Go(func() { c.scrapeActiveTasks(ms) })
 
 	if len(c.databases) > 0 {
-		wg.Go(func() { ; c.scrapeDBStats(ms) })
+		wg.Go(func() { c.scrapeDBStats(ms) })
 	}
 
 	wg.Wait()

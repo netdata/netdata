@@ -137,7 +137,7 @@ func TestAgent_Run(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 
-	wg.Go(func() { ; a.run(ctx) })
+	wg.Go(func() { a.run(ctx) })
 
 	time.Sleep(time.Second * 2)
 	cancel()

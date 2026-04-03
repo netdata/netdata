@@ -161,11 +161,11 @@ func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group
 
 	var wg sync.WaitGroup
 
-	wg.Go(func() { ; d.confProv.run(ctx) })
+	wg.Go(func() { d.confProv.run(ctx) })
 
-	wg.Go(func() { ; d.run(ctx) })
+	wg.Go(func() { d.run(ctx) })
 
-	wg.Go(func() { ; d.mgr.RunGracePeriodCleanup(ctx) })
+	wg.Go(func() { d.mgr.RunGracePeriodCleanup(ctx) })
 
 	wg.Wait()
 

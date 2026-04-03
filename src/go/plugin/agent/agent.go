@@ -259,11 +259,11 @@ func (a *Agent) run(ctx context.Context) {
 	in := make(chan []*confgroup.Group)
 	var wg sync.WaitGroup
 
-	wg.Go(func() { ; fnMgr.Run(ctx, a.quitCh) })
+	wg.Go(func() { fnMgr.Run(ctx, a.quitCh) })
 
-	wg.Go(func() { ; jobMgr.Run(ctx, in) })
+	wg.Go(func() { jobMgr.Run(ctx, in) })
 
-	wg.Go(func() { ; discMgr.Run(ctx, in) })
+	wg.Go(func() { discMgr.Run(ctx, in) })
 
 	wg.Wait()
 	<-ctx.Done()

@@ -265,13 +265,13 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 
 	var wg sync.WaitGroup
 
-	wg.Go(func() { ; m.runFileStatusPersistence() })
+	wg.Go(func() { m.runFileStatusPersistence() })
 
-	wg.Go(func() { ; m.runProcessConfGroups(in) })
+	wg.Go(func() { m.runProcessConfGroups(in) })
 
-	wg.Go(func() { ; m.run() })
+	wg.Go(func() { m.run() })
 
-	wg.Go(func() { ; m.runNotifyRunningJobs() })
+	wg.Go(func() { m.runNotifyRunningJobs() })
 
 	close(m.started)
 
