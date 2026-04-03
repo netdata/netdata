@@ -5,6 +5,7 @@ package azure_monitor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -95,6 +96,8 @@ func TestConfigSchema_QueryModeDisallowsProfileTags(t *testing.T) {
 
 	restriction, ok := allOf[0].(map[string]any)
 	require.True(t, ok)
+	ifSchema := requireMapField(t, restriction, "if")
+	assert.ElementsMatch(t, []string{"discovery"}, requireStringSliceField(t, ifSchema, "required"))
 	thenProps := requireMapField(t, requireMapField(t, restriction, "then"), "properties")
 	profiles := requireMapField(t, thenProps, "profiles")
 	profileProps := requireMapField(t, profiles, "properties")
@@ -475,6 +478,53 @@ func TestCollector_RefreshDiscoveryDisabledWhenRefreshEveryZero(t *testing.T) {
 	_, err := collecttest.CollectScalarSeries(c, metrix.ReadRaw())
 	require.NoError(t, err)
 	assert.Equal(t, 1, rg.calls())
+}
+
+func TestCollector_RefreshDiscoveryFailureFallsBackToLastKnownSnapshot(t *testing.T) {
+	now := time.Date(2026, 3, 7, 12, 0, 0, 0, time.UTC)
+
+	rg := &mockResourceGraph{
+		resources: []map[string]any{
+			{
+				"id":            "/subscriptions/sub-1/resourceGroups/rg-a/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-a",
+				"name":          "pg-a",
+				"type":          "Microsoft.DBforPostgreSQL/flexibleServers",
+				"resourceGroup": "rg-a",
+				"location":      "eastus",
+			},
+		},
+	}
+	mx := &mockMetricsClient{
+		queryResponse: azmetrics.QueryResourcesResponse{MetricResults: azmetrics.MetricResults{Values: []azmetrics.MetricData{
+			{
+				ResourceID: ptrString("/subscriptions/sub-1/resourcegroups/rg-a/providers/microsoft.dbforpostgresql/flexibleservers/pg-a"),
+				Values: []azmetrics.Metric{
+					metricWithAvg("cpu_percent", now, 21.5),
+				},
+			},
+		}}},
+	}
+
+	c := newTestCollectorWithMocks(rg, mx)
+	c.Config = testConfig()
+	c.Config.Discovery.RefreshEvery = 60
+	c.now = func() time.Time { return now }
+
+	require.NoError(t, c.Init(context.Background()))
+	require.NoError(t, c.Check(context.Background()))
+	assert.Equal(t, 1, rg.calls())
+	assert.Equal(t, uint64(1), c.discovery.FetchCounter)
+
+	rg.responseErr = errors.New("refresh failed")
+	now = now.Add(10 * time.Minute)
+
+	series, err := collecttest.CollectScalarSeries(c, metrix.ReadRaw())
+	require.NoError(t, err)
+	assert.NotEmpty(t, series)
+	assert.Contains(t, strings.Join(keysFromSeries(series), "\n"), `subscription_id="sub-1"`)
+	assert.Equal(t, 2, rg.calls())
+	assert.GreaterOrEqual(t, mx.calls(), 1)
+	assert.Equal(t, uint64(1), c.discovery.FetchCounter)
 }
 
 func TestCollector_CollectScenarios(t *testing.T) {
@@ -1742,13 +1792,14 @@ func newTestCollectorWithMocks(rg *mockResourceGraph, mx *mockMetricsClient) *Co
 }
 
 type mockResourceGraph struct {
-	mu        sync.Mutex
-	resources []map[string]any
-	count     int
-	query     string
-	subs      []string
-	timeout   time.Duration
-	hasDL     bool
+	mu          sync.Mutex
+	resources   []map[string]any
+	responseErr error
+	count       int
+	query       string
+	subs        []string
+	timeout     time.Duration
+	hasDL       bool
 }
 
 func (m *mockResourceGraph) Resources(ctx context.Context, req armresourcegraph.QueryRequest, _ *armresourcegraph.ClientResourcesOptions) (armresourcegraph.ClientResourcesResponse, error) {
@@ -1774,6 +1825,9 @@ func (m *mockResourceGraph) Resources(ctx context.Context, req armresourcegraph.
 		m.timeout = time.Until(deadline)
 	} else {
 		m.timeout = 0
+	}
+	if m.responseErr != nil {
+		return armresourcegraph.ClientResourcesResponse{}, m.responseErr
 	}
 
 	rows := make([]any, 0, len(m.resources))

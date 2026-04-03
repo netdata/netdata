@@ -518,6 +518,9 @@
     "allOf": [
       {
         "if": {
+          "required": [
+            "discovery"
+          ],
           "properties": {
             "discovery": {
               "type": "object",

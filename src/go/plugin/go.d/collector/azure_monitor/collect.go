@@ -41,7 +41,11 @@ func (c *Collector) refreshCollectResources(ctx context.Context) (bool, error) {
 	prevFetchCounter := c.discovery.FetchCounter
 	resources, err := c.refreshDiscovery(ctx, false)
 	if err != nil {
-		return false, fmt.Errorf("resource discovery: %w", err)
+		if c.discovery.FetchedAt.IsZero() {
+			return false, fmt.Errorf("resource discovery: %w", err)
+		}
+		c.Warningf("resource discovery refresh failed, continuing with last known discovery snapshot: %v", err)
+		resources = c.discovery.Resources
 	}
 	if c.discovery.FetchCounter != prevFetchCounter {
 		c.observations.pruneStaleResources(c.discovery.ByProfile)
