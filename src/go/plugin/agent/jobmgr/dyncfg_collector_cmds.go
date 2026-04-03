@@ -187,7 +187,7 @@ func (m *Manager) runDyncfgCmdTest(task dyncfgCmdTestTask) {
 	storeSnapshot := secretStoreSvc.Capture()
 	resolveCtx := collectorSecretResolveContext(ctx, m.Logger, task.cfg)
 	if err := applyConfig(resolveCtx, task.cfg, job, m.secretResolver, secretStoreSvc, storeSnapshot); err != nil {
-		m.Errorf("dyncfg: test: module %s job %s: failed to apply config: %v", task.moduleName, task.cfg.Name(), err)
+		m.Warningf("dyncfg: test: module %s job %s: failed to apply config: %v", task.moduleName, task.cfg.Name(), err)
 		m.dyncfgResponder.SendCodef(task.fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
 		return
 	}
