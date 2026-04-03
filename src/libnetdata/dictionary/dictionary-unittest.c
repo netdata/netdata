@@ -1019,7 +1019,11 @@ size_t dictionary_unittest_views(void) {
 // The test runs the racy workload in a forked child process so that a crash
 // is detected as a child signal instead of bringing down the test harness.
 
+#ifndef OS_WINDOWS
 #include <sys/wait.h>
+#endif
+
+#ifndef OS_WINDOWS
 
 struct dict_destroy_race_data {
     DICTIONARY *dict;
@@ -1203,6 +1207,17 @@ static int dictionary_destroy_race_unittest(void) {
     fprintf(stderr, "dictionary_destroy() TOCTOU race test: OK\n");
     return 0;
 }
+
+#else
+
+static int dictionary_destroy_race_unittest(void) {
+    fprintf(stderr,
+            "\nTesting dictionary_destroy() TOCTOU race: SKIPPED "
+            "(fork-based test is unsupported on this platform)\n");
+    return 0;
+}
+
+#endif
 
 bool dictionary_traverse_or_destroy_unittest(void) {
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
