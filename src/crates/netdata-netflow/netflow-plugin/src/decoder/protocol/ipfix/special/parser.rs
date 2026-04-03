@@ -32,7 +32,7 @@ pub(crate) fn parse_ipfix_record_from_template<'a>(
             field.field_length as usize
         };
 
-        if value_len == 0 {
+        if field.field_length != u16::MAX && value_len == 0 {
             return None;
         }
         if consumed.saturating_add(value_len) > body.len() {
@@ -43,4 +43,35 @@ pub(crate) fn parse_ipfix_record_from_template<'a>(
     }
 
     Some((values, consumed))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_ipfix_record_allows_zero_length_variable_field() {
+        let fields = [IPFixTemplateField {
+            field_type: IPFIX_FIELD_DATALINK_FRAME_SECTION,
+            field_length: u16::MAX,
+            enterprise_number: None,
+        }];
+
+        let (values, consumed) = parse_ipfix_record_from_template(&[0], &fields).unwrap();
+
+        assert_eq!(consumed, 1);
+        assert_eq!(values.len(), 1);
+        assert!(values[0].is_empty());
+    }
+
+    #[test]
+    fn parse_ipfix_record_rejects_zero_length_fixed_field() {
+        let fields = [IPFixTemplateField {
+            field_type: IPFIX_FIELD_DATALINK_FRAME_SECTION,
+            field_length: 0,
+            enterprise_number: None,
+        }];
+
+        assert!(parse_ipfix_record_from_template(&[0], &fields).is_none());
+    }
 }

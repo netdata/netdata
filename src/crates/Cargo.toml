@@ -172,6 +172,7 @@ debug = true
 debug-assertions = true
 
 [profile.release]
+# Keep debuginfo in packaged release builds so production crashes remain symbolizable.
 debug = true
 opt-level = 3
 lto = "fat"

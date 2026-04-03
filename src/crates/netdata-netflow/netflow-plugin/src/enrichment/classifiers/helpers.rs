@@ -69,7 +69,12 @@ pub(crate) fn format_with_percent_placeholders(
                     out.push('%');
                     continue;
                 }
-                _ => {}
+                Some(_) => {
+                    if arg_idx < args.len() {
+                        arg_idx += 1;
+                    }
+                }
+                None => {}
             }
         }
         out.push(ch);
@@ -108,6 +113,13 @@ mod tests {
         let rendered =
             format_with_percent_placeholders("keep-%x", &[ResolvedValue::String("unused".into())])
                 .unwrap();
+
+        assert_eq!(rendered, "keep-%x");
+    }
+
+    #[test]
+    fn format_with_percent_placeholders_preserves_unknown_specs_without_arguments() {
+        let rendered = format_with_percent_placeholders("keep-%x", &[]).unwrap();
 
         assert_eq!(rendered, "keep-%x");
     }
