@@ -3,6 +3,14 @@ use super::{
     parse_datalink_frame_section_record, parse_ipv4_packet_record, parse_ipv6_packet_record,
 };
 
+fn vxlan_inner_payload(proto: u8, data: &[u8]) -> Option<&[u8]> {
+    if proto == 17 && data.len() >= 16 && u16::from_be_bytes([data[2], data[3]]) == VXLAN_UDP_PORT {
+        Some(&data[16..])
+    } else {
+        None
+    }
+}
+
 pub(crate) fn parse_transport_record(
     proto: u8,
     data: &[u8],
@@ -12,11 +20,8 @@ pub(crate) fn parse_transport_record(
     match decapsulation_mode {
         DecapsulationMode::None => {}
         DecapsulationMode::Vxlan => {
-            return if proto == 17
-                && data.len() > 16
-                && u16::from_be_bytes([data[2], data[3]]) == VXLAN_UDP_PORT
-            {
-                parse_datalink_frame_section_record(&data[16..], rec, DecapsulationMode::None)
+            return if let Some(inner) = vxlan_inner_payload(proto, data) {
+                parse_datalink_frame_section_record(inner, rec, DecapsulationMode::None)
                     .unwrap_or(0)
             } else {
                 0
@@ -53,6 +58,22 @@ pub(crate) fn parse_transport_record(
     }
 
     0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn vxlan_inner_payload_accepts_minimum_header_length() {
+        let packet = [
+            0x12, 0x34, 0x12, 0xb5, 0, 0, 0, 0, 0x08, 0, 0, 0, 0, 0, 0, 0,
+        ];
+
+        let inner = vxlan_inner_payload(17, &packet);
+
+        assert_eq!(inner, Some(&[][..]));
+    }
 }
 
 pub(crate) fn parse_srv6_inner_record(proto: u8, data: &[u8], rec: &mut FlowRecord) -> Option<u64> {
