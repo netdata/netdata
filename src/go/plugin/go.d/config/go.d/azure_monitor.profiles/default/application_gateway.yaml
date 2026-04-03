@@ -1,6 +1,5 @@
 ---
-id: application_gateway
-name: Azure Application Gateway
+display_name: Azure Application Gateway
 resource_type: Microsoft.Network/applicationGateways
 metrics:
   - id: throughput

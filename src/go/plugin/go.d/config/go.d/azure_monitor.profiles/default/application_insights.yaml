@@ -1,6 +1,5 @@
 ---
-id: application_insights
-name: Azure Application Insights
+display_name: Azure Application Insights
 resource_type: Microsoft.Insights/components
 metrics:
   - id: availability_results_availability_percentage

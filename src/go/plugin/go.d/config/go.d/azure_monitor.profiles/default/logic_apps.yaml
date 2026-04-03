@@ -1,6 +1,5 @@
 ---
-id: logic_apps
-name: Azure Logic Apps Workflow
+display_name: Azure Logic Apps Workflow
 resource_type: Microsoft.Logic/workflows
 metrics:
   - id: runs_started

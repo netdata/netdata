@@ -1,6 +1,5 @@
 ---
-id: service_bus
-name: Azure Service Bus Namespace
+display_name: Azure Service Bus Namespace
 resource_type: Microsoft.ServiceBus/Namespaces
 metrics:
   - id: incoming_messages

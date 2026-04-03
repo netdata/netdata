@@ -1,6 +1,5 @@
 ---
-id: cognitive_services
-name: Azure Cognitive Services
+display_name: Azure Cognitive Services
 resource_type: Microsoft.CognitiveServices/accounts
 metrics:
   - id: success_rate

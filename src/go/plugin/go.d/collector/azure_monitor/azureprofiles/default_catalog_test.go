@@ -37,7 +37,6 @@ func TestLoadFromDefaultDirs_LoadsAllStockProfiles(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, catalog.byBaseName, want)
-	assert.Len(t, catalog.byID, want)
 }
 
 func TestDefaultCatalog_CachesSuccessfulLoads(t *testing.T) {
@@ -122,13 +121,10 @@ func stubDefaultCatalog(t *testing.T, cacheEnabled func() bool, loader func() (C
 }
 
 func testCatalog(id string) Catalog {
-	profile := Profile{ID: id, DisplayName: id}
+	profile := Profile{DisplayName: id}
 	return Catalog{
 		byBaseName: map[string]Profile{
 			normalizeKey(id): profile,
-		},
-		byID: map[string]Profile{
-			id: profile,
 		},
 		stockProfileBaseNames: map[string]struct{}{
 			normalizeKey(id): {},

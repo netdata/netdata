@@ -1,6 +1,5 @@
 ---
-id: nat_gateway
-name: Azure NAT Gateway
+display_name: Azure NAT Gateway
 resource_type: Microsoft.Network/natGateways
 metrics:
   - id: datapath_availability

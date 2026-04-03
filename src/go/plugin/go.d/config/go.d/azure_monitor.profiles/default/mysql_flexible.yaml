@@ -1,6 +1,5 @@
 ---
-id: mysql_flexible
-name: Azure MySQL Flexible Server
+display_name: Azure MySQL Flexible Server
 resource_type: Microsoft.DBforMySQL/flexibleServers
 metrics:
   - id: ha_io_status

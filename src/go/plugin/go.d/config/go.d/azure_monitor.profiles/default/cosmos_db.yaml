@@ -1,6 +1,5 @@
 ---
-id: cosmos_db
-name: Azure Cosmos DB Account
+display_name: Azure Cosmos DB Account
 resource_type: Microsoft.DocumentDB/databaseAccounts
 metrics:
   - id: total_requests

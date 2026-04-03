@@ -1,6 +1,5 @@
 ---
-id: container_instances
-name: Azure Container Instances
+display_name: Azure Container Instances
 resource_type: Microsoft.ContainerInstance/containerGroups
 metrics:
   - id: cpu_usage

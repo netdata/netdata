@@ -1,6 +1,5 @@
 ---
-id: vpn_gateway
-name: Azure VPN Gateway
+display_name: Azure VPN Gateway
 resource_type: Microsoft.Network/virtualNetworkGateways
 metrics:
   - id: average_bandwidth

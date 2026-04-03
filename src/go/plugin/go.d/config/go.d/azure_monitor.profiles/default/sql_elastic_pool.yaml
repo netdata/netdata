@@ -1,6 +1,5 @@
 ---
-id: sql_elastic_pool
-name: Azure SQL Elastic Pool
+display_name: Azure SQL Elastic Pool
 resource_type: Microsoft.Sql/servers/elasticPools
 metrics:
   - id: cpu_percent

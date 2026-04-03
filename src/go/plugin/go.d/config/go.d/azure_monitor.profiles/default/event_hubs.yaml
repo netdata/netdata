@@ -1,6 +1,5 @@
 ---
-id: event_hubs
-name: Azure Event Hubs Namespace
+display_name: Azure Event Hubs Namespace
 resource_type: Microsoft.EventHub/Namespaces
 metrics:
   - id: incoming_messages

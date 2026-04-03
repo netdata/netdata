@@ -1,6 +1,5 @@
 ---
-id: data_factory
-name: Azure Data Factory
+display_name: Azure Data Factory
 resource_type: Microsoft.DataFactory/factories
 metrics:
   - id: pipeline_succeeded_runs

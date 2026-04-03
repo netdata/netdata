@@ -58,13 +58,13 @@ type Config struct {
 }
 
 type DiscoveryConfig struct {
-	RefreshEvery int                     `yaml:"refresh_every,omitempty" json:"refresh_every"`
-	Mode         string                  `yaml:"mode,omitempty" json:"mode"`
-	ModeFilters  *DiscoveryFiltersConfig `yaml:"mode_filters,omitempty" json:"mode_filters,omitempty"`
-	ModeQuery    *DiscoveryQueryConfig   `yaml:"mode_query,omitempty" json:"mode_query,omitempty"`
+	RefreshEvery int                    `yaml:"refresh_every,omitempty" json:"refresh_every"`
+	Mode         string                 `yaml:"mode,omitempty" json:"mode"`
+	ModeFilters  *ResourceFiltersConfig `yaml:"mode_filters,omitempty" json:"mode_filters,omitempty"`
+	ModeQuery    *DiscoveryQueryConfig  `yaml:"mode_query,omitempty" json:"mode_query,omitempty"`
 }
 
-type DiscoveryFiltersConfig struct {
+type ResourceFiltersConfig struct {
 	ResourceGroups []string            `yaml:"resource_groups,omitempty" json:"resource_groups,omitempty"`
 	Regions        []string            `yaml:"regions,omitempty" json:"regions,omitempty"`
 	Tags           map[string][]string `yaml:"tags,omitempty" json:"tags,omitempty"`
@@ -74,12 +74,18 @@ type DiscoveryQueryConfig struct {
 	KQL string `yaml:"kql" json:"kql"`
 }
 
+type ProfileEntryConfig struct {
+	Name    string                 `yaml:"name" json:"name"`
+	Filters *ResourceFiltersConfig `yaml:"filters,omitempty" json:"filters,omitempty"`
+}
+
 type ProfilesModeConfig struct {
-	Names []string `yaml:"names,omitempty" json:"names,omitempty"`
+	Entries []ProfileEntryConfig `yaml:"entries,omitempty" json:"entries,omitempty"`
 }
 
 type ProfilesConfig struct {
 	Mode         string              `yaml:"mode,omitempty" json:"mode"`
+	ModeAuto     *ProfilesModeConfig `yaml:"mode_auto,omitempty" json:"mode_auto,omitempty"`
 	ModeExact    *ProfilesModeConfig `yaml:"mode_exact,omitempty" json:"mode_exact,omitempty"`
 	ModeCombined *ProfilesModeConfig `yaml:"mode_combined,omitempty" json:"mode_combined,omitempty"`
 }
@@ -160,7 +166,7 @@ func (c Config) validate() error {
 		errs = append(errs, errors.New("'limits.max_metrics_per_query' must be between 1 and 20"))
 	}
 
-	switch strings.ToLower(strings.TrimSpace(c.Cloud)) {
+	switch stringsLowerTrim(c.Cloud) {
 	case cloudPublic, cloudGovernment, cloudChina:
 	default:
 		errs = append(errs, fmt.Errorf("'cloud' must be one of: %s, %s, %s", cloudPublic, cloudGovernment, cloudChina))
@@ -170,9 +176,11 @@ func (c Config) validate() error {
 		errs = append(errs, err)
 	}
 
-	switch strings.ToLower(strings.TrimSpace(c.Discovery.Mode)) {
+	validateProfileTags := false
+	switch stringsLowerTrim(c.Discovery.Mode) {
 	case discoveryModeFilters:
-		errs = append(errs, validateDiscoveryFilters(c.Discovery.ModeFilters)...)
+		validateProfileTags = true
+		errs = append(errs, validateResourceFilters("discovery.mode_filters", c.Discovery.ModeFilters, true)...)
 	case discoveryModeQuery:
 		if c.Discovery.ModeQuery == nil || strings.TrimSpace(c.Discovery.ModeQuery.KQL) == "" {
 			errs = append(errs, errors.New("'discovery.mode_query.kql' must not be empty when discovery.mode is 'query'"))
@@ -181,19 +189,22 @@ func (c Config) validate() error {
 		errs = append(errs, fmt.Errorf("'discovery.mode' must be one of: %s, %s", discoveryModeFilters, discoveryModeQuery))
 	}
 
-	switch strings.ToLower(strings.TrimSpace(c.Profiles.Mode)) {
+	switch stringsLowerTrim(c.Profiles.Mode) {
 	case profilesModeAuto:
+		errs = append(errs, validateProfileEntries("profiles.mode_auto.entries", modeEntries(c.Profiles.ModeAuto), validateProfileTags)...)
 	case profilesModeExact:
-		if c.Profiles.ModeExact == nil || len(c.Profiles.ModeExact.Names) == 0 {
-			errs = append(errs, fmt.Errorf("'profiles.mode_exact.names' must not be empty when profiles.mode is '%s'", c.Profiles.Mode))
+		entries := modeEntries(c.Profiles.ModeExact)
+		if len(entries) == 0 {
+			errs = append(errs, fmt.Errorf("'profiles.mode_exact.entries' must not be empty when profiles.mode is '%s'", c.Profiles.Mode))
 		} else {
-			errs = append(errs, validateProfilesList("profiles.mode_exact.names", c.Profiles.ModeExact.Names)...)
+			errs = append(errs, validateProfileEntries("profiles.mode_exact.entries", entries, validateProfileTags)...)
 		}
 	case profilesModeCombined:
-		if c.Profiles.ModeCombined == nil || len(c.Profiles.ModeCombined.Names) == 0 {
-			errs = append(errs, fmt.Errorf("'profiles.mode_combined.names' must not be empty when profiles.mode is '%s'", c.Profiles.Mode))
+		entries := modeEntries(c.Profiles.ModeCombined)
+		if len(entries) == 0 {
+			errs = append(errs, fmt.Errorf("'profiles.mode_combined.entries' must not be empty when profiles.mode is '%s'", c.Profiles.Mode))
 		} else {
-			errs = append(errs, validateProfilesList("profiles.mode_combined.names", c.Profiles.ModeCombined.Names)...)
+			errs = append(errs, validateProfileEntries("profiles.mode_combined.entries", entries, validateProfileTags)...)
 		}
 	default:
 		errs = append(errs, fmt.Errorf("'profiles.mode' must be one of: %s, %s, %s",
@@ -203,75 +214,188 @@ func (c Config) validate() error {
 	return errors.Join(errs...)
 }
 
-func validateDiscoveryFilters(filters *DiscoveryFiltersConfig) []error {
+func validateProfileEntries(path string, entries []ProfileEntryConfig, validateTags bool) []error {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	var errs []error
+	seen := map[string]struct{}{}
+	for i, entry := range entries {
+		entryPath := fmt.Sprintf("%s[%d]", path, i)
+		name := stringsTrim(entry.Name)
+		if !isValidProfileName(name) {
+			errs = append(errs, fmt.Errorf("'%s.name' must match %q", entryPath, profileNamePattern))
+		} else {
+			if _, ok := seen[name]; ok {
+				errs = append(errs, fmt.Errorf("'%s' contains duplicate entry name '%s'", path, name))
+			}
+			seen[name] = struct{}{}
+		}
+		errs = append(errs, validateResourceFilters(entryPath+".filters", entry.Filters, validateTags)...)
+	}
+	return errs
+}
+
+func validateResourceFilters(path string, filters *ResourceFiltersConfig, validateTags bool) []error {
 	if filters == nil {
 		return nil
 	}
 
 	var errs []error
 	for i, v := range filters.ResourceGroups {
-		if strings.TrimSpace(v) == "" {
-			errs = append(errs, fmt.Errorf("'discovery.mode_filters.resource_groups[%d]' must not be empty", i))
+		if stringsTrim(v) == "" {
+			errs = append(errs, fmt.Errorf("'%s.resource_groups[%d]' must not be empty", path, i))
 		}
 	}
 	for i, v := range filters.Regions {
-		if strings.TrimSpace(v) == "" {
-			errs = append(errs, fmt.Errorf("'discovery.mode_filters.regions[%d]' must not be empty", i))
+		if stringsTrim(v) == "" {
+			errs = append(errs, fmt.Errorf("'%s.regions[%d]' must not be empty", path, i))
 		}
 	}
+	if !validateTags && len(filters.Tags) > 0 {
+		return errs
+	}
 	for key, values := range filters.Tags {
-		if strings.TrimSpace(key) == "" {
-			errs = append(errs, errors.New("'discovery.mode_filters.tags' contains an empty key"))
+		if stringsTrim(key) == "" {
+			errs = append(errs, fmt.Errorf("'%s.tags' contains an empty key", path))
 			continue
 		}
 		if len(values) == 0 {
-			errs = append(errs, fmt.Errorf("'discovery.mode_filters.tags.%s' must contain at least one value", key))
+			errs = append(errs, fmt.Errorf("'%s.tags.%s' must contain at least one value", path, key))
 			continue
 		}
 		for i, v := range values {
-			if strings.TrimSpace(v) == "" {
-				errs = append(errs, fmt.Errorf("'discovery.mode_filters.tags.%s[%d]' must not be empty", key, i))
+			if stringsTrim(v) == "" {
+				errs = append(errs, fmt.Errorf("'%s.tags.%s[%d]' must not be empty", path, key, i))
 			}
 		}
 	}
 	return errs
 }
 
-func validateProfilesList(path string, profiles []string) []error {
-	var errs []error
-	seen := map[string]struct{}{}
-	for _, name := range profiles {
-		n := strings.TrimSpace(name)
-		if n == "" {
-			errs = append(errs, fmt.Errorf("'%s' contains an empty value", path))
-			continue
-		}
-		norm := stringsLowerTrim(n)
-		if _, ok := seen[norm]; ok {
-			errs = append(errs, fmt.Errorf("'%s' contains duplicate value '%s'", path, n))
-		}
-		seen[norm] = struct{}{}
+func sanitizeIgnoredProfileTagFilters(cfg Config) (Config, []string) {
+	if stringsLowerTrim(cfg.Discovery.Mode) != discoveryModeQuery {
+		return cfg, nil
 	}
-	return errs
+
+	switch stringsLowerTrim(cfg.Profiles.Mode) {
+	case profilesModeAuto:
+		cfg.Profiles.ModeAuto = cloneProfilesModeConfig(cfg.Profiles.ModeAuto)
+		warnings := stripIgnoredProfileTagFilters("profiles.mode_auto.entries", cfg.Profiles.ModeAuto)
+		return cfg, warnings
+	case profilesModeExact:
+		cfg.Profiles.ModeExact = cloneProfilesModeConfig(cfg.Profiles.ModeExact)
+		warnings := stripIgnoredProfileTagFilters("profiles.mode_exact.entries", cfg.Profiles.ModeExact)
+		return cfg, warnings
+	case profilesModeCombined:
+		cfg.Profiles.ModeCombined = cloneProfilesModeConfig(cfg.Profiles.ModeCombined)
+		warnings := stripIgnoredProfileTagFilters("profiles.mode_combined.entries", cfg.Profiles.ModeCombined)
+		return cfg, warnings
+	default:
+		return cfg, nil
+	}
 }
 
-func (p ProfilesConfig) explicitBaseNames() []string {
-	switch stringsLowerTrim(p.Mode) {
-	case profilesModeExact:
-		if p.ModeExact != nil {
-			return p.ModeExact.Names
-		}
-	case profilesModeCombined:
-		if p.ModeCombined != nil {
-			return p.ModeCombined.Names
+func cloneProfilesModeConfig(src *ProfilesModeConfig) *ProfilesModeConfig {
+	if src == nil {
+		return nil
+	}
+
+	out := &ProfilesModeConfig{
+		Entries: make([]ProfileEntryConfig, len(src.Entries)),
+	}
+	for i, entry := range src.Entries {
+		out.Entries[i] = ProfileEntryConfig{
+			Name:    entry.Name,
+			Filters: cloneResourceFilters(entry.Filters),
 		}
 	}
-	return nil
+	return out
+}
+
+func stripIgnoredProfileTagFilters(path string, cfg *ProfilesModeConfig) []string {
+	if cfg == nil {
+		return nil
+	}
+
+	var warnings []string
+	for i := range cfg.Entries {
+		filters := cfg.Entries[i].Filters
+		if filters == nil || len(filters.Tags) == 0 {
+			continue
+		}
+
+		warnings = append(warnings, fmt.Sprintf("%s[%d].filters.tags", path, i))
+		filters.Tags = nil
+		if len(filters.ResourceGroups) == 0 && len(filters.Regions) == 0 {
+			cfg.Entries[i].Filters = nil
+		}
+	}
+	return warnings
+}
+
+func modeEntries(cfg *ProfilesModeConfig) []ProfileEntryConfig {
+	if cfg == nil {
+		return nil
+	}
+	return cfg.Entries
+}
+
+func entryNames(entries []ProfileEntryConfig) []string {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if name := stringsTrim(entry.Name); name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+func entryMap(entries []ProfileEntryConfig) map[string]ProfileEntryConfig {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	out := make(map[string]ProfileEntryConfig, len(entries))
+	for _, entry := range entries {
+		name := stringsTrim(entry.Name)
+		if name == "" {
+			continue
+		}
+		out[name] = ProfileEntryConfig{
+			Name:    name,
+			Filters: cloneResourceFilters(entry.Filters),
+		}
+	}
+	return out
+}
+
+func cloneResourceFilters(src *ResourceFiltersConfig) *ResourceFiltersConfig {
+	if src == nil {
+		return nil
+	}
+
+	dst := &ResourceFiltersConfig{
+		ResourceGroups: append([]string(nil), src.ResourceGroups...),
+		Regions:        append([]string(nil), src.Regions...),
+	}
+	if len(src.Tags) > 0 {
+		dst.Tags = make(map[string][]string, len(src.Tags))
+		for key, values := range src.Tags {
+			dst.Tags[key] = append([]string(nil), values...)
+		}
+	}
+	return dst
 }
 
 func (c Config) primarySubscriptionID() string {
 	for _, id := range c.SubscriptionIDs {
-		if v := strings.TrimSpace(id); v != "" {
+		if v := stringsTrim(id); v != "" {
 			return v
 		}
 	}
@@ -281,7 +405,7 @@ func (c Config) primarySubscriptionID() string {
 func (c Config) subscriptionIDs() []string {
 	out := make([]string, 0, len(c.SubscriptionIDs))
 	for _, id := range c.SubscriptionIDs {
-		if v := strings.TrimSpace(id); v != "" {
+		if v := stringsTrim(id); v != "" {
 			out = append(out, v)
 		}
 	}

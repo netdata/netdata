@@ -1,6 +1,5 @@
 ---
-id: aks
-name: Azure Kubernetes Service Cluster
+display_name: Azure Kubernetes Service Cluster
 resource_type: Microsoft.ContainerService/managedClusters
 metrics:
   - id: apiserver_cpu_usage_percentage

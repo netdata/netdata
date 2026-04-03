@@ -1,6 +1,5 @@
 ---
-id: container_apps
-name: Azure Container Apps
+display_name: Azure Container Apps
 resource_type: Microsoft.App/containerApps
 metrics:
   - id: usage_nano_cores

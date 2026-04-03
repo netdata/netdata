@@ -1,6 +1,5 @@
 ---
-id: key_vault
-name: Azure Key Vault
+display_name: Azure Key Vault
 resource_type: Microsoft.KeyVault/vaults
 metrics:
   - id: availability

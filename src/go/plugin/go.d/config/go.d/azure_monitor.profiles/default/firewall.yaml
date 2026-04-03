@@ -1,6 +1,5 @@
 ---
-id: firewall
-name: Azure Firewall
+display_name: Azure Firewall
 resource_type: Microsoft.Network/azureFirewalls
 metrics:
   - id: firewall_health

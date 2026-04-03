@@ -1,6 +1,5 @@
 ---
-id: load_balancers
-name: Azure Load Balancer
+display_name: Azure Load Balancer
 resource_type: Microsoft.Network/loadBalancers
 metrics:
   - id: vip_availability

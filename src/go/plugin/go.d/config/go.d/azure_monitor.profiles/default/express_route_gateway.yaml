@@ -1,6 +1,5 @@
 ---
-id: express_route_gateway
-name: Azure ExpressRoute Gateway
+display_name: Azure ExpressRoute Gateway
 resource_type: Microsoft.Network/expressRouteGateways
 metrics:
   - id: er_gateway_connection_bits_in_per_second

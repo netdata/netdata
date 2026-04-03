@@ -1,6 +1,5 @@
 ---
-id: virtual_machines
-name: Azure Virtual Machine
+display_name: Azure Virtual Machine
 resource_type: Microsoft.Compute/virtualMachines
 metrics:
   - id: percentage_cpu

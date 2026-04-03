@@ -1,6 +1,5 @@
 ---
-id: postgres_flexible
-name: Azure PostgreSQL Flexible Server
+display_name: Azure PostgreSQL Flexible Server
 resource_type: Microsoft.DBforPostgreSQL/flexibleServers
 metrics:
   - id: cpu_percent

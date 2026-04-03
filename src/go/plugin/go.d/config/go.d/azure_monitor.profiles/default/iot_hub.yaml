@@ -1,6 +1,5 @@
 ---
-id: iot_hub
-name: Azure IoT Hub
+display_name: Azure IoT Hub
 resource_type: Microsoft.Devices/IotHubs
 metrics:
   - id: c2d_commands_egress_abandon_success

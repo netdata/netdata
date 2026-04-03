@@ -1,6 +1,5 @@
 ---
-id: api_management
-name: Azure API Management
+display_name: Azure API Management
 resource_type: Microsoft.ApiManagement/service
 metrics:
   - id: capacity

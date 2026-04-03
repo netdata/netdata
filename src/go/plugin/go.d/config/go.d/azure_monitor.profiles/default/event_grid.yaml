@@ -1,6 +1,5 @@
 ---
-id: event_grid
-name: Azure Event Grid Topic
+display_name: Azure Event Grid Topic
 resource_type: Microsoft.EventGrid/topics
 metrics:
   - id: publish_success_count
