@@ -2,9 +2,10 @@
 
 package secretstore
 
-import "maps"
-
-import "time"
+import (
+	"maps"
+	"time"
+)
 
 type publishedRecord struct {
 	published PublishedStore
