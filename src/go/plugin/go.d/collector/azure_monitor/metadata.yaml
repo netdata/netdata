@@ -29,7 +29,7 @@ modules:
 
           - **Multi-subscription** -- monitor resources across one or more Azure subscriptions in a single job
           - **Automatic service detection** -- discovers resources and enables matching metric profiles without manual configuration
-          - **38 built-in service profiles** -- covers databases, compute, networking, storage, AI, analytics, and more
+          - **[38 built-in service profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default)** -- covers databases, compute, networking, storage, AI, analytics, and more
           - **Flexible discovery** -- use structured filters (resource groups, regions, tags) or a custom Azure Resource Graph KQL query
         method_description: &method_description |
           It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/migrate-to-batch-api) to collect metrics, grouping requests by subscription, region, and time grain. Resources are discovered via [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) queries at startup and refreshed periodically. Authentication is handled through [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/identity/) (service principal, managed identity, or default credentials).
@@ -53,7 +53,7 @@ modules:
             **Bootstrap (first run)**
 
             - With the default `profiles.mode: auto`, the collector queries Azure Resource Graph within the configured `subscription_ids` to find candidate resources.
-            - It matches discovered resource types against built-in profiles and automatically enables the relevant ones.
+            - It matches discovered resource types against [built-in profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) and automatically enables the relevant ones.
             - Discovery scope can be narrowed using `discovery.mode: filters` (resource groups, regions, tags) or replaced entirely with `discovery.mode: query` for a custom KQL query.
             - A single job can monitor multiple subscriptions.
 
@@ -131,7 +131,7 @@ modules:
             | Stock profiles | `/usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/` |
             | User overrides | `/etc/netdata/go.d/azure_monitor.profiles/` |
 
-            User profile files with the same basename as a stock profile override it.
+            User profile files with the same basename as a [stock profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) override it.
             Custom profiles extend the collector's catalog -- they do not replace the discovery mechanism.
           folding:
             title: Config options
@@ -248,6 +248,7 @@ modules:
               group: Discovery
               detailed_description: |
                 A raw Azure Resource Graph KQL query used when `discovery.mode` is `query`.
+                See the [Azure Resource Graph query language documentation](https://learn.microsoft.com/en-us/azure/governance/resource-graph/concepts/query-language) for syntax and supported operators.
 
                 The query **must** project these five columns:
 
@@ -258,6 +259,12 @@ modules:
                 | `type` | Resource type (e.g., `microsoft.sql/servers/databases`) |
                 | `resourceGroup` | Resource group name |
                 | `location` | Azure region |
+
+                :::info
+
+                Returned resource `type` values should match the Azure resource types expected by the [active profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default). Resources with unsupported or non-matching types are ignored and do not activate profiles. For the stock catalog, see [built-in profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default).
+
+                :::
 
                 Example:
 
@@ -276,7 +283,7 @@ modules:
 
                 | Mode | Behavior |
                 |:-----|:---------|
-                | `auto` | Discovers resource types in your subscriptions and enables matching built-in profiles automatically. This is the default. |
+                | `auto` | Discovers resource types in your subscriptions and enables matching [built-in profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) automatically. This is the default. |
                 | `exact` | Uses only the profile entries listed under `profiles.mode_exact.entries`. No auto-discovery. |
                 | `combined` | Merges auto-discovered profiles with the explicit entries listed under `profiles.mode_combined.entries`. |
 
@@ -493,7 +500,7 @@ modules:
               Profiles are matched by Azure resource type. If a resource type exists but metrics are missing:
 
               - **Check profile mode** -- Ensure `profiles.mode: auto` (default), or explicitly list the profile basename under `profiles.mode_exact.entries` or `profiles.mode_combined.entries`.
-              - **Verify a built-in profile exists** -- List available profiles:
+              - **Verify a [built-in profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) exists** -- List available profiles:
                 ```bash
                 ls /usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/
                 ```
