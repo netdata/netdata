@@ -286,10 +286,12 @@ In Netdata, HTTP 412 is used to indicate that an authorization bearer token was 
 
 **Resolution steps:**
 
-1. **Verify Cloud connection**: Check `http://your-agent:19999/api/v3/info` for `cloud-available: true`
-2. **Re-authenticate**: Log out and log back into Netdata Cloud to refresh your bearer token
-3. **Check permissions**: Ensure you have Admin or Manager role in the space containing the agent
-4. **Verify bearer token protection setting**: If enabled in `netdata.conf`, ensure you're accessing via Cloud-authenticated session
+1. **Verify Claim and Cloud connection**: Check `http://IP:19999/api/v3/info` and inspect the `cloud` section, or confirm `agent-claimed: true` and `aclk-available: true`.
+2. **Re-authenticate**: Log out and log back into Netdata Cloud to refresh your bearer token.
+3. **Verify bearer token protection setting**: If enabled in `netdata.conf`, ensure you're accessing the agent through a Cloud-authenticated session.
+4. **Check permissions only if you get HTTP 403**: If the request changes from HTTP 412 to HTTP 403 after re-authenticating, ensure you have Admin or Manager role in the space containing the agent.
+
+For more information, see [Secure Your Netdata Agent with Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
 
     
 
