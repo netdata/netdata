@@ -32,11 +32,11 @@ func TestFuncLicensesHandle(t *testing.T) {
 			Impact:       "Feature disabled",
 		},
 		{
-			ID:            "ignored-license",
-			Name:          "Optional Bundle",
-			StateRaw:      "not_subscribed",
-			StateBucket:   licenseStateBucketIgnored,
-			IsPerpetual:   true,
+			ID:             "ignored-license",
+			Name:           "Optional Bundle",
+			StateRaw:       "not_subscribed",
+			StateBucket:    licenseStateBucketIgnored,
+			IsPerpetual:    true,
 			OriginalMetric: "_license_row",
 		},
 		{
