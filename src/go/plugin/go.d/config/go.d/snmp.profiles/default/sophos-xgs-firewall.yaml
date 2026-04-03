@@ -32,6 +32,484 @@ metric_tags:
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/sophos/SFOS-FIREWALL-MIB
 
 metrics:
+  # Licensing
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: _license_row
+      OID: 1.3.6.1.4.1.2604.5.1.5.1.1.0
+      mapping:
+        0: 0
+        1: 1
+        2: 0
+        3: 0
+        4: 2
+        5: 2
+    static_tags:
+      - tag: _license_id
+        value: base_firewall
+      - tag: _license_name
+        value: Base Firewall
+      - tag: _license_type
+        value: subscription
+      - tag: _license_component
+        value: base_firewall
+      - tag: _license_value_kind
+        value: state_severity
+      - tag: _license_expiry_source
+        value: sfosBaseFWLicExpiryDate
+      - tag: _license_impact
+        value: Sophos Base Firewall subscription state and expiry on the device
+    metric_tags:
+      - tag: _license_state_raw
+        symbol:
+          name: sfosBaseFWLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.1.1.0
+        mapping:
+          0: none
+          1: trial
+          2: not_subscribed
+          3: subscribed
+          4: expired
+          5: deactivated
+      - tag: _license_state_severity_raw
+        symbol:
+          name: sfosBaseFWLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.1.1.0
+        mapping:
+          0: 0
+          1: 1
+          2: 0
+          3: 0
+          4: 2
+          5: 2
+      - tag: _license_expiry_raw
+        symbol:
+          name: sfosBaseFWLicExpiryDate
+          OID: 1.3.6.1.4.1.2604.5.1.5.1.2.0
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: _license_row
+      OID: 1.3.6.1.4.1.2604.5.1.5.2.1.0
+      mapping:
+        0: 0
+        1: 1
+        2: 0
+        3: 0
+        4: 2
+        5: 2
+    static_tags:
+      - tag: _license_id
+        value: network_protection
+      - tag: _license_name
+        value: Network Protection
+      - tag: _license_type
+        value: subscription
+      - tag: _license_component
+        value: network_protection
+      - tag: _license_value_kind
+        value: state_severity
+      - tag: _license_expiry_source
+        value: sfosNetProtectionLicExpiryDate
+      - tag: _license_impact
+        value: Sophos Network Protection subscription state and expiry on the device
+    metric_tags:
+      - tag: _license_state_raw
+        symbol:
+          name: sfosNetProtectionLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.2.1.0
+        mapping:
+          0: none
+          1: trial
+          2: not_subscribed
+          3: subscribed
+          4: expired
+          5: deactivated
+      - tag: _license_state_severity_raw
+        symbol:
+          name: sfosNetProtectionLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.2.1.0
+        mapping:
+          0: 0
+          1: 1
+          2: 0
+          3: 0
+          4: 2
+          5: 2
+      - tag: _license_expiry_raw
+        symbol:
+          name: sfosNetProtectionLicExpiryDate
+          OID: 1.3.6.1.4.1.2604.5.1.5.2.2.0
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: _license_row
+      OID: 1.3.6.1.4.1.2604.5.1.5.3.1.0
+      mapping:
+        0: 0
+        1: 1
+        2: 0
+        3: 0
+        4: 2
+        5: 2
+    static_tags:
+      - tag: _license_id
+        value: web_protection
+      - tag: _license_name
+        value: Web Protection
+      - tag: _license_type
+        value: subscription
+      - tag: _license_component
+        value: web_protection
+      - tag: _license_value_kind
+        value: state_severity
+      - tag: _license_expiry_source
+        value: sfosWebProtectionLicExpiryDate
+      - tag: _license_impact
+        value: Sophos Web Protection subscription state and expiry on the device
+    metric_tags:
+      - tag: _license_state_raw
+        symbol:
+          name: sfosWebProtectionLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.3.1.0
+        mapping:
+          0: none
+          1: trial
+          2: not_subscribed
+          3: subscribed
+          4: expired
+          5: deactivated
+      - tag: _license_state_severity_raw
+        symbol:
+          name: sfosWebProtectionLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.3.1.0
+        mapping:
+          0: 0
+          1: 1
+          2: 0
+          3: 0
+          4: 2
+          5: 2
+      - tag: _license_expiry_raw
+        symbol:
+          name: sfosWebProtectionLicExpiryDate
+          OID: 1.3.6.1.4.1.2604.5.1.5.3.2.0
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: _license_row
+      OID: 1.3.6.1.4.1.2604.5.1.5.4.1.0
+      mapping:
+        0: 0
+        1: 1
+        2: 0
+        3: 0
+        4: 2
+        5: 2
+    static_tags:
+      - tag: _license_id
+        value: mail_protection
+      - tag: _license_name
+        value: Mail Protection
+      - tag: _license_type
+        value: subscription
+      - tag: _license_component
+        value: mail_protection
+      - tag: _license_value_kind
+        value: state_severity
+      - tag: _license_expiry_source
+        value: sfosMailProtectionLicExpiryDate
+      - tag: _license_impact
+        value: Sophos Mail Protection subscription state and expiry on the device
+    metric_tags:
+      - tag: _license_state_raw
+        symbol:
+          name: sfosMailProtectionLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.4.1.0
+        mapping:
+          0: none
+          1: trial
+          2: not_subscribed
+          3: subscribed
+          4: expired
+          5: deactivated
+      - tag: _license_state_severity_raw
+        symbol:
+          name: sfosMailProtectionLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.4.1.0
+        mapping:
+          0: 0
+          1: 1
+          2: 0
+          3: 0
+          4: 2
+          5: 2
+      - tag: _license_expiry_raw
+        symbol:
+          name: sfosMailProtectionLicExpiryDate
+          OID: 1.3.6.1.4.1.2604.5.1.5.4.2.0
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: _license_row
+      OID: 1.3.6.1.4.1.2604.5.1.5.5.1.0
+      mapping:
+        0: 0
+        1: 1
+        2: 0
+        3: 0
+        4: 2
+        5: 2
+    static_tags:
+      - tag: _license_id
+        value: web_server_protection
+      - tag: _license_name
+        value: Web Server Protection
+      - tag: _license_type
+        value: subscription
+      - tag: _license_component
+        value: web_server_protection
+      - tag: _license_value_kind
+        value: state_severity
+      - tag: _license_expiry_source
+        value: sfosWebServerProtectionLicExpiryDate
+      - tag: _license_impact
+        value: Sophos Web Server Protection subscription state and expiry on the device
+    metric_tags:
+      - tag: _license_state_raw
+        symbol:
+          name: sfosWebServerProtectionLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.5.1.0
+        mapping:
+          0: none
+          1: trial
+          2: not_subscribed
+          3: subscribed
+          4: expired
+          5: deactivated
+      - tag: _license_state_severity_raw
+        symbol:
+          name: sfosWebServerProtectionLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.5.1.0
+        mapping:
+          0: 0
+          1: 1
+          2: 0
+          3: 0
+          4: 2
+          5: 2
+      - tag: _license_expiry_raw
+        symbol:
+          name: sfosWebServerProtectionLicExpiryDate
+          OID: 1.3.6.1.4.1.2604.5.1.5.5.2.0
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: _license_row
+      OID: 1.3.6.1.4.1.2604.5.1.5.6.1.0
+      mapping:
+        0: 0
+        1: 1
+        2: 0
+        3: 0
+        4: 2
+        5: 2
+    static_tags:
+      - tag: _license_id
+        value: sandstorm
+      - tag: _license_name
+        value: Sandstorm
+      - tag: _license_type
+        value: subscription
+      - tag: _license_component
+        value: sandstorm
+      - tag: _license_value_kind
+        value: state_severity
+      - tag: _license_expiry_source
+        value: sfosSandstromLicExpiryDate
+      - tag: _license_impact
+        value: Sophos Sandstorm subscription state and expiry on the device
+    metric_tags:
+      - tag: _license_state_raw
+        symbol:
+          name: sfosSandstromLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.6.1.0
+        mapping:
+          0: none
+          1: trial
+          2: not_subscribed
+          3: subscribed
+          4: expired
+          5: deactivated
+      - tag: _license_state_severity_raw
+        symbol:
+          name: sfosSandstromLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.6.1.0
+        mapping:
+          0: 0
+          1: 1
+          2: 0
+          3: 0
+          4: 2
+          5: 2
+      - tag: _license_expiry_raw
+        symbol:
+          name: sfosSandstromLicExpiryDate
+          OID: 1.3.6.1.4.1.2604.5.1.5.6.2.0
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: _license_row
+      OID: 1.3.6.1.4.1.2604.5.1.5.7.1.0
+      mapping:
+        0: 0
+        1: 1
+        2: 0
+        3: 0
+        4: 2
+        5: 2
+    static_tags:
+      - tag: _license_id
+        value: enhanced_support
+      - tag: _license_name
+        value: Enhanced Support
+      - tag: _license_type
+        value: support
+      - tag: _license_component
+        value: enhanced_support
+      - tag: _license_value_kind
+        value: state_severity
+      - tag: _license_expiry_source
+        value: sfosEnhancedSupportLicExpiryDate
+      - tag: _license_impact
+        value: Sophos Enhanced Support state and expiry on the device
+    metric_tags:
+      - tag: _license_state_raw
+        symbol:
+          name: sfosEnhancedSupportLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.7.1.0
+        mapping:
+          0: none
+          1: trial
+          2: not_subscribed
+          3: subscribed
+          4: expired
+          5: deactivated
+      - tag: _license_state_severity_raw
+        symbol:
+          name: sfosEnhancedSupportLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.7.1.0
+        mapping:
+          0: 0
+          1: 1
+          2: 0
+          3: 0
+          4: 2
+          5: 2
+      - tag: _license_expiry_raw
+        symbol:
+          name: sfosEnhancedSupportLicExpiryDate
+          OID: 1.3.6.1.4.1.2604.5.1.5.7.2.0
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: _license_row
+      OID: 1.3.6.1.4.1.2604.5.1.5.8.1.0
+      mapping:
+        0: 0
+        1: 1
+        2: 0
+        3: 0
+        4: 2
+        5: 2
+    static_tags:
+      - tag: _license_id
+        value: enhanced_plus_support
+      - tag: _license_name
+        value: Enhanced Plus Support
+      - tag: _license_type
+        value: support
+      - tag: _license_component
+        value: enhanced_plus_support
+      - tag: _license_value_kind
+        value: state_severity
+      - tag: _license_expiry_source
+        value: sfosEnhancedPlusLicExpiryDate
+      - tag: _license_impact
+        value: Sophos Enhanced Plus Support state and expiry on the device
+    metric_tags:
+      - tag: _license_state_raw
+        symbol:
+          name: sfosEnhancedPlusLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.8.1.0
+        mapping:
+          0: none
+          1: trial
+          2: not_subscribed
+          3: subscribed
+          4: expired
+          5: deactivated
+      - tag: _license_state_severity_raw
+        symbol:
+          name: sfosEnhancedPlusLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.8.1.0
+        mapping:
+          0: 0
+          1: 1
+          2: 0
+          3: 0
+          4: 2
+          5: 2
+      - tag: _license_expiry_raw
+        symbol:
+          name: sfosEnhancedPlusLicExpiryDate
+          OID: 1.3.6.1.4.1.2604.5.1.5.8.2.0
+  - MIB: SFOS-FIREWALL-MIB
+    symbol:
+      name: _license_row
+      OID: 1.3.6.1.4.1.2604.5.1.5.9.1.0
+      mapping:
+        0: 0
+        1: 1
+        2: 0
+        3: 0
+        4: 2
+        5: 2
+    static_tags:
+      - tag: _license_id
+        value: central_orchestration
+      - tag: _license_name
+        value: Central Orchestration
+      - tag: _license_type
+        value: subscription
+      - tag: _license_component
+        value: central_orchestration
+      - tag: _license_value_kind
+        value: state_severity
+      - tag: _license_expiry_source
+        value: sfosCentralOrchestrationLicExpiryDate
+      - tag: _license_impact
+        value: Sophos Central Orchestration state and expiry on the device
+    metric_tags:
+      - tag: _license_state_raw
+        symbol:
+          name: sfosCentralOrchestrationLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.9.1.0
+        mapping:
+          0: none
+          1: trial
+          2: not_subscribed
+          3: subscribed
+          4: expired
+          5: deactivated
+      - tag: _license_state_severity_raw
+        symbol:
+          name: sfosCentralOrchestrationLicRegStatus
+          OID: 1.3.6.1.4.1.2604.5.1.5.9.1.0
+        mapping:
+          0: 0
+          1: 1
+          2: 0
+          3: 0
+          4: 2
+          5: 2
+      - tag: _license_expiry_raw
+        symbol:
+          name: sfosCentralOrchestrationLicExpiryDate
+          OID: 1.3.6.1.4.1.2604.5.1.5.9.2.0
   - MIB: SFOS-FIREWALL-MIB
     symbol:
       name: memory.usage

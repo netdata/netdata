@@ -74,7 +74,7 @@ func (tc *tableCache) getCachedData(cfg ddprofiledefinition.MetricsConfig) (oids
 	tc.mu.RLock()
 	defer tc.mu.RUnlock()
 
-	if tc.baseTTL == 0 {
+	if tc.baseTTL == 0 || cfg.DisableTableCache {
 		return nil, nil, false
 	}
 
@@ -108,7 +108,7 @@ func (tc *tableCache) cacheData(cfg ddprofiledefinition.MetricsConfig, oidMap ma
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
 
-	if tc.baseTTL == 0 {
+	if tc.baseTTL == 0 || cfg.DisableTableCache {
 		return
 	}
 
@@ -279,7 +279,7 @@ func (tc *tableCache) isConfigCached(cfg ddprofiledefinition.MetricsConfig) bool
 	tc.mu.RLock()
 	defer tc.mu.RUnlock()
 
-	if tc.baseTTL == 0 {
+	if tc.baseTTL == 0 || cfg.DisableTableCache {
 		return false
 	}
 

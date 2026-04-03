@@ -1,0 +1,122 @@
+# Profile for Blue Coat ProxySG / SGOS appliances
+#
+# BLUECOAT-MIB defines the ProxySG product tree under 1.3.6.1.4.1.3417.1.1.*
+# and BLUECOAT-LICENSE-MIB exposes per-license application / feature / component
+# rows with expire type, expire date, and license state.
+
+extends:
+  - _system-base.yaml
+  - _std-if-mib.yaml
+
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.3417.1.1.*
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "Blue Coat"
+      serial_number:
+        symbol:
+          MIB: BLUECOAT-SG-PROXY-MIB
+          OID: 1.3.6.1.4.1.3417.2.11.1.4.0
+          name: sgProxySerialNumber
+      version:
+        symbol:
+          MIB: BLUECOAT-SG-PROXY-MIB
+          OID: 1.3.6.1.4.1.3417.2.11.1.3.0
+          name: sgProxyVersion
+      product_name:
+        symbol:
+          MIB: BLUECOAT-SG-PROXY-MIB
+          OID: 1.3.6.1.4.1.3417.2.11.1.2.0
+          name: sgProxySoftware
+      os_name:
+        value: "SGOS"
+      os_version:
+        symbol:
+          MIB: BLUECOAT-SG-PROXY-MIB
+          OID: 1.3.6.1.4.1.3417.2.11.1.3.0
+          name: sgProxyVersion
+      type:
+        value: "Proxy"
+
+# https://github.com/librenms/librenms/blob/master/resources/definitions/os_detection/sgos.yaml
+# /opt/baddisk/monitoring/librenms/librenms/mibs/bluecoat/BLUECOAT-LICENSE-MIB
+
+metrics:
+  - MIB: BLUECOAT-LICENSE-MIB
+    table:
+      OID: 1.3.6.1.4.1.3417.2.16.1.1.1
+      name: appLicenseStatusTable
+    disable_table_cache: true
+    symbols:
+      - OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.1
+        name: _license_row
+        metric_type: gauge
+        chart_meta:
+          description: Hidden licensing row helper
+          family: 'Internal/Licensing'
+          unit: "{row}"
+    static_tags:
+      - tag: _license_expiry_source
+        value: appLicenseStatusExpireDate
+    metric_tags:
+      - tag: _license_index
+        symbol:
+          OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.1
+          name: appLicenseStatusIndex
+      - tag: _license_id
+        symbol:
+          OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.1
+          name: appLicenseStatusIndex
+      - tag: _license_name
+        symbol:
+          OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.2
+          name: appLicenseStatusApplicationName
+      - tag: _license_feature
+        symbol:
+          OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.3
+          name: appLicenseStatusFeatureName
+      - tag: _license_component
+        symbol:
+          OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.4
+          name: appLicenseStatusComponentName
+      - tag: _license_type
+        symbol:
+          OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.5
+          name: appLicenseStatusExpireType
+        mapping:
+          0: unknown
+          1: perpetual
+          2: subscription
+          3: demo
+      - tag: _license_perpetual
+        symbol:
+          OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.5
+          name: appLicenseStatusExpireType
+        mapping:
+          1: true
+      - tag: _license_expiry_raw
+        symbol:
+          OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.6
+          name: appLicenseStatusExpireDate
+          format: snmp_dateandtime
+      - tag: _license_state_raw
+        symbol:
+          OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.7
+          name: appLicenseStatusLicenseState
+        mapping:
+          0: unknown
+          1: active
+          2: expired
+      - tag: _license_state_severity_raw
+        symbol:
+          OID: 1.3.6.1.4.1.3417.2.16.1.1.1.1.7
+          name: appLicenseStatusLicenseState
+        mapping:
+          0: 1
+          1: 0
+          2: 2

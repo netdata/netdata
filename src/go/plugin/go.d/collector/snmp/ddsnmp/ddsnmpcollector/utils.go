@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/gosnmp/gosnmp"
@@ -88,10 +89,56 @@ func convPduToStringf(pdu gosnmp.SnmpPDU, format string) (string, error) {
 			return "", fmt.Errorf("cannot convert %T to hex", pdu.Value)
 		}
 		return hex.EncodeToString(bs), nil
+	case "snmp_dateandtime":
+		ts, err := convPduToDateAndTimeUnix(pdu)
+		if err != nil {
+			return "", err
+		}
+		return strconv.FormatInt(ts, 10), nil
 	default:
 		// For unknown formats, use the default string conversion
 		return convPduToString(pdu)
 	}
+}
+
+func convPduToDateAndTimeUnix(pdu gosnmp.SnmpPDU) (int64, error) {
+	var bs []byte
+
+	switch v := pdu.Value.(type) {
+	case []byte:
+		bs = v
+	case string:
+		bs = []byte(v)
+	default:
+		return 0, fmt.Errorf("cannot convert %T to SNMP DateAndTime", pdu.Value)
+	}
+
+	if len(bs) != 8 && len(bs) != 11 {
+		return 0, fmt.Errorf("invalid SNMP DateAndTime length %d", len(bs))
+	}
+
+	year := int(bs[0])<<8 | int(bs[1])
+	month := time.Month(bs[2])
+	day := int(bs[3])
+	hour := int(bs[4])
+	minute := int(bs[5])
+	second := int(bs[6])
+	deci := int(bs[7])
+
+	loc := time.UTC
+	if len(bs) == 11 {
+		sign := bs[8]
+		tzHours := int(bs[9])
+		tzMinutes := int(bs[10])
+		offset := tzHours*3600 + tzMinutes*60
+		if sign == '-' {
+			offset = -offset
+		}
+		loc = time.FixedZone("snmp", offset)
+	}
+
+	tm := time.Date(year, month, day, hour, minute, second, deci*100_000_000, loc)
+	return tm.Unix(), nil
 }
 
 func convPduToString(pdu gosnmp.SnmpPDU) (string, error) {

@@ -64,7 +64,58 @@ metadata:
         value: "Firewall"
 
 metrics:
-  # CPU
+  # Licensing
+  - MIB: CHECKPOINT-MIB
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.18.1
+      name: licensingTable
+    disable_table_cache: true
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.6.18.1.1.2
+        name: _license_row
+        metric_type: gauge
+        chart_meta:
+          description: "Hidden licensing row helper"
+          family: 'Internal/Licensing'
+          unit: "{row}"
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.1
+          name: licensingIndex
+        tag: _license_index
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.2
+          name: licensingID
+        tag: _license_id
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.3
+          name: licensingBladeName
+        tag: _license_name
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.4
+          name: licensingState
+        tag: _license_state_raw
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.5
+          name: licensingExpirationDate
+        tag: _license_expiry_raw
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.6
+          name: licensingImpact
+        tag: _license_impact
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.7
+          name: licensingBladeActive
+        tag: _license_active_raw
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.8
+          name: licensingTotalQuota
+        tag: _license_capacity_raw
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.9
+          name: licensingUsedQuota
+        tag: _license_usage_raw
+    # CPU
   - MIB: CHECKPOINT-MIB
     table:
       OID: 1.3.6.1.4.1.2620.1.6.7.5

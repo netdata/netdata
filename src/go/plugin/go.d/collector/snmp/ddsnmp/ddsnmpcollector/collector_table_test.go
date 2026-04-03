@@ -4050,6 +4050,157 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 			collectCount:  3,
 			sleepBetween:  10 * time.Millisecond,
 		},
+		"table cache with constant_value_one helper only": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.9999.1",
+									Name: "licenseTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										Name:             "license_present",
+										ConstantValueOne: true,
+										MetricType:       "gauge",
+									},
+								},
+								StaticTags: []ddprofiledefinition.StaticMetricTagConfig{
+									{Tag: "component", Value: "license"},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "license_name",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.4.1.9999.1.1.1",
+											Name: "licenseName",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).Times(1)
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.9999.1").Return(
+					[]gosnmp.SnmpPDU{
+						createStringPDU("1.3.6.1.4.1.9999.1.1.1.7", "Threat Prevention"),
+					}, nil,
+				).Times(1)
+			},
+			expectedResult: []*ddsnmp.ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []ddsnmp.Metric{
+						{
+							Name:       "license_present",
+							Value:      1,
+							Tags:       map[string]string{"license_name": "Threat Prevention"},
+							StaticTags: map[string]string{"component": "license"},
+							MetricType: "gauge",
+							IsTable:    true,
+							Table:      "licenseTable",
+						},
+					},
+				},
+			},
+			expectedError: false,
+			enableCache:   true,
+			cacheTTL:      30 * time.Second,
+			collectCount:  2,
+			sleepBetween:  10 * time.Millisecond,
+		},
+		"table cache with constant_value_one helper and metric columns": {
+			profiles: []*ddsnmp.Profile{
+				{
+					SourceFile: "test-profile.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{
+						Metrics: []ddprofiledefinition.MetricsConfig{
+							{
+								Table: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.9999.2",
+									Name: "powerSupplyTable",
+								},
+								Symbols: []ddprofiledefinition.SymbolConfig{
+									{
+										Name:             "power_supply_present",
+										ConstantValueOne: true,
+										MetricType:       "gauge",
+									},
+									{
+										OID:        "1.3.6.1.4.1.9999.2.1.2",
+										Name:       "power_supply_used",
+										MetricType: "gauge",
+									},
+								},
+								MetricTags: []ddprofiledefinition.MetricTagConfig{
+									{
+										Tag: "supply",
+										Symbol: ddprofiledefinition.SymbolConfigCompat{
+											OID:  "1.3.6.1.4.1.9999.2.1.1",
+											Name: "powerSupplyName",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				m.EXPECT().MaxOids().Return(10).AnyTimes()
+				m.EXPECT().Version().Return(gosnmp.Version2c).Times(1)
+				m.EXPECT().BulkWalkAll("1.3.6.1.4.1.9999.2").Return(
+					[]gosnmp.SnmpPDU{
+						createStringPDU("1.3.6.1.4.1.9999.2.1.1.1", "PSU-A"),
+						createGauge32PDU("1.3.6.1.4.1.9999.2.1.2.1", 120),
+					}, nil,
+				).Times(1)
+				m.EXPECT().Get([]string{"1.3.6.1.4.1.9999.2.1.2.1"}).Return(
+					&gosnmp.SnmpPacket{
+						Variables: []gosnmp.SnmpPDU{
+							createGauge32PDU("1.3.6.1.4.1.9999.2.1.2.1", 140),
+						},
+					}, nil,
+				).Times(1)
+			},
+			expectedResult: []*ddsnmp.ProfileMetrics{
+				{
+					Source:         "test-profile.yaml",
+					DeviceMetadata: nil,
+					Metrics: []ddsnmp.Metric{
+						{
+							Name:       "power_supply_present",
+							Value:      1,
+							Tags:       map[string]string{"supply": "PSU-A"},
+							MetricType: "gauge",
+							IsTable:    true,
+							Table:      "powerSupplyTable",
+						},
+						{
+							Name:       "power_supply_used",
+							Value:      140,
+							Tags:       map[string]string{"supply": "PSU-A"},
+							MetricType: "gauge",
+							IsTable:    true,
+							Table:      "powerSupplyTable",
+						},
+					},
+				},
+			},
+			expectedError: false,
+			enableCache:   true,
+			cacheTTL:      30 * time.Second,
+			collectCount:  2,
+			sleepBetween:  10 * time.Millisecond,
+		},
 		"table cache expiration": {
 			profiles: []*ddsnmp.Profile{
 				{

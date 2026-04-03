@@ -236,19 +236,25 @@ func (p *Profile) removeConstantMetrics() {
 		return
 	}
 
-	p.Definition.Metrics = slices.DeleteFunc(p.Definition.Metrics, func(m ddprofiledefinition.MetricsConfig) bool {
-		if m.IsScalar() && m.Symbol.ConstantValueOne {
-			return true
+	metrics := p.Definition.Metrics[:0]
+	for _, metric := range p.Definition.Metrics {
+		if metric.IsScalar() && metric.Symbol.ConstantValueOne && !strings.HasPrefix(metric.Symbol.Name, "_") {
+			continue
 		}
 
-		if m.IsColumn() {
-			m.Symbols = slices.DeleteFunc(m.Symbols, func(s ddprofiledefinition.SymbolConfig) bool {
-				return s.ConstantValueOne
+		if metric.IsColumn() {
+			metric.Symbols = slices.DeleteFunc(metric.Symbols, func(s ddprofiledefinition.SymbolConfig) bool {
+				return s.ConstantValueOne && !strings.HasPrefix(s.Name, "_")
 			})
+			if len(metric.Symbols) == 0 {
+				continue
+			}
 		}
 
-		return m.IsColumn() && len(m.Symbols) == 0
-	})
+		metrics = append(metrics, metric)
+	}
+
+	p.Definition.Metrics = metrics
 }
 
 // sortProfilesBySpecificity sorts profiles by their match specificity.

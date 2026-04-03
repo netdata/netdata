@@ -20,10 +20,12 @@ func newTestFuncInterfaces(cache *ifaceCache) *funcInterfaces {
 func TestSnmpMethods(t *testing.T) {
 	methods := snmpMethods()
 
-	require.Len(t, methods, 1)
+	require.Len(t, methods, 2)
 	assert.Equal(t, "interfaces", methods[0].ID)
 	assert.Equal(t, "Network Interfaces", methods[0].Name)
 	require.NotEmpty(t, methods[0].RequiredParams)
+	assert.Equal(t, "licenses", methods[1].ID)
+	assert.Equal(t, "Licenses", methods[1].Name)
 
 	// Verify type group param exists
 	var typeGroupParam *funcapi.ParamConfig

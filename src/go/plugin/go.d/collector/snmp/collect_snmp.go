@@ -22,6 +22,7 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 	}
 
 	c.resetIfaceCache()
+	c.collectLicensing(mx, pms)
 
 	c.collectProfileScalarMetrics(mx, pms)
 	c.collectProfileTableMetrics(mx, pms)

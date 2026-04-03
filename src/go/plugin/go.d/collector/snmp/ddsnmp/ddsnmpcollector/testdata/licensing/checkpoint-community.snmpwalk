@@ -1,0 +1,26 @@
+# Adapted from the public Check Point community thread:
+# https://community.checkpoint.com/t5/Security-Gateways/Firewall-and-Content-Awareness-Blade-missing-license/td-p/114613
+# The forum post shows licensing rows as a rendered table (ID, Blade name, Entitlement status, Expiration date),
+# not as a raw snmpwalk. This fixture re-encodes only those public values into the Check Point licensing table
+# shape so we can validate real blade names, real state strings, the max-uint32 sentinel, and real epoch values.
+# The SNMP row index is not shown in the forum post, so this adapted fixture uses the public IDs as row indexes.
+1.3.6.1.4.1.2620.1.6.18.1.1.2.0 = Gauge32: 0
+1.3.6.1.4.1.2620.1.6.18.1.1.3.0 = STRING: Firewall
+1.3.6.1.4.1.2620.1.6.18.1.1.4.0 = STRING: Not Entitled
+1.3.6.1.4.1.2620.1.6.18.1.1.5.0 = Gauge32: 4294967295
+1.3.6.1.4.1.2620.1.6.18.1.1.2.4 = Gauge32: 4
+1.3.6.1.4.1.2620.1.6.18.1.1.3.4 = STRING: Application Ctrl
+1.3.6.1.4.1.2620.1.6.18.1.1.4.4 = STRING: Evaluation
+1.3.6.1.4.1.2620.1.6.18.1.1.5.4 = Gauge32: 1619246913
+1.3.6.1.4.1.2620.1.6.18.1.1.2.5 = Gauge32: 5
+1.3.6.1.4.1.2620.1.6.18.1.1.3.5 = STRING: URL Filtering
+1.3.6.1.4.1.2620.1.6.18.1.1.4.5 = STRING: Evaluation
+1.3.6.1.4.1.2620.1.6.18.1.1.5.5 = Gauge32: 1619246913
+1.3.6.1.4.1.2620.1.6.18.1.1.2.2 = Gauge32: 2
+1.3.6.1.4.1.2620.1.6.18.1.1.3.2 = STRING: IPS
+1.3.6.1.4.1.2620.1.6.18.1.1.4.2 = STRING: Evaluation
+1.3.6.1.4.1.2620.1.6.18.1.1.5.2 = Gauge32: 1619246941
+1.3.6.1.4.1.2620.1.6.18.1.1.2.1003 = Gauge32: 1003
+1.3.6.1.4.1.2620.1.6.18.1.1.3.1003 = STRING: SmartEvent
+1.3.6.1.4.1.2620.1.6.18.1.1.4.1003 = STRING: Evaluation
+1.3.6.1.4.1.2620.1.6.18.1.1.5.1003 = Gauge32: 1620542985
