@@ -123,7 +123,7 @@ Example combining bearer token with IP restrictions:
 
 **Users can't authenticate:**
 
-- Verify the Agent is claimed and connected to Cloud: Check `http://your-server:19999/api/v3/info` and inspect the `cloud` section, or confirm `agent-claimed: true` and `aclk-available: true`
+- Verify the Agent is claimed and connected to Cloud: Check `http://your-server:19999/api/v3/info` and inspect the `cloud` section. Use `cloud.status` to verify whether the agent is connected to Netdata Cloud, and if it is not `online`, inspect `cloud.reason` for the failure details
 - If needed, run `sudo netdatacli aclk-state` to diagnose the ACLK connection
 - Ensure users have access to the same Cloud Space as the Agent
 
