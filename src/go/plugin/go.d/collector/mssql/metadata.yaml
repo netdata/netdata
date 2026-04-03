@@ -160,8 +160,10 @@ modules:
               GRANT SELECT ON dbo.sysjobs TO [DOMAIN\COMPUTERNAME$];
               ```
 
-              Remote Windows Authentication requires Active Directory — it does not work
-              from workgroup machines.
+              For the default `Local System` service account, remote Windows Authentication works
+              only on domain-joined machines, where it can authenticate as the computer account.
+              In workgroups, use a different Windows service account if you need remote Windows
+              Authentication.
 
               > **Note**: To verify which account SQL Server sees, connect with Windows Authentication
               > and run `SELECT SYSTEM_USER`.
