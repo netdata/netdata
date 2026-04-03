@@ -1529,3 +1529,52 @@ When seeking help, include:
 - [Alert Troubleshooting](/docs/troubleshooting/troubleshoot.md) - AI-powered alert investigation and root-cause analysis
 
 **Next Steps:** You now have comprehensive knowledge of Netdata health configuration. Start with the [Quick Start Guide](#quick-start-guide) for immediate needs or dive into [Common Tasks](#common-tasks) for specific workflows.
+
+## Alert Notification Variables
+
+When configuring alert notifications, you can use the following variables in your notification templates and custom sender functions. These variables are replaced with actual values when the notification is sent.
+
+| Variable name               | Description                                                                      |
+|:---------------------------:|:---------------------------------------------------------------------------------|
+| `${alarm}`                  | Like "name = value units"                                                        |
+| `${status_message}`         | Like "needs attention", "recovered", "is critical"                               |
+| `${severity}`               | Like "Escalated to CRITICAL", "Recovered from WARNING"                           |
+| `${raised_for}`             | Like "(alarm was raised for 10 minutes)"                                         |
+| `${host}`                   | The host generated this event                                                    |
+| `${url_host}`               | Same as ${host} but URL encoded                                                  |
+| `${unique_id}`              | The unique id of this event                                                      |
+| `${alarm_id}`               | The unique id of the alarm that generated this event                             |
+| `${event_id}`               | The incremental id of the event, for this alarm id                               |
+| `${when}`                   | The timestamp this event occurred                                                |
+| `${name}`                   | The name of the alarm, as given in netdata health.d entries                      |
+| `${url_name}`               | Same as ${name} but URL encoded                                                  |
+| `${chart}`                  | The name of the chart (type.id)                                                  |
+| `${url_chart}`              | Same as ${chart} but URL encoded                                                 |
+| `${status}`                 | The current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL |
+| `${old_status}`             | The previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL |
+| `${value}`                  | The current value of the alarm                                                   |
+| `${old_value}`              | The previous value of the alarm                                                  |
+| `${src}`                    | The line number and file the alarm has been configured                           |
+| `${duration}`               | The duration in seconds of the previous alarm state                              |
+| `${duration_txt}`           | Same as ${duration} for humans                                                   |
+| `${non_clear_duration}`     | The total duration in seconds this is/was non-clear. For repeating alerts in WARNING or CRITICAL state, Netdata sends ${duration} instead. |
+| `${non_clear_duration_txt}` | Same as ${non_clear_duration} for humans                                         |
+| `${units}`                  | The units of the value                                                           |
+| `${info}`                   | A short description of the alarm                                                 |
+| `${value_string}`           | Friendly value (with units)                                                      |
+| `${old_value_string}`       | Friendly old value (with units)                                                  |
+| `${image}`                  | The URL of an image to represent the status of the alarm                         |
+| `${color}`                  | A color in  AABBCC format for the alarm                                          |
+| `${goto_url}`               | The URL the user can click to see the netdata dashboard                          |
+| `${calc_expression}`        | The expression evaluated to provide the value for the alarm                      |
+| `${calc_param_values}`      | The value of the variables in the evaluated expression                           |
+| `${total_warnings}`         | The total number of alarms in WARNING state on the host                          |
+| `${total_critical}`         | The total number of alarms in CRITICAL state on the host                         |
+
+:::note
+
+**Repeating Alerts**
+
+For repeating notifications in WARNING or CRITICAL state, Netdata sends `${duration}` instead of `${non_clear_duration}`. This is because the notification is sent while the alert is still in the same state, so the duration represents the time since the last notification, not the total non-clear time.
+
+:::
