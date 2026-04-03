@@ -740,7 +740,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 # Network viewer belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
 
-%if %{_have_rust}
+%if 0%{_have_rust}
 # NetFlow belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/netflow-plugin
 %exclude %{_sbindir}/topology-ip-intel-downloader
@@ -3265,7 +3265,7 @@ Requires(pre): %{name}-user >= %{version}
 # CAP_SYS_ADMIN, CAP_SYS_PTRACE and CAP_DAC_READ_SEARCH needed for data collection.
 %caps(cap_sys_admin,cap_sys_ptrace,cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
 
-%if %{_have_rust}
+%if 0%{_have_rust}
 %package plugin-netflow
 Summary: The NetFlow/IPFIX/sFlow flow analysis plugin for the Netdata Agent
 Group: Applications/System
@@ -3311,7 +3311,7 @@ Requires(pre): %{name}-user >= %{version}
 %defattr(0644,root,root,0755)
 %{_datadir}/%{name}/web
 
-%if %{_have_rust}
+%if 0%{_have_rust}
 %package plugin-otel
 Summary: The Open Telemetry plugin for the Netdata Agent
 Group: Applications/System
@@ -3332,7 +3332,7 @@ Requires(pre): %{name}-user >= %{version}
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/otel-plugin
 %endif
 
-%if %{_have_rust}
+%if 0%{_have_rust}
 %package plugin-otel-signal-viewer
 Summary: The OTel signal viewer plugin for the Netdata Agent
 Group: Applications/System
