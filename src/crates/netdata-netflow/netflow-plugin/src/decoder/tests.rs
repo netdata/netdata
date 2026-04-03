@@ -2813,6 +2813,96 @@ fn persisted_decoder_state_rehydrates_loaded_namespace_for_new_source_socket() {
 }
 
 #[test]
+fn v9_restore_packet_keeps_options_template_descriptor_lengths() {
+    let exporter_ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+    let key = super::DecoderStateNamespaceKey {
+        exporter_ip: exporter_ip.to_string(),
+        observation_domain_id: 42,
+    };
+    let mut namespace = DecoderStateNamespace::default();
+    let scope_fields = vec![super::PersistedV9TemplateField {
+        field_type: 1,
+        field_length: 1,
+    }];
+    let option_fields = vec![
+        super::PersistedV9TemplateField {
+            field_type: 34,
+            field_length: 8,
+        },
+        super::PersistedV9TemplateField {
+            field_type: 50,
+            field_length: 2,
+        },
+    ];
+    namespace.set_v9_options_template(256, scope_fields, option_fields);
+
+    let packets = super::build_namespace_restore_packets(&key, &namespace)
+        .expect("failed to build restore packets");
+    assert_eq!(packets.len(), 1, "expected a single v9 restore packet");
+    let packet = &packets[0];
+
+    assert_eq!(u16::from_be_bytes([packet[0], packet[1]]), 9);
+    assert_eq!(u16::from_be_bytes([packet[20], packet[21]]), 1);
+    assert_eq!(u16::from_be_bytes([packet[24], packet[25]]), 256);
+    assert_eq!(u16::from_be_bytes([packet[26], packet[27]]), 4);
+    assert_eq!(u16::from_be_bytes([packet[28], packet[29]]), 8);
+    assert_eq!(u16::from_be_bytes([packet[32], packet[33]]), 1);
+    assert_eq!(u16::from_be_bytes([packet[36], packet[37]]), 8);
+    assert_eq!(u16::from_be_bytes([packet[40], packet[41]]), 2);
+
+    let mut decoders = FlowDecoders::new();
+    let source = SocketAddr::new(exporter_ip, 2055);
+    decoders
+        .replay_namespace_packets(&key, &namespace, source)
+        .expect("v9 restore packet with non-4-byte field widths should replay");
+}
+
+#[test]
+fn ipfix_v9_restore_packet_keeps_options_template_descriptor_lengths() {
+    let exporter_ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+    let key = super::DecoderStateNamespaceKey {
+        exporter_ip: exporter_ip.to_string(),
+        observation_domain_id: 42,
+    };
+    let mut namespace = DecoderStateNamespace::default();
+    let scope_fields = vec![super::PersistedV9TemplateField {
+        field_type: 1,
+        field_length: 1,
+    }];
+    let option_fields = vec![
+        super::PersistedV9TemplateField {
+            field_type: 34,
+            field_length: 8,
+        },
+        super::PersistedV9TemplateField {
+            field_type: 50,
+            field_length: 2,
+        },
+    ];
+    namespace.set_ipfix_v9_options_template(256, scope_fields, option_fields);
+
+    let packets = super::build_namespace_restore_packets(&key, &namespace)
+        .expect("failed to build restore packets");
+    assert_eq!(packets.len(), 1, "expected a single ipfix restore packet");
+    let packet = &packets[0];
+
+    assert_eq!(u16::from_be_bytes([packet[0], packet[1]]), 10);
+    assert_eq!(u16::from_be_bytes([packet[16], packet[17]]), 1);
+    assert_eq!(u16::from_be_bytes([packet[20], packet[21]]), 256);
+    assert_eq!(u16::from_be_bytes([packet[22], packet[23]]), 4);
+    assert_eq!(u16::from_be_bytes([packet[24], packet[25]]), 8);
+    assert_eq!(u16::from_be_bytes([packet[28], packet[29]]), 1);
+    assert_eq!(u16::from_be_bytes([packet[32], packet[33]]), 8);
+    assert_eq!(u16::from_be_bytes([packet[36], packet[37]]), 2);
+
+    let mut decoders = FlowDecoders::new();
+    let source = SocketAddr::new(exporter_ip, 2055);
+    decoders
+        .replay_namespace_packets(&key, &namespace, source)
+        .expect("ipfix v9 restore packet with non-4-byte field widths should replay");
+}
+
+#[test]
 fn persisted_decoder_state_rejects_unsupported_schema_version() {
     let (_key, mut persisted) = sample_persisted_namespace_bytes();
     persisted[4..8].copy_from_slice(&999_u32.to_le_bytes());
