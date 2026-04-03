@@ -267,7 +267,6 @@ func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.Target, error) {
 	var n int
 
 	for _, tgt := range targets {
-		tgt := tgt
 
 		proto := strings.TrimSuffix(tgt.Protocol, "6")
 		key := tgt.Protocol + ":" + tgt.Address

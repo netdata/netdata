@@ -26,10 +26,10 @@ type fakeProcess struct {
 	stderrR *io.PipeReader
 	stderrW *io.PipeWriter
 	done    chan struct{}
-	handler func(map[string]interface{}) Response
+	handler func(map[string]any) Response
 }
 
-func newFakeProcess(handler func(map[string]interface{}) Response) *fakeProcess {
+func newFakeProcess(handler func(map[string]any) Response) *fakeProcess {
 	stdinR, stdinW := io.Pipe()
 	stdoutR, stdoutW := io.Pipe()
 	stderrR, stderrW := io.Pipe()
@@ -57,7 +57,7 @@ func (p *fakeProcess) run() {
 	scanner := bufio.NewScanner(p.stdinR)
 	for scanner.Scan() {
 		line := scanner.Text()
-		var cmd map[string]interface{}
+		var cmd map[string]any
 		if err := json.Unmarshal([]byte(line), &cmd); err != nil {
 			continue
 		}
@@ -74,12 +74,12 @@ func (p *fakeProcess) Wait() error           { <-p.done; return nil }
 
 func TestClientStartAndSend(t *testing.T) {
 	var call int
-	handler := func(cmd map[string]interface{}) Response {
+	handler := func(cmd map[string]any) Response {
 		call++
 		if call == 1 {
 			return Response{Status: "OK"}
 		}
-		return Response{Status: "OK", Data: map[string]interface{}{"value": 123}}
+		return Response{Status: "OK", Data: map[string]any{"value": 123}}
 	}
 
 	var procMu sync.Mutex
@@ -115,7 +115,7 @@ func TestClientStartAndSend(t *testing.T) {
 
 func TestClientErrorStatus(t *testing.T) {
 	var call int
-	handler := func(cmd map[string]interface{}) Response {
+	handler := func(cmd map[string]any) Response {
 		call++
 		if call == 1 {
 			return Response{Status: "OK"}
@@ -144,7 +144,7 @@ func TestClientErrorStatus(t *testing.T) {
 }
 
 func TestClientCancellation(t *testing.T) {
-	handler := func(cmd map[string]interface{}) Response {
+	handler := func(cmd map[string]any) Response {
 		time.Sleep(200 * time.Millisecond)
 		return Response{Status: "OK"}
 	}
@@ -178,7 +178,7 @@ func TestClientWritesJar(t *testing.T) {
 		if _, err := os.Stat(jarPath); err != nil {
 			t.Fatalf("jar file not written: %v", err)
 		}
-		return newFakeProcess(func(cmd map[string]interface{}) Response { return Response{Status: "OK"} }), nil
+		return newFakeProcess(func(cmd map[string]any) Response { return Response{Status: "OK"} }), nil
 	}))
 	if err != nil {
 		t.Fatalf("NewClient failed: %v", err)

@@ -79,11 +79,11 @@ func (m *Manager) extractModuleJobName(id string) (mn string, jn string, ok bool
 
 func (m *Manager) extractModuleName(id string) (string, bool) {
 	id = strings.TrimPrefix(id, m.dyncfgCollectorPrefixValue())
-	i := strings.IndexByte(id, ':')
-	if i == -1 {
+	before, _, ok := strings.Cut(id, ":")
+	if !ok {
 		return id, id != ""
 	}
-	return id[:i], true
+	return before, true
 }
 
 func extractJobName(id string) (string, bool) {

@@ -5,6 +5,7 @@ package ddsnmp
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net"
 	"strconv"
@@ -70,7 +71,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 	fm := sprig.TxtFuncMap()
 
 	extra := map[string]any{
-		"deleteTag": func(m *Metric, key string) interface{} {
+		"deleteTag": func(m *Metric, key string) any {
 			delete(m.Tags, key)
 			return nil
 		},
@@ -176,7 +177,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 			sensorPrecision := m.Tags["rm:sensor_precision"]
 
 			famPrefix := "Hardware/Sensor/"
-			config := map[string]map[string]interface{}{
+			config := map[string]map[string]any{
 				"1":  {"name": "unspecified", "family": "Generic", "desc": "Unspecified or vendor-specific sensor"},
 				"2":  {"name": "unknown", "family": "Unknown", "desc": "Unknown sensor type"},
 				"3":  {"name": "voltage_ac", "unit": "V", "family": "Voltage/AC", "desc": "AC voltage"},
@@ -322,9 +323,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 		},
 	}
 
-	for name, fn := range extra {
-		fm[name] = fn
-	}
+	maps.Copy(fm, extra)
 
 	return fm
 }

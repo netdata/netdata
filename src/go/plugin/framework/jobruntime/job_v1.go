@@ -759,7 +759,7 @@ func getChartType(chart *collectorapi.Chart, j *Job) string {
 	}
 	if chart.OverModule != "" {
 		cachedType := chart.CachedType()
-		if v := strings.TrimPrefix(cachedType, j.ModuleName()); v != cachedType {
+		if v, ok := strings.CutPrefix(cachedType, j.ModuleName()); ok {
 			chart.SetCachedType(chart.OverModule + v)
 		}
 	}

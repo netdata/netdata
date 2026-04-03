@@ -4,6 +4,8 @@ package metricsaudit
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -130,13 +132,7 @@ func (da *Auditor) PrintSummary() {
 
 			// Update label keys and dimension names if needed
 			for _, label := range ca.Chart.Labels {
-				found := false
-				for _, key := range contextMap[ctx].labelKeys {
-					if key == label.Key {
-						found = true
-						break
-					}
-				}
+				found := slices.Contains(contextMap[ctx].labelKeys, label.Key)
 				if !found {
 					contextMap[ctx].labelKeys = append(contextMap[ctx].labelKeys, label.Key)
 					sort.Strings(contextMap[ctx].labelKeys)
@@ -148,13 +144,7 @@ func (da *Auditor) PrintSummary() {
 				if dimName == "" {
 					dimName = dim.ID
 				}
-				found := false
-				for _, name := range contextMap[ctx].dimNames {
-					if name == dimName {
-						found = true
-						break
-					}
-				}
+				found := slices.Contains(contextMap[ctx].dimNames, dimName)
 				if !found {
 					contextMap[ctx].dimNames = append(contextMap[ctx].dimNames, dimName)
 					sort.Strings(contextMap[ctx].dimNames)
@@ -536,9 +526,7 @@ func cloneJobAnalysis(src *JobAnalysis) JobAnalysis {
 		AllSeenMetrics:  make(map[string]bool, len(src.AllSeenMetrics)),
 		Charts:          make([]ChartAnalysis, len(src.Charts)),
 	}
-	for metricID, seen := range src.AllSeenMetrics {
-		dst.AllSeenMetrics[metricID] = seen
-	}
+	maps.Copy(dst.AllSeenMetrics, src.AllSeenMetrics)
 	for i := range src.Charts {
 		dst.Charts[i] = cloneChartAnalysis(src.Charts[i])
 	}
@@ -555,9 +543,7 @@ func cloneChartAnalysis(src ChartAnalysis) ChartAnalysis {
 	for id, values := range src.CollectedValues {
 		dst.CollectedValues[id] = append([]int64(nil), values...)
 	}
-	for id, seen := range src.SeenDimensions {
-		dst.SeenDimensions[id] = seen
-	}
+	maps.Copy(dst.SeenDimensions, src.SeenDimensions)
 	return dst
 }
 
@@ -1064,7 +1050,7 @@ func (da *Auditor) printContextAnalysis(ctxInfo *contextInfo, isLast bool) []str
 				if len(values) > 5 {
 					// Show first 3 and last 2 values for long series
 					firstVals := []string{}
-					for i := 0; i < 3; i++ {
+					for i := range 3 {
 						firstVals = append(firstVals, fmt.Sprintf("%d", values[i]))
 					}
 					lastVals := []string{}
@@ -1111,12 +1097,7 @@ func (da *Auditor) printContextAnalysis(ctxInfo *contextInfo, isLast bool) []str
 }
 
 func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, item)
 }
 
 // analyzeMetricDimensionMatching performs comprehensive analysis of dimension/metric matching
@@ -1256,8 +1237,8 @@ func (da *Auditor) analyzeFamilyStructureForJob(job *JobAnalysis, contextIssues 
 
 		// Extract top-level family
 		topLevel := family
-		if idx := strings.Index(family, "/"); idx != -1 {
-			topLevel = family[:idx]
+		if before, _, ok := strings.Cut(family, "/"); ok {
+			topLevel = before
 		}
 		topLevelFamilies[topLevel] = true
 
@@ -1406,8 +1387,8 @@ func (da *Auditor) analyzeFamilyStructureForJob(job *JobAnalysis, contextIssues 
 	for family := range families {
 		// Check only the base family name (before /)
 		baseName := family
-		if idx := strings.Index(family, "/"); idx != -1 {
-			baseName = family[:idx]
+		if before, _, ok := strings.Cut(family, "/"); ok {
+			baseName = before
 		}
 
 		if genericFamilies[strings.ToLower(baseName)] {

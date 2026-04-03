@@ -177,10 +177,10 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 
 				var wg sync.WaitGroup
 				wg.Add(workers)
-				for i := 0; i < workers; i++ {
+				for range workers {
 					go func() {
 						defer wg.Done()
-						for j := 0; j < perWorker; j++ {
+						for range perWorker {
 							c.Add(1)
 						}
 					}()

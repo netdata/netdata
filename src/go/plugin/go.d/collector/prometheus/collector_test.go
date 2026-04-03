@@ -588,7 +588,7 @@ test_gauge_no_meta_metric_1{label1="value2"} 12
 
 					var mx map[string]int64
 
-					for i := 0; i < maxNotSeenTimes+1; i++ {
+					for range maxNotSeenTimes + 1 {
 						mx = collr.Collect(context.Background())
 					}
 

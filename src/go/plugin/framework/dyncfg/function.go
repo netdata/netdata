@@ -87,7 +87,7 @@ func (f Function) User() string {
 // Source format is "key1=value1,key2=value2,...".
 func (f Function) SourceValue(key string) string {
 	prefix := key + "="
-	for _, part := range strings.Split(f.fn.Source, ",") {
+	for part := range strings.SplitSeq(f.fn.Source, ",") {
 		if v, ok := strings.CutPrefix(part, prefix); ok {
 			return strings.TrimSpace(v)
 		}

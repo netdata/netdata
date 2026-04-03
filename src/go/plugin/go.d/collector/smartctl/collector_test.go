@@ -597,7 +597,7 @@ func TestCollector_Collect(t *testing.T) {
 			collr.PollDevicesEvery = confopt.Duration(time.Microsecond * 1)
 
 			var mx map[string]int64
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				mx = collr.Collect(context.Background())
 			}
 

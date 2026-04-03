@@ -103,7 +103,7 @@ func parseScoreboard(value string) *scoreboard {
 	// “_” Waiting for Connection (NOTE: not sure, copied the description from apache score board)
 
 	var sb scoreboard
-	for _, s := range strings.Split(value, "") {
+	for s := range strings.SplitSeq(value, "") {
 		switch s {
 		case "_":
 			sb.Waiting++

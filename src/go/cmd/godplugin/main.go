@@ -50,7 +50,7 @@ func init() {
 }
 
 func main() {
-	_, _ = maxprocs.Set(maxprocs.Logger(func(s string, args ...interface{}) {}))
+	_, _ = maxprocs.Set(maxprocs.Logger(func(s string, args ...any) {}))
 
 	opts := parseCLI()
 
@@ -250,8 +250,8 @@ func readFunctionPayload(raw string) ([]byte, time.Duration, error) {
 
 	var data []byte
 	var err error
-	if strings.HasPrefix(raw, "@") {
-		data, err = os.ReadFile(strings.TrimPrefix(raw, "@"))
+	if after, ok := strings.CutPrefix(raw, "@"); ok {
+		data, err = os.ReadFile(after)
 	} else {
 		data = []byte(raw)
 	}

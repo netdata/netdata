@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -35,10 +36,8 @@ func NewTokenProvider(cred azcore.TokenCredential, scopes []string, refreshMargi
 	if len(scopes) == 0 {
 		return nil, errors.New("token scopes are required")
 	}
-	for _, scope := range scopes {
-		if scope == "" {
-			return nil, errors.New("token scopes contain an empty value")
-		}
+	if slices.Contains(scopes, "") {
+		return nil, errors.New("token scopes contain an empty value")
 	}
 	if refreshMargin <= 0 {
 		refreshMargin = DefaultTokenRefreshMargin

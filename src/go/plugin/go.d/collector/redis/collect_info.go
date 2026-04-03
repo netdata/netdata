@@ -164,11 +164,11 @@ func convertBgSaveStatus(status string) string {
 }
 
 func parseProperty(prop string) (field, value string, ok bool) {
-	i := strings.IndexByte(prop, ':')
-	if i == -1 {
+	before, after, ok0 := strings.Cut(prop, ":")
+	if !ok0 {
 		return "", "", false
 	}
-	field, value = prop[:i], prop[i+1:]
+	field, value = before, after
 	return field, value, field != "" && value != ""
 }
 

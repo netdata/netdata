@@ -643,7 +643,7 @@ func TestScalarCollector_Collect(t *testing.T) {
 			profile: func() *ddsnmp.Profile {
 				// Create a profile with many metrics to force chunking
 				var metrics []ddprofiledefinition.MetricsConfig
-				for i := 0; i < 25; i++ {
+				for i := range 25 {
 					metrics = append(metrics, createScalarMetric(
 						fmt.Sprintf("1.3.6.1.2.1.1.%02d.0", i),
 						fmt.Sprintf("metric%d", i),
@@ -660,21 +660,21 @@ func TestScalarCollector_Collect(t *testing.T) {
 				// Expect 3 chunks (10 + 10 + 5)
 				chunk1OIDs := make([]string, 10)
 				chunk1PDUs := make([]gosnmp.SnmpPDU, 10)
-				for i := 0; i < 10; i++ {
+				for i := range 10 {
 					chunk1OIDs[i] = fmt.Sprintf("1.3.6.1.2.1.1.%02d.0", i)
 					chunk1PDUs[i] = createIntegerPDU(chunk1OIDs[i], i*100)
 				}
 
 				chunk2OIDs := make([]string, 10)
 				chunk2PDUs := make([]gosnmp.SnmpPDU, 10)
-				for i := 0; i < 10; i++ {
+				for i := range 10 {
 					chunk2OIDs[i] = fmt.Sprintf("1.3.6.1.2.1.1.%02d.0", i+10)
 					chunk2PDUs[i] = createIntegerPDU(chunk2OIDs[i], (i+10)*100)
 				}
 
 				chunk3OIDs := make([]string, 5)
 				chunk3PDUs := make([]gosnmp.SnmpPDU, 5)
-				for i := 0; i < 5; i++ {
+				for i := range 5 {
 					chunk3OIDs[i] = fmt.Sprintf("1.3.6.1.2.1.1.%02d.0", i+20)
 					chunk3PDUs[i] = createIntegerPDU(chunk3OIDs[i], (i+20)*100)
 				}
@@ -686,7 +686,7 @@ func TestScalarCollector_Collect(t *testing.T) {
 			expectedResult: func() []ddsnmp.Metric {
 				// Generate expected metrics
 				var metrics []ddsnmp.Metric
-				for i := 0; i < 25; i++ {
+				for i := range 25 {
 					metrics = append(metrics, ddsnmp.Metric{
 						Name:       fmt.Sprintf("metric%d", i),
 						Value:      int64(i * 100),

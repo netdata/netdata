@@ -163,7 +163,6 @@ func (d *Discoverer) discoverNetworks(ctx context.Context, in chan<- []model.Tar
 
 	p := pool.New()
 	for _, sub := range d.subnets {
-		sub := sub
 		p.Go(func() { d.discoverNetwork(ctx, in, sub, doProbing) })
 	}
 	p.Wait()

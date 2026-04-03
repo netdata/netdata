@@ -37,7 +37,7 @@ type Profile struct {
 	ResourceType    string         `yaml:"resource_type" json:"resource_type,omitempty"`
 	MetricNamespace string         `yaml:"metric_namespace,omitempty" json:"metric_namespace,omitempty"`
 	Metrics         []Metric       `yaml:"metrics" json:"metrics,omitempty"`
-	Template        charttpl.Group `yaml:"template" json:"template,omitempty"`
+	Template        charttpl.Group `yaml:"template" json:"template"`
 }
 
 type Metric struct {

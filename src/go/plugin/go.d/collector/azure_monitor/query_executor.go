@@ -45,19 +45,13 @@ func (e *queryExecutor) reset() {
 }
 
 func (e *queryExecutor) runQueryBatches(ctx context.Context, batches []queryBatch, queryNow time.Time, queryOffsetSeconds int) []queryBatchResult {
-	workers := e.maxConcurrency
-	if workers < 1 {
-		workers = 1
-	}
-	if workers > len(batches) {
-		workers = len(batches)
-	}
+	workers := min(max(e.maxConcurrency, 1), len(batches))
 
 	input := make(chan queryBatch)
 	output := make(chan queryBatchResult, len(batches))
 
 	var wg sync.WaitGroup
-	for i := 0; i < workers; i++ {
+	for range workers {
 		wg.Go(func() {
 			for batch := range input {
 				samples, err := e.executeQueryBatch(ctx, batch, queryNow, queryOffsetSeconds)

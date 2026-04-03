@@ -67,7 +67,7 @@ func benchmarkCollectorReader(b *testing.B, seriesCount int) metrix.Reader {
 	g := meter.Gauge("bench_metric")
 
 	cc.BeginCycle()
-	for i := 0; i < seriesCount; i++ {
+	for i := range seriesCount {
 		g.Observe(metrix.SampleValue(i), meter.LabelSet(
 			metrix.Label{Key: "id", Value: strconv.Itoa(i)},
 		))

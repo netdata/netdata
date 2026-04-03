@@ -191,8 +191,8 @@ func sourceTypeFromPath(path string) string {
 
 func configNameFromSource(source string) string {
 	base := filepath.Base(strings.TrimSpace(source))
-	if strings.HasSuffix(base, ".conf") {
-		base = strings.TrimSuffix(base, ".conf")
+	if before, ok := strings.CutSuffix(base, ".conf"); ok {
+		base = before
 	}
 	return base
 }
