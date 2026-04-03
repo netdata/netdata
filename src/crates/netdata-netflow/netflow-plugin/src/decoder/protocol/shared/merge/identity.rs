@@ -6,11 +6,6 @@ pub(crate) fn append_unique_flows(dst: &mut Vec<DecodedFlow>, incoming: Vec<Deco
         return;
     }
 
-    if dst.is_empty() && incoming_len == 1 {
-        dst.extend(incoming);
-        return;
-    }
-
     dst.reserve(incoming_len);
 
     // Build a hash index over existing flows for O(1) identity lookups instead of O(n) scans.
