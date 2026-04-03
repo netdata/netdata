@@ -120,11 +120,7 @@ func main() {
 		VarLibDir:           pluginconfig.VarLibDir(),
 		ModuleRegistry:      collectorapi.DefaultRegistry,
 		IsInsideK8s:         hostinfo.IsInsideK8sCluster(),
-		RunModePolicy: policy.RunModePolicy{
-			IsTerminal:               isTerminal,
-			AutoEnableDiscovered:     isTerminal,
-			UseFileStatusPersistence: !isTerminal,
-		},
+		RunModePolicy:       policy.Agent(isTerminal),
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discoveryproviders.File(),
 			discoveryproviders.Dummy(),
