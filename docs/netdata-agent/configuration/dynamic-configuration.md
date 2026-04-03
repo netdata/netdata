@@ -293,8 +293,6 @@ In Netdata, HTTP 412 is used to indicate that an authorization bearer token was 
 
 For more information, see [Secure Your Netdata Agent with Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
 
-    
-
 ---
 
 Experience the efficiency and power of the Dynamic Configuration Manager in Netdata today. Whether you're managing a handful of nodes or a vast infrastructure, this feature will make your monitoring and alerting tasks smoother and more intuitive.
