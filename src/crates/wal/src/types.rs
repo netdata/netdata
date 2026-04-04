@@ -1,7 +1,9 @@
 use std::fmt;
+use std::hash::Hasher;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
+use twox_hash::XxHash64;
 use uuid::Uuid;
 
 // ---------------------------------------------------------------------------
@@ -57,6 +59,38 @@ impl fmt::Display for ByteSize {
 }
 
 // ---------------------------------------------------------------------------
+// ns_hash
+// ---------------------------------------------------------------------------
+
+/// Compute the namespace hash for a `(service.namespace, service.name)` pair.
+///
+/// - Both absent → `0` (sentinel: "no service attribution").
+/// - Otherwise, feed each present field into an xxhash64 (seed 0) hasher
+///   as `"service.namespace="` + value and/or `"service.name="` + value.
+/// - If the resulting hash is `0`, remap to `u64::MAX` so that the sentinel
+///   remains unambiguous.
+pub fn compute_ns_hash(namespace: Option<&str>, name: Option<&str>) -> u64 {
+    if namespace.is_none() && name.is_none() {
+        return 0;
+    }
+
+    let mut h = XxHash64::default();
+    if let Some(ns) = namespace {
+        h.write(b"service.namespace=");
+        h.write(ns.as_bytes());
+    }
+    if let Some(n) = name {
+        h.write(b"service.name=");
+        h.write(n.as_bytes());
+    }
+
+    match h.finish() {
+        0 => u64::MAX,
+        v => v,
+    }
+}
+
+// ---------------------------------------------------------------------------
 // FileId
 // ---------------------------------------------------------------------------
 
@@ -67,9 +101,10 @@ impl fmt::Display for ByteSize {
 /// seq is a 10-digit zero-padded decimal, and ns_hash is a 16-character
 /// zero-padded hex u64.
 ///
-/// The `ns_hash` is the FNV-1a hash of sorted `service.namespace` and
-/// `service.name`. Zero means "no service attribution." If FNV-1a genuinely
-/// produces zero, it is remapped to `u64::MAX`.
+/// The `ns_hash` is the xxhash64 digest of `service.namespace` and
+/// `service.name` (see [`compute_ns_hash`]). Zero means "no service
+/// attribution." If the hash genuinely produces zero, it is remapped
+/// to `u64::MAX`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FileId {
     pub machine_id: Uuid,
@@ -244,5 +279,43 @@ mod tests {
         let c = FileId::new(test_machine_id(), test_boot_id(), 1, 1);
         let d = FileId::new(test_machine_id(), test_boot_id(), 1, 2);
         assert!(c < d);
+    }
+
+    #[test]
+    fn ns_hash_both_missing_is_zero() {
+        assert_eq!(compute_ns_hash(None, None), 0);
+    }
+
+    #[test]
+    fn ns_hash_with_namespace_only() {
+        let h = compute_ns_hash(Some("prod"), None);
+        assert_ne!(h, 0);
+        assert_eq!(h, compute_ns_hash(Some("prod"), None), "must be deterministic");
+    }
+
+    #[test]
+    fn ns_hash_with_name_only() {
+        let h = compute_ns_hash(None, Some("myapp"));
+        assert_ne!(h, 0);
+        assert_eq!(h, compute_ns_hash(None, Some("myapp")));
+    }
+
+    #[test]
+    fn ns_hash_with_both() {
+        let h = compute_ns_hash(Some("prod"), Some("myapp"));
+        assert_ne!(h, 0);
+        // Different from either field alone.
+        assert_ne!(h, compute_ns_hash(Some("prod"), None));
+        assert_ne!(h, compute_ns_hash(None, Some("myapp")));
+    }
+
+    #[test]
+    fn ns_hash_different_values_differ() {
+        let a = compute_ns_hash(Some("prod"), Some("app1"));
+        let b = compute_ns_hash(Some("prod"), Some("app2"));
+        let c = compute_ns_hash(Some("staging"), Some("app1"));
+        assert_ne!(a, b);
+        assert_ne!(a, c);
+        assert_ne!(b, c);
     }
 }

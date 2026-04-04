@@ -12,6 +12,6 @@ pub use config::{Config, RotationConfig};
 pub use error::{Error, Result};
 pub use reader::{WalFrame, WalReader};
 pub use registry::{WalFileEntry, WalRegistry};
-pub use types::{ByteSize, FileId, TimestampNs};
+pub use types::{ByteSize, FileId, TimestampNs, compute_ns_hash};
 pub use waldir::WalDir;
-pub use writer::WalWriter;
+pub use writer::{WalWriter, WalWriterMap};

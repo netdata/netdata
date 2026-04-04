@@ -10,6 +10,7 @@ const WAL_EXT: &str = "wal";
 ///
 /// Owns the directory path and the machine/boot identity. All `FileId`s
 /// produced by this handle carry its machine and boot IDs.
+#[derive(Clone)]
 pub struct WalDir {
     path: PathBuf,
     machine_id: Uuid,

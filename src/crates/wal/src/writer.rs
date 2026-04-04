@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
@@ -295,8 +296,141 @@ impl Config {
     }
 }
 
+// ---------------------------------------------------------------------------
+// WalWriterMap
+// ---------------------------------------------------------------------------
+
+/// Manages multiple [`WalWriter`]s keyed by `ns_hash`, with a shared
+/// monotonic sequence counter so that file sequence numbers are globally
+/// unique within the WAL directory.
+pub struct WalWriterMap {
+    dir: WalDir,
+    config: Config,
+    seq: Arc<AtomicU64>,
+    writers: HashMap<u64, WalWriter>,
+}
+
+impl WalWriterMap {
+    /// Create a new writer map.
+    ///
+    /// Scans the WAL directory once to seed the shared sequence counter.
+    pub fn new(dir: WalDir, config: Config) -> Result<Self> {
+        std::fs::create_dir_all(dir.path())?;
+        let max_seq = dir.scan_max_sequence()?;
+        Ok(Self {
+            dir,
+            config,
+            seq: Arc::new(AtomicU64::new(max_seq)),
+            writers: HashMap::new(),
+        })
+    }
+
+    /// Get or lazily create a writer for the given `ns_hash`.
+    pub fn get_or_create(&mut self, ns_hash: u64) -> &mut WalWriter {
+        self.writers.entry(ns_hash).or_insert_with(|| {
+            WalWriter::with_shared_seq(
+                self.dir.clone(),
+                self.config.clone(),
+                Arc::clone(&self.seq),
+                ns_hash,
+            )
+        })
+    }
+
+    /// Drain pending events from all writers.
+    pub fn take_all_events(&mut self) -> Vec<WalEvent> {
+        let mut events = Vec::new();
+        for writer in self.writers.values_mut() {
+            events.append(&mut writer.take_events());
+        }
+        events
+    }
+
+    /// Sync all active writers to disk.
+    pub fn sync_all(&mut self) -> Result<()> {
+        for writer in self.writers.values_mut() {
+            writer.sync()?;
+        }
+        Ok(())
+    }
+
+    /// Shut down all writers, returning any remaining events.
+    pub fn shutdown_all(&mut self) -> Result<Vec<WalEvent>> {
+        let mut events = Vec::new();
+        for writer in self.writers.values_mut() {
+            events.append(&mut writer.shutdown()?);
+        }
+        Ok(events)
+    }
+}
+
 fn fsync_dir(dir: &std::path::Path) -> Result<()> {
     let dir_file = File::open(dir)?;
     dir_file.sync_all()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Config;
+
+    fn test_dir(tmp: &std::path::Path) -> WalDir {
+        let machine_id = uuid::Uuid::try_parse("550e8400e29b41d4a716446655440000").unwrap();
+        let boot_id = uuid::Uuid::try_parse("7f3b2a1e9c4d4f8ab1c2d3e4f5a6b7c8").unwrap();
+        WalDir::new(tmp, machine_id, boot_id)
+    }
+
+    #[test]
+    fn writer_map_creates_separate_writers_per_ns_hash() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = test_dir(tmp.path());
+        let mut map = WalWriterMap::new(dir, Config::default()).unwrap();
+
+        let data = b"test payload";
+
+        map.get_or_create(1).write_frame(data, 1).unwrap();
+        map.get_or_create(2).write_frame(data, 1).unwrap();
+        map.get_or_create(1).write_frame(data, 1).unwrap();
+
+        map.sync_all().unwrap();
+
+        // Two distinct ns_hash values → two WAL files.
+        let wal_files: Vec<_> = std::fs::read_dir(tmp.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "wal"))
+            .collect();
+        assert_eq!(wal_files.len(), 2);
+
+        // Verify filenames carry distinct ns_hash suffixes.
+        let mut hashes: Vec<u64> = wal_files
+            .iter()
+            .map(|e| crate::types::FileId::parse(&e.path()).unwrap().ns_hash)
+            .collect();
+        hashes.sort();
+        assert_eq!(hashes, vec![1, 2]);
+    }
+
+    #[test]
+    fn writer_map_shared_seq_is_globally_unique() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = test_dir(tmp.path());
+        let mut map = WalWriterMap::new(dir, Config::default()).unwrap();
+
+        let data = b"test payload";
+        map.get_or_create(10).write_frame(data, 1).unwrap();
+        map.get_or_create(20).write_frame(data, 1).unwrap();
+
+        map.sync_all().unwrap();
+
+        let mut seqs: Vec<u64> = std::fs::read_dir(tmp.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| crate::types::FileId::parse(&e.path()).unwrap().seq)
+            .collect();
+        seqs.sort();
+        // Sequences must be distinct (1, 2) — not both 1.
+        assert_eq!(seqs, vec![1, 2]);
+    }
 }

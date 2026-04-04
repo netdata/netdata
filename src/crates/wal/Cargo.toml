@@ -14,6 +14,7 @@ nix = { workspace = true, features = ["fs"] }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+twox-hash = { workspace = true, features = ["xxhash64"] }
 uuid = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]

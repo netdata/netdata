@@ -12,7 +12,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::logs_service_server::LogsSe
 use opentelemetry_proto::tonic::collector::metrics::v1::metrics_service_server::MetricsServiceServer;
 use tokio::sync::RwLock;
 use tonic::transport::{Identity, Server, ServerTlsConfig};
-use wal::{ByteSize, Config as WalConfig, RotationConfig, WalDir, WalWriter};
+use wal::{ByteSize, Config as WalConfig, RotationConfig, WalDir, WalWriterMap};
 
 mod aggregation;
 mod arrow_bridge;
@@ -268,8 +268,8 @@ fn create_logs_service(
         compression_enabled: logs_config.wal.compression_enabled,
     };
 
-    let wal_writer = WalWriter::new(wal_dir, writer_config, 0)
-        .with_context(|| format!("creating WAL writer in {:?}", wal_path))?;
+    let writer_map = WalWriterMap::new(wal_dir, writer_config)
+        .with_context(|| format!("creating WAL writer map in {:?}", wal_path))?;
 
     let sender = ledger_sender::LedgerSender::new(writer_socket_path);
 
@@ -278,5 +278,5 @@ fn create_logs_service(
         "logs ingestion enabled (WAL)"
     );
 
-    Ok(NetdataLogsService::new(wal_writer, sender))
+    Ok(NetdataLogsService::new(writer_map, sender))
 }
