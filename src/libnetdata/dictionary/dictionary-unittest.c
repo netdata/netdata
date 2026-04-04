@@ -1182,6 +1182,8 @@ static int dictionary_destroy_race_unittest(void) {
         pid_t rc = waitpid(pid, &status, WNOHANG);
         if(rc > 0) { reaped = true; break; }
         if(rc < 0) {
+            if(errno == EINTR)
+                continue;
             fprintf(stderr, "dictionary_destroy() TOCTOU race test: waitpid() failed: %s\n",
                     strerror(errno));
             return 1;
@@ -1190,7 +1192,13 @@ static int dictionary_destroy_race_unittest(void) {
     }
     if(!reaped) {
         kill(pid, SIGKILL);
-        waitpid(pid, &status, 0);
+        while(waitpid(pid, &status, 0) < 0) {
+            if(errno != EINTR) {
+                fprintf(stderr, "dictionary_destroy() TOCTOU race test: waitpid() failed after SIGKILL: %s\n",
+                        strerror(errno));
+                return 1;
+            }
+        }
         fprintf(stderr, "dictionary_destroy() TOCTOU race test: FAILED — "
                 "child hung (killed after %d seconds)\n", timeout_sec);
         return 1;
