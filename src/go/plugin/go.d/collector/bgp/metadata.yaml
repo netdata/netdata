@@ -7,6 +7,7 @@ modules:
       monitored_instance:
         name: BGP daemon or service
         link: https://datatracker.ietf.org/doc/html/rfc4271
+        icon_filename: network-wired.svg
         categories:
           - data-collection.networking
       keywords:

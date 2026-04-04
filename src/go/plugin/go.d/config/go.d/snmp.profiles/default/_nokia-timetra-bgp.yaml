@@ -350,9 +350,9 @@ metrics:
       name: tBgpPeerNgOperTable
       OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8
     static_tags:
-      - { tag: address_family, value: ipv6 }
-      - { tag: subsequent_address_family, value: unicast }
-      - { tag: address_family_name, value: ipv6 unicast }
+      - {tag: address_family, value: ipv6}
+      - {tag: subsequent_address_family, value: unicast}
+      - {tag: address_family_name, value: ipv6 unicast}
     symbols:
       - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.27
         name: bgpPeerPrefixesReceivedTotal
@@ -389,9 +389,9 @@ metrics:
       name: tBgpPeerNgOperTable
       OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8
     static_tags:
-      - { tag: address_family, value: ipv6 }
-      - { tag: subsequent_address_family, value: vpn }
-      - { tag: address_family_name, value: vpnv6 unicast }
+      - {tag: address_family, value: ipv6}
+      - {tag: subsequent_address_family, value: vpn}
+      - {tag: address_family_name, value: vpnv6 unicast}
     symbols:
       - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.40
         name: bgpPeerPrefixesReceivedTotal
@@ -428,9 +428,9 @@ metrics:
       name: tBgpPeerNgOperTable
       OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8
     static_tags:
-      - { tag: address_family, value: l2vpn }
-      - { tag: subsequent_address_family, value: vpls }
-      - { tag: address_family_name, value: l2vpn vpls }
+      - {tag: address_family, value: l2vpn}
+      - {tag: subsequent_address_family, value: vpls}
+      - {tag: address_family_name, value: l2vpn vpls}
     symbols:
       - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.49
         name: bgpPeerPrefixesReceivedTotal
@@ -467,9 +467,9 @@ metrics:
       name: tBgpPeerNgOperTable
       OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8
     static_tags:
-      - { tag: address_family, value: l2vpn }
-      - { tag: subsequent_address_family, value: evpn }
-      - { tag: address_family_name, value: l2vpn evpn }
+      - {tag: address_family, value: l2vpn}
+      - {tag: subsequent_address_family, value: evpn}
+      - {tag: address_family_name, value: l2vpn evpn}
     symbols:
       - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.88
         name: bgpPeerPrefixesReceivedTotal
