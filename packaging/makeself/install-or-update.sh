@@ -194,7 +194,7 @@ if command -v setcap >/dev/null 2>&1; then
   if ! run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"; then
     run chmod 4750 "usr/libexec/netdata/plugins.d/slabinfo.plugin"
   fi
-  if ! run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"; then
+  if ! run setcap "cap_dac_read_search,cap_audit_control=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"; then
     run chmod 4750 "usr/libexec/netdata/plugins.d/debugfs.plugin"
   fi
   if ! run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"; then

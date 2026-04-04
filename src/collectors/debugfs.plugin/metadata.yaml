@@ -390,3 +390,146 @@ modules:
                 - name: dram
                 - name: core
                 - name: uncore
+  - meta:
+      plugin_name: debugfs.plugin
+      module_name: audit
+      monitored_instance:
+        name: Linux Audit Subsystem
+        link: 'https://man7.org/linux/man-pages/man8/auditd.8.html'
+        categories:
+          - data-collection.operating-systems
+        icon_filename: 'linux.svg'
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords:
+        - audit
+        - auditd
+        - backlog
+        - security
+        - kernel panic
+        - compliance
+    overview:
+      data_collection:
+        metrics_description: >
+          Monitors Linux kernel audit subsystem status via NETLINK_AUDIT.
+          Tracks audit backlog depth, backlog utilization, lost events,
+          and configuration (failure mode, enabled state).
+          Critical for detecting audit backlog overflow conditions that
+          cause kernel panics when failure mode is set to 2 (panic).
+        method_description: 'Query kernel audit status via NETLINK_AUDIT socket (AUDIT_GET)'
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: >
+          This integration requires root privileges or CAP_AUDIT_CONTROL capability
+          to query the kernel audit subsystem via netlink. The Netdata installer
+          grants this capability to debugfs.plugin automatically. The module
+          detects missing privileges and disables itself gracefully.
+      default_behavior:
+        auto_detection:
+          description: >
+            Automatically detects and monitors the Linux audit subsystem when
+            the kernel supports NETLINK_AUDIT. Gracefully disables itself if
+            audit is not available.
+        limits:
+          description: ''
+        performance_impact:
+          description: >
+            Minimal. Performs a single netlink query per collection cycle.
+            No file I/O, no process forking.
+    setup:
+      prerequisites:
+        list:
+          - title: 'Linux kernel with audit support'
+            description: >
+              The Linux kernel must have audit support enabled (CONFIG_AUDIT=y).
+              Most distribution kernels include this by default.
+      configuration:
+        file:
+          name: 'netdata.conf'
+          section_name: '[plugin:debugfs]'
+          description: 'This is netdata main configuration file.'
+        options:
+          description: ''
+          folding:
+            title: 'Config options'
+            enabled: true
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: audit_backlog_utilization
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/audit.conf
+        metric: audit.backlog_utilization
+        info: >
+          Linux audit backlog utilization has exceeded the warning threshold
+          while failure mode is set to panic. Kernel panic is imminent if
+          backlog overflows.
+      - name: audit_lost_events
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/audit.conf
+        metric: audit.lost
+        info: >
+          Linux audit subsystem is losing events (backlog overflow, rate
+          limiting, or memory pressure).
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: "Monitor the Linux kernel audit subsystem status and backlog health."
+      availability: []
+      scopes:
+        - name: global
+          description: "Audit subsystem status for the entire system."
+          labels: []
+          metrics:
+            - name: audit.backlog
+              description: Audit Backlog
+              unit: "events"
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: free
+            - name: audit.backlog_utilization
+              description: Audit Backlog Utilization
+              unit: "%"
+              chart_type: area
+              dimensions:
+                - name: utilization
+            - name: audit.lost
+              description: Audit Lost Events
+              unit: "events/s"
+              chart_type: area
+              dimensions:
+                - name: lost
+            - name: audit.enabled
+              description: Audit Enabled State
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: disabled
+                - name: enabled
+                - name: immutable
+            - name: audit.failure
+              description: Audit Failure Mode
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: silent
+                - name: printk
+                - name: panic
