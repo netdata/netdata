@@ -239,6 +239,18 @@
 - Fix coverity report ([#22104](https://github.com/netdata/netdata/issues/22104))
 - Docs: put collectors under Collecting Metrics/Collectors ([#22107](https://github.com/netdata/netdata/issues/22107))
 - Chore(scripts.d/nagios): add float flag to perfdata fields observation ([#22116](https://github.com/netdata/netdata/issues/22116))
+- Feat(plugin/agent): add configurable secretstore backend HTTP timeouts ([#22118](https://github.com/netdata/netdata/issues/22118))
+- Regenerate integrations docs ([#22121](https://github.com/netdata/netdata/issues/22121))
+- Fix(plugin/agent): log applyConfig failures in job manager ([#22124](https://github.com/netdata/netdata/issues/22124))
+- Docs: add DO_NOT_TRACK environment variable to telemetry documentation ([#22076](https://github.com/netdata/netdata/issues/22076))
+- Chore(go.d/agent): improve terminal-mode behavior ([#22125](https://github.com/netdata/netdata/issues/22125))
+- Update PR template to remove AI verification checkbox ([#22126](https://github.com/netdata/netdata/issues/22126))
+- Feat(go/jobruntime): add config_source field to runtime job logs ([#22127](https://github.com/netdata/netdata/issues/22127))
+- Chore(go.d/azure_monitor): format profiles and fix IO family ([#22128](https://github.com/netdata/netdata/issues/22128))
+- Fix(go.d/mssql): fix database size overflow and Windows Auth docs ([#22129](https://github.com/netdata/netdata/issues/22129))
+- Regenerate integrations docs ([#22131](https://github.com/netdata/netdata/issues/22131))
+- Chore(go): go fix ([#22133](https://github.com/netdata/netdata/issues/22133))
+- Feat(go.d/azure_monitor): add per-profile resource filters ([#22132](https://github.com/netdata/netdata/issues/22132))
 
 ## [2.9.0] - 2026-02-16
 
