@@ -220,9 +220,9 @@ template:
       units: nanocores
       algorithm: absolute
       dimensions:
-        - selector: container_apps.usage_nano_cores_average
+        - selector: usage_nano_cores_average
           name: average
-        - selector: container_apps.usage_nano_cores_maximum
+        - selector: usage_nano_cores_maximum
           name: maximum
     - id: am_azure_container_apps__cpu_percentage
       title: Azure Container Apps CPU Percentage
@@ -232,9 +232,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: container_apps.cpu_percentage_average
+        - selector: cpu_percentage_average
           name: average
-        - selector: container_apps.cpu_percentage_maximum
+        - selector: cpu_percentage_maximum
           name: maximum
     - id: am_azure_container_apps__memory_working_set
       title: Azure Container Apps Memory Working Set
@@ -244,9 +244,9 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: container_apps.working_set_bytes_average
+        - selector: working_set_bytes_average
           name: average
-        - selector: container_apps.working_set_bytes_maximum
+        - selector: working_set_bytes_maximum
           name: maximum
     - id: am_azure_container_apps__memory_percentage
       title: Azure Container Apps Memory Percentage
@@ -256,9 +256,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: container_apps.memory_percentage_average
+        - selector: memory_percentage_average
           name: average
-        - selector: container_apps.memory_percentage_maximum
+        - selector: memory_percentage_maximum
           name: maximum
     - id: am_azure_container_apps__replicas
       title: Azure Container Apps Replica Count
@@ -268,7 +268,7 @@ template:
       units: replicas
       algorithm: absolute
       dimensions:
-        - selector: container_apps.replicas_average
+        - selector: replicas_average
           name: average
     - id: am_azure_container_apps__reserved_cores
       title: Azure Container Apps Reserved Cores
@@ -278,9 +278,9 @@ template:
       units: cores
       algorithm: absolute
       dimensions:
-        - selector: container_apps.cores_quota_used_maximum
+        - selector: cores_quota_used_maximum
           name: per_revision
-        - selector: container_apps.total_cores_quota_used_average
+        - selector: total_cores_quota_used_average
           name: total
     - id: am_azure_container_apps__restart_count
       title: Azure Container Apps Replica Restarts
@@ -290,7 +290,7 @@ template:
       units: restarts/s
       algorithm: incremental
       dimensions:
-        - selector: container_apps.restart_count_total
+        - selector: restart_count_total
           name: restarts
     - id: am_azure_container_apps__requests
       title: Azure Container Apps Requests
@@ -300,7 +300,7 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: container_apps.requests_total
+        - selector: requests_total
           name: requests
     - id: am_azure_container_apps__response_time
       title: Azure Container Apps Response Time
@@ -310,7 +310,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: container_apps.response_time_average
+        - selector: response_time_average
           name: average
     - id: am_azure_container_apps__network
       title: Azure Container Apps Network Traffic
@@ -320,9 +320,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: container_apps.rx_bytes_total
+        - selector: rx_bytes_total
           name: received
-        - selector: container_apps.tx_bytes_total
+        - selector: tx_bytes_total
           name: sent
     - id: am_azure_container_apps__resiliency_timeouts
       title: Azure Container Apps Resiliency Timeouts
@@ -332,9 +332,9 @@ template:
       units: timeouts/s
       algorithm: incremental
       dimensions:
-        - selector: container_apps.resiliency_connect_timeouts_total
+        - selector: resiliency_connect_timeouts_total
           name: connection
-        - selector: container_apps.resiliency_request_timeouts_total
+        - selector: resiliency_request_timeouts_total
           name: request
     - id: am_azure_container_apps__resiliency_retries
       title: Azure Container Apps Resiliency Request Retries
@@ -344,7 +344,7 @@ template:
       units: retries/s
       algorithm: incremental
       dimensions:
-        - selector: container_apps.resiliency_request_retries_total
+        - selector: resiliency_request_retries_total
           name: retries
     - id: am_azure_container_apps__resiliency_pending_connections
       title: Azure Container Apps Resiliency Pending Connection Pool
@@ -354,7 +354,7 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: container_apps.resiliency_requests_pending_connection_pool_total
+        - selector: resiliency_requests_pending_connection_pool_total
           name: pending
     - id: am_azure_container_apps__resiliency_ejections
       title: Azure Container Apps Resiliency Host Ejections
@@ -364,9 +364,9 @@ template:
       units: ejections/s
       algorithm: incremental
       dimensions:
-        - selector: container_apps.resiliency_ejected_hosts_total
+        - selector: resiliency_ejected_hosts_total
           name: ejected
-        - selector: container_apps.resiliency_ejections_aborted_total
+        - selector: resiliency_ejections_aborted_total
           name: aborted
     - id: am_azure_container_apps__gpu_utilization
       title: Azure Container Apps GPU Utilization
@@ -376,9 +376,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: container_apps.gpu_utilization_percentage_average
+        - selector: gpu_utilization_percentage_average
           name: average
-        - selector: container_apps.gpu_utilization_percentage_maximum
+        - selector: gpu_utilization_percentage_maximum
           name: maximum
     - id: am_azure_container_apps__jvm_buffer_count
       title: Azure Container Apps JVM Buffer Count
@@ -388,7 +388,7 @@ template:
       units: buffers
       algorithm: absolute
       dimensions:
-        - selector: container_apps.jvm_buffer_count_average
+        - selector: jvm_buffer_count_average
           name: average
     - id: am_azure_container_apps__jvm_buffer_memory
       title: Azure Container Apps JVM Buffer Memory
@@ -398,9 +398,9 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: container_apps.jvm_buffer_memory_usage_average
+        - selector: jvm_buffer_memory_usage_average
           name: used
-        - selector: container_apps.jvm_buffer_memory_limit_average
+        - selector: jvm_buffer_memory_limit_average
           name: limit
     - id: am_azure_container_apps__jvm_gc_count
       title: Azure Container Apps JVM Garbage Collections
@@ -410,7 +410,7 @@ template:
       units: collections/s
       algorithm: incremental
       dimensions:
-        - selector: container_apps.jvm_gc_count_total
+        - selector: jvm_gc_count_total
           name: collections
     - id: am_azure_container_apps__jvm_gc_duration
       title: Azure Container Apps JVM GC Duration
@@ -420,7 +420,7 @@ template:
       units: milliseconds/s
       algorithm: incremental
       dimensions:
-        - selector: container_apps.jvm_gc_duration_total
+        - selector: jvm_gc_duration_total
           name: duration
     - id: am_azure_container_apps__jvm_memory_pool
       title: Azure Container Apps JVM Memory per Pool
@@ -430,11 +430,11 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: container_apps.jvm_memory_used_average
+        - selector: jvm_memory_used_average
           name: used
-        - selector: container_apps.jvm_memory_committed_average
+        - selector: jvm_memory_committed_average
           name: committed
-        - selector: container_apps.jvm_memory_limit_average
+        - selector: jvm_memory_limit_average
           name: limit
     - id: am_azure_container_apps__jvm_memory_total
       title: Azure Container Apps JVM Memory Total
@@ -444,11 +444,11 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: container_apps.jvm_memory_total_used_average
+        - selector: jvm_memory_total_used_average
           name: used
-        - selector: container_apps.jvm_memory_total_committed_average
+        - selector: jvm_memory_total_committed_average
           name: committed
-        - selector: container_apps.jvm_memory_total_limit_average
+        - selector: jvm_memory_total_limit_average
           name: limit
     - id: am_azure_container_apps__jvm_thread_count
       title: Azure Container Apps JVM Thread Count
@@ -458,5 +458,5 @@ template:
       units: threads
       algorithm: absolute
       dimensions:
-        - selector: container_apps.jvm_thread_count_average
+        - selector: jvm_thread_count_average
           name: average

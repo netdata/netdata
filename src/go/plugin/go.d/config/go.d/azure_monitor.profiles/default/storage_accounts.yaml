@@ -70,7 +70,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: storage_accounts.availability_average
+        - selector: availability_average
           name: average
     - id: am_azure_storage_accounts__transactions
       title: Azure Storage Account Transactions
@@ -80,7 +80,7 @@ template:
       units: transactions/s
       algorithm: incremental
       dimensions:
-        - selector: storage_accounts.transactions_total
+        - selector: transactions_total
           name: total
     - id: am_azure_storage_accounts__throughput
       title: Azure Storage Account Throughput
@@ -90,9 +90,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: storage_accounts.ingress_total
+        - selector: ingress_total
           name: ingress
-        - selector: storage_accounts.egress_total
+        - selector: egress_total
           name: egress
     - id: am_azure_storage_accounts__e2e_latency
       title: Azure Storage Account End-to-End Latency
@@ -102,9 +102,9 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: storage_accounts.success_e2e_latency_average
+        - selector: success_e2e_latency_average
           name: average
-        - selector: storage_accounts.success_e2e_latency_maximum
+        - selector: success_e2e_latency_maximum
           name: maximum
     - id: am_azure_storage_accounts__server_latency
       title: Azure Storage Account Server Latency
@@ -114,9 +114,9 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: storage_accounts.success_server_latency_average
+        - selector: success_server_latency_average
           name: average
-        - selector: storage_accounts.success_server_latency_maximum
+        - selector: success_server_latency_maximum
           name: maximum
     - id: am_azure_storage_accounts__used_capacity
       title: Azure Storage Account Used Capacity
@@ -126,5 +126,5 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: storage_accounts.used_capacity_average
+        - selector: used_capacity_average
           name: average

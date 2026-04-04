@@ -450,7 +450,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.cpu_percent_average
+        - selector: cpu_percent_average
           name: average
     - id: am_azure_postgres_flexible__memory
       title: Azure PostgreSQL Flexible Server Memory Utilization
@@ -460,7 +460,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.memory_percent_average
+        - selector: memory_percent_average
           name: average
     - id: am_azure_postgres_flexible__availability
       title: Azure PostgreSQL Flexible Server Database Alive
@@ -470,7 +470,7 @@ template:
       units: state
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.is_db_alive_maximum
+        - selector: is_db_alive_maximum
           name: maximum
     - id: am_azure_postgres_flexible__iops
       title: Azure PostgreSQL Flexible Server IOPS
@@ -480,11 +480,11 @@ template:
       units: operations/s
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.iops_average
+        - selector: iops_average
           name: total
-        - selector: postgres_flexible.read_iops_average
+        - selector: read_iops_average
           name: read
-        - selector: postgres_flexible.write_iops_average
+        - selector: write_iops_average
           name: write
     - id: am_azure_postgres_flexible__disk_throughput
       title: Azure PostgreSQL Flexible Server Disk Throughput
@@ -494,9 +494,9 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.read_throughput_average
+        - selector: read_throughput_average
           name: read
-        - selector: postgres_flexible.write_throughput_average
+        - selector: write_throughput_average
           name: write
     - id: am_azure_postgres_flexible__disk_saturation
       title: Azure PostgreSQL Flexible Server Disk Saturation
@@ -506,9 +506,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.disk_bandwidth_consumed_percentage_average
+        - selector: disk_bandwidth_consumed_percentage_average
           name: bandwidth
-        - selector: postgres_flexible.disk_iops_consumed_percentage_average
+        - selector: disk_iops_consumed_percentage_average
           name: iops
     - id: am_azure_postgres_flexible__disk_queue_depth
       title: Azure PostgreSQL Flexible Server Disk Queue Depth
@@ -518,7 +518,7 @@ template:
       units: operations
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.disk_queue_depth_average
+        - selector: disk_queue_depth_average
           name: average
     - id: am_azure_postgres_flexible__buffer_cache
       title: Azure PostgreSQL Flexible Server Buffer Cache
@@ -528,9 +528,9 @@ template:
       units: blocks/s
       algorithm: incremental
       dimensions:
-        - selector: postgres_flexible.blks_hit_total
+        - selector: blks_hit_total
           name: hits
-        - selector: postgres_flexible.blks_read_total
+        - selector: blks_read_total
           name: reads
     - id: am_azure_postgres_flexible__active_connections
       title: Azure PostgreSQL Flexible Server Active Connections
@@ -540,7 +540,7 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.active_connections_average
+        - selector: active_connections_average
           name: average
     - id: am_azure_postgres_flexible__connection_rate
       title: Azure PostgreSQL Flexible Server Connection Rate
@@ -550,9 +550,9 @@ template:
       units: connections/s
       algorithm: incremental
       dimensions:
-        - selector: postgres_flexible.connections_succeeded_total
+        - selector: connections_succeeded_total
           name: succeeded
-        - selector: postgres_flexible.connections_failed_total
+        - selector: connections_failed_total
           name: failed
     - id: am_azure_postgres_flexible__transactions
       title: Azure PostgreSQL Flexible Server Transactions
@@ -562,9 +562,9 @@ template:
       units: transactions/s
       algorithm: incremental
       dimensions:
-        - selector: postgres_flexible.xact_commit_total
+        - selector: xact_commit_total
           name: committed
-        - selector: postgres_flexible.xact_rollback_total
+        - selector: xact_rollback_total
           name: rolled_back
     - id: am_azure_postgres_flexible__transaction_rate
       title: Azure PostgreSQL Flexible Server Transaction Rate
@@ -574,9 +574,9 @@ template:
       units: transactions/s
       algorithm: incremental
       dimensions:
-        - selector: postgres_flexible.tps_total
+        - selector: tps_total
           name: total
-        - selector: postgres_flexible.xact_total_total
+        - selector: xact_total_total
           name: xact_total
     - id: am_azure_postgres_flexible__deadlocks
       title: Azure PostgreSQL Flexible Server Deadlocks
@@ -586,7 +586,7 @@ template:
       units: deadlocks/s
       algorithm: incremental
       dimensions:
-        - selector: postgres_flexible.deadlocks_total
+        - selector: deadlocks_total
           name: total
     - id: am_azure_postgres_flexible__tuple_reads
       title: Azure PostgreSQL Flexible Server Tuple Reads
@@ -596,9 +596,9 @@ template:
       units: tuples/s
       algorithm: incremental
       dimensions:
-        - selector: postgres_flexible.tup_returned_total
+        - selector: tup_returned_total
           name: returned
-        - selector: postgres_flexible.tup_fetched_total
+        - selector: tup_fetched_total
           name: fetched
     - id: am_azure_postgres_flexible__tuple_writes
       title: Azure PostgreSQL Flexible Server Tuple Writes
@@ -608,11 +608,11 @@ template:
       units: tuples/s
       algorithm: incremental
       dimensions:
-        - selector: postgres_flexible.tup_inserted_total
+        - selector: tup_inserted_total
           name: inserted
-        - selector: postgres_flexible.tup_updated_total
+        - selector: tup_updated_total
           name: updated
-        - selector: postgres_flexible.tup_deleted_total
+        - selector: tup_deleted_total
           name: deleted
     - id: am_azure_postgres_flexible__temp_files
       title: Azure PostgreSQL Flexible Server Temp Files Created
@@ -622,7 +622,7 @@ template:
       units: files/s
       algorithm: incremental
       dimensions:
-        - selector: postgres_flexible.temp_files_total
+        - selector: temp_files_total
           name: total
     - id: am_azure_postgres_flexible__temp_bytes
       title: Azure PostgreSQL Flexible Server Temp Bytes Written
@@ -632,7 +632,7 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: postgres_flexible.temp_bytes_total
+        - selector: temp_bytes_total
           name: total
     - id: am_azure_postgres_flexible__long_running
       title: Azure PostgreSQL Flexible Server Long Running Operations
@@ -642,9 +642,9 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.longest_query_time_sec_maximum
+        - selector: longest_query_time_sec_maximum
           name: query
-        - selector: postgres_flexible.longest_transaction_time_sec_maximum
+        - selector: longest_transaction_time_sec_maximum
           name: transaction
     - id: am_azure_postgres_flexible__xid_usage
       title: Azure PostgreSQL Flexible Server Transaction ID Usage
@@ -654,9 +654,9 @@ template:
       units: transactions
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.maximum_used_transaction_ids_average
+        - selector: maximum_used_transaction_ids_average
           name: max_used
-        - selector: postgres_flexible.oldest_backend_xmin_maximum
+        - selector: oldest_backend_xmin_maximum
           name: oldest_xmin
     - id: am_azure_postgres_flexible__xmin_age
       title: Azure PostgreSQL Flexible Server Backend XID Age
@@ -666,7 +666,7 @@ template:
       units: transactions
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.oldest_backend_xmin_age_maximum
+        - selector: oldest_backend_xmin_age_maximum
           name: maximum
     - id: am_azure_postgres_flexible__network
       title: Azure PostgreSQL Flexible Server Network Traffic
@@ -676,9 +676,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: postgres_flexible.network_bytes_ingress_total
+        - selector: network_bytes_ingress_total
           name: in
-        - selector: postgres_flexible.network_bytes_egress_total
+        - selector: network_bytes_egress_total
           name: out
     - id: am_azure_postgres_flexible__storage
       title: Azure PostgreSQL Flexible Server Storage
@@ -688,9 +688,9 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.storage_used_average
+        - selector: storage_used_average
           name: used
-        - selector: postgres_flexible.storage_free_average
+        - selector: storage_free_average
           name: free
     - id: am_azure_postgres_flexible__storage_utilization
       title: Azure PostgreSQL Flexible Server Storage Utilization
@@ -700,7 +700,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.storage_percent_average
+        - selector: storage_percent_average
           name: average
     - id: am_azure_postgres_flexible__wal_storage
       title: Azure PostgreSQL Flexible Server WAL Storage
@@ -710,7 +710,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.txlogs_storage_used_average
+        - selector: txlogs_storage_used_average
           name: used
     - id: am_azure_postgres_flexible__database_size
       title: Azure PostgreSQL Flexible Server Database Size
@@ -720,7 +720,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.database_size_bytes_average
+        - selector: database_size_bytes_average
           name: average
     - id: am_azure_postgres_flexible__backup_storage
       title: Azure PostgreSQL Flexible Server Backup Storage
@@ -730,7 +730,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.backup_storage_used_average
+        - selector: backup_storage_used_average
           name: used
     - id: am_azure_postgres_flexible__replication_lag_time
       title: Azure PostgreSQL Flexible Server Replication Lag
@@ -740,7 +740,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.physical_replication_delay_in_seconds_average
+        - selector: physical_replication_delay_in_seconds_average
           name: average
     - id: am_azure_postgres_flexible__replication_lag_bytes
       title: Azure PostgreSQL Flexible Server Replication Lag Bytes
@@ -750,9 +750,9 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.physical_replication_delay_in_bytes_maximum
+        - selector: physical_replication_delay_in_bytes_maximum
           name: physical
-        - selector: postgres_flexible.logical_replication_delay_in_bytes_maximum
+        - selector: logical_replication_delay_in_bytes_maximum
           name: logical
     - id: am_azure_postgres_flexible__sessions_by_state
       title: Azure PostgreSQL Flexible Server Sessions by State
@@ -762,7 +762,7 @@ template:
       units: sessions
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.sessions_by_state_maximum
+        - selector: sessions_by_state_maximum
           name: maximum
     - id: am_azure_postgres_flexible__sessions_by_wait_event_type
       title: Azure PostgreSQL Flexible Server Sessions by Wait Event Type
@@ -772,7 +772,7 @@ template:
       units: sessions
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.sessions_by_wait_event_type_maximum
+        - selector: sessions_by_wait_event_type_maximum
           name: maximum
     - id: am_azure_postgres_flexible__autovacuum_operations
       title: Azure PostgreSQL Flexible Server Autovacuum Operations
@@ -782,13 +782,13 @@ template:
       units: operations
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.vacuum_count_user_tables_maximum
+        - selector: vacuum_count_user_tables_maximum
           name: vacuum
-        - selector: postgres_flexible.autovacuum_count_user_tables_maximum
+        - selector: autovacuum_count_user_tables_maximum
           name: autovacuum
-        - selector: postgres_flexible.analyze_count_user_tables_maximum
+        - selector: analyze_count_user_tables_maximum
           name: analyze
-        - selector: postgres_flexible.autoanalyze_count_user_tables_maximum
+        - selector: autoanalyze_count_user_tables_maximum
           name: autoanalyze
     - id: am_azure_postgres_flexible__autovacuum_table_coverage
       title: Azure PostgreSQL Flexible Server Autovacuum Table Coverage
@@ -798,15 +798,15 @@ template:
       units: tables
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.tables_vacuumed_user_tables_maximum
+        - selector: tables_vacuumed_user_tables_maximum
           name: vacuumed
-        - selector: postgres_flexible.tables_autovacuumed_user_tables_maximum
+        - selector: tables_autovacuumed_user_tables_maximum
           name: autovacuumed
-        - selector: postgres_flexible.tables_analyzed_user_tables_maximum
+        - selector: tables_analyzed_user_tables_maximum
           name: analyzed
-        - selector: postgres_flexible.tables_autoanalyzed_user_tables_maximum
+        - selector: tables_autoanalyzed_user_tables_maximum
           name: autoanalyzed
-        - selector: postgres_flexible.tables_counter_user_tables_maximum
+        - selector: tables_counter_user_tables_maximum
           name: total
     - id: am_azure_postgres_flexible__tuple_liveness
       title: Azure PostgreSQL Flexible Server Tuple Liveness
@@ -816,11 +816,11 @@ template:
       units: tuples
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.n_live_tup_user_tables_maximum
+        - selector: n_live_tup_user_tables_maximum
           name: live
-        - selector: postgres_flexible.n_dead_tup_user_tables_maximum
+        - selector: n_dead_tup_user_tables_maximum
           name: dead
-        - selector: postgres_flexible.n_mod_since_analyze_user_tables_maximum
+        - selector: n_mod_since_analyze_user_tables_maximum
           name: modified_since_analyze
     - id: am_azure_postgres_flexible__bloat
       title: Azure PostgreSQL Flexible Server Table Bloat
@@ -830,7 +830,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.bloat_percent_maximum
+        - selector: bloat_percent_maximum
           name: maximum
     - id: am_azure_postgres_flexible__backend_count
       title: Azure PostgreSQL Flexible Server Backend Count
@@ -840,7 +840,7 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.numbackends_maximum
+        - selector: numbackends_maximum
           name: maximum
     - id: am_azure_postgres_flexible__pgbouncer_client_connections
       title: Azure PostgreSQL Flexible Server PgBouncer Client Connections
@@ -850,9 +850,9 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.client_connections_active_maximum
+        - selector: client_connections_active_maximum
           name: active
-        - selector: postgres_flexible.client_connections_waiting_maximum
+        - selector: client_connections_waiting_maximum
           name: waiting
     - id: am_azure_postgres_flexible__pgbouncer_server_connections
       title: Azure PostgreSQL Flexible Server PgBouncer Server Connections
@@ -862,9 +862,9 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.server_connections_active_maximum
+        - selector: server_connections_active_maximum
           name: active
-        - selector: postgres_flexible.server_connections_idle_maximum
+        - selector: server_connections_idle_maximum
           name: idle
     - id: am_azure_postgres_flexible__pgbouncer_pool_count
       title: Azure PostgreSQL Flexible Server PgBouncer Pool Count
@@ -874,7 +874,7 @@ template:
       units: pools
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.num_pools_maximum
+        - selector: num_pools_maximum
           name: pools
     - id: am_azure_postgres_flexible__pgbouncer_pooled_connections
       title: Azure PostgreSQL Flexible Server PgBouncer Pooled Connections
@@ -884,7 +884,7 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.total_pooled_connections_maximum
+        - selector: total_pooled_connections_maximum
           name: pooled_connections
     - id: am_azure_postgres_flexible__cpu_credits
       title: Azure PostgreSQL Flexible Server CPU Credits
@@ -894,9 +894,9 @@ template:
       units: credits
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.cpu_credits_consumed_average
+        - selector: cpu_credits_consumed_average
           name: consumed
-        - selector: postgres_flexible.cpu_credits_remaining_average
+        - selector: cpu_credits_remaining_average
           name: remaining
     - id: am_azure_postgres_flexible__postmaster_cpu
       title: Azure PostgreSQL Flexible Server Postmaster CPU Usage
@@ -906,7 +906,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.postmaster_process_cpu_usage_percent_average
+        - selector: postmaster_process_cpu_usage_percent_average
           name: average
     - id: am_azure_postgres_flexible__max_connections
       title: Azure PostgreSQL Flexible Server Max Connections
@@ -916,7 +916,7 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.max_connections_maximum
+        - selector: max_connections_maximum
           name: maximum
     - id: am_azure_postgres_flexible__tcp_connection_backlog
       title: Azure PostgreSQL Flexible Server TCP Connection Backlog
@@ -926,5 +926,5 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: postgres_flexible.tcp_connection_backlog_maximum
+        - selector: tcp_connection_backlog_maximum
           name: maximum

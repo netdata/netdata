@@ -330,7 +330,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.cpu_average
+        - selector: cpu_average
           name: average
     - id: am_azure_data_explorer__utilization
       title: Azure Data Explorer Utilization
@@ -340,9 +340,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.ingestion_utilization_average
+        - selector: ingestion_utilization_average
           name: ingestion
-        - selector: data_explorer.cache_utilization_factor_average
+        - selector: cache_utilization_factor_average
           name: cache
     - id: am_azure_data_explorer__keep_alive
       title: Azure Data Explorer Keep Alive
@@ -352,7 +352,7 @@ template:
       units: count
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.keep_alive_average
+        - selector: keep_alive_average
           name: average
     - id: am_azure_data_explorer__instance_count
       title: Azure Data Explorer Instance Count
@@ -362,11 +362,11 @@ template:
       units: instances
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.instance_count_average
+        - selector: instance_count_average
           name: average
-        - selector: data_explorer.instance_count_maximum
+        - selector: instance_count_maximum
           name: maximum
-        - selector: data_explorer.instance_count_minimum
+        - selector: instance_count_minimum
           name: minimum
     - id: am_azure_data_explorer__extents
       title: Azure Data Explorer Total Extents
@@ -376,7 +376,7 @@ template:
       units: extents
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.total_number_of_extents_average
+        - selector: total_number_of_extents_average
           name: average
     - id: am_azure_data_explorer__throttled_commands
       title: Azure Data Explorer Throttled Commands
@@ -386,7 +386,7 @@ template:
       units: commands/s
       algorithm: incremental
       dimensions:
-        - selector: data_explorer.total_number_of_throttled_commands_total
+        - selector: total_number_of_throttled_commands_total
           name: total
     - id: am_azure_data_explorer__follower_latency
       title: Azure Data Explorer Follower Latency
@@ -396,7 +396,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.follower_latency_average
+        - selector: follower_latency_average
           name: average
     - id: am_azure_data_explorer__query_duration
       title: Azure Data Explorer Query Duration
@@ -406,7 +406,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.query_duration_average
+        - selector: query_duration_average
           name: average
     - id: am_azure_data_explorer__query_count
       title: Azure Data Explorer Query Count
@@ -416,7 +416,7 @@ template:
       units: queries/s
       algorithm: incremental
       dimensions:
-        - selector: data_explorer.query_result_count
+        - selector: query_result_count
           name: count
     - id: am_azure_data_explorer__concurrent_queries
       title: Azure Data Explorer Concurrent Queries
@@ -426,9 +426,9 @@ template:
       units: queries
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.total_number_of_concurrent_queries_average
+        - selector: total_number_of_concurrent_queries_average
           name: average
-        - selector: data_explorer.total_number_of_concurrent_queries_maximum
+        - selector: total_number_of_concurrent_queries_maximum
           name: maximum
     - id: am_azure_data_explorer__throttled_queries
       title: Azure Data Explorer Throttled Queries
@@ -438,7 +438,7 @@ template:
       units: queries/s
       algorithm: incremental
       dimensions:
-        - selector: data_explorer.total_number_of_throttled_queries_total
+        - selector: total_number_of_throttled_queries_total
           name: total
     - id: am_azure_data_explorer__weak_consistency_latency
       title: Azure Data Explorer Weak Consistency Latency
@@ -448,7 +448,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.weak_consistency_latency_average
+        - selector: weak_consistency_latency_average
           name: average
     - id: am_azure_data_explorer__ingestion_result
       title: Azure Data Explorer Ingestion Result
@@ -458,7 +458,7 @@ template:
       units: sources/s
       algorithm: incremental
       dimensions:
-        - selector: data_explorer.ingestion_result_total
+        - selector: ingestion_result_total
           name: total
     - id: am_azure_data_explorer__ingestion_volume
       title: Azure Data Explorer Ingestion Volume
@@ -468,7 +468,7 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: data_explorer.ingestion_volume_in_mb_total
+        - selector: ingestion_volume_in_mb_total
           name: total
     - id: am_azure_data_explorer__ingestion_latency
       title: Azure Data Explorer Ingestion Latency
@@ -478,7 +478,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.ingestion_latency_in_seconds_average
+        - selector: ingestion_latency_in_seconds_average
           name: average
     - id: am_azure_data_explorer__events
       title: Azure Data Explorer Events
@@ -488,11 +488,11 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: data_explorer.events_received_total
+        - selector: events_received_total
           name: received
-        - selector: data_explorer.events_processed_total
+        - selector: events_processed_total
           name: processed
-        - selector: data_explorer.events_dropped_total
+        - selector: events_dropped_total
           name: dropped
     - id: am_azure_data_explorer__blobs
       title: Azure Data Explorer Blobs
@@ -502,11 +502,11 @@ template:
       units: blobs/s
       algorithm: incremental
       dimensions:
-        - selector: data_explorer.blobs_received_total
+        - selector: blobs_received_total
           name: received
-        - selector: data_explorer.blobs_processed_total
+        - selector: blobs_processed_total
           name: processed
-        - selector: data_explorer.blobs_dropped_total
+        - selector: blobs_dropped_total
           name: dropped
     - id: am_azure_data_explorer__discovery_latency
       title: Azure Data Explorer Discovery Latency
@@ -516,7 +516,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.discovery_latency_average
+        - selector: discovery_latency_average
           name: average
     - id: am_azure_data_explorer__stage_latency
       title: Azure Data Explorer Stage Latency
@@ -526,7 +526,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.stage_latency_average
+        - selector: stage_latency_average
           name: average
     - id: am_azure_data_explorer__ingestion_queue
       title: Azure Data Explorer Ingestion Queue
@@ -536,7 +536,7 @@ template:
       units: messages
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.queue_length_average
+        - selector: queue_length_average
           name: length
     - id: am_azure_data_explorer__queue_oldest_message
       title: Azure Data Explorer Queue Oldest Message Age
@@ -546,7 +546,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.queue_oldest_message_average
+        - selector: queue_oldest_message_average
           name: age
     - id: am_azure_data_explorer__received_data_size
       title: Azure Data Explorer Received Data Size
@@ -556,7 +556,7 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: data_explorer.received_data_size_bytes_total
+        - selector: received_data_size_bytes_total
           name: total
     - id: am_azure_data_explorer__batches_processed
       title: Azure Data Explorer Batches Processed
@@ -566,7 +566,7 @@ template:
       units: batches/s
       algorithm: incremental
       dimensions:
-        - selector: data_explorer.batches_processed_total
+        - selector: batches_processed_total
           name: total
     - id: am_azure_data_explorer__batch_blob_count
       title: Azure Data Explorer Batch Blob Count
@@ -576,7 +576,7 @@ template:
       units: blobs
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.batch_blob_count_average
+        - selector: batch_blob_count_average
           name: average
     - id: am_azure_data_explorer__batch_size
       title: Azure Data Explorer Batch Size
@@ -586,7 +586,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.batch_size_average
+        - selector: batch_size_average
           name: average
     - id: am_azure_data_explorer__batch_duration
       title: Azure Data Explorer Batch Duration
@@ -596,7 +596,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.batch_duration_average
+        - selector: batch_duration_average
           name: average
     - id: am_azure_data_explorer__export_utilization
       title: Azure Data Explorer Export Utilization
@@ -606,7 +606,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.export_utilization_maximum
+        - selector: export_utilization_maximum
           name: maximum
     - id: am_azure_data_explorer__continuous_export_records
       title: Azure Data Explorer Continuous Export Records
@@ -616,7 +616,7 @@ template:
       units: records/s
       algorithm: incremental
       dimensions:
-        - selector: data_explorer.continuous_export_num_of_records_exported_total
+        - selector: continuous_export_num_of_records_exported_total
           name: total
     - id: am_azure_data_explorer__continuous_export_result
       title: Azure Data Explorer Continuous Export Result
@@ -626,7 +626,7 @@ template:
       units: results/s
       algorithm: incremental
       dimensions:
-        - selector: data_explorer.continuous_export_result_count
+        - selector: continuous_export_result_count
           name: count
     - id: am_azure_data_explorer__continuous_export_pending
       title: Azure Data Explorer Continuous Export Pending Jobs
@@ -636,7 +636,7 @@ template:
       units: jobs
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.continuous_export_pending_count_maximum
+        - selector: continuous_export_pending_count_maximum
           name: maximum
     - id: am_azure_data_explorer__continuous_export_lateness
       title: Azure Data Explorer Continuous Export Lateness
@@ -646,7 +646,7 @@ template:
       units: minutes
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.continuous_export_max_lateness_minutes_maximum
+        - selector: continuous_export_max_lateness_minutes_maximum
           name: maximum
     - id: am_azure_data_explorer__streaming_ingest_data_rate
       title: Azure Data Explorer Streaming Ingest Data Rate
@@ -656,7 +656,7 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.streaming_ingest_data_rate_average
+        - selector: streaming_ingest_data_rate_average
           name: average
     - id: am_azure_data_explorer__streaming_ingest_duration
       title: Azure Data Explorer Streaming Ingest Duration
@@ -666,7 +666,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.streaming_ingest_duration_average
+        - selector: streaming_ingest_duration_average
           name: average
     - id: am_azure_data_explorer__streaming_ingest_result
       title: Azure Data Explorer Streaming Ingest Result
@@ -676,7 +676,7 @@ template:
       units: results/s
       algorithm: incremental
       dimensions:
-        - selector: data_explorer.streaming_ingest_results_count
+        - selector: streaming_ingest_results_count
           name: count
     - id: am_azure_data_explorer__streaming_ingest_utilization
       title: Azure Data Explorer Streaming Ingest Utilization
@@ -686,7 +686,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.streaming_ingest_utilization_average
+        - selector: streaming_ingest_utilization_average
           name: average
     - id: am_azure_data_explorer__materialized_view_health
       title: Azure Data Explorer Materialized View Health
@@ -696,7 +696,7 @@ template:
       units: status
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.materialized_view_health_average
+        - selector: materialized_view_health_average
           name: health
     - id: am_azure_data_explorer__materialized_view_age
       title: Azure Data Explorer Materialized View Age
@@ -706,7 +706,7 @@ template:
       units: minutes
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.materialized_view_age_minutes_average
+        - selector: materialized_view_age_minutes_average
           name: minutes
     - id: am_azure_data_explorer__materialized_view_age_seconds
       title: Azure Data Explorer Materialized View Age (Seconds)
@@ -716,7 +716,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.materialized_view_age_seconds_average
+        - selector: materialized_view_age_seconds_average
           name: average
     - id: am_azure_data_explorer__materialized_view_records_in_delta
       title: Azure Data Explorer Materialized View Records in Delta
@@ -726,7 +726,7 @@ template:
       units: records
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.materialized_view_records_in_delta_average
+        - selector: materialized_view_records_in_delta_average
           name: average
     - id: am_azure_data_explorer__materialized_view_extents_rebuild
       title: Azure Data Explorer Materialized View Extents Rebuild
@@ -736,7 +736,7 @@ template:
       units: extents
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.materialized_view_extents_rebuild_average
+        - selector: materialized_view_extents_rebuild_average
           name: average
     - id: am_azure_data_explorer__materialized_view_data_loss
       title: Azure Data Explorer Materialized View Data Loss
@@ -746,7 +746,7 @@ template:
       units: status
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.materialized_view_data_loss_maximum
+        - selector: materialized_view_data_loss_maximum
           name: maximum
     - id: am_azure_data_explorer__materialized_view_result
       title: Azure Data Explorer Materialized View Result
@@ -756,7 +756,7 @@ template:
       units: status
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.materialized_view_result_average
+        - selector: materialized_view_result_average
           name: average
     - id: am_azure_data_explorer__partitioning_percentage
       title: Azure Data Explorer Partitioning Percentage
@@ -766,9 +766,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.partitioning_percentage_average
+        - selector: partitioning_percentage_average
           name: total
-        - selector: data_explorer.partitioning_percentage_hot_average
+        - selector: partitioning_percentage_hot_average
           name: hot
     - id: am_azure_data_explorer__partitioned_records
       title: Azure Data Explorer Processed Partitioned Records
@@ -778,5 +778,5 @@ template:
       units: records
       algorithm: absolute
       dimensions:
-        - selector: data_explorer.processed_partitioned_records_average
+        - selector: processed_partitioned_records_average
           name: average
