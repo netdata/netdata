@@ -111,7 +111,7 @@
       },
       "select_families": {
         "title": "Family selector",
-        "description": "When the number of discovered families exceeds `max_families`, Netdata prefers families matched by `vrf/afi/safi` strings such as `default/ipv4/unicast`. If no selector is configured, Netdata keeps a deterministic first-`max_families` fallback.",
+        "description": "When the number of discovered families exceeds `max_families`, Netdata prefers families matched by `vrf/afi/safi` strings such as `default/ipv4/unicast`. If the selector matches more than `max_families`, Netdata keeps the matched set bounded with deterministic first-`max_families` truncation. If no selector is configured, Netdata keeps a deterministic first-`max_families` fallback.",
         "type": [
           "object",
           "null"
@@ -161,7 +161,7 @@
       },
       "select_vnis": {
         "title": "VNI selector",
-        "description": "When the number of discovered EVPN VNIs exceeds `max_vnis`, Netdata prefers matched `tenant_vrf/vni` values such as `default/172192`. If no selector is configured, Netdata keeps a deterministic first-`max_vnis` fallback.",
+        "description": "When the number of discovered EVPN VNIs exceeds `max_vnis`, Netdata prefers matched `tenant_vrf/vni` values such as `default/172192`. If the selector matches more than `max_vnis`, Netdata keeps the matched set bounded with deterministic first-`max_vnis` truncation. If no selector is configured, Netdata keeps a deterministic first-`max_vnis` fallback.",
         "type": [
           "object",
           "null"
@@ -210,7 +210,7 @@
       },
       "select_peers": {
         "title": "Peer selector",
-        "description": "When the number of discovered peers exceeds `max_peers`, Netdata prefers peer addresses matched by this selector. If no selector is configured, Netdata keeps a deterministic first-`max_peers` fallback.",
+        "description": "When the number of discovered peers exceeds `max_peers`, Netdata prefers peer addresses matched by this selector. If the selector matches more than `max_peers`, Netdata keeps the matched set bounded with deterministic first-`max_peers` truncation. If no selector is configured, Netdata keeps a deterministic first-`max_peers` fallback.",
         "type": [
           "object",
           "null"

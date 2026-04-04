@@ -30,8 +30,21 @@ func (c *Collector) selectFamilies(families []familyStats) map[string]bool {
 			selected[family.ID] = true
 		}
 	}
+	if len(selected) <= c.MaxFamilies {
+		return selected
+	}
 
-	return selected
+	limited := make(map[string]bool, c.MaxFamilies)
+	for _, family := range sortedFamilies(families) {
+		if !selected[family.ID] {
+			continue
+		}
+		limited[family.ID] = true
+		if len(limited) == c.MaxFamilies {
+			break
+		}
+	}
+	return limited
 }
 
 func (c *Collector) selectPeers(families []familyStats, selectedFamilies map[string]bool) map[string]bool {
@@ -72,7 +85,15 @@ func (c *Collector) selectPeers(families []familyStats, selectedFamilies map[str
 			}
 		}
 	}
-	return selected
+	if len(selected) <= c.MaxPeers {
+		return selected
+	}
+
+	limited := make(map[string]bool, c.MaxPeers)
+	for _, peerID := range sortedSelectedIDs(selected)[:c.MaxPeers] {
+		limited[peerID] = true
+	}
+	return limited
 }
 
 func (c *Collector) selectVNIs(vnis []vniStats) map[string]bool {
@@ -97,8 +118,21 @@ func (c *Collector) selectVNIs(vnis []vniStats) map[string]bool {
 			selected[vni.ID] = true
 		}
 	}
+	if len(selected) <= c.MaxVNIs {
+		return selected
+	}
 
-	return selected
+	limited := make(map[string]bool, c.MaxVNIs)
+	for _, vni := range sortedVNIs(vnis) {
+		if !selected[vni.ID] {
+			continue
+		}
+		limited[vni.ID] = true
+		if len(limited) == c.MaxVNIs {
+			break
+		}
+	}
+	return limited
 }
 
 func familyMatchKey(f familyStats) string {
@@ -147,4 +181,13 @@ func sortedVNIs(vnis []vniStats) []vniStats {
 		return vniMatchKey(sorted[i]) < vniMatchKey(sorted[j])
 	})
 	return sorted
+}
+
+func sortedSelectedIDs(selected map[string]bool) []string {
+	ids := make([]string, 0, len(selected))
+	for id := range selected {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }

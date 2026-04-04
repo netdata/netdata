@@ -141,7 +141,7 @@ func (c *frrClient) execWithConn(state *frrConn, cmd string) ([]byte, error) {
 		if _, err := state.conn.Write([]byte("enable\x00")); err != nil {
 			return nil, err
 		}
-		if _, err := state.conn.Read(buf); err != nil {
+		if _, err := readFRRResponse(state.conn, buf); err != nil {
 			return nil, err
 		}
 		state.enabled = true
@@ -151,9 +151,13 @@ func (c *frrClient) execWithConn(state *frrConn, cmd string) ([]byte, error) {
 		return nil, err
 	}
 
+	return readFRRResponse(state.conn, buf)
+}
+
+func readFRRResponse(conn net.Conn, buf []byte) ([]byte, error) {
 	var response bytes.Buffer
 	for {
-		n, err := state.conn.Read(buf)
+		n, err := conn.Read(buf)
 		if err != nil {
 			return response.Bytes(), err
 		}
