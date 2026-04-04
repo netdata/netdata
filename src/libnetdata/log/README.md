@@ -49,6 +49,33 @@ If any of the above is detected, Netdata will select `journal` for `daemon` and 
 
 On Windows, the default is `etw` and if that is not available it falls back to `wel`. The availability of `etw` is decided at compile time.
 
+## Log Retention
+
+Log retention duration varies depending on the configured output method:
+
+| Output       | Retention Control                                      | Default Duration                                        |
+|--------------|--------------------------------------------------------|---------------------------------------------------------|
+| **filename** | logrotate configuration (`/etc/logrotate.d/netdata`)   | 14 days (configurable)                                  |
+| **journal**  | OS-controlled (systemd-journal settings)               | System default                                          |
+| **syslog**   | OS-controlled (syslog daemon configuration)            | System default                                          |
+| **etw**      | OS-controlled (Event Viewer channel settings)          | System default                                          |
+| **wel**      | Size-based limits configured per publisher             | 100 MiB total (20 MiB × 4 + 5 MiB + 35 MiB per channel) |
+| **stdout**   | Not retained (streamed to stdout)                      | N/A                                                     |
+| **stderr**   | Not retained (streamed to stderr)                      | N/A                                                     |
+| **system**   | Depends on platform stdout/stderr handling             | N/A (typically not retained)                            |
+
+:::note
+
+Netdata's operational logs (documented here) are separate from collected observability data. Metrics, alerts, and other monitoring data have their own retention settings configured via the database and health subsystems.
+
+:::
+
+:::important
+
+File-based logs use logrotate for rotation. The default configuration at `/etc/logrotate.d/netdata` retains 14 days of logs with daily rotation. Systemd-journal and Windows Event Log retention is controlled by the operating system, not Netdata.
+
+:::
+
 ## Log formats
 
 Netdata supports multiple log formats to integrate with different systems:
@@ -176,13 +203,14 @@ Example logrotate configuration:
 ```
 /var/log/netdata/*.log {
     daily
-    rotate 7
+    missingok
+    rotate 14
     compress
     delaycompress
-    missingok
     notifempty
+    sharedscripts
     postrotate
-        killall -USR2 netdata 2>/dev/null || true
+        /bin/kill -HUP `cat /run/netdata/netdata.pid 2>/dev/null` 2>/dev/null || true
     endscript
 }
 ```
