@@ -196,6 +196,7 @@ struct rrdhost_system_info *rrdhost_system_info_from_host_labels(RRDLABELS *labe
     rrdlabels_get_value_strdup_or_null(labels, &info->network_default_iface_detection, "_net_default_iface_detection");
     rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_name, "_hw_product_name");
     rrdlabels_get_value_strdup_or_null(labels, &info->hw_sys_vendor, "_hw_sys_vendor");
+    rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_type, "_hw_product_type");
     return info;
 }
 
@@ -274,6 +275,9 @@ void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *system_info, R
 
     if (system_info->hw_sys_vendor)
         rrdlabels_add(labels, "_hw_sys_vendor", system_info->hw_sys_vendor, RRDLABEL_SRC_AUTO);
+
+    if (system_info->hw_product_type)
+        rrdlabels_add(labels, "_hw_product_type", system_info->hw_product_type, RRDLABEL_SRC_AUTO);
 }
 
 int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
@@ -294,6 +298,12 @@ int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
         if (sys_vendor && *sys_vendor) {
             freez(system_info->hw_sys_vendor);
             system_info->hw_sys_vendor = strdupz(sys_vendor);
+        }
+
+        const char *product_type = daemon_status_file_get_product_type();
+        if (product_type && *product_type) {
+            freez(system_info->hw_product_type);
+            system_info->hw_product_type = strdupz(product_type);
         }
     }
 
@@ -430,6 +440,7 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
         freez(system_info->network_default_iface_detection);
         freez(system_info->hw_product_name);
         freez(system_info->hw_sys_vendor);
+        freez(system_info->hw_product_type);
         freez(system_info);
     }
 }
