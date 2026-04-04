@@ -160,9 +160,16 @@ The architecture adapts to your needs - train where you have resources, use ever
 
 | Nodes per Parent | Metrics/sec | Resources            |
 |:----------------:|:-----------:|:---------------------|
+|     ~20 nodes    |  ~0.1M/sec  | 2 cores, 4 GiB RAM   |
 |    ~100 nodes    |  ~0.5M/sec  | 5 cores, 20 GiB RAM  |
 |    ~250 nodes    |   ~1M/sec   | 10 cores, 40 GiB RAM |
 |    ~500 nodes    |   ~2M/sec   | 20 cores, 80 GiB RAM |
+
+:::tip
+
+For precise sizing based on your specific workload (metrics per node, retention requirements), see [Parent Configuration Best Practices](/docs/observability-centralization-points/best-practices.md) and [Disk Requirements and Retention](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md).
+
+:::
 
 :::tip
 
