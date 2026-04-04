@@ -73,12 +73,24 @@ pub fn encode_logs_arrow(req: &mut ExportLogsServiceRequest) -> Result<(Vec<u8>,
         }
     }
 
-    // Step 1: Serialize our proto types to bytes.
+    // Steps 1-2: Proto bytes round-trip to bridge type systems.
+    //
+    // `opentelemetry-proto` (our gRPC service) and `otap-df-pdata` (Arrow
+    // encoding) both generate prost types from the same .proto definitions,
+    // but they are distinct Rust types. The only way to cross from one to
+    // the other is to serialize and deserialize via proto bytes.
+    //
+    // This could be eliminated if `otap-df-pdata` either re-exported the
+    // `opentelemetry-proto` types instead of generating its own, or
+    // implemented `LogsDataView` (from `otap-df-pdata-views`) for them —
+    // `encode_logs_otap_batch` is already generic over that trait. The
+    // upstream project is aware of the duplication:
+    //   - https://github.com/open-telemetry/otel-arrow/issues/1848
+    //   - https://github.com/open-telemetry/otel-arrow/issues/1340
     let mut proto_bytes = Vec::with_capacity(req.encoded_len());
     req.encode(&mut proto_bytes)
         .map_err(|e| format!("proto encode: {e}"))?;
 
-    // Step 2: Deserialize as pdata's LogsData.
     // ExportLogsServiceRequest has a single field `resource_logs` at tag 1,
     // which is the same as LogsData. So we can decode directly.
     let logs_data =
