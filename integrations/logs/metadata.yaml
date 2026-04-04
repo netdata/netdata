@@ -71,7 +71,7 @@
   setup:
     prerequisites:
       description: |
-        - Netdata Cloud paid subscription
+        - A Netdata Cloud account
 - id: "logs-opentelemetry"
   meta:
     name: "OpenTelemetry Logs"
