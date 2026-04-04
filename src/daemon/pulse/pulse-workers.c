@@ -752,7 +752,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 size_t job_name_len = string_strlen(wu->per_job_type[i].name);
                 if(job_name_len > RRD_ID_LENGTH_MAX) job_name_len = RRD_ID_LENGTH_MAX;
 
-                char job_name_sanitized[job_name_len + 1];
+                char job_name_sanitized[RRD_ID_LENGTH_MAX + 1];
                 rrdset_strncpyz_name(job_name_sanitized, string2str(wu->per_job_type[i].name), job_name_len);
 
                 char name[RRD_ID_LENGTH_MAX + 1];
@@ -808,7 +808,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 size_t job_name_len = string_strlen(wu->per_job_type[i].name);
                 if(job_name_len > RRD_ID_LENGTH_MAX) job_name_len = RRD_ID_LENGTH_MAX;
 
-                char job_name_sanitized[job_name_len + 1];
+                char job_name_sanitized[RRD_ID_LENGTH_MAX + 1];
                 rrdset_strncpyz_name(job_name_sanitized, string2str(wu->per_job_type[i].name), job_name_len);
 
                 char name[RRD_ID_LENGTH_MAX + 1];
