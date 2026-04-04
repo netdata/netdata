@@ -138,6 +138,7 @@ func validateInstances(instances *Instances, path string) error {
 		return nil
 	}
 	var errs []error
+	hasPositive := false
 	if len(instances.ByLabels) == 0 {
 		return semErr(path+".instances.by_labels", "must contain at least one token when instances is set")
 	}
@@ -149,14 +150,29 @@ func validateInstances(instances *Instances, path string) error {
 			errs = append(errs, semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), "must not be empty"))
 			continue
 		}
-		if token != "*" && strings.HasPrefix(token, "!") && len(token) == 1 {
-			errs = append(errs, semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), "exclude token must include label key"))
-			continue
+		switch {
+		case token == "*":
+			hasPositive = true
+		case strings.HasPrefix(token, "!"):
+			key := strings.TrimPrefix(token, "!")
+			if key == "" {
+				errs = append(errs, semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), "exclude token must include label key"))
+				continue
+			}
+			if strings.TrimSpace(key) != key {
+				errs = append(errs, semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), "exclude token must use !label_key syntax"))
+				continue
+			}
+		default:
+			hasPositive = true
 		}
 		if _, ok := seen[token]; ok {
 			errs = append(errs, semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), fmt.Sprintf("duplicate token %q", token)))
 		}
 		seen[token] = struct{}{}
+	}
+	if !hasPositive {
+		errs = append(errs, semErr(path+".instances.by_labels", "must include at least one positive selector ('*' or label key)"))
 	}
 	return errors.Join(errs...)
 }

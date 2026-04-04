@@ -580,6 +580,7 @@ instances:
 | `!label_key` | Exclude this label (use with `*` to include all _except_...). |
 
 Excludes are order-independent and always win. For example, both `["host", "!host"]` and `["!host", "host"]` exclude `host`.
+When `instances` is set, `by_labels` must include at least one positive selector: `*` or `label_key`. Exclude tokens use strict `!label_key` syntax; `! host` is invalid.
 
 **Example: One chart per host**
 
@@ -1017,7 +1018,8 @@ All rules below produce semantic validation errors unless noted:
 | `name` and `name_from_label` must not be whitespace-only                                | semantic                        |
 | Duplicate dimension `name` values within the same chart are rejected                    | semantic                        |
 | `instances.by_labels` must contain at least one token when `instances` is set           | semantic                        |
-| `instances.by_labels` exclude token must include label key (e.g., `!key`, not bare `!`) | semantic                        |
+| `instances.by_labels` exclude token must use `!label_key` syntax                         | semantic                        |
+| `instances.by_labels` must include at least one positive selector (`*` or `label_key`)   | semantic                        |
 | `instances.by_labels` tokens must not be duplicated                                     | semantic                        |
 | `label_promotion[]` entries must not be empty or whitespace-only                        | semantic                        |
 | Lifecycle numeric fields must be `>= 0`                                                 | semantic                        |

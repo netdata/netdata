@@ -922,3 +922,139 @@ func TestSpecValidateRejectsEmptyLabelPromotionEntries(t *testing.T) {
 		})
 	}
 }
+
+func TestSpecValidateRejectsMalformedExcludeTokens(t *testing.T) {
+	tests := map[string]struct {
+		spec    Spec
+		errLike string
+	}{
+		"chart instances": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{
+					{
+						Family:  "Database",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Instances: &Instances{
+									ByLabels: []string{"*", "! host"},
+								},
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			errLike: "exclude token must use !label_key syntax",
+		},
+		"chart_defaults instances": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{
+					{
+						Family: "Database",
+						ChartDefaults: &ChartDefaults{
+							Instances: &Instances{
+								ByLabels: []string{"*", "! host"},
+							},
+						},
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			errLike: "chart_defaults.instances.by_labels[1]",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := tc.spec.Validate()
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.errLike)
+		})
+	}
+}
+
+func TestSpecValidateRejectsNegationOnlyInstances(t *testing.T) {
+	tests := map[string]struct {
+		spec    Spec
+		errLike string
+	}{
+		"chart instances": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{
+					{
+						Family:  "Database",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Instances: &Instances{
+									ByLabels: []string{"!host"},
+								},
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			errLike: "must include at least one positive selector",
+		},
+		"chart_defaults instances": {
+			spec: Spec{
+				Version: VersionV1,
+				Groups: []Group{
+					{
+						Family: "Database",
+						ChartDefaults: &ChartDefaults{
+							Instances: &Instances{
+								ByLabels: []string{"!host"},
+							},
+						},
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			errLike: "chart_defaults.instances.by_labels",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := tc.spec.Validate()
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.errLike)
+		})
+	}
+}

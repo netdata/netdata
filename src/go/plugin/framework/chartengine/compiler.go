@@ -14,7 +14,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
-// Compile converts a validated chart template spec into immutable chartengine IR.
+// Compile converts a decoded/default-applied chart template spec into immutable
+// chartengine IR.
+//
+// Callers should prefer charttpl.DecodeYAML, which applies chart_defaults
+// inheritance before validation. Compile validates the provided spec but does
+// not apply charttpl defaults or mutate the input.
 func Compile(spec *charttpl.Spec, revision uint64) (*program.Program, error) {
 	if spec == nil {
 		return nil, fmt.Errorf("chartengine: nil template spec")
