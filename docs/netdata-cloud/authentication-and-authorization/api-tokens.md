@@ -22,11 +22,11 @@ You can access token management through the Netdata UI:
 
 You can limit each token to specific scopes that define its access permissions:
 
-| Scope                  | Description                                                                                                                                        | API Access                         |
-|:-----------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------|:-----------------------------------|
-| `scope:all`            | Grants the same permissions as the user who created the token. Use case: Terraform provider integration.                                           | Full access to all API endpoints   |
-| `scope:agent-ui`       | Used by Agent for accessing the Cloud UI                                                                                                           | Access to UI-related endpoints     |
-| `scope:grafana-plugin` | Used for the [Netdata Grafana plugin](https://github.com/netdata/netdata-grafana-datasource-plugin/blob/master/README.md) to access Netdata charts | Access to chart and data endpoints |
+| Scope                  | Description                                                                                                                                                    | API Access                         |
+| :--------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------- |
+| `scope:all`            | Grants the same permissions as the user who created the token. Use case: Terraform provider integration.                                                       | Full access to all API endpoints   |
+| `scope:agent-ui`       | Used by Agent for accessing the Cloud UI                                                                                                                       | Access to UI-related endpoints     |
+| `scope:grafana-plugin` | Used for the [Netdata Grafana plugin](https://github.com/netdata/netdata-grafana-datasource-plugin/blob/master/README.md) to access Netdata charts             | Access to chart and data endpoints |
 | `scope:mcp`            | Used to connect MCP clients (Claude Desktop, Cursor, etc.) to [Netdata Cloud MCP](/docs/netdata-ai/mcp/README.md#netdata-cloud-mcp) for AI-assisted monitoring | Access to MCP server endpoints     |
 
 ## API Versions
@@ -81,3 +81,32 @@ curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://ap
 ```console
 curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/contexts
 ```
+
+## Troubleshooting HTTP 412 Errors
+
+If you receive an HTTP 412 (Precondition Failed) error when accessing Netdata Cloud API endpoints, this indicates that you are trying to access an authenticated endpoint without providing a valid Bearer token in the `Authorization` header.
+
+In the context of Netdata Cloud, HTTP 412 specifically means that the API request is missing the required authorization token, rather than indicating a generic HTTP precondition failure.
+
+**How to resolve HTTP 412 errors:**
+
+1. **Generate an API token** from your Netdata Cloud settings:
+   - Click your profile picture in the bottom-left corner
+   - Select "User Settings"
+   - Navigate to the API Tokens section
+   - Create a new token with appropriate scopes for your use case
+
+2. **Include the token in your request headers**:
+
+   ```console
+   curl -H 'Accept: application/json' -H "Authorization: Bearer <your-token-here>" https://app.netdata.cloud/api/v2/nodes
+   ```
+
+3. **Verify the token format**: Ensure you're using the full token string and that it starts with "Bearer " (note the space after "Bearer")
+
+**Common causes:**
+
+- Missing `Authorization` header entirely
+- Using an invalid or revoked token
+- Incorrect header format (missing "Bearer " prefix)
+- Token with insufficient scope for the requested endpoint
