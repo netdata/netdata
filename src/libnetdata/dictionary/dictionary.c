@@ -327,18 +327,19 @@ DEFINE_JUDYL_TYPED(STACKTRACE, size_t);
 #endif
 
 static void dictionary_queue_for_destruction(DICTIONARY *dict) {
+    netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
+
     if(dict_flag_check(dict, DICT_FLAG_QUEUED_FOR_DESTRUCTION))
-        return;
+        goto cleanup;
 
     DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
     dict_flag_set(dict, DICT_FLAG_DESTROYED);
     dict_flag_set(dict, DICT_FLAG_QUEUED_FOR_DESTRUCTION);
 
-    netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
-
     dict->next = dictionaries_waiting_to_be_destroyed;
     dictionaries_waiting_to_be_destroyed = dict;
 
+cleanup:
     netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
 }
 
