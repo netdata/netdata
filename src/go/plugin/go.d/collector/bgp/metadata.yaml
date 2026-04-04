@@ -179,7 +179,7 @@ modules:
               group: Peer charts
             - name: max_deep_queries_per_scrape
               description: |
-                Maximum number of optional deep FRR route queries Netdata will issue in one scrape when `deep_peer_prefix_metrics` is enabled. This budget is global for the scrape, not per peer. Ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`.
+                Maximum number of optional deep FRR route queries Netdata will issue in one scrape when `deep_peer_prefix_metrics` is enabled. This budget is global for the scrape, not per peer. Set this to `0` to disable the budget cap. Ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`.
               default_value: 40
               required: false
               group: Peer charts
@@ -195,7 +195,7 @@ modules:
               required: false
               group: Family charts
             - name: rib_summary_every
-              description: Minimum time between optional cached summary refreshes when `collect_rib_summaries` is enabled.
+              description: Minimum time between optional cached summary refreshes when `collect_rib_summaries` is enabled. Set this to a value greater than zero when `collect_rib_summaries` is enabled.
               default_value: 60
               required: false
               group: Family charts

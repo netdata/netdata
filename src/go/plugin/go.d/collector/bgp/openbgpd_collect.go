@@ -13,13 +13,13 @@ func (c *Collector) collectOpenBGPDData(scrape *scrapeMetrics) ([]familyStats, [
 	data, err := client.Neighbors()
 	if err != nil {
 		scrape.noteQueryError(err, true)
-		return nil, nil, nil, nil, nil, fmt.Errorf("collect neighbors: %v", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("collect neighbors: %w", err)
 	}
 
 	families, neighbors, err := parseOpenBGPDNeighbors(data)
 	if err != nil {
 		scrape.noteParseError(true)
-		return nil, nil, nil, nil, nil, fmt.Errorf("parse neighbors: %v", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("parse neighbors: %w", err)
 	}
 
 	selectedFamilies := c.selectFamilies(families)

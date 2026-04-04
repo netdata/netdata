@@ -16,13 +16,13 @@ func (c *Collector) collectGoBGPData(scrape *scrapeMetrics) ([]familyStats, []ne
 	global, err := client.GetBgp()
 	if err != nil {
 		scrape.noteQueryError(err, true)
-		return nil, nil, nil, nil, nil, fmt.Errorf("collect GoBGP global state: %v", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("collect GoBGP global state: %w", err)
 	}
 
 	peers, err := client.ListPeers()
 	if err != nil {
 		scrape.noteQueryError(err, true)
-		return nil, nil, nil, nil, nil, fmt.Errorf("collect GoBGP peers: %v", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("collect GoBGP peers: %w", err)
 	}
 
 	var rpkiCaches []rpkiCacheStats

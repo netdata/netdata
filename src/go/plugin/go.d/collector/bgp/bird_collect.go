@@ -17,13 +17,13 @@ func (c *Collector) collectBIRDData(scrape *scrapeMetrics) ([]familyStats, []nei
 	data, err := client.ProtocolsAll()
 	if err != nil {
 		scrape.noteQueryError(err, true)
-		return nil, nil, nil, nil, nil, fmt.Errorf("collect protocols: %v", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("collect protocols: %w", err)
 	}
 
 	protocols, err := parseBIRDProtocolsAll(data)
 	if err != nil {
 		scrape.noteParseError(true)
-		return nil, nil, nil, nil, nil, fmt.Errorf("parse protocols: %v", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("parse protocols: %w", err)
 	}
 
 	families := buildBIRDFamilies(protocols)

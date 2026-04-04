@@ -60,7 +60,7 @@ func (c *birdClient) exec(cmd string) ([]byte, error) {
 		}
 	}
 
-	return nil, nil
+	return nil, fmt.Errorf("unexpected retry loop exit in exec")
 }
 
 func (c *birdClient) connect() error {

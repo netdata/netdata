@@ -100,7 +100,7 @@ func (c *frrClient) execAt(socketPath, cmd string) ([]byte, error) {
 		}
 	}
 
-	return nil, nil
+	return nil, fmt.Errorf("unexpected retry loop exit in execAt")
 }
 
 func (c *frrClient) conn(socketPath string) (*frrConn, error) {

@@ -16,7 +16,8 @@ import (
 )
 
 func Test_CiscoBgpPeer3Profile_AlignedWithOfficialMIBAndCheckmk(t *testing.T) {
-	dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/default")
+	dir, err := filepath.Abs("../../../config/go.d/snmp.profiles/default")
+	require.NoError(t, err)
 
 	profiles, err := loadProfilesFromDir(dir, multipath.New(dir))
 	require.NoError(t, err)

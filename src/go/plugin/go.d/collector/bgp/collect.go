@@ -304,13 +304,13 @@ func (c *Collector) collectDeepPeerPolicyMetrics(peer *peerStats, scrape *scrape
 		routesData, err := client.PeerRoutes(peer.Family.VRF, peer.Family.AFI, peer.Family.SAFI, peer.Address)
 		if err != nil {
 			scrape.noteDeepQueryError()
-			return fmt.Errorf("accepted routes: %v", err)
+			return fmt.Errorf("accepted routes: %w", err)
 		}
 
 		accepted, err := parseFRRPrefixCounter(routesData)
 		if err != nil {
 			scrape.noteDeepQueryError()
-			return fmt.Errorf("parse accepted routes: %v", err)
+			return fmt.Errorf("parse accepted routes: %w", err)
 		}
 
 		peer.HasPrefixPolicy = true
@@ -332,13 +332,13 @@ func (c *Collector) collectDeepPeerPolicyMetrics(peer *peerStats, scrape *scrape
 	advertisedData, err := client.PeerAdvertisedRoutes(peer.Family.VRF, peer.Family.AFI, peer.Family.SAFI, peer.Address)
 	if err != nil {
 		scrape.noteDeepQueryError()
-		return fmt.Errorf("advertised routes: %v", err)
+		return fmt.Errorf("advertised routes: %w", err)
 	}
 
 	advertised, err := parseFRRPrefixCounter(advertisedData)
 	if err != nil {
 		scrape.noteDeepQueryError()
-		return fmt.Errorf("parse advertised routes: %v", err)
+		return fmt.Errorf("parse advertised routes: %w", err)
 	}
 
 	peer.HasPrefixesSent = true

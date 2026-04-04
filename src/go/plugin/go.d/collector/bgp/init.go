@@ -54,7 +54,7 @@ func (c *Collector) validateConfig() error {
 			address = defaultAddressGoBGP
 		}
 		if _, _, err := net.SplitHostPort(address); err != nil {
-			return fmt.Errorf("invalid 'address': %v", err)
+			return fmt.Errorf("invalid 'address': %w", err)
 		}
 	} else {
 		address = ""
@@ -82,7 +82,7 @@ func (c *Collector) validateConfig() error {
 		}
 		u, err := url.Parse(apiURL)
 		if err != nil {
-			return fmt.Errorf("invalid 'api_url': %v", err)
+			return fmt.Errorf("invalid 'api_url': %w", err)
 		}
 		if u.Scheme != "http" && u.Scheme != "https" {
 			return fmt.Errorf("'api_url' must use http or https")
@@ -91,8 +91,8 @@ func (c *Collector) validateConfig() error {
 			return fmt.Errorf("'api_url' must include a host")
 		}
 	}
-	if c.RIBSummaryEvery.Duration() <= 0 {
-		return fmt.Errorf("'rib_summary_every' must be greater than zero")
+	if (backend == backendGoBGP || backend == backendOpenBGPD) && c.CollectRIBSummaries && c.RIBSummaryEvery.Duration() <= 0 {
+		return fmt.Errorf("'rib_summary_every' must be greater than zero when 'collect_rib_summaries' is enabled")
 	}
 	if c.MaxFamilies <= 0 {
 		return fmt.Errorf("'max_families' must be greater than zero")
@@ -103,8 +103,8 @@ func (c *Collector) validateConfig() error {
 	if c.MaxVNIs <= 0 {
 		return fmt.Errorf("'max_vnis' must be greater than zero")
 	}
-	if c.MaxDeepQueriesPerScrape <= 0 {
-		return fmt.Errorf("'max_deep_queries_per_scrape' must be greater than zero")
+	if c.MaxDeepQueriesPerScrape < 0 {
+		return fmt.Errorf("'max_deep_queries_per_scrape' must be zero or greater")
 	}
 
 	c.Backend = backend

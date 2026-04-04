@@ -145,32 +145,32 @@ func (c *Collector) Configuration() any {
 
 func (c *Collector) Init(context.Context) error {
 	if err := c.validateConfig(); err != nil {
-		return fmt.Errorf("invalid config: %v", err)
+		return fmt.Errorf("invalid config: %w", err)
 	}
 
 	c.charts = c.initCharts()
 
 	m, err := c.initSelectMatcher(c.SelectFamilies)
 	if err != nil {
-		return fmt.Errorf("init select_families matcher: %v", err)
+		return fmt.Errorf("init select_families matcher: %w", err)
 	}
 	c.selectFamilyMatcher = m
 
 	m, err = c.initSelectMatcher(c.SelectPeers)
 	if err != nil {
-		return fmt.Errorf("init select_peers matcher: %v", err)
+		return fmt.Errorf("init select_peers matcher: %w", err)
 	}
 	c.selectPeerMatcher = m
 
 	m, err = c.initSelectMatcher(c.SelectVNIs)
 	if err != nil {
-		return fmt.Errorf("init select_vnis matcher: %v", err)
+		return fmt.Errorf("init select_vnis matcher: %w", err)
 	}
 	c.selectVNIMatcher = m
 
 	client, err := c.newClient(c.Config)
 	if err != nil {
-		return fmt.Errorf("init client: %v", err)
+		return fmt.Errorf("init client: %w", err)
 	}
 	c.client = client
 

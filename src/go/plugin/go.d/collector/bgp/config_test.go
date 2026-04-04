@@ -5,7 +5,9 @@ package bgp
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -82,4 +84,52 @@ func TestCollector_InitNormalizesOpenBGPDAPIURL(t *testing.T) {
 	assert.Equal(t, "http://127.0.0.1:8080", collr.APIURL)
 	assert.Equal(t, "", collr.SocketPath)
 	assert.Equal(t, "", collr.ZebraSocketPath)
+}
+
+func TestCollector_InitAllowsZeroRIBSummaryEveryWhenDisabled(t *testing.T) {
+	collr := New()
+	collr.Backend = backendGoBGP
+	collr.CollectRIBSummaries = false
+	collr.RIBSummaryEvery = 0
+	collr.newClient = func(cfg Config) (bgpClient, error) { return &mockClient{}, nil }
+
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Equal(t, confopt.Duration(0), collr.RIBSummaryEvery)
+}
+
+func TestCollector_InitRequiresPositiveRIBSummaryEveryWhenEnabled(t *testing.T) {
+	collr := New()
+	collr.Backend = backendGoBGP
+	collr.CollectRIBSummaries = true
+	collr.RIBSummaryEvery = 0
+	collr.newClient = func(cfg Config) (bgpClient, error) { return &mockClient{}, nil }
+
+	require.Error(t, collr.Init(context.Background()))
+}
+
+func TestCollector_InitAllowsUnlimitedDeepQueryBudget(t *testing.T) {
+	collr := New()
+	collr.MaxDeepQueriesPerScrape = 0
+	collr.newClient = func(cfg Config) (bgpClient, error) { return &mockClient{}, nil }
+
+	require.NoError(t, collr.Init(context.Background()))
+	assert.Zero(t, collr.MaxDeepQueriesPerScrape)
+}
+
+func TestCollector_InitRejectsNegativeDeepQueryBudget(t *testing.T) {
+	collr := New()
+	collr.MaxDeepQueriesPerScrape = -1
+	collr.newClient = func(cfg Config) (bgpClient, error) { return &mockClient{}, nil }
+
+	require.Error(t, collr.Init(context.Background()))
+}
+
+func TestCollector_InitIgnoresRIBSummaryEveryForFRR(t *testing.T) {
+	collr := New()
+	collr.Backend = backendFRR
+	collr.CollectRIBSummaries = true
+	collr.RIBSummaryEvery = confopt.Duration(time.Duration(0))
+	collr.newClient = func(cfg Config) (bgpClient, error) { return &mockClient{}, nil }
+
+	require.NoError(t, collr.Init(context.Background()))
 }
