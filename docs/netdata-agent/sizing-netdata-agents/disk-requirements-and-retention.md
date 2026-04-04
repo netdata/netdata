@@ -49,6 +49,40 @@ In practice, with default settings and an ingestion rate of about 4,000 metrics 
 
 These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
+### Estimating Disk Usage
+
+You can estimate the disk space required for each tier using the following formula:
+
+```
+Disk per tier (bytes) = metrics_per_second × retention_seconds × bytes_per_sample
+```
+
+Where:
+- `metrics_per_second`: The number of metrics your system collects per second
+- `retention_seconds`: The desired retention period in seconds (e.g., 30 days = 2,592,000 seconds)
+- `bytes_per_sample`: The compressed size per sample for each tier (see table below)
+
+| Tier    | Bytes per Sample |
+|:-------:|:----------------:|
+| `tier0` |      0.6         |
+| `tier1` |      6           |
+| `tier2` |      18          |
+
+#### Worked Example
+
+For a system collecting **10,000 metrics per second** with a **30-day retention** for `tier0`:
+
+1. Calculate seconds in 30 days: 30 days × 24 hours × 60 minutes × 60 seconds = **2,592,000 seconds**
+2. Apply the formula: 10,000 × 2,592,000 × 0.6 = **15,552,000,000 bytes** ≈ **15.6 GiB**
+
+:::note
+
+Add approximately **1 GiB** for SQLite databases, alert transitions, and other metadata overhead.
+
+:::
+
+To calculate requirements for all tiers, repeat the calculation for each tier using its respective `bytes_per_sample` and desired retention period.
+
 **Configuring dbengine mode and retention**:
 
 - Enable dbengine mode: The dbengine mode is already the default, so no configuration change is necessary. For reference, the dbengine mode can be configured by setting `[db].mode` to `dbengine` in `netdata.conf`.
