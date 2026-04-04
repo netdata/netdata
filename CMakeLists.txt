@@ -1086,6 +1086,9 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/nd_log-common.h
         src/libnetdata/log/nd_log-to-windows-common.h
         src/libnetdata/common.h
+        src/libnetdata/libnetdata-base.h
+        src/libnetdata/libnetdata-types.h
+        src/libnetdata/libnetdata-platform-fwd.h
         src/libnetdata/xxHash/xxhash.h
         src/libnetdata/os/random.c
         src/libnetdata/os/random.h

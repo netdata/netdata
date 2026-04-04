@@ -3,7 +3,7 @@
 #ifndef NETDATA_SIGNALS_H
 #define NETDATA_SIGNALS_H
 
-#include "../common.h"
+#include "../libnetdata-base.h"
 
 void signals_block_all_except_deadly(void);
 void signals_block_all(void);

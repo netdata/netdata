@@ -3,7 +3,7 @@
 #ifndef NETDATA_STACKTRACE_H
 #define NETDATA_STACKTRACE_H 1
 
-#include "libnetdata/common.h"
+#include "libnetdata/libnetdata-base.h"
 
 #define STACK_TRACE_INFO_PREFIX "info: "
 

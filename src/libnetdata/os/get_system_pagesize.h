@@ -3,7 +3,7 @@
 #ifndef NETDATA_GET_SYSTEM_PAGESIZE_H
 #define NETDATA_GET_SYSTEM_PAGESIZE_H
 
-#include "../common.h"
+#include "../libnetdata-base.h"
 
 size_t os_get_system_page_size(void) __attribute__((const));
 
