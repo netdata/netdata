@@ -4,7 +4,6 @@ package bgp
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -13,7 +12,7 @@ import (
 )
 
 var (
-	dataBIRDProtocolsAllRPKI, _ = os.ReadFile("testdata/bird/show_protocols_all_rpki.txt")
+	dataBIRDProtocolsAllRPKI = mustReadTestData("testdata/bird/show_protocols_all_rpki.txt")
 )
 
 func TestBuildBIRDRPKICaches(t *testing.T) {

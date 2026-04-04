@@ -3,7 +3,6 @@
 package bgp
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -11,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var dataBIRDProtocolsAllMPLSVPNAliases, _ = os.ReadFile("testdata/bird/show_protocols_all_mpls_vpn_aliases.txt")
+var dataBIRDProtocolsAllMPLSVPNAliases = mustReadTestData("testdata/bird/show_protocols_all_mpls_vpn_aliases.txt")
 
 func TestParseBIRDProtocolsAllMPLSVPNAliases(t *testing.T) {
 	restore := setBIRDNowForTest(time.Date(2026, 4, 3, 18, 0, 0, 0, time.Local))

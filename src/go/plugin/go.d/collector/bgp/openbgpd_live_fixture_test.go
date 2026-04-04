@@ -3,7 +3,6 @@
 package bgp
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,8 +10,8 @@ import (
 )
 
 var (
-	dataOpenBGPDNeighborsLiveActive, _ = os.ReadFile("testdata/openbgpd/show_neighbor_live_active.json")
-	dataOpenBGPDRIBLiveActive, _       = os.ReadFile("testdata/openbgpd/rib_live_active.json")
+	dataOpenBGPDNeighborsLiveActive = mustReadTestData("testdata/openbgpd/show_neighbor_live_active.json")
+	dataOpenBGPDRIBLiveActive       = mustReadTestData("testdata/openbgpd/rib_live_active.json")
 )
 
 func TestParseOpenBGPDNeighborsLiveActiveFixture(t *testing.T) {

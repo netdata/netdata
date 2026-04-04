@@ -3,7 +3,6 @@
 package bgp
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -12,10 +11,10 @@ import (
 )
 
 var (
-	dataBIRDProtocolsAllMultichannel, _ = os.ReadFile("testdata/bird/show_protocols_all_multichannel.txt")
-	dataBIRDProtocolsAllLegacy, _       = os.ReadFile("testdata/bird/show_protocols_all_legacy.txt")
-	dataBIRDProtocolsAllBird3, _        = os.ReadFile("testdata/bird/show_protocols_all_bird3.txt")
-	dataBIRDProtocolsAllAdvanced, _     = os.ReadFile("testdata/bird/show_protocols_all_advanced_families.txt")
+	dataBIRDProtocolsAllMultichannel = mustReadTestData("testdata/bird/show_protocols_all_multichannel.txt")
+	dataBIRDProtocolsAllLegacy       = mustReadTestData("testdata/bird/show_protocols_all_legacy.txt")
+	dataBIRDProtocolsAllBird3        = mustReadTestData("testdata/bird/show_protocols_all_bird3.txt")
+	dataBIRDProtocolsAllAdvanced     = mustReadTestData("testdata/bird/show_protocols_all_advanced_families.txt")
 )
 
 func TestParseBIRDProtocolsAllMultichannel(t *testing.T) {

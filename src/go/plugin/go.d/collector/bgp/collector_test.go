@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -23,21 +22,21 @@ import (
 )
 
 var (
-	dataConfigJSON, _           = os.ReadFile("testdata/config.json")
-	dataConfigYAML, _           = os.ReadFile("testdata/config.yaml")
-	dataFRRIPv4Summary, _       = os.ReadFile("testdata/frr/show_bgp_vrf_all_ipv4_summary.json")
-	dataFRRIPv4SummaryDeep, _   = os.ReadFile("testdata/frr/show_bgp_vrf_all_ipv4_summary_deep_prefixes.json")
-	dataFRRIPv4SummaryPfxSnt, _ = os.ReadFile("testdata/frr/show_bgp_vrf_all_ipv4_summary_pfxsnt.json")
-	dataFRRIPv6Summary, _       = os.ReadFile("testdata/frr/show_bgp_vrf_all_ipv6_summary.json")
-	dataFRREVPNSummary, _       = os.ReadFile("testdata/frr/show_bgp_vrf_all_l2vpn_evpn_summary.json")
-	dataFRREVPNVNI, _           = os.ReadFile("testdata/frr/show_evpn_vni.json")
-	dataFRRNeighbors, _         = os.ReadFile("testdata/frr/show_bgp_vrf_all_neighbors.json")
-	dataFRRNeighborsEnriched, _ = os.ReadFile("testdata/frr/show_bgp_vrf_all_neighbors_enriched.json")
-	dataFRRPeerRoutesDefault, _ = os.ReadFile("testdata/frr/show_bgp_ipv4_unicast_neighbor_192.168.0.2_routes.json")
-	dataFRRPeerRoutesRed, _     = os.ReadFile("testdata/frr/show_bgp_vrf_red_ipv4_unicast_neighbor_192.168.1.2_routes.json")
-	dataFRRPeerAdvDefault, _    = os.ReadFile("testdata/frr/show_bgp_ipv4_unicast_neighbor_192.168.0.2_advertised_routes.json")
-	dataFRRPeerAdvRed, _        = os.ReadFile("testdata/frr/show_bgp_vrf_red_ipv4_unicast_neighbor_192.168.1.2_advertised_routes.json")
-	dataFRREmptySummary         = []byte("{}")
+	dataConfigJSON           = mustReadTestData("testdata/config.json")
+	dataConfigYAML           = mustReadTestData("testdata/config.yaml")
+	dataFRRIPv4Summary       = mustReadTestData("testdata/frr/show_bgp_vrf_all_ipv4_summary.json")
+	dataFRRIPv4SummaryDeep   = mustReadTestData("testdata/frr/show_bgp_vrf_all_ipv4_summary_deep_prefixes.json")
+	dataFRRIPv4SummaryPfxSnt = mustReadTestData("testdata/frr/show_bgp_vrf_all_ipv4_summary_pfxsnt.json")
+	dataFRRIPv6Summary       = mustReadTestData("testdata/frr/show_bgp_vrf_all_ipv6_summary.json")
+	dataFRREVPNSummary       = mustReadTestData("testdata/frr/show_bgp_vrf_all_l2vpn_evpn_summary.json")
+	dataFRREVPNVNI           = mustReadTestData("testdata/frr/show_evpn_vni.json")
+	dataFRRNeighbors         = mustReadTestData("testdata/frr/show_bgp_vrf_all_neighbors.json")
+	dataFRRNeighborsEnriched = mustReadTestData("testdata/frr/show_bgp_vrf_all_neighbors_enriched.json")
+	dataFRRPeerRoutesDefault = mustReadTestData("testdata/frr/show_bgp_ipv4_unicast_neighbor_192.168.0.2_routes.json")
+	dataFRRPeerRoutesRed     = mustReadTestData("testdata/frr/show_bgp_vrf_red_ipv4_unicast_neighbor_192.168.1.2_routes.json")
+	dataFRRPeerAdvDefault    = mustReadTestData("testdata/frr/show_bgp_ipv4_unicast_neighbor_192.168.0.2_advertised_routes.json")
+	dataFRRPeerAdvRed        = mustReadTestData("testdata/frr/show_bgp_vrf_red_ipv4_unicast_neighbor_192.168.1.2_advertised_routes.json")
+	dataFRREmptySummary      = []byte("{}")
 )
 
 func Test_testDataIsValid(t *testing.T) {

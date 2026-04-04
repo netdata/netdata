@@ -5,7 +5,6 @@ package bgp
 import (
 	"context"
 	"errors"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,10 +12,10 @@ import (
 )
 
 var (
-	dataFRRNeighborsRich, _        = os.ReadFile("testdata/frr/show_bgp_vrf_all_neighbors_rich.json")
-	dataFRRIPv4SummaryDualstack, _ = os.ReadFile("testdata/frr/show_bgp_vrf_all_ipv4_summary_dualstack.json")
-	dataFRRIPv6SummaryDualstack, _ = os.ReadFile("testdata/frr/show_bgp_vrf_all_ipv6_summary_dualstack.json")
-	dataFRRNeighborsDualstack, _   = os.ReadFile("testdata/frr/show_bgp_vrf_all_neighbors_dualstack.json")
+	dataFRRNeighborsRich        = mustReadTestData("testdata/frr/show_bgp_vrf_all_neighbors_rich.json")
+	dataFRRIPv4SummaryDualstack = mustReadTestData("testdata/frr/show_bgp_vrf_all_ipv4_summary_dualstack.json")
+	dataFRRIPv6SummaryDualstack = mustReadTestData("testdata/frr/show_bgp_vrf_all_ipv6_summary_dualstack.json")
+	dataFRRNeighborsDualstack   = mustReadTestData("testdata/frr/show_bgp_vrf_all_neighbors_dualstack.json")
 )
 
 func TestParseFRRNeighborsRichCounters(t *testing.T) {

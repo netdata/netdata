@@ -4,14 +4,13 @@ package bgp
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var dataFRRRPKIPrefixCount, _ = os.ReadFile("testdata/frr/show_rpki_prefix_count.json")
+var dataFRRRPKIPrefixCount = mustReadTestData("testdata/frr/show_rpki_prefix_count.json")
 
 func TestBuildFRRRPKIInventory(t *testing.T) {
 	inv, err := buildFRRRPKIInventory(dataFRRRPKIPrefixCount)

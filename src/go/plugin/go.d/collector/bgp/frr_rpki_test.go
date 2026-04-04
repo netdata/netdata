@@ -4,7 +4,6 @@ package bgp
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,9 +11,9 @@ import (
 )
 
 var (
-	dataFRRRPKICacheServer, _                 = os.ReadFile("testdata/frr/show_rpki_cache_server.json")
-	dataFRRRPKICacheConnection, _             = os.ReadFile("testdata/frr/show_rpki_cache_connection.json")
-	dataFRRRPKICacheConnectionDisconnected, _ = os.ReadFile("testdata/frr/show_rpki_cache_connection_disconnected.json")
+	dataFRRRPKICacheServer                 = mustReadTestData("testdata/frr/show_rpki_cache_server.json")
+	dataFRRRPKICacheConnection             = mustReadTestData("testdata/frr/show_rpki_cache_connection.json")
+	dataFRRRPKICacheConnectionDisconnected = mustReadTestData("testdata/frr/show_rpki_cache_connection_disconnected.json")
 )
 
 func TestBuildFRRRPKICaches(t *testing.T) {

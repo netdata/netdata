@@ -3,7 +3,6 @@
 package bgp
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -12,9 +11,9 @@ import (
 )
 
 var (
-	dataOpenBGPDNeighbors, _            = os.ReadFile("testdata/openbgpd/show_neighbor.json")
-	dataOpenBGPDNeighborsMultifamily, _ = os.ReadFile("testdata/openbgpd/show_neighbor_multifamily.json")
-	dataOpenBGPDRIB, _                  = os.ReadFile("testdata/openbgpd/rib.json")
+	dataOpenBGPDNeighbors            = mustReadTestData("testdata/openbgpd/show_neighbor.json")
+	dataOpenBGPDNeighborsMultifamily = mustReadTestData("testdata/openbgpd/show_neighbor_multifamily.json")
+	dataOpenBGPDRIB                  = mustReadTestData("testdata/openbgpd/rib.json")
 )
 
 func TestParseOpenBGPDNeighbors(t *testing.T) {

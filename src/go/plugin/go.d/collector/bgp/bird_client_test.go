@@ -9,7 +9,6 @@ import (
 	"io"
 	"io/fs"
 	"net"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -20,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var dataBIRDProtocolsAllAccessDenied, _ = os.ReadFile("testdata/bird/show_protocols_all_access_denied.txt")
+var dataBIRDProtocolsAllAccessDenied = mustReadTestData("testdata/bird/show_protocols_all_access_denied.txt")
 
 func TestBIRDClient_ProtocolsAll(t *testing.T) {
 	server := newBIRDReplayServer(t, dataBIRDProtocolsAllMultichannel)
