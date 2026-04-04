@@ -178,7 +178,6 @@ func prepareAndCommitPlan(engine *Engine, reader metrix.Reader) (Plan, error) {
 	if err != nil {
 		return Plan{}, err
 	}
-	defer attempt.Abort()
 
 	plan := attempt.Plan()
 	if err := attempt.Commit(); err != nil {

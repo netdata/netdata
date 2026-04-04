@@ -3,6 +3,7 @@
 package charttpl
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -18,40 +19,37 @@ func (s *Spec) Validate() error {
 	if s == nil {
 		return semErr("", "nil spec")
 	}
+	var errs []error
 	if s.Version != VersionV1 {
-		return semErr("version", fmt.Sprintf("expected %q", VersionV1))
+		errs = append(errs, semErr("version", fmt.Sprintf("expected %q", VersionV1)))
 	}
 	if len(s.Groups) == 0 {
-		return semErr("groups", "groups[] is required")
+		errs = append(errs, semErr("groups", "groups[] is required"))
 	}
-	if err := validateEngine(s.Engine); err != nil {
-		return err
-	}
+	errs = append(errs, validateEngine(s.Engine))
 
 	for i := range s.Groups {
-		if err := validateGroup(s.Groups[i], fmt.Sprintf("groups[%d]", i), nil); err != nil {
-			return err
-		}
+		errs = append(errs, validateGroup(s.Groups[i], fmt.Sprintf("groups[%d]", i), nil))
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func validateGroup(group Group, path string, inheritedMetrics map[string]struct{}) error {
+	var errs []error
 	if strings.TrimSpace(group.Family) == "" {
-		return semErr(path+".family", "must not be empty")
+		errs = append(errs, semErr(path+".family", "must not be empty"))
 	}
-	if err := validateChartDefaults(group.ChartDefaults, path); err != nil {
-		return err
-	}
+	errs = append(errs, validateChartDefaults(group.ChartDefaults, path))
 
 	ownMetrics := make(map[string]struct{}, len(group.Metrics))
 	for i, name := range group.Metrics {
 		name = strings.TrimSpace(name)
 		if name == "" {
-			return semErr(fmt.Sprintf("%s.metrics[%d]", path, i), "metric name must not be empty")
+			errs = append(errs, semErr(fmt.Sprintf("%s.metrics[%d]", path, i), "metric name must not be empty"))
+			continue
 		}
 		if _, ok := ownMetrics[name]; ok {
-			return semErr(fmt.Sprintf("%s.metrics[%d]", path, i), fmt.Sprintf("duplicate metric %q", name))
+			errs = append(errs, semErr(fmt.Sprintf("%s.metrics[%d]", path, i), fmt.Sprintf("duplicate metric %q", name)))
 		}
 		ownMetrics[name] = struct{}{}
 	}
@@ -65,82 +63,82 @@ func validateGroup(group Group, path string, inheritedMetrics map[string]struct{
 	}
 
 	for i := range group.Charts {
-		if err := validateChart(group.Charts[i], fmt.Sprintf("%s.charts[%d]", path, i), effective); err != nil {
-			return err
-		}
+		errs = append(errs, validateChart(group.Charts[i], fmt.Sprintf("%s.charts[%d]", path, i), effective))
 	}
 	for i := range group.Groups {
-		if err := validateGroup(group.Groups[i], fmt.Sprintf("%s.groups[%d]", path, i), effective); err != nil {
-			return err
-		}
+		errs = append(errs, validateGroup(group.Groups[i], fmt.Sprintf("%s.groups[%d]", path, i), effective))
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func validateChartDefaults(defaults *ChartDefaults, path string) error {
 	if defaults == nil {
 		return nil
 	}
-	return validateInstances(defaults.Instances, path+".chart_defaults")
+	return errors.Join(
+		validateLabelPromotion(defaults.LabelPromoted, path+".chart_defaults.label_promotion"),
+		validateInstances(defaults.Instances, path+".chart_defaults"),
+	)
 }
 
 func validateChart(chart Chart, path string, effectiveMetrics map[string]struct{}) error {
-	if err := validateChartCore(chart, path); err != nil {
-		return err
-	}
-	if err := validateLifecycle(chart.Lifecycle, path); err != nil {
-		return err
-	}
-	if err := validateInstances(chart.Instances, path); err != nil {
-		return err
-	}
-	return validateDimensions(chart.Dimensions, path, effectiveMetrics)
+	return errors.Join(
+		validateChartCore(chart, path),
+		validateLabelPromotion(chart.LabelPromoted, path+".label_promotion"),
+		validateLifecycle(chart.Lifecycle, path),
+		validateInstances(chart.Instances, path),
+		validateDimensions(chart.Dimensions, path, effectiveMetrics),
+	)
 }
 
 func validateChartCore(chart Chart, path string) error {
+	var errs []error
 	if strings.TrimSpace(chart.Title) == "" {
-		return semErr(path+".title", "must not be empty")
+		errs = append(errs, semErr(path+".title", "must not be empty"))
 	}
 	if strings.TrimSpace(chart.Context) == "" {
-		return semErr(path+".context", "must not be empty")
+		errs = append(errs, semErr(path+".context", "must not be empty"))
 	}
 	if strings.TrimSpace(chart.Units) == "" {
-		return semErr(path+".units", "must not be empty")
+		errs = append(errs, semErr(path+".units", "must not be empty"))
 	}
 	if chart.Algorithm != "" && !slices.Contains(validAlgorithms, chart.Algorithm) {
-		return semErr(path+".algorithm", fmt.Sprintf("must be one of %v", validAlgorithms))
+		errs = append(errs, semErr(path+".algorithm", fmt.Sprintf("must be one of %v", validAlgorithms)))
 	}
 	if chart.Type != "" && !slices.Contains(validChartTypes, chart.Type) {
-		return semErr(path+".type", fmt.Sprintf("must be one of %v", validChartTypes))
+		errs = append(errs, semErr(path+".type", fmt.Sprintf("must be one of %v", validChartTypes)))
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func validateLifecycle(lifecycle *Lifecycle, path string) error {
 	if lifecycle == nil {
 		return nil
 	}
+	var errs []error
 	if lifecycle.MaxInstances < 0 {
-		return semErr(path+".lifecycle.max_instances", "must be >= 0")
+		errs = append(errs, semErr(path+".lifecycle.max_instances", "must be >= 0"))
 	}
 	if lifecycle.ExpireAfterCycles < 0 {
-		return semErr(path+".lifecycle.expire_after_cycles", "must be >= 0")
+		errs = append(errs, semErr(path+".lifecycle.expire_after_cycles", "must be >= 0"))
 	}
 	if lifecycle.Dimensions != nil {
 		if lifecycle.Dimensions.MaxDims < 0 {
-			return semErr(path+".lifecycle.dimensions.max_dims", "must be >= 0")
+			errs = append(errs, semErr(path+".lifecycle.dimensions.max_dims", "must be >= 0"))
 		}
 		if lifecycle.Dimensions.ExpireAfterCycles < 0 {
-			return semErr(path+".lifecycle.dimensions.expire_after_cycles", "must be >= 0")
+			errs = append(errs, semErr(path+".lifecycle.dimensions.expire_after_cycles", "must be >= 0"))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func validateInstances(instances *Instances, path string) error {
 	if instances == nil {
 		return nil
 	}
+	var errs []error
+	hasPositive := false
 	if len(instances.ByLabels) == 0 {
 		return semErr(path+".instances.by_labels", "must contain at least one token when instances is set")
 	}
@@ -149,17 +147,34 @@ func validateInstances(instances *Instances, path string) error {
 	for i, token := range instances.ByLabels {
 		token = strings.TrimSpace(token)
 		if token == "" {
-			return semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), "must not be empty")
+			errs = append(errs, semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), "must not be empty"))
+			continue
 		}
-		if token != "*" && strings.HasPrefix(token, "!") && len(token) == 1 {
-			return semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), "exclude token must include label key")
+		switch {
+		case token == "*":
+			hasPositive = true
+		case strings.HasPrefix(token, "!"):
+			key := strings.TrimPrefix(token, "!")
+			if key == "" {
+				errs = append(errs, semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), "exclude token must include label key"))
+				continue
+			}
+			if strings.TrimSpace(key) != key {
+				errs = append(errs, semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), "exclude token must use !label_key syntax"))
+				continue
+			}
+		default:
+			hasPositive = true
 		}
 		if _, ok := seen[token]; ok {
-			return semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), fmt.Sprintf("duplicate token %q", token))
+			errs = append(errs, semErr(fmt.Sprintf("%s.instances.by_labels[%d]", path, i), fmt.Sprintf("duplicate token %q", token)))
 		}
 		seen[token] = struct{}{}
 	}
-	return nil
+	if !hasPositive {
+		errs = append(errs, semErr(path+".instances.by_labels", "must include at least one positive selector ('*' or label key)"))
+	}
+	return errors.Join(errs...)
 }
 
 func validateDimensions(dimensions []Dimension, path string, effectiveMetrics map[string]struct{}) error {
@@ -167,41 +182,42 @@ func validateDimensions(dimensions []Dimension, path string, effectiveMetrics ma
 		return semErr(path+".dimensions", "at least one dimension is required")
 	}
 
+	var errs []error
 	seenDimNames := make(map[string]struct{}, len(dimensions))
 	for i := range dimensions {
 		d := dimensions[i]
 		selectorExpr := strings.TrimSpace(d.Selector)
 		if selectorExpr == "" {
-			return semErr(fmt.Sprintf("%s.dimensions[%d].selector", path, i), "must not be empty")
-		}
-
-		metricName, ok := selectorMetricName(selectorExpr)
-		if !ok {
-			return semErr(fmt.Sprintf("%s.dimensions[%d].selector", path, i), "selector must include explicit metric name")
-		}
-		if _, ok := effectiveMetrics[metricName]; !ok {
-			return semErr(fmt.Sprintf("%s.dimensions[%d].selector", path, i), fmt.Sprintf("metric %q is not visible in current group scope", metricName))
+			errs = append(errs, semErr(fmt.Sprintf("%s.dimensions[%d].selector", path, i), "must not be empty"))
+		} else {
+			metricName, ok := selectorMetricName(selectorExpr)
+			if !ok {
+				errs = append(errs, semErr(fmt.Sprintf("%s.dimensions[%d].selector", path, i), "selector must include explicit metric name"))
+			} else if _, ok := effectiveMetrics[metricName]; !ok {
+				errs = append(errs, semErr(fmt.Sprintf("%s.dimensions[%d].selector", path, i), fmt.Sprintf("metric %q is not visible in current group scope", metricName)))
+			}
 		}
 
 		name := strings.TrimSpace(d.Name)
 		nameFrom := strings.TrimSpace(d.NameFromLabel)
 		if d.Name != "" && name == "" {
-			return semErr(fmt.Sprintf("%s.dimensions[%d].name", path, i), "must not be whitespace-only")
+			errs = append(errs, semErr(fmt.Sprintf("%s.dimensions[%d].name", path, i), "must not be whitespace-only"))
 		}
 		if d.NameFromLabel != "" && nameFrom == "" {
-			return semErr(fmt.Sprintf("%s.dimensions[%d].name_from_label", path, i), "must not be whitespace-only")
+			errs = append(errs, semErr(fmt.Sprintf("%s.dimensions[%d].name_from_label", path, i), "must not be whitespace-only"))
 		}
 		if name != "" && nameFrom != "" {
-			return semErr(fmt.Sprintf("%s.dimensions[%d]", path, i), "use either name or name_from_label, not both")
+			errs = append(errs, semErr(fmt.Sprintf("%s.dimensions[%d]", path, i), "use either name or name_from_label, not both"))
 		}
 		if name != "" {
 			if _, ok := seenDimNames[name]; ok {
-				return semErr(fmt.Sprintf("%s.dimensions[%d].name", path, i), fmt.Sprintf("duplicate dimension name %q", name))
+				errs = append(errs, semErr(fmt.Sprintf("%s.dimensions[%d].name", path, i), fmt.Sprintf("duplicate dimension name %q", name)))
+			} else {
+				seenDimNames[name] = struct{}{}
 			}
-			seenDimNames[name] = struct{}{}
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func validateEngine(engine *Engine) error {
@@ -209,29 +225,40 @@ func validateEngine(engine *Engine) error {
 		return nil
 	}
 
+	var errs []error
 	if engine.Selector != nil {
 		for i, expr := range engine.Selector.Allow {
 			if strings.TrimSpace(expr) == "" {
-				return semErr(fmt.Sprintf("engine.selector.allow[%d]", i), "must not be empty")
+				errs = append(errs, semErr(fmt.Sprintf("engine.selector.allow[%d]", i), "must not be empty"))
 			}
 		}
 		for i, expr := range engine.Selector.Deny {
 			if strings.TrimSpace(expr) == "" {
-				return semErr(fmt.Sprintf("engine.selector.deny[%d]", i), "must not be empty")
+				errs = append(errs, semErr(fmt.Sprintf("engine.selector.deny[%d]", i), "must not be empty"))
 			}
 		}
 	}
 
 	if engine.Autogen != nil {
 		if engine.Autogen.MaxTypeIDLen < 0 {
-			return semErr("engine.autogen.max_type_id_len", "must be >= 0")
+			errs = append(errs, semErr("engine.autogen.max_type_id_len", "must be >= 0"))
 		}
 		if engine.Autogen.MaxTypeIDLen > 0 && engine.Autogen.MaxTypeIDLen < 4 {
-			return semErr("engine.autogen.max_type_id_len", "must be >= 4 when set")
+			errs = append(errs, semErr("engine.autogen.max_type_id_len", "must be >= 4 when set"))
 		}
 	}
 
-	return nil
+	return errors.Join(errs...)
+}
+
+func validateLabelPromotion(labels []string, path string) error {
+	var errs []error
+	for i, label := range labels {
+		if strings.TrimSpace(label) == "" {
+			errs = append(errs, semErr(fmt.Sprintf("%s[%d]", path, i), "must not be empty"))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func selectorMetricName(expr string) (string, bool) {

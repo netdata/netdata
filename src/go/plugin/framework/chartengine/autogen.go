@@ -658,7 +658,7 @@ func getAutogenCounterUnits(metric string) string {
 }
 
 func getAutogenSummaryUnits(metric string) string {
-	return getAutogenCounterUnits(metric)
+	return getAutogenGaugeUnits(metric)
 }
 
 func getAutogenMetricUnits(metric string) string {
