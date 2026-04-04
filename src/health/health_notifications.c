@@ -2,8 +2,12 @@
 
 #include "health_internals.h"
 #include "health-alert-entry.h"
+#include "health_event_loop_uv.h"
 
 // the queue of executed alarm notifications that haven't been waited for yet
+// Protected by alarm_notifications_spinlock since multiple UV worker threads
+// can call enqueue/unlink concurrently via health_send_notification()
+static SPINLOCK alarm_notifications_spinlock = SPINLOCK_INITIALIZER;
 static ALARM_ENTRY *alarm_notifications_in_progress = NULL;
 
 struct health_raised_summary {
@@ -50,10 +54,18 @@ cleanup:
         unlink_alarm_notify_in_progress(ae);
 }
 
+// Called only from the health event loop main thread during shutdown, after all
+// host-processing workers have completed.  Because no workers are active, no
+// concurrent enqueue/unlink can occur, making the lock-read-unlock-then-use
+// pattern on `ae` safe.
 void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up(void) {
     ALARM_ENTRY *ae;
-    while (NULL != (ae = alarm_notifications_in_progress)) {
-        if(unlikely(!service_running(SERVICE_HEALTH)))
+    while (true) {
+        spinlock_lock(&alarm_notifications_spinlock);
+        ae = alarm_notifications_in_progress;
+        spinlock_unlock(&alarm_notifications_spinlock);
+
+        if (!ae || unlikely(health_should_stop()))
             break;
 
         health_alarm_wait_for_execution(ae);
@@ -62,14 +74,18 @@ void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_u
 
 void unlink_alarm_notify_in_progress(ALARM_ENTRY *ae)
 {
+    spinlock_lock(&alarm_notifications_spinlock);
     fatal_assert(ae->prev_in_progress || ae->next_in_progress);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(alarm_notifications_in_progress, ae, prev_in_progress, next_in_progress);
+    spinlock_unlock(&alarm_notifications_spinlock);
 }
 
 static inline void enqueue_alarm_notify_in_progress(ALARM_ENTRY *ae)
 {
+    spinlock_lock(&alarm_notifications_spinlock);
     fatal_assert(!ae->prev_in_progress && !ae->next_in_progress);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(alarm_notifications_in_progress, ae, prev_in_progress, next_in_progress);
+    spinlock_unlock(&alarm_notifications_spinlock);
 }
 
 static bool prepare_command(BUFFER *wb,
@@ -329,7 +345,7 @@ static const char *health_raised_summary_my_expression_error(struct health_raise
     return "";
 }
 
-void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_raised_summary *hrm) {
+void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_raised_summary *hrm, struct health_stmt_set *stmts) {
     netdata_log_debug(D_HEALTH, "Health alarm '%s.%s' = " NETDATA_DOUBLE_FORMAT_AUTO " - changed status from %s to %s",
                       ae->chart?ae_chart_id(ae):"NOCHART", ae_name(ae),
                       ae->new_value,
@@ -361,7 +377,7 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
     // exception: alarms with HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION set
     RRDCALC_STATUS last_executed_status = -3;
     if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION))) {
-        int ret = sql_health_get_last_executed_event(host, ae, &last_executed_status);
+        int ret = sql_health_get_last_executed_event(host, ae, &last_executed_status, stmts);
 
         if (likely(ret == 1)) {
             // we have executed this alarm notification in the past
@@ -463,7 +479,7 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
         else
             netdata_log_error("Failed to execute alarm notification");
 
-        health_alarm_log_save(host, ae, false);
+        health_alarm_log_save(host, ae, false, stmts);
     }
     else
         netdata_log_error("Failed to format command arguments");
@@ -475,7 +491,7 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
 
     return; //health_alarm_wait_for_execution
 done:
-    health_alarm_log_save(host, ae, false);
+    health_alarm_log_save(host, ae, false, stmts);
 }
 
 bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, nd_uuid_t *transitions_id) {
@@ -506,7 +522,7 @@ bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, u
     return ae != NULL;
 }
 
-void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health_raised_summary *hrm) {
+void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health_raised_summary *hrm, struct health_stmt_set *stmts) {
     uint32_t first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
     time_t now = now_realtime_sec();
 
@@ -521,7 +537,7 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health
                 first_waiting = ae->unique_id;
 
             if(likely(now >= ae->delay_up_to_timestamp))
-                health_send_notification(host, ae, hrm);
+                health_send_notification(host, ae, hrm, stmts);
         }
     }
 

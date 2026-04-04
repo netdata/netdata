@@ -6,6 +6,7 @@
 #include "daemon/daemon-shutdown-watcher.h"
 #include "static_threads.h"
 #include "common.h"
+#include "health/health_event_loop_uv.h"
 
 #include <curl/curl.h>
 
@@ -206,15 +207,19 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     service_signal_exit(ABILITY_WEB_REQUESTS | SERVICE_ACLK | ABILITY_STREAMING_CONNECTIONS | SERVICE_SYSTEMD);
 
-    service_signal_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD);
+    service_signal_exit(SERVICE_EXPORTERS | SERVICE_WEB_SERVER | SERVICE_HTTPD);
 
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS);
 
     service_wait_exit(SERVICE_SYSTEMD, 5 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD);
 
-    service_wait_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD, 3 * USEC_PER_SEC);
+    service_wait_exit(SERVICE_EXPORTERS | SERVICE_WEB_SERVER | SERVICE_HTTPD, 3 * USEC_PER_SEC);
     watcher_step_complete(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS);
+
+    // Shutdown health event loop before streaming threads are cancelled
+    // to ensure health operations complete cleanly while data structures are still valid
+    health_event_loop_shutdown();
 
     stream_threads_cancel();
     service_wait_exit(SERVICE_COLLECTORS | SERVICE_STREAMING, 20 * USEC_PER_SEC);

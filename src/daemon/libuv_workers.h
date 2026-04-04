@@ -97,6 +97,18 @@ enum event_loop_job {
 
     // netdatacli
     UV_EVENT_SCHEDULE_CMD,
+
+    // health (worker thread jobs for per-host alert processing)
+    UV_EVENT_HEALTH_HOST_LOCK,
+    UV_EVENT_HEALTH_DB_QUERY,
+    UV_EVENT_HEALTH_CALC_EVAL,
+    UV_EVENT_HEALTH_WARNING_EVAL,
+    UV_EVENT_HEALTH_CRITICAL_EVAL,
+    UV_EVENT_HEALTH_ALARM_LOG_ENTRY,
+    UV_EVENT_HEALTH_ALARM_LOG_PROCESS,
+    UV_EVENT_HEALTH_ALARM_LOG_QUEUE,
+    UV_EVENT_HEALTH_DELAYED_INIT_RRDSET,
+    UV_EVENT_HEALTH_CLEANUP,
 };
 
 #define MAX_ACTIVE_WORKERS (256)
@@ -104,7 +116,6 @@ enum event_loop_job {
 typedef struct worker_data {
     uv_work_t request;
     void *config;
-    void *pending_alert_list;
     void *pending_ctx_cleanup_list;
     void *pending_uuid_deletion;
     void *pending_sql_statement;

@@ -3,25 +3,11 @@
 #include "health.h"
 #include "health_internals.h"
 #include "health-alert-entry.h"
+#include "health_event_loop_uv.h"
 
-#define WORKER_HEALTH_JOB_RRD_LOCK              0
-#define WORKER_HEALTH_JOB_HOST_LOCK             1
-#define WORKER_HEALTH_JOB_DB_QUERY              2
-#define WORKER_HEALTH_JOB_CALC_EVAL             3
-#define WORKER_HEALTH_JOB_WARNING_EVAL          4
-#define WORKER_HEALTH_JOB_CRITICAL_EVAL         5
-#define WORKER_HEALTH_JOB_ALARM_LOG_ENTRY       6
-#define WORKER_HEALTH_JOB_ALARM_LOG_PROCESS     7
-#define WORKER_HEALTH_JOB_ALARM_LOG_QUEUE       8
-#define WORKER_HEALTH_JOB_WAIT_EXEC             9
-#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET   10
-#define WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM   11
-
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 10
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
-#endif
-
-static uint64_t health_evloop_iteration = 0;
+// Main-loop worker job IDs are defined in health_event_loop_uv.h;
+// health_evloop_iteration is declared extern there and defined here.
+uint64_t health_evloop_iteration = 0;
 
 uint64_t health_evloop_current_iteration(void) {
     return __atomic_load_n(&health_evloop_iteration, __ATOMIC_RELAXED);
@@ -186,23 +172,6 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
     return 1;
 }
 
-static void health_sleep(time_t next_run, uint64_t loop __maybe_unused) {
-    time_t now = now_realtime_sec();
-    if(now < next_run) {
-        worker_is_idle();
-        netdata_log_debug(D_HEALTH, "Health monitoring iteration no %llu done. Next iteration in %d secs",
-                          (unsigned long long)loop, (int) (next_run - now));
-        while (now < next_run && service_running(SERVICE_HEALTH)) {
-            sleep_usec(USEC_PER_SEC);
-            now = now_realtime_sec();
-        }
-    }
-    else {
-        netdata_log_debug(D_HEALTH, "Health monitoring iteration no %llu done. Next iteration now",
-                          (unsigned long long)loop);
-    }
-}
-
 static void health_execute_delayed_initializations(RRDHOST *host) {
     health_plugin_init();
 
@@ -217,11 +186,11 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
         rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
 
-        worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
+        worker_is_busy(UV_EVENT_HEALTH_DELAYED_INIT_RRDSET);
 
         health_prototype_alerts_for_rrdset_incrementally(st);
 
-        if (!service_running(SERVICE_HEALTH))
+        if (health_should_stop())
             break;
     }
     rrdset_foreach_done(st);
@@ -232,7 +201,7 @@ static void health_initialize_rrdhost(RRDHOST *host) {
 
     if(!host->health.enabled ||
         rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH) ||
-        !service_running(SERVICE_HEALTH))
+        health_should_stop())
         return;
 
     host->health_log.max = health_globals.config.health_log_entries_max;
@@ -249,27 +218,10 @@ static void health_initialize_rrdhost(RRDHOST *host) {
     rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
 
 
-    if (!service_running(SERVICE_HEALTH))
+    if (health_should_stop())
         return;
 
     health_apply_prototypes_to_host(host);
-}
-
-static inline int check_if_resumed_from_suspension(void) {
-    static usec_t last_realtime = 0, last_monotonic = 0;
-    usec_t realtime = now_realtime_usec(), monotonic = now_monotonic_usec();
-    int ret = 0;
-
-    // detect if monotonic and realtime have twice the difference
-    // in which case we assume the system was just waken from hibernation
-
-    if(last_realtime && last_monotonic && realtime - last_realtime > 2 * (monotonic - last_monotonic))
-        ret = 1;
-
-    last_realtime = realtime;
-    last_monotonic = monotonic;
-
-    return ret;
 }
 
 static void do_eval_expression(
@@ -316,8 +268,9 @@ static void do_eval_expression(
         *result = expression_result(expression);
 }
 
-// returns the number of runnable alerts
-static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, time_t now, time_t *next_run) {
+// Process health alerts for a single host.
+// Called from health_event_loop_uv.c worker callbacks for each host.
+void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, time_t now, time_t *next_run, struct health_stmt_set *stmts) {
     size_t runnable = 0;
     struct health_alert_status_counts status_counts = { 0 };
     bool snapshot_complete = true;
@@ -362,7 +315,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         host->health.delay_up_to = 0;
     }
 
-    worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
+    worker_is_busy(UV_EVENT_HEALTH_HOST_LOCK);
     {
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
         if (aclk_host_config && aclk_host_config->send_snapshot == 2)
@@ -372,7 +325,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     // the first loop is to lookup values from the db
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host))) {
+        if(unlikely(health_should_stop() || !rrdhost_should_run_health(host))) {
             snapshot_complete = false;
             break;
         }
@@ -392,7 +345,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                      now > (rc->rrdset->last_collected_time.tv_sec + 60))) {
 
             if (!rrdcalc_isrepeating(rc)) {
-                worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
+                worker_is_busy(UV_EVENT_HEALTH_ALARM_LOG_ENTRY);
                 time_t now_tmp = now_realtime_sec();
 
                 ALARM_ENTRY *ae =
@@ -410,7 +363,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
 
                 if (ae) {
                     health_log_alert(host, ae);
-                    health_alarm_log_add_entry(host, ae, false);
+                    health_alarm_log_add_entry(host, ae, false, stmts);
                     health_alert_status_counts_sub(&status_counts, rc->status);
                     rc->old_status = rc->status;
                     rc->status = RRDCALC_STATUS_REMOVED;
@@ -436,7 +389,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         // if there is database lookup, do it
 
         if (unlikely(RRDCALC_HAS_DB_LOOKUP(rc))) {
-            worker_is_busy(WORKER_HEALTH_JOB_DB_QUERY);
+            worker_is_busy(UV_EVENT_HEALTH_DB_QUERY);
 
             /* time_t old_db_timestamp = rc->db_before; */
             int value_is_null = 0;
@@ -503,15 +456,15 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         // ------------------------------------------------------------
         // if there is calculation expression, run it
 
-        do_eval_expression(rc, rc->config.calculation, "calculation", WORKER_HEALTH_JOB_CALC_EVAL, RRDCALC_FLAG_CALC_ERROR, NULL, &rc->value);
+        do_eval_expression(rc, rc->config.calculation, "calculation", UV_EVENT_HEALTH_CALC_EVAL, RRDCALC_FLAG_CALC_ERROR, NULL, &rc->value);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
 
     struct health_raised_summary *hrm = alerts_raised_summary_create(host);
 
-    if (unlikely(runnable && service_running(SERVICE_HEALTH))) {
+    if (unlikely(runnable && !health_should_stop())) {
         foreach_rrdcalc_in_rrdhost_read(host, rc) {
-            if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host))) {
+            if(unlikely(health_should_stop() || !rrdhost_should_run_health(host))) {
                 snapshot_complete = false;
                 break;
             }
@@ -525,8 +478,8 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
             RRDCALC_STATUS warning_status = RRDCALC_STATUS_UNDEFINED;
             RRDCALC_STATUS critical_status = RRDCALC_STATUS_UNDEFINED;
 
-            do_eval_expression(rc, rc->config.warning, "warning", WORKER_HEALTH_JOB_WARNING_EVAL, RRDCALC_FLAG_WARN_ERROR, &warning_status, NULL);
-            do_eval_expression(rc, rc->config.critical, "critical", WORKER_HEALTH_JOB_CRITICAL_EVAL, RRDCALC_FLAG_CRIT_ERROR, &critical_status, NULL);
+            do_eval_expression(rc, rc->config.warning, "warning", UV_EVENT_HEALTH_WARNING_EVAL, RRDCALC_FLAG_WARN_ERROR, &warning_status, NULL);
+            do_eval_expression(rc, rc->config.critical, "critical", UV_EVENT_HEALTH_CRITICAL_EVAL, RRDCALC_FLAG_CRIT_ERROR, &critical_status, NULL);
 
             // --------------------------------------------------------
             // decide the final alarm status
@@ -565,7 +518,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
 
             if (status != rc->status) {
 
-                worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
+                worker_is_busy(UV_EVENT_HEALTH_ALARM_LOG_ENTRY);
                 int delay;
 
                 // apply trigger hysteresis
@@ -616,7 +569,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     );
 
                 health_log_alert(host, ae);
-                health_alarm_log_add_entry(host, ae, false);
+                health_alarm_log_add_entry(host, ae, false, stmts);
 
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
                        "[%s]: Alert event for [%s.%s], value [%s], status [%s].",
@@ -650,7 +603,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
 
         // process repeating alarms
         foreach_rrdcalc_in_rrdhost_read(host, rc) {
-            if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host)))
+            if(unlikely(health_should_stop() || !rrdhost_should_run_health(host)))
                 break;
 
             int repeat_every = 0;
@@ -673,7 +626,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                 continue;
 
             if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
-                worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
+                worker_is_busy(UV_EVENT_HEALTH_ALARM_LOG_ENTRY);
                 rc->last_repeat = now;
                 if (likely(rc->times_repeat < UINT32_MAX)) rc->times_repeat++;
                 ALARM_ENTRY *ae =
@@ -700,7 +653,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     ae->flags |= HEALTH_ENTRY_RUN_ONCE;
                 }
                 rc->run_flags |= RRDCALC_FLAG_RUN_ONCE;
-                health_send_notification(host, ae, hrm);
+                health_send_notification(host, ae, hrm, stmts);
                 netdata_log_debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
                 health_alarm_wait_for_execution(ae);
                 health_alarm_log_free_one_nochecks_nounlink(ae);
@@ -714,7 +667,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         health_alert_status_snapshot_finish_update(host, &status_counts, snapshot_generation);
     }
 
-    if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host))) {
+    if(unlikely(health_should_stop() || !rrdhost_should_run_health(host))) {
         alerts_raised_summary_free(hrm);
         return;
     }
@@ -722,13 +675,9 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     // execute notifications
     // and cleanup
 
-    worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS);
-    health_alarm_log_process_to_send_notifications(host, hrm);
+    worker_is_busy(UV_EVENT_HEALTH_ALARM_LOG_PROCESS);
+    health_alarm_log_process_to_send_notifications(host, hrm, stmts);
     alerts_raised_summary_free(hrm);
-
-    int32_t pending = __atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED);
-    if (pending)
-        commit_alert_transitions(host);
 
     if (!__atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED)) {
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_RELAXED);
@@ -736,100 +685,10 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
             aclk_host_config->send_snapshot = 2;
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
         } else {
-            worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE);
-            if (process_alert_pending_queue(host))
+            worker_is_busy(UV_EVENT_HEALTH_ALARM_LOG_QUEUE);
+            if (process_alert_pending_queue(host, stmts))
                 rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
         }
     }
     worker_is_idle();
-}
-
-__thread bool is_health_thread = false;
-static void health_event_loop(void) {
-
-    is_health_thread = true;
-    while(service_running(SERVICE_HEALTH)) {
-        if(!stream_control_health_should_be_running()) {
-            worker_is_idle();
-            stream_control_throttle();
-            continue;
-        }
-
-        time_t now = now_realtime_sec();
-        bool apply_hibernation_delay = false;
-        time_t next_run = now + health_globals.config.run_at_least_every_seconds;
-
-        if (unlikely(check_if_resumed_from_suspension())) {
-            apply_hibernation_delay = true;
-
-            nd_log(NDLS_DAEMON, NDLP_NOTICE,
-                   "Postponing alarm checks for %"PRId32" seconds, "
-                   "because it seems that the system was just resumed from suspension.",
-                   (int32_t)health_globals.config.postpone_alarms_during_hibernation_for_seconds);
-            schedule_node_state_update(localhost, 10);
-        }
-
-        if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {
-            static int logged=0;
-            if (!logged) {
-                nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                       "Skipping health checks, because all alarms are disabled via API command.");
-                logged = 1;
-            }
-        }
-
-        worker_is_busy(WORKER_HEALTH_JOB_RRD_LOCK);
-        uint64_t loop = __atomic_add_fetch(&health_evloop_iteration, 1, __ATOMIC_RELAXED);
-
-        RRDHOST *host;
-        dfe_start_reentrant(rrdhost_root_index, host) {
-            if(unlikely(!service_running(SERVICE_HEALTH)))
-                break;
-
-            health_event_loop_for_host(host, apply_hibernation_delay, now, &next_run);
-        }
-        dfe_done(host);
-
-        if(unlikely(!service_running(SERVICE_HEALTH)))
-            break;
-
-        // wait for all notifications to finish before allowing health to be cleaned up
-        worker_is_busy(WORKER_HEALTH_JOB_WAIT_EXEC);
-        wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up();
-        worker_is_idle();
-        
-        health_sleep(next_run, loop);
-    } // forever
-}
-
-
-static void health_main_cleanup(void *pptr) {
-    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
-    if(!static_thread) return;
-
-    worker_unregister();
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-    finalize_self_prepared_sql_statements();
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Health thread ended.");
-}
-
-void *health_main(void *ptr) {
-    worker_register("HEALTH");
-    worker_register_job_name(WORKER_HEALTH_JOB_RRD_LOCK, "rrd lock");
-    worker_register_job_name(WORKER_HEALTH_JOB_HOST_LOCK, "host lock");
-    worker_register_job_name(WORKER_HEALTH_JOB_DB_QUERY, "db lookup");
-    worker_register_job_name(WORKER_HEALTH_JOB_CALC_EVAL, "calc eval");
-    worker_register_job_name(WORKER_HEALTH_JOB_WARNING_EVAL, "warning eval");
-    worker_register_job_name(WORKER_HEALTH_JOB_CRITICAL_EVAL, "critical eval");
-    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY, "alert log entry");
-    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS, "alert log process");
-    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE, "alert log queue");
-    worker_register_job_name(WORKER_HEALTH_JOB_WAIT_EXEC, "alert wait exec");
-    worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET, "rrdset init");
-    worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM, "rrddim init");
-
-    CLEANUP_FUNCTION_REGISTER(health_main_cleanup) cleanup_ptr = ptr;
-    health_event_loop();
-    return NULL;
 }
