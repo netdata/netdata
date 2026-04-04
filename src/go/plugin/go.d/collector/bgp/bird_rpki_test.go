@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	dataBIRDProtocolsAllRPKI = mustReadTestData("testdata/bird/show_protocols_all_rpki.txt")
+	dataBIRDProtocolsAllRPKI []byte
 )
 
 func TestBuildBIRDRPKICaches(t *testing.T) {

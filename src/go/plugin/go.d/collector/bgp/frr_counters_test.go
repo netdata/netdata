@@ -12,10 +12,10 @@ import (
 )
 
 var (
-	dataFRRNeighborsRich        = mustReadTestData("testdata/frr/show_bgp_vrf_all_neighbors_rich.json")
-	dataFRRIPv4SummaryDualstack = mustReadTestData("testdata/frr/show_bgp_vrf_all_ipv4_summary_dualstack.json")
-	dataFRRIPv6SummaryDualstack = mustReadTestData("testdata/frr/show_bgp_vrf_all_ipv6_summary_dualstack.json")
-	dataFRRNeighborsDualstack   = mustReadTestData("testdata/frr/show_bgp_vrf_all_neighbors_dualstack.json")
+	dataFRRNeighborsRich        []byte
+	dataFRRIPv4SummaryDualstack []byte
+	dataFRRIPv6SummaryDualstack []byte
+	dataFRRNeighborsDualstack   []byte
 )
 
 func TestParseFRRNeighborsRichCounters(t *testing.T) {

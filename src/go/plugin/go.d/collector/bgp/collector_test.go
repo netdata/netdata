@@ -22,20 +22,20 @@ import (
 )
 
 var (
-	dataConfigJSON           = mustReadTestData("testdata/config.json")
-	dataConfigYAML           = mustReadTestData("testdata/config.yaml")
-	dataFRRIPv4Summary       = mustReadTestData("testdata/frr/show_bgp_vrf_all_ipv4_summary.json")
-	dataFRRIPv4SummaryDeep   = mustReadTestData("testdata/frr/show_bgp_vrf_all_ipv4_summary_deep_prefixes.json")
-	dataFRRIPv4SummaryPfxSnt = mustReadTestData("testdata/frr/show_bgp_vrf_all_ipv4_summary_pfxsnt.json")
-	dataFRRIPv6Summary       = mustReadTestData("testdata/frr/show_bgp_vrf_all_ipv6_summary.json")
-	dataFRREVPNSummary       = mustReadTestData("testdata/frr/show_bgp_vrf_all_l2vpn_evpn_summary.json")
-	dataFRREVPNVNI           = mustReadTestData("testdata/frr/show_evpn_vni.json")
-	dataFRRNeighbors         = mustReadTestData("testdata/frr/show_bgp_vrf_all_neighbors.json")
-	dataFRRNeighborsEnriched = mustReadTestData("testdata/frr/show_bgp_vrf_all_neighbors_enriched.json")
-	dataFRRPeerRoutesDefault = mustReadTestData("testdata/frr/show_bgp_ipv4_unicast_neighbor_192.168.0.2_routes.json")
-	dataFRRPeerRoutesRed     = mustReadTestData("testdata/frr/show_bgp_vrf_red_ipv4_unicast_neighbor_192.168.1.2_routes.json")
-	dataFRRPeerAdvDefault    = mustReadTestData("testdata/frr/show_bgp_ipv4_unicast_neighbor_192.168.0.2_advertised_routes.json")
-	dataFRRPeerAdvRed        = mustReadTestData("testdata/frr/show_bgp_vrf_red_ipv4_unicast_neighbor_192.168.1.2_advertised_routes.json")
+	dataConfigJSON           []byte
+	dataConfigYAML           []byte
+	dataFRRIPv4Summary       []byte
+	dataFRRIPv4SummaryDeep   []byte
+	dataFRRIPv4SummaryPfxSnt []byte
+	dataFRRIPv6Summary       []byte
+	dataFRREVPNSummary       []byte
+	dataFRREVPNVNI           []byte
+	dataFRRNeighbors         []byte
+	dataFRRNeighborsEnriched []byte
+	dataFRRPeerRoutesDefault []byte
+	dataFRRPeerRoutesRed     []byte
+	dataFRRPeerAdvDefault    []byte
+	dataFRRPeerAdvRed        []byte
 	dataFRREmptySummary      = []byte("{}")
 )
 

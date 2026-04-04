@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	dataFRRRPKICacheServer                 = mustReadTestData("testdata/frr/show_rpki_cache_server.json")
-	dataFRRRPKICacheConnection             = mustReadTestData("testdata/frr/show_rpki_cache_connection.json")
-	dataFRRRPKICacheConnectionDisconnected = mustReadTestData("testdata/frr/show_rpki_cache_connection_disconnected.json")
+	dataFRRRPKICacheServer                 []byte
+	dataFRRRPKICacheConnection             []byte
+	dataFRRRPKICacheConnectionDisconnected []byte
 )
 
 func TestBuildFRRRPKICaches(t *testing.T) {

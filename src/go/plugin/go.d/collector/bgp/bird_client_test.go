@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var dataBIRDProtocolsAllAccessDenied = mustReadTestData("testdata/bird/show_protocols_all_access_denied.txt")
+var dataBIRDProtocolsAllAccessDenied []byte
 
 func TestBIRDClient_ProtocolsAll(t *testing.T) {
 	server := newBIRDReplayServer(t, dataBIRDProtocolsAllMultichannel)

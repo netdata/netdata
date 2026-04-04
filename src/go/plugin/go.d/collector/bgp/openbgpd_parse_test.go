@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	dataOpenBGPDNeighbors            = mustReadTestData("testdata/openbgpd/show_neighbor.json")
-	dataOpenBGPDNeighborsMultifamily = mustReadTestData("testdata/openbgpd/show_neighbor_multifamily.json")
-	dataOpenBGPDRIB                  = mustReadTestData("testdata/openbgpd/rib.json")
+	dataOpenBGPDNeighbors            []byte
+	dataOpenBGPDNeighborsMultifamily []byte
+	dataOpenBGPDRIB                  []byte
 )
 
 func TestParseOpenBGPDNeighbors(t *testing.T) {

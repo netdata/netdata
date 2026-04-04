@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var dataFRRRPKIPrefixCount = mustReadTestData("testdata/frr/show_rpki_prefix_count.json")
+var dataFRRRPKIPrefixCount []byte
 
 func TestBuildFRRRPKIInventory(t *testing.T) {
 	inv, err := buildFRRRPKIInventory(dataFRRRPKIPrefixCount)

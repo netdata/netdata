@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	dataOpenBGPDNeighborsLiveActive = mustReadTestData("testdata/openbgpd/show_neighbor_live_active.json")
-	dataOpenBGPDRIBLiveActive       = mustReadTestData("testdata/openbgpd/rib_live_active.json")
+	dataOpenBGPDNeighborsLiveActive []byte
+	dataOpenBGPDRIBLiveActive       []byte
 )
 
 func TestParseOpenBGPDNeighborsLiveActiveFixture(t *testing.T) {

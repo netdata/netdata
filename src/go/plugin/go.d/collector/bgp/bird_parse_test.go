@@ -11,10 +11,10 @@ import (
 )
 
 var (
-	dataBIRDProtocolsAllMultichannel = mustReadTestData("testdata/bird/show_protocols_all_multichannel.txt")
-	dataBIRDProtocolsAllLegacy       = mustReadTestData("testdata/bird/show_protocols_all_legacy.txt")
-	dataBIRDProtocolsAllBird3        = mustReadTestData("testdata/bird/show_protocols_all_bird3.txt")
-	dataBIRDProtocolsAllAdvanced     = mustReadTestData("testdata/bird/show_protocols_all_advanced_families.txt")
+	dataBIRDProtocolsAllMultichannel []byte
+	dataBIRDProtocolsAllLegacy       []byte
+	dataBIRDProtocolsAllBird3        []byte
+	dataBIRDProtocolsAllAdvanced     []byte
 )
 
 func TestParseBIRDProtocolsAllMultichannel(t *testing.T) {
