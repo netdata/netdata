@@ -50,6 +50,7 @@ func (c *Collector) collectGoBGPValidationSummaries(client gobgpClientAPI, refs 
 		if !gobgpValidationSupported(ref) {
 			continue
 		}
+		scrape.noteDeepQueryAttempt()
 		summary, err := client.ListPathValidation(ref)
 		if err != nil {
 			scrape.noteDeepQueryError()

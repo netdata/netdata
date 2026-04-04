@@ -82,7 +82,7 @@ func TestCollector_CollectGoBGP(t *testing.T) {
 
 	mx := collr.Collect(context.Background())
 	require.NotNil(t, mx)
-	mx = assertAndStripCollectorMetrics(t, mx, collectorStatusOK, 0, 0, 0, 0, 0, 0)
+	mx = assertAndStripCollectorMetrics(t, mx, collectorStatusOK, 0, 0, 0, 1, 0, 0)
 
 	expected := map[string]int64{}
 	for k, v := range familyMetricSet("default_ipv4_unicast", 1, 0, 0, 1, 1, 15, 20, 100, 123) {
@@ -296,7 +296,7 @@ func TestCollector_GoBGPSummariesHonorFamilySelection(t *testing.T) {
 
 	mx := collr.Collect(context.Background())
 	require.NotNil(t, mx)
-	mx = assertAndStripCollectorMetrics(t, mx, collectorStatusOK, 0, 0, 0, 0, 0, 0)
+	mx = assertAndStripCollectorMetrics(t, mx, collectorStatusOK, 0, 0, 0, 1, 0, 0)
 
 	assert.Equal(t, []string{"default_ipv4_unicast"}, mock.gobgpTableRefs)
 	assert.Equal(t, []string{"default_ipv4_unicast"}, mock.gobgpValidationRefs)
@@ -308,6 +308,38 @@ func TestCollector_GoBGPSummariesHonorFamilySelection(t *testing.T) {
 	assert.NotContains(t, mx, "family_blue_ipv6_unicast_rib_routes")
 	assert.NotContains(t, mx, "family_blue_ipv4_unicast_correctness_not_found")
 	assert.NotContains(t, mx, "family_blue_ipv6_unicast_correctness_invalid")
+}
+
+func TestCollector_GoBGPValidationFailureCountsAttempt(t *testing.T) {
+	now := time.Now()
+	mock := &mockClient{
+		gobgpGlobal: testGoBGPGlobal(),
+		gobgpPeers:  testGoBGPPeers(now),
+		gobgpTables: map[string]uint64{
+			"default_ipv4_unicast": 1,
+			"blue_ipv4_unicast":    2,
+			"blue_ipv6_unicast":    3,
+		},
+		gobgpValidationErrs: map[string]error{
+			"default_ipv4_unicast": assert.AnError,
+		},
+	}
+
+	collr := New()
+	collr.Backend = backendGoBGP
+	collr.Address = "127.0.0.1:50051"
+	collr.CollectRIBSummaries = true
+	collr.RIBSummaryEvery = confopt.Duration(time.Minute)
+	collr.newClient = func(Config) (bgpClient, error) { return mock, nil }
+	require.NoError(t, collr.Init(context.Background()))
+	t.Cleanup(func() { collr.Cleanup(context.Background()) })
+
+	mx := collr.Collect(context.Background())
+	require.NotNil(t, mx)
+	assertAndStripCollectorMetrics(t, mx, collectorStatusOK, 0, 0, 1, 1, 1, 0)
+
+	assert.Equal(t, 1, mock.gobgpValidationCalls)
+	assert.Equal(t, []string{"default_ipv4_unicast"}, mock.gobgpValidationRefs)
 }
 
 func assertMetricRange(t *testing.T, mx map[string]int64, key string, min, max int64) {

@@ -4,6 +4,7 @@ package bgp
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -18,6 +19,9 @@ func (c *Collector) selectFamilies(families []familyStats) map[string]bool {
 	}
 
 	if c.selectFamilyMatcher == nil {
+		for _, family := range sortedFamilies(families)[:c.MaxFamilies] {
+			selected[family.ID] = true
+		}
 		return selected
 	}
 
@@ -52,6 +56,9 @@ func (c *Collector) selectPeers(families []familyStats, selectedFamilies map[str
 		return selected
 	}
 	if c.selectPeerMatcher == nil {
+		for _, peerID := range sortedPeerIDs(families, selectedFamilies)[:c.MaxPeers] {
+			selected[peerID] = true
+		}
 		return selected
 	}
 
@@ -79,6 +86,9 @@ func (c *Collector) selectVNIs(vnis []vniStats) map[string]bool {
 	}
 
 	if c.selectVNIMatcher == nil {
+		for _, vni := range sortedVNIs(vnis)[:c.MaxVNIs] {
+			selected[vni.ID] = true
+		}
 		return selected
 	}
 
@@ -107,4 +117,34 @@ func countSelectedPeers(family familyStats, selected map[string]bool) int {
 		}
 	}
 	return count
+}
+
+func sortedFamilies(families []familyStats) []familyStats {
+	sorted := append([]familyStats(nil), families...)
+	sort.Slice(sorted, func(i, j int) bool {
+		return familyMatchKey(sorted[i]) < familyMatchKey(sorted[j])
+	})
+	return sorted
+}
+
+func sortedPeerIDs(families []familyStats, selectedFamilies map[string]bool) []string {
+	var ids []string
+	for _, family := range families {
+		if !selectedFamilies[family.ID] {
+			continue
+		}
+		for _, peer := range family.Peers {
+			ids = append(ids, peer.ID)
+		}
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func sortedVNIs(vnis []vniStats) []vniStats {
+	sorted := append([]vniStats(nil), vnis...)
+	sort.Slice(sorted, func(i, j int) bool {
+		return vniMatchKey(sorted[i]) < vniMatchKey(sorted[j])
+	})
+	return sorted
 }

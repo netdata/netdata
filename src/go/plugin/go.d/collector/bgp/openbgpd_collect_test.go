@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -163,6 +164,7 @@ func TestCollector_OpenBGPDSkipsRIBWhenNoFamiliesSelected(t *testing.T) {
 	collr.CollectRIBSummaries = true
 	collr.RIBSummaryEvery = confopt.Duration(time.Minute)
 	collr.MaxFamilies = 1
+	collr.SelectFamilies = matcher.SimpleExpr{Includes: []string{"=does-not-match/ipv4/unicast"}}
 	collr.newClient = func(Config) (bgpClient, error) { return mock, nil }
 	require.NoError(t, collr.Init(context.Background()))
 	t.Cleanup(func() { collr.Cleanup(context.Background()) })

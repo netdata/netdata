@@ -210,7 +210,9 @@ jobs:
 Stock alerts only evaluate charted families and charted peers. If the
 environment is larger than `max_families` or `max_peers`, use
 `select_families` and `select_peers` deliberately so the routers, VRFs,
-and peers you care about stay inside alert coverage.
+and peers you care about stay inside alert coverage. If no selector is
+configured, Netdata keeps a deterministic bounded fallback instead of
+dropping chart selection to zero.
 
 Enable deeper FRR prefix policy counters for a bounded peer set:
 

@@ -35,7 +35,7 @@ modules:
             This collector does not auto-detect BGP daemons yet. Configure jobs explicitly.
         limits:
           description: |
-            If the number of discovered families exceeds `max_families`, Netdata charts only families matched by `select_families`. If the number of discovered peers inside the selected families exceeds `max_peers`, Netdata charts only peers matched by `select_peers`. If the number of discovered EVPN VNIs exceeds `max_vnis`, Netdata charts only VNIs matched by `select_vnis`. Stock alerts evaluate only charted families and charted peers.
+            If the number of discovered families exceeds `max_families`, Netdata charts families matched by `select_families`, or a deterministic first-`max_families` fallback when no selector is configured. If the number of discovered peers inside the selected families exceeds `max_peers`, Netdata charts peers matched by `select_peers`, or a deterministic first-`max_peers` fallback when no selector is configured. If the number of discovered EVPN VNIs exceeds `max_vnis`, Netdata charts VNIs matched by `select_vnis`, or a deterministic first-`max_vnis` fallback when no selector is configured. Stock alerts evaluate only charted families and charted peers.
         performance_impact:
           description: |
             Low by default. FRR runs IPv4 and IPv6 summary commands plus a best-effort neighbors query, and adds EVPN or deeper peer queries only when needed. BIRD runs one `show protocols all` query per scrape. GoBGP runs `GetBgp`, `ListPeer`, and per-family `GetTable` requests each scrape, and only refreshes cached validation summaries when `collect_rib_summaries` is enabled and the cache interval expires. OpenBGPD runs one `neighbors` query per scrape and only refreshes `/rib` summaries when `collect_rib_summaries` is enabled and the cache interval expires. Enabling `deep_peer_prefix_metrics` affects FRR only.
@@ -152,7 +152,7 @@ modules:
               required: false
               group: Family charts
             - name: select_families
-              description: When the discovered family count exceeds `max_families`, create family charts only for matched `vrf/afi/safi` values such as `default/ipv4/unicast`.
+              description: When the discovered family count exceeds `max_families`, prefer matched `vrf/afi/safi` values such as `default/ipv4/unicast`. If no selector is configured, Netdata keeps a deterministic first-`max_families` fallback.
               default_value: ""
               required: false
               group: Family charts
@@ -167,7 +167,7 @@ modules:
               required: false
               group: EVPN VNI charts
             - name: select_vnis
-              description: When the discovered EVPN VNI count exceeds `max_vnis`, create VNI charts only for matched `tenant_vrf/vni` values such as `default/172192`.
+              description: When the discovered EVPN VNI count exceeds `max_vnis`, prefer matched `tenant_vrf/vni` values such as `default/172192`. If no selector is configured, Netdata keeps a deterministic first-`max_vnis` fallback.
               default_value: ""
               required: false
               group: EVPN VNI charts
@@ -184,7 +184,7 @@ modules:
               required: false
               group: Peer charts
             - name: select_peers
-              description: When the discovered peer count exceeds `max_peers`, create peer charts only for matched peer addresses.
+              description: When the discovered peer count exceeds `max_peers`, prefer matched peer addresses. If no selector is configured, Netdata keeps a deterministic first-`max_peers` fallback.
               default_value: ""
               required: false
               group: Peer charts

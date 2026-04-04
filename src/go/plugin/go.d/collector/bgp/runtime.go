@@ -62,6 +62,10 @@ func (m *scrapeMetrics) tryDeepQuery(limit int) bool {
 	return true
 }
 
+func (m *scrapeMetrics) noteDeepQueryAttempt() {
+	m.deepQueriesAttempted++
+}
+
 func (m *scrapeMetrics) noteDeepQueryError() {
 	m.deepQueryErrors++
 	m.deepQueriesFailed++
