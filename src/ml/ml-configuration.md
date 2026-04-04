@@ -131,6 +131,54 @@ This consensus approach **reduces false positives by approximately 99%**, ensuri
 
 **Models trained on different time frames capture various patterns in your data**, making the system robust against temporary fluctuations.
 
+## Understanding Your Baseline Period
+
+When you receive an anomaly alert, it's natural to ask: "Compared to what?" Understanding the comparison baseline period helps you interpret anomaly alerts correctly.
+
+### Calculating Your Baseline Period
+
+Your baseline period—the timeframe against which new data is compared—is determined by your ML configuration:
+
+:::tip
+
+**Baseline Period Formula:**
+
+```
+baseline_period = number of models per dimension × train every
+```
+
+This represents the total time span covered by all trained models working together.
+
+:::
+
+### Example Calculations
+
+**Default Configuration:**
+- `number of models per dimension` = 18
+- `train every` = 3h
+- **Baseline period** = 18 × 3h = **54 hours**
+
+With default settings, anomalies are detected by comparing new data against patterns learned over approximately 54 hours of historical data.
+
+**Custom Configuration (from user example):**
+- `number of models per dimension` = 6
+- `train every` = 1h
+- **Baseline period** = 6 × 1h = **6 hours**
+
+With these settings, your anomaly detection compares against a shorter 6-hour baseline, making it more responsive to recent changes but potentially less stable.
+
+### How the Baseline Works
+
+Each individual model is trained on data from the `maximum num samples to train` window (default: 6 hours of data). However, since you have multiple models trained at different times, the combined coverage spans your entire baseline period.
+
+:::note
+
+The `maximum num samples to train` parameter determines how much historical data each individual model learns from, while the baseline period (models × train interval) determines the total time range covered by all models combined.
+
+:::
+
+For anomaly detection, new data points are evaluated against **all trained models**. An anomaly is flagged only when **all models agree** that the data point deviates significantly from their respective training periods.
+
 ## Configuration Examples
 
 If you want to **run ML on a parent instead of at the edge**, the examples below illustrate various configurations.
