@@ -286,7 +286,7 @@ int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
         return 1;
     }
 
-    // Populate hardware product name and vendor from daemon status file (all platforms)
+    // Populate hardware product fields from the daemon status file when it is available/initialized.
     {
         const char *product_name = daemon_status_file_get_product_name();
         if (product_name && *product_name) {
