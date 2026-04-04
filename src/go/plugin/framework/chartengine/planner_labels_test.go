@@ -82,3 +82,36 @@ func TestChartLabelAccumulatorIntersectsLabels(t *testing.T) {
 		})
 	}
 }
+
+func TestCompileInstanceLabelPlanExcludeWinsRegardlessOfTokenOrder(t *testing.T) {
+	tests := map[string]struct {
+		selectors []program.InstanceLabelSelector
+	}{
+		"exclude after explicit": {
+			selectors: []program.InstanceLabelSelector{
+				{Key: "host"},
+				{Exclude: true, Key: "host"},
+				{IncludeAll: true},
+			},
+		},
+		"exclude before explicit": {
+			selectors: []program.InstanceLabelSelector{
+				{Exclude: true, Key: "host"},
+				{Key: "host"},
+				{IncludeAll: true},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			plan := compileInstanceLabelPlan(program.ChartIdentity{
+				InstanceByLabels: tc.selectors,
+			})
+			assert.True(t, plan.includeAll)
+			assert.Empty(t, plan.explicitKeys)
+			assert.Empty(t, plan.explicitSet)
+			assert.Contains(t, plan.excludeSet, "host")
+		})
+	}
+}

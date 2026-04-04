@@ -92,7 +92,6 @@ func compileInstanceLabelPlan(identity program.ChartIdentity) compiledInstanceLa
 		excludeSet:   make(map[string]struct{}),
 	}
 
-	seenExplicit := make(map[string]struct{}, len(identity.InstanceByLabels))
 	for _, token := range identity.InstanceByLabels {
 		switch {
 		case token.Exclude:
@@ -101,18 +100,25 @@ func compileInstanceLabelPlan(identity program.ChartIdentity) compiledInstanceLa
 			}
 		case token.IncludeAll:
 			plan.includeAll = true
-		case token.Key != "":
-			key := token.Key
-			if _, excluded := plan.excludeSet[key]; excluded {
-				continue
-			}
-			if _, exists := seenExplicit[key]; exists {
-				continue
-			}
-			seenExplicit[key] = struct{}{}
-			plan.explicitKeys = append(plan.explicitKeys, key)
-			plan.explicitSet[key] = struct{}{}
 		}
+	}
+
+	seenExplicit := make(map[string]struct{}, len(identity.InstanceByLabels))
+	for _, token := range identity.InstanceByLabels {
+		if token.Exclude || token.IncludeAll || token.Key == "" {
+			continue
+		}
+
+		key := token.Key
+		if _, excluded := plan.excludeSet[key]; excluded {
+			continue
+		}
+		if _, exists := seenExplicit[key]; exists {
+			continue
+		}
+		seenExplicit[key] = struct{}{}
+		plan.explicitKeys = append(plan.explicitKeys, key)
+		plan.explicitSet[key] = struct{}{}
 	}
 	return plan
 }
