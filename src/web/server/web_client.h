@@ -195,6 +195,7 @@ struct web_client {
     char *forwarded_host;               // the X-Forwarded-Host: header
     char *origin;                       // the Origin: header
     char *user_agent;                   // the User-Agent: header
+    nd_uuid_t mcp_session_id;            // the Mcp-Session-Id: header (MCP HTTP transport)
 
     // WebSocket related data - NEED TO BE FREED
     struct {

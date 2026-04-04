@@ -208,6 +208,14 @@ int mcp_http_handle_request(struct rrdhost *host __maybe_unused, struct web_clie
         result_code = w->response.code;
     }
 
+    // Stateless Mcp-Session-Id: generate if absent, then emit as response header
+    if (uuid_is_null(w->mcp_session_id))
+        uuid_generate_random(w->mcp_session_id);
+
+    char session_id_str[UUID_STR_LEN];
+    uuid_unparse_lower(w->mcp_session_id, session_id_str);
+    buffer_sprintf(w->response.header, "Mcp-Session-Id: %s\r\n", session_id_str);
+
     json_object_put(root);
     mcp_free_client(mcpc);
     return result_code;
