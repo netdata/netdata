@@ -396,7 +396,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: vmss.percentage_cpu_average
+        - selector: percentage_cpu_average
           name: average
     - id: am_azure_vmss__cpu_credits
       title: Azure VMSS CPU Credits
@@ -406,9 +406,9 @@ template:
       units: credits
       algorithm: absolute
       dimensions:
-        - selector: vmss.cpu_credits_consumed_average
+        - selector: cpu_credits_consumed_average
           name: consumed
-        - selector: vmss.cpu_credits_remaining_average
+        - selector: cpu_credits_remaining_average
           name: remaining
     - id: am_azure_vmss__memory
       title: Azure VMSS Available Memory
@@ -418,7 +418,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: vmss.available_memory_bytes_average
+        - selector: available_memory_bytes_average
           name: available
     - id: am_azure_vmss__memory_percentage
       title: Azure VMSS Available Memory Percentage
@@ -428,7 +428,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: vmss.available_memory_percentage_average
+        - selector: available_memory_percentage_average
           name: available
     - id: am_azure_vmss__availability
       title: Azure VMSS Availability
@@ -438,7 +438,7 @@ template:
       units: state
       algorithm: absolute
       dimensions:
-        - selector: vmss.vm_availability_metric_average
+        - selector: vm_availability_metric_average
           name: average
     - id: am_azure_vmss__network_traffic
       title: Azure VMSS Network Traffic
@@ -448,9 +448,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: vmss.network_in_total_total
+        - selector: network_in_total_total
           name: in
-        - selector: vmss.network_out_total_total
+        - selector: network_out_total_total
           name: out
     - id: am_azure_vmss__network_flows
       title: Azure VMSS Network Flows
@@ -460,9 +460,9 @@ template:
       units: flows
       algorithm: absolute
       dimensions:
-        - selector: vmss.inbound_flows_average
+        - selector: inbound_flows_average
           name: in
-        - selector: vmss.outbound_flows_average
+        - selector: outbound_flows_average
           name: out
     - id: am_azure_vmss__network_flow_creation_rate
       title: Azure VMSS Network Flow Creation Rate
@@ -472,9 +472,9 @@ template:
       units: flows/s
       algorithm: absolute
       dimensions:
-        - selector: vmss.inbound_flows_maximum_creation_rate_average
+        - selector: inbound_flows_maximum_creation_rate_average
           name: in
-        - selector: vmss.outbound_flows_maximum_creation_rate_average
+        - selector: outbound_flows_maximum_creation_rate_average
           name: out
     - id: am_azure_vmss__disk_throughput
       title: Azure VMSS Disk Throughput
@@ -484,9 +484,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: vmss.disk_read_bytes_total
+        - selector: disk_read_bytes_total
           name: read
-        - selector: vmss.disk_write_bytes_total
+        - selector: disk_write_bytes_total
           name: write
     - id: am_azure_vmss__disk_iops
       title: Azure VMSS Disk IOPS
@@ -496,9 +496,9 @@ template:
       units: operations/s
       algorithm: absolute
       dimensions:
-        - selector: vmss.disk_read_operations_sec_average
+        - selector: disk_read_operations_sec_average
           name: read
-        - selector: vmss.disk_write_operations_sec_average
+        - selector: disk_write_operations_sec_average
           name: write
     - id: am_azure_vmss__os_disk_throughput
       title: Azure VMSS OS Disk Throughput
@@ -508,9 +508,9 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: vmss.os_disk_read_bytes_sec_average
+        - selector: os_disk_read_bytes_sec_average
           name: read
-        - selector: vmss.os_disk_write_bytes_sec_average
+        - selector: os_disk_write_bytes_sec_average
           name: write
     - id: am_azure_vmss__os_disk_iops
       title: Azure VMSS OS Disk IOPS
@@ -520,9 +520,9 @@ template:
       units: operations/s
       algorithm: absolute
       dimensions:
-        - selector: vmss.os_disk_read_operations_sec_average
+        - selector: os_disk_read_operations_sec_average
           name: read
-        - selector: vmss.os_disk_write_operations_sec_average
+        - selector: os_disk_write_operations_sec_average
           name: write
     - id: am_azure_vmss__os_disk_latency
       title: Azure VMSS OS Disk Latency
@@ -532,7 +532,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: vmss.os_disk_latency_average
+        - selector: os_disk_latency_average
           name: average
     - id: am_azure_vmss__os_disk_queue_depth
       title: Azure VMSS OS Disk Queue Depth
@@ -542,7 +542,7 @@ template:
       units: operations
       algorithm: absolute
       dimensions:
-        - selector: vmss.os_disk_queue_depth_average
+        - selector: os_disk_queue_depth_average
           name: average
     - id: am_azure_vmss__os_disk_throttling
       title: Azure VMSS OS Disk Throttling
@@ -552,9 +552,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: vmss.os_disk_bandwidth_consumed_percentage_average
+        - selector: os_disk_bandwidth_consumed_percentage_average
           name: bandwidth
-        - selector: vmss.os_disk_iops_consumed_percentage_average
+        - selector: os_disk_iops_consumed_percentage_average
           name: iops
     - id: am_azure_vmss__os_disk_burst_capacity
       title: Azure VMSS OS Disk Burst Capacity
@@ -564,9 +564,9 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: vmss.os_disk_max_burst_bandwidth_average
+        - selector: os_disk_max_burst_bandwidth_average
           name: max_burst
-        - selector: vmss.os_disk_target_bandwidth_average
+        - selector: os_disk_target_bandwidth_average
           name: target
     - id: am_azure_vmss__os_disk_burst_iops_capacity
       title: Azure VMSS OS Disk Burst IOPS Capacity
@@ -576,9 +576,9 @@ template:
       units: iops
       algorithm: absolute
       dimensions:
-        - selector: vmss.os_disk_max_burst_iops_average
+        - selector: os_disk_max_burst_iops_average
           name: max_burst
-        - selector: vmss.os_disk_target_iops_average
+        - selector: os_disk_target_iops_average
           name: target
     - id: am_azure_vmss__os_disk_burst_credits
       title: Azure VMSS OS Disk Burst Credits Used
@@ -588,9 +588,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: vmss.os_disk_used_burst_bps_credits_percentage_average
+        - selector: os_disk_used_burst_bps_credits_percentage_average
           name: bandwidth
-        - selector: vmss.os_disk_used_burst_io_credits_percentage_average
+        - selector: os_disk_used_burst_io_credits_percentage_average
           name: io
     - id: am_azure_vmss__data_disk_throughput
       title: Azure VMSS Data Disk Throughput
@@ -600,9 +600,9 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: vmss.data_disk_read_bytes_sec_average
+        - selector: data_disk_read_bytes_sec_average
           name: read
-        - selector: vmss.data_disk_write_bytes_sec_average
+        - selector: data_disk_write_bytes_sec_average
           name: write
     - id: am_azure_vmss__data_disk_iops
       title: Azure VMSS Data Disk IOPS
@@ -612,9 +612,9 @@ template:
       units: operations/s
       algorithm: absolute
       dimensions:
-        - selector: vmss.data_disk_read_operations_sec_average
+        - selector: data_disk_read_operations_sec_average
           name: read
-        - selector: vmss.data_disk_write_operations_sec_average
+        - selector: data_disk_write_operations_sec_average
           name: write
     - id: am_azure_vmss__data_disk_latency
       title: Azure VMSS Data Disk Latency
@@ -624,7 +624,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: vmss.data_disk_latency_average
+        - selector: data_disk_latency_average
           name: average
     - id: am_azure_vmss__data_disk_queue_depth
       title: Azure VMSS Data Disk Queue Depth
@@ -634,7 +634,7 @@ template:
       units: operations
       algorithm: absolute
       dimensions:
-        - selector: vmss.data_disk_queue_depth_average
+        - selector: data_disk_queue_depth_average
           name: average
     - id: am_azure_vmss__data_disk_throttling
       title: Azure VMSS Data Disk Throttling
@@ -644,9 +644,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: vmss.data_disk_bandwidth_consumed_percentage_average
+        - selector: data_disk_bandwidth_consumed_percentage_average
           name: bandwidth
-        - selector: vmss.data_disk_iops_consumed_percentage_average
+        - selector: data_disk_iops_consumed_percentage_average
           name: iops
     - id: am_azure_vmss__data_disk_burst_capacity
       title: Azure VMSS Data Disk Burst Capacity
@@ -656,9 +656,9 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: vmss.data_disk_max_burst_bandwidth_average
+        - selector: data_disk_max_burst_bandwidth_average
           name: max_burst
-        - selector: vmss.data_disk_target_bandwidth_average
+        - selector: data_disk_target_bandwidth_average
           name: target
     - id: am_azure_vmss__data_disk_burst_iops_capacity
       title: Azure VMSS Data Disk Burst IOPS Capacity
@@ -668,9 +668,9 @@ template:
       units: iops
       algorithm: absolute
       dimensions:
-        - selector: vmss.data_disk_max_burst_iops_average
+        - selector: data_disk_max_burst_iops_average
           name: max_burst
-        - selector: vmss.data_disk_target_iops_average
+        - selector: data_disk_target_iops_average
           name: target
     - id: am_azure_vmss__data_disk_burst_credits
       title: Azure VMSS Data Disk Burst Credits Used
@@ -680,9 +680,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: vmss.data_disk_used_burst_bps_credits_percentage_average
+        - selector: data_disk_used_burst_bps_credits_percentage_average
           name: bandwidth
-        - selector: vmss.data_disk_used_burst_io_credits_percentage_average
+        - selector: data_disk_used_burst_io_credits_percentage_average
           name: io
     - id: am_azure_vmss__temp_disk_throughput
       title: Azure VMSS Temp Disk Throughput
@@ -692,9 +692,9 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: vmss.temp_disk_read_bytes_sec_average
+        - selector: temp_disk_read_bytes_sec_average
           name: read
-        - selector: vmss.temp_disk_write_bytes_sec_average
+        - selector: temp_disk_write_bytes_sec_average
           name: write
     - id: am_azure_vmss__temp_disk_iops
       title: Azure VMSS Temp Disk IOPS
@@ -704,9 +704,9 @@ template:
       units: operations/s
       algorithm: absolute
       dimensions:
-        - selector: vmss.temp_disk_read_operations_sec_average
+        - selector: temp_disk_read_operations_sec_average
           name: read
-        - selector: vmss.temp_disk_write_operations_sec_average
+        - selector: temp_disk_write_operations_sec_average
           name: write
     - id: am_azure_vmss__temp_disk_latency
       title: Azure VMSS Temp Disk Latency
@@ -716,7 +716,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: vmss.temp_disk_latency_average
+        - selector: temp_disk_latency_average
           name: average
     - id: am_azure_vmss__temp_disk_queue_depth
       title: Azure VMSS Temp Disk Queue Depth
@@ -726,7 +726,7 @@ template:
       units: operations
       algorithm: absolute
       dimensions:
-        - selector: vmss.temp_disk_queue_depth_average
+        - selector: temp_disk_queue_depth_average
           name: average
     - id: am_azure_vmss__premium_data_disk_cache
       title: Azure VMSS Premium Data Disk Cache
@@ -736,9 +736,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: vmss.premium_data_disk_cache_read_hit_average
+        - selector: premium_data_disk_cache_read_hit_average
           name: hit
-        - selector: vmss.premium_data_disk_cache_read_miss_average
+        - selector: premium_data_disk_cache_read_miss_average
           name: miss
     - id: am_azure_vmss__premium_os_disk_cache
       title: Azure VMSS Premium OS Disk Cache
@@ -748,9 +748,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: vmss.premium_os_disk_cache_read_hit_average
+        - selector: premium_os_disk_cache_read_hit_average
           name: hit
-        - selector: vmss.premium_os_disk_cache_read_miss_average
+        - selector: premium_os_disk_cache_read_miss_average
           name: miss
     - id: am_azure_vmss__vm_cached_throttling
       title: Azure VMSS Cached IO Throttling
@@ -760,9 +760,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: vmss.vm_cached_bandwidth_consumed_percentage_average
+        - selector: vm_cached_bandwidth_consumed_percentage_average
           name: bandwidth
-        - selector: vmss.vm_cached_iops_consumed_percentage_average
+        - selector: vm_cached_iops_consumed_percentage_average
           name: iops
     - id: am_azure_vmss__vm_uncached_throttling
       title: Azure VMSS Uncached IO Throttling
@@ -772,9 +772,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: vmss.vm_uncached_bandwidth_consumed_percentage_average
+        - selector: vm_uncached_bandwidth_consumed_percentage_average
           name: bandwidth
-        - selector: vmss.vm_uncached_iops_consumed_percentage_average
+        - selector: vm_uncached_iops_consumed_percentage_average
           name: iops
     - id: am_azure_vmss__vm_cached_burst_credits
       title: Azure VMSS Cached Burst Credits Used
@@ -784,9 +784,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: vmss.vm_local_used_burst_bps_credits_percentage_average
+        - selector: vm_local_used_burst_bps_credits_percentage_average
           name: bandwidth
-        - selector: vmss.vm_local_used_burst_io_credits_percentage_average
+        - selector: vm_local_used_burst_io_credits_percentage_average
           name: io
     - id: am_azure_vmss__vm_uncached_burst_credits
       title: Azure VMSS Uncached Burst Credits Used
@@ -796,7 +796,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: vmss.vm_remote_used_burst_bps_credits_percentage_average
+        - selector: vm_remote_used_burst_bps_credits_percentage_average
           name: bandwidth
-        - selector: vmss.vm_remote_used_burst_io_credits_percentage_average
+        - selector: vm_remote_used_burst_io_credits_percentage_average
           name: io

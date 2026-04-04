@@ -236,9 +236,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_database.cpu_percent_average
+        - selector: cpu_percent_average
           name: average
-        - selector: sql_database.cpu_percent_maximum
+        - selector: cpu_percent_maximum
           name: maximum
     - id: am_azure_sql_database__instance_cpu
       title: Azure SQL Database Instance CPU Utilization
@@ -248,7 +248,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_database.sql_instance_cpu_percent_average
+        - selector: sql_instance_cpu_percent_average
           name: average
     - id: am_azure_sql_database__instance_memory
       title: Azure SQL Database Instance Memory Utilization
@@ -258,7 +258,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_database.sql_instance_memory_percent_average
+        - selector: sql_instance_memory_percent_average
           name: average
     - id: am_azure_sql_database__dtu_consumption
       title: Azure SQL Database DTU Consumption
@@ -268,7 +268,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_database.dtu_consumption_percent_average
+        - selector: dtu_consumption_percent_average
           name: average
     - id: am_azure_sql_database__io_utilization
       title: Azure SQL Database I/O Utilization
@@ -278,9 +278,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_database.physical_data_read_percent_average
+        - selector: physical_data_read_percent_average
           name: data_read
-        - selector: sql_database.log_write_percent_average
+        - selector: log_write_percent_average
           name: log_write
     - id: am_azure_sql_database__resource_utilization
       title: Azure SQL Database Resource Utilization
@@ -290,9 +290,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_database.workers_percent_average
+        - selector: workers_percent_average
           name: workers
-        - selector: sql_database.sessions_percent_average
+        - selector: sessions_percent_average
           name: sessions
     - id: am_azure_sql_database__availability
       title: Azure SQL Database Availability
@@ -302,7 +302,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_database.availability_average
+        - selector: availability_average
           name: average
     - id: am_azure_sql_database__connections
       title: Azure SQL Database Connection Events
@@ -312,13 +312,13 @@ template:
       units: connections/s
       algorithm: incremental
       dimensions:
-        - selector: sql_database.connection_successful_total
+        - selector: connection_successful_total
           name: successful
-        - selector: sql_database.connection_failed_total
+        - selector: connection_failed_total
           name: failed_system
-        - selector: sql_database.connection_failed_user_error_total
+        - selector: connection_failed_user_error_total
           name: failed_user
-        - selector: sql_database.blocked_by_firewall_total
+        - selector: blocked_by_firewall_total
           name: firewall_blocked
     - id: am_azure_sql_database__deadlocks
       title: Azure SQL Database Deadlocks
@@ -328,7 +328,7 @@ template:
       units: deadlocks/s
       algorithm: incremental
       dimensions:
-        - selector: sql_database.deadlock_total
+        - selector: deadlock_total
           name: total
     - id: am_azure_sql_database__storage
       title: Azure SQL Database Storage
@@ -338,9 +338,9 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: sql_database.storage_average
+        - selector: storage_average
           name: used
-        - selector: sql_database.allocated_data_storage_average
+        - selector: allocated_data_storage_average
           name: allocated
     - id: am_azure_sql_database__storage_utilization
       title: Azure SQL Database Storage Utilization
@@ -350,7 +350,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_database.storage_percent_average
+        - selector: storage_percent_average
           name: average
     - id: am_azure_sql_database__tempdb_size
       title: Azure SQL Database Tempdb Size
@@ -360,9 +360,9 @@ template:
       units: KiB
       algorithm: absolute
       dimensions:
-        - selector: sql_database.tempdb_data_size_average
+        - selector: tempdb_data_size_average
           name: data
-        - selector: sql_database.tempdb_log_size_average
+        - selector: tempdb_log_size_average
           name: log
     - id: am_azure_sql_database__tempdb_log_utilization
       title: Azure SQL Database Tempdb Log Utilization
@@ -372,7 +372,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_database.tempdb_log_used_percent_average
+        - selector: tempdb_log_used_percent_average
           name: average
     - id: am_azure_sql_database__vcore_usage
       title: Azure SQL Database vCore Usage
@@ -382,9 +382,9 @@ template:
       units: vCores
       algorithm: absolute
       dimensions:
-        - selector: sql_database.cpu_used_average
+        - selector: cpu_used_average
           name: used
-        - selector: sql_database.cpu_limit_average
+        - selector: cpu_limit_average
           name: limit
     - id: am_azure_sql_database__dtu_usage
       title: Azure SQL Database DTU Usage
@@ -394,9 +394,9 @@ template:
       units: DTU
       algorithm: absolute
       dimensions:
-        - selector: sql_database.dtu_used_average
+        - selector: dtu_used_average
           name: used
-        - selector: sql_database.dtu_limit_average
+        - selector: dtu_limit_average
           name: limit
     - id: am_azure_sql_database__sessions_count
       title: Azure SQL Database Sessions Count
@@ -406,7 +406,7 @@ template:
       units: sessions
       algorithm: absolute
       dimensions:
-        - selector: sql_database.sessions_count_average
+        - selector: sessions_count_average
           name: average
     - id: am_azure_sql_database__replication_lag
       title: Azure SQL Database Replication Lag
@@ -416,7 +416,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: sql_database.replication_lag_seconds_average
+        - selector: replication_lag_seconds_average
           name: average
     - id: am_azure_sql_database__xtp_storage
       title: Azure SQL Database In-Memory OLTP Storage
@@ -426,7 +426,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_database.xtp_storage_percent_average
+        - selector: xtp_storage_percent_average
           name: average
     - id: am_azure_sql_database__serverless_utilization
       title: Azure SQL Database Serverless Utilization
@@ -436,9 +436,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_database.app_cpu_percent_average
+        - selector: app_cpu_percent_average
           name: cpu
-        - selector: sql_database.app_memory_percent_average
+        - selector: app_memory_percent_average
           name: memory
     - id: am_azure_sql_database__serverless_billing
       title: Azure SQL Database Serverless Billing
@@ -448,9 +448,9 @@ template:
       units: vCore-seconds/s
       algorithm: incremental
       dimensions:
-        - selector: sql_database.app_cpu_billed_total
+        - selector: app_cpu_billed_total
           name: total
-        - selector: sql_database.app_cpu_billed_ha_replicas_total
+        - selector: app_cpu_billed_ha_replicas_total
           name: ha_replicas
     - id: am_azure_sql_database__free_tier_usage
       title: Azure SQL Database Free Tier Usage
@@ -460,9 +460,9 @@ template:
       units: vCore-seconds
       algorithm: absolute
       dimensions:
-        - selector: sql_database.free_amount_consumed_average
+        - selector: free_amount_consumed_average
           name: consumed
-        - selector: sql_database.free_amount_remaining_average
+        - selector: free_amount_remaining_average
           name: remaining
     - id: am_azure_sql_database__ledger_digest
       title: Azure SQL Database Ledger Digest Uploads
@@ -472,7 +472,7 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: sql_database.ledger_digest_upload_success_count
+        - selector: ledger_digest_upload_success_count
           name: success
-        - selector: sql_database.ledger_digest_upload_failed_count
+        - selector: ledger_digest_upload_failed_count
           name: failed

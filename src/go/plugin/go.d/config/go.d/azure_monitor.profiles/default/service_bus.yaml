@@ -174,9 +174,9 @@ template:
       units: messages/s
       algorithm: incremental
       dimensions:
-        - selector: service_bus.incoming_messages_total
+        - selector: incoming_messages_total
           name: in
-        - selector: service_bus.outgoing_messages_total
+        - selector: outgoing_messages_total
           name: out
     - id: am_azure_service_bus__message_operations
       title: Azure Service Bus Message Operations
@@ -186,9 +186,9 @@ template:
       units: messages/s
       algorithm: incremental
       dimensions:
-        - selector: service_bus.complete_message_total
+        - selector: complete_message_total
           name: completed
-        - selector: service_bus.abandon_message_total
+        - selector: abandon_message_total
           name: abandoned
     - id: am_azure_service_bus__queue_depth
       title: Azure Service Bus Queue Depth
@@ -198,7 +198,7 @@ template:
       units: messages
       algorithm: absolute
       dimensions:
-        - selector: service_bus.active_messages_average
+        - selector: active_messages_average
           name: active
     - id: am_azure_service_bus__problem_messages
       title: Azure Service Bus Problem Messages
@@ -208,9 +208,9 @@ template:
       units: messages
       algorithm: absolute
       dimensions:
-        - selector: service_bus.deadlettered_messages_average
+        - selector: deadlettered_messages_average
           name: dead_lettered
-        - selector: service_bus.scheduled_messages_average
+        - selector: scheduled_messages_average
           name: scheduled
     - id: am_azure_service_bus__total_messages
       title: Azure Service Bus Total Messages
@@ -220,7 +220,7 @@ template:
       units: messages
       algorithm: absolute
       dimensions:
-        - selector: service_bus.messages_average
+        - selector: messages_average
           name: total
     - id: am_azure_service_bus__requests
       title: Azure Service Bus Requests
@@ -230,9 +230,9 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: service_bus.incoming_requests_total
+        - selector: incoming_requests_total
           name: incoming
-        - selector: service_bus.successful_requests_total
+        - selector: successful_requests_total
           name: successful
     - id: am_azure_service_bus__errors
       title: Azure Service Bus Errors
@@ -242,11 +242,11 @@ template:
       units: errors/s
       algorithm: incremental
       dimensions:
-        - selector: service_bus.server_errors_total
+        - selector: server_errors_total
           name: server
-        - selector: service_bus.user_errors_total
+        - selector: user_errors_total
           name: user
-        - selector: service_bus.throttled_requests_total
+        - selector: throttled_requests_total
           name: throttled
     - id: am_azure_service_bus__connections
       title: Azure Service Bus Active Connections
@@ -256,7 +256,7 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: service_bus.active_connections_total
+        - selector: active_connections_total
           name: active
     - id: am_azure_service_bus__connection_events
       title: Azure Service Bus Connection Events
@@ -266,9 +266,9 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: service_bus.connections_opened_average
+        - selector: connections_opened_average
           name: opened
-        - selector: service_bus.connections_closed_average
+        - selector: connections_closed_average
           name: closed
     - id: am_azure_service_bus__namespace_size
       title: Azure Service Bus Namespace Size
@@ -278,7 +278,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: service_bus.size_average
+        - selector: size_average
           name: average
     - id: am_azure_service_bus__data_throughput
       title: Azure Service Bus Data Throughput
@@ -288,9 +288,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: service_bus.incoming_bytes_total
+        - selector: incoming_bytes_total
           name: in
-        - selector: service_bus.outgoing_bytes_total
+        - selector: outgoing_bytes_total
           name: out
     - id: am_azure_service_bus__namespace_resources
       title: Azure Service Bus Namespace Resources
@@ -300,9 +300,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: service_bus.namespace_cpu_usage_maximum
+        - selector: namespace_cpu_usage_maximum
           name: cpu
-        - selector: service_bus.namespace_memory_usage_maximum
+        - selector: namespace_memory_usage_maximum
           name: memory
     - id: am_azure_service_bus__send_latency
       title: Azure Service Bus Send Latency
@@ -312,7 +312,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: service_bus.server_send_latency_average
+        - selector: server_send_latency_average
           name: average
     - id: am_azure_service_bus__replication_lag
       title: Azure Service Bus Replication Lag
@@ -322,7 +322,7 @@ template:
       units: messages
       algorithm: absolute
       dimensions:
-        - selector: service_bus.replication_lag_count_maximum
+        - selector: replication_lag_count_maximum
           name: messages
     - id: am_azure_service_bus__replication_lag_duration
       title: Azure Service Bus Replication Lag Duration
@@ -332,7 +332,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: service_bus.replication_lag_duration_maximum
+        - selector: replication_lag_duration_maximum
           name: duration
     - id: am_azure_service_bus__checkpoint_operations
       title: Azure Service Bus Pending Checkpoint Operations
@@ -342,5 +342,5 @@ template:
       units: operations
       algorithm: absolute
       dimensions:
-        - selector: service_bus.pending_checkpoint_operation_count_total
+        - selector: pending_checkpoint_operation_count_total
           name: pending

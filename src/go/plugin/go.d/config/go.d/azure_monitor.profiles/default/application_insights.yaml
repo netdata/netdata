@@ -204,7 +204,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: application_insights.availability_results_availability_percentage_average
+        - selector: availability_results_availability_percentage_average
           name: average
     - id: am_azure_application_insights__availability_tests
       title: Azure Application Insights Availability Tests
@@ -214,7 +214,7 @@ template:
       units: tests/s
       algorithm: incremental
       dimensions:
-        - selector: application_insights.availability_results_count_count
+        - selector: availability_results_count_count
           name: tests
     - id: am_azure_application_insights__availability_duration
       title: Azure Application Insights Availability Test Duration
@@ -224,7 +224,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: application_insights.availability_results_duration_average
+        - selector: availability_results_duration_average
           name: average
     - id: am_azure_application_insights__server_requests
       title: Azure Application Insights Server Requests
@@ -234,9 +234,9 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: application_insights.requests_count_count
+        - selector: requests_count_count
           name: total
-        - selector: application_insights.requests_failed_count
+        - selector: requests_failed_count
           name: failed
     - id: am_azure_application_insights__server_request_rate
       title: Azure Application Insights Server Request Rate
@@ -246,7 +246,7 @@ template:
       units: requests/s
       algorithm: absolute
       dimensions:
-        - selector: application_insights.requests_rate_average
+        - selector: requests_rate_average
           name: average
     - id: am_azure_application_insights__server_response_time
       title: Azure Application Insights Server Response Time
@@ -256,7 +256,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: application_insights.requests_duration_average
+        - selector: requests_duration_average
           name: average
     - id: am_azure_application_insights__dependency_calls
       title: Azure Application Insights Dependency Calls
@@ -266,9 +266,9 @@ template:
       units: calls/s
       algorithm: incremental
       dimensions:
-        - selector: application_insights.dependencies_count_count
+        - selector: dependencies_count_count
           name: total
-        - selector: application_insights.dependencies_failed_count
+        - selector: dependencies_failed_count
           name: failed
     - id: am_azure_application_insights__dependency_duration
       title: Azure Application Insights Dependency Duration
@@ -278,7 +278,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: application_insights.dependencies_duration_average
+        - selector: dependencies_duration_average
           name: average
     - id: am_azure_application_insights__exceptions
       title: Azure Application Insights Exceptions
@@ -288,11 +288,11 @@ template:
       units: exceptions/s
       algorithm: incremental
       dimensions:
-        - selector: application_insights.exceptions_count_count
+        - selector: exceptions_count_count
           name: total
-        - selector: application_insights.exceptions_browser_count
+        - selector: exceptions_browser_count
           name: browser
-        - selector: application_insights.exceptions_server_count
+        - selector: exceptions_server_count
           name: server
     - id: am_azure_application_insights__browser_page_load_time
       title: Azure Application Insights Browser Page Load Time
@@ -302,7 +302,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: application_insights.browser_timings_total_duration_average
+        - selector: browser_timings_total_duration_average
           name: total
     - id: am_azure_application_insights__browser_timing_breakdown
       title: Azure Application Insights Browser Timing Breakdown
@@ -312,13 +312,13 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: application_insights.browser_timings_network_duration_average
+        - selector: browser_timings_network_duration_average
           name: network
-        - selector: application_insights.browser_timings_send_duration_average
+        - selector: browser_timings_send_duration_average
           name: send
-        - selector: application_insights.browser_timings_receive_duration_average
+        - selector: browser_timings_receive_duration_average
           name: receive
-        - selector: application_insights.browser_timings_processing_duration_average
+        - selector: browser_timings_processing_duration_average
           name: processing
     - id: am_azure_application_insights__cpu_utilization
       title: Azure Application Insights CPU Utilization
@@ -328,9 +328,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: application_insights.performance_counters_process_cpu_percentage_average
+        - selector: performance_counters_process_cpu_percentage_average
           name: process
-        - selector: application_insights.performance_counters_processor_cpu_percentage_average
+        - selector: performance_counters_processor_cpu_percentage_average
           name: processor
     - id: am_azure_application_insights__memory
       title: Azure Application Insights Memory
@@ -340,9 +340,9 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: application_insights.performance_counters_memory_available_bytes_average
+        - selector: performance_counters_memory_available_bytes_average
           name: available
-        - selector: application_insights.performance_counters_process_private_bytes_average
+        - selector: performance_counters_process_private_bytes_average
           name: private
     - id: am_azure_application_insights__process_io_rate
       title: Azure Application Insights Process IO Rate
@@ -352,7 +352,7 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: application_insights.performance_counters_process_io_bytes_per_second_average
+        - selector: performance_counters_process_io_bytes_per_second_average
           name: average
     - id: am_azure_application_insights__exception_rate
       title: Azure Application Insights Exception Rate
@@ -362,7 +362,7 @@ template:
       units: exceptions/s
       algorithm: absolute
       dimensions:
-        - selector: application_insights.performance_counters_exceptions_per_second_average
+        - selector: performance_counters_exceptions_per_second_average
           name: average
     - id: am_azure_application_insights__http_request_execution_time
       title: Azure Application Insights HTTP Request Execution Time
@@ -372,7 +372,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: application_insights.performance_counters_request_execution_time_average
+        - selector: performance_counters_request_execution_time_average
           name: average
     - id: am_azure_application_insights__http_request_queue
       title: Azure Application Insights HTTP Requests in Queue
@@ -382,7 +382,7 @@ template:
       units: requests
       algorithm: absolute
       dimensions:
-        - selector: application_insights.performance_counters_requests_in_queue_average
+        - selector: performance_counters_requests_in_queue_average
           name: queued
     - id: am_azure_application_insights__http_request_rate
       title: Azure Application Insights HTTP Request Rate
@@ -392,7 +392,7 @@ template:
       units: requests/s
       algorithm: absolute
       dimensions:
-        - selector: application_insights.performance_counters_requests_per_second_average
+        - selector: performance_counters_requests_per_second_average
           name: average
     - id: am_azure_application_insights__page_views
       title: Azure Application Insights Page Views
@@ -402,7 +402,7 @@ template:
       units: views/s
       algorithm: incremental
       dimensions:
-        - selector: application_insights.page_views_count_count
+        - selector: page_views_count_count
           name: views
     - id: am_azure_application_insights__page_view_load_time
       title: Azure Application Insights Page View Load Time
@@ -412,7 +412,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: application_insights.page_views_duration_average
+        - selector: page_views_duration_average
           name: average
     - id: am_azure_application_insights__traces
       title: Azure Application Insights Traces
@@ -422,5 +422,5 @@ template:
       units: traces/s
       algorithm: incremental
       dimensions:
-        - selector: application_insights.traces_count_count
+        - selector: traces_count_count
           name: traces

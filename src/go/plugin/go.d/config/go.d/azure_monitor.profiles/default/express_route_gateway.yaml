@@ -106,9 +106,9 @@ template:
       units: bits/s
       algorithm: absolute
       dimensions:
-        - selector: express_route_gateway.er_gateway_connection_bits_in_per_second_average
+        - selector: er_gateway_connection_bits_in_per_second_average
           name: in
-        - selector: express_route_gateway.er_gateway_connection_bits_out_per_second_average
+        - selector: er_gateway_connection_bits_out_per_second_average
           name: out
     - id: am_azure_express_route_gateway__gateway_throughput
       title: Azure ExpressRoute Gateway Throughput
@@ -118,7 +118,7 @@ template:
       units: bits/s
       algorithm: absolute
       dimensions:
-        - selector: express_route_gateway.express_route_gateway_bits_per_second_average
+        - selector: express_route_gateway_bits_per_second_average
           name: average
     - id: am_azure_express_route_gateway__cpu_utilization
       title: Azure ExpressRoute Gateway CPU Utilization
@@ -128,7 +128,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: express_route_gateway.express_route_gateway_cpu_utilization_average
+        - selector: express_route_gateway_cpu_utilization_average
           name: average
     - id: am_azure_express_route_gateway__packets
       title: Azure ExpressRoute Gateway Packets
@@ -138,7 +138,7 @@ template:
       units: packets/s
       algorithm: absolute
       dimensions:
-        - selector: express_route_gateway.express_route_gateway_packets_per_second_average
+        - selector: express_route_gateway_packets_per_second_average
           name: average
     - id: am_azure_express_route_gateway__active_flows
       title: Azure ExpressRoute Gateway Active Flows
@@ -148,7 +148,7 @@ template:
       units: flows
       algorithm: absolute
       dimensions:
-        - selector: express_route_gateway.express_route_gateway_active_flows_average
+        - selector: express_route_gateway_active_flows_average
           name: average
     - id: am_azure_express_route_gateway__routes_advertised
       title: Azure ExpressRoute Gateway Routes Advertised to Peer
@@ -158,7 +158,7 @@ template:
       units: routes
       algorithm: absolute
       dimensions:
-        - selector: express_route_gateway.express_route_gateway_count_of_routes_advertised_to_peer_maximum
+        - selector: express_route_gateway_count_of_routes_advertised_to_peer_maximum
           name: maximum
     - id: am_azure_express_route_gateway__routes_learned
       title: Azure ExpressRoute Gateway Routes Learned from Peer
@@ -168,7 +168,7 @@ template:
       units: routes
       algorithm: absolute
       dimensions:
-        - selector: express_route_gateway.express_route_gateway_count_of_routes_learned_from_peer_maximum
+        - selector: express_route_gateway_count_of_routes_learned_from_peer_maximum
           name: maximum
     - id: am_azure_express_route_gateway__route_changes
       title: Azure ExpressRoute Gateway Route Changes
@@ -178,7 +178,7 @@ template:
       units: changes/s
       algorithm: incremental
       dimensions:
-        - selector: express_route_gateway.express_route_gateway_frequency_of_routes_changed_total
+        - selector: express_route_gateway_frequency_of_routes_changed_total
           name: total
     - id: am_azure_express_route_gateway__max_flows_creation_rate
       title: Azure ExpressRoute Gateway Max Flow Creation Rate
@@ -188,7 +188,7 @@ template:
       units: flows/s
       algorithm: absolute
       dimensions:
-        - selector: express_route_gateway.express_route_gateway_max_flows_creation_rate_maximum
+        - selector: express_route_gateway_max_flows_creation_rate_maximum
           name: maximum
     - id: am_azure_express_route_gateway__vm_count
       title: Azure ExpressRoute Gateway VMs in VNet
@@ -198,5 +198,5 @@ template:
       units: VMs
       algorithm: absolute
       dimensions:
-        - selector: express_route_gateway.express_route_gateway_number_of_vm_in_vnet_maximum
+        - selector: express_route_gateway_number_of_vm_in_vnet_maximum
           name: maximum

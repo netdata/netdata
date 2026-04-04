@@ -318,7 +318,7 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.average_bandwidth_average
+        - selector: average_bandwidth_average
           name: average
     - id: am_azure_vpn_gateway__p2s_bandwidth
       title: Azure VPN Gateway P2S Bandwidth
@@ -328,7 +328,7 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.p2s_bandwidth_average
+        - selector: p2s_bandwidth_average
           name: average
     - id: am_azure_vpn_gateway__p2s_connections
       title: Azure VPN Gateway P2S Connection Count
@@ -338,7 +338,7 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.p2s_connection_count_total
+        - selector: p2s_connection_count_total
           name: total
     - id: am_azure_vpn_gateway__gateway_flows
       title: Azure VPN Gateway Flows
@@ -348,9 +348,9 @@ template:
       units: flows
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.inbound_flows_count_maximum
+        - selector: inbound_flows_count_maximum
           name: inbound
-        - selector: vpn_gateway.outbound_flows_count_maximum
+        - selector: outbound_flows_count_maximum
           name: outbound
     - id: am_azure_vpn_gateway__tunnel_bandwidth
       title: Azure VPN Gateway Tunnel Bandwidth
@@ -360,7 +360,7 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.tunnel_average_bandwidth_average
+        - selector: tunnel_average_bandwidth_average
           name: average
     - id: am_azure_vpn_gateway__tunnel_bytes
       title: Azure VPN Gateway Tunnel Bytes
@@ -370,9 +370,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: vpn_gateway.tunnel_egress_bytes_total
+        - selector: tunnel_egress_bytes_total
           name: egress
-        - selector: vpn_gateway.tunnel_ingress_bytes_total
+        - selector: tunnel_ingress_bytes_total
           name: ingress
     - id: am_azure_vpn_gateway__tunnel_packets
       title: Azure VPN Gateway Tunnel Packets
@@ -382,9 +382,9 @@ template:
       units: packets/s
       algorithm: incremental
       dimensions:
-        - selector: vpn_gateway.tunnel_egress_packets_total
+        - selector: tunnel_egress_packets_total
           name: egress
-        - selector: vpn_gateway.tunnel_ingress_packets_total
+        - selector: tunnel_ingress_packets_total
           name: ingress
     - id: am_azure_vpn_gateway__tunnel_peak_pps
       title: Azure VPN Gateway Tunnel Peak PPS
@@ -394,7 +394,7 @@ template:
       units: packets/s
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.tunnel_peak_packets_maximum
+        - selector: tunnel_peak_packets_maximum
           name: peak
     - id: am_azure_vpn_gateway__tunnel_total_flows
       title: Azure VPN Gateway Tunnel Total Flows
@@ -404,7 +404,7 @@ template:
       units: flows/s
       algorithm: incremental
       dimensions:
-        - selector: vpn_gateway.tunnel_total_flow_count_total
+        - selector: tunnel_total_flow_count_total
           name: total
     - id: am_azure_vpn_gateway__tunnel_nat_allocations
       title: Azure VPN Gateway Tunnel NAT Allocations
@@ -414,7 +414,7 @@ template:
       units: allocations/s
       algorithm: incremental
       dimensions:
-        - selector: vpn_gateway.tunnel_nat_allocations_total
+        - selector: tunnel_nat_allocations_total
           name: total
     - id: am_azure_vpn_gateway__tunnel_nated_bytes
       title: Azure VPN Gateway Tunnel NATed Bytes
@@ -424,9 +424,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: vpn_gateway.tunnel_nated_bytes_total
+        - selector: tunnel_nated_bytes_total
           name: nated
-        - selector: vpn_gateway.tunnel_reverse_nated_bytes_total
+        - selector: tunnel_reverse_nated_bytes_total
           name: reverse_nated
     - id: am_azure_vpn_gateway__tunnel_nated_packets
       title: Azure VPN Gateway Tunnel NATed Packets
@@ -436,9 +436,9 @@ template:
       units: packets/s
       algorithm: incremental
       dimensions:
-        - selector: vpn_gateway.tunnel_nated_packets_total
+        - selector: tunnel_nated_packets_total
           name: nated
-        - selector: vpn_gateway.tunnel_reverse_nated_packets_total
+        - selector: tunnel_reverse_nated_packets_total
           name: reverse_nated
     - id: am_azure_vpn_gateway__tunnel_nat_flows
       title: Azure VPN Gateway Tunnel NAT Flows
@@ -448,7 +448,7 @@ template:
       units: flows/s
       algorithm: incremental
       dimensions:
-        - selector: vpn_gateway.tunnel_nat_flow_count_total
+        - selector: tunnel_nat_flow_count_total
           name: total
     - id: am_azure_vpn_gateway__tunnel_packet_drops
       title: Azure VPN Gateway Tunnel Packet Drops
@@ -458,9 +458,9 @@ template:
       units: packets/s
       algorithm: incremental
       dimensions:
-        - selector: vpn_gateway.tunnel_egress_packet_drop_count_total
+        - selector: tunnel_egress_packet_drop_count_total
           name: egress
-        - selector: vpn_gateway.tunnel_ingress_packet_drop_count_total
+        - selector: tunnel_ingress_packet_drop_count_total
           name: ingress
     - id: am_azure_vpn_gateway__tunnel_ts_mismatch_drops
       title: Azure VPN Gateway Tunnel TS Mismatch Drops
@@ -470,9 +470,9 @@ template:
       units: packets/s
       algorithm: incremental
       dimensions:
-        - selector: vpn_gateway.tunnel_egress_packet_drop_ts_mismatch_total
+        - selector: tunnel_egress_packet_drop_ts_mismatch_total
           name: egress
-        - selector: vpn_gateway.tunnel_ingress_packet_drop_ts_mismatch_total
+        - selector: tunnel_ingress_packet_drop_ts_mismatch_total
           name: ingress
     - id: am_azure_vpn_gateway__tunnel_nat_packet_drops
       title: Azure VPN Gateway Tunnel NAT Packet Drops
@@ -482,7 +482,7 @@ template:
       units: packets/s
       algorithm: incremental
       dimensions:
-        - selector: vpn_gateway.tunnel_nat_packet_drop_total
+        - selector: tunnel_nat_packet_drop_total
           name: total
     - id: am_azure_vpn_gateway__ipsec_sa
       title: Azure VPN Gateway IPsec Security Associations
@@ -492,9 +492,9 @@ template:
       units: associations
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.mmsa_count_total
+        - selector: mmsa_count_total
           name: mmsa
-        - selector: vpn_gateway.qmsa_count_total
+        - selector: qmsa_count_total
           name: qmsa
     - id: am_azure_vpn_gateway__bgp_peer_status
       title: Azure VPN Gateway BGP Peer Status
@@ -504,7 +504,7 @@ template:
       units: status
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.bgp_peer_status_average
+        - selector: bgp_peer_status_average
           name: average
     - id: am_azure_vpn_gateway__bgp_routes
       title: Azure VPN Gateway BGP Routes
@@ -514,9 +514,9 @@ template:
       units: routes/s
       algorithm: incremental
       dimensions:
-        - selector: vpn_gateway.bgp_routes_advertised_total
+        - selector: bgp_routes_advertised_total
           name: advertised
-        - selector: vpn_gateway.bgp_routes_learned_total
+        - selector: bgp_routes_learned_total
           name: learned
     - id: am_azure_vpn_gateway__route_counts
       title: Azure VPN Gateway Route Counts
@@ -526,9 +526,9 @@ template:
       units: routes
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.user_vpn_route_count_total
+        - selector: user_vpn_route_count_total
           name: user_vpn
-        - selector: vpn_gateway.vnet_address_prefix_count_total
+        - selector: vnet_address_prefix_count_total
           name: vnet_prefix
     - id: am_azure_vpn_gateway__er_gateway_bandwidth
       title: Azure VPN Gateway ExpressRoute Bandwidth
@@ -538,7 +538,7 @@ template:
       units: bits/s
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.express_route_gateway_bits_per_second_average
+        - selector: express_route_gateway_bits_per_second_average
           name: average
     - id: am_azure_vpn_gateway__er_gateway_cpu
       title: Azure VPN Gateway ExpressRoute CPU Utilization
@@ -548,7 +548,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.express_route_gateway_cpu_utilization_average
+        - selector: express_route_gateway_cpu_utilization_average
           name: average
     - id: am_azure_vpn_gateway__er_gateway_packets
       title: Azure VPN Gateway ExpressRoute Packets
@@ -558,7 +558,7 @@ template:
       units: packets/s
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.express_route_gateway_packets_per_second_average
+        - selector: express_route_gateway_packets_per_second_average
           name: average
     - id: am_azure_vpn_gateway__er_gateway_active_flows
       title: Azure VPN Gateway ExpressRoute Active Flows
@@ -568,7 +568,7 @@ template:
       units: flows
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.express_route_gateway_active_flows_average
+        - selector: express_route_gateway_active_flows_average
           name: average
     - id: am_azure_vpn_gateway__er_gateway_routes_advertised
       title: Azure VPN Gateway ExpressRoute Routes Advertised to Peer
@@ -578,7 +578,7 @@ template:
       units: routes
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.express_route_gateway_count_of_routes_advertised_to_peer_maximum
+        - selector: express_route_gateway_count_of_routes_advertised_to_peer_maximum
           name: maximum
     - id: am_azure_vpn_gateway__er_gateway_routes_learned
       title: Azure VPN Gateway ExpressRoute Routes Learned from Peer
@@ -588,7 +588,7 @@ template:
       units: routes
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.express_route_gateway_count_of_routes_learned_from_peer_maximum
+        - selector: express_route_gateway_count_of_routes_learned_from_peer_maximum
           name: maximum
     - id: am_azure_vpn_gateway__er_gateway_route_changes
       title: Azure VPN Gateway ExpressRoute Route Changes
@@ -598,7 +598,7 @@ template:
       units: changes/s
       algorithm: incremental
       dimensions:
-        - selector: vpn_gateway.express_route_gateway_frequency_of_routes_changed_total
+        - selector: express_route_gateway_frequency_of_routes_changed_total
           name: total
     - id: am_azure_vpn_gateway__er_gateway_max_flows_rate
       title: Azure VPN Gateway ExpressRoute Max Flow Creation Rate
@@ -608,7 +608,7 @@ template:
       units: flows/s
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.express_route_gateway_max_flows_creation_rate_maximum
+        - selector: express_route_gateway_max_flows_creation_rate_maximum
           name: maximum
     - id: am_azure_vpn_gateway__er_gateway_vm_count
       title: Azure VPN Gateway ExpressRoute VMs in VNet
@@ -618,7 +618,7 @@ template:
       units: VMs
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.express_route_gateway_number_of_vm_in_vnet_maximum
+        - selector: express_route_gateway_number_of_vm_in_vnet_maximum
           name: maximum
     - id: am_azure_vpn_gateway__scalable_er_bandwidth
       title: Azure VPN Gateway Scalable ExpressRoute Bandwidth
@@ -628,7 +628,7 @@ template:
       units: bits/s
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.scalable_express_route_gateway_bits_per_second_average
+        - selector: scalable_express_route_gateway_bits_per_second_average
           name: average
     - id: am_azure_vpn_gateway__scalable_er_cpu
       title: Azure VPN Gateway Scalable ExpressRoute CPU Utilization
@@ -638,7 +638,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.scalable_express_route_gateway_cpu_utilization_average
+        - selector: scalable_express_route_gateway_cpu_utilization_average
           name: average
     - id: am_azure_vpn_gateway__scalable_er_packets
       title: Azure VPN Gateway Scalable ExpressRoute Packets
@@ -648,7 +648,7 @@ template:
       units: packets/s
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.scalable_express_route_gateway_packets_per_second_average
+        - selector: scalable_express_route_gateway_packets_per_second_average
           name: average
     - id: am_azure_vpn_gateway__scalable_er_active_flows
       title: Azure VPN Gateway Scalable ExpressRoute Active Flows
@@ -658,7 +658,7 @@ template:
       units: flows
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.scalable_express_route_gateway_active_flows_average
+        - selector: scalable_express_route_gateway_active_flows_average
           name: average
     - id: am_azure_vpn_gateway__scalable_er_routes_advertised
       title: Azure VPN Gateway Scalable ExpressRoute Routes Advertised
@@ -668,7 +668,7 @@ template:
       units: routes
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.scalable_express_route_gateway_count_of_routes_advertised_to_peer_maximum
+        - selector: scalable_express_route_gateway_count_of_routes_advertised_to_peer_maximum
           name: maximum
     - id: am_azure_vpn_gateway__scalable_er_routes_learned
       title: Azure VPN Gateway Scalable ExpressRoute Routes Learned
@@ -678,7 +678,7 @@ template:
       units: routes
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.scalable_express_route_gateway_count_of_routes_learned_from_peer_maximum
+        - selector: scalable_express_route_gateway_count_of_routes_learned_from_peer_maximum
           name: maximum
     - id: am_azure_vpn_gateway__scalable_er_route_changes
       title: Azure VPN Gateway Scalable ExpressRoute Route Changes
@@ -688,7 +688,7 @@ template:
       units: changes/s
       algorithm: incremental
       dimensions:
-        - selector: vpn_gateway.scalable_express_route_gateway_frequency_of_routes_changed_total
+        - selector: scalable_express_route_gateway_frequency_of_routes_changed_total
           name: total
     - id: am_azure_vpn_gateway__scalable_er_max_flows_rate
       title: Azure VPN Gateway Scalable ExpressRoute Max Flow Creation Rate
@@ -698,7 +698,7 @@ template:
       units: flows/s
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.scalable_express_route_gateway_max_flows_creation_rate_maximum
+        - selector: scalable_express_route_gateway_max_flows_creation_rate_maximum
           name: maximum
     - id: am_azure_vpn_gateway__scalable_er_vm_count
       title: Azure VPN Gateway Scalable ExpressRoute VMs in VNet
@@ -708,7 +708,7 @@ template:
       units: VMs
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.scalable_express_route_gateway_number_of_vm_in_vnet_maximum
+        - selector: scalable_express_route_gateway_number_of_vm_in_vnet_maximum
           name: maximum
     - id: am_azure_vpn_gateway__scalable_er_scale_units
       title: Azure VPN Gateway Scalable ExpressRoute Scale Units
@@ -718,5 +718,5 @@ template:
       units: units
       algorithm: absolute
       dimensions:
-        - selector: vpn_gateway.scalable_express_route_gateway_scale_unit_maximum
+        - selector: scalable_express_route_gateway_scale_unit_maximum
           name: maximum

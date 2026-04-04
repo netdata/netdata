@@ -150,9 +150,9 @@ template:
       units: messages/s
       algorithm: incremental
       dimensions:
-        - selector: event_hubs.incoming_messages_total
+        - selector: incoming_messages_total
           name: in
-        - selector: event_hubs.outgoing_messages_total
+        - selector: outgoing_messages_total
           name: out
     - id: am_azure_event_hubs__data_throughput
       title: Azure Event Hubs Data Throughput
@@ -162,9 +162,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: event_hubs.incoming_bytes_total
+        - selector: incoming_bytes_total
           name: in
-        - selector: event_hubs.outgoing_bytes_total
+        - selector: outgoing_bytes_total
           name: out
     - id: am_azure_event_hubs__requests
       title: Azure Event Hubs Requests
@@ -174,9 +174,9 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: event_hubs.incoming_requests_total
+        - selector: incoming_requests_total
           name: incoming
-        - selector: event_hubs.successful_requests_total
+        - selector: successful_requests_total
           name: successful
     - id: am_azure_event_hubs__errors
       title: Azure Event Hubs Errors
@@ -186,13 +186,13 @@ template:
       units: errors/s
       algorithm: incremental
       dimensions:
-        - selector: event_hubs.server_errors_total
+        - selector: server_errors_total
           name: server
-        - selector: event_hubs.user_errors_total
+        - selector: user_errors_total
           name: user
-        - selector: event_hubs.throttled_requests_total
+        - selector: throttled_requests_total
           name: throttled
-        - selector: event_hubs.quota_exceeded_errors_total
+        - selector: quota_exceeded_errors_total
           name: quota_exceeded
     - id: am_azure_event_hubs__connections
       title: Azure Event Hubs Active Connections
@@ -202,7 +202,7 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: event_hubs.active_connections_average
+        - selector: active_connections_average
           name: active
     - id: am_azure_event_hubs__connection_events
       title: Azure Event Hubs Connection Events
@@ -212,9 +212,9 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: event_hubs.connections_opened_maximum
+        - selector: connections_opened_maximum
           name: opened
-        - selector: event_hubs.connections_closed_maximum
+        - selector: connections_closed_maximum
           name: closed
     - id: am_azure_event_hubs__captured_messages
       title: Azure Event Hubs Captured Messages
@@ -224,7 +224,7 @@ template:
       units: messages/s
       algorithm: incremental
       dimensions:
-        - selector: event_hubs.captured_messages_total
+        - selector: captured_messages_total
           name: total
     - id: am_azure_event_hubs__captured_data
       title: Azure Event Hubs Captured Data
@@ -234,7 +234,7 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: event_hubs.captured_bytes_total
+        - selector: captured_bytes_total
           name: total
     - id: am_azure_event_hubs__namespace_size
       title: Azure Event Hubs Namespace Size
@@ -244,7 +244,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: event_hubs.size_average
+        - selector: size_average
           name: average
     - id: am_azure_event_hubs__capture_backlog
       title: Azure Event Hubs Capture Backlog
@@ -254,7 +254,7 @@ template:
       units: messages
       algorithm: absolute
       dimensions:
-        - selector: event_hubs.capture_backlog_total
+        - selector: capture_backlog_total
           name: backlog
     - id: am_azure_event_hubs__namespace_resources
       title: Azure Event Hubs Namespace Resources
@@ -264,9 +264,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: event_hubs.namespace_cpu_usage_maximum
+        - selector: namespace_cpu_usage_maximum
           name: cpu
-        - selector: event_hubs.namespace_memory_usage_maximum
+        - selector: namespace_memory_usage_maximum
           name: memory
     - id: am_azure_event_hubs__replication_lag
       title: Azure Event Hubs Replication Lag
@@ -276,7 +276,7 @@ template:
       units: messages
       algorithm: absolute
       dimensions:
-        - selector: event_hubs.replication_lag_count_maximum
+        - selector: replication_lag_count_maximum
           name: messages
     - id: am_azure_event_hubs__replication_lag_duration
       title: Azure Event Hubs Replication Lag Duration
@@ -286,5 +286,5 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: event_hubs.replication_lag_duration_maximum
+        - selector: replication_lag_duration_maximum
           name: duration

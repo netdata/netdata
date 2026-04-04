@@ -204,9 +204,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: aks.apiserver_cpu_usage_percentage_average
+        - selector: apiserver_cpu_usage_percentage_average
           name: average
-        - selector: aks.apiserver_cpu_usage_percentage_maximum
+        - selector: apiserver_cpu_usage_percentage_maximum
           name: maximum
     - id: am_azure_aks__apiserver_memory
       title: AKS API Server Memory Utilization
@@ -216,9 +216,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: aks.apiserver_memory_usage_percentage_average
+        - selector: apiserver_memory_usage_percentage_average
           name: average
-        - selector: aks.apiserver_memory_usage_percentage_maximum
+        - selector: apiserver_memory_usage_percentage_maximum
           name: maximum
     - id: am_azure_aks__apiserver_inflight_requests
       title: AKS API Server Inflight Requests
@@ -228,7 +228,7 @@ template:
       units: requests
       algorithm: absolute
       dimensions:
-        - selector: aks.apiserver_current_inflight_requests_average
+        - selector: apiserver_current_inflight_requests_average
           name: average
     - id: am_azure_aks__etcd_cpu
       title: AKS etcd CPU Utilization
@@ -238,9 +238,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: aks.etcd_cpu_usage_percentage_average
+        - selector: etcd_cpu_usage_percentage_average
           name: average
-        - selector: aks.etcd_cpu_usage_percentage_maximum
+        - selector: etcd_cpu_usage_percentage_maximum
           name: maximum
     - id: am_azure_aks__etcd_memory
       title: AKS etcd Memory Utilization
@@ -250,9 +250,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: aks.etcd_memory_usage_percentage_average
+        - selector: etcd_memory_usage_percentage_average
           name: average
-        - selector: aks.etcd_memory_usage_percentage_maximum
+        - selector: etcd_memory_usage_percentage_maximum
           name: maximum
     - id: am_azure_aks__etcd_database
       title: AKS etcd Database Utilization
@@ -262,9 +262,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: aks.etcd_database_usage_percentage_average
+        - selector: etcd_database_usage_percentage_average
           name: average
-        - selector: aks.etcd_database_usage_percentage_maximum
+        - selector: etcd_database_usage_percentage_maximum
           name: maximum
     - id: am_azure_aks__pod_status_phase
       title: AKS Pods by Phase
@@ -274,7 +274,7 @@ template:
       units: pods
       algorithm: absolute
       dimensions:
-        - selector: aks.kube_pod_status_phase_average
+        - selector: kube_pod_status_phase_average
           name: average
     - id: am_azure_aks__pod_status_ready
       title: AKS Pods in Ready State
@@ -284,7 +284,7 @@ template:
       units: pods
       algorithm: absolute
       dimensions:
-        - selector: aks.kube_pod_status_ready_average
+        - selector: kube_pod_status_ready_average
           name: average
     - id: am_azure_aks__allocatable_cpu
       title: AKS Allocatable CPU Cores
@@ -294,7 +294,7 @@ template:
       units: cores
       algorithm: absolute
       dimensions:
-        - selector: aks.kube_node_status_allocatable_cpu_cores_average
+        - selector: kube_node_status_allocatable_cpu_cores_average
           name: average
     - id: am_azure_aks__allocatable_memory
       title: AKS Allocatable Memory
@@ -304,7 +304,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: aks.kube_node_status_allocatable_memory_bytes_average
+        - selector: kube_node_status_allocatable_memory_bytes_average
           name: average
     - id: am_azure_aks__node_conditions
       title: AKS Node Conditions
@@ -314,7 +314,7 @@ template:
       units: nodes
       algorithm: absolute
       dimensions:
-        - selector: aks.kube_node_status_condition_average
+        - selector: kube_node_status_condition_average
           name: average
     - id: am_azure_aks__autoscaler_health
       title: AKS Cluster Autoscaler Health
@@ -324,9 +324,9 @@ template:
       units: state
       algorithm: absolute
       dimensions:
-        - selector: aks.cluster_autoscaler_cluster_safe_to_autoscale_average
+        - selector: cluster_autoscaler_cluster_safe_to_autoscale_average
           name: safe_to_autoscale
-        - selector: aks.cluster_autoscaler_scale_down_in_cooldown_average
+        - selector: cluster_autoscaler_scale_down_in_cooldown_average
           name: cooldown
     - id: am_azure_aks__autoscaler_unschedulable_pods
       title: AKS Autoscaler Unschedulable Pods
@@ -336,7 +336,7 @@ template:
       units: pods
       algorithm: absolute
       dimensions:
-        - selector: aks.cluster_autoscaler_unschedulable_pods_count_average
+        - selector: cluster_autoscaler_unschedulable_pods_count_average
           name: average
     - id: am_azure_aks__autoscaler_unneeded_nodes
       title: AKS Autoscaler Unneeded Nodes
@@ -346,7 +346,7 @@ template:
       units: nodes
       algorithm: absolute
       dimensions:
-        - selector: aks.cluster_autoscaler_unneeded_nodes_count_average
+        - selector: cluster_autoscaler_unneeded_nodes_count_average
           name: average
     - id: am_azure_aks__node_cpu_millicores
       title: AKS Node CPU Usage
@@ -356,9 +356,9 @@ template:
       units: millicores
       algorithm: absolute
       dimensions:
-        - selector: aks.node_cpu_usage_millicores_average
+        - selector: node_cpu_usage_millicores_average
           name: average
-        - selector: aks.node_cpu_usage_millicores_maximum
+        - selector: node_cpu_usage_millicores_maximum
           name: maximum
     - id: am_azure_aks__node_cpu_percentage
       title: AKS Node CPU Percentage
@@ -368,9 +368,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: aks.node_cpu_usage_percentage_average
+        - selector: node_cpu_usage_percentage_average
           name: average
-        - selector: aks.node_cpu_usage_percentage_maximum
+        - selector: node_cpu_usage_percentage_maximum
           name: maximum
     - id: am_azure_aks__node_memory_working_set
       title: AKS Node Memory Working Set
@@ -380,9 +380,9 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: aks.node_memory_working_set_bytes_average
+        - selector: node_memory_working_set_bytes_average
           name: average
-        - selector: aks.node_memory_working_set_bytes_maximum
+        - selector: node_memory_working_set_bytes_maximum
           name: maximum
     - id: am_azure_aks__node_memory_working_set_percentage
       title: AKS Node Memory Working Set Percentage
@@ -392,9 +392,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: aks.node_memory_working_set_percentage_average
+        - selector: node_memory_working_set_percentage_average
           name: average
-        - selector: aks.node_memory_working_set_percentage_maximum
+        - selector: node_memory_working_set_percentage_maximum
           name: maximum
     - id: am_azure_aks__node_memory_rss
       title: AKS Node Memory RSS
@@ -404,9 +404,9 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: aks.node_memory_rss_bytes_average
+        - selector: node_memory_rss_bytes_average
           name: average
-        - selector: aks.node_memory_rss_bytes_maximum
+        - selector: node_memory_rss_bytes_maximum
           name: maximum
     - id: am_azure_aks__node_memory_rss_percentage
       title: AKS Node Memory RSS Percentage
@@ -416,9 +416,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: aks.node_memory_rss_percentage_average
+        - selector: node_memory_rss_percentage_average
           name: average
-        - selector: aks.node_memory_rss_percentage_maximum
+        - selector: node_memory_rss_percentage_maximum
           name: maximum
     - id: am_azure_aks__node_disk_usage
       title: AKS Node Disk Usage
@@ -428,9 +428,9 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: aks.node_disk_usage_bytes_average
+        - selector: node_disk_usage_bytes_average
           name: average
-        - selector: aks.node_disk_usage_bytes_maximum
+        - selector: node_disk_usage_bytes_maximum
           name: maximum
     - id: am_azure_aks__node_disk_percentage
       title: AKS Node Disk Usage Percentage
@@ -440,9 +440,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: aks.node_disk_usage_percentage_average
+        - selector: node_disk_usage_percentage_average
           name: average
-        - selector: aks.node_disk_usage_percentage_maximum
+        - selector: node_disk_usage_percentage_maximum
           name: maximum
     - id: am_azure_aks__node_network
       title: AKS Node Network Traffic
@@ -452,7 +452,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: aks.node_network_in_bytes_average
+        - selector: node_network_in_bytes_average
           name: in
-        - selector: aks.node_network_out_bytes_average
+        - selector: node_network_out_bytes_average
           name: out

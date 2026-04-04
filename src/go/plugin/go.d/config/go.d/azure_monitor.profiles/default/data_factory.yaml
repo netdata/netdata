@@ -588,11 +588,11 @@ template:
       units: runs/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.pipeline_succeeded_runs_total
+        - selector: pipeline_succeeded_runs_total
           name: succeeded
-        - selector: data_factory.pipeline_failed_runs_total
+        - selector: pipeline_failed_runs_total
           name: failed
-        - selector: data_factory.pipeline_cancelled_runs_total
+        - selector: pipeline_cancelled_runs_total
           name: cancelled
     - id: am_azure_data_factory__pipeline_elapsed_time
       title: Azure Data Factory Pipeline Elapsed Time Runs
@@ -602,7 +602,7 @@ template:
       units: runs/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.pipeline_elapsed_time_runs_total
+        - selector: pipeline_elapsed_time_runs_total
           name: elapsed_time
     - id: am_azure_data_factory__activity_runs
       title: Azure Data Factory Activity Runs
@@ -612,11 +612,11 @@ template:
       units: runs/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.activity_succeeded_runs_total
+        - selector: activity_succeeded_runs_total
           name: succeeded
-        - selector: data_factory.activity_failed_runs_total
+        - selector: activity_failed_runs_total
           name: failed
-        - selector: data_factory.activity_cancelled_runs_total
+        - selector: activity_cancelled_runs_total
           name: cancelled
     - id: am_azure_data_factory__trigger_runs
       title: Azure Data Factory Trigger Runs
@@ -626,11 +626,11 @@ template:
       units: runs/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.trigger_succeeded_runs_total
+        - selector: trigger_succeeded_runs_total
           name: succeeded
-        - selector: data_factory.trigger_failed_runs_total
+        - selector: trigger_failed_runs_total
           name: failed
-        - selector: data_factory.trigger_cancelled_runs_total
+        - selector: trigger_cancelled_runs_total
           name: cancelled
     - id: am_azure_data_factory__ssis_ir_starts
       title: Azure Data Factory SSIS IR Start Operations
@@ -640,11 +640,11 @@ template:
       units: runs/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.ssis_integration_runtime_start_succeeded_total
+        - selector: ssis_integration_runtime_start_succeeded_total
           name: succeeded
-        - selector: data_factory.ssis_integration_runtime_start_failed_total
+        - selector: ssis_integration_runtime_start_failed_total
           name: failed
-        - selector: data_factory.ssis_integration_runtime_start_cancel_total
+        - selector: ssis_integration_runtime_start_cancel_total
           name: cancelled
     - id: am_azure_data_factory__ssis_ir_stops
       title: Azure Data Factory SSIS IR Stop Operations
@@ -654,9 +654,9 @@ template:
       units: runs/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.ssis_integration_runtime_stop_succeeded_total
+        - selector: ssis_integration_runtime_stop_succeeded_total
           name: succeeded
-        - selector: data_factory.ssis_integration_runtime_stop_stuck_total
+        - selector: ssis_integration_runtime_stop_stuck_total
           name: stuck
     - id: am_azure_data_factory__ssis_package_executions
       title: Azure Data Factory SSIS Package Executions
@@ -666,11 +666,11 @@ template:
       units: executions/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.ssis_package_execution_succeeded_total
+        - selector: ssis_package_execution_succeeded_total
           name: succeeded
-        - selector: data_factory.ssis_package_execution_failed_total
+        - selector: ssis_package_execution_failed_total
           name: failed
-        - selector: data_factory.ssis_package_execution_cancel_total
+        - selector: ssis_package_execution_cancel_total
           name: cancelled
     - id: am_azure_data_factory__ir_cpu
       title: Azure Data Factory Integration Runtime CPU
@@ -680,7 +680,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: data_factory.integration_runtime_cpu_percentage_average
+        - selector: integration_runtime_cpu_percentage_average
           name: average
     - id: am_azure_data_factory__ir_memory
       title: Azure Data Factory Integration Runtime Available Memory
@@ -690,7 +690,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: data_factory.integration_runtime_available_memory_average
+        - selector: integration_runtime_available_memory_average
           name: available
     - id: am_azure_data_factory__ir_nodes
       title: Azure Data Factory Integration Runtime Available Nodes
@@ -700,7 +700,7 @@ template:
       units: nodes
       algorithm: absolute
       dimensions:
-        - selector: data_factory.integration_runtime_available_node_number_average
+        - selector: integration_runtime_available_node_number_average
           name: available
     - id: am_azure_data_factory__ir_queue
       title: Azure Data Factory Integration Runtime Queue
@@ -710,7 +710,7 @@ template:
       units: tasks
       algorithm: absolute
       dimensions:
-        - selector: data_factory.integration_runtime_queue_length_average
+        - selector: integration_runtime_queue_length_average
           name: queue_length
     - id: am_azure_data_factory__ir_task_pickup_delay
       title: Azure Data Factory Integration Runtime Task Pickup Delay
@@ -720,7 +720,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: data_factory.integration_runtime_average_task_pickup_delay_average
+        - selector: integration_runtime_average_task_pickup_delay_average
           name: average
     - id: am_azure_data_factory__factory_size
       title: Azure Data Factory Factory Size
@@ -730,9 +730,9 @@ template:
       units: GiB
       algorithm: absolute
       dimensions:
-        - selector: data_factory.factory_size_in_gb_units_maximum
+        - selector: factory_size_in_gb_units_maximum
           name: current
-        - selector: data_factory.max_allowed_factory_size_in_gb_units_maximum
+        - selector: max_allowed_factory_size_in_gb_units_maximum
           name: max_allowed
     - id: am_azure_data_factory__entity_count
       title: Azure Data Factory Entity Count
@@ -742,9 +742,9 @@ template:
       units: entities
       algorithm: absolute
       dimensions:
-        - selector: data_factory.resource_count_maximum
+        - selector: resource_count_maximum
           name: current
-        - selector: data_factory.max_allowed_resource_count_maximum
+        - selector: max_allowed_resource_count_maximum
           name: max_allowed
     - id: am_azure_data_factory__mvnet_ir_copy_capacity
       title: Azure Data Factory MVNet IR Copy Capacity
@@ -754,9 +754,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: data_factory.mv_net_ir_copy_capacity_utilization_maximum
+        - selector: mv_net_ir_copy_capacity_utilization_maximum
           name: utilization
-        - selector: data_factory.mv_net_ir_copy_available_capacity_pct_maximum
+        - selector: mv_net_ir_copy_available_capacity_pct_maximum
           name: available
     - id: am_azure_data_factory__mvnet_ir_copy_queue
       title: Azure Data Factory MVNet IR Copy Queue
@@ -766,7 +766,7 @@ template:
       units: tasks
       algorithm: absolute
       dimensions:
-        - selector: data_factory.mv_net_ir_copy_waiting_queue_length_average
+        - selector: mv_net_ir_copy_waiting_queue_length_average
           name: waiting
     - id: am_azure_data_factory__mvnet_ir_external_capacity
       title: Azure Data Factory MVNet IR External Capacity
@@ -776,9 +776,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: data_factory.mv_net_ir_external_capacity_utilization_maximum
+        - selector: mv_net_ir_external_capacity_utilization_maximum
           name: utilization
-        - selector: data_factory.mv_net_ir_external_available_capacity_pct_maximum
+        - selector: mv_net_ir_external_available_capacity_pct_maximum
           name: available
     - id: am_azure_data_factory__mvnet_ir_external_queue
       title: Azure Data Factory MVNet IR External Queue
@@ -788,7 +788,7 @@ template:
       units: tasks
       algorithm: absolute
       dimensions:
-        - selector: data_factory.mv_net_ir_external_waiting_queue_length_average
+        - selector: mv_net_ir_external_waiting_queue_length_average
           name: waiting
     - id: am_azure_data_factory__mvnet_ir_pipeline_capacity
       title: Azure Data Factory MVNet IR Pipeline Capacity
@@ -798,9 +798,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: data_factory.mv_net_ir_pipeline_capacity_utilization_maximum
+        - selector: mv_net_ir_pipeline_capacity_utilization_maximum
           name: utilization
-        - selector: data_factory.mv_net_ir_pipeline_available_capacity_pct_maximum
+        - selector: mv_net_ir_pipeline_available_capacity_pct_maximum
           name: available
     - id: am_azure_data_factory__mvnet_ir_pipeline_queue
       title: Azure Data Factory MVNet IR Pipeline Queue
@@ -810,7 +810,7 @@ template:
       units: tasks
       algorithm: absolute
       dimensions:
-        - selector: data_factory.mv_net_ir_pipeline_waiting_queue_length_average
+        - selector: mv_net_ir_pipeline_waiting_queue_length_average
           name: waiting
     - id: am_azure_data_factory__airflow_ir_cpu
       title: Azure Data Factory Airflow IR CPU
@@ -820,7 +820,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_cpu_percentage_average
+        - selector: airflow_integration_runtime_cpu_percentage_average
           name: percentage
     - id: am_azure_data_factory__airflow_ir_cpu_usage
       title: Azure Data Factory Airflow IR CPU Usage
@@ -830,7 +830,7 @@ template:
       units: millicores
       algorithm: absolute
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_cpu_usage_average
+        - selector: airflow_integration_runtime_cpu_usage_average
           name: average
     - id: am_azure_data_factory__airflow_ir_memory
       title: Azure Data Factory Airflow IR Memory
@@ -840,7 +840,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_memory_percentage_average
+        - selector: airflow_integration_runtime_memory_percentage_average
           name: percentage
     - id: am_azure_data_factory__airflow_ir_memory_usage
       title: Azure Data Factory Airflow IR Memory Usage
@@ -850,7 +850,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_memory_usage_average
+        - selector: airflow_integration_runtime_memory_usage_average
           name: average
     - id: am_azure_data_factory__airflow_ir_nodes
       title: Azure Data Factory Airflow IR Node Count
@@ -860,7 +860,7 @@ template:
       units: nodes
       algorithm: absolute
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_node_count_average
+        - selector: airflow_integration_runtime_node_count_average
           name: average
     - id: am_azure_data_factory__airflow_ir_dag_collection
       title: Azure Data Factory Airflow IR DAG DB Collection Time
@@ -870,7 +870,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_collect_db_dags_average
+        - selector: airflow_integration_runtime_collect_db_dags_average
           name: average
     - id: am_azure_data_factory__airflow_ir_dag_bag
       title: Azure Data Factory Airflow IR DAG Bag Size
@@ -880,7 +880,7 @@ template:
       units: dags/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_dag_bag_size_total
+        - selector: airflow_integration_runtime_dag_bag_size_total
           name: total
     - id: am_azure_data_factory__airflow_ir_dag_errors
       title: Azure Data Factory Airflow IR DAG Errors
@@ -890,11 +890,11 @@ template:
       units: errors/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_dag_callback_exceptions_total
+        - selector: airflow_integration_runtime_dag_callback_exceptions_total
           name: callback_exceptions
-        - selector: data_factory.airflow_integration_runtime_dag_file_refresh_error_total
+        - selector: airflow_integration_runtime_dag_file_refresh_error_total
           name: file_refresh
-        - selector: data_factory.airflow_integration_runtime_dag_processing_import_errors_total
+        - selector: airflow_integration_runtime_dag_processing_import_errors_total
           name: import
     - id: am_azure_data_factory__airflow_ir_dag_processing_duration
       title: Azure Data Factory Airflow IR DAG Processing Duration
@@ -904,7 +904,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_dag_processing_last_duration_average
+        - selector: airflow_integration_runtime_dag_processing_last_duration_average
           name: last_duration
     - id: am_azure_data_factory__airflow_ir_dag_processing_lag
       title: Azure Data Factory Airflow IR DAG Processing Lag
@@ -914,11 +914,11 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_dag_processing_last_run_seconds_ago_average
+        - selector: airflow_integration_runtime_dag_processing_last_run_seconds_ago_average
           name: last_run_seconds_ago
-        - selector: data_factory.airflow_integration_runtime_dag_processing_processor_timeouts_average
+        - selector: airflow_integration_runtime_dag_processing_processor_timeouts_average
           name: processor_timeouts
-        - selector: data_factory.airflow_integration_runtime_dag_processing_total_parse_time_average
+        - selector: airflow_integration_runtime_dag_processing_total_parse_time_average
           name: total_parse_time
     - id: am_azure_data_factory__airflow_ir_dag_processing_activity
       title: Azure Data Factory Airflow IR DAG Processing Activity
@@ -928,9 +928,9 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_dag_processing_manager_stalls_total
+        - selector: airflow_integration_runtime_dag_processing_manager_stalls_total
           name: manager_stalls
-        - selector: data_factory.airflow_integration_runtime_dag_processing_processes_total
+        - selector: airflow_integration_runtime_dag_processing_processes_total
           name: processes
     - id: am_azure_data_factory__airflow_ir_dag_run_duration
       title: Azure Data Factory Airflow IR DAG Run Duration
@@ -940,9 +940,9 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_dag_run_duration_success_average
+        - selector: airflow_integration_runtime_dag_run_duration_success_average
           name: success
-        - selector: data_factory.airflow_integration_runtime_dag_run_duration_failed_average
+        - selector: airflow_integration_runtime_dag_run_duration_failed_average
           name: failed
     - id: am_azure_data_factory__airflow_ir_dag_run_scheduling
       title: Azure Data Factory Airflow IR DAG Run Scheduling Delays
@@ -952,11 +952,11 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_dag_run_dependency_check_average
+        - selector: airflow_integration_runtime_dag_run_dependency_check_average
           name: dependency_check
-        - selector: data_factory.airflow_integration_runtime_dag_run_first_task_scheduling_delay_average
+        - selector: airflow_integration_runtime_dag_run_first_task_scheduling_delay_average
           name: first_task_delay
-        - selector: data_factory.airflow_integration_runtime_dag_run_schedule_delay_average
+        - selector: airflow_integration_runtime_dag_run_schedule_delay_average
           name: schedule_delay
     - id: am_azure_data_factory__airflow_ir_executor
       title: Azure Data Factory Airflow IR Executor
@@ -966,11 +966,11 @@ template:
       units: slots/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_executor_open_slots_total
+        - selector: airflow_integration_runtime_executor_open_slots_total
           name: open_slots
-        - selector: data_factory.airflow_integration_runtime_executor_queued_tasks_total
+        - selector: airflow_integration_runtime_executor_queued_tasks_total
           name: queued_tasks
-        - selector: data_factory.airflow_integration_runtime_executor_running_tasks_total
+        - selector: airflow_integration_runtime_executor_running_tasks_total
           name: running_tasks
     - id: am_azure_data_factory__airflow_ir_jobs
       title: Azure Data Factory Airflow IR Jobs
@@ -980,11 +980,11 @@ template:
       units: jobs/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_job_start_total
+        - selector: airflow_integration_runtime_job_start_total
           name: started
-        - selector: data_factory.airflow_integration_runtime_job_end_total
+        - selector: airflow_integration_runtime_job_end_total
           name: ended
-        - selector: data_factory.airflow_integration_runtime_job_heartbeat_failure_total
+        - selector: airflow_integration_runtime_job_heartbeat_failure_total
           name: heartbeat_failures
     - id: am_azure_data_factory__airflow_ir_operators
       title: Azure Data Factory Airflow IR Operators
@@ -994,9 +994,9 @@ template:
       units: operations/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_operator_successes_total
+        - selector: airflow_integration_runtime_operator_successes_total
           name: successes
-        - selector: data_factory.airflow_integration_runtime_operator_failures_total
+        - selector: airflow_integration_runtime_operator_failures_total
           name: failures
     - id: am_azure_data_factory__airflow_ir_pool_slots
       title: Azure Data Factory Airflow IR Pool Slots
@@ -1006,11 +1006,11 @@ template:
       units: slots/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_pool_open_slots_total
+        - selector: airflow_integration_runtime_pool_open_slots_total
           name: open
-        - selector: data_factory.airflow_integration_runtime_pool_queued_slots_total
+        - selector: airflow_integration_runtime_pool_queued_slots_total
           name: queued
-        - selector: data_factory.airflow_integration_runtime_pool_running_slots_total
+        - selector: airflow_integration_runtime_pool_running_slots_total
           name: running
     - id: am_azure_data_factory__airflow_ir_pool_starving
       title: Azure Data Factory Airflow IR Pool Starving Tasks
@@ -1020,7 +1020,7 @@ template:
       units: tasks/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_pool_starving_tasks_total
+        - selector: airflow_integration_runtime_pool_starving_tasks_total
           name: starving
     - id: am_azure_data_factory__airflow_ir_scheduler_critical_section
       title: Azure Data Factory Airflow IR Scheduler Critical Section
@@ -1030,7 +1030,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_scheduler_critical_section_duration_average
+        - selector: airflow_integration_runtime_scheduler_critical_section_duration_average
           name: duration
     - id: am_azure_data_factory__airflow_ir_scheduler_activity
       title: Azure Data Factory Airflow IR Scheduler Activity
@@ -1040,11 +1040,11 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_scheduler_critical_section_busy_total
+        - selector: airflow_integration_runtime_scheduler_critical_section_busy_total
           name: critical_section_busy
-        - selector: data_factory.airflow_integration_runtime_scheduler_heartbeat_total
+        - selector: airflow_integration_runtime_scheduler_heartbeat_total
           name: heartbeats
-        - selector: data_factory.airflow_integration_runtime_scheduler_failed_sla_email_attempts_total
+        - selector: airflow_integration_runtime_scheduler_failed_sla_email_attempts_total
           name: failed_sla_emails
     - id: am_azure_data_factory__airflow_ir_scheduler_orphaned_tasks
       title: Azure Data Factory Airflow IR Scheduler Orphaned Tasks
@@ -1054,9 +1054,9 @@ template:
       units: tasks/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_scheduler_orphaned_tasks_adopted_total
+        - selector: airflow_integration_runtime_scheduler_orphaned_tasks_adopted_total
           name: adopted
-        - selector: data_factory.airflow_integration_runtime_scheduler_orphaned_tasks_cleared_total
+        - selector: airflow_integration_runtime_scheduler_orphaned_tasks_cleared_total
           name: cleared
     - id: am_azure_data_factory__airflow_ir_scheduler_tasks
       title: Azure Data Factory Airflow IR Scheduler Tasks
@@ -1066,13 +1066,13 @@ template:
       units: tasks/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_scheduler_tasks_executable_total
+        - selector: airflow_integration_runtime_scheduler_tasks_executable_total
           name: executable
-        - selector: data_factory.airflow_integration_runtime_scheduler_tasks_running_total
+        - selector: airflow_integration_runtime_scheduler_tasks_running_total
           name: running
-        - selector: data_factory.airflow_integration_runtime_scheduler_tasks_starving_total
+        - selector: airflow_integration_runtime_scheduler_tasks_starving_total
           name: starving
-        - selector: data_factory.airflow_integration_runtime_scheduler_tasks_killed_externally_total
+        - selector: airflow_integration_runtime_scheduler_tasks_killed_externally_total
           name: killed_externally
     - id: am_azure_data_factory__airflow_ir_task_instances
       title: Azure Data Factory Airflow IR Task Instances
@@ -1082,17 +1082,17 @@ template:
       units: instances/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_started_task_instances_total
+        - selector: airflow_integration_runtime_started_task_instances_total
           name: started
-        - selector: data_factory.airflow_integration_runtime_task_instance_successes_total
+        - selector: airflow_integration_runtime_task_instance_successes_total
           name: succeeded
-        - selector: data_factory.airflow_integration_runtime_task_instance_failures_total
+        - selector: airflow_integration_runtime_task_instance_failures_total
           name: failed
-        - selector: data_factory.airflow_integration_runtime_task_instance_finished_total
+        - selector: airflow_integration_runtime_task_instance_finished_total
           name: finished
-        - selector: data_factory.airflow_integration_runtime_task_instance_previously_succeeded_total
+        - selector: airflow_integration_runtime_task_instance_previously_succeeded_total
           name: previously_succeeded
-        - selector: data_factory.airflow_integration_runtime_task_instance_created_using_operator_total
+        - selector: airflow_integration_runtime_task_instance_created_using_operator_total
           name: created_via_operator
     - id: am_azure_data_factory__airflow_ir_task_instance_duration
       title: Azure Data Factory Airflow IR Task Instance Duration
@@ -1102,7 +1102,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_task_instance_duration_average
+        - selector: airflow_integration_runtime_task_instance_duration_average
           name: average
     - id: am_azure_data_factory__airflow_ir_task_dag_changes
       title: Azure Data Factory Airflow IR Task DAG Changes
@@ -1112,9 +1112,9 @@ template:
       units: tasks/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_task_removed_from_dag_total
+        - selector: airflow_integration_runtime_task_removed_from_dag_total
           name: removed
-        - selector: data_factory.airflow_integration_runtime_task_restored_to_dag_total
+        - selector: airflow_integration_runtime_task_restored_to_dag_total
           name: restored
     - id: am_azure_data_factory__airflow_ir_triggers
       title: Azure Data Factory Airflow IR Triggers
@@ -1124,11 +1124,11 @@ template:
       units: triggers/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_triggers_succeeded_total
+        - selector: airflow_integration_runtime_triggers_succeeded_total
           name: succeeded
-        - selector: data_factory.airflow_integration_runtime_triggers_failed_total
+        - selector: airflow_integration_runtime_triggers_failed_total
           name: failed
-        - selector: data_factory.airflow_integration_runtime_triggers_running_total
+        - selector: airflow_integration_runtime_triggers_running_total
           name: running
     - id: am_azure_data_factory__airflow_ir_trigger_issues
       title: Azure Data Factory Airflow IR Trigger Issues
@@ -1138,9 +1138,9 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_triggers_blocked_main_thread_total
+        - selector: airflow_integration_runtime_triggers_blocked_main_thread_total
           name: blocked_main_thread
-        - selector: data_factory.airflow_integration_runtime_celery_task_timeout_error_total
+        - selector: airflow_integration_runtime_celery_task_timeout_error_total
           name: celery_timeout_errors
     - id: am_azure_data_factory__airflow_ir_zombies
       title: Azure Data Factory Airflow IR Zombie Tasks Killed
@@ -1150,5 +1150,5 @@ template:
       units: tasks/s
       algorithm: incremental
       dimensions:
-        - selector: data_factory.airflow_integration_runtime_zombies_killed_total
+        - selector: airflow_integration_runtime_zombies_killed_total
           name: killed

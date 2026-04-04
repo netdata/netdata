@@ -126,7 +126,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: api_management.capacity_average
+        - selector: capacity_average
           name: capacity
     - id: am_azure_api_management__gateway_cpu
       title: Azure API Management Gateway CPU
@@ -136,7 +136,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: api_management.cpu_percent_gateway_average
+        - selector: cpu_percent_gateway_average
           name: cpu
     - id: am_azure_api_management__gateway_memory
       title: Azure API Management Gateway Memory
@@ -146,7 +146,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: api_management.memory_percent_gateway_average
+        - selector: memory_percent_gateway_average
           name: memory
     - id: am_azure_api_management__requests
       title: Azure API Management Gateway Requests
@@ -156,7 +156,7 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: api_management.requests_total
+        - selector: requests_total
           name: requests
     - id: am_azure_api_management__request_duration
       title: Azure API Management Request Duration
@@ -166,9 +166,9 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: api_management.duration_average
+        - selector: duration_average
           name: overall
-        - selector: api_management.backend_duration_average
+        - selector: backend_duration_average
           name: backend
     - id: am_azure_api_management__eventhub_events
       title: Azure API Management EventHub Events
@@ -178,19 +178,19 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: api_management.event_hub_total_events_total
+        - selector: event_hub_total_events_total
           name: total
-        - selector: api_management.event_hub_successful_events_total
+        - selector: event_hub_successful_events_total
           name: successful
-        - selector: api_management.event_hub_total_failed_events_total
+        - selector: event_hub_total_failed_events_total
           name: failed
-        - selector: api_management.event_hub_dropped_events_total
+        - selector: event_hub_dropped_events_total
           name: dropped
-        - selector: api_management.event_hub_rejected_events_total
+        - selector: event_hub_rejected_events_total
           name: rejected
-        - selector: api_management.event_hub_throttled_events_total
+        - selector: event_hub_throttled_events_total
           name: throttled
-        - selector: api_management.event_hub_timedout_events_total
+        - selector: event_hub_timedout_events_total
           name: timed_out
     - id: am_azure_api_management__eventhub_bytes
       title: Azure API Management EventHub Bytes Sent
@@ -200,7 +200,7 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: api_management.event_hub_total_bytes_sent_total
+        - selector: event_hub_total_bytes_sent_total
           name: sent
     - id: am_azure_api_management__websocket_connections
       title: Azure API Management WebSocket Connection Attempts
@@ -210,7 +210,7 @@ template:
       units: attempts/s
       algorithm: incremental
       dimensions:
-        - selector: api_management.connection_attempts_total
+        - selector: connection_attempts_total
           name: connection_attempts
     - id: am_azure_api_management__websocket_messages
       title: Azure API Management WebSocket Messages
@@ -220,7 +220,7 @@ template:
       units: messages/s
       algorithm: incremental
       dimensions:
-        - selector: api_management.web_socket_messages_total
+        - selector: web_socket_messages_total
           name: messages
     - id: am_azure_api_management__network_connectivity
       title: Azure API Management Network Connectivity Status
@@ -230,5 +230,5 @@ template:
       units: status
       algorithm: absolute
       dimensions:
-        - selector: api_management.network_connectivity_average
+        - selector: network_connectivity_average
           name: connectivity

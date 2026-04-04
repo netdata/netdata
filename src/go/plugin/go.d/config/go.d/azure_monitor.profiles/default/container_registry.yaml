@@ -66,7 +66,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: container_registry.storage_used_average
+        - selector: storage_used_average
           name: used
     - id: am_azure_container_registry__pull_count
       title: Azure Container Registry Image Pulls
@@ -76,9 +76,9 @@ template:
       units: pulls/s
       algorithm: incremental
       dimensions:
-        - selector: container_registry.successful_pull_count_total
+        - selector: successful_pull_count_total
           name: successful
-        - selector: container_registry.total_pull_count_total
+        - selector: total_pull_count_total
           name: total
     - id: am_azure_container_registry__push_count
       title: Azure Container Registry Image Pushes
@@ -88,9 +88,9 @@ template:
       units: pushes/s
       algorithm: incremental
       dimensions:
-        - selector: container_registry.successful_push_count_total
+        - selector: successful_push_count_total
           name: successful
-        - selector: container_registry.total_push_count_total
+        - selector: total_push_count_total
           name: total
     - id: am_azure_container_registry__agentpool_cpu_time
       title: Azure Container Registry AgentPool CPU Time
@@ -100,7 +100,7 @@ template:
       units: seconds/s
       algorithm: incremental
       dimensions:
-        - selector: container_registry.agent_pool_cpu_time_total
+        - selector: agent_pool_cpu_time_total
           name: cpu_time
     - id: am_azure_container_registry__run_duration
       title: Azure Container Registry Task Run Duration
@@ -110,5 +110,5 @@ template:
       units: milliseconds/s
       algorithm: incremental
       dimensions:
-        - selector: container_registry.run_duration_total
+        - selector: run_duration_total
           name: duration

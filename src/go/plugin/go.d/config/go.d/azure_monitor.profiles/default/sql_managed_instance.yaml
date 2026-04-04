@@ -68,9 +68,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_managed_instance.avg_cpu_percent_average
+        - selector: avg_cpu_percent_average
           name: average
-        - selector: sql_managed_instance.avg_cpu_percent_maximum
+        - selector: avg_cpu_percent_maximum
           name: maximum
     - id: am_azure_sql_managed_instance__io_throughput
       title: Azure SQL Managed Instance I/O Throughput
@@ -80,9 +80,9 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: sql_managed_instance.io_bytes_read_average
+        - selector: io_bytes_read_average
           name: read
-        - selector: sql_managed_instance.io_bytes_written_average
+        - selector: io_bytes_written_average
           name: written
     - id: am_azure_sql_managed_instance__io_requests
       title: Azure SQL Managed Instance I/O Requests
@@ -92,7 +92,7 @@ template:
       units: requests/s
       algorithm: absolute
       dimensions:
-        - selector: sql_managed_instance.io_requests_average
+        - selector: io_requests_average
           name: average
     - id: am_azure_sql_managed_instance__storage
       title: Azure SQL Managed Instance Storage
@@ -102,9 +102,9 @@ template:
       units: MiB
       algorithm: absolute
       dimensions:
-        - selector: sql_managed_instance.reserved_storage_mb_average
+        - selector: reserved_storage_mb_average
           name: reserved
-        - selector: sql_managed_instance.storage_space_used_mb_average
+        - selector: storage_space_used_mb_average
           name: used
     - id: am_azure_sql_managed_instance__virtual_core_count
       title: Azure SQL Managed Instance Virtual Core Count
@@ -114,5 +114,5 @@ template:
       units: cores
       algorithm: absolute
       dimensions:
-        - selector: sql_managed_instance.virtual_core_count_average
+        - selector: virtual_core_count_average
           name: average

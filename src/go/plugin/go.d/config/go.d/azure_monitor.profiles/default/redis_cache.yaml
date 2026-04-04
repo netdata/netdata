@@ -300,9 +300,9 @@ template:
       units: operations/s
       algorithm: incremental
       dimensions:
-        - selector: redis_cache.cachehits_total
+        - selector: cachehits_total
           name: hits
-        - selector: redis_cache.cachemisses_total
+        - selector: cachemisses_total
           name: misses
     - id: am_azure_redis_cache__throughput
       title: Azure Cache for Redis Throughput
@@ -312,9 +312,9 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.cache_read_maximum
+        - selector: cache_read_maximum
           name: read
-        - selector: redis_cache.cache_write_maximum
+        - selector: cache_write_maximum
           name: write
     - id: am_azure_redis_cache__server_load
       title: Azure Cache for Redis Server Load
@@ -324,7 +324,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.server_load_maximum
+        - selector: server_load_maximum
           name: maximum
     - id: am_azure_redis_cache__cpu
       title: Azure Cache for Redis CPU Utilization
@@ -334,7 +334,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.percent_processor_time_maximum
+        - selector: percent_processor_time_maximum
           name: maximum
     - id: am_azure_redis_cache__memory_usage
       title: Azure Cache for Redis Memory Usage
@@ -344,9 +344,9 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.usedmemory_maximum
+        - selector: usedmemory_maximum
           name: used
-        - selector: redis_cache.usedmemory_rss_maximum
+        - selector: usedmemory_rss_maximum
           name: rss
     - id: am_azure_redis_cache__memory_utilization
       title: Azure Cache for Redis Memory Utilization
@@ -356,7 +356,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.usedmemorypercentage_maximum
+        - selector: usedmemorypercentage_maximum
           name: maximum
     - id: am_azure_redis_cache__clients
       title: Azure Cache for Redis Connected Clients
@@ -366,7 +366,7 @@ template:
       units: clients
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.connectedclients_maximum
+        - selector: connectedclients_maximum
           name: maximum
     - id: am_azure_redis_cache__operations
       title: Azure Cache for Redis Operations
@@ -376,7 +376,7 @@ template:
       units: operations/s
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.operations_per_second_maximum
+        - selector: operations_per_second_maximum
           name: maximum
     - id: am_azure_redis_cache__commands
       title: Azure Cache for Redis Commands Processed
@@ -386,7 +386,7 @@ template:
       units: commands/s
       algorithm: incremental
       dimensions:
-        - selector: redis_cache.totalcommandsprocessed_total
+        - selector: totalcommandsprocessed_total
           name: total
     - id: am_azure_redis_cache__command_types
       title: Azure Cache for Redis Command Types
@@ -396,9 +396,9 @@ template:
       units: commands/s
       algorithm: incremental
       dimensions:
-        - selector: redis_cache.getcommands_total
+        - selector: getcommands_total
           name: get
-        - selector: redis_cache.setcommands_total
+        - selector: setcommands_total
           name: set
     - id: am_azure_redis_cache__latency
       title: Azure Cache for Redis Latency
@@ -408,7 +408,7 @@ template:
       units: microseconds
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.cache_latency_average
+        - selector: cache_latency_average
           name: average
     - id: am_azure_redis_cache__key_events
       title: Azure Cache for Redis Key Events
@@ -418,9 +418,9 @@ template:
       units: keys/s
       algorithm: incremental
       dimensions:
-        - selector: redis_cache.evictedkeys_total
+        - selector: evictedkeys_total
           name: evicted
-        - selector: redis_cache.expiredkeys_total
+        - selector: expiredkeys_total
           name: expired
     - id: am_azure_redis_cache__total_keys
       title: Azure Cache for Redis Total Keys
@@ -430,7 +430,7 @@ template:
       units: keys
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.totalkeys_maximum
+        - selector: totalkeys_maximum
           name: maximum
     - id: am_azure_redis_cache__errors
       title: Azure Cache for Redis Errors
@@ -440,7 +440,7 @@ template:
       units: errors
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.errors_maximum
+        - selector: errors_maximum
           name: maximum
     - id: am_azure_redis_cache__miss_rate
       title: Azure Cache for Redis Miss Rate
@@ -450,7 +450,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.cachemissrate_total
+        - selector: cachemissrate_total
           name: miss_rate
     - id: am_azure_redis_cache__latency_p99
       title: Azure Cache for Redis P99 Latency
@@ -460,7 +460,7 @@ template:
       units: microseconds
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.latency_p99_average
+        - selector: latency_p99_average
           name: p99
     - id: am_azure_redis_cache__connection_rate
       title: Azure Cache for Redis Connection Rate
@@ -470,9 +470,9 @@ template:
       units: connections/s
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.all_connections_created_per_second_maximum
+        - selector: all_connections_created_per_second_maximum
           name: created
-        - selector: redis_cache.all_connections_closed_per_second_maximum
+        - selector: all_connections_closed_per_second_maximum
           name: closed
     - id: am_azure_redis_cache__aad_clients
       title: Azure Cache for Redis Entra Token Clients
@@ -482,7 +482,7 @@ template:
       units: clients
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.connected_clients_using_aad_token_maximum
+        - selector: connected_clients_using_aad_token_maximum
           name: maximum
     - id: am_azure_redis_cache__instance_cache_hits
       title: Azure Cache for Redis Instance Hit Rate
@@ -492,9 +492,9 @@ template:
       units: operations/s
       algorithm: incremental
       dimensions:
-        - selector: redis_cache.allcachehits_total
+        - selector: allcachehits_total
           name: hits
-        - selector: redis_cache.allcachemisses_total
+        - selector: allcachemisses_total
           name: misses
     - id: am_azure_redis_cache__instance_throughput
       title: Azure Cache for Redis Instance Throughput
@@ -504,9 +504,9 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.allcache_read_maximum
+        - selector: allcache_read_maximum
           name: read
-        - selector: redis_cache.allcache_write_maximum
+        - selector: allcache_write_maximum
           name: write
     - id: am_azure_redis_cache__instance_server_load
       title: Azure Cache for Redis Instance Server Load
@@ -516,9 +516,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.allserver_load_maximum
+        - selector: allserver_load_maximum
           name: server_load
-        - selector: redis_cache.allpercentprocessortime_maximum
+        - selector: allpercentprocessortime_maximum
           name: cpu
     - id: am_azure_redis_cache__instance_memory_usage
       title: Azure Cache for Redis Instance Memory Usage
@@ -528,9 +528,9 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.allusedmemory_maximum
+        - selector: allusedmemory_maximum
           name: used
-        - selector: redis_cache.allusedmemory_rss_maximum
+        - selector: allusedmemory_rss_maximum
           name: rss
     - id: am_azure_redis_cache__instance_memory_utilization
       title: Azure Cache for Redis Instance Memory Utilization
@@ -540,7 +540,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.allusedmemorypercentage_maximum
+        - selector: allusedmemorypercentage_maximum
           name: maximum
     - id: am_azure_redis_cache__instance_clients
       title: Azure Cache for Redis Instance Connected Clients
@@ -550,7 +550,7 @@ template:
       units: clients
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.allconnectedclients_maximum
+        - selector: allconnectedclients_maximum
           name: maximum
     - id: am_azure_redis_cache__instance_operations
       title: Azure Cache for Redis Instance Operations
@@ -560,7 +560,7 @@ template:
       units: operations/s
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.alloperations_per_second_maximum
+        - selector: alloperations_per_second_maximum
           name: maximum
     - id: am_azure_redis_cache__instance_commands
       title: Azure Cache for Redis Instance Commands Processed
@@ -570,11 +570,11 @@ template:
       units: commands/s
       algorithm: incremental
       dimensions:
-        - selector: redis_cache.alltotalcommandsprocessed_total
+        - selector: alltotalcommandsprocessed_total
           name: total
-        - selector: redis_cache.allgetcommands_total
+        - selector: allgetcommands_total
           name: get
-        - selector: redis_cache.allsetcommands_total
+        - selector: allsetcommands_total
           name: set
     - id: am_azure_redis_cache__instance_total_keys
       title: Azure Cache for Redis Instance Total Keys
@@ -584,7 +584,7 @@ template:
       units: keys
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.alltotalkeys_maximum
+        - selector: alltotalkeys_maximum
           name: maximum
     - id: am_azure_redis_cache__instance_key_events
       title: Azure Cache for Redis Instance Key Events
@@ -594,9 +594,9 @@ template:
       units: keys/s
       algorithm: incremental
       dimensions:
-        - selector: redis_cache.allevictedkeys_total
+        - selector: allevictedkeys_total
           name: evicted
-        - selector: redis_cache.allexpiredkeys_total
+        - selector: allexpiredkeys_total
           name: expired
     - id: am_azure_redis_cache__geo_replication_lag
       title: Azure Cache for Redis Geo-Replication Connectivity Lag
@@ -606,7 +606,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.geo_replication_connectivity_lag_average
+        - selector: geo_replication_connectivity_lag_average
           name: average
     - id: am_azure_redis_cache__geo_replication_sync_offset
       title: Azure Cache for Redis Geo-Replication Data Sync Offset
@@ -616,7 +616,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.geo_replication_data_sync_offset_average
+        - selector: geo_replication_data_sync_offset_average
           name: average
     - id: am_azure_redis_cache__geo_replication_sync_events
       title: Azure Cache for Redis Geo-Replication Sync Events
@@ -626,9 +626,9 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: redis_cache.geo_replication_full_sync_event_started_count
+        - selector: geo_replication_full_sync_event_started_count
           name: started
-        - selector: redis_cache.geo_replication_full_sync_event_finished_count
+        - selector: geo_replication_full_sync_event_finished_count
           name: finished
     - id: am_azure_redis_cache__geo_replication_health
       title: Azure Cache for Redis Geo-Replication Health
@@ -638,5 +638,5 @@ template:
       units: status
       algorithm: absolute
       dimensions:
-        - selector: redis_cache.geo_replication_healthy_average
+        - selector: geo_replication_healthy_average
           name: average

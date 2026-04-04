@@ -246,15 +246,15 @@ template:
       units: runs/s
       algorithm: incremental
       dimensions:
-        - selector: logic_apps.runs_started_total
+        - selector: runs_started_total
           name: started
-        - selector: logic_apps.runs_completed_total
+        - selector: runs_completed_total
           name: completed
-        - selector: logic_apps.runs_succeeded_total
+        - selector: runs_succeeded_total
           name: succeeded
-        - selector: logic_apps.runs_failed_total
+        - selector: runs_failed_total
           name: failed
-        - selector: logic_apps.runs_cancelled_total
+        - selector: runs_cancelled_total
           name: cancelled
     - id: am_azure_logic_apps__run_latency
       title: Azure Logic Apps Run Latency
@@ -264,9 +264,9 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: logic_apps.run_latency_average
+        - selector: run_latency_average
           name: all
-        - selector: logic_apps.run_success_latency_average
+        - selector: run_success_latency_average
           name: success
     - id: am_azure_logic_apps__run_failure_rate
       title: Azure Logic Apps Run Failure Rate
@@ -276,7 +276,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: logic_apps.run_failure_percentage_total
+        - selector: run_failure_percentage_total
           name: failure_rate
     - id: am_azure_logic_apps__run_throttling
       title: Azure Logic Apps Run Throttling
@@ -286,9 +286,9 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: logic_apps.run_throttled_events_total
+        - selector: run_throttled_events_total
           name: during_run
-        - selector: logic_apps.run_start_throttled_events_total
+        - selector: run_start_throttled_events_total
           name: at_start
     - id: am_azure_logic_apps__action_lifecycle
       title: Azure Logic Apps Action Lifecycle
@@ -298,15 +298,15 @@ template:
       units: actions/s
       algorithm: incremental
       dimensions:
-        - selector: logic_apps.actions_started_total
+        - selector: actions_started_total
           name: started
-        - selector: logic_apps.actions_completed_total
+        - selector: actions_completed_total
           name: completed
-        - selector: logic_apps.actions_succeeded_total
+        - selector: actions_succeeded_total
           name: succeeded
-        - selector: logic_apps.actions_failed_total
+        - selector: actions_failed_total
           name: failed
-        - selector: logic_apps.actions_skipped_total
+        - selector: actions_skipped_total
           name: skipped
     - id: am_azure_logic_apps__action_latency
       title: Azure Logic Apps Action Latency
@@ -316,9 +316,9 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: logic_apps.action_latency_average
+        - selector: action_latency_average
           name: all
-        - selector: logic_apps.action_success_latency_average
+        - selector: action_success_latency_average
           name: success
     - id: am_azure_logic_apps__action_throttling
       title: Azure Logic Apps Action Throttling
@@ -328,7 +328,7 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: logic_apps.action_throttled_events_total
+        - selector: action_throttled_events_total
           name: total
     - id: am_azure_logic_apps__trigger_lifecycle
       title: Azure Logic Apps Trigger Lifecycle
@@ -338,17 +338,17 @@ template:
       units: triggers/s
       algorithm: incremental
       dimensions:
-        - selector: logic_apps.triggers_started_total
+        - selector: triggers_started_total
           name: started
-        - selector: logic_apps.triggers_completed_total
+        - selector: triggers_completed_total
           name: completed
-        - selector: logic_apps.triggers_succeeded_total
+        - selector: triggers_succeeded_total
           name: succeeded
-        - selector: logic_apps.triggers_fired_total
+        - selector: triggers_fired_total
           name: fired
-        - selector: logic_apps.triggers_failed_total
+        - selector: triggers_failed_total
           name: failed
-        - selector: logic_apps.triggers_skipped_total
+        - selector: triggers_skipped_total
           name: skipped
     - id: am_azure_logic_apps__trigger_latency
       title: Azure Logic Apps Trigger Latency
@@ -358,11 +358,11 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: logic_apps.trigger_latency_average
+        - selector: trigger_latency_average
           name: all
-        - selector: logic_apps.trigger_fire_latency_average
+        - selector: trigger_fire_latency_average
           name: fire
-        - selector: logic_apps.trigger_success_latency_average
+        - selector: trigger_success_latency_average
           name: success
     - id: am_azure_logic_apps__trigger_throttling
       title: Azure Logic Apps Trigger Throttling
@@ -372,7 +372,7 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: logic_apps.trigger_throttled_events_total
+        - selector: trigger_throttled_events_total
           name: total
     - id: am_azure_logic_apps__billable_executions
       title: Azure Logic Apps Billable Executions
@@ -382,11 +382,11 @@ template:
       units: executions/s
       algorithm: incremental
       dimensions:
-        - selector: logic_apps.total_billable_executions_total
+        - selector: total_billable_executions_total
           name: total
-        - selector: logic_apps.billable_action_executions_total
+        - selector: billable_action_executions_total
           name: actions
-        - selector: logic_apps.billable_trigger_executions_total
+        - selector: billable_trigger_executions_total
           name: triggers
     - id: am_azure_logic_apps__billing_by_type
       title: Azure Logic Apps Billing by Type
@@ -396,11 +396,11 @@ template:
       units: operations/s
       algorithm: incremental
       dimensions:
-        - selector: logic_apps.billing_usage_native_operation_total
+        - selector: billing_usage_native_operation_total
           name: native
-        - selector: logic_apps.billing_usage_standard_connector_total
+        - selector: billing_usage_standard_connector_total
           name: standard_connector
-        - selector: logic_apps.billing_usage_storage_consumption_total
+        - selector: billing_usage_storage_consumption_total
           name: storage
     - id: am_azure_logic_apps__agent
       title: Azure Logic Apps AI Agent Activity
@@ -410,9 +410,9 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: logic_apps.agent_loop_execution_total
+        - selector: agent_loop_execution_total
           name: loop_executions
-        - selector: logic_apps.completion_token_overflow_usage_total
+        - selector: completion_token_overflow_usage_total
           name: completion_overflow
-        - selector: logic_apps.prompt_token_overflow_usage_total
+        - selector: prompt_token_overflow_usage_total
           name: prompt_overflow
