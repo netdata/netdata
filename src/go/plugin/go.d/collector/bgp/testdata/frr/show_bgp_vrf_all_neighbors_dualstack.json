@@ -1,0 +1,31 @@
+{
+  "default": {
+    "192.0.2.2": {
+      "nbrDesc": "{\"desc\":\"dualstack-edge\"}",
+      "peerGroup": "transit",
+      "messageStats": {
+        "notificationsSent": 1,
+        "notificationsRecv": 0,
+        "updatesSent": 12,
+        "updatesRecv": 13,
+        "keepalivesSent": 80,
+        "keepalivesRecv": 81,
+        "routeRefreshSent": 2,
+        "routeRefreshRecv": 1
+      },
+      "addressFamilyInfo": {
+        "ipv4Unicast": {
+          "acceptedPrefixCounter": 4,
+          "sentPrefixCounter": 6
+        },
+        "ipv6Unicast": {
+          "acceptedPrefixCounter": 2,
+          "sentPrefixCounter": 5
+        }
+      },
+      "connectionsEstablished": 4,
+      "connectionsDropped": 1,
+      "lastReset": "never"
+    }
+  }
+}

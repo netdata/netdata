@@ -315,10 +315,40 @@ func validateEnrichMetricTag(metricTag *MetricTagConfig) error {
 		metricTag.Symbol.OID = metricTag.OID
 		metricTag.OID = ""
 	}
-	if metricTag.Symbol.OID != "" || metricTag.Symbol.Name != "" {
+	if isRawIndexMetricTag(*metricTag) {
+		symbol := SymbolConfig(metricTag.Symbol)
+		if symbol.Name == "" && metricTag.Tag == "" {
+			errs = append(errs, errors.New("raw index metric tag requires `tag` or `symbol.name`"))
+		}
+		if symbol.ExtractValue != "" {
+			pattern, err := regexp.Compile(symbol.ExtractValue)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("cannot compile `extract_value` (%s): %s", symbol.ExtractValue, err.Error()))
+			} else {
+				symbol.ExtractValueCompiled = pattern
+			}
+		}
+		if symbol.MatchPattern != "" {
+			pattern, err := regexp.Compile(symbol.MatchPattern)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("cannot compile `match_pattern` (%s): %s", symbol.MatchPattern, err.Error()))
+			} else {
+				symbol.MatchPatternCompiled = pattern
+			}
+		}
+		metricTag.Symbol = SymbolConfigCompat(symbol)
+	} else if metricTag.Symbol.OID != "" || metricTag.Symbol.Name != "" {
 		symbol := SymbolConfig(metricTag.Symbol)
 		errs = append(errs, validateEnrichSymbol(&symbol, MetricTagSymbol))
 		metricTag.Symbol = SymbolConfigCompat(symbol)
+	}
+	if metricTag.LookupSymbol.OID != "" || metricTag.LookupSymbol.Name != "" {
+		symbol := SymbolConfig(metricTag.LookupSymbol)
+		errs = append(errs, validateEnrichSymbol(&symbol, MetricTagSymbol))
+		metricTag.LookupSymbol = SymbolConfigCompat(symbol)
+		if metricTag.Table == "" {
+			errs = append(errs, errors.New("`lookup_symbol` requires `table`"))
+		}
 	}
 	if metricTag.Match != "" {
 		pattern, err := regexp.Compile(metricTag.Match)
@@ -335,10 +365,29 @@ func validateEnrichMetricTag(metricTag *MetricTagConfig) error {
 		errs = append(errs, fmt.Errorf("``tag` must be provided if `mapping` (`%s`) is defined", metricTag.Mapping))
 	}
 	for _, transform := range metricTag.IndexTransform {
-		if transform.Start > transform.End {
+		if transform.DropRight == 0 && transform.Start > transform.End {
 			errs = append(errs, fmt.Errorf("transform rule end should be greater than start. Invalid rule: %#v", transform))
 		}
 	}
 
 	return errors.Join(errs...)
+}
+
+func isRawIndexMetricTag(metricTag MetricTagConfig) bool {
+	if metricTag.Table != "" || metricTag.Symbol.OID != "" {
+		return false
+	}
+
+	if metricTag.Index != 0 {
+		return metricTag.Symbol.Format != "" ||
+			metricTag.Symbol.ExtractValue != "" ||
+			metricTag.Symbol.MatchPattern != "" ||
+			len(metricTag.Mapping) > 0
+	}
+
+	return len(metricTag.IndexTransform) > 0 ||
+		metricTag.Symbol.Format != "" ||
+		metricTag.Symbol.ExtractValue != "" ||
+		metricTag.Symbol.MatchPattern != "" ||
+		len(metricTag.Mapping) > 0
 }

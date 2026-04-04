@@ -947,6 +947,7 @@ Cross-table tags let you **use data from another SNMP table** as a tag source.
 - Reads tag values from the specified `table:` instead of the current one.
 - Matches rows between tables by their **index**.
 - When index structures differ, an optional `index_transform` can modify the current table’s index to align it with the target.
+- When the target table is keyed differently, an optional `lookup_symbol` can match a transformed index value against a column in the target table and then read tags from the matched row.
 
 #### Same Index
 
@@ -1064,7 +1065,86 @@ metrics:
 - `start` and `end` positions are **zero-based** (0 = first index element).
 - Each range defines which parts of the index to keep.
 - You can list multiple ranges to combine non-contiguous parts.
+- `drop_right` can be used instead of `end` when you need to keep a variable-length prefix of the index and trim a fixed number of trailing elements.
 - The goal is to make the current table’s index **match** the target table’s index so tags align correctly.
+
+Example with `drop_right`:
+
+```yaml
+metric_tags:
+  - tag: peer_index
+    table: peerTable
+    symbol:
+      OID: 1.2.3.4.5
+      name: peerRemoteAs
+    index_transform:
+      - start: 0
+        drop_right: 2
+```
+
+If the current row index is `1.192.0.2.1.1.128`, the transform keeps `1.192.0.2.1` and drops the trailing AFI / SAFI pair.
+
+#### With Value Lookup (`lookup_symbol`)
+
+Some vendor MIBs split related data across tables that do **not** share the same row index.
+
+For example:
+
+- a prefix-counter table may be indexed by `peerIndex.afi.safi`
+- the peer table may be indexed by `routingInstance.localAddr.remoteAddr`
+- but the peer table still contains a `peerIndex` column
+
+In that case, `index_transform` alone is not enough:
+
+- it can extract the current row's `peerIndex`
+- but it cannot guess which peer-table row owns that `peerIndex`
+
+Use `lookup_symbol` to tell the collector:
+
+1. Extract a lookup value from the current row index
+2. Find the row in the target table whose `lookup_symbol` column matches that value
+3. Read the requested `symbol` from that matched row
+
+```yaml
+metrics:
+  - MIB: BGP4-V2-MIB-JUNIPER
+    table:
+      OID: 1.3.6.1.4.1.2636.5.1.1.2.6.2
+      name: jnxBgpM2PrefixCountersTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2636.5.1.1.2.6.2.1.8
+        name: bgpPeerPrefixesAccepted
+    metric_tags:
+      - tag: neighbor
+        table: jnxBgpM2PeerTable
+        symbol:
+          OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.11
+          name: jnxBgpM2PeerRemoteAddr
+        lookup_symbol:
+          OID: 1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14
+          name: jnxBgpM2PeerIndex
+        index_transform:
+          - start: 0
+            end: 0
+```
+
+**What this does**:
+
+- Collects accepted-prefix counters from the Juniper prefix table
+- Takes the first index element from the current row (`peerIndex`)
+- Scans `jnxBgpM2PeerTable.jnxBgpM2PeerIndex` for a matching value
+- Reads `jnxBgpM2PeerRemoteAddr` from the matched peer-table row
+- Produces metrics like:
+    ```text
+    bgpPeerPrefixesAccepted{neighbor="192.0.2.1"} = 1234
+    ```
+
+**Important behavior**:
+
+- `lookup_symbol` is used only for **cross-table tags**
+- it works together with `index_transform`, not instead of it
+- the transformed index value must match **exactly one** row in the target table
+- if no row matches, or if multiple rows match, the tag lookup fails for that row
 
 ### Index-Based
 
@@ -1078,6 +1158,7 @@ This is useful when a table encodes identifiers (like method, code, or port numb
 - For each `index:` rule, assigns a tag using the specified position in the index.
 - Converts numeric index components to strings automatically.
 - Attaches all resulting tags to the metric collected from that row.
+- Can also derive tags from the full row index using `index_transform` plus `symbol.format`, `symbol.extract_value`, `symbol.match_pattern`, or `mapping`, even when there is no column OID for that tag.
 
 ```yaml
 metrics:
@@ -1118,6 +1199,25 @@ metrics:
     ```text
     sipCommonStatusCodeIns{applIndex="1", sipCommonStatusCodeMethod="6", sipCommonStatusCodeValue="200"} = 42
     ```
+
+Derived tag example from a transformed index:
+
+```yaml
+metric_tags:
+  - tag: neighbor
+    symbol:
+      name: peerRemoteAddrIndex
+      format: ip_address
+    index_transform:
+      - start: 1
+        drop_right: 2
+```
+
+If the current row index is `1.192.0.2.1.1.128`, the collector:
+
+- keeps the peer-address part only: `192.0.2.1`
+- formats it as an IP address
+- emits `neighbor="192.0.2.1"`
 
 ## Tag Transformation
 
@@ -1364,6 +1464,7 @@ These transformations are typically used to:
 | **Where**                 | Value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`.                                      |
 | **Order of application**  | 1️⃣ `extract_value` (if present) → 2️⃣ `mapping` → 3️⃣ `scale_factor`.                                                    |
 | **Scale factor position** | `scale_factor` is always applied **last**, after all other transformations.                                               |
+| **String base parsing**   | String-like values are parsed as base-10 by default. If `format: hex` is set, extracted values are parsed as base-16.   |
 | **Data type handling**    | Transformations preserve numeric type (integer/float) unless the mapping converts it to a multi-value metric.             |
 | **Error handling**        | If a transformation fails (e.g., regex doesn’t match), the collector keeps the original value.                            |
 | **Applicability**         | Transformations affect metric values only — not metadata or tags.                                                         |
@@ -1382,6 +1483,12 @@ These transformations are typically used to:
 - `extract_value`
     ```yaml
     extract_value: '(\d+)'   # First capture group is used
+    ```
+
+- `format: hex`
+    ```yaml
+    format: hex
+    extract_value: '^([0-9a-f]{2})'   # First byte of an OCTET STRING
     ```
 
 - `scale_factor`
@@ -1459,6 +1566,7 @@ metrics:
 - Extracts only the numeric part `"23"` and uses it as the metric value.
 - If the value doesn’t match, the original string is retained.
 - Ideal for string metrics that embed numbers, units, or labels.
+- If `format: hex` is also set, the extracted value is interpreted as hexadecimal before being stored as a metric.
 
 ### Scale Factor
 
@@ -1539,6 +1647,8 @@ virtual_metrics:
 
     per_row: <true|false>
     group_by: <label | [labels]>
+    emit_tags:
+      - { tag: <outputTag>, from: <sourceTag> }
     chart_meta:
       description: ...
       family: ...
@@ -1561,10 +1671,14 @@ The collector evaluates alternatives **in order** and uses the **first** set tha
 |                    | `alternatives` | array\<Alternative\> | no*      | —       | totals, per_row, grouped | Ordered fallback sets. The first alternative whose sources produce data is used.                                                                                                |
 |                    | `per_row`      | bool                 | no       | false   | per-row/grouped          | When `true`, emits one output per input row; sources become dimensions; row tags attach.                                                                                        |
 |                    | `group_by`     | string / array       | no       | —       | per-row/grouped          | Label(s) used as row-key hints (in order). Missing/empty hints fall back to a full-tag stable key. With `per_row:false`, this acts like PromQL’s `sum by (...)`.                |
+|                    | `emit_tags`    | array\<EmitTag\>     | no       | —       | per-row/grouped          | Renames or selects which source tags are emitted on the resulting virtual metric. Useful when grouping by private tags such as `_neighbor` but exporting standard tags such as `neighbor`. |
 |                    | `chart_meta`   | object               | no       | —       | all                      | Presentation metadata (`description`, `family`, `unit`, `type`).                                                                                                                |
 | **Source**         | `metric`       | string               | yes      | —       | —                        | Name of an existing metric (scalar or table column metric).                                                                                                                     |
 |                    | `table`        | string               | yes      | —       | —                        | Table name for the originating metric. Must match the metric’s table when used in per-row/grouped.                                                                              |
 |                    | `as`           | string               | yes      | —       | —                        | Dimension name within the composite (e.g., `in`, `out`).                                                                                                                        |
+|                    | `dim`          | string               | no       | —       | —                        | Selects one dimension from a MultiValue source metric (for example `start` or `established`) before aggregation. Useful when composing virtual metrics from mapped status charts. |
+| **EmitTag**        | `tag`          | string               | yes      | —       | —                        | Output tag name to emit on the virtual metric.                                                                                                                                   |
+|                    | `from`         | string               | yes      | —       | —                        | Existing source-tag name to copy from the grouped source rows.                                                                                                                   |
 | **Alternative**    | `sources`      | array\<Source\>      | yes      | —       | —                        | All sources in an alternative are evaluated together. If none produce data, the collector tries the next alternative. Per-row/group rules apply within the winning alternative. |
 
 > At least one of `sources` or `alternatives` **must be defined**.
@@ -1578,9 +1692,11 @@ The collector evaluates alternatives **in order** and uses the **first** set tha
 | **per_row: true**                 | One output per input row; multiple sources become chart dimensions (`as`); row tags attach automatically.                                              |
 | **group_by (with per_row:true)**  | Acts as row-key hints (in order). Missing or empty hints fall back to a full-tag composite key.                                                        |
 | **group_by (with per_row:false)** | Aggregates rows by the listed labels, similar to PromQL’s `sum by (...)`.                                                                              |
+| **emit_tags**                     | If omitted, emitted tags are copied from the winning source row set as-is. When set, only the listed tags are emitted, using the `from` source-tag names. |
 | **Alternative evaluation**        | Alternatives are checked in order. The first whose sources produce data becomes the “winner”; others are ignored.                                      |
 | **Parent metadata**               | The virtual metric emits charts using its own `name` and `chart_meta`, even when data comes from an alternative.                                       |
 | **Dimensions**                    | Each `as` value defines a dimension in the resulting chart (e.g., `in`, `out`, `total`).                                                               |
+| **Selected source dimension**     | When `dim` is set on a source, the collector reads only that MultiValue dimension from the source metric and ignores the rest.                            |
 | **Totals vs per-row**             | Omitting both `per_row` and `group_by` produces a single total chart across all rows (device-wide view).                                               |
 
 ### Examples
@@ -1644,6 +1760,54 @@ virtual_metrics:
       family: 'Network/InterfaceType/Traffic'
       unit: "bit/s"
 ```
+
+#### Per-row availability from mapped status charts
+
+```yaml
+virtual_metrics:
+  - name: bgpPeerAvailability
+    per_row: true
+    sources:
+      - { metric: bgpPeerAdminStatus, table: bgpPeerTable, as: admin_enabled, dim: start }
+      - { metric: bgpPeerState, table: bgpPeerTable, as: established, dim: established }
+    chart_meta:
+      description: BGP peer administrative and established availability
+      family: 'Network/Routing/BGP/Peer/Availability'
+      unit: "{status}"
+```
+
+**What this does**:
+
+- Reuses mapped one-hot status charts instead of adding duplicate raw-code metrics.
+- Reads only the `start` dimension from `bgpPeerAdminStatus`.
+- Reads only the `established` dimension from `bgpPeerState`.
+- Emits one per-peer chart row with stable dimensions `admin_enabled` and `established`.
+
+#### Per-row grouping by private tags, but emitting normalized tags
+
+```yaml
+virtual_metrics:
+  - name: bgpPeerAvailability
+    per_row: true
+    group_by: ["_neighbor", "_address_family", "_subsequent_address_family"]
+    emit_tags:
+      - { tag: neighbor, from: _neighbor }
+      - { tag: address_family, from: _address_family }
+      - { tag: subsequent_address_family, from: _subsequent_address_family }
+    sources:
+      - { metric: hwBgpPeerAdminStatus, table: hwBgpPeerRouteTable, as: admin_enabled, dim: start }
+      - { metric: hwBgpPeerState, table: hwBgpPeerRouteTable, as: established, dim: established }
+    chart_meta:
+      description: BGP peer availability
+      family: 'Network/Routing/BGP/Peer/Availability'
+      unit: "{status}"
+```
+
+**What this does**:
+
+- Groups rows using private helper tags that are not meant to appear in the final chart labels.
+- Emits standard operator-facing tags on the virtual metric (`neighbor`, `address_family`, `subsequent_address_family`).
+- Avoids collapsing multiple AFI/SAFI rows for the same peer into one output row.
 
 **What this does**:
 

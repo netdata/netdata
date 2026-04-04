@@ -746,6 +746,40 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 			},
 		},
 
+		"composite with selected multivalue dimensions": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name: "bgpPeerAvailability",
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "bgpPeerAdminStatus", Table: "bgpPeerTable", As: "admin_enabled", Dim: "start"},
+							{Metric: "bgpPeerState", Table: "bgpPeerTable", As: "established", Dim: "established"},
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{
+					Name:       "bgpPeerAdminStatus",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					MultiValue: map[string]int64{"stop": 0, "start": 1},
+				},
+				{
+					Name:       "bgpPeerState",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					MultiValue: map[string]int64{"idle": 0, "connect": 0, "active": 0, "opensent": 0, "openconfirm": 0, "established": 1},
+				},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:       "bgpPeerAvailability",
+					MultiValue: map[string]int64{"admin_enabled": 1, "established": 1},
+				},
+			},
+		},
+
 		"composite with scalar sources (CPU)": {
 			profileDef: &ddprofiledefinition.ProfileDefinition{
 				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
@@ -1058,6 +1092,333 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 					Table:      "ifXTable",
 					Tags:       map[string]string{"interface": "ethB", "ifType": "ethernetCsmacd", "ifIndex": "12"},
 					MultiValue: map[string]int64{"in": 1, "out": 2},
+				},
+			},
+		},
+
+		"per_row composite with selected multivalue dimensions": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name:    "bgpPeerAvailability",
+						PerRow:  true,
+						GroupBy: []string{"neighbor"},
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "bgpPeerAdminStatus", Table: "bgpPeerTable", As: "admin_enabled", Dim: "start"},
+							{Metric: "bgpPeerState", Table: "bgpPeerTable", As: "established", Dim: "established"},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Per-peer availability",
+							Family:      "Network/Routing/BGP/Peer/Availability",
+							Unit:        "{status}",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{
+					Name:       "bgpPeerAdminStatus",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					Tags:       map[string]string{"neighbor": "192.0.2.1", "remote_as": "64512"},
+					MultiValue: map[string]int64{"stop": 0, "start": 1},
+				},
+				{
+					Name:       "bgpPeerState",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					Tags:       map[string]string{"neighbor": "192.0.2.1", "remote_as": "64512"},
+					MultiValue: map[string]int64{"idle": 1, "connect": 0, "active": 0, "opensent": 0, "openconfirm": 0, "established": 0},
+				},
+				{
+					Name:       "bgpPeerAdminStatus",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					Tags:       map[string]string{"neighbor": "2001:db8::1", "remote_as": "64513"},
+					MultiValue: map[string]int64{"stop": 1, "start": 0},
+				},
+				{
+					Name:       "bgpPeerState",
+					IsTable:    true,
+					Table:      "bgpPeerTable",
+					Tags:       map[string]string{"neighbor": "2001:db8::1", "remote_as": "64513"},
+					MultiValue: map[string]int64{"idle": 1, "connect": 0, "active": 0, "opensent": 0, "openconfirm": 0, "established": 0},
+				},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:        "bgpPeerAvailability",
+					IsTable:     true,
+					Table:       "bgpPeerTable",
+					Tags:        map[string]string{"neighbor": "192.0.2.1", "remote_as": "64512"},
+					MultiValue:  map[string]int64{"admin_enabled": 1, "established": 0},
+					Description: "Per-peer availability",
+					Family:      "Network/Routing/BGP/Peer/Availability",
+					Unit:        "{status}",
+				},
+				{
+					Name:        "bgpPeerAvailability",
+					IsTable:     true,
+					Table:       "bgpPeerTable",
+					Tags:        map[string]string{"neighbor": "2001:db8::1", "remote_as": "64513"},
+					MultiValue:  map[string]int64{"admin_enabled": 0, "established": 0},
+					Description: "Per-peer availability",
+					Family:      "Network/Routing/BGP/Peer/Availability",
+					Unit:        "{status}",
+				},
+			},
+		},
+
+		"per_row composite can group by hidden tags and emit normalized tags": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name:    "bgpPeerAvailability",
+						PerRow:  true,
+						GroupBy: []string{"_routing_instance", "_neighbor", "_address_family", "_subsequent_address_family"},
+						EmitTags: []ddprofiledefinition.VirtualMetricEmitTagConfig{
+							{Tag: "routing_instance", From: "_routing_instance"},
+							{Tag: "neighbor", From: "_neighbor"},
+							{Tag: "address_family", From: "_address_family"},
+							{Tag: "subsequent_address_family", From: "_subsequent_address_family"},
+							{Tag: "remote_as", From: "_remote_as"},
+						},
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "bgpPeerAdminStatus", Table: "hwBgpPeerTable", As: "admin_enabled", Dim: "start"},
+							{Metric: "bgpPeerState", Table: "hwBgpPeerTable", As: "established", Dim: "established"},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Per-peer availability",
+							Family:      "Network/Routing/BGP/Peer/Availability",
+							Unit:        "{status}",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{
+					Name:    "bgpPeerAdminStatus",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"huawei_hw_bgp_peer_vrf_name":    "blue",
+						"huawei_hw_bgp_peer_remote_addr": "192.0.2.1",
+						"_routing_instance":              "blue",
+						"_neighbor":                      "192.0.2.1",
+						"_remote_as":                     "64512",
+						"_address_family":                "ipv4",
+						"_subsequent_address_family":     "unicast",
+					},
+					MultiValue: map[string]int64{"stop": 0, "start": 1},
+				},
+				{
+					Name:    "bgpPeerState",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"huawei_hw_bgp_peer_vrf_name":    "blue",
+						"huawei_hw_bgp_peer_remote_addr": "192.0.2.1",
+						"_routing_instance":              "blue",
+						"_neighbor":                      "192.0.2.1",
+						"_remote_as":                     "64512",
+						"_address_family":                "ipv4",
+						"_subsequent_address_family":     "unicast",
+					},
+					MultiValue: map[string]int64{"idle": 0, "established": 1},
+				},
+				{
+					Name:    "bgpPeerAdminStatus",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"huawei_hw_bgp_peer_vrf_name":    "blue",
+						"huawei_hw_bgp_peer_remote_addr": "192.0.2.1",
+						"_routing_instance":              "blue",
+						"_neighbor":                      "192.0.2.1",
+						"_remote_as":                     "64512",
+						"_address_family":                "ipv6",
+						"_subsequent_address_family":     "unicast",
+					},
+					MultiValue: map[string]int64{"stop": 0, "start": 1},
+				},
+				{
+					Name:    "bgpPeerState",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"huawei_hw_bgp_peer_vrf_name":    "blue",
+						"huawei_hw_bgp_peer_remote_addr": "192.0.2.1",
+						"_routing_instance":              "blue",
+						"_neighbor":                      "192.0.2.1",
+						"_remote_as":                     "64512",
+						"_address_family":                "ipv6",
+						"_subsequent_address_family":     "unicast",
+					},
+					MultiValue: map[string]int64{"idle": 1, "established": 0},
+				},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:    "bgpPeerAvailability",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"routing_instance":          "blue",
+						"neighbor":                  "192.0.2.1",
+						"address_family":            "ipv4",
+						"subsequent_address_family": "unicast",
+						"remote_as":                 "64512",
+					},
+					MultiValue:  map[string]int64{"admin_enabled": 1, "established": 1},
+					Description: "Per-peer availability",
+					Family:      "Network/Routing/BGP/Peer/Availability",
+					Unit:        "{status}",
+				},
+				{
+					Name:    "bgpPeerAvailability",
+					IsTable: true,
+					Table:   "hwBgpPeerTable",
+					Tags: map[string]string{
+						"routing_instance":          "blue",
+						"neighbor":                  "192.0.2.1",
+						"address_family":            "ipv6",
+						"subsequent_address_family": "unicast",
+						"remote_as":                 "64512",
+					},
+					MultiValue:  map[string]int64{"admin_enabled": 1, "established": 0},
+					Description: "Per-peer availability",
+					Family:      "Network/Routing/BGP/Peer/Availability",
+					Unit:        "{status}",
+				},
+			},
+		},
+
+		"per_row composite can group by metric static tags": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name:    "bgpPeerUpdates",
+						PerRow:  true,
+						GroupBy: []string{"routing_instance", "neighbor", "address_family", "subsequent_address_family"},
+						EmitTags: []ddprofiledefinition.VirtualMetricEmitTagConfig{
+							{Tag: "routing_instance", From: "routing_instance"},
+							{Tag: "neighbor", From: "neighbor"},
+							{Tag: "address_family", From: "address_family"},
+							{Tag: "subsequent_address_family", From: "subsequent_address_family"},
+							{Tag: "remote_as", From: "remote_as"},
+						},
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "bgpPeerInUpdates", Table: "tBgpPeerNgOperTable", As: "received"},
+							{Metric: "bgpPeerOutUpdates", Table: "tBgpPeerNgOperTable", As: "sent"},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Per-peer update traffic",
+							Family:      "Network/Routing/BGP/Peer/Message/Update",
+							Unit:        "{message}",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{
+					Name:       "bgpPeerInUpdates",
+					Value:      11,
+					IsTable:    true,
+					Table:      "tBgpPeerNgOperTable",
+					MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+					Tags: map[string]string{
+						"routing_instance": "Base",
+						"neighbor":         "192.0.2.1",
+						"remote_as":        "64512",
+					},
+					StaticTags: map[string]string{
+						"address_family":            "ipv4",
+						"subsequent_address_family": "unicast",
+					},
+				},
+				{
+					Name:       "bgpPeerOutUpdates",
+					Value:      12,
+					IsTable:    true,
+					Table:      "tBgpPeerNgOperTable",
+					MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+					Tags: map[string]string{
+						"routing_instance": "Base",
+						"neighbor":         "192.0.2.1",
+						"remote_as":        "64512",
+					},
+					StaticTags: map[string]string{
+						"address_family":            "ipv4",
+						"subsequent_address_family": "unicast",
+					},
+				},
+				{
+					Name:       "bgpPeerInUpdates",
+					Value:      21,
+					IsTable:    true,
+					Table:      "tBgpPeerNgOperTable",
+					MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+					Tags: map[string]string{
+						"routing_instance": "Base",
+						"neighbor":         "192.0.2.1",
+						"remote_as":        "64512",
+					},
+					StaticTags: map[string]string{
+						"address_family":            "ipv6",
+						"subsequent_address_family": "unicast",
+					},
+				},
+				{
+					Name:       "bgpPeerOutUpdates",
+					Value:      22,
+					IsTable:    true,
+					Table:      "tBgpPeerNgOperTable",
+					MetricType: ddprofiledefinition.ProfileMetricTypeRate,
+					Tags: map[string]string{
+						"routing_instance": "Base",
+						"neighbor":         "192.0.2.1",
+						"remote_as":        "64512",
+					},
+					StaticTags: map[string]string{
+						"address_family":            "ipv6",
+						"subsequent_address_family": "unicast",
+					},
+				},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:    "bgpPeerUpdates",
+					IsTable: true,
+					Table:   "tBgpPeerNgOperTable",
+					Tags: map[string]string{
+						"routing_instance":          "Base",
+						"neighbor":                  "192.0.2.1",
+						"address_family":            "ipv4",
+						"subsequent_address_family": "unicast",
+						"remote_as":                 "64512",
+					},
+					MultiValue:  map[string]int64{"received": 11, "sent": 12},
+					Description: "Per-peer update traffic",
+					Family:      "Network/Routing/BGP/Peer/Message/Update",
+					Unit:        "{message}",
+					MetricType:  ddprofiledefinition.ProfileMetricTypeRate,
+				},
+				{
+					Name:    "bgpPeerUpdates",
+					IsTable: true,
+					Table:   "tBgpPeerNgOperTable",
+					Tags: map[string]string{
+						"routing_instance":          "Base",
+						"neighbor":                  "192.0.2.1",
+						"address_family":            "ipv6",
+						"subsequent_address_family": "unicast",
+						"remote_as":                 "64512",
+					},
+					MultiValue:  map[string]int64{"received": 21, "sent": 22},
+					Description: "Per-peer update traffic",
+					Family:      "Network/Routing/BGP/Peer/Message/Update",
+					Unit:        "{message}",
+					MetricType:  ddprofiledefinition.ProfileMetricTypeRate,
 				},
 			},
 		},

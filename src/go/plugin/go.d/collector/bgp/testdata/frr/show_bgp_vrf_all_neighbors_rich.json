@@ -1,0 +1,115 @@
+{
+  "default": {
+    "vrfId": 0,
+    "vrfName": "default",
+    "192.168.0.2": {
+      "nbrDesc": "{\"desc\":\"edge-01\"}",
+      "peerGroup": "transit",
+      "messageStats": {
+        "notificationsSent": 1,
+        "notificationsRecv": 0,
+        "updatesSent": 10,
+        "updatesRecv": 12,
+        "keepalivesSent": 80,
+        "keepalivesRecv": 78,
+        "routeRefreshSent": 1,
+        "routeRefreshRecv": 0
+      },
+      "addressFamilyInfo": {
+        "ipv4Unicast": {
+          "acceptedPrefixCounter": 2,
+          "sentPrefixCounter": 4
+        }
+      },
+      "connectionsEstablished": 3,
+      "connectionsDropped": 2,
+      "lastReset": "BGP Notification received",
+      "lastErrorCodeSubcode": "6/3",
+      "downLastResetCode": 6,
+      "downLastResetTimeSecs": 42,
+      "lastNotificationHardReset": true
+    },
+    "192.168.0.3": {
+      "nbrDesc": "backup-peer",
+      "peerGroup": "transit",
+      "messageStats": {
+        "notificationsSent": 0,
+        "notificationsRecv": 1,
+        "updatesSent": 4,
+        "updatesRecv": 5,
+        "keepalivesSent": 12,
+        "keepalivesRecv": 10,
+        "routeRefreshSent": 0,
+        "routeRefreshRecv": 0
+      },
+      "connectionsEstablished": 1,
+      "connectionsDropped": 1,
+      "lastReset": "BGP Notification received",
+      "lastErrorCodeSubcode": "4/0",
+      "downLastResetCode": 4,
+      "downLastResetTimeSecs": 15
+    },
+    "192.168.0.4": {
+      "peerGroup": "standby",
+      "messageStats": {
+        "notificationsSent": 0,
+        "notificationsRecv": 0,
+        "updatesSent": 0,
+        "updatesRecv": 0,
+        "keepalivesSent": 0,
+        "keepalivesRecv": 0,
+        "routeRefreshSent": 0,
+        "routeRefreshRecv": 0
+      },
+      "connectionsEstablished": 0,
+      "connectionsDropped": 0,
+      "lastReset": "never"
+    }
+  },
+  "red": {
+    "vrfId": 39,
+    "vrfName": "red",
+    "192.168.1.2": {
+      "nbrDesc": "{\"description\":\"branch-west\"}",
+      "peerGroup": "branches",
+      "messageStats": {
+        "notificationsSent": 0,
+        "notificationsRecv": 0,
+        "updatesSent": 14,
+        "updatesRecv": 15,
+        "keepalivesSent": 84,
+        "keepalivesRecv": 83,
+        "routeRefreshSent": 0,
+        "routeRefreshRecv": 1
+      },
+      "addressFamilyInfo": {
+        "ipv4Unicast": {
+          "acceptedPrefixCounter": 1,
+          "sentPrefixCounter": 2
+        }
+      },
+      "connectionsEstablished": 4,
+      "connectionsDropped": 1,
+      "lastReset": "BGP Notification received",
+      "lastErrorCodeSubcode": "5/1",
+      "downLastResetCode": 5,
+      "downLastResetTimeSecs": 7
+    },
+    "192.168.1.3": {
+      "nbrDesc": "{\"desc\":\"branch-backup\"}",
+      "messageStats": {
+        "notificationsSent": 1,
+        "notificationsRecv": 0,
+        "updatesSent": 7,
+        "updatesRecv": 6,
+        "keepalivesSent": 16,
+        "keepalivesRecv": 15,
+        "routeRefreshSent": 0,
+        "routeRefreshRecv": 0
+      },
+      "connectionsEstablished": 2,
+      "connectionsDropped": 2,
+      "lastReset": "never"
+    }
+  }
+}

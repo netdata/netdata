@@ -1,0 +1,7 @@
+BIRD 3.2.0 ready.
+Name       Proto      Table      State  Since                 Info
+rpki1      RPKI       ---        up     2026-04-03 07:55:00   Established
+  Description:        Primary validator
+
+rpki2      RPKI       ---        start  2026-04-03 07:58:30   Active
+  Description:        Backup validator

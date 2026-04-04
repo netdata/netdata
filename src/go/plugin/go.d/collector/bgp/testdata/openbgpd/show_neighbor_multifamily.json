@@ -1,0 +1,57 @@
+{
+  "neighbors": [
+    {
+      "remote_as": "65001",
+      "group": "transit",
+      "remote_addr": "198.51.100.2",
+      "bgpid": "198.51.100.2",
+      "state": "Established",
+      "last_updown": "2d03h04m",
+      "stats": {
+        "prefixes": {
+          "sent": 200,
+          "received": 100
+        },
+        "message": {
+          "sent": {
+            "notifications": 1,
+            "updates": 22,
+            "keepalives": 500,
+            "route_refresh": 4,
+            "total": 527
+          },
+          "received": {
+            "notifications": 0,
+            "updates": 20,
+            "keepalives": 480,
+            "route_refresh": 3,
+            "total": 503
+          }
+        },
+        "update": {
+          "sent": {
+            "updates": 22,
+            "withdraws": 2,
+            "eor": 1
+          },
+          "received": {
+            "updates": 20,
+            "withdraws": 1,
+            "eor": 1
+          }
+        }
+      },
+      "session": {
+        "local": {
+          "address": "203.0.113.1"
+        },
+        "capabilities": {
+          "multiprotocol": [
+            "IPv4 unicast",
+            "IPv6 unicast"
+          ]
+        }
+      }
+    }
+  ]
+}
