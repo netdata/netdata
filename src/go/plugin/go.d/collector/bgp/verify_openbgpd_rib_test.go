@@ -82,4 +82,3 @@ socket "/run/bgpd.rsock" restricted
 network 203.0.113.0/24
 flowspec inet from any to 203.0.113.0/24 port 53 set ext-community flow-rate 65010:0
 `
-

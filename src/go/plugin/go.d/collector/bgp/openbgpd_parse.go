@@ -395,5 +395,5 @@ func openbgpdPeerScope(entry openbgpdNeighbor, remoteAS int64) string {
 	if value := strings.TrimSpace(entry.BGPID); value != "" {
 		parts = append(parts, value)
 	}
-	return strings.Join(parts, "/")
+	return makeCompositeID(parts...)
 }

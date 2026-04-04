@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -118,5 +119,5 @@ func frrRPKICacheName(mode, host, port string, preference int64) string {
 }
 
 func frrRPKICacheKey(mode, host, port string, preference int64) string {
-	return frrRPKICacheName(mode, host, port, preference)
+	return makeCompositeID(mode, host, port, strconv.FormatInt(preference, 10))
 }

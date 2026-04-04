@@ -9,7 +9,7 @@ import (
 )
 
 func makeFamilyID(vrf, afi, safi string) string {
-	return joinID(idPart(vrf), idPart(afi), idPart(safi))
+	return makeCompositeID(vrf, afi, safi)
 }
 
 func makePeerID(familyID, address string) string {
@@ -38,10 +38,21 @@ func makeVNIID(tenantVRF string, vni int64, kind string) string {
 	return joinID(idPart(tenantVRF), idPart(kind), strconv.FormatInt(vni, 10))
 }
 
+func makeCompositeID(parts ...string) string {
+	encoded := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		encoded = append(encoded, idPart(part))
+	}
+	return joinID(encoded...)
+}
+
 func joinID(parts ...string) string {
 	filtered := make([]string, 0, len(parts))
 	for _, part := range parts {
-		part = strings.Trim(part, "_")
 		if part == "" {
 			continue
 		}
@@ -82,7 +93,7 @@ func idPart(value string) string {
 		}
 	}
 
-	out := strings.Trim(b.String(), "_")
+	out := b.String()
 	if out == "" {
 		return "unknown"
 	}

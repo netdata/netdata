@@ -4,8 +4,8 @@ metrics:
       name: hwBgpPeerStatisticTable
       OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7
     static_tags:
-      - { tag: _address_family, value: all }
-      - { tag: _subsequent_address_family, value: all }
+      - {tag: _address_family, value: all}
+      - {tag: _subsequent_address_family, value: all}
     symbols:
       - name: huawei.hwBgpPeerFsmEstablishedTransitions
         OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7.1.4

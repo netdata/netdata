@@ -85,27 +85,32 @@ modules:
               group: Collection
 
             - name: backend
-              description: BGP backend type. `frr` uses FRR VTY sockets. `bird` uses the BIRD control socket and `show protocols all`. `gobgp` uses the GoBGP gRPC API. `openbgpd` uses a read-only HTTP JSON endpoint such as bgplgd or an equivalent state-server.
+              description: |
+                BGP backend type. `frr` uses FRR VTY sockets. `bird` uses the BIRD control socket and `show protocols all`. `gobgp` uses the GoBGP gRPC API. `openbgpd` uses a read-only HTTP JSON endpoint such as bgplgd or an equivalent state-server.
               default_value: frr
               required: true
               group: Target
             - name: socket_path
-              description: Absolute path to the backend control socket. FRR usually uses `/var/run/frr/bgpd.vty`. BIRD usually uses `/var/run/bird.ctl`. Ignored for `backend: gobgp` and `backend: openbgpd`.
+              description: |
+                Absolute path to the backend control socket. FRR usually uses `/var/run/frr/bgpd.vty`. BIRD usually uses `/var/run/bird.ctl`. Ignored for `backend: gobgp` and `backend: openbgpd`.
               default_value: /var/run/frr/bgpd.vty
               required: false
               group: Target
             - name: zebra_socket_path
-              description: Absolute path to the FRR `zebra.vty` Unix socket. Netdata uses this for EVPN VNI queries. If omitted, Netdata derives it from `socket_path` by replacing the filename with `zebra.vty`. Ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`.
+              description: |
+                Absolute path to the FRR `zebra.vty` Unix socket. Netdata uses this for EVPN VNI queries. If omitted, Netdata derives it from `socket_path` by replacing the filename with `zebra.vty`. Ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`.
               default_value: sibling of socket_path named zebra.vty
               required: false
               group: Target
             - name: address
-              description: The GoBGP gRPC endpoint in `host:port` form. Required for `backend: gobgp`.
+              description: |
+                The GoBGP gRPC endpoint in `host:port` form. Required for `backend: gobgp`.
               default_value: 127.0.0.1:50051
               required: false
               group: Target
             - name: api_url
-              description: Base URL for a read-only OpenBGPD JSON endpoint such as bgplgd or an equivalent state-server. Required for `backend: openbgpd`.
+              description: |
+                Base URL for a read-only OpenBGPD JSON endpoint such as bgplgd or an equivalent state-server. Required for `backend: openbgpd`.
               default_value: http://127.0.0.1:8080
               required: false
               group: Target
@@ -166,12 +171,14 @@ modules:
               required: false
               group: EVPN VNI charts
             - name: deep_peer_prefix_metrics
-              description: Enable extra per-peer FRR route queries only when FRR summary and neighbors JSON do not already expose accepted, filtered, or advertised prefix counts. Use this only with a bounded charted peer set. Ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`.
+              description: |
+                Enable extra per-peer FRR route queries only when FRR summary and neighbors JSON do not already expose accepted, filtered, or advertised prefix counts. Use this only with a bounded charted peer set. Ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`.
               default_value: "no"
               required: false
               group: Peer charts
             - name: max_deep_queries_per_scrape
-              description: Maximum number of optional deep FRR route queries Netdata will issue in one scrape when `deep_peer_prefix_metrics` is enabled. This budget is global for the scrape, not per peer. Ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`.
+              description: |
+                Maximum number of optional deep FRR route queries Netdata will issue in one scrape when `deep_peer_prefix_metrics` is enabled. This budget is global for the scrape, not per peer. Ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`.
               default_value: 40
               required: false
               group: Peer charts
@@ -181,7 +188,8 @@ modules:
               required: false
               group: Peer charts
             - name: collect_rib_summaries
-              description: Enable cached deeper family summaries when the backend exposes them. GoBGP uses this for cached validation summaries from `ListPath`, while OpenBGPD uses this for cached `/rib` summaries. Ignored for `backend: frr` and `backend: bird`.
+              description: |
+                Enable cached deeper family summaries when the backend exposes them. GoBGP uses this for cached validation summaries from `ListPath`, while OpenBGPD uses this for cached `/rib` summaries. Ignored for `backend: frr` and `backend: bird`.
               default_value: "no"
               required: false
               group: Family charts

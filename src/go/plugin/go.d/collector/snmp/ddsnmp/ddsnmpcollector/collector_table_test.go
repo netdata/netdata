@@ -2158,15 +2158,15 @@ func TestTableCollector_Collect(t *testing.T) {
 					Unit:        "{prefix}",
 					Value:       123,
 					Tags: map[string]string{
-						"huawei_hw_bgp_peer_vrf_name": "blue",
+						"huawei_hw_bgp_peer_vrf_name":    "blue",
 						"huawei_hw_bgp_peer_remote_addr": "192.0.2.1",
-						"_routing_instance":           "blue",
-						"_neighbor":                   "192.0.2.1",
-						"_remote_as":                  "65001",
-						"_peer_description":           "Transit-1",
-						"_address_family":             "ipv4",
-						"_subsequent_address_family":  "unicast",
-						"_neighbor_address_type":      "ipv4",
+						"_routing_instance":              "blue",
+						"_neighbor":                      "192.0.2.1",
+						"_remote_as":                     "65001",
+						"_peer_description":              "Transit-1",
+						"_address_family":                "ipv4",
+						"_subsequent_address_family":     "unicast",
+						"_neighbor_address_type":         "ipv4",
 					},
 					MetricType: ddprofiledefinition.ProfileMetricTypeMonotonicCount,
 					IsTable:    true,
@@ -2507,7 +2507,7 @@ func TestTableCollector_Collect(t *testing.T) {
 							},
 							MetricTags: []ddprofiledefinition.MetricTagConfig{
 								{
-									Tag: "neighbor",
+									Tag:   "neighbor",
 									Table: "jnxBgpM2PeerTable",
 									Symbol: ddprofiledefinition.SymbolConfigCompat{
 										OID:    "1.3.6.1.4.1.2636.5.1.1.2.1.1.1.11",
@@ -2523,7 +2523,7 @@ func TestTableCollector_Collect(t *testing.T) {
 									},
 								},
 								{
-									Tag: "remote_as",
+									Tag:   "remote_as",
 									Table: "jnxBgpM2PeerTable",
 									Symbol: ddprofiledefinition.SymbolConfigCompat{
 										OID:  "1.3.6.1.4.1.2636.5.1.1.2.1.1.1.13",
@@ -2541,8 +2541,8 @@ func TestTableCollector_Collect(t *testing.T) {
 									Tag:   "address_family",
 									Index: 2,
 									Mapping: map[string]string{
-										"1": "ipv4",
-										"2": "ipv6",
+										"1":  "ipv4",
+										"2":  "ipv6",
 										"25": "l2vpn",
 									},
 								},

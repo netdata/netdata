@@ -57,19 +57,21 @@ func TestCollector_CollectOpenBGPD(t *testing.T) {
 	expected["family_default_ipv6_unicast_correctness_invalid"] = 0
 	expected["family_default_ipv6_unicast_correctness_not_found"] = 0
 
-	peer4ID := makePeerIDWithScope("default_ipv4_unicast", "200.100.25.7", "clients/123/206.100.25.7")
+	peer4Scope := openbgpdPeerScope(openbgpdNeighbor{Group: "clients", BGPID: "206.100.25.7"}, 123)
+	peer4ID := makePeerIDWithScope("default_ipv4_unicast", "200.100.25.7", peer4Scope)
 	for k, v := range peerMetricSet(peer4ID, 22161, 22613, 1, 662400, peerStateUp) {
 		expected[k] = v
 	}
 	expected["peer_"+peer4ID+"_prefixes_advertised"] = 864
 
-	peer6ID := makePeerIDWithScope("default_ipv6_unicast", "2000:1:2::3", "clients/12346/1.2.3.4")
+	peer6Scope := openbgpdPeerScope(openbgpdNeighbor{Group: "clients", BGPID: "1.2.3.4"}, 12346)
+	peer6ID := makePeerIDWithScope("default_ipv6_unicast", "2000:1:2::3", peer6Scope)
 	for k, v := range peerMetricSet(peer6ID, 22160, 22289, 0, 662400, peerStateUp) {
 		expected[k] = v
 	}
 	expected["peer_"+peer6ID+"_prefixes_advertised"] = 127
 
-	neighbor4ID := makeNeighborIDWithScope("default", "200.100.25.7", "clients/123/206.100.25.7")
+	neighbor4ID := makeNeighborIDWithScope("default", "200.100.25.7", peer4Scope)
 	expected["neighbor_"+neighbor4ID+"_updates_received"] = 1
 	expected["neighbor_"+neighbor4ID+"_updates_sent"] = 897
 	expected["neighbor_"+neighbor4ID+"_notifications_received"] = 0
@@ -87,7 +89,7 @@ func TestCollector_CollectOpenBGPD(t *testing.T) {
 	expected["neighbor_"+neighbor4ID+"_churn_route_refresh_received"] = 0
 	expected["neighbor_"+neighbor4ID+"_churn_route_refresh_sent"] = 0
 
-	neighbor6ID := makeNeighborIDWithScope("default", "2000:1:2::3", "clients/12346/1.2.3.4")
+	neighbor6ID := makeNeighborIDWithScope("default", "2000:1:2::3", peer6Scope)
 	expected["neighbor_"+neighbor6ID+"_updates_received"] = 0
 	expected["neighbor_"+neighbor6ID+"_updates_sent"] = 131
 	expected["neighbor_"+neighbor6ID+"_notifications_received"] = 0

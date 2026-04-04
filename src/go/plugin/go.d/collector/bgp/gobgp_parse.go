@@ -259,7 +259,7 @@ func gobgpFamilyRefFromAPI(vrf string, family *gobgpapi.Family) (gobgpFamilyRef,
 	}
 
 	return gobgpFamilyRef{
-		ID:     vrf + "_" + afi + "_" + safi,
+		ID:     makeFamilyID(vrf, afi, safi),
 		VRF:    vrf,
 		AFI:    afi,
 		SAFI:   safi,
@@ -377,7 +377,7 @@ func gobgpPeerScope(peer *gobgpapi.Peer) string {
 	if routerID := peer.GetState().GetRouterId(); routerID != "" {
 		parts = append(parts, routerID)
 	}
-	return strings.Join(parts, "/")
+	return makeCompositeID(parts...)
 }
 
 func gobgpPeerVRF(peer *gobgpapi.Peer) string {

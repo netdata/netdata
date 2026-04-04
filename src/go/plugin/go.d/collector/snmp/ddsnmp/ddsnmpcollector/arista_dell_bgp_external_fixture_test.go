@@ -45,8 +45,8 @@ func TestCollector_Collect_AristaBGP_FromLibreNMSFixture(t *testing.T) {
 	defer ctrl.Finish()
 
 	setProfileWalkExpectations(t, mockHandler, profile, map[string][]gosnmp.SnmpPDU{
-		"aristaBgp4V2PeerTable":       snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.30065.4.1.1.2."),
-		"aristaBgp4V2PeerErrorsTable": snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.30065.4.1.1.3."),
+		"aristaBgp4V2PeerTable":           snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.30065.4.1.1.2."),
+		"aristaBgp4V2PeerErrorsTable":     snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.30065.4.1.1.3."),
 		"aristaBgp4V2PeerEventTimesTable": snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.30065.4.1.1.4."),
 		"aristaBgp4V2PeerCountersTable":   snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.30065.4.1.1.7."),
 		"aristaBgp4V2PrefixGaugesTable":   snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.30065.4.1.1.8."),
@@ -151,8 +151,8 @@ func TestCollector_Collect_DellBGP_FromLibreNMSFixture(t *testing.T) {
 	defer ctrl.Finish()
 
 	setProfileWalkExpectations(t, mockHandler, profile, map[string][]gosnmp.SnmpPDU{
-		"dell.os10bgp4V2PeerTable":       snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.674.11000.5000.200.1.1.2."),
-		"dell.os10bgp4V2PeerErrorsTable": snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.674.11000.5000.200.1.1.3."),
+		"dell.os10bgp4V2PeerTable":           snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.674.11000.5000.200.1.1.2."),
+		"dell.os10bgp4V2PeerErrorsTable":     snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.674.11000.5000.200.1.1.3."),
 		"dell.os10bgp4V2PeerEventTimesTable": snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.674.11000.5000.200.1.1.4."),
 		"dell.os10bgp4V2PeerCountersTable":   snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.674.11000.5000.200.1.1.7."),
 		"dell.os10bgp4V2PrefixGaugesTable":   snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.674.11000.5000.200.1.1.8."),

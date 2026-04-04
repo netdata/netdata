@@ -20,8 +20,8 @@ virtual_metrics:
   - name: bgpPeerUpdates
     per_row: true
     sources:
-      - { metric: bgpPeerInUpdates, table: aristaBgp4V2PeerCountersTable, as: received }
-      - { metric: bgpPeerOutUpdates, table: aristaBgp4V2PeerCountersTable, as: sent }
+      - {metric: bgpPeerInUpdates, table: aristaBgp4V2PeerCountersTable, as: received}
+      - {metric: bgpPeerOutUpdates, table: aristaBgp4V2PeerCountersTable, as: sent}
     chart_meta:
       description: BGP peer update traffic by direction
       family: 'Network/Routing/BGP/Peer/Message/Update'
