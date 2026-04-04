@@ -38,9 +38,11 @@ pub fn run(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // PRIM
+    let mut prim_size = 0usize;
     if let Ok(raw) = sfst.primary_raw() {
-        print_section("PRIM", raw.len(), file_size);
-        total_sections += raw.len();
+        prim_size = raw.len();
+        print_section("PRIM", prim_size, file_size);
+        total_sections += prim_size;
     }
 
     // Secondary chunks: field chunks (mid/high), then stream chunks
@@ -50,6 +52,8 @@ pub fn run(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         .count();
 
     let mut field_total = 0usize;
+    let mut mid_total = 0usize;
+    let mut high_total = 0usize;
     let mut chunk_idx = 0u16;
     for field in &fields {
         match field.tier {
@@ -66,6 +70,11 @@ pub fn run(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
                         raw.len(),
                         file_size,
                     );
+                    match field.tier {
+                        FieldTier::Mid => mid_total += raw.len(),
+                        FieldTier::High => high_total += raw.len(),
+                        _ => unreachable!(),
+                    }
                     field_total += raw.len();
                 }
                 chunk_idx += 1;
@@ -90,6 +99,10 @@ pub fn run(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
 
     total_sections += field_total + stream_total;
 
+    println!();
+    print_section("low tier (PRIM)", prim_size, file_size);
+    print_section("mid tier chunks", mid_total, file_size);
+    print_section("high tier chunks", high_total, file_size);
     println!();
     print_section("field chunks total", field_total, file_size);
     print_section("stream chunks total", stream_total, file_size);
