@@ -1,6 +1,5 @@
 ---
-id: container_instances
-name: Azure Container Instances
+display_name: Azure Container Instances
 resource_type: Microsoft.ContainerInstance/containerGroups
 metrics:
   - id: cpu_usage
@@ -53,9 +52,9 @@ template:
       units: millicores
       algorithm: absolute
       dimensions:
-        - selector: container_instances.cpu_usage_average
+        - selector: cpu_usage_average
           name: average
-        - selector: container_instances.cpu_usage_maximum
+        - selector: cpu_usage_maximum
           name: maximum
     - id: am_azure_container_instances__memory_usage
       title: Azure Container Instances Memory Usage
@@ -65,9 +64,9 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: container_instances.memory_usage_average
+        - selector: memory_usage_average
           name: average
-        - selector: container_instances.memory_usage_maximum
+        - selector: memory_usage_maximum
           name: maximum
     - id: am_azure_container_instances__network
       title: Azure Container Instances Network Traffic
@@ -77,7 +76,7 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: container_instances.network_bytes_received_per_second_average
+        - selector: network_bytes_received_per_second_average
           name: received
-        - selector: container_instances.network_bytes_transmitted_per_second_average
+        - selector: network_bytes_transmitted_per_second_average
           name: sent

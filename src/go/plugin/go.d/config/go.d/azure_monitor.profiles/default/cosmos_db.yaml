@@ -1,6 +1,5 @@
 ---
-id: cosmos_db
-name: Azure Cosmos DB Account
+display_name: Azure Cosmos DB Account
 resource_type: Microsoft.DocumentDB/databaseAccounts
 metrics:
   - id: total_requests
@@ -205,7 +204,7 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: cosmos_db.total_requests_count
+        - selector: total_requests_count
           name: count
     - id: am_azure_cosmos_db__request_units
       title: Azure Cosmos DB Request Units Consumed
@@ -215,7 +214,7 @@ template:
       units: RU/s
       algorithm: incremental
       dimensions:
-        - selector: cosmos_db.total_request_units_total
+        - selector: total_request_units_total
           name: total
     - id: am_azure_cosmos_db__normalized_ru_consumption
       title: Azure Cosmos DB Normalized RU Consumption
@@ -225,7 +224,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: cosmos_db.normalized_ru_consumption_maximum
+        - selector: normalized_ru_consumption_maximum
           name: maximum
     - id: am_azure_cosmos_db__server_side_latency
       title: Azure Cosmos DB Server-Side Latency
@@ -235,9 +234,9 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: cosmos_db.server_side_latency_direct_average
+        - selector: server_side_latency_direct_average
           name: direct
-        - selector: cosmos_db.server_side_latency_gateway_average
+        - selector: server_side_latency_gateway_average
           name: gateway
     - id: am_azure_cosmos_db__replication_latency
       title: Azure Cosmos DB Replication Latency
@@ -247,7 +246,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: cosmos_db.replication_latency_average
+        - selector: replication_latency_average
           name: average
     - id: am_azure_cosmos_db__storage
       title: Azure Cosmos DB Storage
@@ -257,11 +256,11 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: cosmos_db.data_usage_maximum
+        - selector: data_usage_maximum
           name: data
-        - selector: cosmos_db.index_usage_maximum
+        - selector: index_usage_maximum
           name: index
-        - selector: cosmos_db.document_quota_total
+        - selector: document_quota_total
           name: quota
     - id: am_azure_cosmos_db__document_count
       title: Azure Cosmos DB Document Count
@@ -271,7 +270,7 @@ template:
       units: documents
       algorithm: absolute
       dimensions:
-        - selector: cosmos_db.document_count_average
+        - selector: document_count_average
           name: average
     - id: am_azure_cosmos_db__partition_size
       title: Azure Cosmos DB Physical Partition Size
@@ -281,7 +280,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: cosmos_db.physical_partition_size_info_maximum
+        - selector: physical_partition_size_info_maximum
           name: maximum
     - id: am_azure_cosmos_db__partition_count
       title: Azure Cosmos DB Physical Partition Count
@@ -291,7 +290,7 @@ template:
       units: partitions
       algorithm: absolute
       dimensions:
-        - selector: cosmos_db.physical_partition_count_maximum
+        - selector: physical_partition_count_maximum
           name: maximum
     - id: am_azure_cosmos_db__provisioned_throughput
       title: Azure Cosmos DB Provisioned Throughput
@@ -301,11 +300,11 @@ template:
       units: RU/s
       algorithm: absolute
       dimensions:
-        - selector: cosmos_db.provisioned_throughput_maximum
+        - selector: provisioned_throughput_maximum
           name: provisioned
-        - selector: cosmos_db.autoscale_max_throughput_maximum
+        - selector: autoscale_max_throughput_maximum
           name: autoscale_max
-        - selector: cosmos_db.autoscaled_ru_maximum
+        - selector: autoscaled_ru_maximum
           name: autoscaled
     - id: am_azure_cosmos_db__partition_throughput
       title: Azure Cosmos DB Physical Partition Throughput
@@ -315,7 +314,7 @@ template:
       units: RU/s
       algorithm: absolute
       dimensions:
-        - selector: cosmos_db.physical_partition_throughput_info_maximum
+        - selector: physical_partition_throughput_info_maximum
           name: maximum
     - id: am_azure_cosmos_db__availability
       title: Azure Cosmos DB Service Availability
@@ -325,7 +324,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: cosmos_db.service_availability_average
+        - selector: service_availability_average
           name: average
     - id: am_azure_cosmos_db__metadata_requests
       title: Azure Cosmos DB Metadata Requests
@@ -335,7 +334,7 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: cosmos_db.metadata_requests_count
+        - selector: metadata_requests_count
           name: count
     - id: am_azure_cosmos_db__api_requests
       title: Azure Cosmos DB API Requests
@@ -345,11 +344,11 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: cosmos_db.mongo_requests_count
+        - selector: mongo_requests_count
           name: mongo
-        - selector: cosmos_db.cassandra_requests_count
+        - selector: cassandra_requests_count
           name: cassandra
-        - selector: cosmos_db.gremlin_requests_count
+        - selector: gremlin_requests_count
           name: gremlin
     - id: am_azure_cosmos_db__api_request_charges
       title: Azure Cosmos DB API Request Charges
@@ -359,11 +358,11 @@ template:
       units: RU/s
       algorithm: incremental
       dimensions:
-        - selector: cosmos_db.mongo_request_charge_total
+        - selector: mongo_request_charge_total
           name: mongo
-        - selector: cosmos_db.cassandra_request_charges_total
+        - selector: cassandra_request_charges_total
           name: cassandra
-        - selector: cosmos_db.gremlin_request_charges_total
+        - selector: gremlin_request_charges_total
           name: gremlin
     - id: am_azure_cosmos_db__cassandra_connections
       title: Azure Cosmos DB Cassandra Connection Closures
@@ -373,7 +372,7 @@ template:
       units: connections/s
       algorithm: incremental
       dimensions:
-        - selector: cosmos_db.cassandra_connection_closures_total
+        - selector: cassandra_connection_closures_total
           name: total
     - id: am_azure_cosmos_db__dedicated_gateway_cpu
       title: Azure Cosmos DB Dedicated Gateway CPU Usage
@@ -383,7 +382,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: cosmos_db.dedicated_gateway_cpu_usage_average
+        - selector: dedicated_gateway_cpu_usage_average
           name: average
     - id: am_azure_cosmos_db__dedicated_gateway_memory
       title: Azure Cosmos DB Dedicated Gateway Memory Usage
@@ -393,7 +392,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: cosmos_db.dedicated_gateway_memory_usage_average
+        - selector: dedicated_gateway_memory_usage_average
           name: average
     - id: am_azure_cosmos_db__dedicated_gateway_requests
       title: Azure Cosmos DB Dedicated Gateway Requests
@@ -403,7 +402,7 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: cosmos_db.dedicated_gateway_requests_count
+        - selector: dedicated_gateway_requests_count
           name: count
     - id: am_azure_cosmos_db__integrated_cache_hit_rate
       title: Azure Cosmos DB Integrated Cache Hit Rate
@@ -413,7 +412,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: cosmos_db.integrated_cache_item_hit_rate_average
+        - selector: integrated_cache_item_hit_rate_average
           name: item
-        - selector: cosmos_db.integrated_cache_query_hit_rate_average
+        - selector: integrated_cache_query_hit_rate_average
           name: query

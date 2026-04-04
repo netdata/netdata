@@ -25,8 +25,12 @@ const (
 
 type Catalog struct {
 	byBaseName            map[string]Profile
-	byID                  map[string]Profile
 	stockProfileBaseNames map[string]struct{}
+}
+
+type ResolvedProfile struct {
+	Name   string
+	Config Profile
 }
 
 type catalogEntry struct {
@@ -60,7 +64,6 @@ func LoadFromDefaultDirs() (Catalog, error) {
 func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 	catalog := Catalog{
 		byBaseName:            make(map[string]Profile),
-		byID:                  make(map[string]Profile),
 		stockProfileBaseNames: make(map[string]struct{}),
 	}
 	seen := make(map[string]catalogEntry)
@@ -93,14 +96,14 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 				return nil
 			}
 
-			cfg, err := loadProfileFile(path)
-			if err != nil {
-				return err
+			baseName := strings.TrimSpace(profileBaseName(path))
+			if !IsValidProfileName(baseName) {
+				return fmt.Errorf("profile %q: basename must match %q", path, reIdentityID.String())
 			}
 
-			baseName := normalizeKey(profileBaseName(path))
-			if baseName == "" {
-				return fmt.Errorf("profile %q: decoded empty basename", path)
+			cfg, err := loadProfileFile(path, baseName)
+			if err != nil {
+				return err
 			}
 			if spec.IsStock {
 				catalog.stockProfileBaseNames[baseName] = struct{}{}
@@ -136,24 +139,14 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 		return Catalog{}, errors.New("no Azure Monitor profiles were loaded")
 	}
 
-	idToBaseName := make(map[string]string, len(seen))
-	for _, entry := range seen {
-		id := normalizeKey(entry.Config.ID)
-		if id == "" {
-			return Catalog{}, fmt.Errorf("profile %q: decoded empty id", entry.Path)
-		}
-		if prevBaseName, ok := idToBaseName[id]; ok {
-			return Catalog{}, fmt.Errorf("duplicate profile id %q for basenames %q and %q", entry.Config.ID, prevBaseName, entry.BaseName)
-		}
-		idToBaseName[id] = entry.BaseName
-		catalog.byID[id] = entry.Config
-		catalog.byBaseName[entry.BaseName] = entry.Config
+	for baseName, entry := range seen {
+		catalog.byBaseName[baseName] = entry.Config
 	}
 
 	return catalog, nil
 }
 
-func loadProfileFile(path string) (Profile, error) {
+func loadProfileFile(path, baseName string) (Profile, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return Profile{}, err
@@ -166,47 +159,42 @@ func loadProfileFile(path string) (Profile, error) {
 		return Profile{}, fmt.Errorf("unmarshal profile %q: %w", path, err)
 	}
 
-	profileID := strings.TrimSpace(cfg.ID)
-	if profileID == "" {
-		return Profile{}, fmt.Errorf("validate profile %q: missing required field 'id'", path)
+	if err := cfg.Normalize(baseName); err != nil {
+		return Profile{}, fmt.Errorf("normalize profile %q: %w", path, err)
 	}
-	if err := cfg.Validate(fmt.Sprintf("profile %q", profileID)); err != nil {
+	if err := cfg.Validate(fmt.Sprintf("profile %q", baseName), baseName); err != nil {
 		return Profile{}, fmt.Errorf("validate profile %q: %w", path, err)
 	}
 
 	return cfg, nil
 }
 
-func (c Catalog) Resolve(profileIDs []string) ([]Profile, error) {
-	if len(profileIDs) == 0 {
+func (c Catalog) Resolve(profileNames []string) ([]ResolvedProfile, error) {
+	if len(profileNames) == 0 {
 		return nil, errors.New("no Azure Monitor profiles selected")
 	}
 
-	profiles := make([]Profile, 0, len(profileIDs))
-	for _, id := range profileIDs {
-		normalizedID := normalizeKey(id)
-		prof, ok := c.byID[normalizedID]
+	profiles := make([]ResolvedProfile, 0, len(profileNames))
+	for _, name := range profileNames {
+		profileName := strings.TrimSpace(name)
+		prof, ok := c.byBaseName[profileName]
 		if !ok {
-			return nil, fmt.Errorf("unknown profile %q", id)
+			return nil, fmt.Errorf("unknown profile %q", name)
 		}
-		profiles = append(profiles, prof)
+		profiles = append(profiles, ResolvedProfile{Name: profileName, Config: prof})
 	}
 	return profiles, nil
 }
 
 func (c Catalog) ResolveBaseNames(profileBaseNames []string) ([]Profile, error) {
-	if len(profileBaseNames) == 0 {
-		return nil, errors.New("no Azure Monitor profiles selected")
+	resolved, err := c.Resolve(profileBaseNames)
+	if err != nil {
+		return nil, err
 	}
 
-	profiles := make([]Profile, 0, len(profileBaseNames))
-	for _, baseName := range profileBaseNames {
-		normalizedBaseName := normalizeKey(baseName)
-		prof, ok := c.byBaseName[normalizedBaseName]
-		if !ok {
-			return nil, fmt.Errorf("unknown profile basename %q", baseName)
-		}
-		profiles = append(profiles, prof)
+	profiles := make([]Profile, 0, len(resolved))
+	for _, profile := range resolved {
+		profiles = append(profiles, profile.Config)
 	}
 	return profiles, nil
 }
@@ -216,72 +204,30 @@ func (c Catalog) ProfilesForResourceTypes(types map[string]struct{}) []string {
 		return nil
 	}
 
-	var ids []string
-	for id, prof := range c.byID {
+	var names []string
+	for name, prof := range c.byBaseName {
 		rt := normalizeKey(prof.ResourceType)
 		if rt == "" {
 			continue
 		}
 		if _, ok := types[rt]; ok {
-			ids = append(ids, id)
+			names = append(names, name)
 		}
 	}
-	sort.Strings(ids)
-	return ids
-}
-
-func (c Catalog) ResourceTypesForProfileIDs(profileIDs []string) ([]string, error) {
-	if len(profileIDs) == 0 {
-		return nil, nil
-	}
-
-	seen := make(map[string]struct{}, len(profileIDs))
-	types := make([]string, 0, len(profileIDs))
-	for _, id := range profileIDs {
-		prof, ok := c.byID[normalizeKey(id)]
-		if !ok {
-			return nil, fmt.Errorf("unknown profile %q", id)
-		}
-
-		rt := strings.TrimSpace(prof.ResourceType)
-		key := normalizeKey(rt)
-		if key == "" {
-			continue
-		}
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		types = append(types, rt)
-	}
-
-	sort.Strings(types)
-	return types, nil
-}
-
-func (c Catalog) ProfileIDsForBaseNames(profileBaseNames []string) ([]string, error) {
-	profiles, err := c.ResolveBaseNames(profileBaseNames)
-	if err != nil {
-		return nil, err
-	}
-
-	ids := make([]string, 0, len(profiles))
-	for _, profile := range profiles {
-		ids = append(ids, profile.ID)
-	}
-	return ids, nil
+	sort.Strings(names)
+	return names
 }
 
 func (c Catalog) ResourceTypesForProfileBaseNames(profileBaseNames []string) ([]string, error) {
-	profiles, err := c.ResolveBaseNames(profileBaseNames)
+	resolved, err := c.Resolve(profileBaseNames)
 	if err != nil {
 		return nil, err
 	}
 
-	seen := make(map[string]struct{}, len(profiles))
-	types := make([]string, 0, len(profiles))
-	for _, profile := range profiles {
-		rt := strings.TrimSpace(profile.ResourceType)
+	seen := make(map[string]struct{}, len(resolved))
+	types := make([]string, 0, len(resolved))
+	for _, resolvedProfile := range resolved {
+		rt := strings.TrimSpace(resolvedProfile.Config.ResourceType)
 		key := normalizeKey(rt)
 		if key == "" {
 			continue
@@ -317,13 +263,13 @@ func profileBaseName(path string) string {
 }
 
 func (c Catalog) ResourceTypes() []string {
-	if len(c.byID) == 0 {
+	if len(c.byBaseName) == 0 {
 		return nil
 	}
 
-	seen := make(map[string]struct{}, len(c.byID))
-	types := make([]string, 0, len(c.byID))
-	for _, prof := range c.byID {
+	seen := make(map[string]struct{}, len(c.byBaseName))
+	types := make([]string, 0, len(c.byBaseName))
+	for _, prof := range c.byBaseName {
 		rt := strings.TrimSpace(prof.ResourceType)
 		key := normalizeKey(rt)
 		if key == "" {

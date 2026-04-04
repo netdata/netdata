@@ -37,7 +37,42 @@ func TestLoadFromDefaultDirs_LoadsAllStockProfiles(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, catalog.byBaseName, want)
-	assert.Len(t, catalog.byID, want)
+}
+
+func TestLoadFromDefaultDirs_StockProfilesUseSelectorShorthand(t *testing.T) {
+	dir := azureProfilesDirFromThisFile()
+	require.NotEmpty(t, dir)
+
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		ext := strings.ToLower(filepath.Ext(name))
+		if ext != ".yaml" && ext != ".yml" {
+			continue
+		}
+
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		require.NoError(t, err)
+
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if !strings.HasPrefix(line, "- selector:") {
+				continue
+			}
+
+			selector := strings.TrimSpace(strings.TrimPrefix(line, "- selector:"))
+			if selector == "" || strings.HasPrefix(selector, "{") {
+				continue
+			}
+
+			assert.NotContainsf(t, selector, ".", "stock profile %q should use selector shorthand, found %q", name, selector)
+		}
+	}
 }
 
 func TestDefaultCatalog_CachesSuccessfulLoads(t *testing.T) {
@@ -122,13 +157,10 @@ func stubDefaultCatalog(t *testing.T, cacheEnabled func() bool, loader func() (C
 }
 
 func testCatalog(id string) Catalog {
-	profile := Profile{ID: id, DisplayName: id}
+	profile := Profile{DisplayName: id}
 	return Catalog{
 		byBaseName: map[string]Profile{
 			normalizeKey(id): profile,
-		},
-		byID: map[string]Profile{
-			id: profile,
 		},
 		stockProfileBaseNames: map[string]struct{}{
 			normalizeKey(id): {},

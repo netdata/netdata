@@ -1,6 +1,5 @@
 ---
-id: key_vault
-name: Azure Key Vault
+display_name: Azure Key Vault
 resource_type: Microsoft.KeyVault/vaults
 metrics:
   - id: availability
@@ -55,7 +54,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: key_vault.availability_average
+        - selector: availability_average
           name: average
     - id: am_azure_key_vault__api_latency
       title: Azure Key Vault API Latency
@@ -65,7 +64,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: key_vault.service_api_latency_average
+        - selector: service_api_latency_average
           name: average
     - id: am_azure_key_vault__saturation
       title: Azure Key Vault Saturation
@@ -75,7 +74,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: key_vault.saturation_shoebox_average
+        - selector: saturation_shoebox_average
           name: average
     - id: am_azure_key_vault__api_activity
       title: Azure Key Vault API Activity
@@ -85,7 +84,7 @@ template:
       units: operations/s
       algorithm: incremental
       dimensions:
-        - selector: key_vault.service_api_hit_count
+        - selector: service_api_hit_count
           name: hits
-        - selector: key_vault.service_api_result_count
+        - selector: service_api_result_count
           name: results

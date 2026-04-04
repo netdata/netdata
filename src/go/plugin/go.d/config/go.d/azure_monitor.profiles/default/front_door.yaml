@@ -1,6 +1,5 @@
 ---
-id: front_door
-name: Azure Front Door
+display_name: Azure Front Door
 resource_type: Microsoft.Cdn/profiles
 metrics:
   - id: total_latency
@@ -145,9 +144,9 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: front_door.total_latency_average
+        - selector: total_latency_average
           name: total
-        - selector: front_door.origin_latency_average
+        - selector: origin_latency_average
           name: origin
     - id: am_azure_front_door__origin_health
       title: Azure Front Door Origin Health
@@ -157,7 +156,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: front_door.origin_health_percentage_average
+        - selector: origin_health_percentage_average
           name: health
     - id: am_azure_front_door__byte_hit_ratio
       title: Azure Front Door Byte Hit Ratio
@@ -167,7 +166,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: front_door.byte_hit_ratio_average
+        - selector: byte_hit_ratio_average
           name: hit_ratio
     - id: am_azure_front_door__error_rate
       title: Azure Front Door Error Rate
@@ -177,9 +176,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: front_door.percentage4xx_average
+        - selector: percentage4xx_average
           name: 4xx
-        - selector: front_door.percentage5xx_average
+        - selector: percentage5xx_average
           name: 5xx
     - id: am_azure_front_door__requests
       title: Azure Front Door Requests
@@ -189,9 +188,9 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: front_door.request_count_total
+        - selector: request_count_total
           name: client
-        - selector: front_door.origin_request_count_total
+        - selector: origin_request_count_total
           name: origin
     - id: am_azure_front_door__data_transfer
       title: Azure Front Door Data Transfer
@@ -201,9 +200,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: front_door.request_size_total
+        - selector: request_size_total
           name: request
-        - selector: front_door.response_size_total
+        - selector: response_size_total
           name: response
     - id: am_azure_front_door__origin_shield_requests
       title: Azure Front Door Origin Shield Requests
@@ -213,11 +212,11 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: front_door.origin_shield_request_count_total
+        - selector: origin_shield_request_count_total
           name: to_shield
-        - selector: front_door.origin_shield_origin_request_count_total
+        - selector: origin_shield_origin_request_count_total
           name: to_origin
-        - selector: front_door.origin_shield_rate_limit_request_count_total
+        - selector: origin_shield_rate_limit_request_count_total
           name: rate_limited
     - id: am_azure_front_door__origin_shield_data_transfer
       title: Azure Front Door Origin Shield Data Transfer
@@ -227,7 +226,7 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: front_door.origin_shield_request_size_total
+        - selector: origin_shield_request_size_total
           name: request
     - id: am_azure_front_door__waf_requests
       title: Azure Front Door WAF Requests
@@ -237,7 +236,7 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: front_door.web_application_firewall_request_count_total
+        - selector: web_application_firewall_request_count_total
           name: total
     - id: am_azure_front_door__waf_challenges
       title: Azure Front Door WAF Challenges
@@ -247,9 +246,9 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: front_door.web_application_firewall_captcha_request_count_total
+        - selector: web_application_firewall_captcha_request_count_total
           name: captcha
-        - selector: front_door.web_application_firewall_js_request_count_total
+        - selector: web_application_firewall_js_request_count_total
           name: js_challenge
     - id: am_azure_front_door__websocket_connections
       title: Azure Front Door WebSocket Connections
@@ -259,9 +258,9 @@ template:
       units: connections/s
       algorithm: incremental
       dimensions:
-        - selector: front_door.web_socket_connections_total
+        - selector: web_socket_connections_total
           name: requested
-        - selector: front_door.active_web_socket_connections_total
+        - selector: active_web_socket_connections_total
           name: active
     - id: am_azure_front_door__websocket_duration
       title: Azure Front Door WebSocket Connection Duration
@@ -271,5 +270,5 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: front_door.average_web_socket_connection_duration_average
+        - selector: average_web_socket_connection_duration_average
           name: average

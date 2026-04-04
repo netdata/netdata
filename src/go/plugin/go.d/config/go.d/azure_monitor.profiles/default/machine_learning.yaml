@@ -1,6 +1,5 @@
 ---
-id: machine_learning
-name: Azure Machine Learning Workspace
+display_name: Azure Machine Learning Workspace
 resource_type: Microsoft.MachineLearningServices/workspaces
 metrics:
   - id: agents
@@ -415,9 +414,9 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.agents_total
+        - selector: agents_total
           name: agent_events
-        - selector: machine_learning.threads_total
+        - selector: threads_total
           name: thread_events
     - id: am_azure_machine_learning__agent_messages
       title: Azure Machine Learning Agent Messages
@@ -427,7 +426,7 @@ template:
       units: messages/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.messages_total
+        - selector: messages_total
           name: messages
     - id: am_azure_machine_learning__agent_runs
       title: Azure Machine Learning Agent Runs
@@ -437,7 +436,7 @@ template:
       units: runs/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.runs_total
+        - selector: runs_total
           name: runs
     - id: am_azure_machine_learning__agent_tokens
       title: Azure Machine Learning Agent Tokens
@@ -447,7 +446,7 @@ template:
       units: tokens/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.tokens_total
+        - selector: tokens_total
           name: tokens
     - id: am_azure_machine_learning__agent_tool_calls
       title: Azure Machine Learning Agent Tool Calls
@@ -457,7 +456,7 @@ template:
       units: calls/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.tool_calls_total
+        - selector: tool_calls_total
           name: tool_calls
     - id: am_azure_machine_learning__agent_indexed_files
       title: Azure Machine Learning Agent Indexed Files
@@ -467,7 +466,7 @@ template:
       units: files/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.indexed_files_total
+        - selector: indexed_files_total
           name: indexed_files
     - id: am_azure_machine_learning__model_deployments
       title: Azure Machine Learning Model Deployments
@@ -477,11 +476,11 @@ template:
       units: deployments/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.model_deploy_started_total
+        - selector: model_deploy_started_total
           name: started
-        - selector: machine_learning.model_deploy_succeeded_total
+        - selector: model_deploy_succeeded_total
           name: succeeded
-        - selector: machine_learning.model_deploy_failed_total
+        - selector: model_deploy_failed_total
           name: failed
     - id: am_azure_machine_learning__model_registrations
       title: Azure Machine Learning Model Registrations
@@ -491,9 +490,9 @@ template:
       units: registrations/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.model_register_succeeded_total
+        - selector: model_register_succeeded_total
           name: succeeded
-        - selector: machine_learning.model_register_failed_total
+        - selector: model_register_failed_total
           name: failed
     - id: am_azure_machine_learning__cluster_cores
       title: Azure Machine Learning Cluster Cores
@@ -503,15 +502,15 @@ template:
       units: cores
       algorithm: absolute
       dimensions:
-        - selector: machine_learning.active_cores_average
+        - selector: active_cores_average
           name: active
-        - selector: machine_learning.idle_cores_average
+        - selector: idle_cores_average
           name: idle
-        - selector: machine_learning.leaving_cores_average
+        - selector: leaving_cores_average
           name: leaving
-        - selector: machine_learning.preempted_cores_average
+        - selector: preempted_cores_average
           name: preempted
-        - selector: machine_learning.unusable_cores_average
+        - selector: unusable_cores_average
           name: unusable
     - id: am_azure_machine_learning__total_cores
       title: Azure Machine Learning Total Cores
@@ -521,7 +520,7 @@ template:
       units: cores
       algorithm: absolute
       dimensions:
-        - selector: machine_learning.total_cores_average
+        - selector: total_cores_average
           name: total
     - id: am_azure_machine_learning__cluster_nodes
       title: Azure Machine Learning Cluster Nodes
@@ -531,15 +530,15 @@ template:
       units: nodes
       algorithm: absolute
       dimensions:
-        - selector: machine_learning.active_nodes_average
+        - selector: active_nodes_average
           name: active
-        - selector: machine_learning.idle_nodes_average
+        - selector: idle_nodes_average
           name: idle
-        - selector: machine_learning.leaving_nodes_average
+        - selector: leaving_nodes_average
           name: leaving
-        - selector: machine_learning.preempted_nodes_average
+        - selector: preempted_nodes_average
           name: preempted
-        - selector: machine_learning.unusable_nodes_average
+        - selector: unusable_nodes_average
           name: unusable
     - id: am_azure_machine_learning__total_nodes
       title: Azure Machine Learning Total Nodes
@@ -549,7 +548,7 @@ template:
       units: nodes
       algorithm: absolute
       dimensions:
-        - selector: machine_learning.total_nodes_average
+        - selector: total_nodes_average
           name: total
     - id: am_azure_machine_learning__quota_utilization
       title: Azure Machine Learning Quota Utilization
@@ -559,7 +558,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: machine_learning.quota_utilization_percentage_average
+        - selector: quota_utilization_percentage_average
           name: utilization
     - id: am_azure_machine_learning__cpu_utilization
       title: Azure Machine Learning CPU Utilization
@@ -569,9 +568,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: machine_learning.cpu_utilization_average
+        - selector: cpu_utilization_average
           name: cluster_cpu
-        - selector: machine_learning.cpu_utilization_percentage_average
+        - selector: cpu_utilization_percentage_average
           name: node_cpu
     - id: am_azure_machine_learning__cpu_millicores
       title: Azure Machine Learning CPU Millicores
@@ -581,9 +580,9 @@ template:
       units: millicores
       algorithm: absolute
       dimensions:
-        - selector: machine_learning.cpu_utilization_millicores_average
+        - selector: cpu_utilization_millicores_average
           name: used
-        - selector: machine_learning.cpu_capacity_millicores_average
+        - selector: cpu_capacity_millicores_average
           name: capacity
     - id: am_azure_machine_learning__cpu_memory_utilization
       title: Azure Machine Learning CPU Memory Utilization
@@ -593,7 +592,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: machine_learning.cpu_memory_utilization_percentage_average
+        - selector: cpu_memory_utilization_percentage_average
           name: utilization
     - id: am_azure_machine_learning__cpu_memory_megabytes
       title: Azure Machine Learning CPU Memory
@@ -603,9 +602,9 @@ template:
       units: megabytes
       algorithm: absolute
       dimensions:
-        - selector: machine_learning.cpu_memory_utilization_megabytes_average
+        - selector: cpu_memory_utilization_megabytes_average
           name: used
-        - selector: machine_learning.cpu_memory_capacity_megabytes_average
+        - selector: cpu_memory_capacity_megabytes_average
           name: capacity
     - id: am_azure_machine_learning__gpu_utilization
       title: Azure Machine Learning GPU Utilization
@@ -615,9 +614,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: machine_learning.gpu_utilization_average
+        - selector: gpu_utilization_average
           name: cluster_gpu
-        - selector: machine_learning.gpu_utilization_percentage_average
+        - selector: gpu_utilization_percentage_average
           name: node_gpu
     - id: am_azure_machine_learning__gpu_milligpus
       title: Azure Machine Learning GPU MilliGPUs
@@ -627,9 +626,9 @@ template:
       units: milliGPUs
       algorithm: absolute
       dimensions:
-        - selector: machine_learning.gpu_utilization_milli_gpus_average
+        - selector: gpu_utilization_milli_gpus_average
           name: used
-        - selector: machine_learning.gpu_capacity_milli_gpus_average
+        - selector: gpu_capacity_milli_gpus_average
           name: capacity
     - id: am_azure_machine_learning__gpu_memory_utilization
       title: Azure Machine Learning GPU Memory Utilization
@@ -639,9 +638,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: machine_learning.gpu_memory_utilization_average
+        - selector: gpu_memory_utilization_average
           name: cluster_gpu_memory
-        - selector: machine_learning.gpu_memory_utilization_percentage_average
+        - selector: gpu_memory_utilization_percentage_average
           name: node_gpu_memory
     - id: am_azure_machine_learning__gpu_memory_megabytes
       title: Azure Machine Learning GPU Memory
@@ -651,9 +650,9 @@ template:
       units: megabytes
       algorithm: absolute
       dimensions:
-        - selector: machine_learning.gpu_memory_utilization_megabytes_average
+        - selector: gpu_memory_utilization_megabytes_average
           name: used
-        - selector: machine_learning.gpu_memory_capacity_megabytes_average
+        - selector: gpu_memory_capacity_megabytes_average
           name: capacity
     - id: am_azure_machine_learning__gpu_energy
       title: Azure Machine Learning GPU Energy
@@ -663,7 +662,7 @@ template:
       units: joules/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.gpu_energy_joules_total
+        - selector: gpu_energy_joules_total
           name: energy
     - id: am_azure_machine_learning__disk_usage
       title: Azure Machine Learning Disk Usage
@@ -673,9 +672,9 @@ template:
       units: megabytes
       algorithm: absolute
       dimensions:
-        - selector: machine_learning.disk_used_megabytes_average
+        - selector: disk_used_megabytes_average
           name: used
-        - selector: machine_learning.disk_avail_megabytes_average
+        - selector: disk_avail_megabytes_average
           name: available
     - id: am_azure_machine_learning__disk_io
       title: Azure Machine Learning Disk I/O
@@ -685,9 +684,9 @@ template:
       units: megabytes/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.disk_read_megabytes_total
+        - selector: disk_read_megabytes_total
           name: read
-        - selector: machine_learning.disk_write_megabytes_total
+        - selector: disk_write_megabytes_total
           name: write
     - id: am_azure_machine_learning__network_traffic
       title: Azure Machine Learning Network Traffic
@@ -697,9 +696,9 @@ template:
       units: megabytes/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.network_input_megabytes_total
+        - selector: network_input_megabytes_total
           name: in
-        - selector: machine_learning.network_output_megabytes_total
+        - selector: network_output_megabytes_total
           name: out
     - id: am_azure_machine_learning__infiniband_traffic
       title: Azure Machine Learning InfiniBand Traffic
@@ -709,9 +708,9 @@ template:
       units: megabytes/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.ib_receive_megabytes_total
+        - selector: ib_receive_megabytes_total
           name: receive
-        - selector: machine_learning.ib_transmit_megabytes_total
+        - selector: ib_transmit_megabytes_total
           name: transmit
     - id: am_azure_machine_learning__storage_api_calls
       title: Azure Machine Learning Storage API Calls
@@ -721,9 +720,9 @@ template:
       units: calls/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.storage_api_success_count_total
+        - selector: storage_api_success_count_total
           name: success
-        - selector: machine_learning.storage_api_failure_count_total
+        - selector: storage_api_failure_count_total
           name: failure
     - id: am_azure_machine_learning__run_lifecycle
       title: Azure Machine Learning Run Lifecycle
@@ -733,17 +732,17 @@ template:
       units: runs/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.not_started_runs_total
+        - selector: not_started_runs_total
           name: not_started
-        - selector: machine_learning.starting_runs_total
+        - selector: starting_runs_total
           name: starting
-        - selector: machine_learning.preparing_runs_total
+        - selector: preparing_runs_total
           name: preparing
-        - selector: machine_learning.provisioning_runs_total
+        - selector: provisioning_runs_total
           name: provisioning
-        - selector: machine_learning.queued_runs_total
+        - selector: queued_runs_total
           name: queued
-        - selector: machine_learning.started_runs_total
+        - selector: started_runs_total
           name: started
     - id: am_azure_machine_learning__run_completion
       title: Azure Machine Learning Run Completion
@@ -753,17 +752,17 @@ template:
       units: runs/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.completed_runs_total
+        - selector: completed_runs_total
           name: completed
-        - selector: machine_learning.failed_runs_total
+        - selector: failed_runs_total
           name: failed
-        - selector: machine_learning.finalizing_runs_total
+        - selector: finalizing_runs_total
           name: finalizing
-        - selector: machine_learning.cancelled_runs_total
+        - selector: cancelled_runs_total
           name: cancelled
-        - selector: machine_learning.cancel_requested_runs_total
+        - selector: cancel_requested_runs_total
           name: cancel_requested
-        - selector: machine_learning.not_responding_runs_total
+        - selector: not_responding_runs_total
           name: not_responding
     - id: am_azure_machine_learning__run_issues
       title: Azure Machine Learning Run Issues
@@ -773,7 +772,7 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: machine_learning.errors_total
+        - selector: errors_total
           name: errors
-        - selector: machine_learning.warnings_total
+        - selector: warnings_total
           name: warnings

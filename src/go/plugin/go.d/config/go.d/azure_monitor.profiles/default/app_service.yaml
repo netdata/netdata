@@ -1,6 +1,5 @@
 ---
-id: app_service
-name: Azure App Service
+display_name: Azure App Service
 resource_type: Microsoft.Web/sites
 metrics:
   - id: requests
@@ -283,7 +282,7 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: app_service.requests_total
+        - selector: requests_total
           name: requests
     - id: am_azure_app_service__response_time
       title: Azure App Service Response Time
@@ -293,7 +292,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: app_service.http_response_time_average
+        - selector: http_response_time_average
           name: average
     - id: am_azure_app_service__http_status
       title: Azure App Service HTTP Status Codes
@@ -303,13 +302,13 @@ template:
       units: responses/s
       algorithm: incremental
       dimensions:
-        - selector: app_service.http2xx_total
+        - selector: http2xx_total
           name: 2xx
-        - selector: app_service.http3xx_total
+        - selector: http3xx_total
           name: 3xx
-        - selector: app_service.http4xx_total
+        - selector: http4xx_total
           name: 4xx
-        - selector: app_service.http5xx_total
+        - selector: http5xx_total
           name: 5xx
     - id: am_azure_app_service__http_error_detail
       title: Azure App Service HTTP Error Detail
@@ -319,15 +318,15 @@ template:
       units: responses/s
       algorithm: incremental
       dimensions:
-        - selector: app_service.http101_total
+        - selector: http101_total
           name: 101_websocket
-        - selector: app_service.http401_total
+        - selector: http401_total
           name: 401_unauthorized
-        - selector: app_service.http403_total
+        - selector: http403_total
           name: 403_forbidden
-        - selector: app_service.http404_total
+        - selector: http404_total
           name: 404_not_found
-        - selector: app_service.http406_total
+        - selector: http406_total
           name: 406_not_acceptable
     - id: am_azure_app_service__cpu
       title: Azure App Service CPU Utilization
@@ -337,7 +336,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: app_service.cpu_percentage_average
+        - selector: cpu_percentage_average
           name: average
     - id: am_azure_app_service__cpu_time
       title: Azure App Service CPU Time
@@ -347,7 +346,7 @@ template:
       units: seconds
       algorithm: incremental
       dimensions:
-        - selector: app_service.cpu_time_total
+        - selector: cpu_time_total
           name: total
     - id: am_azure_app_service__memory_usage
       title: Azure App Service Memory Usage
@@ -357,11 +356,11 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: app_service.average_memory_working_set_average
+        - selector: average_memory_working_set_average
           name: average_working_set
-        - selector: app_service.memory_working_set_average
+        - selector: memory_working_set_average
           name: working_set
-        - selector: app_service.private_bytes_average
+        - selector: private_bytes_average
           name: private
     - id: am_azure_app_service__health
       title: Azure App Service Health Check Status
@@ -371,7 +370,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: app_service.health_check_status_average
+        - selector: health_check_status_average
           name: average
     - id: am_azure_app_service__network_traffic
       title: Azure App Service Network Traffic
@@ -381,9 +380,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: app_service.bytes_received_total
+        - selector: bytes_received_total
           name: received
-        - selector: app_service.bytes_sent_total
+        - selector: bytes_sent_total
           name: sent
     - id: am_azure_app_service__connections
       title: Azure App Service Connections
@@ -393,7 +392,7 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: app_service.app_connections_average
+        - selector: app_connections_average
           name: average
     - id: am_azure_app_service__io_throughput
       title: Azure App Service IO Throughput
@@ -403,11 +402,11 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: app_service.io_read_bytes_per_second_total
+        - selector: io_read_bytes_per_second_total
           name: read
-        - selector: app_service.io_write_bytes_per_second_total
+        - selector: io_write_bytes_per_second_total
           name: write
-        - selector: app_service.io_other_bytes_per_second_total
+        - selector: io_other_bytes_per_second_total
           name: other
     - id: am_azure_app_service__io_operations
       title: Azure App Service IO Operations
@@ -417,11 +416,11 @@ template:
       units: operations/s
       algorithm: incremental
       dimensions:
-        - selector: app_service.io_read_operations_per_second_total
+        - selector: io_read_operations_per_second_total
           name: read
-        - selector: app_service.io_write_operations_per_second_total
+        - selector: io_write_operations_per_second_total
           name: write
-        - selector: app_service.io_other_operations_per_second_total
+        - selector: io_other_operations_per_second_total
           name: other
     - id: am_azure_app_service__threads
       title: Azure App Service Threads
@@ -431,7 +430,7 @@ template:
       units: threads
       algorithm: absolute
       dimensions:
-        - selector: app_service.threads_average
+        - selector: threads_average
           name: average
     - id: am_azure_app_service__handles
       title: Azure App Service Handles
@@ -441,7 +440,7 @@ template:
       units: handles
       algorithm: absolute
       dimensions:
-        - selector: app_service.handles_average
+        - selector: handles_average
           name: average
     - id: am_azure_app_service__gc_collections
       title: Azure App Service .NET GC Collections
@@ -451,11 +450,11 @@ template:
       units: collections/s
       algorithm: incremental
       dimensions:
-        - selector: app_service.gen0_collections_total
+        - selector: gen0_collections_total
           name: gen0
-        - selector: app_service.gen1_collections_total
+        - selector: gen1_collections_total
           name: gen1
-        - selector: app_service.gen2_collections_total
+        - selector: gen2_collections_total
           name: gen2
     - id: am_azure_app_service__function_executions
       title: Azure App Service Function Executions
@@ -465,7 +464,7 @@ template:
       units: executions/s
       algorithm: incremental
       dimensions:
-        - selector: app_service.function_execution_count_total
+        - selector: function_execution_count_total
           name: total
     - id: am_azure_app_service__function_execution_units
       title: Azure App Service Function Execution Units
@@ -475,7 +474,7 @@ template:
       units: MB-milliseconds/s
       algorithm: incremental
       dimensions:
-        - selector: app_service.function_execution_units_total
+        - selector: function_execution_units_total
           name: total
     - id: am_azure_app_service__always_ready_function_executions
       title: Azure App Service Always Ready Function Executions
@@ -485,7 +484,7 @@ template:
       units: executions/s
       algorithm: incremental
       dimensions:
-        - selector: app_service.always_ready_function_execution_count_total
+        - selector: always_ready_function_execution_count_total
           name: total
     - id: am_azure_app_service__always_ready_function_execution_units
       title: Azure App Service Always Ready Function Execution Units
@@ -495,7 +494,7 @@ template:
       units: MB-milliseconds/s
       algorithm: incremental
       dimensions:
-        - selector: app_service.always_ready_function_execution_units_total
+        - selector: always_ready_function_execution_units_total
           name: total
     - id: am_azure_app_service__always_ready_units
       title: Azure App Service Always Ready Units
@@ -505,7 +504,7 @@ template:
       units: units
       algorithm: absolute
       dimensions:
-        - selector: app_service.always_ready_units_total
+        - selector: always_ready_units_total
           name: total
     - id: am_azure_app_service__on_demand_function_executions
       title: Azure App Service On Demand Function Executions
@@ -515,7 +514,7 @@ template:
       units: executions/s
       algorithm: incremental
       dimensions:
-        - selector: app_service.on_demand_function_execution_count_total
+        - selector: on_demand_function_execution_count_total
           name: total
     - id: am_azure_app_service__on_demand_function_execution_units
       title: Azure App Service On Demand Function Execution Units
@@ -525,7 +524,7 @@ template:
       units: MB-milliseconds/s
       algorithm: incremental
       dimensions:
-        - selector: app_service.on_demand_function_execution_units_total
+        - selector: on_demand_function_execution_units_total
           name: total
     - id: am_azure_app_service__request_queue
       title: Azure App Service Request Queue
@@ -535,7 +534,7 @@ template:
       units: requests
       algorithm: absolute
       dimensions:
-        - selector: app_service.requests_in_application_queue_average
+        - selector: requests_in_application_queue_average
           name: queued
     - id: am_azure_app_service__instances
       title: Azure App Service Instance Count
@@ -545,7 +544,7 @@ template:
       units: instances
       algorithm: absolute
       dimensions:
-        - selector: app_service.instance_count_average
+        - selector: instance_count_average
           name: running
     - id: am_azure_app_service__assemblies
       title: Azure App Service .NET Assemblies
@@ -555,7 +554,7 @@ template:
       units: assemblies
       algorithm: absolute
       dimensions:
-        - selector: app_service.current_assemblies_average
+        - selector: current_assemblies_average
           name: loaded
     - id: am_azure_app_service__app_domains
       title: Azure App Service App Domains
@@ -565,7 +564,7 @@ template:
       units: domains
       algorithm: absolute
       dimensions:
-        - selector: app_service.total_app_domains_average
+        - selector: total_app_domains_average
           name: loaded
-        - selector: app_service.total_app_domains_unloaded_average
+        - selector: total_app_domains_unloaded_average
           name: unloaded

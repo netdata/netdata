@@ -1,6 +1,5 @@
 ---
-id: virtual_machines
-name: Azure Virtual Machine
+display_name: Azure Virtual Machine
 resource_type: Microsoft.Compute/virtualMachines
 metrics:
   - id: percentage_cpu
@@ -397,7 +396,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.percentage_cpu_average
+        - selector: percentage_cpu_average
           name: average
     - id: am_azure_virtual_machines__cpu_credits
       title: Azure Virtual Machine CPU Credits
@@ -407,9 +406,9 @@ template:
       units: credits
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.cpu_credits_consumed_average
+        - selector: cpu_credits_consumed_average
           name: consumed
-        - selector: virtual_machines.cpu_credits_remaining_average
+        - selector: cpu_credits_remaining_average
           name: remaining
     - id: am_azure_virtual_machines__memory
       title: Azure Virtual Machine Available Memory
@@ -419,7 +418,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.available_memory_bytes_average
+        - selector: available_memory_bytes_average
           name: available
     - id: am_azure_virtual_machines__memory_percentage
       title: Azure Virtual Machine Available Memory Percentage
@@ -429,7 +428,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.available_memory_percentage_average
+        - selector: available_memory_percentage_average
           name: available
     - id: am_azure_virtual_machines__availability
       title: Azure Virtual Machine Availability
@@ -439,7 +438,7 @@ template:
       units: state
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.vm_availability_metric_average
+        - selector: vm_availability_metric_average
           name: average
     - id: am_azure_virtual_machines__network_traffic
       title: Azure Virtual Machine Network Traffic
@@ -449,9 +448,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: virtual_machines.network_in_total_total
+        - selector: network_in_total_total
           name: in
-        - selector: virtual_machines.network_out_total_total
+        - selector: network_out_total_total
           name: out
     - id: am_azure_virtual_machines__network_flows
       title: Azure Virtual Machine Network Flows
@@ -461,9 +460,9 @@ template:
       units: flows
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.inbound_flows_average
+        - selector: inbound_flows_average
           name: in
-        - selector: virtual_machines.outbound_flows_average
+        - selector: outbound_flows_average
           name: out
     - id: am_azure_virtual_machines__network_flow_creation_rate
       title: Azure Virtual Machine Network Flow Creation Rate
@@ -473,9 +472,9 @@ template:
       units: flows/s
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.inbound_flows_maximum_creation_rate_average
+        - selector: inbound_flows_maximum_creation_rate_average
           name: in
-        - selector: virtual_machines.outbound_flows_maximum_creation_rate_average
+        - selector: outbound_flows_maximum_creation_rate_average
           name: out
     - id: am_azure_virtual_machines__disk_throughput
       title: Azure Virtual Machine Disk Throughput
@@ -485,9 +484,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: virtual_machines.disk_read_bytes_total
+        - selector: disk_read_bytes_total
           name: read
-        - selector: virtual_machines.disk_write_bytes_total
+        - selector: disk_write_bytes_total
           name: write
     - id: am_azure_virtual_machines__disk_iops
       title: Azure Virtual Machine Disk IOPS
@@ -497,9 +496,9 @@ template:
       units: operations/s
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.disk_read_operations_sec_average
+        - selector: disk_read_operations_sec_average
           name: read
-        - selector: virtual_machines.disk_write_operations_sec_average
+        - selector: disk_write_operations_sec_average
           name: write
     - id: am_azure_virtual_machines__os_disk_throughput
       title: Azure Virtual Machine OS Disk Throughput
@@ -509,9 +508,9 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.os_disk_read_bytes_sec_average
+        - selector: os_disk_read_bytes_sec_average
           name: read
-        - selector: virtual_machines.os_disk_write_bytes_sec_average
+        - selector: os_disk_write_bytes_sec_average
           name: write
     - id: am_azure_virtual_machines__os_disk_iops
       title: Azure Virtual Machine OS Disk IOPS
@@ -521,9 +520,9 @@ template:
       units: operations/s
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.os_disk_read_operations_sec_average
+        - selector: os_disk_read_operations_sec_average
           name: read
-        - selector: virtual_machines.os_disk_write_operations_sec_average
+        - selector: os_disk_write_operations_sec_average
           name: write
     - id: am_azure_virtual_machines__os_disk_latency
       title: Azure Virtual Machine OS Disk Latency
@@ -533,7 +532,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.os_disk_latency_average
+        - selector: os_disk_latency_average
           name: average
     - id: am_azure_virtual_machines__os_disk_queue_depth
       title: Azure Virtual Machine OS Disk Queue Depth
@@ -543,7 +542,7 @@ template:
       units: operations
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.os_disk_queue_depth_average
+        - selector: os_disk_queue_depth_average
           name: average
     - id: am_azure_virtual_machines__os_disk_throttling
       title: Azure Virtual Machine OS Disk Throttling
@@ -553,9 +552,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.os_disk_bandwidth_consumed_percentage_average
+        - selector: os_disk_bandwidth_consumed_percentage_average
           name: bandwidth
-        - selector: virtual_machines.os_disk_iops_consumed_percentage_average
+        - selector: os_disk_iops_consumed_percentage_average
           name: iops
     - id: am_azure_virtual_machines__os_disk_burst_capacity
       title: Azure Virtual Machine OS Disk Burst Capacity
@@ -565,9 +564,9 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.os_disk_max_burst_bandwidth_average
+        - selector: os_disk_max_burst_bandwidth_average
           name: max_burst
-        - selector: virtual_machines.os_disk_target_bandwidth_average
+        - selector: os_disk_target_bandwidth_average
           name: target
     - id: am_azure_virtual_machines__os_disk_burst_iops_capacity
       title: Azure Virtual Machine OS Disk Burst IOPS Capacity
@@ -577,9 +576,9 @@ template:
       units: iops
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.os_disk_max_burst_iops_average
+        - selector: os_disk_max_burst_iops_average
           name: max_burst
-        - selector: virtual_machines.os_disk_target_iops_average
+        - selector: os_disk_target_iops_average
           name: target
     - id: am_azure_virtual_machines__os_disk_burst_credits
       title: Azure Virtual Machine OS Disk Burst Credits Used
@@ -589,9 +588,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.os_disk_used_burst_bps_credits_percentage_average
+        - selector: os_disk_used_burst_bps_credits_percentage_average
           name: bandwidth
-        - selector: virtual_machines.os_disk_used_burst_io_credits_percentage_average
+        - selector: os_disk_used_burst_io_credits_percentage_average
           name: io
     - id: am_azure_virtual_machines__data_disk_throughput
       title: Azure Virtual Machine Data Disk Throughput
@@ -601,9 +600,9 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.data_disk_read_bytes_sec_average
+        - selector: data_disk_read_bytes_sec_average
           name: read
-        - selector: virtual_machines.data_disk_write_bytes_sec_average
+        - selector: data_disk_write_bytes_sec_average
           name: write
     - id: am_azure_virtual_machines__data_disk_iops
       title: Azure Virtual Machine Data Disk IOPS
@@ -613,9 +612,9 @@ template:
       units: operations/s
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.data_disk_read_operations_sec_average
+        - selector: data_disk_read_operations_sec_average
           name: read
-        - selector: virtual_machines.data_disk_write_operations_sec_average
+        - selector: data_disk_write_operations_sec_average
           name: write
     - id: am_azure_virtual_machines__data_disk_latency
       title: Azure Virtual Machine Data Disk Latency
@@ -625,7 +624,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.data_disk_latency_average
+        - selector: data_disk_latency_average
           name: average
     - id: am_azure_virtual_machines__data_disk_queue_depth
       title: Azure Virtual Machine Data Disk Queue Depth
@@ -635,7 +634,7 @@ template:
       units: operations
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.data_disk_queue_depth_average
+        - selector: data_disk_queue_depth_average
           name: average
     - id: am_azure_virtual_machines__data_disk_throttling
       title: Azure Virtual Machine Data Disk Throttling
@@ -645,9 +644,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.data_disk_bandwidth_consumed_percentage_average
+        - selector: data_disk_bandwidth_consumed_percentage_average
           name: bandwidth
-        - selector: virtual_machines.data_disk_iops_consumed_percentage_average
+        - selector: data_disk_iops_consumed_percentage_average
           name: iops
     - id: am_azure_virtual_machines__data_disk_burst_capacity
       title: Azure Virtual Machine Data Disk Burst Capacity
@@ -657,9 +656,9 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.data_disk_max_burst_bandwidth_average
+        - selector: data_disk_max_burst_bandwidth_average
           name: max_burst
-        - selector: virtual_machines.data_disk_target_bandwidth_average
+        - selector: data_disk_target_bandwidth_average
           name: target
     - id: am_azure_virtual_machines__data_disk_burst_iops_capacity
       title: Azure Virtual Machine Data Disk Burst IOPS Capacity
@@ -669,9 +668,9 @@ template:
       units: iops
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.data_disk_max_burst_iops_average
+        - selector: data_disk_max_burst_iops_average
           name: max_burst
-        - selector: virtual_machines.data_disk_target_iops_average
+        - selector: data_disk_target_iops_average
           name: target
     - id: am_azure_virtual_machines__data_disk_burst_credits
       title: Azure Virtual Machine Data Disk Burst Credits Used
@@ -681,9 +680,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.data_disk_used_burst_bps_credits_percentage_average
+        - selector: data_disk_used_burst_bps_credits_percentage_average
           name: bandwidth
-        - selector: virtual_machines.data_disk_used_burst_io_credits_percentage_average
+        - selector: data_disk_used_burst_io_credits_percentage_average
           name: io
     - id: am_azure_virtual_machines__temp_disk_throughput
       title: Azure Virtual Machine Temp Disk Throughput
@@ -693,9 +692,9 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.temp_disk_read_bytes_sec_average
+        - selector: temp_disk_read_bytes_sec_average
           name: read
-        - selector: virtual_machines.temp_disk_write_bytes_sec_average
+        - selector: temp_disk_write_bytes_sec_average
           name: write
     - id: am_azure_virtual_machines__temp_disk_iops
       title: Azure Virtual Machine Temp Disk IOPS
@@ -705,9 +704,9 @@ template:
       units: operations/s
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.temp_disk_read_operations_sec_average
+        - selector: temp_disk_read_operations_sec_average
           name: read
-        - selector: virtual_machines.temp_disk_write_operations_sec_average
+        - selector: temp_disk_write_operations_sec_average
           name: write
     - id: am_azure_virtual_machines__temp_disk_latency
       title: Azure Virtual Machine Temp Disk Latency
@@ -717,7 +716,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.temp_disk_latency_average
+        - selector: temp_disk_latency_average
           name: average
     - id: am_azure_virtual_machines__temp_disk_queue_depth
       title: Azure Virtual Machine Temp Disk Queue Depth
@@ -727,7 +726,7 @@ template:
       units: operations
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.temp_disk_queue_depth_average
+        - selector: temp_disk_queue_depth_average
           name: average
     - id: am_azure_virtual_machines__premium_data_disk_cache
       title: Azure Virtual Machine Premium Data Disk Cache
@@ -737,9 +736,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.premium_data_disk_cache_read_hit_average
+        - selector: premium_data_disk_cache_read_hit_average
           name: hit
-        - selector: virtual_machines.premium_data_disk_cache_read_miss_average
+        - selector: premium_data_disk_cache_read_miss_average
           name: miss
     - id: am_azure_virtual_machines__premium_os_disk_cache
       title: Azure Virtual Machine Premium OS Disk Cache
@@ -749,9 +748,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.premium_os_disk_cache_read_hit_average
+        - selector: premium_os_disk_cache_read_hit_average
           name: hit
-        - selector: virtual_machines.premium_os_disk_cache_read_miss_average
+        - selector: premium_os_disk_cache_read_miss_average
           name: miss
     - id: am_azure_virtual_machines__vm_cached_throttling
       title: Azure Virtual Machine Cached IO Throttling
@@ -761,9 +760,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.vm_cached_bandwidth_consumed_percentage_average
+        - selector: vm_cached_bandwidth_consumed_percentage_average
           name: bandwidth
-        - selector: virtual_machines.vm_cached_iops_consumed_percentage_average
+        - selector: vm_cached_iops_consumed_percentage_average
           name: iops
     - id: am_azure_virtual_machines__vm_uncached_throttling
       title: Azure Virtual Machine Uncached IO Throttling
@@ -773,9 +772,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.vm_uncached_bandwidth_consumed_percentage_average
+        - selector: vm_uncached_bandwidth_consumed_percentage_average
           name: bandwidth
-        - selector: virtual_machines.vm_uncached_iops_consumed_percentage_average
+        - selector: vm_uncached_iops_consumed_percentage_average
           name: iops
     - id: am_azure_virtual_machines__vm_cached_burst_credits
       title: Azure Virtual Machine Cached Burst Credits Used
@@ -785,9 +784,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.vm_local_used_burst_bps_credits_percentage_average
+        - selector: vm_local_used_burst_bps_credits_percentage_average
           name: bandwidth
-        - selector: virtual_machines.vm_local_used_burst_io_credits_percentage_average
+        - selector: vm_local_used_burst_io_credits_percentage_average
           name: io
     - id: am_azure_virtual_machines__vm_uncached_burst_credits
       title: Azure Virtual Machine Uncached Burst Credits Used
@@ -797,7 +796,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: virtual_machines.vm_remote_used_burst_bps_credits_percentage_average
+        - selector: vm_remote_used_burst_bps_credits_percentage_average
           name: bandwidth
-        - selector: virtual_machines.vm_remote_used_burst_io_credits_percentage_average
+        - selector: vm_remote_used_burst_io_credits_percentage_average
           name: io

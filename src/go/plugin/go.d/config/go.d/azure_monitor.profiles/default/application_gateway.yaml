@@ -1,6 +1,5 @@
 ---
-id: application_gateway
-name: Azure Application Gateway
+display_name: Azure Application Gateway
 resource_type: Microsoft.Network/applicationGateways
 metrics:
   - id: throughput
@@ -235,7 +234,7 @@ template:
       units: bytes/s
       algorithm: absolute
       dimensions:
-        - selector: application_gateway.throughput_average
+        - selector: throughput_average
           name: average
     - id: am_azure_application_gateway__traffic_volume
       title: Azure Application Gateway Traffic Volume
@@ -245,9 +244,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: application_gateway.bytes_received_total
+        - selector: bytes_received_total
           name: received
-        - selector: application_gateway.bytes_sent_total
+        - selector: bytes_sent_total
           name: sent
     - id: am_azure_application_gateway__requests
       title: Azure Application Gateway Requests
@@ -257,9 +256,9 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: application_gateway.total_requests_total
+        - selector: total_requests_total
           name: total
-        - selector: application_gateway.failed_requests_total
+        - selector: failed_requests_total
           name: failed
     - id: am_azure_application_gateway__response_status
       title: Azure Application Gateway Response Status
@@ -269,9 +268,9 @@ template:
       units: responses/s
       algorithm: incremental
       dimensions:
-        - selector: application_gateway.response_status_total
+        - selector: response_status_total
           name: gateway
-        - selector: application_gateway.backend_response_status_total
+        - selector: backend_response_status_total
           name: backend
     - id: am_azure_application_gateway__backend_health
       title: Azure Application Gateway Backend Health
@@ -281,9 +280,9 @@ template:
       units: hosts
       algorithm: absolute
       dimensions:
-        - selector: application_gateway.healthy_host_count_average
+        - selector: healthy_host_count_average
           name: healthy
-        - selector: application_gateway.unhealthy_host_count_average
+        - selector: unhealthy_host_count_average
           name: unhealthy
     - id: am_azure_application_gateway__backend_request_load
       title: Azure Application Gateway Backend Request Load
@@ -293,7 +292,7 @@ template:
       units: requests
       algorithm: absolute
       dimensions:
-        - selector: application_gateway.avg_request_count_per_healthy_host_average
+        - selector: avg_request_count_per_healthy_host_average
           name: per_healthy_host
     - id: am_azure_application_gateway__backend_latency
       title: Azure Application Gateway Backend Latency
@@ -303,11 +302,11 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: application_gateway.backend_connect_time_average
+        - selector: backend_connect_time_average
           name: connect
-        - selector: application_gateway.backend_first_byte_response_time_average
+        - selector: backend_first_byte_response_time_average
           name: first_byte
-        - selector: application_gateway.backend_last_byte_response_time_average
+        - selector: backend_last_byte_response_time_average
           name: last_byte
     - id: am_azure_application_gateway__client_latency
       title: Azure Application Gateway Client Latency
@@ -317,9 +316,9 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: application_gateway.application_gateway_total_time_average
+        - selector: application_gateway_total_time_average
           name: total_time
-        - selector: application_gateway.client_rtt_average
+        - selector: client_rtt_average
           name: client_rtt
     - id: am_azure_application_gateway__current_connections
       title: Azure Application Gateway Current Connections
@@ -329,7 +328,7 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: application_gateway.current_connections_total
+        - selector: current_connections_total
           name: current
     - id: am_azure_application_gateway__new_connections
       title: Azure Application Gateway New Connections
@@ -339,7 +338,7 @@ template:
       units: connections/s
       algorithm: absolute
       dimensions:
-        - selector: application_gateway.new_connections_per_second_average
+        - selector: new_connections_per_second_average
           name: average
     - id: am_azure_application_gateway__websocket_connections
       title: Azure Application Gateway WebSocket Connections
@@ -349,7 +348,7 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: application_gateway.web_socket_active_connections_total
+        - selector: web_socket_active_connections_total
           name: active
     - id: am_azure_application_gateway__websocket_close_codes
       title: Azure Application Gateway WebSocket Close Codes
@@ -359,7 +358,7 @@ template:
       units: connections/s
       algorithm: incremental
       dimensions:
-        - selector: application_gateway.websocket_specific_close_status_code_total
+        - selector: websocket_specific_close_status_code_total
           name: total
     - id: am_azure_application_gateway__capacity
       title: Azure Application Gateway Capacity
@@ -369,13 +368,13 @@ template:
       units: units
       algorithm: absolute
       dimensions:
-        - selector: application_gateway.capacity_units_average
+        - selector: capacity_units_average
           name: capacity
-        - selector: application_gateway.compute_units_average
+        - selector: compute_units_average
           name: compute
-        - selector: application_gateway.estimated_billed_capacity_units_average
+        - selector: estimated_billed_capacity_units_average
           name: billed
-        - selector: application_gateway.fixed_billable_capacity_units_average
+        - selector: fixed_billable_capacity_units_average
           name: fixed_billed
     - id: am_azure_application_gateway__cpu
       title: Azure Application Gateway CPU Utilization
@@ -385,7 +384,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: application_gateway.cpu_utilization_average
+        - selector: cpu_utilization_average
           name: average
     - id: am_azure_application_gateway__tls_connections
       title: Azure Application Gateway TLS Connections
@@ -395,7 +394,7 @@ template:
       units: connections/s
       algorithm: incremental
       dimensions:
-        - selector: application_gateway.tls_protocol_total
+        - selector: tls_protocol_total
           name: total
     - id: am_azure_application_gateway__waf_requests
       title: Azure Application Gateway WAF Requests
@@ -405,11 +404,11 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: application_gateway.azwaf_total_requests_total
+        - selector: azwaf_total_requests_total
           name: total
-        - selector: application_gateway.blocked_count_total
+        - selector: blocked_count_total
           name: blocked
-        - selector: application_gateway.matched_count_total
+        - selector: matched_count_total
           name: matched
     - id: am_azure_application_gateway__waf_rule_matches
       title: Azure Application Gateway WAF Rule Matches
@@ -419,11 +418,11 @@ template:
       units: matches/s
       algorithm: incremental
       dimensions:
-        - selector: application_gateway.azwaf_sec_rule_total
+        - selector: azwaf_sec_rule_total
           name: managed
-        - selector: application_gateway.azwaf_custom_rule_total
+        - selector: azwaf_custom_rule_total
           name: custom
-        - selector: application_gateway.azwaf_bot_protection_total
+        - selector: azwaf_bot_protection_total
           name: bot
     - id: am_azure_application_gateway__waf_challenges
       title: Azure Application Gateway WAF Challenges
@@ -433,9 +432,9 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: application_gateway.az_waf_captcha_challenge_request_count_total
+        - selector: az_waf_captcha_challenge_request_count_total
           name: captcha
-        - selector: application_gateway.az_wafjs_challenge_request_count_total
+        - selector: az_wafjs_challenge_request_count_total
           name: js_challenge
     - id: am_azure_application_gateway__waf_penalty_box
       title: Azure Application Gateway WAF Penalty Box
@@ -445,7 +444,7 @@ template:
       units: IPs
       algorithm: absolute
       dimensions:
-        - selector: application_gateway.azwaf_penalty_box_size_average
+        - selector: azwaf_penalty_box_size_average
           name: size
     - id: am_azure_application_gateway__waf_penalty_box_hits
       title: Azure Application Gateway WAF Penalty Box Hits
@@ -455,5 +454,5 @@ template:
       units: hits/s
       algorithm: incremental
       dimensions:
-        - selector: application_gateway.azwaf_penalty_box_hits_total
+        - selector: azwaf_penalty_box_hits_total
           name: total

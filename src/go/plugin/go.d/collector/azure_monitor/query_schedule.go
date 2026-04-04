@@ -10,28 +10,15 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
 )
 
-func (c *Collector) buildQueryBatches(resources []resourceInfo, now time.Time) []queryBatch {
+func (c *Collector) buildQueryBatches(now time.Time) []queryBatch {
 	dueByGrain := make(map[string]bool)
-	resourcesByType := c.indexResourcesByType(resources)
 	var batches []queryBatch
 
 	for _, profile := range c.runtime.Profiles {
-		batches = append(batches, c.buildProfileQueryBatches(profile, resourcesByType[stringsLowerTrim(profile.ResourceType)], dueByGrain, now)...)
+		batches = append(batches, c.buildProfileQueryBatches(profile, c.discovery.ByProfile[profile.Name], dueByGrain, now)...)
 	}
 
 	return batches
-}
-
-func (c *Collector) indexResourcesByType(resources []resourceInfo) map[string][]resourceInfo {
-	if len(c.discovery.ByType) > 0 {
-		return c.discovery.ByType
-	}
-
-	result := make(map[string][]resourceInfo)
-	for _, resource := range resources {
-		result[stringsLowerTrim(resource.Type)] = append(result[stringsLowerTrim(resource.Type)], resource)
-	}
-	return result
 }
 
 func (c *Collector) buildProfileQueryBatches(profile *profileRuntime, resources []resourceInfo, dueByGrain map[string]bool, now time.Time) []queryBatch {

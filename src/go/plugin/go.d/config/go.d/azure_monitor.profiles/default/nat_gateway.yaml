@@ -1,6 +1,5 @@
 ---
-id: nat_gateway
-name: Azure NAT Gateway
+display_name: Azure NAT Gateway
 resource_type: Microsoft.Network/natGateways
 metrics:
   - id: datapath_availability
@@ -61,7 +60,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: nat_gateway.datapath_availability_average
+        - selector: datapath_availability_average
           name: average
     - id: am_azure_nat_gateway__byte_throughput
       title: Azure NAT Gateway Byte Throughput
@@ -71,7 +70,7 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: nat_gateway.byte_count_total
+        - selector: byte_count_total
           name: total
     - id: am_azure_nat_gateway__packet_throughput
       title: Azure NAT Gateway Packet Throughput
@@ -81,7 +80,7 @@ template:
       units: packets/s
       algorithm: incremental
       dimensions:
-        - selector: nat_gateway.packet_count_total
+        - selector: packet_count_total
           name: total
     - id: am_azure_nat_gateway__dropped_packets
       title: Azure NAT Gateway Dropped Packets
@@ -91,7 +90,7 @@ template:
       units: packets/s
       algorithm: incremental
       dimensions:
-        - selector: nat_gateway.packet_drop_count_total
+        - selector: packet_drop_count_total
           name: total
     - id: am_azure_nat_gateway__snat_connections
       title: Azure NAT Gateway SNAT Connections
@@ -101,7 +100,7 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: nat_gateway.snat_connection_count_total
+        - selector: snat_connection_count_total
           name: total
     - id: am_azure_nat_gateway__total_connections
       title: Azure NAT Gateway Total SNAT Connections
@@ -111,5 +110,5 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: nat_gateway.total_connection_count_total
+        - selector: total_connection_count_total
           name: total

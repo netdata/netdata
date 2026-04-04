@@ -10,16 +10,16 @@ import (
 )
 
 func (c *Collector) collect(ctx context.Context) error {
-	resources, err := c.refreshCollectResources(ctx)
+	hasResources, err := c.refreshCollectResources(ctx)
 	if err != nil {
 		return err
 	}
-	if len(resources) == 0 {
+	if !hasResources {
 		return nil
 	}
 
 	now := c.now()
-	queryBatches := c.buildQueryBatches(resources, now)
+	queryBatches := c.buildQueryBatches(now)
 
 	dueInstruments := dueInstrumentsForBatches(queryBatches)
 	samples, err := c.collectQuerySamples(ctx, queryBatches, now)
@@ -33,20 +33,24 @@ func (c *Collector) collect(ctx context.Context) error {
 	return nil
 }
 
-func (c *Collector) refreshCollectResources(ctx context.Context) ([]resourceInfo, error) {
+func (c *Collector) refreshCollectResources(ctx context.Context) (bool, error) {
 	if err := c.ensureBootstrapped(ctx); err != nil {
-		return nil, err
+		return false, err
 	}
 
 	prevFetchCounter := c.discovery.FetchCounter
 	resources, err := c.refreshDiscovery(ctx, false)
 	if err != nil {
-		return nil, fmt.Errorf("resource discovery: %w", err)
+		if c.discovery.FetchedAt.IsZero() {
+			return false, fmt.Errorf("resource discovery: %w", err)
+		}
+		c.Warningf("resource discovery refresh failed, continuing with last known discovery snapshot: %v", err)
+		resources = c.discovery.Resources
 	}
 	if c.discovery.FetchCounter != prevFetchCounter {
-		c.observations.pruneStaleResources(resources)
+		c.observations.pruneStaleResources(c.discovery.ByProfile)
 	}
-	return resources, nil
+	return len(resources) > 0, nil
 }
 
 func (c *Collector) collectQuerySamples(ctx context.Context, batches []queryBatch, queryNow time.Time) ([]metricSample, error) {

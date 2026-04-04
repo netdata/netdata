@@ -1,6 +1,5 @@
 ---
-id: load_balancers
-name: Azure Load Balancer
+display_name: Azure Load Balancer
 resource_type: Microsoft.Network/loadBalancers
 metrics:
   - id: vip_availability
@@ -79,7 +78,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: load_balancers.vip_availability_average
+        - selector: vip_availability_average
           name: average
     - id: am_azure_load_balancers__dip_availability
       title: Azure Load Balancer Health Probe Status
@@ -89,7 +88,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: load_balancers.dip_availability_average
+        - selector: dip_availability_average
           name: average
     - id: am_azure_load_balancers__global_backend_availability
       title: Azure Load Balancer Global Backend Availability
@@ -99,7 +98,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: load_balancers.global_backend_availability_average
+        - selector: global_backend_availability_average
           name: average
     - id: am_azure_load_balancers__byte_throughput
       title: Azure Load Balancer Byte Throughput
@@ -109,7 +108,7 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: load_balancers.byte_count_total
+        - selector: byte_count_total
           name: total
     - id: am_azure_load_balancers__packet_throughput
       title: Azure Load Balancer Packet Throughput
@@ -119,7 +118,7 @@ template:
       units: packets/s
       algorithm: incremental
       dimensions:
-        - selector: load_balancers.packet_count_total
+        - selector: packet_count_total
           name: total
     - id: am_azure_load_balancers__syn_count
       title: Azure Load Balancer SYN Packets
@@ -129,7 +128,7 @@ template:
       units: packets/s
       algorithm: incremental
       dimensions:
-        - selector: load_balancers.syn_count_total
+        - selector: syn_count_total
           name: total
     - id: am_azure_load_balancers__snat_connections
       title: Azure Load Balancer SNAT Connections
@@ -139,7 +138,7 @@ template:
       units: connections/s
       algorithm: incremental
       dimensions:
-        - selector: load_balancers.snat_connection_count_total
+        - selector: snat_connection_count_total
           name: total
     - id: am_azure_load_balancers__snat_ports
       title: Azure Load Balancer SNAT Port Usage
@@ -149,7 +148,7 @@ template:
       units: ports
       algorithm: absolute
       dimensions:
-        - selector: load_balancers.allocated_snat_ports_average
+        - selector: allocated_snat_ports_average
           name: allocated
-        - selector: load_balancers.used_snat_ports_average
+        - selector: used_snat_ports_average
           name: used

@@ -1,6 +1,5 @@
 ---
-id: cognitive_services
-name: Azure Cognitive Services
+display_name: Azure Cognitive Services
 resource_type: Microsoft.CognitiveServices/accounts
 metrics:
   - id: success_rate
@@ -841,7 +840,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.success_rate_average
+        - selector: success_rate_average
           name: availability
     - id: am_azure_cognitive_services__calls
       title: Azure Cognitive Services Calls
@@ -851,13 +850,13 @@ template:
       units: calls/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.total_calls_total
+        - selector: total_calls_total
           name: total
-        - selector: cognitive_services.successful_calls_total
+        - selector: successful_calls_total
           name: successful
-        - selector: cognitive_services.blocked_calls_total
+        - selector: blocked_calls_total
           name: blocked
-        - selector: cognitive_services.total_token_calls_total
+        - selector: total_token_calls_total
           name: token
     - id: am_azure_cognitive_services__errors
       title: Azure Cognitive Services Errors
@@ -867,11 +866,11 @@ template:
       units: errors/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.total_errors_total
+        - selector: total_errors_total
           name: total
-        - selector: cognitive_services.client_errors_total
+        - selector: client_errors_total
           name: client
-        - selector: cognitive_services.server_errors_total
+        - selector: server_errors_total
           name: server
     - id: am_azure_cognitive_services__latency
       title: Azure Cognitive Services Latency
@@ -881,7 +880,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.latency_average
+        - selector: latency_average
           name: average
     - id: am_azure_cognitive_services__data_transfer
       title: Azure Cognitive Services Data Transfer
@@ -891,9 +890,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.data_in_total
+        - selector: data_in_total
           name: in
-        - selector: cognitive_services.data_out_total
+        - selector: data_out_total
           name: out
     - id: am_azure_cognitive_services__rate_limit
       title: Azure Cognitive Services Rate Limit
@@ -903,7 +902,7 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.ratelimit_total
+        - selector: ratelimit_total
           name: rate_limit
     - id: am_azure_cognitive_services__openai_availability
       title: Azure OpenAI Availability
@@ -913,7 +912,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.azure_open_ai_availability_rate_average
+        - selector: azure_open_ai_availability_rate_average
           name: availability
     - id: am_azure_cognitive_services__openai_requests
       title: Azure OpenAI Requests
@@ -923,7 +922,7 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.azure_open_ai_requests_total
+        - selector: azure_open_ai_requests_total
           name: requests
     - id: am_azure_cognitive_services__openai_latency
       title: Azure OpenAI Latency
@@ -933,13 +932,13 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.azure_open_ai_time_to_response_average
+        - selector: azure_open_ai_time_to_response_average
           name: time_to_response
-        - selector: cognitive_services.azure_open_ai_normalized_ttft_in_ms_average
+        - selector: azure_open_ai_normalized_ttft_in_ms_average
           name: time_to_first_token
-        - selector: cognitive_services.azure_open_ai_normalized_tbt_in_ms_average
+        - selector: azure_open_ai_normalized_tbt_in_ms_average
           name: time_between_tokens
-        - selector: cognitive_services.azure_open_aittlt_in_ms_average
+        - selector: azure_open_aittlt_in_ms_average
           name: time_to_last_byte
     - id: am_azure_cognitive_services__openai_generation_speed
       title: Azure OpenAI Token Generation Speed
@@ -949,7 +948,7 @@ template:
       units: tokens/s
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.azure_open_ai_token_per_second_average
+        - selector: azure_open_ai_token_per_second_average
           name: tokens_per_second
     - id: am_azure_cognitive_services__openai_token_usage
       title: Azure OpenAI Token Usage
@@ -959,13 +958,13 @@ template:
       units: tokens/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.token_transaction_total
+        - selector: token_transaction_total
           name: total
-        - selector: cognitive_services.processed_prompt_tokens_total
+        - selector: processed_prompt_tokens_total
           name: prompt
-        - selector: cognitive_services.generated_tokens_total
+        - selector: generated_tokens_total
           name: generated
-        - selector: cognitive_services.active_tokens_total
+        - selector: active_tokens_total
           name: active
     - id: am_azure_cognitive_services__openai_audio_tokens
       title: Azure OpenAI Audio Tokens
@@ -975,9 +974,9 @@ template:
       units: tokens/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.audio_prompt_tokens_total
+        - selector: audio_prompt_tokens_total
           name: prompt
-        - selector: cognitive_services.audio_completion_tokens_total
+        - selector: audio_completion_tokens_total
           name: completion
     - id: am_azure_cognitive_services__openai_cache_match_rate
       title: Azure OpenAI Prompt Token Cache Match Rate
@@ -987,7 +986,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.azure_open_ai_context_tokens_cache_match_rate_average
+        - selector: azure_open_ai_context_tokens_cache_match_rate_average
           name: cache_match_rate
     - id: am_azure_cognitive_services__openai_provisioned_utilization
       title: Azure OpenAI Provisioned-managed Utilization
@@ -997,7 +996,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.azure_open_ai_provisioned_managed_utilization_v2_average
+        - selector: azure_open_ai_provisioned_managed_utilization_v2_average
           name: utilization
     - id: am_azure_cognitive_services__openai_finetuning
       title: Azure OpenAI Fine-Tuning Training Hours
@@ -1007,7 +1006,7 @@ template:
       units: hours/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.fine_tuned_training_hours_total
+        - selector: fine_tuned_training_hours_total
           name: training_hours
     - id: am_azure_cognitive_services__openai_realtime_usage
       title: Azure OpenAI Realtime API Usage
@@ -1017,7 +1016,7 @@ template:
       units: seconds/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.realtime_usage_time_total
+        - selector: realtime_usage_time_total
           name: seconds_used
     - id: am_azure_cognitive_services__model_availability
       title: Azure Cognitive Services Model Availability
@@ -1027,7 +1026,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.model_availability_rate_average
+        - selector: model_availability_rate_average
           name: availability
     - id: am_azure_cognitive_services__model_requests
       title: Azure Cognitive Services Model Requests
@@ -1037,7 +1036,7 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.model_requests_total
+        - selector: model_requests_total
           name: requests
     - id: am_azure_cognitive_services__model_latency
       title: Azure Cognitive Services Model Latency
@@ -1047,13 +1046,13 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.time_to_response_average
+        - selector: time_to_response_average
           name: time_to_response
-        - selector: cognitive_services.normalized_time_to_first_token_average
+        - selector: normalized_time_to_first_token_average
           name: time_to_first_token
-        - selector: cognitive_services.normalized_time_between_tokens_average
+        - selector: normalized_time_between_tokens_average
           name: time_between_tokens
-        - selector: cognitive_services.time_to_last_byte_average
+        - selector: time_to_last_byte_average
           name: time_to_last_byte
     - id: am_azure_cognitive_services__model_generation_speed
       title: Azure Cognitive Services Model Token Generation Speed
@@ -1063,7 +1062,7 @@ template:
       units: tokens/s
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.tokens_per_second_average
+        - selector: tokens_per_second_average
           name: tokens_per_second
     - id: am_azure_cognitive_services__model_token_usage
       title: Azure Cognitive Services Model Token Usage
@@ -1073,11 +1072,11 @@ template:
       units: tokens/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.total_tokens_total
+        - selector: total_tokens_total
           name: total
-        - selector: cognitive_services.input_tokens_total
+        - selector: input_tokens_total
           name: input
-        - selector: cognitive_services.output_tokens_total
+        - selector: output_tokens_total
           name: output
     - id: am_azure_cognitive_services__model_audio_tokens
       title: Azure Cognitive Services Model Audio Tokens
@@ -1087,9 +1086,9 @@ template:
       units: tokens/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.audio_input_tokens_total
+        - selector: audio_input_tokens_total
           name: input
-        - selector: cognitive_services.audio_output_tokens_total
+        - selector: audio_output_tokens_total
           name: output
     - id: am_azure_cognitive_services__model_cache_tokens
       title: Azure Cognitive Services Model Cache Tokens
@@ -1099,11 +1098,11 @@ template:
       units: tokens/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.cache_read_input_tokens_total
+        - selector: cache_read_input_tokens_total
           name: cache_read
-        - selector: cognitive_services.ephemeral1h_input_tokens_total
+        - selector: ephemeral1h_input_tokens_total
           name: cache_write_1h
-        - selector: cognitive_services.ephemeral5m_input_tokens_total
+        - selector: ephemeral5m_input_tokens_total
           name: cache_write_5m
     - id: am_azure_cognitive_services__model_provisioned_utilization
       title: Azure Cognitive Services Model Provisioned Utilization
@@ -1113,7 +1112,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.provisioned_utilization_average
+        - selector: provisioned_utilization_average
           name: utilization
     - id: am_azure_cognitive_services__model_pages
       title: Azure Cognitive Services Model Pages Processed
@@ -1123,9 +1122,9 @@ template:
       units: pages/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.total_pages_total
+        - selector: total_pages_total
           name: total
-        - selector: cognitive_services.annotated_pages_total
+        - selector: annotated_pages_total
           name: annotated
     - id: am_azure_cognitive_services__model_generated_images
       title: Azure Cognitive Services Generated Images
@@ -1135,7 +1134,7 @@ template:
       units: images/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.generated_images_total
+        - selector: generated_images_total
           name: generated
     - id: am_azure_cognitive_services__content_safety_requests
       title: Azure Cognitive Services Content Safety Requests
@@ -1145,11 +1144,11 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.rai_total_requests_total
+        - selector: rai_total_requests_total
           name: total
-        - selector: cognitive_services.rai_harmful_requests_total
+        - selector: rai_harmful_requests_total
           name: harmful
-        - selector: cognitive_services.rai_rejected_requests_total
+        - selector: rai_rejected_requests_total
           name: blocked
     - id: am_azure_cognitive_services__content_safety_abusive_users
       title: Azure Cognitive Services Potentially Abusive Users
@@ -1159,7 +1158,7 @@ template:
       units: users/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.rai_abusive_users_count_total
+        - selector: rai_abusive_users_count_total
           name: abusive_users
     - id: am_azure_cognitive_services__content_safety_system_events
       title: Azure Cognitive Services Safety System Events
@@ -1169,7 +1168,7 @@ template:
       units: events
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.rai_system_event_average
+        - selector: rai_system_event_average
           name: events
     - id: am_azure_cognitive_services__content_safety_moderation
       title: Azure Cognitive Services Content Moderation Calls
@@ -1179,9 +1178,9 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.content_safety_text_analyze_request_count_total
+        - selector: content_safety_text_analyze_request_count_total
           name: text
-        - selector: cognitive_services.content_safety_image_analyze_request_count_total
+        - selector: content_safety_image_analyze_request_count_total
           name: image
     - id: am_azure_cognitive_services__job_duration
       title: Azure Cognitive Services Job Duration
@@ -1191,7 +1190,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.job_duration_average
+        - selector: job_duration_average
           name: average
     - id: am_azure_cognitive_services__personalizer_actions
       title: Azure Cognitive Services Personalizer Action Occurrences
@@ -1201,7 +1200,7 @@ template:
       units: occurrences/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.action_id_occurrences_total
+        - selector: action_id_occurrences_total
           name: occurrences
     - id: am_azure_cognitive_services__personalizer_actions_per_event
       title: Azure Cognitive Services Personalizer Actions Per Event
@@ -1211,7 +1210,7 @@ template:
       units: actions
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.actions_per_event_average
+        - selector: actions_per_event_average
           name: average
     - id: am_azure_cognitive_services__personalizer_feature_occurrences
       title: Azure Cognitive Services Personalizer Feature Occurrences
@@ -1221,11 +1220,11 @@ template:
       units: occurrences/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.action_feature_id_occurrences_total
+        - selector: action_feature_id_occurrences_total
           name: action
-        - selector: cognitive_services.context_feature_id_occurrences_total
+        - selector: context_feature_id_occurrences_total
           name: context
-        - selector: cognitive_services.slot_feature_id_occurrences_total
+        - selector: slot_feature_id_occurrences_total
           name: slot
     - id: am_azure_cognitive_services__personalizer_feature_cardinality
       title: Azure Cognitive Services Personalizer Feature Cardinality
@@ -1235,11 +1234,11 @@ template:
       units: features
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.feature_cardinality_action_average
+        - selector: feature_cardinality_action_average
           name: action
-        - selector: cognitive_services.feature_cardinality_context_average
+        - selector: feature_cardinality_context_average
           name: context
-        - selector: cognitive_services.feature_cardinality_slot_average
+        - selector: feature_cardinality_slot_average
           name: slot
     - id: am_azure_cognitive_services__personalizer_features_per_event
       title: Azure Cognitive Services Personalizer Features Per Event
@@ -1249,11 +1248,11 @@ template:
       units: features
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.action_features_per_event_average
+        - selector: action_features_per_event_average
           name: action
-        - selector: cognitive_services.context_features_per_event_average
+        - selector: context_features_per_event_average
           name: context
-        - selector: cognitive_services.slot_features_per_event_average
+        - selector: slot_features_per_event_average
           name: slot
     - id: am_azure_cognitive_services__personalizer_namespaces_per_event
       title: Azure Cognitive Services Personalizer Namespaces Per Event
@@ -1263,11 +1262,11 @@ template:
       units: namespaces
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.action_namespaces_per_event_average
+        - selector: action_namespaces_per_event_average
           name: action
-        - selector: cognitive_services.context_namespaces_per_event_average
+        - selector: context_namespaces_per_event_average
           name: context
-        - selector: cognitive_services.slot_namespaces_per_event_average
+        - selector: slot_namespaces_per_event_average
           name: slot
     - id: am_azure_cognitive_services__personalizer_rewards
       title: Azure Cognitive Services Personalizer Rewards
@@ -1277,9 +1276,9 @@ template:
       units: reward
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.reward_average
+        - selector: reward_average
           name: average
-        - selector: cognitive_services.slot_reward_average
+        - selector: slot_reward_average
           name: slot
     - id: am_azure_cognitive_services__personalizer_estimator_rewards
       title: Azure Cognitive Services Personalizer Estimator Rewards
@@ -1289,11 +1288,11 @@ template:
       units: reward
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.online_estimator_overall_reward_average
+        - selector: online_estimator_overall_reward_average
           name: online
-        - selector: cognitive_services.baseline_estimator_overall_reward_average
+        - selector: baseline_estimator_overall_reward_average
           name: baseline
-        - selector: cognitive_services.baseline_random_estimator_overall_reward_average
+        - selector: baseline_random_estimator_overall_reward_average
           name: baseline_random
     - id: am_azure_cognitive_services__personalizer_estimator_slot_rewards
       title: Azure Cognitive Services Personalizer Estimator Slot Rewards
@@ -1303,11 +1302,11 @@ template:
       units: reward
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.online_estimator_slot_reward_average
+        - selector: online_estimator_slot_reward_average
           name: online
-        - selector: cognitive_services.baseline_estimator_slot_reward_average
+        - selector: baseline_estimator_slot_reward_average
           name: baseline
-        - selector: cognitive_services.baseline_random_estimator_slot_reward_average
+        - selector: baseline_random_estimator_slot_reward_average
           name: baseline_random
     - id: am_azure_cognitive_services__personalizer_slots
       title: Azure Cognitive Services Personalizer Slots
@@ -1317,7 +1316,7 @@ template:
       units: slots
       algorithm: absolute
       dimensions:
-        - selector: cognitive_services.number_of_slots_average
+        - selector: number_of_slots_average
           name: average
     - id: am_azure_cognitive_services__personalizer_slot_occurrences
       title: Azure Cognitive Services Personalizer Slot Occurrences
@@ -1327,7 +1326,7 @@ template:
       units: occurrences/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.slot_id_occurrences_total
+        - selector: slot_id_occurrences_total
           name: occurrences
     - id: am_azure_cognitive_services__personalizer_event_counts
       title: Azure Cognitive Services Personalizer Event Counts
@@ -1337,11 +1336,11 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.online_event_count_total
+        - selector: online_event_count_total
           name: online
-        - selector: cognitive_services.baseline_random_event_count_total
+        - selector: baseline_random_event_count_total
           name: baseline_random
-        - selector: cognitive_services.user_baseline_event_count_total
+        - selector: user_baseline_event_count_total
           name: user_baseline
     - id: am_azure_cognitive_services__personalizer_estimated_rewards
       title: Azure Cognitive Services Personalizer Estimated Rewards
@@ -1351,11 +1350,11 @@ template:
       units: reward/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.online_reward_total
+        - selector: online_reward_total
           name: online
-        - selector: cognitive_services.baseline_random_reward_total
+        - selector: baseline_random_reward_total
           name: baseline_random
-        - selector: cognitive_services.user_baseline_reward_total
+        - selector: user_baseline_reward_total
           name: user_baseline
     - id: am_azure_cognitive_services__speech_transcription
       title: Azure Cognitive Services Speech Transcription
@@ -1365,15 +1364,15 @@ template:
       units: seconds/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.audio_seconds_transcribed_total
+        - selector: audio_seconds_transcribed_total
           name: realtime
-        - selector: cognitive_services.audio_seconds_batch_transcribed_total
+        - selector: audio_seconds_batch_transcribed_total
           name: batch
-        - selector: cognitive_services.audio_seconds_batch_whisper_transcribed_total
+        - selector: audio_seconds_batch_whisper_transcribed_total
           name: batch_whisper
-        - selector: cognitive_services.audio_seconds_fast_transcribed_total
+        - selector: audio_seconds_fast_transcribed_total
           name: fast
-        - selector: cognitive_services.audio_seconds_fast_whisper_transcribed_total
+        - selector: audio_seconds_fast_whisper_transcribed_total
           name: fast_whisper
     - id: am_azure_cognitive_services__speech_translation
       title: Azure Cognitive Services Speech Translation
@@ -1383,7 +1382,7 @@ template:
       units: seconds/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.audio_seconds_translated_total
+        - selector: audio_seconds_translated_total
           name: translated
     - id: am_azure_cognitive_services__speech_synthesis
       title: Azure Cognitive Services Speech Synthesis
@@ -1393,7 +1392,7 @@ template:
       units: characters/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.synthesized_characters_total
+        - selector: synthesized_characters_total
           name: synthesized
     - id: am_azure_cognitive_services__speech_video_synthesis
       title: Azure Cognitive Services Video Synthesis
@@ -1403,7 +1402,7 @@ template:
       units: seconds/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.video_seconds_synthesized_total
+        - selector: video_seconds_synthesized_total
           name: synthesized
     - id: am_azure_cognitive_services__speech_avatar
       title: Azure Cognitive Services Avatar Usage
@@ -1413,9 +1412,9 @@ template:
       units: seconds/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.avatar_model_hosting_seconds_total
+        - selector: avatar_model_hosting_seconds_total
           name: hosting
-        - selector: cognitive_services.avatar_model_training_seconds_total
+        - selector: avatar_model_training_seconds_total
           name: training
     - id: am_azure_cognitive_services__speech_speaker_recognition
       title: Azure Cognitive Services Speaker Recognition
@@ -1425,7 +1424,7 @@ template:
       units: transactions/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.speaker_recognition_transactions_total
+        - selector: speaker_recognition_transactions_total
           name: transactions
     - id: am_azure_cognitive_services__speech_speaker_profiles
       title: Azure Cognitive Services Speaker Profiles
@@ -1435,7 +1434,7 @@ template:
       units: profiles/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.numberof_speaker_profiles_total
+        - selector: numberof_speaker_profiles_total
           name: profiles
     - id: am_azure_cognitive_services__speech_model_hosting
       title: Azure Cognitive Services Speech Model Hosting
@@ -1445,7 +1444,7 @@ template:
       units: hours/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.speech_model_hosting_hours_total
+        - selector: speech_model_hosting_hours_total
           name: hosting
     - id: am_azure_cognitive_services__speech_voice_live_tokens
       title: Azure Cognitive Services Voice Live Tokens
@@ -1455,17 +1454,17 @@ template:
       units: tokens/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.voice_live_audio_input_tokens_total
+        - selector: voice_live_audio_input_tokens_total
           name: audio_input
-        - selector: cognitive_services.voice_live_audio_output_tokens_total
+        - selector: voice_live_audio_output_tokens_total
           name: audio_output
-        - selector: cognitive_services.voice_live_cached_audio_input_tokens_total
+        - selector: voice_live_cached_audio_input_tokens_total
           name: cached_audio_input
-        - selector: cognitive_services.voice_live_text_input_tokens_total
+        - selector: voice_live_text_input_tokens_total
           name: text_input
-        - selector: cognitive_services.voice_live_text_output_tokens_total
+        - selector: voice_live_text_output_tokens_total
           name: text_output
-        - selector: cognitive_services.voice_live_cached_text_input_tokens_total
+        - selector: voice_live_cached_text_input_tokens_total
           name: cached_text_input
     - id: am_azure_cognitive_services__speech_voice_model
       title: Azure Cognitive Services Voice Model Usage
@@ -1475,7 +1474,7 @@ template:
       units: hours/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.voice_model_hosting_hours_total
+        - selector: voice_model_hosting_hours_total
           name: hosting
     - id: am_azure_cognitive_services__speech_voice_training
       title: Azure Cognitive Services Voice Model Training
@@ -1485,7 +1484,7 @@ template:
       units: minutes/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.voice_model_training_minutes_total
+        - selector: voice_model_training_minutes_total
           name: training
     - id: am_azure_cognitive_services__translator_text
       title: Azure Cognitive Services Translator Text Characters
@@ -1495,11 +1494,11 @@ template:
       units: characters/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.text_characters_translated_total
+        - selector: text_characters_translated_total
           name: standard
-        - selector: cognitive_services.text_custom_characters_translated_total
+        - selector: text_custom_characters_translated_total
           name: custom
-        - selector: cognitive_services.text_trained_characters_total
+        - selector: text_trained_characters_total
           name: trained
     - id: am_azure_cognitive_services__translator_document
       title: Azure Cognitive Services Translator Document Characters
@@ -1509,9 +1508,9 @@ template:
       units: characters/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.document_characters_translated_total
+        - selector: document_characters_translated_total
           name: standard
-        - selector: cognitive_services.document_custom_characters_translated_total
+        - selector: document_custom_characters_translated_total
           name: custom
     - id: am_azure_cognitive_services__translator_document_sync
       title: Azure Cognitive Services Translator Document Sync Characters
@@ -1521,9 +1520,9 @@ template:
       units: characters/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.one_document_characters_translated_total
+        - selector: one_document_characters_translated_total
           name: standard
-        - selector: cognitive_services.one_document_custom_characters_translated_total
+        - selector: one_document_custom_characters_translated_total
           name: custom
     - id: am_azure_cognitive_services__translator_pro_app
       title: Azure Cognitive Services Translator Pro App Usage
@@ -1533,7 +1532,7 @@ template:
       units: seconds/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.translator_pro_app_seconds_total
+        - selector: translator_pro_app_seconds_total
           name: seconds
     - id: am_azure_cognitive_services__vision_transactions
       title: Azure Cognitive Services Vision Transactions
@@ -1543,9 +1542,9 @@ template:
       units: transactions/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.computer_vision_transactions_total
+        - selector: computer_vision_transactions_total
           name: computer_vision
-        - selector: cognitive_services.custom_vision_transactions_total
+        - selector: custom_vision_transactions_total
           name: custom_vision
     - id: am_azure_cognitive_services__vision_training
       title: Azure Cognitive Services Custom Vision Training
@@ -1555,7 +1554,7 @@ template:
       units: seconds/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.custom_vision_training_time_total
+        - selector: custom_vision_training_time_total
           name: training_time
     - id: am_azure_cognitive_services__vision_images_stored
       title: Azure Cognitive Services Images Stored
@@ -1565,7 +1564,7 @@ template:
       units: images/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.images_stored_total
+        - selector: images_stored_total
           name: stored
     - id: am_azure_cognitive_services__face_transactions
       title: Azure Cognitive Services Face Transactions
@@ -1575,7 +1574,7 @@ template:
       units: transactions/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.face_transactions_total
+        - selector: face_transactions_total
           name: transactions
     - id: am_azure_cognitive_services__face_images_trained
       title: Azure Cognitive Services Face Images Trained
@@ -1585,7 +1584,7 @@ template:
       units: images/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.face_images_trained_total
+        - selector: face_images_trained_total
           name: trained
     - id: am_azure_cognitive_services__faces_stored
       title: Azure Cognitive Services Faces Stored
@@ -1595,7 +1594,7 @@ template:
       units: faces/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.faces_stored_total
+        - selector: faces_stored_total
           name: stored
     - id: am_azure_cognitive_services__luis_requests
       title: Azure Cognitive Services LUIS Requests
@@ -1605,9 +1604,9 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.luis_speech_requests_total
+        - selector: luis_speech_requests_total
           name: speech
-        - selector: cognitive_services.luis_text_requests_total
+        - selector: luis_text_requests_total
           name: text
     - id: am_azure_cognitive_services__text_processing
       title: Azure Cognitive Services Text Processing
@@ -1617,11 +1616,11 @@ template:
       units: records/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.processed_text_records_total
+        - selector: processed_text_records_total
           name: text
-        - selector: cognitive_services.processed_health_text_records_total
+        - selector: processed_health_text_records_total
           name: health_text
-        - selector: cognitive_services.question_answering_text_records_total
+        - selector: question_answering_text_records_total
           name: question_answering
     - id: am_azure_cognitive_services__processed_characters
       title: Azure Cognitive Services Processed Characters
@@ -1631,7 +1630,7 @@ template:
       units: characters/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.processed_characters_total
+        - selector: processed_characters_total
           name: characters
     - id: am_azure_cognitive_services__processed_images
       title: Azure Cognitive Services Processed Images
@@ -1641,7 +1640,7 @@ template:
       units: images/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.processed_images_total
+        - selector: processed_images_total
           name: images
     - id: am_azure_cognitive_services__processed_pages
       title: Azure Cognitive Services Processed Pages
@@ -1651,7 +1650,7 @@ template:
       units: pages/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.processed_pages_total
+        - selector: processed_pages_total
           name: pages
     - id: am_azure_cognitive_services__carnegie_inference
       title: Azure Cognitive Services Carnegie Inference
@@ -1661,7 +1660,7 @@ template:
       units: inferences/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.carnegie_inference_count_total
+        - selector: carnegie_inference_count_total
           name: inferences
     - id: am_azure_cognitive_services__personalizer_events
       title: Azure Cognitive Services Personalizer Events
@@ -1671,11 +1670,11 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.total_events_total
+        - selector: total_events_total
           name: total
-        - selector: cognitive_services.learned_events_total
+        - selector: learned_events_total
           name: learned
-        - selector: cognitive_services.non_activated_events_total
+        - selector: non_activated_events_total
           name: non_activated
     - id: am_azure_cognitive_services__personalizer_reward_tracking
       title: Azure Cognitive Services Personalizer Reward Tracking
@@ -1685,7 +1684,7 @@ template:
       units: rewards/s
       algorithm: incremental
       dimensions:
-        - selector: cognitive_services.matched_rewards_total
+        - selector: matched_rewards_total
           name: matched
-        - selector: cognitive_services.observed_rewards_total
+        - selector: observed_rewards_total
           name: observed

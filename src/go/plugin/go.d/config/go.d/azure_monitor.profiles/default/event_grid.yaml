@@ -1,6 +1,5 @@
 ---
-id: event_grid
-name: Azure Event Grid Topic
+display_name: Azure Event Grid Topic
 resource_type: Microsoft.EventGrid/topics
 metrics:
   - id: publish_success_count
@@ -91,9 +90,9 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: event_grid.publish_success_count_total
+        - selector: publish_success_count_total
           name: success
-        - selector: event_grid.publish_fail_count_total
+        - selector: publish_fail_count_total
           name: failed
     - id: am_azure_event_grid__publish_latency
       title: Azure Event Grid Publish Latency
@@ -103,7 +102,7 @@ template:
       units: milliseconds
       algorithm: incremental
       dimensions:
-        - selector: event_grid.publish_success_latency_in_ms_total
+        - selector: publish_success_latency_in_ms_total
           name: latency
     - id: am_azure_event_grid__routing
       title: Azure Event Grid Event Routing
@@ -113,9 +112,9 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: event_grid.matched_event_count_total
+        - selector: matched_event_count_total
           name: matched
-        - selector: event_grid.unmatched_event_count_total
+        - selector: unmatched_event_count_total
           name: unmatched
     - id: am_azure_event_grid__advanced_filter_evaluations
       title: Azure Event Grid Advanced Filter Evaluations
@@ -125,7 +124,7 @@ template:
       units: evaluations/s
       algorithm: incremental
       dimensions:
-        - selector: event_grid.advanced_filter_evaluation_count_total
+        - selector: advanced_filter_evaluation_count_total
           name: evaluations
     - id: am_azure_event_grid__delivery
       title: Azure Event Grid Event Delivery
@@ -135,13 +134,13 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: event_grid.delivery_success_count_total
+        - selector: delivery_success_count_total
           name: delivered
-        - selector: event_grid.delivery_attempt_fail_count_total
+        - selector: delivery_attempt_fail_count_total
           name: failed
-        - selector: event_grid.dropped_event_count_total
+        - selector: dropped_event_count_total
           name: dropped
-        - selector: event_grid.dead_lettered_count_total
+        - selector: dead_lettered_count_total
           name: dead_lettered
     - id: am_azure_event_grid__destination_processing_duration
       title: Azure Event Grid Destination Processing Duration
@@ -151,5 +150,5 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: event_grid.destination_processing_duration_in_ms_average
+        - selector: destination_processing_duration_in_ms_average
           name: average

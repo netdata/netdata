@@ -1,6 +1,5 @@
 ---
-id: sql_elastic_pool
-name: Azure SQL Elastic Pool
+display_name: Azure SQL Elastic Pool
 resource_type: Microsoft.Sql/servers/elasticPools
 metrics:
   - id: cpu_percent
@@ -177,9 +176,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.cpu_percent_average
+        - selector: cpu_percent_average
           name: average
-        - selector: sql_elastic_pool.cpu_percent_maximum
+        - selector: cpu_percent_maximum
           name: maximum
     - id: am_azure_sql_elastic_pool__instance_cpu
       title: Azure SQL Elastic Pool Instance CPU Utilization
@@ -189,7 +188,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.sql_instance_cpu_percent_average
+        - selector: sql_instance_cpu_percent_average
           name: average
     - id: am_azure_sql_elastic_pool__instance_memory
       title: Azure SQL Elastic Pool Instance Memory Utilization
@@ -199,7 +198,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.sql_instance_memory_percent_average
+        - selector: sql_instance_memory_percent_average
           name: average
     - id: am_azure_sql_elastic_pool__dtu_consumption
       title: Azure SQL Elastic Pool DTU Consumption
@@ -209,7 +208,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.dtu_consumption_percent_average
+        - selector: dtu_consumption_percent_average
           name: average
     - id: am_azure_sql_elastic_pool__io_utilization
       title: Azure SQL Elastic Pool I/O Utilization
@@ -219,9 +218,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.physical_data_read_percent_average
+        - selector: physical_data_read_percent_average
           name: data_read
-        - selector: sql_elastic_pool.log_write_percent_average
+        - selector: log_write_percent_average
           name: log_write
     - id: am_azure_sql_elastic_pool__resource_utilization
       title: Azure SQL Elastic Pool Resource Utilization
@@ -231,9 +230,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.workers_percent_average
+        - selector: workers_percent_average
           name: workers
-        - selector: sql_elastic_pool.sessions_percent_average
+        - selector: sessions_percent_average
           name: sessions
     - id: am_azure_sql_elastic_pool__sessions_count
       title: Azure SQL Elastic Pool Sessions Count
@@ -243,7 +242,7 @@ template:
       units: sessions
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.sessions_count_average
+        - selector: sessions_count_average
           name: average
     - id: am_azure_sql_elastic_pool__storage
       title: Azure SQL Elastic Pool Storage
@@ -253,11 +252,11 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.storage_used_average
+        - selector: storage_used_average
           name: used
-        - selector: sql_elastic_pool.allocated_data_storage_average
+        - selector: allocated_data_storage_average
           name: allocated
-        - selector: sql_elastic_pool.storage_limit_average
+        - selector: storage_limit_average
           name: limit
     - id: am_azure_sql_elastic_pool__storage_utilization
       title: Azure SQL Elastic Pool Storage Utilization
@@ -267,9 +266,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.storage_percent_average
+        - selector: storage_percent_average
           name: used
-        - selector: sql_elastic_pool.allocated_data_storage_percent_average
+        - selector: allocated_data_storage_percent_average
           name: allocated
     - id: am_azure_sql_elastic_pool__xtp_storage
       title: Azure SQL Elastic Pool In-Memory OLTP Storage
@@ -279,7 +278,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.xtp_storage_percent_average
+        - selector: xtp_storage_percent_average
           name: average
     - id: am_azure_sql_elastic_pool__tempdb_size
       title: Azure SQL Elastic Pool Tempdb Size
@@ -289,9 +288,9 @@ template:
       units: KiB
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.tempdb_data_size_average
+        - selector: tempdb_data_size_average
           name: data
-        - selector: sql_elastic_pool.tempdb_log_size_average
+        - selector: tempdb_log_size_average
           name: log
     - id: am_azure_sql_elastic_pool__tempdb_log_utilization
       title: Azure SQL Elastic Pool Tempdb Log Utilization
@@ -301,7 +300,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.tempdb_log_used_percent_average
+        - selector: tempdb_log_used_percent_average
           name: average
     - id: am_azure_sql_elastic_pool__vcore_usage
       title: Azure SQL Elastic Pool vCore Usage
@@ -311,9 +310,9 @@ template:
       units: vCores
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.cpu_used_average
+        - selector: cpu_used_average
           name: used
-        - selector: sql_elastic_pool.cpu_limit_average
+        - selector: cpu_limit_average
           name: limit
     - id: am_azure_sql_elastic_pool__edtu_usage
       title: Azure SQL Elastic Pool eDTU Usage
@@ -323,9 +322,9 @@ template:
       units: eDTU
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.e_dtu_used_average
+        - selector: e_dtu_used_average
           name: used
-        - selector: sql_elastic_pool.e_dtu_limit_average
+        - selector: e_dtu_limit_average
           name: limit
     - id: am_azure_sql_elastic_pool__serverless_utilization
       title: Azure SQL Elastic Pool Serverless Utilization
@@ -335,9 +334,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: sql_elastic_pool.app_cpu_percent_average
+        - selector: app_cpu_percent_average
           name: cpu
-        - selector: sql_elastic_pool.app_memory_percent_average
+        - selector: app_memory_percent_average
           name: memory
     - id: am_azure_sql_elastic_pool__serverless_billing
       title: Azure SQL Elastic Pool Serverless Billing
@@ -347,5 +346,5 @@ template:
       units: vCore-seconds/s
       algorithm: incremental
       dimensions:
-        - selector: sql_elastic_pool.app_cpu_billed_total
+        - selector: app_cpu_billed_total
           name: total

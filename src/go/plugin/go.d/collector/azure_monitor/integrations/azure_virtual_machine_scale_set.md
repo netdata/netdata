@@ -65,7 +65,7 @@ The collector has two discovery phases:
 **Bootstrap (first run)**
 
 - With the default `profiles.mode: auto`, the collector queries Azure Resource Graph within the configured `subscription_ids` to find candidate resources.
-- It matches discovered resource types against built-in profiles and automatically enables the relevant ones.
+- It matches discovered resource types against [built-in profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) and automatically enables the relevant ones.
 - Discovery scope can be narrowed using `discovery.mode: filters` (resource groups, regions, tags) or replaced entirely with `discovery.mode: query` for a custom KQL query.
 - A single job can monitor multiple subscriptions.
 
@@ -167,7 +167,7 @@ The following options can be defined globally: `update_every`, `autodetection_re
 | Stock profiles | `/usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/` |
 | User overrides | `/etc/netdata/go.d/azure_monitor.profiles/` |
 
-User profile files with the same `id` as a stock profile override it.
+User profile files with the same basename as a [stock profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) override it.
 Custom profiles extend the collector's catalog -- they do not replace the discovery mechanism.
 
 
@@ -195,8 +195,9 @@ Custom profiles extend the collector's catalog -- they do not replace the discov
 |  | discovery.mode_filters.tags | Optional exact-match tag filters for `filters` mode. Keys are matched case-insensitively and values case-sensitively. | {} | no |
 |  | [discovery.mode_query.kql](#option-discovery-discovery-mode-query-kql) | Custom Azure Resource Graph KQL for `query` mode. Must project `id`, `name`, `type`, `resourceGroup`, `location`. |  | no |
 | **Profiles** | [profiles.mode](#option-profiles-profiles-mode) | How profiles are selected: `auto` (discover from resources), `exact` (explicit list), or `combined` (both). | auto | no |
-|  | profiles.mode_exact.names | Explicit profile file basenames used by `exact` mode. Matching is case-insensitive. | [] | no |
-|  | profiles.mode_combined.names | Explicit profile file basenames merged with auto-discovered profiles in `combined` mode. Matching is case-insensitive. | [] | no |
+|  | [profiles.mode_auto.entries](#option-profiles-profiles-mode-auto-entries) | Optional per-profile overrides applied only to profiles that auto-activate at bootstrap. | [] | no |
+|  | [profiles.mode_exact.entries](#option-profiles-profiles-mode-exact-entries) | Explicit profile entries used by `exact` mode. | [] | no |
+|  | [profiles.mode_combined.entries](#option-profiles-profiles-mode-combined-entries) | Explicit profile entries merged with auto-discovered profiles in `combined` mode. | [] | no |
 | **Limits** | limits.max_concurrency | Maximum concurrent batch queries to Azure Monitor. | 4 | no |
 |  | limits.max_batch_resources | Maximum resources per Azure Monitor batch request. | 50 | no |
 |  | limits.max_metrics_per_query | Maximum metrics per Azure Monitor batch request. | 20 | no |
@@ -242,6 +243,7 @@ Controls how the collector finds candidate Azure resources.
 ##### discovery.mode_query.kql
 
 A raw Azure Resource Graph KQL query used when `discovery.mode` is `query`.
+See the [Azure Resource Graph query language documentation](https://learn.microsoft.com/en-us/azure/governance/resource-graph/concepts/query-language) for syntax and supported operators.
 
 The query **must** project these five columns:
 
@@ -252,6 +254,14 @@ The query **must** project these five columns:
 | `type` | Resource type (e.g., `microsoft.sql/servers/databases`) |
 | `resourceGroup` | Resource group name |
 | `location` | Azure region |
+
+:::info
+
+- Returned resource `type` values should match the Azure resource types expected by the active profiles. 
+- Resources with unsupported or non-matching types are ignored and do not activate profiles. 
+- For the stock catalog, see [built-in profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default).
+
+:::
 
 Example:
 
@@ -269,11 +279,67 @@ Controls how the collector decides which metric profiles to activate.
 
 | Mode | Behavior |
 |:-----|:---------|
-| `auto` | Discovers resource types in your subscriptions and enables matching built-in profiles automatically. This is the default. |
-| `exact` | Uses only the profile basenames listed under `profiles.mode_exact.names`. No auto-discovery. |
-| `combined` | Merges auto-discovered profiles with the basenames listed under `profiles.mode_combined.names`. |
+| `auto` | Discovers resource types in your subscriptions and enables matching [built-in profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) automatically. This is the default. |
+| `exact` | Uses only the profile entries listed under `profiles.mode_exact.entries`. No auto-discovery. |
+| `combined` | Merges auto-discovered profiles with the explicit entries listed under `profiles.mode_combined.entries`. |
 
-Profile basename matching is case-insensitive. A basename is the profile filename without the `.yaml` / `.yml` suffix.
+Each profile entry uses `name` as the canonical profile basename. The basename is the profile filename without the `.yaml` / `.yml` suffix and must be lowercase.
+
+Filter layering:
+
+- `discovery.mode_filters.*` defines the job-wide discovery scope.
+- `profiles.mode_*.entries[].filters.*` narrows resources for one profile only.
+- The effective resource set for a profile is the intersection of both filter sets.
+- Per-profile filters never widen or bypass the global discovery scope.
+- In `discovery.mode: query`, per-profile filters can use only `resource_groups` and `regions`. If you need per-profile tag filtering there, encode it in the KQL.
+
+
+<a id="option-profiles-profiles-mode-auto-entries"></a>
+##### profiles.mode_auto.entries
+
+Each entry has:
+
+| Field | Description |
+|:------|:------------|
+| `name` | Canonical profile basename. |
+| `filters.resource_groups` | Optional resource-group narrowing for this profile. |
+| `filters.regions` | Optional region narrowing for this profile. |
+| `filters.tags` | Optional tag narrowing for this profile in `discovery.mode: filters`. |
+
+Auto-mode entries do not activate profiles on their own. They only override filtering for profiles that were auto-selected at bootstrap.
+In `discovery.mode: query`, only `filters.resource_groups` and `filters.regions` apply.
+
+
+<a id="option-profiles-profiles-mode-exact-entries"></a>
+##### profiles.mode_exact.entries
+
+Each entry has:
+
+| Field | Description |
+|:------|:------------|
+| `name` | Canonical profile basename. |
+| `filters.resource_groups` | Optional resource-group narrowing for this profile. |
+| `filters.regions` | Optional region narrowing for this profile. |
+| `filters.tags` | Optional tag narrowing for this profile in `discovery.mode: filters`. |
+
+Per-profile filters only narrow the globally discovered resource set. They never widen it.
+In `discovery.mode: query`, only `filters.resource_groups` and `filters.regions` apply.
+
+
+<a id="option-profiles-profiles-mode-combined-entries"></a>
+##### profiles.mode_combined.entries
+
+Each entry has:
+
+| Field | Description |
+|:------|:------------|
+| `name` | Canonical profile basename. |
+| `filters.resource_groups` | Optional resource-group narrowing for this profile. |
+| `filters.regions` | Optional region narrowing for this profile. |
+| `filters.tags` | Optional tag narrowing for this profile in `discovery.mode: filters`. |
+
+If an explicit `combined` entry matches an auto-selected profile, the collector keeps one runtime profile and overlays the explicit entry filters onto it.
+In `discovery.mode: query`, only `filters.resource_groups` and `filters.regions` apply.
 
 
 
@@ -361,9 +427,48 @@ jobs:
     profiles:
       mode: exact
       mode_exact:
-        names:
-          - sql_database
-          - postgres_flexible
+        entries:
+          - name: sql_database
+          - name: postgres_flexible
+    auth:
+      mode: managed_identity
+
+```
+</details>
+
+###### Global and per-profile filters together
+
+Apply a global discovery boundary to the whole job, then narrow only the SQL Database profile further with a per-profile tag filter.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: prod-databases
+    subscription_ids:
+      - "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    discovery:
+      mode: filters
+      mode_filters:
+        resource_groups:
+          - production-rg
+        regions:
+          - eastus
+    profiles:
+      mode: combined
+      mode_combined:
+        entries:
+          - name: sql_database
+            filters:
+              tags:
+                env:
+                  - prod
+    # Effective scope:
+    # 1. Discovery first keeps only resources in production-rg and eastus.
+    # 2. Auto-selected profiles use that global scope as-is.
+    # 3. The sql_database profile is narrowed further to resources tagged env=prod.
+    # 4. The sql_database profile cannot see resources outside production-rg/eastus,
+    #    because per-profile filters only narrow the globally discovered set.
     auth:
       mode: managed_identity
 
@@ -475,7 +580,7 @@ Labels:
 | resource_group | The Azure resource group. |
 | region | The Azure region where the resource is deployed. |
 | resource_type | The Azure resource type identifier. |
-| profile | The Azure Monitor profile id. |
+| profile | The Azure Monitor profile basename. |
 | subscription_id | The Azure subscription identifier. |
 | resource_uid | The unique Azure resource identifier. |
 
@@ -609,8 +714,8 @@ Check the following:
 
 Profiles are matched by Azure resource type. If a resource type exists but metrics are missing:
 
-- **Check profile mode** -- Ensure `profiles.mode: auto` (default), or explicitly list the profile basename under `profiles.mode_exact.names` or `profiles.mode_combined.names`.
-- **Verify a built-in profile exists** -- List available profiles:
+- **Check profile mode** -- Ensure `profiles.mode: auto` (default), or explicitly list the profile basename under `profiles.mode_exact.entries` or `profiles.mode_combined.entries`.
+- **Verify a [built-in profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) exists** -- List available profiles:
   ```bash
   ls /usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default/
   ```

@@ -1,6 +1,5 @@
 ---
-id: stream_analytics
-name: Azure Stream Analytics Job
+display_name: Azure Stream Analytics Job
 resource_type: Microsoft.StreamAnalytics/streamingjobs
 metrics:
   - id: input_events
@@ -143,9 +142,9 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: stream_analytics.input_events_total
+        - selector: input_events_total
           name: in
-        - selector: stream_analytics.output_events_total
+        - selector: output_events_total
           name: out
     - id: am_azure_stream_analytics__input_data_throughput
       title: Azure Stream Analytics Input Data Throughput
@@ -155,7 +154,7 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: stream_analytics.input_event_bytes_total
+        - selector: input_event_bytes_total
           name: received
     - id: am_azure_stream_analytics__input_sources_received
       title: Azure Stream Analytics Input Sources Received
@@ -165,7 +164,7 @@ template:
       units: sources/s
       algorithm: incremental
       dimensions:
-        - selector: stream_analytics.input_events_sources_per_second_total
+        - selector: input_events_sources_per_second_total
           name: received
     - id: am_azure_stream_analytics__event_timing
       title: Azure Stream Analytics Event Timing Issues
@@ -175,11 +174,11 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: stream_analytics.late_input_events_total
+        - selector: late_input_events_total
           name: late
-        - selector: stream_analytics.early_input_events_total
+        - selector: early_input_events_total
           name: early
-        - selector: stream_analytics.dropped_or_adjusted_events_total
+        - selector: dropped_or_adjusted_events_total
           name: out_of_order
     - id: am_azure_stream_analytics__backlogged_events
       title: Azure Stream Analytics Backlogged Events
@@ -189,7 +188,7 @@ template:
       units: events
       algorithm: absolute
       dimensions:
-        - selector: stream_analytics.input_events_sources_backlogged_average
+        - selector: input_events_sources_backlogged_average
           name: backlogged
     - id: am_azure_stream_analytics__watermark_delay
       title: Azure Stream Analytics Watermark Delay
@@ -199,7 +198,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: stream_analytics.output_watermark_delay_seconds_maximum
+        - selector: output_watermark_delay_seconds_maximum
           name: delay
     - id: am_azure_stream_analytics__errors
       title: Azure Stream Analytics Errors
@@ -209,11 +208,11 @@ template:
       units: errors/s
       algorithm: incremental
       dimensions:
-        - selector: stream_analytics.errors_total
+        - selector: errors_total
           name: runtime
-        - selector: stream_analytics.conversion_errors_total
+        - selector: conversion_errors_total
           name: data_conversion
-        - selector: stream_analytics.deserialization_error_total
+        - selector: deserialization_error_total
           name: deserialization
     - id: am_azure_stream_analytics__function_requests
       title: Azure Stream Analytics Function Requests
@@ -223,9 +222,9 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: stream_analytics.aml_callout_requests_total
+        - selector: aml_callout_requests_total
           name: total
-        - selector: stream_analytics.aml_callout_failed_requests_total
+        - selector: aml_callout_failed_requests_total
           name: failed
     - id: am_azure_stream_analytics__function_events
       title: Azure Stream Analytics Function Events
@@ -235,7 +234,7 @@ template:
       units: events/s
       algorithm: incremental
       dimensions:
-        - selector: stream_analytics.aml_callout_input_events_total
+        - selector: aml_callout_input_events_total
           name: input
     - id: am_azure_stream_analytics__resource_utilization
       title: Azure Stream Analytics Resource Utilization
@@ -245,7 +244,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: stream_analytics.process_cpu_usage_percentage_average
+        - selector: process_cpu_usage_percentage_average
           name: cpu
-        - selector: stream_analytics.resource_utilization_average
+        - selector: resource_utilization_average
           name: su_memory

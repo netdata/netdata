@@ -1,6 +1,5 @@
 ---
-id: express_route_circuit
-name: Azure ExpressRoute Circuit
+display_name: Azure ExpressRoute Circuit
 resource_type: Microsoft.Network/expressRouteCircuits
 metrics:
   - id: arp_availability
@@ -91,7 +90,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: express_route_circuit.arp_availability_average
+        - selector: arp_availability_average
           name: average
     - id: am_azure_express_route_circuit__bgp_availability
       title: Azure ExpressRoute Circuit BGP Availability
@@ -101,7 +100,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: express_route_circuit.bgp_availability_average
+        - selector: bgp_availability_average
           name: average
     - id: am_azure_express_route_circuit__throughput
       title: Azure ExpressRoute Circuit Throughput
@@ -111,9 +110,9 @@ template:
       units: bits/s
       algorithm: absolute
       dimensions:
-        - selector: express_route_circuit.bits_in_per_second_average
+        - selector: bits_in_per_second_average
           name: in
-        - selector: express_route_circuit.bits_out_per_second_average
+        - selector: bits_out_per_second_average
           name: out
     - id: am_azure_express_route_circuit__bandwidth_utilization
       title: Azure ExpressRoute Circuit Bandwidth Utilization
@@ -123,9 +122,9 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: express_route_circuit.ingress_bandwidth_utilization_maximum
+        - selector: ingress_bandwidth_utilization_maximum
           name: ingress
-        - selector: express_route_circuit.egress_bandwidth_utilization_maximum
+        - selector: egress_bandwidth_utilization_maximum
           name: egress
     - id: am_azure_express_route_circuit__qos_dropped_bits
       title: Azure ExpressRoute Circuit QoS Dropped Bits
@@ -135,9 +134,9 @@ template:
       units: bits/s
       algorithm: absolute
       dimensions:
-        - selector: express_route_circuit.qos_drop_bits_in_per_second_average
+        - selector: qos_drop_bits_in_per_second_average
           name: in
-        - selector: express_route_circuit.qos_drop_bits_out_per_second_average
+        - selector: qos_drop_bits_out_per_second_average
           name: out
     - id: am_azure_express_route_circuit__fastpath_routes
       title: Azure ExpressRoute Circuit FastPath Routes
@@ -147,7 +146,7 @@ template:
       units: routes
       algorithm: absolute
       dimensions:
-        - selector: express_route_circuit.fast_path_routes_count_for_circuit_maximum
+        - selector: fast_path_routes_count_for_circuit_maximum
           name: maximum
     - id: am_azure_express_route_circuit__global_reach_throughput
       title: Azure ExpressRoute Circuit GlobalReach Throughput
@@ -157,7 +156,7 @@ template:
       units: bits/s
       algorithm: absolute
       dimensions:
-        - selector: express_route_circuit.global_reach_bits_in_per_second_average
+        - selector: global_reach_bits_in_per_second_average
           name: in
-        - selector: express_route_circuit.global_reach_bits_out_per_second_average
+        - selector: global_reach_bits_out_per_second_average
           name: out

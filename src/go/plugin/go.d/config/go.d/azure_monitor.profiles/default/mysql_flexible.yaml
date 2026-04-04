@@ -1,6 +1,5 @@
 ---
-id: mysql_flexible
-name: Azure MySQL Flexible Server
+display_name: Azure MySQL Flexible Server
 resource_type: Microsoft.DBforMySQL/flexibleServers
 metrics:
   - id: ha_io_status
@@ -355,7 +354,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.cpu_percent_average
+        - selector: cpu_percent_average
           name: average
     - id: am_azure_mysql_flexible__memory
       title: Azure MySQL Flexible Server Memory Utilization
@@ -365,7 +364,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.memory_percent_average
+        - selector: memory_percent_average
           name: average
     - id: am_azure_mysql_flexible__io_utilization
       title: Azure MySQL Flexible Server Storage I/O Utilization
@@ -375,7 +374,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.io_consumption_percent_average
+        - selector: io_consumption_percent_average
           name: average
     - id: am_azure_mysql_flexible__cpu_credits
       title: Azure MySQL Flexible Server CPU Credits
@@ -385,9 +384,9 @@ template:
       units: credits
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.cpu_credits_consumed_average
+        - selector: cpu_credits_consumed_average
           name: consumed
-        - selector: mysql_flexible.cpu_credits_remaining_average
+        - selector: cpu_credits_remaining_average
           name: remaining
     - id: am_azure_mysql_flexible__ha_status
       title: Azure MySQL Flexible Server HA Replication Status
@@ -397,9 +396,9 @@ template:
       units: status
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.ha_io_status_maximum
+        - selector: ha_io_status_maximum
           name: io
-        - selector: mysql_flexible.ha_sql_status_maximum
+        - selector: ha_sql_status_maximum
           name: sql
     - id: am_azure_mysql_flexible__replica_status
       title: Azure MySQL Flexible Server Replica Status
@@ -409,9 +408,9 @@ template:
       units: status
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.replica_io_running_maximum
+        - selector: replica_io_running_maximum
           name: io
-        - selector: mysql_flexible.replica_sql_running_maximum
+        - selector: replica_sql_running_maximum
           name: sql
     - id: am_azure_mysql_flexible__uptime
       title: Azure MySQL Flexible Server Uptime
@@ -421,7 +420,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.uptime_maximum
+        - selector: uptime_maximum
           name: uptime
     - id: am_azure_mysql_flexible__replication_lag
       title: Azure MySQL Flexible Server Replication Lag
@@ -431,9 +430,9 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.replication_lag_average
+        - selector: replication_lag_average
           name: replica
-        - selector: mysql_flexible.ha_replication_lag_average
+        - selector: ha_replication_lag_average
           name: ha
     - id: am_azure_mysql_flexible__innodb_row_lock_time
       title: Azure MySQL Flexible Server InnoDB Row Lock Time
@@ -443,7 +442,7 @@ template:
       units: milliseconds
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.innodb_row_lock_time_average
+        - selector: innodb_row_lock_time_average
           name: average
     - id: am_azure_mysql_flexible__innodb_row_lock_waits
       title: Azure MySQL Flexible Server InnoDB Row Lock Waits
@@ -453,7 +452,7 @@ template:
       units: waits/s
       algorithm: incremental
       dimensions:
-        - selector: mysql_flexible.innodb_row_lock_waits_total
+        - selector: innodb_row_lock_waits_total
           name: total
     - id: am_azure_mysql_flexible__aborted_connections
       title: Azure MySQL Flexible Server Aborted Connections
@@ -463,7 +462,7 @@ template:
       units: connections/s
       algorithm: incremental
       dimensions:
-        - selector: mysql_flexible.aborted_connections_total
+        - selector: aborted_connections_total
           name: total
     - id: am_azure_mysql_flexible__active_connections
       title: Azure MySQL Flexible Server Active Connections
@@ -473,7 +472,7 @@ template:
       units: connections
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.active_connections_average
+        - selector: active_connections_average
           name: average
     - id: am_azure_mysql_flexible__total_connections
       title: Azure MySQL Flexible Server Total Connections
@@ -483,7 +482,7 @@ template:
       units: connections/s
       algorithm: incremental
       dimensions:
-        - selector: mysql_flexible.total_connections_total
+        - selector: total_connections_total
           name: total
     - id: am_azure_mysql_flexible__active_transactions
       title: Azure MySQL Flexible Server Active Transactions
@@ -493,7 +492,7 @@ template:
       units: transactions
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.active_transactions_average
+        - selector: active_transactions_average
           name: average
     - id: am_azure_mysql_flexible__threads_running
       title: Azure MySQL Flexible Server Threads Running
@@ -503,7 +502,7 @@ template:
       units: threads
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.threads_running_maximum
+        - selector: threads_running_maximum
           name: maximum
     - id: am_azure_mysql_flexible__queries
       title: Azure MySQL Flexible Server Queries
@@ -513,9 +512,9 @@ template:
       units: queries/s
       algorithm: incremental
       dimensions:
-        - selector: mysql_flexible.queries_total
+        - selector: queries_total
           name: total
-        - selector: mysql_flexible.slow_queries_total
+        - selector: slow_queries_total
           name: slow
     - id: am_azure_mysql_flexible__dml_statements
       title: Azure MySQL Flexible Server DML Statements
@@ -525,13 +524,13 @@ template:
       units: statements/s
       algorithm: incremental
       dimensions:
-        - selector: mysql_flexible.com_select_total
+        - selector: com_select_total
           name: select
-        - selector: mysql_flexible.com_insert_total
+        - selector: com_insert_total
           name: insert
-        - selector: mysql_flexible.com_update_total
+        - selector: com_update_total
           name: update
-        - selector: mysql_flexible.com_delete_total
+        - selector: com_delete_total
           name: delete
     - id: am_azure_mysql_flexible__ddl_statements
       title: Azure MySQL Flexible Server DDL Statements
@@ -541,15 +540,15 @@ template:
       units: statements/s
       algorithm: incremental
       dimensions:
-        - selector: mysql_flexible.com_create_table_total
+        - selector: com_create_table_total
           name: create_table
-        - selector: mysql_flexible.com_alter_table_total
+        - selector: com_alter_table_total
           name: alter_table
-        - selector: mysql_flexible.com_drop_table_total
+        - selector: com_drop_table_total
           name: drop_table
-        - selector: mysql_flexible.com_create_db_total
+        - selector: com_create_db_total
           name: create_db
-        - selector: mysql_flexible.com_drop_db_total
+        - selector: com_drop_db_total
           name: drop_db
     - id: am_azure_mysql_flexible__lock_deadlocks
       title: Azure MySQL Flexible Server Deadlocks
@@ -559,7 +558,7 @@ template:
       units: deadlocks/s
       algorithm: incremental
       dimensions:
-        - selector: mysql_flexible.lock_deadlocks_total
+        - selector: lock_deadlocks_total
           name: total
     - id: am_azure_mysql_flexible__lock_timeouts
       title: Azure MySQL Flexible Server Lock Timeouts
@@ -569,7 +568,7 @@ template:
       units: timeouts/s
       algorithm: incremental
       dimensions:
-        - selector: mysql_flexible.lock_timeouts_total
+        - selector: lock_timeouts_total
           name: total
     - id: am_azure_mysql_flexible__innodb_buffer_pool_pages
       title: Azure MySQL Flexible Server InnoDB Buffer Pool Pages
@@ -579,13 +578,13 @@ template:
       units: pages
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.innodb_buffer_pool_pages_data_maximum
+        - selector: innodb_buffer_pool_pages_data_maximum
           name: data
-        - selector: mysql_flexible.innodb_buffer_pool_pages_dirty_maximum
+        - selector: innodb_buffer_pool_pages_dirty_maximum
           name: dirty
-        - selector: mysql_flexible.innodb_buffer_pool_pages_free_maximum
+        - selector: innodb_buffer_pool_pages_free_maximum
           name: free
-        - selector: mysql_flexible.innodb_buffer_pool_pages_flushed_average
+        - selector: innodb_buffer_pool_pages_flushed_average
           name: flushed
     - id: am_azure_mysql_flexible__innodb_buffer_pool_io
       title: Azure MySQL Flexible Server InnoDB Buffer Pool I/O
@@ -595,9 +594,9 @@ template:
       units: requests/s
       algorithm: incremental
       dimensions:
-        - selector: mysql_flexible.innodb_buffer_pool_read_requests_total
+        - selector: innodb_buffer_pool_read_requests_total
           name: read_requests
-        - selector: mysql_flexible.innodb_buffer_pool_reads_total
+        - selector: innodb_buffer_pool_reads_total
           name: disk_reads
     - id: am_azure_mysql_flexible__innodb_data_writes
       title: Azure MySQL Flexible Server InnoDB Data Writes
@@ -607,7 +606,7 @@ template:
       units: writes/s
       algorithm: incremental
       dimensions:
-        - selector: mysql_flexible.innodb_data_writes_total
+        - selector: innodb_data_writes_total
           name: total
     - id: am_azure_mysql_flexible__sort_merge_passes
       title: Azure MySQL Flexible Server Sort Merge Passes
@@ -617,7 +616,7 @@ template:
       units: passes/s
       algorithm: incremental
       dimensions:
-        - selector: mysql_flexible.sort_merge_passes_total
+        - selector: sort_merge_passes_total
           name: total
     - id: am_azure_mysql_flexible__network
       title: Azure MySQL Flexible Server Network Traffic
@@ -627,9 +626,9 @@ template:
       units: bytes/s
       algorithm: incremental
       dimensions:
-        - selector: mysql_flexible.network_bytes_ingress_total
+        - selector: network_bytes_ingress_total
           name: in
-        - selector: mysql_flexible.network_bytes_egress_total
+        - selector: network_bytes_egress_total
           name: out
     - id: am_azure_mysql_flexible__storage_io
       title: Azure MySQL Flexible Server Storage I/O
@@ -639,7 +638,7 @@ template:
       units: operations/s
       algorithm: incremental
       dimensions:
-        - selector: mysql_flexible.storage_io_count_total
+        - selector: storage_io_count_total
           name: total
     - id: am_azure_mysql_flexible__storage
       title: Azure MySQL Flexible Server Storage
@@ -649,9 +648,9 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.storage_used_average
+        - selector: storage_used_average
           name: used
-        - selector: mysql_flexible.storage_limit_maximum
+        - selector: storage_limit_maximum
           name: limit
     - id: am_azure_mysql_flexible__storage_utilization
       title: Azure MySQL Flexible Server Storage Utilization
@@ -661,7 +660,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.storage_percent_average
+        - selector: storage_percent_average
           name: average
     - id: am_azure_mysql_flexible__storage_breakdown
       title: Azure MySQL Flexible Server Storage Breakdown
@@ -671,13 +670,13 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.data_storage_used_average
+        - selector: data_storage_used_average
           name: data
-        - selector: mysql_flexible.ibdata1_storage_used_average
+        - selector: ibdata1_storage_used_average
           name: ibdata1
-        - selector: mysql_flexible.binlog_storage_used_average
+        - selector: binlog_storage_used_average
           name: binlog
-        - selector: mysql_flexible.others_storage_used_average
+        - selector: others_storage_used_average
           name: others
     - id: am_azure_mysql_flexible__backup_storage
       title: Azure MySQL Flexible Server Backup Storage
@@ -687,7 +686,7 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.backup_storage_used_average
+        - selector: backup_storage_used_average
           name: used
     - id: am_azure_mysql_flexible__serverlog_storage
       title: Azure MySQL Flexible Server Server Log Storage
@@ -697,9 +696,9 @@ template:
       units: bytes
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.serverlog_storage_usage_average
+        - selector: serverlog_storage_usage_average
           name: used
-        - selector: mysql_flexible.serverlog_storage_limit_maximum
+        - selector: serverlog_storage_limit_maximum
           name: limit
     - id: am_azure_mysql_flexible__serverlog_storage_utilization
       title: Azure MySQL Flexible Server Server Log Storage Utilization
@@ -709,7 +708,7 @@ template:
       units: percentage
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.serverlog_storage_percent_average
+        - selector: serverlog_storage_percent_average
           name: average
     - id: am_azure_mysql_flexible__history_list_length
       title: Azure MySQL Flexible Server History List Length
@@ -719,5 +718,5 @@ template:
       units: entries
       algorithm: absolute
       dimensions:
-        - selector: mysql_flexible.trx_rseg_history_len_maximum
+        - selector: trx_rseg_history_len_maximum
           name: maximum

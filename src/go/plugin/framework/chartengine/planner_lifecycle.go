@@ -347,39 +347,6 @@ func collectExpiryRemovals(
 	return removeDims, removeCharts
 }
 
-func orderedDimensionNamesFromState(dimensions map[string]dimensionState) []string {
-	type staticEntry struct {
-		name  string
-		order int
-	}
-	staticEntries := make([]staticEntry, 0, len(dimensions))
-	dynamicNames := make([]string, 0, len(dimensions))
-	for name, state := range dimensions {
-		if state.static {
-			staticEntries = append(staticEntries, staticEntry{
-				name:  name,
-				order: state.order,
-			})
-			continue
-		}
-		dynamicNames = append(dynamicNames, name)
-	}
-	sort.Slice(staticEntries, func(i, j int) bool {
-		if staticEntries[i].order != staticEntries[j].order {
-			return staticEntries[i].order < staticEntries[j].order
-		}
-		return staticEntries[i].name < staticEntries[j].name
-	})
-
-	sort.Strings(dynamicNames)
-	out := make([]string, 0, len(staticEntries)+len(dynamicNames))
-	for _, entry := range staticEntries {
-		out = append(out, entry.name)
-	}
-	out = append(out, dynamicNames...)
-	return out
-}
-
 func orderedObservedDimensionNames(entries map[string]*dimBuildEntry, seenSeq uint64) []string {
 	type staticEntry struct {
 		name  string

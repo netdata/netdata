@@ -2,9 +2,9 @@
 
 package program
 
-import "testing"
-
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -97,6 +97,59 @@ func TestNewProgramScenarios(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		"rejects invalid chart type": {
+			version: "v1",
+			metrics: []string{"windows_rx_total"},
+			charts: []Chart{
+				func() Chart {
+					chart := sampleChart("invalid-type")
+					chart.Meta.Type = ChartType("bars")
+					return chart
+				}(),
+			},
+			wantErr: true,
+		},
+		"rejects missing label promotion mode": {
+			version: "v1",
+			metrics: []string{"windows_rx_total"},
+			charts: []Chart{
+				func() Chart {
+					chart := sampleChart("missing-label-mode")
+					chart.Labels.Mode = ""
+					return chart
+				}(),
+			},
+			wantErr: true,
+		},
+		"rejects negation-only instance selectors": {
+			version: "v1",
+			metrics: []string{"windows_rx_total"},
+			charts: []Chart{
+				func() Chart {
+					chart := sampleChart("negation-only-instance-selectors")
+					chart.Identity.InstanceByLabels = []InstanceLabelSelector{
+						{Exclude: true, Key: "nic"},
+					}
+					return chart
+				}(),
+			},
+			wantErr: true,
+		},
+		"rejects malformed instance selector keys": {
+			version: "v1",
+			metrics: []string{"windows_rx_total"},
+			charts: []Chart{
+				func() Chart {
+					chart := sampleChart("malformed-instance-selector")
+					chart.Identity.InstanceByLabels = []InstanceLabelSelector{
+						{Key: "nic"},
+						{Exclude: true, Key: " host"},
+					}
+					return chart
+				}(),
+			},
+			wantErr: true,
+		},
 	}
 
 	for name, tc := range tests {
@@ -112,6 +165,48 @@ func TestNewProgramScenarios(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateInstanceLabelSelectorsReportsJoinedErrors(t *testing.T) {
+	err := validateInstanceLabelSelectors([]InstanceLabelSelector{
+		{Exclude: true, Key: " host"},
+		{},
+	})
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "instance selector[0]: exclude selector key must be trimmed")
+	assert.ErrorContains(t, err, "instance selector[1]: selector is empty")
+	assert.ErrorContains(t, err, "instance selectors must include at least one positive selector")
+}
+
+func TestValidateDimensionReportsJoinedErrors(t *testing.T) {
+	err := validateDimension(Dimension{})
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "selector expression is required")
+	assert.ErrorContains(t, err, "selector matcher is required")
+	assert.ErrorContains(t, err, "dimension name is required")
+}
+
+func TestNewProgramReportsJoinedChartErrors(t *testing.T) {
+	chart := sampleChart("invalid-multi")
+	chart.Meta.Context = ""
+	chart.Meta.Units = ""
+	chart.Identity.InstanceByLabels = []InstanceLabelSelector{
+		{Exclude: true, Key: "nic"},
+	}
+	chart.CollisionReduce = ""
+	chart.Dimensions = []Dimension{{}}
+
+	_, err := New("v1", 42, []string{"windows_rx_total"}, []Chart{chart})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "context is required")
+	assert.ErrorContains(t, err, "units is required")
+	assert.ErrorContains(t, err, "identity: instance selectors must include at least one positive selector")
+	assert.ErrorContains(t, err, "collision reduce op is required")
+	assert.ErrorContains(t, err, "dimension[0]: selector expression is required")
+	assert.ErrorContains(t, err, "selector matcher is required")
+	assert.ErrorContains(t, err, "dimension name is required")
 }
 
 func sampleChart(templateID string) Chart {
