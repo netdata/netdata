@@ -140,8 +140,159 @@ For SOCKS proxies:
 
 :::
 
-## Manage Connections
+## Troubleshooting ACLK Proxy Connection Issues
 
+### New Log Message Formats (Starting from Nightly Build 2026-02-25)
+
+Starting with nightly build `2026-02-25`, Netdata Agent provides clearer log messages to help diagnose proxy connection problems:
+
+#### Proxy Resolution Messages
+
+**No proxy configured:**
+```
+ACLK: proxy is not configured, will connect directly without proxy.
+```
+This indicates that Netdata Agent will connect directly to Netdata Cloud without using a proxy.
+
+**Proxy explicitly set to "none":**
+```
+ACLK: proxy is set to 'none', will connect directly without proxy.
+```
+The `proxy = none` setting in cloud.conf or netdata.conf explicitly disables proxy usage.
+
+**Proxy from environment variable (without credentials):**
+```
+ACLK: using HTTP proxy http://proxy.company.com:3128 (without credentials, from environment variable 'http_proxy')
+```
+The Agent is using an HTTP proxy specified via the `http_proxy` environment variable. No authentication credentials are included in the URL.
+
+**Proxy from environment variable (with credentials):**
+```
+ACLK: using HTTP proxy http://proxy.company.com:3128 (with credentials, from environment variable 'https_proxy')
+```
+The Agent is using an authenticated HTTP proxy. Note: For security, credentials are never printed in logs - the log shows `(with credentials)` to indicate authentication is being used without exposing the actual credentials.
+
+**Proxy set to "env" but variables missing:**
+```
+ACLK: proxy is explicitly set to 'env' but neither 'http_proxy' nor 'https_proxy' environment variables are set. Will connect directly without proxy.
+```
+The `proxy = env` setting was used but the required environment variables (`http_proxy` or `https_proxy`) are not available.
+
+**HTTP proxy from cloud.conf:**
+```
+ACLK: using HTTP proxy http://proxy.internal:8080 (with credentials, from cloud.conf)
+```
+The Agent is using an HTTP proxy configured in the cloud.conf file.
+
+**SOCKS5 proxy from netdata.conf:**
+```
+ACLK: using SOCKS5 proxy socks5://socks.internal:1080 (without credentials, from netdata.conf [cloud])
+```
+The Agent is using a SOCKS5 proxy configured in netdata.conf.
+
+#### Connection Time Messages
+
+**MQTT WSS Connection:**
+```
+ACLK: connecting to mqtt.cloud.netdata.com:443 via proxy http://proxy.internal:8080 (with credentials)
+```
+Shows the Agent is establishing a WebSocket connection to the Netdata Cloud message broker via the specified proxy.
+
+**HTTPS Client Connection:**
+```
+ACLK: connecting to api.cloud.netdata.com:443 (no proxy)
+```
+Shows the Agent is connecting directly to the Netdata Cloud API without using a proxy.
+
+**OTP/Challenge Connection:**
+```
+ACLK: connecting to api.cloud.netdata.com:443 via proxy http://proxy.internal:3128 (without credentials)
+```
+Shows the Agent is establishing a TLS connection for claim authentication using the specified proxy.
+
+#### Error Messages
+
+**Proxy Connection Failed (CONNECT):**
+```
+ACLK: failed to CONNECT via proxy http://proxy.internal:3128 to api.cloud.netdata.com:443
+```
+The HTTP CONNECT request to establish the proxy tunnel was rejected. This typically means:
+- The proxy server rejected the connection
+- The proxy requires different authentication
+- The proxy is not reachable
+
+**Proxy Response Error:**
+```
+ACLK: proxy http://proxy.internal:3128 returned HTTP 407 (expected 200) for CONNECT to api.cloud.netdata.com:443
+```
+The proxy server returned a non-200 HTTP status code for the CONNECT request. Common codes:
+- `407`: Proxy Authentication Required
+- `503`: Service Unavailable
+- `502`: Bad Gateway
+
+#### State Reporting (netdatacli aclk-state)
+
+The `aclk-state` command shows the current proxy configuration and connection status:
+
+**Old format:**
+```
+ACLK Proxy: socks5://XXXXX@socks.internal:1080
+```
+
+**New format:**
+```
+ACLK Proxy: socks5://socks.internal:1080 (with credentials, from cloud.conf)
+```
+
+**When no proxy is configured:**
+```
+ACLK Proxy: none
+```
+
+The new format explicitly shows:
+- Which configuration source was used
+- Whether credentials are present
+
+### How to Interpret These Messages
+
+1. **Check Configuration Source**: Look at the log to see if the proxy is coming from:
+   - Environment variables (`http_proxy`, `https_proxy`)
+   - cloud.conf configuration
+   - netdata.conf configuration (in the `[cloud]` section)
+
+2. **Verify Proxy Availability**: Before using a proxy, verify:
+   - The proxy server is reachable: `curl -v http://proxy-server:port`
+   - The proxy accepts connections from your Agent's IP
+   - Required authentication is properly configured
+
+3. **Check Proxy Type**: Different proxy types are supported:
+   - HTTP proxies (`http://`)
+   - SOCKS5 proxies (`socks5://` or `socks5h://`)
+   - Netdata requires explicit configuration for each type
+   - **Note**: Secure proxy schemes (`https://`) are not supported; use HTTP or SOCKS5 proxies to reach both HTTP and HTTPS destinations
+
+4. **Authentication**:
+   - Environment variables can include credentials (`http://user:pass@host:port`)
+   - Configuration files may use separate username/password fields
+   - SOCKS5 proxies use different authentication methods
+
+### Common Issues and Solutions
+
+| Issue | Symptom | Solution |
+|-------|----------|----------|
+| **Proxy not reachable** | `failed to CONNECT` errors | Verify proxy server is running and accessible from Agent host |
+| **Wrong proxy type** | `CONNECT` or `407` errors | Ensure proxy type matches Netdata configuration (HTTP vs SOCKS5) |
+| **Authentication failure** | `407` Proxy Auth Required | Check if proxy requires authentication and provide correct credentials |
+| **Proxy returns 502/503** | Temporary proxy outage | Wait and retry, or contact proxy administrator |
+| **Conflicting configurations** | Multiple proxy messages in logs | Disable all but one proxy configuration, restart Agent |
+
+### Additional Resources
+
+- [Netdata Cloud Security Documentation](/docs/security-and-privacy-design/netdata-cloud-security.md)
+- [Agent Configuration Reference](#proxy-configuration)
+- [Reverse Proxy Configuration](/docs/netdata-agent/securing-netdata-agents.md)
+
+## Manage Connections
 ### Reconnect Agent
 
 <details>
