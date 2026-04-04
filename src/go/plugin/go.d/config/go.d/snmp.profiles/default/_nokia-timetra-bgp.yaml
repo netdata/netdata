@@ -6,11 +6,11 @@ virtual_metrics:
     per_row: true
     alternatives:
       - sources:
-          - { metric: bgpPeerAdminStatus, table: tBgpPeerNgTable, as: admin_enabled, dim: start }
-          - { metric: bgpPeerState, table: tBgpPeerNgTable, as: established, dim: established }
+          - {metric: bgpPeerAdminStatus, table: tBgpPeerNgTable, as: admin_enabled, dim: start}
+          - {metric: bgpPeerState, table: tBgpPeerNgTable, as: established, dim: established}
       - sources:
-          - { metric: bgpPeerAdminStatus, table: bgpPeerTable, as: admin_enabled, dim: start }
-          - { metric: bgpPeerState, table: bgpPeerTable, as: established, dim: established }
+          - {metric: bgpPeerAdminStatus, table: bgpPeerTable, as: admin_enabled, dim: start}
+          - {metric: bgpPeerState, table: bgpPeerTable, as: established, dim: established}
     chart_meta:
       description: BGP peer administrative and established availability
       family: 'Network/Routing/BGP/Peer/Availability'
@@ -19,11 +19,11 @@ virtual_metrics:
     per_row: true
     alternatives:
       - sources:
-          - { metric: bgpPeerInUpdates, table: tBgpPeerNgOperTable, as: received }
-          - { metric: bgpPeerOutUpdates, table: tBgpPeerNgOperTable, as: sent }
+          - {metric: bgpPeerInUpdates, table: tBgpPeerNgOperTable, as: received}
+          - {metric: bgpPeerOutUpdates, table: tBgpPeerNgOperTable, as: sent}
       - sources:
-          - { metric: bgpPeerInUpdates, table: bgpPeerTable, as: received }
-          - { metric: bgpPeerOutUpdates, table: bgpPeerTable, as: sent }
+          - {metric: bgpPeerInUpdates, table: bgpPeerTable, as: received}
+          - {metric: bgpPeerOutUpdates, table: bgpPeerTable, as: sent}
     chart_meta:
       description: BGP peer update traffic by direction
       family: 'Network/Routing/BGP/Peer/Message/Update'
@@ -272,9 +272,9 @@ metrics:
       name: tBgpPeerNgOperTable
       OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8
     static_tags:
-      - { tag: address_family, value: ipv4 }
-      - { tag: subsequent_address_family, value: unicast }
-      - { tag: address_family_name, value: ipv4 unicast }
+      - {tag: address_family, value: ipv4}
+      - {tag: subsequent_address_family, value: unicast}
+      - {tag: address_family_name, value: ipv4 unicast}
     symbols:
       - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.5
         name: bgpPeerPrefixesReceivedTotal
@@ -311,9 +311,9 @@ metrics:
       name: tBgpPeerNgOperTable
       OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8
     static_tags:
-      - { tag: address_family, value: ipv4 }
-      - { tag: subsequent_address_family, value: vpn }
-      - { tag: address_family_name, value: vpnv4 unicast }
+      - {tag: address_family, value: ipv4}
+      - {tag: subsequent_address_family, value: vpn}
+      - {tag: address_family_name, value: vpnv4 unicast}
     symbols:
       - OID: 1.3.6.1.4.1.6527.3.1.2.14.4.8.1.13
         name: bgpPeerPrefixesReceivedTotal
