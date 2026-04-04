@@ -10,6 +10,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 )
 
+const collectJobLabel = "_collect_job"
+
 type compiledInstanceLabelPlan struct {
 	explicitKeys []string
 	explicitSet  map[string]struct{}
@@ -284,6 +286,6 @@ func (a *chartLabelAccumulator) materialize() (map[string]string, error) {
 		}
 		out[key] = value
 	}
-	delete(out, "_collect_job")
+	delete(out, collectJobLabel)
 	return out, nil
 }

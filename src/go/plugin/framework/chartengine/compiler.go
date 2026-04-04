@@ -5,6 +5,7 @@ package chartengine
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -433,7 +434,7 @@ func pathIndexes(path []int) string {
 		if i > 0 {
 			b.WriteByte('.')
 		}
-		b.WriteString(fmt.Sprintf("%d", idx))
+		b.WriteString(strconv.Itoa(idx))
 	}
 	return b.String()
 }

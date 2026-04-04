@@ -92,6 +92,14 @@ func validateChart(chart Chart) error {
 	if chart.Meta.Algorithm != AlgorithmAbsolute && chart.Meta.Algorithm != AlgorithmIncremental {
 		return fmt.Errorf("invalid algorithm %q", chart.Meta.Algorithm)
 	}
+	switch chart.Meta.Type {
+	case ChartTypeLine, ChartTypeArea, ChartTypeStacked, ChartTypeHeatmap:
+	default:
+		return fmt.Errorf("invalid chart type %q", chart.Meta.Type)
+	}
+	if err := validateLabelPolicy(chart.Labels); err != nil {
+		return fmt.Errorf("labels: %w", err)
+	}
 	if chart.CollisionReduce == "" {
 		return fmt.Errorf("collision reduce op is required")
 	}

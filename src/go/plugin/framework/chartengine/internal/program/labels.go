@@ -2,6 +2,8 @@
 
 package program
 
+import "fmt"
+
 // PromotionMode defines how non-identity chart labels are selected.
 type PromotionMode string
 
@@ -44,6 +46,15 @@ func DefaultLabelPrecedence() LabelPrecedence {
 		SelectedOverInstance: true,
 		InstanceOverJob:      true,
 		ReservedImmutable:    true,
+	}
+}
+
+func validateLabelPolicy(policy LabelPolicy) error {
+	switch policy.Mode {
+	case PromotionModeAutoIntersection, PromotionModeExplicitIntersection:
+		return nil
+	default:
+		return fmt.Errorf("invalid promotion mode %q", policy.Mode)
 	}
 }
 

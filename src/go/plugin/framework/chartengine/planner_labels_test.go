@@ -18,7 +18,7 @@ func TestChartLabelAccumulatorIntersectsLabels(t *testing.T) {
 		"auto intersection keeps only common labels and excludes dimension key": {
 			observed: []map[string]string{
 				{
-					"_collect_job":   "mysql-local",
+					collectJobLabel:  "mysql-local",
 					"env":            "prod",
 					"instance":       "db1",
 					"mode":           "read",
@@ -26,7 +26,7 @@ func TestChartLabelAccumulatorIntersectsLabels(t *testing.T) {
 					"selector_fixed": "x",
 				},
 				{
-					"_collect_job":   "mysql-local",
+					collectJobLabel:  "mysql-local",
 					"env":            "prod",
 					"instance":       "db1",
 					"mode":           "write",
@@ -34,7 +34,7 @@ func TestChartLabelAccumulatorIntersectsLabels(t *testing.T) {
 					"selector_fixed": "x",
 				},
 				{
-					"_collect_job":   "mysql-local",
+					collectJobLabel:  "mysql-local",
 					"env":            "prod",
 					"instance":       "db1",
 					"mode":           "read",
@@ -78,7 +78,7 @@ func TestChartLabelAccumulatorIntersectsLabels(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 			assert.NotContains(t, got, "mode")
 			assert.NotContains(t, got, "selector_fixed")
-			assert.NotContains(t, got, "_collect_job")
+			assert.NotContains(t, got, collectJobLabel)
 		})
 	}
 }

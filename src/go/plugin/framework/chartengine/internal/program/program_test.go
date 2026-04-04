@@ -2,9 +2,9 @@
 
 package program
 
-import "testing"
-
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -94,6 +94,30 @@ func TestNewProgramScenarios(t *testing.T) {
 						},
 					},
 				},
+			},
+			wantErr: true,
+		},
+		"rejects invalid chart type": {
+			version: "v1",
+			metrics: []string{"windows_rx_total"},
+			charts: []Chart{
+				func() Chart {
+					chart := sampleChart("invalid-type")
+					chart.Meta.Type = ChartType("bars")
+					return chart
+				}(),
+			},
+			wantErr: true,
+		},
+		"rejects missing label promotion mode": {
+			version: "v1",
+			metrics: []string{"windows_rx_total"},
+			charts: []Chart{
+				func() Chart {
+					chart := sampleChart("missing-label-mode")
+					chart.Labels.Mode = ""
+					return chart
+				}(),
 			},
 			wantErr: true,
 		},
