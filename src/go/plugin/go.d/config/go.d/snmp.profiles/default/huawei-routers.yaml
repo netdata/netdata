@@ -23,17 +23,17 @@ virtual_metrics:
       - _subsequent_address_family
       - _neighbor_address_type
     emit_tags:
-      - { tag: routing_instance, from: _routing_instance }
-      - { tag: neighbor, from: _neighbor }
-      - { tag: remote_as, from: _remote_as }
-      - { tag: bgp_version, from: _bgp_version }
-      - { tag: peer_description, from: _peer_description }
-      - { tag: address_family, from: _address_family }
-      - { tag: subsequent_address_family, from: _subsequent_address_family }
-      - { tag: neighbor_address_type, from: _neighbor_address_type }
+      - {tag: routing_instance, from: _routing_instance}
+      - {tag: neighbor, from: _neighbor}
+      - {tag: remote_as, from: _remote_as}
+      - {tag: bgp_version, from: _bgp_version}
+      - {tag: peer_description, from: _peer_description}
+      - {tag: address_family, from: _address_family}
+      - {tag: subsequent_address_family, from: _subsequent_address_family}
+      - {tag: neighbor_address_type, from: _neighbor_address_type}
     sources:
-      - { metric: huawei.hwBgpPeerAdminStatus, table: hwBgpPeerTable, as: admin_enabled, dim: start }
-      - { metric: huawei.hwBgpPeerState, table: hwBgpPeerTable, as: established, dim: established }
+      - {metric: huawei.hwBgpPeerAdminStatus, table: hwBgpPeerTable, as: admin_enabled, dim: start}
+      - {metric: huawei.hwBgpPeerState, table: hwBgpPeerTable, as: established, dim: established}
     chart_meta:
       description: BGP peer administrative and established availability
       family: 'Network/Routing/BGP/Peer/Availability'
@@ -47,16 +47,16 @@ virtual_metrics:
       - _subsequent_address_family
       - _neighbor_address_type
     emit_tags:
-      - { tag: routing_instance, from: _routing_instance }
-      - { tag: neighbor, from: _neighbor }
-      - { tag: remote_as, from: _remote_as }
-      - { tag: bgp_version, from: _bgp_version }
-      - { tag: peer_description, from: _peer_description }
-      - { tag: address_family, from: _address_family }
-      - { tag: subsequent_address_family, from: _subsequent_address_family }
-      - { tag: neighbor_address_type, from: _neighbor_address_type }
+      - {tag: routing_instance, from: _routing_instance}
+      - {tag: neighbor, from: _neighbor}
+      - {tag: remote_as, from: _remote_as}
+      - {tag: bgp_version, from: _bgp_version}
+      - {tag: peer_description, from: _peer_description}
+      - {tag: address_family, from: _address_family}
+      - {tag: subsequent_address_family, from: _subsequent_address_family}
+      - {tag: neighbor_address_type, from: _neighbor_address_type}
     sources:
-      - { metric: huawei.hwBgpPeerFsmEstablishedCounter, table: hwBgpPeerTable }
+      - {metric: huawei.hwBgpPeerFsmEstablishedCounter, table: hwBgpPeerTable}
     chart_meta:
       description: The total number of times the BGP FSM transitioned into the established state
       family: 'Network/Routing/BGP/Peer/FSM/Transition/Established/Count'
@@ -70,20 +70,20 @@ virtual_metrics:
       - _subsequent_address_family
       - _neighbor_address_type
     emit_tags:
-      - { tag: routing_instance, from: _routing_instance }
-      - { tag: neighbor, from: _neighbor }
-      - { tag: remote_as, from: _remote_as }
-      - { tag: peer_description, from: _peer_description }
-      - { tag: address_family, from: _address_family }
-      - { tag: subsequent_address_family, from: _subsequent_address_family }
-      - { tag: neighbor_address_type, from: _neighbor_address_type }
+      - {tag: routing_instance, from: _routing_instance}
+      - {tag: neighbor, from: _neighbor}
+      - {tag: remote_as, from: _remote_as}
+      - {tag: peer_description, from: _peer_description}
+      - {tag: address_family, from: _address_family}
+      - {tag: subsequent_address_family, from: _subsequent_address_family}
+      - {tag: neighbor_address_type, from: _neighbor_address_type}
     alternatives:
       - sources:
-          - { metric: huawei.hwBgpPeerInUpdateMsgCounter, table: hwBgpPeerMessageTable, as: received }
-          - { metric: huawei.hwBgpPeerOutUpdateMsgCounter, table: hwBgpPeerMessageTable, as: sent }
+          - {metric: huawei.hwBgpPeerInUpdateMsgCounter, table: hwBgpPeerMessageTable, as: received}
+          - {metric: huawei.hwBgpPeerOutUpdateMsgCounter, table: hwBgpPeerMessageTable, as: sent}
       - sources:
-          - { metric: huawei.hwBgpPeerInUpdateMsgs, table: hwBgpPeerStatisticTable, as: received }
-          - { metric: huawei.hwBgpPeerOutUpdateMsgs, table: hwBgpPeerStatisticTable, as: sent }
+          - {metric: huawei.hwBgpPeerInUpdateMsgs, table: hwBgpPeerStatisticTable, as: received}
+          - {metric: huawei.hwBgpPeerOutUpdateMsgs, table: hwBgpPeerStatisticTable, as: sent}
     chart_meta:
       description: BGP peer update traffic by direction
       family: 'Network/Routing/BGP/Peer/Message/Update'
