@@ -1809,11 +1809,16 @@ static void *ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unuse
 
     bool logged = false;
     while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED) ||
-            __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED)) {
+            __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED) ||
+            __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED)) {
         if(!logged) {
             logged = true;
-            netdata_log_info("DBENGINE: waiting for %zu inflight queries to finish to shutdown tier %d...",
-                 __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED), ctx->config.tier);
+            netdata_log_info("DBENGINE: waiting for shutdown preconditions on tier %d "
+                             "(collectors_running=%zu, inflight_queries=%zu, extents_currently_being_flushed=%u)...",
+                             ctx->config.tier,
+                             __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED),
+                             __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED),
+                             __atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED));
         }
         sleep_usec(1 * USEC_PER_MS);
     }
