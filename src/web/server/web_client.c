@@ -37,7 +37,6 @@ void web_client_reset_permissions(struct web_client *w) {
     w->user_auth.method = USER_AUTH_METHOD_NONE;
     w->user_auth.access = HTTP_ACCESS_NONE;
     w->user_auth.user_role = HTTP_USER_ROLE_NONE;
-    web_client_clear_mcp_preview_key(w);
 }
 
 void web_client_set_permissions(struct web_client *w, HTTP_ACCESS access, HTTP_USER_ROLE role, USER_AUTH_METHOD type) {
@@ -192,6 +191,7 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     memset(&w->user_auth, 0, sizeof(w->user_auth));
 
     web_client_reset_permissions(w);
+    web_client_clear_mcp_preview_key(w);
     web_client_flag_clear(w, WEB_CLIENT_ENCODING_GZIP|WEB_CLIENT_ENCODING_DEFLATE);
     web_client_flag_clear(w, WEB_CLIENT_FLAG_ACCEPT_JSON |
                              WEB_CLIENT_FLAG_ACCEPT_SSE |
@@ -1161,12 +1161,12 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
         }
         else if(likely(hash == hash_mcp && strcmp(tok, "mcp") == 0)) {
-            if(unlikely(!http_can_access_dashboard(w)))
+            if(unlikely(!http_can_access_mcp(w)))
                 return web_client_permission_denied_acl(w);
             return mcp_http_handle_request(host, w);
         }
         else if(likely(hash == hash_sse && strcmp(tok, "sse") == 0)) {
-            if(unlikely(!http_can_access_dashboard(w)))
+            if(unlikely(!http_can_access_mcp(w)))
                 return web_client_permission_denied_acl(w);
             return mcp_sse_handle_request(host, w);
         }
@@ -1294,6 +1294,24 @@ static bool web_server_log_transport(BUFFER *wb, void *ptr) {
     return true;
 }
 
+static inline bool web_client_targets_mcp_route(const struct web_client *w) {
+    const char *path = buffer_tostring(w->url_path_decoded);
+    if(!path)
+        return false;
+
+    while(*path == '/')
+        path++;
+
+    if(!*path)
+        return false;
+
+    if((strncmp(path, "mcp", 3) == 0 && (!path[3] || path[3] == '/' || path[3] == '?')) ||
+       (strncmp(path, "sse", 3) == 0 && (!path[3] || path[3] == '/' || path[3] == '?')))
+        return true;
+
+    return false;
+}
+
 void web_client_process_request_from_web_server(struct web_client *w) {
     // entry point for web server requests
 
@@ -1353,27 +1371,33 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     return;
                 
                 case HTTP_REQUEST_MODE_WEBSOCKET:
-                    if(unlikely(!http_can_access_dashboard(w))) {
+                    // Coarse gate: allow handshake only for clients that can access at least one WebSocket surface.
+                    // websocket_handle_handshake() performs the protocol-specific ACL check (MCP vs dashboard).
+                    if(unlikely(!http_can_access_dashboard(w) && !http_can_access_mcp(w))) {
                         web_client_permission_denied_acl(w);
                         return;
                     }
-                    
-                    // Handle WebSocket handshake - this will take over the socket
-                    // similar to how stream_receiver_accept_connection works
-                    w->response.code = websocket_handle_handshake(w);
-                    
-                    // After this point the socket has been taken over
-                    // No need to send a response as the WebSocket handler
-                    // has already sent the handshake response
-                    return;
 
-                case HTTP_REQUEST_MODE_OPTIONS:
+                    w->response.code = websocket_handle_handshake(w);
+
+                    if(w->response.code == HTTP_RESP_WEBSOCKET_HANDSHAKE)
+                        // socket taken over successfully, handshake response already sent
+                        return;
+
+                    // handshake failed - fall through to send the HTTP error response
+                    break;
+
+                case HTTP_REQUEST_MODE_OPTIONS: {
+                    // Path-aware coarse pre-filter:
+                    // MCP ACL is accepted only for MCP endpoints (/mcp, /sse), not as generic API access.
+                    bool mcp_route_requested = web_client_targets_mcp_route(w);
                     if(unlikely(
                             !http_can_access_dashboard(w) &&
                             !http_can_access_registry(w) &&
                             !http_can_access_badges(w) &&
                             !http_can_access_mgmt(w) &&
-                            !http_can_access_netdataconf(w)
+                            !http_can_access_netdataconf(w) &&
+                            !(mcp_route_requested && http_can_access_mcp(w))
                     )) {
                         web_client_permission_denied_acl(w);
                         break;
@@ -1384,17 +1408,22 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     buffer_strcat(w->response.data, "OK");
                     w->response.code = HTTP_RESP_OK;
                     break;
+                }
 
                 case HTTP_REQUEST_MODE_POST:
                 case HTTP_REQUEST_MODE_GET:
                 case HTTP_REQUEST_MODE_PUT:
-                case HTTP_REQUEST_MODE_DELETE:
+                case HTTP_REQUEST_MODE_DELETE: {
+                    // Path-aware coarse pre-filter:
+                    // MCP ACL may open only MCP routes, while all other routes still require their own ACL surface.
+                    bool mcp_route_requested = web_client_targets_mcp_route(w);
                     if(unlikely(
                             !http_can_access_dashboard(w) &&
                             !http_can_access_registry(w) &&
                             !http_can_access_badges(w) &&
                             !http_can_access_mgmt(w) &&
-                            !http_can_access_netdataconf(w)
+                            !http_can_access_netdataconf(w) &&
+                            !(mcp_route_requested && http_can_access_mcp(w))
                     )) {
                         web_client_permission_denied_acl(w);
                         break;
@@ -1428,6 +1457,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
                     w->response.code = (short)web_client_process_url(localhost, w, path);
                     break;
+                }
 
                 default:
                     web_client_permission_denied_acl(w);

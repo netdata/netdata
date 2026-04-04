@@ -8,6 +8,7 @@
 #include "mcp-http-common.h"
 
 #include "web/api/mcp_auth.h"
+#include "web/api/http_auth.h"
 
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/http/http_defs.h"
@@ -25,17 +26,20 @@ static void mcp_sse_add_common_headers(struct web_client *w) {
 }
 
 #ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
-static void mcp_sse_apply_api_key(struct web_client *w) {
+static bool mcp_sse_apply_api_key(struct web_client *w) {
     if (web_client_has_mcp_preview_key(w)) {
         web_client_set_permissions(w, HTTP_ACCESS_ALL, HTTP_USER_ROLE_ADMIN, USER_AUTH_METHOD_GOD);
-        return;
+        return true;
     }
 
     char api_key_buffer[MCP_DEV_PREVIEW_API_KEY_LENGTH + 1];
     if (mcp_http_extract_api_key(w, api_key_buffer, sizeof(api_key_buffer)) &&
         mcp_api_key_verify(api_key_buffer, false)) {  // silent=false for MCP requests
         web_client_set_permissions(w, HTTP_ACCESS_ALL, HTTP_USER_ROLE_ADMIN, USER_AUTH_METHOD_GOD);
+        return true;
     }
+
+    return false;
 }
 #endif
 
@@ -139,9 +143,20 @@ int mcp_sse_handle_request(struct rrdhost *host __maybe_unused, struct web_clien
         return w->response.code;
     }
 
+    bool mcp_api_key_verified = false;
 #ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
-    mcp_sse_apply_api_key(w);
+    mcp_api_key_verified = mcp_sse_apply_api_key(w);
 #endif
+    if (netdata_is_protected_by_bearer && !mcp_api_key_verified) {
+        buffer_flush(w->response.data);
+        w->response.data->content_type = CT_TEXT_EVENT_STREAM;
+        mcp_http_disable_compression(w);
+        mcp_sse_add_common_headers(w);
+        mcp_sse_append_event(w->response.data, "error",
+                             "MCP API key is required when bearer token protection is enabled");
+        w->response.code = HTTP_RESP_PRECOND_FAIL;
+        return w->response.code;
+    }
 
     size_t body_len = 0;
     const char *body = NULL;
