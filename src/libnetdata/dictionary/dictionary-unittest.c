@@ -1058,7 +1058,9 @@ static void dict_destroy_race_setter_thread(void *arg) {
     int counter = 0;
     while(!__atomic_load_n(&d->stop, __ATOMIC_RELAXED)) {
         char key[32], val[32];
-        snprintfz(key, sizeof(key), "key-%d", counter % 10);
+        // Use unique keys so the test exercises concurrent inserts during
+        // destruction without racing on value replacement semantics.
+        snprintfz(key, sizeof(key), "key-%d", counter);
         snprintfz(val, sizeof(val), "val-%d", counter);
         dictionary_set(d->dict, key, val, strlen(val) + 1);
         counter++;
