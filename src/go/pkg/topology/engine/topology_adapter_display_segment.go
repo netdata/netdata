@@ -123,8 +123,9 @@ func topologyCompactSegmentID(segmentID string) string {
 		return ""
 	}
 	const max = 48
-	if len(segmentID) <= max {
+	runes := []rune(segmentID)
+	if len(runes) <= max {
 		return segmentID
 	}
-	return segmentID[:max] + "..."
+	return string(runes[:max]) + "..."
 }
