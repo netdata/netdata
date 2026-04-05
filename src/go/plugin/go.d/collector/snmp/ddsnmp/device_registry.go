@@ -63,14 +63,25 @@ func (r *deviceRegistry) Unregister(key string) {
 	r.mu.Unlock()
 }
 
-// Devices returns a snapshot of all registered devices.
+// Devices returns a deep-copied snapshot of all registered devices.
 func (r *deviceRegistry) Devices() []DeviceConnectionInfo {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	devices := make([]DeviceConnectionInfo, 0, len(r.devices))
 	for _, info := range r.devices {
-		devices = append(devices, info)
+		dev := info
+		if len(info.ManualProfiles) > 0 {
+			dev.ManualProfiles = make([]string, len(info.ManualProfiles))
+			copy(dev.ManualProfiles, info.ManualProfiles)
+		}
+		if len(info.VnodeLabels) > 0 {
+			dev.VnodeLabels = make(map[string]string, len(info.VnodeLabels))
+			for k, v := range info.VnodeLabels {
+				dev.VnodeLabels[k] = v
+			}
+		}
+		devices = append(devices, dev)
 	}
 	return devices
 }
