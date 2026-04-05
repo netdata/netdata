@@ -462,7 +462,13 @@ where
     F: FnOnce(&CgroupsRequest, &mut CgroupsBuilder) -> bool,
 {
     let request = CgroupsRequest::decode(req).ok()?;
-    let min_required = CGROUPS_RESP_HDR_SIZE + max_items as usize * CGROUPS_DIR_ENTRY_SIZE;
+    let min_required = (max_items as usize)
+        .checked_mul(CGROUPS_DIR_ENTRY_SIZE)
+        .and_then(|d| d.checked_add(CGROUPS_RESP_HDR_SIZE));
+    let min_required = match min_required {
+        Some(v) => v,
+        None => return None,
+    };
     if resp.len() < min_required {
         return None;
     }
