@@ -74,6 +74,7 @@ extern "C" {
 extern const char *netdata_configured_hostname;
 extern const char *netdata_configured_user_config_dir;
 extern const char *netdata_configured_stock_config_dir;
+extern const char *netdata_configured_stock_data_dir;
 extern const char *netdata_configured_log_dir;
 extern const char *netdata_configured_primary_plugins_dir;
 extern const char *netdata_configured_web_dir;

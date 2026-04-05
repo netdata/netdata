@@ -188,6 +188,8 @@ src/libnetdata/gorilla/fuzz-*.log
 # ignore build/ directory (default dir for many IDEs/LSPs)
 build/
 build-*/
+!src/crates/netdata-netflow/netflow-plugin/src/query/grouping/build/
+!src/crates/netdata-netflow/netflow-plugin/src/query/grouping/build/**
 
 # ignore rules for go plugin code
 src/go/plugin/go.d/bin/

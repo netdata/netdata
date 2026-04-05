@@ -1,9 +1,9 @@
 use crate::error::{Result, WriterError};
 use crate::log::RetentionPolicy;
 use journal_common::Microseconds;
-use journal_core::JournalFile;
 use journal_core::collections::HashMap;
 use journal_core::file::Mmap;
+use journal_core::JournalFile;
 use journal_registry::repository;
 use journal_registry::repository::File;
 use std::path::PathBuf;
@@ -114,6 +114,28 @@ impl OwnedChain {
         }
     }
 
+    pub(super) fn tail_monotonic_for_boot(&self, boot_id: Uuid) -> Result<Option<u64>> {
+        let Some(file) = self.inner.back() else {
+            return Ok(None);
+        };
+
+        let window_size = 4096;
+        let jf = JournalFile::<Mmap>::open(file, window_size)?;
+        let header = jf.journal_header_ref();
+
+        let tail_boot_id = Uuid::from_bytes(header.tail_entry_boot_id);
+        if tail_boot_id != boot_id {
+            return Ok(None);
+        }
+
+        let monotonic = header.tail_entry_monotonic;
+        if monotonic == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(monotonic))
+        }
+    }
+
     /// Registers a new journal file with the directory.
     pub(super) fn create_file(
         &mut self,
@@ -144,13 +166,20 @@ impl OwnedChain {
 
     /// Retains the files that satisfy retention policy limits.
     #[tracing::instrument(skip_all, fields(reason))]
-    pub(super) fn retain(&mut self, retention_policy: &RetentionPolicy) -> Result<()> {
+    pub(super) fn retain(
+        &mut self,
+        retention_policy: &RetentionPolicy,
+    ) -> Result<Vec<repository::File>> {
+        let mut deleted_files = Vec::new();
+
         // Remove by file count limit
         if let Some(max_files) = retention_policy.number_of_journal_files {
             while self.inner.len() > max_files {
                 let reason = format!("num_files({}) > max_files({})", self.inner.len(), max_files);
                 tracing::Span::current().record("reason", reason);
-                self.delete_oldest_file()?;
+                if let Some(file) = self.delete_oldest_file()? {
+                    deleted_files.push(file);
+                }
             }
         }
 
@@ -162,23 +191,25 @@ impl OwnedChain {
                     self.total_size, max_total_size
                 );
                 tracing::Span::current().record("reason", reason);
-                self.delete_oldest_file()?;
+                if let Some(file) = self.delete_oldest_file()? {
+                    deleted_files.push(file);
+                }
             }
         }
 
         // Remove by entry age limit
         if let Some(max_entry_age) = retention_policy.duration_of_journal_files {
-            self.delete_files_older_than(max_entry_age)?;
+            deleted_files.extend(self.delete_files_older_than(max_entry_age)?);
         }
 
-        Ok(())
+        Ok(deleted_files)
     }
 
     /// Remove the oldest file
     #[tracing::instrument(skip_all)]
-    fn delete_oldest_file(&mut self) -> Result<()> {
+    fn delete_oldest_file(&mut self) -> Result<Option<repository::File>> {
         let Some(file) = self.inner.pop_front() else {
-            return Ok(());
+            return Ok(None);
         };
 
         info!("deleting {}", file.path());
@@ -186,22 +217,33 @@ impl OwnedChain {
         let file_size = self.file_sizes.get(&file).copied().unwrap_or(0);
 
         // Remove from filesystem
-        if let Err(e) = std::fs::remove_file(file.path()) {
-            // Log error but continue cleanup - file might already be deleted
-            error!("failed to remove journal file {:?}: {}", file.path(), e);
+        match std::fs::remove_file(file.path()) {
+            Ok(()) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                info!("journal file {:?} was already removed", file.path());
+            }
+            Err(err) => {
+                error!("failed to remove journal file {:?}: {}", file.path(), err);
+                self.inner.insert_file(file);
+                return Err(err.into());
+            }
         }
 
         self.file_sizes.remove(&file);
         self.total_size = self.total_size.saturating_sub(file_size);
-        Ok(())
+        Ok(Some(file))
     }
 
     /// Remove files older than the specified cutoff time
     #[tracing::instrument(skip(self))]
-    fn delete_files_older_than(&mut self, max_entry_age: std::time::Duration) -> Result<()> {
+    fn delete_files_older_than(
+        &mut self,
+        max_entry_age: std::time::Duration,
+    ) -> Result<Vec<repository::File>> {
         let cutoff_time = Microseconds::now()
             .get()
             .saturating_sub(max_entry_age.as_micros() as u64);
+        let mut deleted_files = Vec::new();
 
         for file in self.inner.drain(cutoff_time) {
             info!("deleting {}", file.path());
@@ -212,10 +254,55 @@ impl OwnedChain {
                 continue;
             }
 
+            deleted_files.push(file.clone());
             self.file_sizes.remove(&file);
             self.total_size = self.total_size.saturating_sub(file_size);
         }
 
-        Ok(())
+        Ok(deleted_files)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn delete_oldest_file_preserves_accounting_on_remove_error() {
+        use std::fs;
+        use std::os::unix::fs::PermissionsExt;
+
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let machine_id = Uuid::new_v4();
+        let path = tmp.path().join(machine_id.to_string());
+        fs::create_dir(&path).expect("create machine-id dir");
+
+        let mut chain = OwnedChain::new(path.clone(), machine_id).expect("create chain");
+        let file = create_chain_file(&path, machine_id, 1, 1).expect("create chain file");
+        fs::write(file.path(), b"journal").expect("write journal file");
+
+        let file_size = fs::metadata(file.path()).expect("stat journal file").len();
+        chain.inner.insert_file(file.clone());
+        chain.file_sizes.insert(file.clone(), file_size);
+        chain.total_size = file_size;
+
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o555))
+            .expect("make directory read-only");
+
+        let delete_result = chain.delete_oldest_file();
+
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755))
+            .expect("restore directory permissions");
+
+        match delete_result {
+            Ok(Some(_)) => return,
+            Ok(None) => panic!("expected the oldest file to be selected for deletion"),
+            Err(err) => assert!(matches!(err, WriterError::Io(_))),
+        }
+
+        assert_eq!(chain.inner.len(), 1);
+        assert_eq!(chain.file_sizes.get(&file), Some(&file_size));
+        assert_eq!(chain.total_size, file_size);
     }
 }

@@ -104,8 +104,12 @@ set(CONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/etc/netdata")
 set(LIBCONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/conf.d")
 set(LOG_DIR "${NETDATA_RUNTIME_PREFIX}/var/log/netdata")
 set(PLUGINS_DIR "${NETDATA_RUNTIME_PREFIX}/usr/libexec/netdata/plugins.d")
+set(STOCK_DATA_DEST "usr/share/netdata")
+set(STOCK_DATA_DIR "${NETDATA_RUNTIME_PREFIX}/${STOCK_DATA_DEST}")
 set(VARLIB_DIR "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
 set(NETDATA_BIN_DIR "${NETDATA_RUNTIME_PREFIX}/${BINDIR}")
+set(NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR ""
+    CACHE PATH "Staged topology IP intelligence stock payload for package builds")
 
 # A non-default value is only used when building Debian packages (/var/lib/netdata/www)
 if(NOT DEFINED WEB_DIR)
@@ -139,6 +143,7 @@ option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATU
 option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" OFF)
 option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE})
 cmake_dependent_option(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER "Enable OTel signal viewer plugin" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
+cmake_dependent_option(ENABLE_PLUGIN_NETFLOW "Enable NetFlow/IPFIX/sFlow flow analysis plugin" False "NOT OS_WINDOWS" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
 cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD OR OS_MACOS OR OS_WINDOWS" False)
@@ -194,7 +199,7 @@ mark_as_advanced(FORCE_LEGACY_LIBBPF)
 cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False "ENABLE_PLUGIN_SYSTEMD_JOURNAL" False)
 
 # Setup Rust/Corrosion for plugins that need it
-if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
+if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER OR ENABLE_PLUGIN_NETFLOW)
     include(FetchContent)
     FetchContent_Declare(
         Corrosion
@@ -221,6 +226,9 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
     endif()
     if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
         list(APPEND _WORKSPACE_CRATES otel-signal-viewer-plugin)
+    endif()
+    if(ENABLE_PLUGIN_NETFLOW)
+        list(APPEND _WORKSPACE_CRATES netflow-plugin)
     endif()
     if(_WORKSPACE_CRATES)
         corrosion_import_crate(MANIFEST_PATH src/crates/Cargo.toml
@@ -251,6 +259,34 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
       endif()
 
       corrosion_add_target_rustflags(otel-signal-viewer-plugin ${OTEL_SIGNAL_VIEWER_RUSTFLAGS})
+    endif()
+
+    if(ENABLE_PLUGIN_NETFLOW)
+      set(NETFLOW_PLUGIN_RUSTFLAGS "")
+
+      # We depend (transitively) on the `io-uring` crate which doesn't provide
+      # prebuilt bindings for 32-bit arches. Considering this is a compile-time
+      # and not a runtime dependency (because we don't use foyer's io-uring
+      # engine), we can simply skip the check.
+      if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        list(APPEND NETFLOW_PLUGIN_RUSTFLAGS --cfg=io_uring_skip_arch_check)
+        # The workspace release profile still propagates fat LTO, single-codegen-unit,
+        # and debuginfo settings through Rust dependencies on 32-bit builds. Override
+        # Cargo's release profile too so the entire dependency graph stays linkable.
+        corrosion_set_env_vars(
+                netflow-plugin
+                "CARGO_PROFILE_RELEASE_DEBUG=0"
+                "CARGO_PROFILE_RELEASE_LTO=off"
+                "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=8")
+      endif()
+
+      if(STATIC_BUILD)
+        list(APPEND NETFLOW_PLUGIN_RUSTFLAGS "-C" "target-feature=+crt-static")
+      endif()
+
+      if(NETFLOW_PLUGIN_RUSTFLAGS)
+        corrosion_add_target_rustflags(netflow-plugin ${NETFLOW_PLUGIN_RUSTFLAGS})
+      endif()
     endif()
 endif()
 
@@ -342,7 +378,7 @@ if(ENABLE_JEMALLOC)
     endif()
 endif()
 
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS)
+if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_NETFLOW)
     include(NetdataGoTools)
 
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
@@ -3350,6 +3386,67 @@ if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
                       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
                       RUNTIME DESTINATION usr/libexec/netdata/plugins.d
                       COMPONENT plugin-otel-signal-viewer)
+endif()
+
+#
+# netflow-plugin
+#
+# Handle NetFlow/IPFIX/sFlow flow analysis plugin
+if(ENABLE_PLUGIN_NETFLOW)
+    corrosion_install(TARGETS netflow-plugin
+                      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
+                      RUNTIME DESTINATION usr/libexec/netdata/plugins.d
+                      COMPONENT plugin-netflow)
+
+    install(FILES src/crates/netdata-netflow/netflow-plugin/configs/netflow.yaml
+            COMPONENT plugin-netflow
+            DESTINATION usr/lib/netdata/conf.d)
+
+    if (OS_WINDOWS)
+        set(TOPOLOGY_IP_INTEL_DOWNLOADER_BIN topology-ip-intel-downloader.exe)
+    else()
+        set(TOPOLOGY_IP_INTEL_DOWNLOADER_BIN topology-ip-intel-downloader)
+    endif()
+
+    add_go_target(topology-ip-intel-downloader-target ${TOPOLOGY_IP_INTEL_DOWNLOADER_BIN} src/go tools/topology-ip-intel-downloader)
+    install(PROGRAMS
+            ${CMAKE_BINARY_DIR}/${TOPOLOGY_IP_INTEL_DOWNLOADER_BIN}
+            COMPONENT plugin-netflow
+            DESTINATION "${BINDIR}")
+    install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader\")"
+            COMPONENT plugin-netflow)
+    install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.plugin\")"
+            COMPONENT plugin-netflow)
+    install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.exe\")"
+            COMPONENT plugin-netflow)
+    install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/topology-ip-intel-downloader.plugin.exe\")"
+            COMPONENT plugin-netflow)
+
+    install(FILES src/go/tools/topology-ip-intel-downloader/configs/topology-ip-intel.yaml
+            COMPONENT plugin-netflow
+            DESTINATION usr/lib/netdata/conf.d)
+
+    if(NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR)
+        set(TOPOLOGY_IP_INTEL_STOCK_PAYLOAD
+                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/README.md"
+                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-asn.mmdb"
+                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-geo.mmdb"
+                "${NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR}/topology-ip-intel.json")
+        foreach(stock_file IN LISTS TOPOLOGY_IP_INTEL_STOCK_PAYLOAD)
+            if(NOT EXISTS "${stock_file}")
+                message(FATAL_ERROR
+                        "Missing topology IP intelligence stock payload file: ${stock_file}")
+            endif()
+        endforeach()
+        install(FILES
+                ${TOPOLOGY_IP_INTEL_STOCK_PAYLOAD}
+                COMPONENT plugin-netflow
+                DESTINATION ${STOCK_DATA_DEST}/topology-ip-intel)
+    else()
+        message(STATUS
+                "plugin-netflow: no staged topology IP intelligence stock payload provided; "
+                "skipping stock topology-ip-intel install")
+    endif()
 endif()
 
 #
