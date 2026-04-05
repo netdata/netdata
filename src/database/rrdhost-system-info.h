@@ -48,6 +48,9 @@ struct rrdhost_system_info {
     char *network_default_iface_ip;
     char *network_default_iface_detection;
     int mc_version;
+    char *hw_product_name;
+    char *hw_sys_vendor;
+    char *hw_product_type;
 };
 #else
 struct rrdhost_system_info;
