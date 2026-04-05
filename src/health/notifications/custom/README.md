@@ -118,7 +118,7 @@ The supported variables that you can use for the function's `msg` variable are:
 | `${src}`                    | The line number and file the alarm has been configured                           |
 | `${duration}`               | The duration in seconds of the previous alarm state                              |
 | `${duration_txt}`           | Same as ${duration} for humans                                                   |
-| `${non_clear_duration}`     | The total duration in seconds this is/was non-clear                              |
+| `${non_clear_duration}`     | The total duration in seconds this is/was non-clear. For repeating alerts in WARNING or CRITICAL state, Netdata sends ${duration} instead. |
 | `${non_clear_duration_txt}` | Same as ${non_clear_duration} for humans                                         |
 | `${units}`                  | The units of the value                                                           |
 | `${info}`                   | A short description of the alarm                                                 |
