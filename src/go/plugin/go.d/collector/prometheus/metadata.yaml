@@ -96,6 +96,35 @@ modules:
                     - pattern4
                 ```
 
+            - name: selector_groups
+              description: Multiple selector/rules groups processed from a single scrape.
+              default_value: ""
+              required: false
+              group: Filters
+              detailed_description: |
+                Define multiple filtering/customization groups while scraping the endpoint only once per job.
+                Each group has its own `selector`, `label_relabel`, `context_rules`, and `dimension_rules`.
+                This option is mutually exclusive with top-level `selector`, `label_relabel`, `context_rules`, and `dimension_rules`.
+
+                ```yaml
+                selector_groups:
+                  - name: projects
+                    selector:
+                      allow:
+                        - gitlab_ci_pipeline_status
+                    label_relabel:
+                      - source_labels: [project]
+                        regex: '^[^/]+/([^/]+)/(.+)$'
+                        target_label: gitlab_group
+                        replacement: '$1'
+                    context_rules:
+                      - match: '^gitlab_ci_pipeline_status$'
+                        context: project_pipeline_status
+                    dimension_rules:
+                      - match: '^gitlab_ci_pipeline_status$'
+                        dimension: '${status}'
+                ```
+
             - name: max_time_series
               description: Global time series limit. If an endpoint returns more time series than this, the data is not processed.
               default_value: 2000
@@ -134,6 +163,66 @@ modules:
               default_value: ""
               required: false
               group: Customization
+
+            - name: app
+              description: "Optional application name used in chart contexts (`prometheus.{app}.{metric_name}`)."
+              default_value: ""
+              required: false
+              group: Customization
+
+            - name: label_relabel
+              description: "Optional relabeling pipeline applied to labels before chart IDs and chart labels are generated."
+              default_value: ""
+              required: false
+              group: Customization
+              detailed_description: |
+                Supported actions: `replace` (default), `labelmap`, `labeldrop`, `labelkeep`.
+
+                ```yaml
+                label_relabel:
+                  - source_labels: [project]
+                    regex: 'org/([^/]+)/(.+)'
+                    target_label: gitlab_group
+                    replacement: '$1'
+                  - source_labels: [project]
+                    regex: 'org/([^/]+)/(.+)'
+                    target_label: gitlab_project
+                    replacement: '$2'
+                  - action: labeldrop
+                    regex: '^project$'
+                ```
+
+            - name: context_rules
+              description: "Per-metric overrides for context, title, units, and chart type."
+              default_value: ""
+              required: false
+              group: Customization
+              detailed_description: |
+                First matching `match` regex is applied.
+
+                ```yaml
+                context_rules:
+                  - match: '^gitlab_ci_pipeline_status$'
+                    context: project_pipeline_status
+                    title: Pipeline Status
+                    units: pipelines
+                    type: stacked
+                ```
+
+            - name: dimension_rules
+              description: "Per-metric dimension templates that group multiple Gauge/Counter/Summary/Histogram series into one chart."
+              default_value: ""
+              required: false
+              group: Customization
+              detailed_description: |
+                Rules apply to Gauge, Counter, Summary, and Histogram metric families.
+                Reserved labels `${quantile}` and `${le}` are rejected because they do not exist on all related series.
+
+                ```yaml
+                dimension_rules:
+                  - match: '^gitlab_ci_pipeline_status$'
+                    dimension: '${status}'
+                ```
 
             - name: username
               description: Username for Basic HTTP authentication.
@@ -276,6 +365,36 @@ modules:
                 
                   - name: remote
                     url: http://192.0.2.1:9090/metrics
+            - name: Customize contexts and dimensions
+              description: Rename/split labels, override chart metadata, and group series into dimensions.
+              config: |
+                jobs:
+                  - name: gitlab_ci_exporter
+                    app: gitlab_ci
+                    url: http://127.0.0.1:8080/metrics
+                    label_relabel:
+                      - source_labels: [project]
+                        regex: 'org/([^/]+)/(.+)'
+                        target_label: gitlab_group
+                        replacement: '$1'
+                      - source_labels: [project]
+                        regex: 'org/([^/]+)/(.+)'
+                        target_label: gitlab_project
+                        replacement: '$2'
+                    context_rules:
+                      - match: '^gitlab_ci_pipeline_duration_seconds$'
+                        context: project_pipeline_duration
+                        title: Pipeline Duration
+                        units: seconds
+                        type: line
+                      - match: '^gitlab_ci_pipeline_status$'
+                        context: project_pipeline_status
+                        title: Pipeline Status
+                        units: pipelines
+                        type: stacked
+                    dimension_rules:
+                      - match: '^gitlab_ci_pipeline_status$'
+                        dimension: '${status}'
     troubleshooting:
       problems:
         list: [ ]
