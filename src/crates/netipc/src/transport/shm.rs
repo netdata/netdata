@@ -801,7 +801,8 @@ pub fn cleanup_stale(run_dir: &str, service_name: &str) {
 // ---------------------------------------------------------------------------
 
 fn align64(v: u32) -> u32 {
-    (v + (REGION_ALIGNMENT - 1)) & !(REGION_ALIGNMENT - 1)
+    // Saturate to prevent wrap on values near u32::MAX
+    v.saturating_add(REGION_ALIGNMENT - 1) & !(REGION_ALIGNMENT - 1)
 }
 
 /// Validate service_name: only [a-zA-Z0-9._-], non-empty, not "." or "..".

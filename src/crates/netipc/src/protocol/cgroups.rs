@@ -336,9 +336,17 @@ impl<'a> CgroupsBuilder<'a> {
         let item_start = align8(self.data_offset);
 
         // Item payload: 32-byte header + name + NUL + path + NUL
-        let item_size = CGROUPS_ITEM_HDR_SIZE + name.len() + 1 + path.len() + 1;
+        let item_size = CGROUPS_ITEM_HDR_SIZE
+            .checked_add(name.len())
+            .and_then(|v| v.checked_add(1))
+            .and_then(|v| v.checked_add(path.len()))
+            .and_then(|v| v.checked_add(1))
+            .ok_or(NipcError::Overflow)?;
 
-        if item_start + item_size > self.buf.len() {
+        let item_end = item_start
+            .checked_add(item_size)
+            .ok_or(NipcError::Overflow)?;
+        if item_end > self.buf.len() {
             return Err(NipcError::Overflow);
         }
 
