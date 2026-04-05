@@ -135,9 +135,11 @@ void cgroup_netipc_cleanup(void) {
         return;
 
     nipc_server_stop(&cgroup_netipc_server);
+    nd_thread_join(cgroup_netipc_thread);
+    cgroup_netipc_thread = NULL;
+
     nipc_server_drain(&cgroup_netipc_server, 5000);
     nipc_server_destroy(&cgroup_netipc_server);
-    cgroup_netipc_thread = NULL;
 
     collector_info("CGROUP: netipc server stopped");
 }

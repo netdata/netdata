@@ -696,8 +696,11 @@ size_t nipc_cgroups_builder_finish(nipc_cgroups_builder_t *b) {
     uint32_t first_item_abs = first_entry.offset;
 
     /* Guard against underflow if builder state is inconsistent */
-    if (b->data_offset < first_item_abs)
+    if (b->data_offset < first_item_abs) {
+        hdr.item_count = 0;
+        memcpy(p, &hdr, sizeof(hdr));
         return NIPC_CGROUPS_RESP_HDR_SIZE;
+    }
 
     size_t packed_data_len = b->data_offset - first_item_abs;
 
