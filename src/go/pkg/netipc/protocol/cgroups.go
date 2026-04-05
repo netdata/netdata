@@ -153,8 +153,9 @@ func DecodeCgroupsResponse(buf []byte) (CgroupsResponseView, error) {
 	packedAreaLen := len(buf) - dirEnd
 
 	// Validate each directory entry.
-	for i := 0; i < int(itemCount); i++ {
-		base := cgroupsRespHdr + i*8
+	dirSize := int(dirSize64)
+	for i := 0; i < dirSize; i += cgroupsDirEntry {
+		base := cgroupsRespHdr + i
 		off := ne.Uint32(buf[base : base+4])
 		length := ne.Uint32(buf[base+4 : base+8])
 
@@ -187,7 +188,7 @@ func (v *CgroupsResponseView) Item(index uint32) (CgroupsItemView, error) {
 	}
 
 	dirStart := cgroupsRespHdr
-	dirSize := int(v.ItemCount) * cgroupsDirEntry
+	dirSize := int(uint64(v.ItemCount) * uint64(cgroupsDirEntry))
 	packedAreaStart := dirStart + dirSize
 
 	dirBase := dirStart + int(index)*8
