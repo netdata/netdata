@@ -37,13 +37,13 @@ func (c *Collector) vnodeLabels() map[string]string {
 }
 
 func (c *Collector) deviceRegistryKey() string {
-	return fmt.Sprintf("%s:%d", c.Hostname, c.Options.Port)
+	return fmt.Sprintf("%p:%s:%d", c, c.Hostname, c.Options.Port)
 }
 
 func (c *Collector) registerDeviceForTopology(si *snmputils.SysInfo) {
 	autoprobe := true
-	if c.TopologyAutoprobe != nil {
-		autoprobe = *c.TopologyAutoprobe
+	if c.Topology.Autoprobe != nil {
+		autoprobe = *c.Topology.Autoprobe
 	}
 
 	ddsnmp.DeviceRegistry.Register(c.deviceRegistryKey(), ddsnmp.DeviceConnectionInfo{
