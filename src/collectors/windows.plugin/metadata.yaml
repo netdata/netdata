@@ -2823,7 +2823,7 @@ modules:
               dimensions:
                 - name: remaining
             - name: ad.replication_inbound_values_dns_only
-              description: DRA replication inbound values DNS only
+              description: DRA replication inbound values DNs only
               unit: values/s
               chart_type: line
               dimensions:
@@ -2853,7 +2853,7 @@ modules:
               dimensions:
                 - name: properties
             - name: ad.replication_outbound_values_dns_only
-              description: DRA replication outbound values DNS only
+              description: DRA replication outbound values DNs only
               unit: values/s
               chart_type: line
               dimensions:
