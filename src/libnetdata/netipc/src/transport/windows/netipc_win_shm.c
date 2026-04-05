@@ -688,7 +688,7 @@ nipc_win_shm_error_t nipc_win_shm_send(
         peer_event         = ctx->resp_event;
     }
 
-    if (msg_len > area_capacity)
+    if (msg_len > area_capacity || msg_len > (uint32_t)LONG_MAX)
         return NIPC_WIN_SHM_ERR_MSG_TOO_LARGE;
 
     /* 1. Write message data into the area */

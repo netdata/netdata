@@ -1183,13 +1183,17 @@ fn test_cleanup_stale_invalid_entries() {
     assert!(!build_shm_path(TEST_RUN_DIR, svc, magic_sid)
         .unwrap()
         .exists());
-    // Unreadable file is NOT removed — we can't verify it's stale
-    // without being able to open and inspect the header.
-    assert!(
-        unreadable_path.exists(),
-        "unreadable entry should be preserved (EACCES skip)"
-    );
-    // Clean up manually
+    // Under non-root: unreadable file is preserved (EACCES skip).
+    // Under root: chmod 000 has no effect, so the file gets opened,
+    // inspected, and removed normally.
+    if unsafe { libc::geteuid() } != 0 {
+        assert!(
+            unreadable_path.exists(),
+            "unreadable entry should be preserved (EACCES skip)"
+        );
+    }
+    // Clean up
+    unsafe { libc::chmod(unreadable_c.as_ptr(), 0o600) };
     std::fs::remove_file(&unreadable_path).ok();
 }
 
@@ -1278,12 +1282,14 @@ fn test_check_shm_stale_open_failure_invalid() {
     );
 
     assert!(matches!(check_shm_stale(&path), StaleResult::Invalid));
-    // File is preserved — EACCES means we can't verify it's stale
-    assert!(
-        path.exists(),
-        "unopenable file should be preserved (EACCES skip)"
-    );
-    // Clean up manually
+    // Under non-root: file preserved (EACCES). Under root: chmod 000
+    // has no effect, so the file is opened, inspected, and removed.
+    if unsafe { libc::geteuid() } != 0 {
+        assert!(
+            path.exists(),
+            "unopenable file should be preserved (EACCES skip)"
+        );
+    }
     unsafe { libc::chmod(c_path.as_ptr(), 0o600) };
     std::fs::remove_file(&path).ok();
 }

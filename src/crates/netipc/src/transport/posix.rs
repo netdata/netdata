@@ -905,8 +905,9 @@ fn check_and_recover_stale(path: &str) -> StaleResult {
             StaleResult::Stale
         }
         Err(_) => {
-            // Other errors (EACCES, etc.) — don't unlink, treat as not-exist
-            StaleResult::NotExist
+            // Other errors (EACCES, etc.) — can't determine ownership,
+            // treat as live to prevent overwriting
+            StaleResult::LiveServer
         }
     };
 

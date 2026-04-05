@@ -763,7 +763,8 @@ func checkAndRecoverStale(path string) staleResult {
 		os.Remove(path)
 		return staleRecovered
 	}
-	return staleNotExist
+	// Can't determine ownership — treat as live to prevent overwriting
+	return staleLiveServer
 }
 
 // ---------------------------------------------------------------------------

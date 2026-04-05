@@ -512,7 +512,8 @@ static int check_and_recover_stale(const char *path)
             unlink(path);
             ret = 0;
         } else {
-            ret = -1;
+            /* Can't determine ownership — treat as live to prevent overwriting */
+            ret = 1;
         }
     }
     return ret;

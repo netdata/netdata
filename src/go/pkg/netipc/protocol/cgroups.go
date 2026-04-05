@@ -445,9 +445,5 @@ func DispatchCgroupsSnapshot(req []byte, resp []byte, maxItems uint32,
 	if !handler(&request, builder) {
 		return 0, false
 	}
-	n := builder.Finish()
-	if n == 0 {
-		return 0, false
-	}
-	return n, true
+	return builder.Finish(), true
 }
