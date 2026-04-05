@@ -10,7 +10,7 @@ pub const STRING_REVERSE_HDR_SIZE: usize = 8;
 /// Ephemeral view into a decoded STRING_REVERSE payload.
 #[derive(Debug, Clone)]
 pub struct StringReverseView<'a> {
-    pub str_data: &'a [u8], // slice into payload, NUL-terminated
+    pub str_data: &'a [u8], // slice into payload, excludes NUL
     pub str_len: u32,
 }
 
