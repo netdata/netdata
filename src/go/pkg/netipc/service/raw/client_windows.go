@@ -16,8 +16,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/netdata/plugin-ipc/go/pkg/netipc/protocol"
-	windows "github.com/netdata/plugin-ipc/go/pkg/netipc/transport/windows"
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
+	windows "github.com/netdata/netdata/go/plugins/pkg/netipc/transport/windows"
 )
 
 const clientShmAttachRetryInterval = 5 * time.Millisecond

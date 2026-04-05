@@ -11,8 +11,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/netdata/plugin-ipc/go/pkg/netipc/protocol"
-	"github.com/netdata/plugin-ipc/go/pkg/netipc/transport/posix"
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/posix"
 )
 
 const clientShmAttachRetryInterval = 5 * time.Millisecond
