@@ -21,13 +21,13 @@ type DeviceConnectionInfo struct {
 	MaxOIDs         int
 	Timeout         int
 	Retries         int
-	SysObjectID string
-	SysDescr    string
-	SysName     string
-	SysContact  string
-	SysLocation string
-	Vendor      string
-	Model       string
+	SysObjectID     string
+	SysDescr        string
+	SysName         string
+	SysContact      string
+	SysLocation     string
+	Vendor          string
+	Model           string
 
 	DisableBulkWalk bool
 

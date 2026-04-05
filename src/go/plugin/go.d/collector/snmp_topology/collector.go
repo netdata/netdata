@@ -56,9 +56,9 @@ type (
 		Config            `yaml:",inline"`
 
 		charts              *collectorapi.Charts
-		deviceCaches        map[string]*topologyCache    // one cache per SNMP device
-		deviceLastCollected map[string]time.Time         // last collection time per device
-		topologyCache       *topologyCache               // current device cache (set during refreshDeviceTopology)
+		deviceCaches        map[string]*topologyCache // one cache per SNMP device
+		deviceLastCollected map[string]time.Time      // last collection time per device
+		topologyCache       *topologyCache            // current device cache (set during refreshDeviceTopology)
 		topologyChartsAdded bool
 
 		newSnmpClient func() gosnmp.Handler

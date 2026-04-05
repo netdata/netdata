@@ -97,8 +97,8 @@ type (
 		seenTableMetrics  map[string]bool
 		seenProfiles      map[string]bool
 
-		ifaceCache *ifaceCache  // interface metrics cache for functions
-		funcRouter *funcRouter  // function router for method handlers
+		ifaceCache *ifaceCache // interface metrics cache for functions
+		funcRouter *funcRouter // function router for method handlers
 
 		prober    ping.Prober
 		newProber func(ping.ProberConfig, *logger.Logger) ping.Prober
