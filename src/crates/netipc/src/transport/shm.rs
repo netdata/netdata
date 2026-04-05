@@ -209,8 +209,15 @@ impl ShmContext {
         let resp_cap = align64(resp_capacity);
 
         let req_off = align64(HEADER_LEN as u32);
-        let resp_off = align64(req_off + req_cap);
-        let region_size = (resp_off + resp_cap) as usize;
+        // Guard against u32 overflow on large capacities
+        let resp_off = req_off
+            .checked_add(req_cap)
+            .map(align64)
+            .ok_or_else(|| ShmError::BadParam("region offset overflow".into()))?;
+        let region_size = resp_off
+            .checked_add(resp_cap)
+            .ok_or_else(|| ShmError::BadParam("region size overflow".into()))?
+            as usize;
 
         // Try O_EXCL create first (fast path, no stale check needed).
         let c_path = path_to_cstring(&path)?;
@@ -952,7 +959,10 @@ fn check_shm_stale(path: &Path) -> StaleResult {
 
     let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDONLY) };
     if fd < 0 {
-        unsafe { libc::unlink(c_path.as_ptr()) };
+        let e = errno();
+        if e != libc::EACCES && e != libc::EPERM {
+            unsafe { libc::unlink(c_path.as_ptr()) };
+        }
         return StaleResult::Invalid;
     }
 

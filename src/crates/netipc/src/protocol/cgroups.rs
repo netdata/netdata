@@ -470,11 +470,7 @@ where
     if !handler(&request, &mut builder) {
         return None;
     }
-    let n = builder.finish();
-    if n == 0 {
-        return None;
-    }
-    Some(n)
+    Some(builder.finish())
 }
 
 // ---------------------------------------------------------------------------

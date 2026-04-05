@@ -1278,7 +1278,14 @@ fn test_check_shm_stale_open_failure_invalid() {
     );
 
     assert!(matches!(check_shm_stale(&path), StaleResult::Invalid));
-    assert!(!path.exists(), "unopenable stale file should be removed");
+    // File is preserved — EACCES means we can't verify it's stale
+    assert!(
+        path.exists(),
+        "unopenable file should be preserved (EACCES skip)"
+    );
+    // Clean up manually
+    unsafe { libc::chmod(c_path.as_ptr(), 0o600) };
+    std::fs::remove_file(&path).ok();
 }
 
 #[test]
