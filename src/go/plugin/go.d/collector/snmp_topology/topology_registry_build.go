@@ -108,7 +108,7 @@ func buildSNMPL2TopologyData(
 		AgentID:                   agentID,
 		LocalDeviceID:             localDeviceID,
 		CollectedAt:               collectedAt,
-		ResolveDNSName:            resolveTopologyReverseDNSName,
+		ResolveDNSName:            options.ResolveDNSName,
 		CollapseActorsByIP:        options.CollapseActorsByIP,
 		EliminateNonIPInferred:    options.EliminateNonIPInferred,
 		ProbabilisticConnectivity: isTopologyMapTypeProbable(options.MapType),

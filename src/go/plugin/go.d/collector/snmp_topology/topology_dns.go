@@ -38,6 +38,27 @@ func newTopologyReverseDNSResolver(timeout, ttl time.Duration) *topologyReverseD
 	}
 }
 
+// lookupCached returns the cached result for ip without performing any network I/O.
+// Returns "" when the IP has never been resolved or its cache entry has expired.
+func (r *topologyReverseDNSResolver) lookupCached(ip string) string {
+	if r == nil {
+		return ""
+	}
+	addr, err := netip.ParseAddr(strings.TrimSpace(ip))
+	if err != nil || !addr.IsValid() {
+		return ""
+	}
+	ip = addr.Unmap().String()
+
+	r.mu.RLock()
+	entry, ok := r.cache[ip]
+	r.mu.RUnlock()
+	if ok && time.Now().Before(entry.expiresAt) {
+		return entry.name
+	}
+	return ""
+}
+
 func (r *topologyReverseDNSResolver) lookup(ip string) string {
 	if r == nil {
 		return ""
@@ -106,6 +127,15 @@ func topologyNormalizeReverseDNSName(names []string) string {
 
 var defaultTopologyReverseDNSResolver = newTopologyReverseDNSResolver(topologyReverseDNSTimeout, topologyReverseDNSCacheTTL)
 
+// resolveTopologyReverseDNSName performs a live DNS lookup (with cache).
+// Used during the collector's Collect() cycle to warm the cache.
 func resolveTopologyReverseDNSName(ip string) string {
 	return defaultTopologyReverseDNSResolver.lookup(ip)
+}
+
+// resolveTopologyReverseDNSNameCached returns a cached DNS name if available,
+// or an empty string if the IP has not been resolved yet. Never blocks on network I/O.
+// Used during function responses to avoid external calls.
+func resolveTopologyReverseDNSNameCached(ip string) string {
+	return defaultTopologyReverseDNSResolver.lookupCached(ip)
 }

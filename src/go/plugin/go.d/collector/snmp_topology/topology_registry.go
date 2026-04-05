@@ -13,6 +13,7 @@ type topologyQueryOptions struct {
 	InferenceStrategy      string
 	ManagedDeviceFocus     string
 	Depth                  int
+	ResolveDNSName         func(ip string) string
 }
 
 type topologyRegistry struct {
@@ -59,6 +60,7 @@ func (r *topologyRegistry) snapshot() (topologyData, bool) {
 		InferenceStrategy:      topologyInferenceStrategyFDBMinimumKnowledge,
 		ManagedDeviceFocus:     topologyManagedFocusAllDevices,
 		Depth:                  topologyDepthAllInternal,
+		ResolveDNSName:         resolveTopologyReverseDNSName, // live resolver — warms the cache
 	})
 }
 
