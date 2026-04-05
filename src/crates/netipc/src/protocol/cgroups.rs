@@ -291,15 +291,17 @@ impl<'a> CgroupsBuilder<'a> {
     /// # Panics
     /// Panics if `buf` is too small for the response header and item directory.
     pub fn new(buf: &'a mut [u8], max_items: u32, systemd_enabled: u32, generation: u64) -> Self {
-        let data_offset = CGROUPS_RESP_HDR_SIZE
-            .saturating_add((max_items as usize).saturating_mul(CGROUPS_DIR_ENTRY_SIZE))
-            .min(buf.len());
+        let dir_size = (max_items as usize).saturating_mul(CGROUPS_DIR_ENTRY_SIZE);
+        let min_required = CGROUPS_RESP_HDR_SIZE.saturating_add(dir_size);
         assert!(
-            buf.len() >= CGROUPS_RESP_HDR_SIZE,
-            "CgroupsBuilder buffer too small: need at least {} bytes, got {}",
+            buf.len() >= min_required,
+            "CgroupsBuilder buffer too small: need at least {} bytes (hdr {} + dir {}), got {}",
+            min_required,
             CGROUPS_RESP_HDR_SIZE,
+            dir_size,
             buf.len()
         );
+        let data_offset = min_required;
         CgroupsBuilder {
             buf,
             systemd_enabled,

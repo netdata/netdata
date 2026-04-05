@@ -504,10 +504,11 @@ static int check_and_recover_stale(const char *path)
         close(probe);
         ret = 1;
     } else {
+        int saved_errno = errno;
         close(probe);
         /* Only unlink on ECONNREFUSED/ENOENT (stale socket).
          * Other errors (EACCES, etc.) should not remove the file. */
-        if (errno == ECONNREFUSED || errno == ENOENT) {
+        if (saved_errno == ECONNREFUSED || saved_errno == ENOENT) {
             unlink(path);
             ret = 0;
         } else {

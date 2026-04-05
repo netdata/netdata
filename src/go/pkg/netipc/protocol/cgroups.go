@@ -289,11 +289,12 @@ type CgroupsBuilder struct {
 // NewCgroupsBuilder initializes a cgroups response builder. buf must be
 // caller-owned and large enough for the expected snapshot.
 func NewCgroupsBuilder(buf []byte, maxItems uint32, systemdEnabled uint32, generation uint64) *CgroupsBuilder {
-	dataOffset64 := uint64(cgroupsRespHdr) + uint64(maxItems)*uint64(cgroupsDirEntry)
-	if dataOffset64 > uint64(len(buf)) {
-		dataOffset64 = uint64(len(buf))
+	minRequired := uint64(cgroupsRespHdr) + uint64(maxItems)*uint64(cgroupsDirEntry)
+	if uint64(len(buf)) < minRequired {
+		panic(fmt.Sprintf("CgroupsBuilder buffer too small: need at least %d bytes, got %d",
+			minRequired, len(buf)))
 	}
-	dataOffset := int(dataOffset64)
+	dataOffset := int(minRequired)
 	return &CgroupsBuilder{
 		buf:            buf,
 		systemdEnabled: systemdEnabled,

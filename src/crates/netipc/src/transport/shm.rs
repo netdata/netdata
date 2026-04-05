@@ -725,8 +725,12 @@ pub fn cleanup_stale(run_dir: &str, service_name: &str) {
         // Open read-only to inspect the header
         let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDONLY) };
         if fd < 0 {
-            // Cannot open — try to unlink anyway
-            unsafe { libc::unlink(c_path.as_ptr()) };
+            // Only unlink if ENOENT-like (race) or clearly stale.
+            // Don't unlink on EACCES/EPERM — that's a permission issue, not staleness.
+            let e = errno();
+            if e != libc::EACCES && e != libc::EPERM {
+                unsafe { libc::unlink(c_path.as_ptr()) };
+            }
             continue;
         }
 

@@ -240,12 +240,10 @@ static void ebpf_parse_cgroup_netipc_data(void)
     refresh_fail_count = 0;
 
     uint32_t count = ebpf_cgroup_cache.item_count;
-    if (count == 0)
-        return;
 
     // update global flags for other ebpf modules
     ebpf_cgroup_systemd_enabled = (int)ebpf_cgroup_cache.systemd_enabled;
-    ebpf_cgroup_integration_active = 1;
+    ebpf_cgroup_integration_active = (count > 0) ? 1 : 0;
 
     netdata_mutex_lock(&mutex_cgroup_shm);
     ebpf_remove_cgroup_target_update_list();
