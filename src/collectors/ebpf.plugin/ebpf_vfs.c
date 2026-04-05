@@ -2251,7 +2251,7 @@ static void ebpf_vfs_send_cgroup_data(ebpf_module_t *em)
         return;
     }
 
-    if (shm_ebpf_cgroup.header->systemd_enabled) {
+    if (ebpf_cgroup_systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_vfs_charts(em);
         }
@@ -2353,7 +2353,7 @@ void ebpf_read_vfs_thread(void *ptr)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active)
             read_update_vfs_cgroup();
 
         if (sem_post(shm_mutex_ebpf_integration)) {
@@ -2422,7 +2422,7 @@ static void vfs_collector(ebpf_module_t *em)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active)
             ebpf_vfs_send_cgroup_data(em);
 
         netdata_mutex_unlock(&lock);

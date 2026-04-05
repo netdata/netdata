@@ -852,10 +852,9 @@ ebpf_sync_syscalls_t local_syscalls[] = {
 #endif
      .sync_maps = NULL}};
 
-// Link with cgroup.plugin
-netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup = {NULL, NULL};
-int shm_fd_ebpf_cgroup = -1;
-sem_t *shm_sem_ebpf_cgroup = SEM_FAILED;
+// cgroup integration via netipc
+int ebpf_cgroup_systemd_enabled = 0;
+int ebpf_cgroup_integration_active = 0;
 netdata_mutex_t mutex_cgroup_shm;
 
 //Network viewer
@@ -1042,12 +1041,7 @@ static void ebpf_exit()
         ebpf_check_before2go();
         ebpf_pre_exit_check_done = true;
     }
-    netdata_mutex_lock(&mutex_cgroup_shm);
-    if (shm_ebpf_cgroup.header) {
-        ebpf_unmap_cgroup_shared_memory();
-        shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
-    }
-    netdata_mutex_unlock(&mutex_cgroup_shm);
+    ebpf_cgroup_cache_cleanup();
     netdata_integration_cleanup_shm();
 
     exit(0);

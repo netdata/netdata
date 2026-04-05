@@ -1170,6 +1170,13 @@ if(OS_WINDOWS)
     list(APPEND LIBNETDATA_FILES ${LIBNETDATA_WIN_FILES})
 endif()
 
+if(OS_LINUX OR OS_WINDOWS)
+    list(APPEND LIBNETDATA_FILES
+            src/libnetdata/netipc/netipc_netdata.c
+            src/libnetdata/netipc/netipc_netdata.h
+    )
+endif()
+
 if(NOT OS_FREEBSD)
     set(LIBNETDATA_STACKTRACE_FILES
         src/libnetdata/stacktrace/stacktrace.h
@@ -1947,6 +1954,8 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/cgroup-discovery.c
         src/collectors/cgroups.plugin/cgroup-charts.c
         src/collectors/cgroups.plugin/cgroup-top.c
+        src/collectors/cgroups.plugin/cgroup-netipc.c
+        src/collectors/cgroups.plugin/cgroup-netipc.h
 )
 
 set(DISKSPACE_PLUGIN_FILES
@@ -2251,6 +2260,35 @@ set_source_files_properties(src/libnetdata/libjudy/vendored/JudyL/JudyLByCount.c
 set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/src/libnetdata/libjudy/src/JudyL")
 
 #
+# build netipc (standalone IPC library, no Netdata deps)
+#
+
+if(OS_LINUX)
+    set(NETIPC_FILES
+            src/libnetdata/netipc/src/protocol/netipc_protocol.c
+            src/libnetdata/netipc/src/transport/posix/netipc_uds.c
+            src/libnetdata/netipc/src/transport/posix/netipc_shm.c
+            src/libnetdata/netipc/src/service/netipc_service.c
+    )
+
+    add_library(netipc STATIC ${NETIPC_FILES})
+    target_include_directories(netipc PUBLIC ${CMAKE_SOURCE_DIR}/src/libnetdata/netipc/include)
+    target_link_libraries(netipc PUBLIC pthread rt)
+    set_target_properties(netipc PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+elseif(OS_WINDOWS)
+    set(NETIPC_FILES
+            src/libnetdata/netipc/src/protocol/netipc_protocol.c
+            src/libnetdata/netipc/src/transport/windows/netipc_named_pipe.c
+            src/libnetdata/netipc/src/transport/windows/netipc_win_shm.c
+            src/libnetdata/netipc/src/service/netipc_service_win.c
+    )
+
+    add_library(netipc STATIC ${NETIPC_FILES})
+    target_include_directories(netipc PUBLIC ${CMAKE_SOURCE_DIR}/src/libnetdata/netipc/include)
+    set_target_properties(netipc PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+endif()
+
+#
 # build libnetdata
 #
 
@@ -2275,6 +2313,10 @@ target_link_libraries(libnetdata PUBLIC
         "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid;sensorsapi;iphlpapi>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
+
+if(OS_LINUX OR OS_WINDOWS)
+    target_link_libraries(libnetdata PUBLIC netipc)
+endif()
 
 if(HAVE_LIBBACKTRACE)
     netdata_add_libbacktrace_to_target(libnetdata)

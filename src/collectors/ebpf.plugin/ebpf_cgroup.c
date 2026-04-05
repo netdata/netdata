@@ -7,112 +7,12 @@
 #include "libbpf_api/ebpf_library.h"
 
 ebpf_cgroup_target_t *ebpf_cgroup_pids = NULL;
-static void *ebpf_mapped_memory = NULL;
 int send_cgroup_chart = 0;
 
-// --------------------------------------------------------------------------------------------------------------------
-// Map shared memory
-
-/**
- * Map Shared Memory locally
- *
- * Map the shared memory for current process
- *
- * @param fd       file descriptor returned after shm_open was called.
- * @param length   length of the shared memory
- *
- * @return It returns a pointer to the region mapped on success and MAP_FAILED otherwise.
- */
-static inline void *ebpf_cgroup_map_shm_locally(int fd, size_t length)
-{
-    void *value = nd_mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (value == MAP_FAILED) {
-        netdata_log_error(
-            "Cannot map shared memory used between eBPF and cgroup, integration between processes won't happen");
-        close(shm_fd_ebpf_cgroup);
-        shm_fd_ebpf_cgroup = -1;
-        shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
-    }
-
-    return value;
-}
-
-/**
- * Unmap Shared Memory
- *
- * Unmap shared memory used to integrate eBPF and cgroup plugin
- */
-void ebpf_unmap_cgroup_shared_memory()
-{
-    nd_munmap(ebpf_mapped_memory, shm_ebpf_cgroup.header->body_length);
-}
-
-/**
- * Map cgroup shared memory
- *
- * Map cgroup shared memory from cgroup to plugin
- */
-void ebpf_map_cgroup_shared_memory()
-{
-    static int limit_try = 0;
-    static time_t next_try = 0;
-
-    if (shm_ebpf_cgroup.header || limit_try > NETDATA_EBPF_CGROUP_MAX_TRIES)
-        return;
-
-    time_t curr_time = time(NULL);
-    if (curr_time < next_try)
-        return;
-
-    limit_try++;
-    next_try = curr_time + NETDATA_EBPF_CGROUP_NEXT_TRY_SEC;
-
-    if (shm_fd_ebpf_cgroup < 0) {
-        shm_fd_ebpf_cgroup = shm_open(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME, O_RDWR, 0660);
-        if (shm_fd_ebpf_cgroup < 0) {
-            if (limit_try == NETDATA_EBPF_CGROUP_MAX_TRIES)
-                netdata_log_error("Shared memory was not initialized, integration between processes won't happen.");
-
-            return;
-        }
-    }
-
-    // Map only header
-    void *mapped = (netdata_ebpf_cgroup_shm_header_t *)ebpf_cgroup_map_shm_locally(
-        shm_fd_ebpf_cgroup, sizeof(netdata_ebpf_cgroup_shm_header_t));
-    if (unlikely(mapped == MAP_FAILED)) {
-        return;
-    }
-    netdata_ebpf_cgroup_shm_header_t *header = mapped;
-
-    size_t length = header->body_length;
-
-    nd_munmap(header, sizeof(netdata_ebpf_cgroup_shm_header_t));
-
-    if (length <= ((sizeof(netdata_ebpf_cgroup_shm_header_t) + sizeof(netdata_ebpf_cgroup_shm_body_t)))) {
-        return;
-    }
-
-    ebpf_mapped_memory = (void *)ebpf_cgroup_map_shm_locally(shm_fd_ebpf_cgroup, length);
-    if (unlikely(ebpf_mapped_memory == MAP_FAILED)) {
-        return;
-    }
-    shm_ebpf_cgroup.header = ebpf_mapped_memory;
-    shm_ebpf_cgroup.body = ebpf_mapped_memory + sizeof(netdata_ebpf_cgroup_shm_header_t);
-
-    shm_sem_ebpf_cgroup = sem_open(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME, O_CREAT, 0660, 1);
-
-    if (shm_sem_ebpf_cgroup == SEM_FAILED) {
-        netdata_log_error("Cannot create semaphore, integration between eBPF and cgroup won't happen");
-        limit_try = NETDATA_EBPF_CGROUP_MAX_TRIES + 1;
-        nd_munmap(ebpf_mapped_memory, length);
-        shm_ebpf_cgroup.header = NULL;
-        shm_ebpf_cgroup.body = NULL;
-        close(shm_fd_ebpf_cgroup);
-        shm_fd_ebpf_cgroup = -1;
-        shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
-    }
-}
+#ifdef OS_LINUX
+static nipc_cgroups_cache_t ebpf_cgroup_cache;
+static bool ebpf_cgroup_cache_initialized = false;
+#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 // Close and Cleanup
@@ -169,16 +69,16 @@ static void ebpf_remove_cgroup_target_update_list()
 /**
  * Set Target Data
  *
- * Set local variable values according shared memory information.
+ * Set local variable values from a netipc cache item.
  *
- * @param out local output variable.
- * @param ptr input from shared memory.
+ * @param out  local output variable.
+ * @param item netipc cache item.
  */
-static inline void ebpf_cgroup_set_target_data(ebpf_cgroup_target_t *out, netdata_ebpf_cgroup_shm_body_t *ptr)
+static inline void ebpf_cgroup_set_target_data(ebpf_cgroup_target_t *out, const nipc_cgroups_cache_item_t *item)
 {
-    out->hash = ptr->hash;
-    snprintfz(out->name, 255, "%s", ptr->name);
-    out->systemd = ptr->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE;
+    out->hash = item->hash;
+    snprintfz(out->name, 255, "%s", item->name);
+    out->systemd = item->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE;
     out->updated = 1;
 }
 
@@ -187,21 +87,21 @@ static inline void ebpf_cgroup_set_target_data(ebpf_cgroup_target_t *out, netdat
  *
  * Find the structure inside the link list or allocate and link when it is not present.
  *
- * @param ptr Input from shared memory.
+ * @param item netipc cache item.
  *
  * @return It returns a pointer for the structure associated with the input.
  */
-static ebpf_cgroup_target_t *ebpf_cgroup_find_or_create(netdata_ebpf_cgroup_shm_body_t *ptr)
+static ebpf_cgroup_target_t *ebpf_cgroup_find_or_create(const nipc_cgroups_cache_item_t *item)
 {
     for (ebpf_cgroup_target_t *ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (ect->hash == ptr->hash && !strcmp(ect->name, ptr->name)) {
+        if (ect->hash == item->hash && !strcmp(ect->name, item->name)) {
             ect->updated = 1;
             return ect;
         }
     }
 
     ebpf_cgroup_target_t *new_ect = callocz(1, sizeof(*new_ect));
-    ebpf_cgroup_set_target_data(new_ect, ptr);
+    ebpf_cgroup_set_target_data(new_ect, item);
     new_ect->next = ebpf_cgroup_pids;
     ebpf_cgroup_pids = new_ect;
 
@@ -216,7 +116,7 @@ static ebpf_cgroup_target_t *ebpf_cgroup_find_or_create(netdata_ebpf_cgroup_shm_
  * @param ect  cgroup structure where pids will be stored
  * @param path file with PIDs associated to cgroup.
  */
-static void ebpf_update_pid_link_list(ebpf_cgroup_target_t *ect, char *path)
+static void ebpf_update_pid_link_list(ebpf_cgroup_target_t *ect, const char *path)
 {
     procfile *ff = procfile_open_no_log(path, " \t:", PROCFILE_FLAG_DEFAULT);
     if (!ff)
@@ -278,45 +178,88 @@ void ebpf_reset_updated_var()
 }
 
 /**
- * Parse cgroup shared memory
+ * Initialize netipc cgroup cache
  *
- * This function is responsible to copy necessary data from shared memory to local memory.
+ * Connect to the cgroups-snapshot service via netipc.
  */
-void ebpf_parse_cgroup_shm_data()
+static void ebpf_cgroup_cache_init(void)
 {
-    static int previous = 0;
-    if (!shm_ebpf_cgroup.header || shm_sem_ebpf_cgroup == SEM_FAILED)
+#ifdef OS_LINUX
+    if (ebpf_cgroup_cache_initialized)
         return;
 
-    sem_wait(shm_sem_ebpf_cgroup);
-    int i, end = shm_ebpf_cgroup.header->cgroup_root_count;
-    if (end <= 0) {
-        sem_post(shm_sem_ebpf_cgroup);
+    uint64_t auth = netipc_auth_token();
+
+    nipc_client_config_t config = {
+        .supported_profiles = NIPC_PROFILE_BASELINE | NIPC_PROFILE_SHM_HYBRID | NIPC_PROFILE_SHM_FUTEX,
+        .preferred_profiles = NIPC_PROFILE_SHM_FUTEX,
+        .auth_token = auth,
+    };
+
+    nipc_cgroups_cache_init(&ebpf_cgroup_cache,
+                             os_run_dir(true),
+                             "cgroups-snapshot",
+                             &config);
+
+    ebpf_cgroup_cache_initialized = true;
+#endif
+}
+
+/**
+ * Close the netipc cgroup cache and release resources.
+ */
+void ebpf_cgroup_cache_cleanup(void)
+{
+#ifdef OS_LINUX
+    if (ebpf_cgroup_cache_initialized) {
+        nipc_cgroups_cache_close(&ebpf_cgroup_cache);
+        ebpf_cgroup_cache_initialized = false;
+    }
+#endif
+}
+
+/**
+ * Refresh cgroup data from netipc cache
+ *
+ * Replaces the legacy SHM parse function.
+ */
+static void ebpf_parse_cgroup_netipc_data(void)
+{
+#ifdef OS_LINUX
+    static uint32_t previous_count = 0;
+
+    if (!ebpf_cgroup_cache_initialized)
+        return;
+
+    static int refresh_fail_count = 0;
+    if (!nipc_cgroups_cache_refresh(&ebpf_cgroup_cache)) {
+        if (++refresh_fail_count % 10 == 1)
+            collector_error("EBPF CGROUP: netipc refresh failed (%d consecutive failures)", refresh_fail_count);
         return;
     }
+    refresh_fail_count = 0;
+
+    uint32_t count = ebpf_cgroup_cache.item_count;
+
+    // update global flags for other ebpf modules
+    ebpf_cgroup_systemd_enabled = (int)ebpf_cgroup_cache.systemd_enabled;
+    ebpf_cgroup_integration_active = (count > 0) ? 1 : 0;
 
     netdata_mutex_lock(&mutex_cgroup_shm);
     ebpf_remove_cgroup_target_update_list();
-
     ebpf_reset_updated_var();
 
-    for (i = 0; i < end; i++) {
-        netdata_ebpf_cgroup_shm_body_t *ptr = &shm_ebpf_cgroup.body[i];
-        if (ptr->enabled) {
-            ebpf_cgroup_target_t *ect = ebpf_cgroup_find_or_create(ptr);
-            ebpf_update_pid_link_list(ect, ptr->path);
+    for (uint32_t i = 0; i < count; i++) {
+        const nipc_cgroups_cache_item_t *item = &ebpf_cgroup_cache.items[i];
+        if (item->enabled) {
+            ebpf_cgroup_target_t *ect = ebpf_cgroup_find_or_create(item);
+            ebpf_update_pid_link_list(ect, item->path);
         }
     }
-    send_cgroup_chart = previous != shm_ebpf_cgroup.header->cgroup_root_count;
-    previous = shm_ebpf_cgroup.header->cgroup_root_count;
-    sem_post(shm_sem_ebpf_cgroup);
+
+    send_cgroup_chart = previous_count != count;
+    previous_count = count;
     netdata_mutex_unlock(&mutex_cgroup_shm);
-#ifdef NETDATA_DEV_MODE
-    netdata_log_info(
-        "Updating cgroup %d (Previous: %d, Current: %d)",
-        send_cgroup_chart,
-        previous,
-        shm_ebpf_cgroup.header->cgroup_root_count);
 #endif
 }
 
@@ -388,7 +331,7 @@ void ebpf_cgroup_integration(void *ptr __maybe_unused)
     int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
-    //Plugin will be killed when it receives a signal
+
     while (!ebpf_plugin_stop()) {
         if (ebpf_plugin_stop())
             break;
@@ -397,14 +340,14 @@ void ebpf_cgroup_integration(void *ptr __maybe_unused)
 
         if (ebpf_plugin_stop())
             break;
-        // We are using a small heartbeat time to wake up thread,
-        // but we should not update so frequently the shared memory data
+
+        // refresh every NETDATA_EBPF_CGROUP_UPDATE seconds
         if (++counter >= NETDATA_EBPF_CGROUP_UPDATE) {
             counter = 0;
-            if (!shm_ebpf_cgroup.header)
-                ebpf_map_cgroup_shared_memory();
-            else
-                ebpf_parse_cgroup_shm_data();
+            if (!ebpf_cgroup_cache_initialized)
+                ebpf_cgroup_cache_init();
+
+            ebpf_parse_cgroup_netipc_data();
         }
     }
 }

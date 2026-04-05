@@ -1417,7 +1417,7 @@ static void ebpf_process_send_cgroup_data(ebpf_module_t *em)
         return;
     }
 
-    if (shm_ebpf_cgroup.header->systemd_enabled) {
+    if (ebpf_cgroup_systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_process_charts(em);
         }
@@ -1642,7 +1642,7 @@ static void process_collector(ebpf_module_t *em)
                 netdata_mutex_lock(&collect_data_mutex);
                 collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
 
-                if (cgroups && shm_ebpf_cgroup.header) {
+                if (cgroups && ebpf_cgroup_integration_active) {
                     ebpf_update_process_cgroup();
                 }
                 netdata_mutex_unlock(&collect_data_mutex);
@@ -1669,7 +1669,7 @@ static void process_collector(ebpf_module_t *em)
                 ebpf_process_send_apps_data(apps_groups_root_target, em);
             }
 
-            if (cgroups && shm_ebpf_cgroup.header) {
+            if (cgroups && ebpf_cgroup_integration_active) {
                 if (!ebpf_plugin_stop())
                     ebpf_process_send_cgroup_data(em);
             }

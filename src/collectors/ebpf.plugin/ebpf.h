@@ -23,6 +23,7 @@
 #include "libbpf_api/ebpf.h"
 
 #include "collectors/cgroups.plugin/sys_fs_cgroup.h"
+#include "libnetdata/netipc/netipc_netdata.h"
 
 #include "ebpf_apps.h"
 #include "ebpf_functions.h"
@@ -269,9 +270,8 @@ extern struct ebpf_pid_stat *ebpf_root_of_pids;
 extern ebpf_cgroup_target_t *ebpf_cgroup_pids;
 extern char *ebpf_algorithms[];
 extern struct config collector_config;
-extern netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup;
-extern int shm_fd_ebpf_cgroup;
-extern sem_t *shm_sem_ebpf_cgroup;
+extern int ebpf_cgroup_systemd_enabled;
+extern int ebpf_cgroup_integration_active;
 extern netdata_mutex_t mutex_cgroup_shm;
 extern size_t ebpf_all_pids_count;
 extern ebpf_plugin_stats_t plugin_statistics;
