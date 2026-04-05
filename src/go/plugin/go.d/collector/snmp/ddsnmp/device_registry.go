@@ -53,11 +53,11 @@ type deviceRegistry struct {
 // Reference types are deep-copied to prevent data races with the caller.
 func (r *deviceRegistry) Register(key string, info DeviceConnectionInfo) {
 	dev := info
-	if len(info.ManualProfiles) > 0 {
+	if info.ManualProfiles != nil {
 		dev.ManualProfiles = make([]string, len(info.ManualProfiles))
 		copy(dev.ManualProfiles, info.ManualProfiles)
 	}
-	if len(info.VnodeLabels) > 0 {
+	if info.VnodeLabels != nil {
 		dev.VnodeLabels = make(map[string]string, len(info.VnodeLabels))
 		for k, v := range info.VnodeLabels {
 			dev.VnodeLabels[k] = v
@@ -83,11 +83,11 @@ func (r *deviceRegistry) Devices() []DeviceConnectionInfo {
 	devices := make([]DeviceConnectionInfo, 0, len(r.devices))
 	for _, info := range r.devices {
 		dev := info
-		if len(info.ManualProfiles) > 0 {
+		if info.ManualProfiles != nil {
 			dev.ManualProfiles = make([]string, len(info.ManualProfiles))
 			copy(dev.ManualProfiles, info.ManualProfiles)
 		}
-		if len(info.VnodeLabels) > 0 {
+		if info.VnodeLabels != nil {
 			dev.VnodeLabels = make(map[string]string, len(info.VnodeLabels))
 			for k, v := range info.VnodeLabels {
 				dev.VnodeLabels[k] = v
