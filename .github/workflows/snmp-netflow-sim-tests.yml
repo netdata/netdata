@@ -33,8 +33,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/snmpsim-data
-          LLDP_FILES=$( (grep -l "1\.0\.8802\.1\.1\.2\.1\.4\.1\.1\.9" src/go/plugin/go.d/collector/snmp/testdata/snmprec/*.snmprec | sort | head -n 2) || true )
-          CDP_FILE=$( (grep -l "1\.3\.6\.1\.4\.1\.9\.9\.23\.1\.2\.1\.1\.6" src/go/plugin/go.d/collector/snmp/testdata/snmprec/*.snmprec | sort | head -n 1) || true )
+          LLDP_FILES=$( (grep -l "1\.0\.8802\.1\.1\.2\.1\.4\.1\.1\.9" src/go/plugin/go.d/collector/snmp_topology/testdata/snmprec/*.snmprec | sort | head -n 2) || true )
+          CDP_FILE=$( (grep -l "1\.3\.6\.1\.4\.1\.9\.9\.23\.1\.2\.1\.1\.6" src/go/plugin/go.d/collector/snmp_topology/testdata/snmprec/*.snmprec | sort | head -n 1) || true )
           if [ -z "${LLDP_FILES}" ] || [ -z "${CDP_FILE}" ]; then
             echo "Missing LLDP/CDP snmprec fixtures with neighbor data" >&2
             exit 1
