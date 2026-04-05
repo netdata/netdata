@@ -361,7 +361,9 @@ pub fn batch_item_get(
         return Err(NipcError::OutOfBounds);
     }
 
-    let dir_size = item_count as usize * 8;
+    let dir_size = (item_count as usize)
+        .checked_mul(8)
+        .ok_or(NipcError::BadLayout)?;
     let dir_aligned = align8(dir_size);
 
     if payload.len() < dir_aligned {

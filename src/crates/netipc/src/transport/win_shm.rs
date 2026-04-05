@@ -390,8 +390,14 @@ impl WinShmContext {
         let req_cap = align_cacheline(req_capacity);
         let resp_cap = align_cacheline(resp_capacity);
         let req_off = align_cacheline(HEADER_LEN);
-        let resp_off = align_cacheline(req_off + req_cap);
-        let region_size = (resp_off + resp_cap) as usize;
+        let resp_off = req_off
+            .checked_add(req_cap)
+            .map(align_cacheline)
+            .ok_or_else(|| WinShmError::BadParam("region offset overflow".into()))?;
+        let region_size = resp_off
+            .checked_add(resp_cap)
+            .ok_or_else(|| WinShmError::BadParam("region size overflow".into()))?
+            as usize;
 
         // Create page-file backed mapping
         unsafe { ffi::SetLastError(0) };
@@ -580,7 +586,28 @@ impl WinShmContext {
         let resp_off = read_u32(base, OFF_RESP_OFFSET);
         let resp_cap = read_u32(base, OFF_RESP_CAPACITY);
         let spin = read_u32(base, OFF_SPIN_TRIES);
-        let region_size = (resp_off + resp_cap) as usize;
+
+        // Validate header fields from shared memory
+        if req_off == 0
+            || req_cap == 0
+            || resp_off == 0
+            || resp_cap == 0
+            || req_off % 64 != 0
+            || req_cap % 64 != 0
+            || resp_off % 64 != 0
+            || resp_cap % 64 != 0
+            || req_off
+                .checked_add(req_cap)
+                .map_or(true, |end| resp_off < end)
+        {
+            unsafe {
+                ffi::UnmapViewOfFile(base as *const _);
+                ffi::CloseHandle(mapping);
+            }
+            return Err(WinShmError::BadHeader);
+        }
+
+        let region_size = (resp_off as usize) + (resp_cap as usize);
 
         // Read current sequence numbers via interlocked
         let cur_req_seq = interlocked_read_i64(base, OFF_REQ_SEQ);
