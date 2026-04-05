@@ -2,7 +2,7 @@
 
 #include "netipc_netdata.h"
 
-#ifdef OS_LINUX
+#if defined(OS_LINUX) || defined(OS_WINDOWS)
 
 #include "libnetdata/xxHash/xxhash.h"
 
@@ -11,4 +11,4 @@ uint64_t netipc_auth_token(void) {
     return XXH3_64bits(id.uuid, sizeof(id.uuid));
 }
 
-#endif // OS_LINUX
+#endif // OS_LINUX || OS_WINDOWS

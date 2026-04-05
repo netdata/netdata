@@ -1170,7 +1170,7 @@ if(OS_WINDOWS)
     list(APPEND LIBNETDATA_FILES ${LIBNETDATA_WIN_FILES})
 endif()
 
-if(OS_LINUX)
+if(OS_LINUX OR OS_WINDOWS)
     list(APPEND LIBNETDATA_FILES
             src/libnetdata/netipc/netipc_netdata.c
             src/libnetdata/netipc/netipc_netdata.h
@@ -2260,7 +2260,7 @@ set_source_files_properties(src/libnetdata/libjudy/vendored/JudyL/JudyLByCount.c
 set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/src/libnetdata/libjudy/src/JudyL")
 
 #
-# build netipc (standalone POSIX IPC library, no Netdata deps)
+# build netipc (standalone IPC library, no Netdata deps)
 #
 
 if(OS_LINUX)
@@ -2274,6 +2274,17 @@ if(OS_LINUX)
     add_library(netipc STATIC ${NETIPC_FILES})
     target_include_directories(netipc PUBLIC ${CMAKE_SOURCE_DIR}/src/libnetdata/netipc/include)
     target_link_libraries(netipc PUBLIC pthread rt)
+    set_target_properties(netipc PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
+elseif(OS_WINDOWS)
+    set(NETIPC_FILES
+            src/libnetdata/netipc/src/protocol/netipc_protocol.c
+            src/libnetdata/netipc/src/transport/windows/netipc_named_pipe.c
+            src/libnetdata/netipc/src/transport/windows/netipc_win_shm.c
+            src/libnetdata/netipc/src/service/netipc_service_win.c
+    )
+
+    add_library(netipc STATIC ${NETIPC_FILES})
+    target_include_directories(netipc PUBLIC ${CMAKE_SOURCE_DIR}/src/libnetdata/netipc/include)
     set_target_properties(netipc PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
 endif()
 
@@ -2303,7 +2314,7 @@ target_link_libraries(libnetdata PUBLIC
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
 
-if(OS_LINUX)
+if(OS_LINUX OR OS_WINDOWS)
     target_link_libraries(libnetdata PUBLIC netipc)
 endif()
 
