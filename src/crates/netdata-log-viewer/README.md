@@ -99,9 +99,10 @@ open http://localhost:16686
 
 ## Development
 
-See [QUICKSTART.md](./QUICKSTART.md) for the fast development loop.
+Use this README for the current development loop and tracing workflow.
 
-See [DEVELOPMENT.md](./DEVELOPMENT.md) for comprehensive documentation.
+For plugin-specific configuration details, see
+[`otel-signal-viewer-plugin/README.md`](./otel-signal-viewer-plugin/README.md).
 
 ### Development Workflow
 
@@ -128,8 +129,7 @@ netdata-log-viewer/
 ├── types/                   # Shared request/response types
 ├── watcher-plugin/          # DEPRECATED - no longer needed
 ├── lv/                      # DEPRECATED - no longer needed
-├── DEVELOPMENT.md           # Detailed development guide
-├── QUICKSTART.md            # Fast reference guide
+├── otel-signal-viewer-plugin/README.md  # Plugin-specific configuration guide
 └── README.md                # This file
 ```
 
