@@ -55,7 +55,7 @@ func (c *topologyCache) updateStpPortEntry(tags map[string]string) {
 func (c *topologyCache) updateArpEntry(tags map[string]string) {
 	ip := normalizeIPAddress(tags[tagArpIP])
 	mac := normalizeMAC(tags[tagArpMac])
-	if ip == "" && mac == "" {
+	if ip == "" || mac == "" {
 		return
 	}
 

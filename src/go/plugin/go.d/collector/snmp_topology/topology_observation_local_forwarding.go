@@ -99,6 +99,10 @@ func (c *topologyCache) appendObservedARPNDEntries(observation *topologyengine.L
 		if entry == nil {
 			continue
 		}
+		mac := strings.TrimSpace(entry.mac)
+		if normalizeMAC(mac) == "" {
+			continue // incomplete ARP entry — no MAC means we can't place it on the L2 topology
+		}
 		ifName := strings.TrimSpace(entry.ifName)
 		if ifName == "" && strings.TrimSpace(entry.ifIndex) != "" {
 			ifName = strings.TrimSpace(c.ifNamesByIndex[entry.ifIndex])
