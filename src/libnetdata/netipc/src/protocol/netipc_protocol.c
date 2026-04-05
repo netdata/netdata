@@ -695,6 +695,10 @@ size_t nipc_cgroups_builder_finish(nipc_cgroups_builder_t *b) {
     memcpy(&first_entry, p + NIPC_CGROUPS_RESP_HDR_SIZE, sizeof(first_entry));
     uint32_t first_item_abs = first_entry.offset;
 
+    /* Guard against underflow if builder state is inconsistent */
+    if (b->data_offset < first_item_abs)
+        return NIPC_CGROUPS_RESP_HDR_SIZE;
+
     size_t packed_data_len = b->data_offset - first_item_abs;
 
     if (final_packed_start < first_item_abs) {
@@ -707,6 +711,8 @@ size_t nipc_cgroups_builder_finish(nipc_cgroups_builder_t *b) {
         size_t entry_pos = dir_base + (size_t)i * NIPC_CGROUPS_DIR_ENTRY_SIZE;
         nipc_batch_entry_t entry;
         memcpy(&entry, p + entry_pos, sizeof(entry));
+        if (entry.offset < first_item_abs)
+            continue; /* skip corrupted entry */
         entry.offset -= first_item_abs;
         memcpy(p + entry_pos, &entry, sizeof(entry));
     }
@@ -742,6 +748,10 @@ nipc_error_t nipc_increment_decode(const void *buf, size_t buf_len,
 
 size_t nipc_string_reverse_encode(const char *str, uint32_t str_len,
                                    void *buf, size_t buf_len) {
+    /* Guard against size_t overflow on 32-bit platforms */
+    if (str_len > SIZE_MAX - NIPC_STRING_REVERSE_HDR_SIZE - 1)
+        return 0;
+
     size_t total = NIPC_STRING_REVERSE_HDR_SIZE + str_len + 1;
     if (buf_len < total)
         return 0;

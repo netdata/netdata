@@ -60,6 +60,10 @@ pub const PROFILE_SHM_WAITADDR: u32 = 0x08;
 // Defaults
 pub const MAX_PAYLOAD_DEFAULT: u32 = 1024;
 
+/// Hard cap on negotiated payload sizes (256 MB) — prevents a
+/// compromised peer from forcing excessive memory allocation.
+pub const MAX_PAYLOAD_CAP: u32 = 256 * 1024 * 1024;
+
 // Alignment
 pub const ALIGNMENT: usize = 8;
 

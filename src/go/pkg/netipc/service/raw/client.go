@@ -11,8 +11,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
-	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/posix"
+	"github.com/netdata/plugin-ipc/go/pkg/netipc/protocol"
+	"github.com/netdata/plugin-ipc/go/pkg/netipc/transport/posix"
 )
 
 const clientShmAttachRetryInterval = 5 * time.Millisecond
@@ -154,6 +154,9 @@ func (c *Client) sessionMaxResponsePayloadBytes() uint32 {
 
 func (c *Client) noteRequestCapacity(payloadLen uint32) {
 	grown := nextPowerOf2U32(payloadLen)
+	if grown > protocol.MaxPayloadCap {
+		grown = protocol.MaxPayloadCap
+	}
 	if grown > c.config.MaxRequestPayloadBytes {
 		c.config.MaxRequestPayloadBytes = grown
 	}
@@ -161,6 +164,9 @@ func (c *Client) noteRequestCapacity(payloadLen uint32) {
 
 func (c *Client) noteResponseCapacity(payloadLen uint32) {
 	grown := nextPowerOf2U32(payloadLen)
+	if grown > protocol.MaxPayloadCap {
+		grown = protocol.MaxPayloadCap
+	}
 	if grown > c.config.MaxResponsePayloadBytes {
 		c.config.MaxResponsePayloadBytes = grown
 	}
@@ -176,6 +182,9 @@ func (c *Client) callWithRetry(attempt func() error) error {
 		return protocol.ErrBadLayout
 	}
 
+	// Cap overflow-driven retries: payloads grow by powers of 2, so 8
+	// retries allows ~256x growth from the initial negotiated size.
+	overflowRetries := 0
 	for {
 		prevReq := c.sessionMaxRequestPayloadBytes()
 		prevResp := c.sessionMaxResponsePayloadBytes()
@@ -225,6 +234,14 @@ func (c *Client) callWithRetry(attempt func() error) error {
 			c.sessionMaxResponsePayloadBytes() <= prevResp &&
 			c.config.MaxRequestPayloadBytes <= prevCfgReq &&
 			c.config.MaxResponsePayloadBytes <= prevCfgResp {
+			c.disconnect()
+			c.state = StateBroken
+			c.errorCount++
+			return firstErr
+		}
+
+		overflowRetries++
+		if overflowRetries >= 8 {
 			c.disconnect()
 			c.state = StateBroken
 			c.errorCount++
@@ -800,6 +817,9 @@ func (s *Server) Run() error {
 		s.wg.Add(1)
 		go func(sess *posix.Session, shmCtx *posix.ShmContext) {
 			defer func() {
+				if r := recover(); r != nil {
+					// Session handler panicked; log but don't crash the server
+				}
 				<-sem // release worker slot
 				s.wg.Done()
 			}()

@@ -8,9 +8,9 @@ use crate::protocol::{
     self, batch_item_get, increment_decode, increment_encode, string_reverse_decode,
     string_reverse_encode, BatchBuilder, CgroupsRequest, CgroupsResponseView, Header, NipcError,
     FLAG_BATCH, HEADER_SIZE, INCREMENT_PAYLOAD_SIZE, KIND_REQUEST, KIND_RESPONSE, MAGIC_MSG,
-    MAX_PAYLOAD_DEFAULT, METHOD_CGROUPS_SNAPSHOT, METHOD_INCREMENT, METHOD_STRING_REVERSE,
-    STATUS_BAD_ENVELOPE, STATUS_INTERNAL_ERROR, STATUS_LIMIT_EXCEEDED, STATUS_OK,
-    STRING_REVERSE_HDR_SIZE, VERSION,
+    MAX_PAYLOAD_CAP, MAX_PAYLOAD_DEFAULT, METHOD_CGROUPS_SNAPSHOT, METHOD_INCREMENT,
+    METHOD_STRING_REVERSE, STATUS_BAD_ENVELOPE, STATUS_INTERNAL_ERROR, STATUS_LIMIT_EXCEEDED,
+    STATUS_OK, STRING_REVERSE_HDR_SIZE, VERSION,
 };
 
 #[cfg(unix)]
@@ -245,14 +245,14 @@ impl RawClient {
     }
 
     fn client_note_request_capacity(&mut self, payload_len: u32) {
-        let grown = next_power_of_2_u32(payload_len);
+        let grown = next_power_of_2_u32(payload_len).min(MAX_PAYLOAD_CAP);
         if grown > self.transport_config.max_request_payload_bytes {
             self.transport_config.max_request_payload_bytes = grown;
         }
     }
 
     fn client_note_response_capacity(&mut self, payload_len: u32) {
-        let grown = next_power_of_2_u32(payload_len);
+        let grown = next_power_of_2_u32(payload_len).min(MAX_PAYLOAD_CAP);
         if grown > self.transport_config.max_response_payload_bytes {
             self.transport_config.max_response_payload_bytes = grown;
         }
@@ -538,6 +538,9 @@ impl RawClient {
             return Err(NipcError::BadLayout);
         }
 
+        // Cap overflow-driven retries: payloads grow by powers of 2, so 8
+        // retries allows ~256x growth from the initial negotiated size.
+        let mut overflow_retries = 0u32;
         loop {
             let prev_req = self.session_max_request_payload_bytes();
             let prev_resp = self.session_max_response_payload_bytes();
@@ -593,6 +596,14 @@ impl RawClient {
                         self.error_count += 1;
                         return Err(first_err);
                     }
+
+                    overflow_retries += 1;
+                    if overflow_retries >= 8 {
+                        self.disconnect();
+                        self.state = ClientState::Broken;
+                        self.error_count += 1;
+                        return Err(first_err);
+                    }
                 }
             }
         }
@@ -608,6 +619,7 @@ impl RawClient {
             return Err(NipcError::BadLayout);
         }
 
+        let mut overflow_retries = 0u32;
         loop {
             let prev_req = self.session_max_request_payload_bytes();
             let prev_resp = self.session_max_response_payload_bytes();
@@ -663,6 +675,14 @@ impl RawClient {
                         self.error_count += 1;
                         return Err(first_err);
                     }
+
+                    overflow_retries += 1;
+                    if overflow_retries >= 8 {
+                        self.disconnect();
+                        self.state = ClientState::Broken;
+                        self.error_count += 1;
+                        return Err(first_err);
+                    }
                 }
             }
         }
@@ -679,6 +699,7 @@ impl RawClient {
             return Err(NipcError::BadLayout);
         }
 
+        let mut overflow_retries = 0u32;
         loop {
             let prev_req = self.session_max_request_payload_bytes();
             let prev_resp = self.session_max_response_payload_bytes();
@@ -733,6 +754,14 @@ impl RawClient {
                         && self.transport_config.max_request_payload_bytes <= prev_cfg_req
                         && self.transport_config.max_response_payload_bytes <= prev_cfg_resp
                     {
+                        self.disconnect();
+                        self.state = ClientState::Broken;
+                        self.error_count += 1;
+                        return Err(first_err);
+                    }
+
+                    overflow_retries += 1;
+                    if overflow_retries >= 8 {
                         self.disconnect();
                         self.state = ClientState::Broken;
                         self.error_count += 1;

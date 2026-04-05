@@ -155,6 +155,8 @@ static bool ensure_buffer(uint8_t **buf, size_t *buf_size, size_t need, int faul
 static void client_note_request_capacity(nipc_client_ctx_t *ctx, uint32_t payload_len)
 {
     uint32_t grown = next_power_of_2_u32(payload_len);
+    if (grown > NIPC_MAX_PAYLOAD_CAP)
+        grown = NIPC_MAX_PAYLOAD_CAP;
     if (grown > ctx->transport_config.max_request_payload_bytes)
         ctx->transport_config.max_request_payload_bytes = grown;
 }
@@ -162,6 +164,8 @@ static void client_note_request_capacity(nipc_client_ctx_t *ctx, uint32_t payloa
 static void client_note_response_capacity(nipc_client_ctx_t *ctx, uint32_t payload_len)
 {
     uint32_t grown = next_power_of_2_u32(payload_len);
+    if (grown > NIPC_MAX_PAYLOAD_CAP)
+        grown = NIPC_MAX_PAYLOAD_CAP;
     if (grown > ctx->transport_config.max_response_payload_bytes)
         ctx->transport_config.max_response_payload_bytes = grown;
 }
@@ -513,6 +517,9 @@ static nipc_error_t call_with_retry(nipc_client_ctx_t *ctx,
         return NIPC_ERR_NOT_READY;
     }
 
+    /* Cap overflow-driven retries: payloads grow by powers of 2, so 8
+     * retries allows ~256x growth from the initial negotiated size. */
+    int overflow_retries = 0;
     for (;;) {
         uint32_t prev_req = ctx->session.max_request_payload_bytes;
         uint32_t prev_resp = ctx->session.max_response_payload_bytes;
@@ -560,6 +567,13 @@ static nipc_error_t call_with_retry(nipc_client_ctx_t *ctx,
             ctx->session.max_response_payload_bytes <= prev_resp &&
             ctx->transport_config.max_request_payload_bytes <= prev_cfg_req &&
             ctx->transport_config.max_response_payload_bytes <= prev_cfg_resp) {
+            client_disconnect(ctx);
+            ctx->state = NIPC_CLIENT_BROKEN;
+            ctx->error_count++;
+            return err;
+        }
+
+        if (++overflow_retries >= 8) {
             client_disconnect(ctx);
             ctx->state = NIPC_CLIENT_BROKEN;
             ctx->error_count++;
@@ -913,7 +927,7 @@ static void server_handle_session(nipc_managed_server_t *server,
         resp_hdr.kind       = NIPC_KIND_RESPONSE;
         resp_hdr.code       = hdr.code;
         resp_hdr.message_id = hdr.message_id;
-        if ((hdr.flags & NIPC_FLAG_BATCH) && hdr.item_count > 1) {
+        if ((hdr.flags & NIPC_FLAG_BATCH) && hdr.item_count >= 1) {
             resp_hdr.item_count = hdr.item_count;
             resp_hdr.flags = NIPC_FLAG_BATCH;
         } else {

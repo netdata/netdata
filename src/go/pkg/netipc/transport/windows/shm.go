@@ -84,7 +84,6 @@ var (
 	procOpenEventW         = modkernel32.NewProc("OpenEventW")
 	procSetEvent           = modkernel32.NewProc("SetEvent")
 	procWaitForSingleObj   = modkernel32.NewProc("WaitForSingleObject")
-	procGetTickCount       = modkernel32.NewProc("GetTickCount")
 	procGetTickCount64     = modkernel32.NewProc("GetTickCount64")
 )
 
@@ -691,7 +690,7 @@ func (c *WinShmContext) WinShmReceive(buf []byte, timeoutMs uint32) (int, error)
 			}
 		} else {
 			// BUSYWAIT
-			start, _, _ := procGetTickCount.Call()
+			start, _, _ := procGetTickCount64.Call()
 			for {
 				cur := atomic.LoadInt64((*int64)(unsafe.Pointer(&data[seqOff])))
 				if cur >= expectedSeq {
@@ -703,9 +702,9 @@ func (c *WinShmContext) WinShmReceive(buf []byte, timeoutMs uint32) (int, error)
 				}
 
 				if timeoutMs > 0 {
-					now, _, _ := procGetTickCount.Call()
-					elapsed := uint32(now - start)
-					if elapsed >= timeoutMs {
+					now, _, _ := procGetTickCount64.Call()
+					elapsed := uint64(now - start)
+					if elapsed >= uint64(timeoutMs) {
 						return 0, ErrWinShmTimeout
 					}
 				}

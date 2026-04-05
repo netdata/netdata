@@ -66,6 +66,10 @@ extern "C" {
 /* Defaults */
 #define NIPC_MAX_PAYLOAD_DEFAULT 1024u
 
+/* Hard cap on negotiated payload sizes (256 MB) — prevents a
+ * compromised peer from forcing excessive memory allocation. */
+#define NIPC_MAX_PAYLOAD_CAP (256u * 1024u * 1024u)
+
 /* Alignment for batch items and cgroups items */
 #define NIPC_ALIGNMENT 8u
 
