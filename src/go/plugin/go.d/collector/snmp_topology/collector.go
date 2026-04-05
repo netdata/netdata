@@ -89,37 +89,30 @@ func (c *Collector) Charts() *collectorapi.Charts {
 }
 
 func (c *Collector) Collect(context.Context) map[string]int64 {
-	devices := ddsnmp.DeviceRegistry.Devices()
-	if len(devices) == 0 {
-		return nil
-	}
+	if devices := ddsnmp.DeviceRegistry.Devices(); len(devices) > 0 {
+		refreshEvery := c.refreshEvery()
+		now := time.Now()
+		seen := make(map[string]bool, len(devices))
 
-	refreshEvery := c.refreshEvery()
-	now := time.Now()
-	seen := make(map[string]bool, len(devices))
+		for _, dev := range devices {
+			key := fmt.Sprintf("%s:%d", dev.Hostname, dev.Port)
+			seen[key] = true
 
-	for _, dev := range devices {
-		key := fmt.Sprintf("%s:%d", dev.Hostname, dev.Port)
-		seen[key] = true
+			lastCollected, exists := c.deviceLastCollected[key]
+			isNew := !exists
+			isStale := exists && now.Sub(lastCollected) >= refreshEvery
 
-		lastCollected, exists := c.deviceLastCollected[key]
-		isNew := !exists
-		isStale := exists && now.Sub(lastCollected) >= refreshEvery
-
-		if isNew || isStale {
-			c.refreshDeviceTopology(key, dev)
-			c.deviceLastCollected[key] = now
+			if isNew || isStale {
+				c.refreshDeviceTopology(key, dev)
+				c.deviceLastCollected[key] = now
+			}
 		}
-	}
 
-	c.pruneStaleDeviceCaches(seen)
+		c.pruneStaleDeviceCaches(seen)
+	}
 
 	mx := make(map[string]int64)
 	c.collectTopologyMetrics(mx)
-
-	if len(mx) == 0 {
-		return nil
-	}
 	return mx
 }
 
@@ -199,7 +192,7 @@ func (c *Collector) getOrCreateDeviceCache(key string, dev ddsnmp.DeviceConnecti
 	cache.mu.Lock()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = time.Time{}
-	cache.staleAfter = time.Duration(c.UpdateEvery*2) * time.Second
+	cache.staleAfter = c.refreshEvery() + time.Duration(c.UpdateEvery*2)*time.Second
 	cache.agentID = dev.Hostname
 	cache.localDevice = buildLocalTopologyDevice(dev)
 	cache.lldpLocPorts = make(map[string]*lldpLocPort)
@@ -256,14 +249,20 @@ func (c *Collector) ingestTopologyProfileMetrics(pms []*ddsnmp.ProfileMetrics) {
 
 // collectTopologyMetrics reads the aggregated topology from the global registry.
 func (c *Collector) collectTopologyMetrics(mx map[string]int64) {
-	data, ok := snmpTopologyRegistry.snapshot()
-	if !ok {
-		return
-	}
-
 	if !c.topologyChartsAdded {
 		c.addTopologyCharts()
 		c.topologyChartsAdded = true
+	}
+
+	data, ok := snmpTopologyRegistry.snapshot()
+	if !ok {
+		mx["snmp_topology_devices_total"] = 0
+		mx["snmp_topology_devices_discovered"] = 0
+		mx["snmp_topology_links_total"] = 0
+		mx["snmp_topology_links_lldp"] = 0
+		mx["snmp_topology_links_cdp"] = 0
+		mx["snmp_topology_links_stp"] = 0
+		return
 	}
 
 	totalDevices := 0
