@@ -7,6 +7,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
+// selectTopologyRefreshProfiles filters profiles to keep only topology metrics.
+// It mutates the passed-in profiles in place. Callers must pass cloned profiles
+// (ddsnmp.FindProfiles already returns clones).
 func selectTopologyRefreshProfiles(profiles []*ddsnmp.Profile) []*ddsnmp.Profile {
 	if len(profiles) == 0 {
 		return nil

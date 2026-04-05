@@ -5,10 +5,6 @@ package snmptopology
 import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 var (
-	topologyCharts = collectorapi.Charts{
-		topologyDevicesChart.Copy(),
-		topologyLinksChart.Copy(),
-	}
 	topologyDevicesChart = collectorapi.Chart{
 		ID:       "topology_devices",
 		Title:    "Topology devices",
@@ -34,6 +30,10 @@ var (
 			{ID: "snmp_topology_links_cdp", Name: "cdp"},
 			{ID: "snmp_topology_links_stp", Name: "stp"},
 		},
+	}
+	topologyCharts = collectorapi.Charts{
+		topologyDevicesChart.Copy(),
+		topologyLinksChart.Copy(),
 	}
 )
 
