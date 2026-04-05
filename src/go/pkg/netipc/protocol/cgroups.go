@@ -437,6 +437,10 @@ func DispatchCgroupsSnapshot(req []byte, resp []byte, maxItems uint32,
 	if err != nil {
 		return 0, false
 	}
+	minRequired := uint64(cgroupsRespHdr) + uint64(maxItems)*uint64(cgroupsDirEntry)
+	if uint64(len(resp)) < minRequired {
+		return 0, false
+	}
 	builder := NewCgroupsBuilder(resp, maxItems, 0, 0)
 	if !handler(&request, builder) {
 		return 0, false
