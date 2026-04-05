@@ -50,9 +50,21 @@ type deviceRegistry struct {
 }
 
 // Register adds or updates a device in the registry.
+// Reference types are deep-copied to prevent data races with the caller.
 func (r *deviceRegistry) Register(key string, info DeviceConnectionInfo) {
+	dev := info
+	if len(info.ManualProfiles) > 0 {
+		dev.ManualProfiles = make([]string, len(info.ManualProfiles))
+		copy(dev.ManualProfiles, info.ManualProfiles)
+	}
+	if len(info.VnodeLabels) > 0 {
+		dev.VnodeLabels = make(map[string]string, len(info.VnodeLabels))
+		for k, v := range info.VnodeLabels {
+			dev.VnodeLabels[k] = v
+		}
+	}
 	r.mu.Lock()
-	r.devices[key] = info
+	r.devices[key] = dev
 	r.mu.Unlock()
 }
 
