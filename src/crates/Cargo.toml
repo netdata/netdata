@@ -27,6 +27,9 @@ members = [
     # Netdata OTEL workspace members
     "netdata-otel/otel-plugin",
     "netdata-otel/flatten_otel",
+
+    # Plugin IPC library
+    "netipc",
 ]
 
 [workspace.package]
