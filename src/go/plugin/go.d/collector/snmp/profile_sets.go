@@ -76,7 +76,7 @@ func stripTopologyFromProfile(prof *ddsnmp.Profile) {
 	hadTopologyData := ddsnmp.ProfileContainsTopologyData(prof)
 
 	def.Metrics = stripTopologyMetrics(def.Metrics)
-	def.VirtualMetrics = filterVirtualMetricsBySources(def.VirtualMetrics, def.Metrics)
+	def.VirtualMetrics = ddsnmp.FilterVirtualMetricsBySources(def.VirtualMetrics, def.Metrics)
 	if hadTopologyData {
 		def.MetricTags = stripTopologyMetricTags(def.MetricTags)
 	}
@@ -116,74 +116,4 @@ func stripTopologyMetricTags(tags []ddprofiledefinition.MetricTagConfig) []ddpro
 		return nil
 	}
 	return filtered
-}
-
-func filterVirtualMetricsBySources(vmetrics []ddprofiledefinition.VirtualMetricConfig, metrics []ddprofiledefinition.MetricsConfig) []ddprofiledefinition.VirtualMetricConfig {
-	if len(vmetrics) == 0 {
-		return nil
-	}
-
-	metricNames := make(map[string]struct{}, len(metrics)*2)
-	for i := range metrics {
-		addMetricConfigNames(metricNames, &metrics[i])
-	}
-
-	filtered := vmetrics[:0]
-	for _, vm := range vmetrics {
-		clone := vm.Clone()
-
-		switch {
-		case len(clone.Alternatives) > 0:
-			alts := clone.Alternatives[:0]
-			for _, alt := range clone.Alternatives {
-				if virtualMetricSourcesAvailable(alt.Sources, metricNames) {
-					alts = append(alts, alt)
-				}
-			}
-			if len(alts) == 0 {
-				continue
-			}
-			clone.Sources = nil
-			clone.Alternatives = alts
-		case virtualMetricSourcesAvailable(clone.Sources, metricNames):
-			// Keep as-is.
-		default:
-			continue
-		}
-
-		filtered = append(filtered, clone)
-	}
-
-	if len(filtered) == 0 {
-		return nil
-	}
-	return filtered
-}
-
-func addMetricConfigNames(names map[string]struct{}, metric *ddprofiledefinition.MetricsConfig) {
-	if metric == nil {
-		return
-	}
-
-	if name := strings.TrimSpace(ddsnmp.FirstNonEmpty(metric.Symbol.Name, metric.Name)); name != "" {
-		names[name] = struct{}{}
-	}
-	for i := range metric.Symbols {
-		if name := strings.TrimSpace(metric.Symbols[i].Name); name != "" {
-			names[name] = struct{}{}
-		}
-	}
-}
-
-func virtualMetricSourcesAvailable(sources []ddprofiledefinition.VirtualMetricSourceConfig, metricNames map[string]struct{}) bool {
-	if len(sources) == 0 {
-		return false
-	}
-
-	for _, source := range sources {
-		if _, ok := metricNames[strings.TrimSpace(source.Metric)]; !ok {
-			return false
-		}
-	}
-	return true
 }
