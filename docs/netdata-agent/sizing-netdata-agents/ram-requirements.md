@@ -65,6 +65,36 @@ CONFIGURED_CACHES = 32MiB
 about 16 GiB
 ```
 
+## How to Find Your Metric Count
+
+To use the memory formula above, you need to know the value of `UNIQUE_METRICS` for your system. Here are practical ways to discover this value.
+
+### Using Netdata Cloud
+
+In Netdata Cloud, navigate to the **Metrics** tab in the node's overview. The total number of currently collected metrics is displayed at the top of the metrics list.
+
+### Using the Local Dashboard API
+
+Access the `/api/v1/info` endpoint on your Netdata Agent to retrieve the metrics count:
+
+```bash
+curl http://localhost:19999/api/v1/info | grep 'metrics-count'
+```
+
+This returns the `metrics-count` field showing the number of unique time-series currently being collected.
+
+### Baseline Estimates
+
+The number of metrics a Netdata Agent collects varies based on enabled collectors and monitoring scope. Use the methods above to get the exact `metrics_count` (`UNIQUE_METRICS`) for your node before calculating RAM.
+
+:::note
+
+This is a planning estimate only. Actual metrics counts depend on enabled collectors, applications running, and configured monitoring scope. Always verify with the methods above for accurate sizing.
+
+:::
+
+For more information about how Netdata handles metrics over time (current vs. archived metrics), see [Extreme Cardinality Protection](/docs/extreme-cardinality-protection.md).
+
 ## Parents that also act as `systemd-journal` Logs centralization points
 
 Logs usually require significantly more disk space and I/O bandwidth than metrics. For optimal performance, we recommend to store metrics and logs on separate, independent disks.
