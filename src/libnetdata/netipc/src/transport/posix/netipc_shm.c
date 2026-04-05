@@ -685,7 +685,7 @@ nipc_shm_error_t nipc_shm_receive(nipc_shm_ctx_t *ctx,
         else
             ctx->local_resp_seq = expected_seq;
         *msg_len_out = 0;
-        return NIPC_SHM_ERR_PROTOCOL;
+        return NIPC_SHM_ERR_BAD_HEADER;
     }
 
     *msg_len_out = mlen;
