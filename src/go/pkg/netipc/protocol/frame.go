@@ -50,9 +50,9 @@ const (
 	MethodStringReverse   uint16 = 3
 
 	// Profile bits.
-	ProfileBaseline   uint32 = 0x01
-	ProfileSHMHybrid  uint32 = 0x02
-	ProfileSHMFutex   uint32 = 0x04
+	ProfileBaseline    uint32 = 0x01
+	ProfileSHMHybrid   uint32 = 0x02
+	ProfileSHMFutex    uint32 = 0x04
 	ProfileSHMWaitAddr uint32 = 0x08
 
 	// Defaults.
@@ -62,12 +62,12 @@ const (
 	Alignment = 8
 
 	// Payload sizes.
-	helloSize        = 44
-	helloAckSize     = 48
-	cgroupsReqSize   = 4
-	cgroupsRespHdr   = 24
-	cgroupsDirEntry  = 8
-	cgroupsItemHdr   = 32
+	helloSize       = 44
+	helloAckSize    = 48
+	cgroupsReqSize  = 4
+	cgroupsRespHdr  = 24
+	cgroupsDirEntry = 8
+	cgroupsItemHdr  = 32
 )
 
 var ne = binary.NativeEndian
@@ -425,16 +425,16 @@ func (b *BatchBuilder) Finish() (int, uint32) {
 
 // Hello is the client handshake payload (44 bytes on the wire).
 type Hello struct {
-	LayoutVersion          uint16
-	Flags                  uint16
-	SupportedProfiles      uint32
-	PreferredProfiles      uint32
-	MaxRequestPayloadBytes uint32
-	MaxRequestBatchItems   uint32
+	LayoutVersion           uint16
+	Flags                   uint16
+	SupportedProfiles       uint32
+	PreferredProfiles       uint32
+	MaxRequestPayloadBytes  uint32
+	MaxRequestBatchItems    uint32
 	MaxResponsePayloadBytes uint32
-	MaxResponseBatchItems  uint32
-	AuthToken              uint64
-	PacketSize             uint32
+	MaxResponseBatchItems   uint32
+	AuthToken               uint64
+	PacketSize              uint32
 }
 
 // Encode writes the Hello payload into buf. Returns 44 on success, 0 if

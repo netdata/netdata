@@ -596,16 +596,16 @@ func TestUdsClientHandshakeRejectsMalformedAck(t *testing.T) {
 			want:     ErrProtocol,
 			wantText: "ack payload truncated",
 		},
-			{
-				name: "bad ack payload layout",
-				packetFn: func() []byte {
-					ack := validHelloAckPacket(protocol.StatusOK)
-					binary.NativeEndian.PutUint16(ack[protocol.HeaderSize:protocol.HeaderSize+2], 2)
-					return ack
-				},
-				want:     ErrIncompatible,
-				wantText: "ack payload",
+		{
+			name: "bad ack payload layout",
+			packetFn: func() []byte {
+				ack := validHelloAckPacket(protocol.StatusOK)
+				binary.NativeEndian.PutUint16(ack[protocol.HeaderSize:protocol.HeaderSize+2], 2)
+				return ack
 			},
+			want:     ErrIncompatible,
+			wantText: "ack payload",
+		},
 	}
 
 	for _, tc := range cases {
@@ -723,16 +723,16 @@ func TestUdsServerHandshakeRejectsMalformedHello(t *testing.T) {
 			want:     ErrProtocol,
 			wantText: "hello payload",
 		},
-			{
-				name: "bad hello payload layout",
-				packetFn: func() []byte {
-					hello := validHelloPacket()
-					binary.NativeEndian.PutUint16(hello[protocol.HeaderSize:protocol.HeaderSize+2], 2)
-					return hello
-				},
-				want:     ErrIncompatible,
-				wantText: "protocol or layout version mismatch",
+		{
+			name: "bad hello payload layout",
+			packetFn: func() []byte {
+				hello := validHelloPacket()
+				binary.NativeEndian.PutUint16(hello[protocol.HeaderSize:protocol.HeaderSize+2], 2)
+				return hello
 			},
+			want:     ErrIncompatible,
+			wantText: "protocol or layout version mismatch",
+		},
 	}
 
 	for _, tc := range cases {

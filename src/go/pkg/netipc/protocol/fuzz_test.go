@@ -79,7 +79,7 @@ func FuzzDecodeHello(f *testing.F) {
 	var seed [64]byte
 	h := Hello{
 		LayoutVersion: 1, SupportedProfiles: ProfileBaseline,
-		PreferredProfiles: ProfileBaseline,
+		PreferredProfiles:      ProfileBaseline,
 		MaxRequestPayloadBytes: 1024, MaxRequestBatchItems: 1,
 		MaxResponsePayloadBytes: 1024, MaxResponseBatchItems: 1,
 		AuthToken: 0xABCD, PacketSize: 65536,
@@ -271,4 +271,3 @@ func FuzzBatchItemGet(f *testing.F) {
 		}
 	})
 }
-

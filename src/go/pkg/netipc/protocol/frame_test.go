@@ -536,9 +536,9 @@ func TestHelloDecodeBadLayout(t *testing.T) {
 
 func TestHelloPaddingIsZero(t *testing.T) {
 	h := Hello{
-		LayoutVersion:           1,
-		MaxResponseBatchItems:   0xFFFFFFFF,
-		AuthToken:               0xAAAAAAAAAAAAAAAA,
+		LayoutVersion:         1,
+		MaxResponseBatchItems: 0xFFFFFFFF,
+		AuthToken:             0xAAAAAAAAAAAAAAAA,
 	}
 	var buf [44]byte
 	h.Encode(buf[:])
@@ -980,13 +980,13 @@ func TestCgroupsResponseDecodeBadLayout(t *testing.T) {
 }
 
 func TestCgroupsResponseDecodeDirectoryTruncated(t *testing.T) {
-	buf := make([]byte, 28) // 24 header + 4 bytes, not enough for 1 dir entry (8)
-	ne.PutUint16(buf[0:2], 1)    // layout_version
-	ne.PutUint16(buf[2:4], 0)    // flags
-	ne.PutUint32(buf[4:8], 1)    // item_count = 1
-	ne.PutUint32(buf[8:12], 0)   // systemd_enabled
-	ne.PutUint32(buf[12:16], 0)  // reserved
-	ne.PutUint64(buf[16:24], 0)  // generation
+	buf := make([]byte, 28)     // 24 header + 4 bytes, not enough for 1 dir entry (8)
+	ne.PutUint16(buf[0:2], 1)   // layout_version
+	ne.PutUint16(buf[2:4], 0)   // flags
+	ne.PutUint32(buf[4:8], 1)   // item_count = 1
+	ne.PutUint32(buf[8:12], 0)  // systemd_enabled
+	ne.PutUint32(buf[12:16], 0) // reserved
+	ne.PutUint64(buf[16:24], 0) // generation
 
 	_, err := DecodeCgroupsResponse(buf)
 	if err != ErrTruncated {
@@ -997,15 +997,15 @@ func TestCgroupsResponseDecodeDirectoryTruncated(t *testing.T) {
 func TestCgroupsResponseDecodeItemBadAlignment(t *testing.T) {
 	// Create a payload with a directory entry that has a non-aligned offset.
 	buf := make([]byte, 128)
-	ne.PutUint16(buf[0:2], 1)    // layout_version
-	ne.PutUint16(buf[2:4], 0)    // flags
-	ne.PutUint32(buf[4:8], 1)    // item_count = 1
-	ne.PutUint32(buf[8:12], 0)   // systemd_enabled
-	ne.PutUint32(buf[12:16], 0)  // reserved
-	ne.PutUint64(buf[16:24], 0)  // generation
+	ne.PutUint16(buf[0:2], 1)   // layout_version
+	ne.PutUint16(buf[2:4], 0)   // flags
+	ne.PutUint32(buf[4:8], 1)   // item_count = 1
+	ne.PutUint32(buf[8:12], 0)  // systemd_enabled
+	ne.PutUint32(buf[12:16], 0) // reserved
+	ne.PutUint64(buf[16:24], 0) // generation
 
 	// Directory entry at offset 24: offset=3 (not aligned), length=32
-	ne.PutUint32(buf[24:28], 3)  // bad alignment
+	ne.PutUint32(buf[24:28], 3) // bad alignment
 	ne.PutUint32(buf[28:32], 32)
 
 	_, err := DecodeCgroupsResponse(buf)
@@ -1018,7 +1018,7 @@ func TestCgroupsResponseDecodeItemOutOfBounds(t *testing.T) {
 	buf := make([]byte, 64)
 	ne.PutUint16(buf[0:2], 1)
 	ne.PutUint16(buf[2:4], 0)
-	ne.PutUint32(buf[4:8], 1)   // item_count = 1
+	ne.PutUint32(buf[4:8], 1) // item_count = 1
 	ne.PutUint32(buf[8:12], 0)
 	ne.PutUint32(buf[12:16], 0)
 	ne.PutUint64(buf[16:24], 0)
@@ -1038,7 +1038,7 @@ func TestCgroupsResponseDecodeItemTooSmall(t *testing.T) {
 	buf := make([]byte, 64)
 	ne.PutUint16(buf[0:2], 1)
 	ne.PutUint16(buf[2:4], 0)
-	ne.PutUint32(buf[4:8], 1)   // item_count = 1
+	ne.PutUint32(buf[4:8], 1) // item_count = 1
 	ne.PutUint32(buf[8:12], 0)
 	ne.PutUint32(buf[12:16], 0)
 	ne.PutUint64(buf[16:24], 0)

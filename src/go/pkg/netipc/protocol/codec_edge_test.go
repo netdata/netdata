@@ -181,8 +181,8 @@ func TestBatchItemGetDirTruncated(t *testing.T) {
 func TestDecodeCgroupsRequestBadFlags(t *testing.T) {
 	// Valid layout_version but non-zero flags
 	var buf [4]byte
-	ne.PutUint16(buf[0:2], 1)     // layout_version = 1
-	ne.PutUint16(buf[2:4], 0x01)  // flags = 1 (invalid)
+	ne.PutUint16(buf[0:2], 1)    // layout_version = 1
+	ne.PutUint16(buf[2:4], 0x01) // flags = 1 (invalid)
 
 	_, err := DecodeCgroupsRequest(buf[:])
 	if err != ErrBadLayout {
@@ -597,7 +597,7 @@ func TestStringReverseDecodeMissingNul(t *testing.T) {
 	// Build payload where NUL terminator is wrong
 	buf := make([]byte, StringReverseHdrSize+6)
 	ne.PutUint32(buf[0:4], uint32(StringReverseHdrSize)) // str_offset
-	ne.PutUint32(buf[4:8], 5)                             // str_length
+	ne.PutUint32(buf[4:8], 5)                            // str_length
 	copy(buf[8:13], "hello")
 	buf[13] = 'X' // should be 0
 
