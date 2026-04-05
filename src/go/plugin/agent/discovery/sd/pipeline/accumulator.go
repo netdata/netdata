@@ -62,7 +62,7 @@ func (a *accumulator) run(ctx context.Context, in chan []model.TargetGroup) {
 			} else {
 				a.Info("all discoverers exited")
 			}
-			a.trySend(in)
+			a.flushPending(ctx, in)
 			return
 		case <-tk.C:
 			select {
@@ -110,6 +110,25 @@ func (a *accumulator) trySend(in chan<- []model.TargetGroup) {
 		a.groupsReset()
 	default:
 		a.triggerSend()
+	}
+}
+
+func (a *accumulator) flushPending(ctx context.Context, in chan<- []model.TargetGroup) {
+	a.mux.Lock()
+	tggs := a.groupsList()
+	a.mux.Unlock()
+
+	if len(tggs) == 0 {
+		return
+	}
+
+	select {
+	case in <- tggs:
+		a.mux.Lock()
+		a.groupsReset()
+		a.mux.Unlock()
+	case <-ctx.Done():
+		a.Warning("ctx done before flushing pending target groups")
 	}
 }
 

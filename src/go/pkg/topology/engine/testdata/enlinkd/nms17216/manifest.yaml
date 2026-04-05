@@ -1,0 +1,59 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd/nms17216
+scenarios:
+  - id: nms17216_lldp
+    description: >-
+      Enlinkd NMS-17216 LLDP parity scenario from OpenNMS integration test
+      corpus.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: Switch1
+        walk_file: ../upstream/linkd/nms17216/switch1-walk.txt
+      - device_id: Switch2
+        walk_file: ../upstream/linkd/nms17216/switch2-walk.txt
+      - device_id: Switch3
+        walk_file: ../upstream/linkd/nms17216/switch3-walk.txt
+      - device_id: Switch4
+        walk_file: ../upstream/linkd/nms17216/switch4-walk.txt
+      - device_id: Switch5
+        walk_file: ../upstream/linkd/nms17216/switch5-walk.txt
+    golden_yaml: golden/nms17216_lldp.yaml
+    golden_json: golden/nms17216_lldp.json
+
+  - id: nms17216_cdp
+    description: >-
+      Enlinkd NMS-17216 CDP parity scenario from OpenNMS integration test
+      corpus.
+    protocols:
+      lldp: false
+      cdp: true
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: Switch1
+        walk_file: ../upstream/linkd/nms17216/switch1-walk.txt
+      - device_id: Switch2
+        walk_file: ../upstream/linkd/nms17216/switch2-walk.txt
+      - device_id: Switch3
+        walk_file: ../upstream/linkd/nms17216/switch3-walk.txt
+      - device_id: Switch4
+        walk_file: ../upstream/linkd/nms17216/switch4-walk.txt
+      - device_id: Switch5
+        walk_file: ../upstream/linkd/nms17216/switch5-walk.txt
+      - device_id: Router1
+        walk_file: ../upstream/linkd/nms17216/router1-walk.txt
+      - device_id: Router2
+        walk_file: ../upstream/linkd/nms17216/router2-walk.txt
+      - device_id: Router3
+        walk_file: ../upstream/linkd/nms17216/router3-walk.txt
+      - device_id: Router4
+        walk_file: ../upstream/linkd/nms17216/router4-walk.txt
+    golden_yaml: golden/nms17216_cdp.yaml
+    golden_json: golden/nms17216_cdp.json

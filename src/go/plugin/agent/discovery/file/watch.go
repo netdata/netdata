@@ -25,14 +25,28 @@ type (
 		watcher      *fsnotify.Watcher
 		cache        cache
 		refreshEvery time.Duration
+		eventSettle  time.Duration
 	}
-	cache map[string]time.Time
+	cache     map[string]fileState
+	fileState struct {
+		modTime time.Time
+		size    int64
+	}
 )
 
-func (c cache) lookup(path string) (time.Time, bool) { v, ok := c[path]; return v, ok }
+func (c cache) lookup(path string) (fileState, bool) { v, ok := c[path]; return v, ok }
 func (c cache) has(path string) bool                 { _, ok := c.lookup(path); return ok }
 func (c cache) remove(path string)                   { delete(c, path) }
-func (c cache) put(path string, modTime time.Time)   { c[path] = modTime }
+func (c cache) put(path string, fi os.FileInfo) {
+	c[path] = fileState{
+		modTime: fi.ModTime(),
+		size:    fi.Size(),
+	}
+}
+
+func (s fileState) sameFile(fi os.FileInfo) bool {
+	return s.modTime.Equal(fi.ModTime()) && s.size == fi.Size()
+}
 
 func NewWatcher(reg confgroup.Registry, paths []string) *Watcher {
 	d := &Watcher{
@@ -42,6 +56,7 @@ func NewWatcher(reg confgroup.Registry, paths []string) *Watcher {
 		watcher:      nil,
 		cache:        make(cache),
 		refreshEvery: time.Minute,
+		eventSettle:  100 * time.Millisecond,
 	}
 	return d
 }
@@ -86,13 +101,7 @@ func (w *Watcher) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 				// vim "backupcopy=no" case, already collected after Rename event.
 				break
 			}
-			if event.Has(fsnotify.Rename) {
-				// It is common to modify files using vim.
-				// When writing to a file a backup is made. "backupcopy" option tells how it's done.
-				// Default is "no": rename the file and write a new one.
-				// This is cheap attempt to not send empty group for the old file.
-				time.Sleep(time.Millisecond * 100)
-			}
+			w.waitFileEventSettle(event)
 			w.refresh(ctx, in)
 		case err := <-w.watcher.Errors:
 			if err != nil {
@@ -141,10 +150,10 @@ func (w *Watcher) refresh(ctx context.Context, in chan<- []*confgroup.Group) {
 		}
 
 		seen[file] = true
-		if v, ok := w.cache.lookup(file); ok && v.Equal(fi.ModTime()) {
+		if v, ok := w.cache.lookup(file); ok && v.sameFile(fi) {
 			continue
 		}
-		w.cache.put(file, fi.ModTime())
+		w.cache.put(file, fi)
 
 		if group, err := parse(w.reg, file); err != nil {
 			w.Warningf("parse '%s': %v", file, err)
@@ -203,6 +212,17 @@ func (w *Watcher) stop() {
 	}()
 
 	_ = w.watcher.Close()
+}
+
+func (w *Watcher) waitFileEventSettle(event fsnotify.Event) {
+	if w.eventSettle <= 0 {
+		return
+	}
+	if event.Has(fsnotify.Create) || event.Has(fsnotify.Write) || event.Has(fsnotify.Rename) {
+		// Give editors and os.WriteFile() a chance to finish truncating/replacing the file
+		// before we snapshot it, otherwise transient empty reads can be cached as real updates.
+		time.Sleep(w.eventSettle)
+	}
 }
 
 func isChmodOnly(event fsnotify.Event) bool {

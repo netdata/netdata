@@ -1,0 +1,11 @@
+version: v1
+scenario_id: nms7777dw_lldp_no_links
+description: Enlinkd NMS-7777DW LLDP no-links parity scenario.
+devices:
+  - id: dw
+    hostname: NuDesign
+adjacencies: []
+expectations:
+  directional_adjacencies: 0
+  bidirectional_pairs: 0
+  devices: 1

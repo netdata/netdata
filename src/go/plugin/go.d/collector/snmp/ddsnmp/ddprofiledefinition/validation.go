@@ -14,19 +14,23 @@ import (
 
 var validMetadataResources = map[string]map[string]bool{
 	"device": {
-		"name":          true,
-		"description":   true,
-		"sys_object_id": true,
-		"location":      true,
-		"serial_number": true,
-		"vendor":        true,
-		"version":       true,
-		"product_name":  true,
-		"model":         true,
-		"os_name":       true,
-		"os_version":    true,
-		"os_hostname":   true,
-		"type":          true,
+		"name":             true,
+		"description":      true,
+		"sys_object_id":    true,
+		"location":         true,
+		"serial_number":    true,
+		"vendor":           true,
+		"version":          true,
+		"software_version": true,
+		"firmware_version": true,
+		"hardware_version": true,
+		"product_name":     true,
+		"model":            true,
+		"os_name":          true,
+		"os_version":       true,
+		"os_hostname":      true,
+		"category":         true,
+		"type":             true,
 	},
 	"interface": {
 		"name":         true,
@@ -125,8 +129,7 @@ func validateEnrichMetadata(metadata MetadataConfig) error {
 		} else {
 			res := metadata[resName]
 			for fieldName := range res.Fields {
-				_, isValidField := validMetadataResources[resName][fieldName]
-				if !isValidField {
+				if !isValidMetadataField(resName, fieldName) {
 					errs = append(errs, fmt.Errorf("invalid resource (%s) field: %s", resName, fieldName))
 					continue
 				}
@@ -176,6 +179,11 @@ func validateEnrichSysobjectIDMetadata(entries []SysobjectIDMetadataEntryConfig)
 
 		// Validate metadata fields
 		for fieldName, field := range entry.Metadata {
+			if !isValidMetadataField(MetadataDeviceResource, fieldName) {
+				errs = append(errs, fmt.Errorf("sysobjectid_metadata[%d]: invalid resource (%s) field: %s", i, MetadataDeviceResource, fieldName))
+				continue
+			}
+
 			// Validate the field must have either value or symbol(s)
 			if field.Value == "" && field.Symbol.OID == "" && len(field.Symbols) == 0 {
 				errs = append(errs, fmt.Errorf("sysobjectid_metadata[%d].%s: must have either value or symbol(s)", i, fieldName))
@@ -205,6 +213,15 @@ func validateEnrichSysobjectIDMetadata(entries []SysobjectIDMetadataEntryConfig)
 	}
 
 	return errors.Join(errs...)
+}
+
+func isValidMetadataField(resourceName, fieldName string) bool {
+	fields, ok := validMetadataResources[resourceName]
+	if !ok {
+		return false
+	}
+	_, ok = fields[fieldName]
+	return ok
 }
 
 func validateEnrichMetrics(metrics []MetricsConfig) error {

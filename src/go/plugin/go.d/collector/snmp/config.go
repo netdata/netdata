@@ -22,7 +22,13 @@ type (
 
 		ManualProfiles []string `yaml:"manual_profiles,omitempty" json:"manual_profiles"`
 
+		Topology TopologyConfig `yaml:"topology,omitempty" json:"topology,omitempty"`
+
 		Ping PingConfig `yaml:"ping,omitempty" json:"ping"`
+	}
+
+	TopologyConfig struct {
+		Autoprobe *bool `yaml:"autoprobe,omitempty" json:"autoprobe,omitempty"`
 	}
 
 	PingConfig struct {

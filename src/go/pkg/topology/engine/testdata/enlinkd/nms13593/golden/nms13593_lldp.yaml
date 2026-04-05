@@ -1,0 +1,55 @@
+version: v1
+scenario_id: nms13593_lldp
+description: Enlinkd NMS-13593 LLDP parity scenario from OpenNMS integration test corpus.
+devices:
+    - id: ZHBGO1Zsr001
+      hostname: ZHBGO1Zsr001
+    - id: ZHBGO1Zsr002
+      hostname: ZHBGO1Zsr002
+    - id: chassis-50e0ef005000
+      hostname: chassis-50e0ef005000
+    - id: chassis-e48184acbf34
+      hostname: chassis-e48184acbf34
+    - id: esat-1
+      hostname: esat-1
+adjacencies:
+    - protocol: lldp
+      source_device: ZHBGO1Zsr001
+      source_port: "104906753"
+      target_device: esat-1
+      target_port: "35700737"
+    - protocol: lldp
+      source_device: ZHBGO1Zsr001
+      source_port: "105037825"
+      target_device: ZHBGO1Zsr002
+      target_port: 3/2/c5/1
+    - protocol: lldp
+      source_device: ZHBGO1Zsr001
+      source_port: "105070593"
+      target_device: ZHBGO1Zsr002
+      target_port: 3/2/c6/1
+    - protocol: lldp
+      source_device: ZHBGO1Zsr002
+      source_port: 3/2/c1/1
+      target_device: chassis-50e0ef005000
+      target_port: "35700737"
+    - protocol: lldp
+      source_device: ZHBGO1Zsr002
+      source_port: 3/2/c5/1
+      target_device: ZHBGO1Zsr001
+      target_port: 3/2/c5/1
+    - protocol: lldp
+      source_device: ZHBGO1Zsr002
+      source_port: 3/2/c6/1
+      target_device: ZHBGO1Zsr001
+      target_port: 3/2/c6/1
+    - protocol: lldp
+      source_device: ZHBGO1Zsr002
+      source_port: esat-1/1/27
+      target_device: chassis-e48184acbf34
+      target_port: "1610901763"
+expectations:
+    directional_adjacencies: 7
+    bidirectional_pairs: 0
+    devices: 5
+

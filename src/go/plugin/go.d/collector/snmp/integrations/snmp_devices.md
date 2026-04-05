@@ -142,7 +142,10 @@ Before configuring the collector:
 
 #### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+The following options can be defined globally: `update_every`, `autodetection_retry`.
+
+For `snmp.conf`, you can also define a module-wide `topology:` block at file top-level.
+Its values are applied as defaults to jobs that do not define their own `topology:` block.
 
 
 <details open><summary>Config options</summary>
@@ -173,6 +176,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | ping.packets | Number of ping packets to send per iteration. | 3 | no |
 |  | ping.interval | Interval between sending ping packets. | 100ms | no |
 | **Profiles** | manual_profiles | A list of profiles to force-apply when auto-detection cannot be used. | [] | no |
+| **Topology** | topology.autoprobe | When enabled, auto-append LLDP/CDP profiles in-memory for topology discovery even if the matched vendor profile does not include them. Topology data collection is handled by the separate snmp_topology module. | true | no |
 | **Virtual node** | create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
 |  | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
 |  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
@@ -557,6 +561,3 @@ Table metrics are usually the slowest and often determine the total collection t
 1. Do logs show “skipping data collection”?  
 2. Does *Internal → Stats* show collection time > `update_every`?  
 3. Increase `update_every` until skips disappear.
-
-
-

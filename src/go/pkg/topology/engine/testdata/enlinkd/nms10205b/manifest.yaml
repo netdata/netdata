@@ -1,0 +1,36 @@
+version: v1
+source:
+  repo: https://github.com/opennms/opennms
+  commit: 057ded59
+  path: features/enlinkd/tests/src/test/resources/linkd/nms10205b
+scenarios:
+  - id: nms10205b_lldp
+    description: >-
+      Enlinkd NMS-10205b LLDP parity scenario from OpenNMS integration test
+      corpus.
+    protocols:
+      lldp: true
+      cdp: false
+      bridge: false
+      arp_nd: false
+    fixtures:
+      - device_id: Mumbai
+        walk_file: ../upstream/linkd/nms10205b/Mumbai_10.205.56.5.txt
+      - device_id: Delhi
+        walk_file: ../upstream/linkd/nms10205b/Delhi_10.205.56.7.txt
+      - device_id: Bangalore
+        walk_file: ../upstream/linkd/nms10205b/Bangalore_10.205.56.9.txt
+      - device_id: Bagmane
+        walk_file: ../upstream/linkd/nms10205b/Bagmane_10.205.56.20.txt
+      - device_id: Mysore
+        walk_file: ../upstream/linkd/nms10205b/Mysore_10.205.56.22.txt
+      - device_id: Space-EX-SW1
+        walk_file: ../upstream/linkd/nms10205b/Space-EX-SW1_10.205.56.1.txt
+      - device_id: Space-EX-SW2
+        walk_file: ../upstream/linkd/nms10205b/Space-EX-SW2_10.205.56.2.txt
+      - device_id: J6350-42
+        walk_file: ../upstream/linkd/nms10205b/J6350-42_10.205.56.42.txt
+      - device_id: SRX-100
+        walk_file: ../upstream/linkd/nms10205b/SRX-100_10.205.56.23.txt
+    golden_yaml: golden/nms10205b_lldp.yaml
+    golden_json: golden/nms10205b_lldp.json
