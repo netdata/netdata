@@ -351,9 +351,9 @@ func (tc *tableCollector) processTableResult(result tableWalkResult, walkedData 
 				stats.Errors.SNMP++
 				return nil, fmt.Errorf("fallback walk failed for table OID '%s': %w", result.tableOID, err)
 			}
+			stats.SNMP.TablesWalked++
+			walkedData[result.tableOID] = pdus
 			if len(pdus) > 0 {
-				stats.SNMP.TablesWalked++
-				walkedData[result.tableOID] = pdus
 				result.pdus = pdus
 			}
 		}
