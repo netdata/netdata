@@ -16,7 +16,7 @@
 #define WORKER_DISCOVERY_LOCK               9
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 10
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 11
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
 #endif
 
 struct cgroup *discovered_cgroup_root = NULL;

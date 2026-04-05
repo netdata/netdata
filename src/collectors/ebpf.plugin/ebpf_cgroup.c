@@ -231,12 +231,13 @@ static void ebpf_parse_cgroup_netipc_data(void)
     if (!ebpf_cgroup_cache_initialized)
         return;
 
+    static int refresh_fail_count = 0;
     if (!nipc_cgroups_cache_refresh(&ebpf_cgroup_cache)) {
-        static int fail_count = 0;
-        if (++fail_count % 10 == 1)
-            collector_error("EBPF CGROUP: netipc refresh failed (%d consecutive failures)", fail_count);
+        if (++refresh_fail_count % 10 == 1)
+            collector_error("EBPF CGROUP: netipc refresh failed (%d consecutive failures)", refresh_fail_count);
         return;
     }
+    refresh_fail_count = 0;
 
     uint32_t count = ebpf_cgroup_cache.item_count;
     if (count == 0)
