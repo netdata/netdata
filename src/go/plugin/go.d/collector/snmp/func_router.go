@@ -24,8 +24,8 @@ func newFuncRouter(cache *ifaceCache) *funcRouter {
 		handlers:   make(map[string]funcapi.MethodHandler),
 	}
 	r.handlers[ifacesMethodID] = newFuncInterfaces(r)
-	if ddsnmp.TopologyHandler != nil {
-		r.handlers["topology:snmp"] = ddsnmp.TopologyHandler
+	if ddsnmp.TopologyHandler != nil && ddsnmp.TopologyMethodConfig != nil {
+		r.handlers[ddsnmp.TopologyMethodConfig.ID] = ddsnmp.TopologyHandler
 	}
 	return r
 }
