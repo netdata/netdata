@@ -221,10 +221,10 @@ fn test_shm_chaos_forged_length() {
 
     // --- Test forged req_len (server-side receive) ---
 
-    // Forged lengths that exceed capacity must produce MsgTooLarge.
-    // Valid lengths (within capacity) must succeed normally.
+    // Forged lengths: 0 → BadHeader (corruption), within capacity → Ok,
+    // over capacity → MsgTooLarge.
     let forged_req_lengths: &[(u32, bool)] = &[
-        (0, false),                  // zero: copy skipped, Ok(0)
+        // (0, ...) tested separately below as BadHeader
         (1, false),                  // tiny valid
         (req_cap as u32 - 1, false), // just under capacity
         (req_cap as u32, false),     // exactly at capacity
@@ -274,7 +274,7 @@ fn test_shm_chaos_forged_length() {
     // --- Test forged resp_len (client-side receive) ---
 
     let forged_resp_lengths: &[(u32, bool)] = &[
-        (0, false),
+        // (0, ...) tested separately below as BadHeader
         (1, false),
         (resp_cap as u32 - 1, false),
         (resp_cap as u32, false),
@@ -318,6 +318,27 @@ fn test_shm_chaos_forged_length() {
             );
         }
     }
+
+    // --- mlen==0 → BadHeader (corruption indicator) ---
+    // Server-side: forge req_len=0
+    atomic_store_u32(base, OFF_REQ_LEN, 0);
+    atomic_add_u64(base, OFF_REQ_SEQ, 1);
+    atomic_add_u32(base, OFF_REQ_SIGNAL, 1);
+    assert_eq!(
+        server_ctx.receive(&mut recv_buf, 100).unwrap_err(),
+        ShmError::BadHeader,
+        "forged req_len=0 should return BadHeader"
+    );
+
+    // Client-side: forge resp_len=0
+    atomic_store_u32(base, OFF_RESP_LEN, 0);
+    atomic_add_u64(base, OFF_RESP_SEQ, 1);
+    atomic_add_u32(base, OFF_RESP_SIGNAL, 1);
+    assert_eq!(
+        client_ctx.receive(&mut recv_buf, 100).unwrap_err(),
+        ShmError::BadHeader,
+        "forged resp_len=0 should return BadHeader"
+    );
 
     client_ctx.close();
     server_ctx.destroy();
@@ -1162,10 +1183,14 @@ fn test_cleanup_stale_invalid_entries() {
     assert!(!build_shm_path(TEST_RUN_DIR, svc, magic_sid)
         .unwrap()
         .exists());
+    // Unreadable file is NOT removed — we can't verify it's stale
+    // without being able to open and inspect the header.
     assert!(
-        !unreadable_path.exists(),
-        "unreadable invalid entry should be removed"
+        unreadable_path.exists(),
+        "unreadable entry should be preserved (EACCES skip)"
     );
+    // Clean up manually
+    std::fs::remove_file(&unreadable_path).ok();
 }
 
 #[test]

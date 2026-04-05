@@ -1220,6 +1220,13 @@ fn client_handshake(handle: ffi::HANDLE, config: &ClientConfig) -> Result<NpSess
         Err(e) => return Err(NpError::Protocol(format!("ack payload: {e}"))),
     };
 
+    // Reject packet sizes too small for a header
+    if ack.agreed_packet_size <= HEADER_SIZE as u32 {
+        return Err(NpError::Handshake(
+            "agreed packet_size <= HEADER_SIZE".into(),
+        ));
+    }
+
     Ok(NpSession {
         handle,
         role: Role::Client,
@@ -1347,7 +1354,12 @@ fn server_handshake(
     let agreed_req_bat = max_u32(hello.max_request_batch_items, s_req_bat);
     let agreed_resp_pay = s_resp_pay;
     let agreed_resp_bat = s_resp_bat;
-    let agreed_pkt = min_u32(hello.packet_size, server_pkt_size);
+    let mut agreed_pkt = min_u32(hello.packet_size, server_pkt_size);
+
+    // Reject packet sizes too small for a header
+    if agreed_pkt <= HEADER_SIZE as u32 {
+        agreed_pkt = server_pkt_size;
+    }
 
     // Send HELLO_ACK
     let ack = HelloAck {

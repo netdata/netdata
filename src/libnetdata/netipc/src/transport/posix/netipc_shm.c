@@ -161,7 +161,10 @@ static int check_shm_stale(const char *path)
 
     int fd = open(path, O_RDONLY);
     if (fd < 0) {
-        unlink(path);
+        /* Don't unlink on permission errors — the file may be owned by
+         * another user/process and we just can't read it. */
+        if (errno != EACCES && errno != EPERM)
+            unlink(path);
         return -2;
     }
 

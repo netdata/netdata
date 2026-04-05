@@ -41,6 +41,9 @@ pub fn string_reverse_decode(buf: &[u8]) -> Result<StringReverseView<'_>, NipcEr
         return Err(NipcError::Truncated);
     }
     let str_offset = u32::from_ne_bytes(buf[0..4].try_into().unwrap()) as usize;
+    if str_offset < STRING_REVERSE_HDR_SIZE {
+        return Err(NipcError::BadLayout);
+    }
     let str_length = u32::from_ne_bytes(buf[4..8].try_into().unwrap()) as usize;
     let end = str_offset
         .checked_add(str_length)
