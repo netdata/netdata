@@ -4,7 +4,9 @@
 #include "windows-internals.h"
 
 static void netdata_ad_address_book_ambiguous_name_resolution(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA addressBookANRPerSec = {.key = "AB ANR/sec"};
     static RRDSET *st_address_book_ambiguous_name_resolution = NULL;
@@ -71,7 +73,8 @@ static void netdata_ad_address_book_browse(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
         rd_address_book_browse = rrddim_add(st_address_book_browse, "browse", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(st_address_book_browse, rd_address_book_browse, (collected_number)addressBookBrowsesPerSec.current.Data);
+    rrddim_set_by_pointer(
+        st_address_book_browse, rd_address_book_browse, (collected_number)addressBookBrowsesPerSec.current.Data);
     rrdset_done(st_address_book_browse);
 }
 
@@ -102,12 +105,13 @@ static void netdata_ad_address_book_find(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
         rd_address_book_find = rrddim_add(st_address_book_find, "find", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(st_address_book_find, rd_address_book_find, (collected_number)addressBookMatchesPerSec.current.Data);
+    rrddim_set_by_pointer(
+        st_address_book_find, rd_address_book_find, (collected_number)addressBookMatchesPerSec.current.Data);
     rrdset_done(st_address_book_find);
 }
 
-static void netdata_ad_address_book_property_read(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_address_book_property_read(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA addressBookPropertyReadsPerSec = {.key = "AB Property Reads/sec"};
     static RRDSET *st_address_book_property_read = NULL;
@@ -131,8 +135,8 @@ static void netdata_ad_address_book_property_read(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_address_book_property_read = rrddim_add(
-            st_address_book_property_read, "property_read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_address_book_property_read =
+            rrddim_add(st_address_book_property_read, "property_read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -169,12 +173,13 @@ static void netdata_ad_address_book_search(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
         rd_address_book_search = rrddim_add(st_address_book_search, "search", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(st_address_book_search, rd_address_book_search, (collected_number)addressBookSearchesPerSec.current.Data);
+    rrddim_set_by_pointer(
+        st_address_book_search, rd_address_book_search, (collected_number)addressBookSearchesPerSec.current.Data);
     rrdset_done(st_address_book_search);
 }
 
-static void netdata_ad_address_book_proxy_search(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_address_book_proxy_search(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA addressBookProxyLookupsPerSec = {.key = "AB Proxy Lookups/sec"};
     static RRDSET *st_address_book_proxy_search = NULL;
@@ -203,12 +208,14 @@ static void netdata_ad_address_book_proxy_search(
     }
 
     rrddim_set_by_pointer(
-        st_address_book_proxy_search, rd_address_book_proxy_search, (collected_number)addressBookProxyLookupsPerSec.current.Data);
+        st_address_book_proxy_search,
+        rd_address_book_proxy_search,
+        (collected_number)addressBookProxyLookupsPerSec.current.Data);
     rrdset_done(st_address_book_proxy_search);
 }
 
-static void netdata_ad_address_book_client_sessions(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_address_book_client_sessions(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA addressBookClientSessions = {.key = "AB Client Sessions"};
     static RRDSET *st_address_book_client_sessions = NULL;
@@ -232,8 +239,8 @@ static void netdata_ad_address_book_client_sessions(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_address_book_client_sessions = rrddim_add(
-            st_address_book_client_sessions, "sessions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_address_book_client_sessions =
+            rrddim_add(st_address_book_client_sessions, "sessions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -254,8 +261,8 @@ static void netdata_ad_address_book(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYP
     netdata_ad_address_book_client_sessions(pDataBlock, pObjectType, update_every);
 }
 
-static void netdata_ad_approximate_highest_dnt(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_approximate_highest_dnt(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA approximateHighestDNT = {.key = "Approximate highest DNT"};
 
@@ -280,8 +287,7 @@ static void netdata_ad_approximate_highest_dnt(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_approximate_highest_dnt =
-            rrddim_add(st_approximate_highest_dnt, "dnt", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_approximate_highest_dnt = rrddim_add(st_approximate_highest_dnt, "dnt", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -379,8 +385,9 @@ static void netdata_ad_directory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
 
     collected_number writeValue = directoryPercWritesFromDCA.current.Data + directoryPercWritesFromKCC.current.Data +
                                   directoryPercWritesFromLSA.current.Data + directoryPercWritesFromNSPI.current.Data +
-                                  directoryPercWritesFromNTDSAPI.current.Data + directoryPercWritesFromSAM.current.Data +
-                                  directoryPercWritesFromLDAP.current.Data + directoryPercWritesOther.current.Data;
+                                  directoryPercWritesFromNTDSAPI.current.Data +
+                                  directoryPercWritesFromSAM.current.Data + directoryPercWritesFromLDAP.current.Data +
+                                  directoryPercWritesOther.current.Data;
 
     collected_number searchValue =
         directoryPercSearchesFromDCA.current.Data + directoryPercSearchesFromKCC.current.Data +
@@ -424,11 +431,13 @@ static void netdata_ad_search_scope_base(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
         rd_search_scope_base = rrddim_add(st_search_scope_base, "base", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(st_search_scope_base, rd_search_scope_base, (collected_number)baseSearchesPerSec.current.Data);
+    rrddim_set_by_pointer(
+        st_search_scope_base, rd_search_scope_base, (collected_number)baseSearchesPerSec.current.Data);
     rrdset_done(st_search_scope_base);
 }
 
-static void netdata_ad_search_scope_subtree(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_search_scope_subtree(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA subtreeSearchesPerSec = {.key = "Subtree searches/sec"};
     static RRDSET *st_search_scope_subtree = NULL;
@@ -452,8 +461,7 @@ static void netdata_ad_search_scope_subtree(PERF_DATA_BLOCK *pDataBlock, PERF_OB
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_search_scope_subtree =
-            rrddim_add(st_search_scope_subtree, "subtree", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_search_scope_subtree = rrddim_add(st_search_scope_subtree, "subtree", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -461,8 +469,8 @@ static void netdata_ad_search_scope_subtree(PERF_DATA_BLOCK *pDataBlock, PERF_OB
     rrdset_done(st_search_scope_subtree);
 }
 
-static void netdata_ad_search_scope_one_level(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_search_scope_one_level(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA oneLevelSearchesPerSec = {.key = "Onelevel searches/sec"};
     static RRDSET *st_search_scope_one_level = NULL;
@@ -533,13 +541,13 @@ static void netdata_ad_cache_lookups(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TY
     }
 
     rrddim_set_by_pointer(
-        st_name_cache_lookups_total, rd_name_cache_lookups_total, (collected_number)nameCacheLookupsTotal.current.Time);
+        st_name_cache_lookups_total, rd_name_cache_lookups_total, (collected_number)nameCacheLookupsTotal.current.Data);
     rrdset_done(st_name_cache_lookups_total);
 }
 
 static void netdata_ad_cache_hits(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
-    static COUNTER_DATA nameCacheHitsTotal = {.key = "DS Name Cache hit rate"};
+    static COUNTER_DATA nameCacheHitsTotal = {.key = "DS Name Cache hit rate,secondvalue"};
 
     static RRDSET *st_name_cache_hits_total = NULL;
     static RRDDIM *rd_name_cache_hits_total = NULL;
@@ -772,7 +780,9 @@ intraChart:
 }
 
 static void netdata_ad_replication_highest_usn_committed(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA replicationHighestUSNCommittedHighPart = {.key = "DRA Highest USN Committed (High part)"};
     static COUNTER_DATA replicationHighestUSNCommittedLowPart = {.key = "DRA Highest USN Committed (Low part)"};
@@ -811,8 +821,8 @@ static void netdata_ad_replication_highest_usn_committed(
     rrdset_done(st_replication_highest_usn_committed);
 }
 
-static void netdata_ad_replication_highest_usn_issued(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_replication_highest_usn_issued(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA replicationHighestUSNIssuedHighPart = {.key = "DRA Highest USN Issued (High part)"};
     static COUNTER_DATA replicationHighestUSNIssuedLowPart = {.key = "DRA Highest USN Issued (Low part)"};
@@ -851,15 +861,17 @@ static void netdata_ad_replication_highest_usn_issued(
     rrdset_done(st_replication_highest_usn_issued);
 }
 
-static void netdata_ad_replication_highest_usn(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_replication_highest_usn(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     netdata_ad_replication_highest_usn_committed(pDataBlock, pObjectType, update_every);
     netdata_ad_replication_highest_usn_issued(pDataBlock, pObjectType, update_every);
 }
 
 static void netdata_ad_replication_inbound_sync_objects_remaining(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA replicationInboundSyncObjectsRemaining = {.key = "DRA Inbound Full Sync Objects Remaining"};
     static RRDSET *st_replication_inbound_sync_objects_remaining = NULL;
@@ -883,8 +895,8 @@ static void netdata_ad_replication_inbound_sync_objects_remaining(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_replication_inbound_sync_objects_remaining = rrddim_add(
-            st_replication_inbound_sync_objects_remaining, "remaining", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_replication_inbound_sync_objects_remaining =
+            rrddim_add(st_replication_inbound_sync_objects_remaining, "remaining", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -895,7 +907,9 @@ static void netdata_ad_replication_inbound_sync_objects_remaining(
 }
 
 static void netdata_ad_replication_inbound_link_value_updates_remaining(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA replicationInboundLinkValueUpdatesRemaining = {
         .key = "DRA Inbound Link Value Updates Remaining in Packet"};
@@ -932,7 +946,9 @@ static void netdata_ad_replication_inbound_link_value_updates_remaining(
 }
 
 static void netdata_ad_replication_inbound_objects_updated(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA replicationInboundObjectsUpdatedTotal = {.key = "DRA Inbound Objects Applied/sec"};
     static RRDSET *st_replication_inbound_objects_updated = NULL;
@@ -968,7 +984,9 @@ static void netdata_ad_replication_inbound_objects_updated(
 }
 
 static void netdata_ad_replication_inbound_objects_filtered(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA replicationInboundObjectsFilteredTotal = {.key = "DRA Inbound Objects Filtered/sec"};
     static RRDSET *st_replication_inbound_objects_filtered = NULL;
@@ -1081,8 +1099,8 @@ totalSyncChart:
     rrdset_done(st_dra_replication_sync_requests);
 }
 
-static void netdata_ad_replication_pending_operations(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_replication_pending_operations(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA replicationPendingOperations = {.key = "DRA Pending Replication Operations"};
 
@@ -1142,8 +1160,8 @@ static void netdata_ad_sync_result_success(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_replication_sync_requests_success = rrddim_add(
-            st_replication_sync_requests_success, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_replication_sync_requests_success =
+            rrddim_add(st_replication_sync_requests_success, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -1154,7 +1172,9 @@ static void netdata_ad_sync_result_success(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
 }
 
 static void netdata_ad_sync_result_schema_mismatch_failure(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA replicationSyncRequestsSchemaMismatchFailureTotal = {
         .key = "DRA Sync Failures on Schema Mismatch"};
@@ -1196,8 +1216,8 @@ static void netdata_ad_sync_result(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE
     netdata_ad_sync_result_schema_mismatch_failure(pDataBlock, pObjectType, update_every);
 }
 
-static void netdata_ad_name_translations_client(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_name_translations_client(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA clientNameTranslationsPerSec = {.key = "DS Client Name Translations/sec"};
     static RRDSET *st_name_translations_client = NULL;
@@ -1232,8 +1252,8 @@ static void netdata_ad_name_translations_client(
     rrdset_done(st_name_translations_client);
 }
 
-static void netdata_ad_name_translations_server(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_name_translations_server(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA serverNameTranslationsPerSec = {.key = "DS Server Name Translations/sec"};
     static RRDSET *st_name_translations_server = NULL;
@@ -1274,8 +1294,8 @@ static void netdata_ad_name_translations(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
     netdata_ad_name_translations_server(pDataBlock, pObjectType, update_every);
 }
 
-static void netdata_ad_change_monitors_registered(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_change_monitors_registered(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA changeMonitorsRegistered = {.key = "DS Monitor List Size"};
     static RRDSET *st_change_monitors_registered = NULL;
@@ -1310,8 +1330,8 @@ static void netdata_ad_change_monitors_registered(
     rrdset_done(st_change_monitors_registered);
 }
 
-static void netdata_ad_change_monitor_updates_pending(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_change_monitor_updates_pending(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA changeMonitorUpdatesPending = {.key = "DS Notify Queue Size"};
     static RRDSET *st_change_monitor_updates_pending = NULL;
@@ -1352,8 +1372,8 @@ static void netdata_ad_change_monitors(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
     netdata_ad_change_monitor_updates_pending(pDataBlock, pObjectType, update_every);
 }
 
-static void netdata_ad_directory_search_suboperations(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_directory_search_suboperations(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA directorySearchSubOperationsPerSec = {.key = "DS Search sub-operations/sec"};
 
@@ -1378,8 +1398,8 @@ static void netdata_ad_directory_search_suboperations(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_directory_search_suboperations_total = rrddim_add(
-            st_directory_search_suboperations_total, "suboperations", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_directory_search_suboperations_total =
+            rrddim_add(st_directory_search_suboperations_total, "suboperations", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -1390,7 +1410,9 @@ static void netdata_ad_directory_search_suboperations(
 }
 
 static void netdata_ad_security_descriptor_propagation_events(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA securityDescriptorSubOperationsPerSec = {.key = "DS Security Descriptor sub-operations/sec"};
     static RRDSET *st_security_descriptor_propagation_events = NULL;
@@ -1414,8 +1436,8 @@ static void netdata_ad_security_descriptor_propagation_events(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_security_descriptor_propagation_events = rrddim_add(
-            st_security_descriptor_propagation_events, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_security_descriptor_propagation_events =
+            rrddim_add(st_security_descriptor_propagation_events, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -1426,7 +1448,9 @@ static void netdata_ad_security_descriptor_propagation_events(
 }
 
 static void netdata_ad_security_descriptor_propagation_events_queued(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA securityDescriptorPropagationsEvents = {.key = "DS Security Descriptor Propagations Events"};
     static RRDSET *st_security_descriptor_propagation_events_queued = NULL;
@@ -1450,8 +1474,8 @@ static void netdata_ad_security_descriptor_propagation_events_queued(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_security_descriptor_propagation_events_queued = rrddim_add(
-            st_security_descriptor_propagation_events_queued, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_security_descriptor_propagation_events_queued =
+            rrddim_add(st_security_descriptor_propagation_events_queued, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -1462,7 +1486,9 @@ static void netdata_ad_security_descriptor_propagation_events_queued(
 }
 
 static void netdata_ad_security_descriptor_propagation_access_wait(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA securityDescriptorPropagatorAverageExclusionTime = {
         .key = "DS Security Descriptor Propagator Average Exclusion Time"};
@@ -1487,8 +1513,8 @@ static void netdata_ad_security_descriptor_propagation_access_wait(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_security_descriptor_propagation_access_wait = rrddim_add(
-            st_security_descriptor_propagation_access_wait, "wait", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_security_descriptor_propagation_access_wait =
+            rrddim_add(st_security_descriptor_propagation_access_wait, "wait", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -1499,7 +1525,9 @@ static void netdata_ad_security_descriptor_propagation_access_wait(
 }
 
 static void netdata_ad_security_descriptor_propagation_items_queued(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA securityDescriptorPropagatorRuntimeQueue = {
         .key = "DS Security Descriptor Propagator Runtime Queue"};
@@ -1524,8 +1552,8 @@ static void netdata_ad_security_descriptor_propagation_items_queued(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_security_descriptor_propagation_items_queued = rrddim_add(
-            st_security_descriptor_propagation_items_queued, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_security_descriptor_propagation_items_queued =
+            rrddim_add(st_security_descriptor_propagation_items_queued, "queued", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -1535,8 +1563,8 @@ static void netdata_ad_security_descriptor_propagation_items_queued(
     rrdset_done(st_security_descriptor_propagation_items_queued);
 }
 
-static void netdata_ad_security_descriptor_propagation(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_security_descriptor_propagation(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     netdata_ad_security_descriptor_propagation_events(pDataBlock, pObjectType, update_every);
     netdata_ad_security_descriptor_propagation_events_queued(pDataBlock, pObjectType, update_every);
@@ -1918,36 +1946,34 @@ static void netdata_ad_bind(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
 
 static void netdata_ad_atq_queue_requests(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
-    static COUNTER_DATA atqOutstandingRequests = { .key = "ATQ Outstanding Queued Requests" };
+    static COUNTER_DATA atqOutstandingRequests = {.key = "ATQ Outstanding Queued Requests"};
     static RRDSET *st_atq_outstanding_requests = NULL;
     static RRDDIM *rd_atq_outstanding_requests = NULL;
 
-    if(perflibGetObjectCounter(pDataBlock, pObjectType, &atqOutstandingRequests)) {
+    if (perflibGetObjectCounter(pDataBlock, pObjectType, &atqOutstandingRequests)) {
         if (unlikely(!st_atq_outstanding_requests)) {
-            st_atq_outstanding_requests = rrdset_create_localhost("ad"
-                                                                  , "atq_outstanding_requests"
-                                                                  , NULL
-                                                                  , "queue"
-                                                                  , "ad.atq_outstanding_requests"
-                                                                  , "Outstanding requests"
-                                                                  , "requests"
-                                                                  , PLUGIN_WINDOWS_NAME
-                                                                  , "PerflibAD"
-                                                                  , PRIO_AD_OUTSTANDING_REQUEST
-                                                                  , update_every
-                                                                  , RRDSET_TYPE_LINE);
+            st_atq_outstanding_requests = rrdset_create_localhost(
+                "ad",
+                "atq_outstanding_requests",
+                NULL,
+                "queue",
+                "ad.atq_outstanding_requests",
+                "Outstanding requests",
+                "requests",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibAD",
+                PRIO_AD_OUTSTANDING_REQUEST,
+                update_every,
+                RRDSET_TYPE_LINE);
 
-            rd_atq_outstanding_requests = rrddim_add(st_atq_outstanding_requests,
-                                                     "outstanding",
-                                                     NULL,
-                                                     1,
-                                                     1,
-                                                     RRD_ALGORITHM_ABSOLUTE);
+            rd_atq_outstanding_requests =
+                rrddim_add(st_atq_outstanding_requests, "outstanding", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        rrddim_set_by_pointer(st_atq_outstanding_requests,
-                              rd_atq_outstanding_requests,
-                              (collected_number)atqOutstandingRequests.current.Data);
+        rrddim_set_by_pointer(
+            st_atq_outstanding_requests,
+            rd_atq_outstanding_requests,
+            (collected_number)atqOutstandingRequests.current.Data);
         rrdset_done(st_atq_outstanding_requests);
     }
 }
@@ -1977,16 +2003,16 @@ static void netdata_ad_atq_estimated_delay(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_atq_estimated_delay =
-            rrddim_add(st_atq_estimated_delay, "delay", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        rd_atq_estimated_delay = rrddim_add(st_atq_estimated_delay, "delay", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set_by_pointer(st_atq_estimated_delay, rd_atq_estimated_delay, (collected_number)atqEstimatedDelay.current.Data);
+    rrddim_set_by_pointer(
+        st_atq_estimated_delay, rd_atq_estimated_delay, (collected_number)atqEstimatedDelay.current.Data);
     rrdset_done(st_atq_estimated_delay);
 }
 
-static void netdata_ad_atq_current_threads_ldap(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_atq_current_threads_ldap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA atqThreadsLDAP = {.key = "ATQ Threads LDAP"};
     static RRDSET *st_atq_current_threads_ldap = NULL;
@@ -2019,8 +2045,8 @@ static void netdata_ad_atq_current_threads_ldap(
     rrdset_done(st_atq_current_threads_ldap);
 }
 
-static void netdata_ad_atq_current_threads_other(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_atq_current_threads_other(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA atqThreadsOther = {.key = "ATQ Threads Other"};
     static RRDSET *st_atq_current_threads_other = NULL;
@@ -2053,8 +2079,8 @@ static void netdata_ad_atq_current_threads_other(
     rrdset_done(st_atq_current_threads_other);
 }
 
-static void netdata_ad_atq_current_threads_total(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_atq_current_threads_total(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA atqThreadsTotal = {.key = "ATQ Threads Total"};
     static RRDSET *st_atq_current_threads_total = NULL;
@@ -2199,7 +2225,8 @@ static void netdata_ad_op_total(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
     rrdset_done(st_database_operation_total);
 }
 
-static void netdata_ad_ldap_closed_connections(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_ldap_closed_connections(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA ldapClosedConnectionsPerSec = {.key = "LDAP Closed Connections/sec"};
     static RRDSET *st_ldap_closed_connections_total = NULL;
@@ -2234,8 +2261,8 @@ static void netdata_ad_ldap_closed_connections(PERF_DATA_BLOCK *pDataBlock, PERF
     rrdset_done(st_ldap_closed_connections_total);
 }
 
-static void netdata_ad_ldap_opened_connections_ldap(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_ldap_opened_connections_ldap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA ldapNewConnectionsPerSec = {.key = "LDAP New Connections/sec"};
     static RRDSET *st_ldap_opened_connections_ldap = NULL;
@@ -2270,8 +2297,8 @@ static void netdata_ad_ldap_opened_connections_ldap(
     rrdset_done(st_ldap_opened_connections_ldap);
 }
 
-static void netdata_ad_ldap_opened_connections_ldaps(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_ldap_opened_connections_ldaps(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA ldapNewSSLConnectionsPerSec = {.key = "LDAP New SSL Connections/sec"};
     static RRDSET *st_ldap_opened_connections_ldaps = NULL;
@@ -2333,7 +2360,8 @@ static void netdata_ad_ldap_active_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
         rd_ldap_active_threads = rrddim_add(st_ldap_active_threads, "active", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set_by_pointer(st_ldap_active_threads, rd_ldap_active_threads, (collected_number)ldapActiveThreads.current.Data);
+    rrddim_set_by_pointer(
+        st_ldap_active_threads, rd_ldap_active_threads, (collected_number)ldapActiveThreads.current.Data);
     rrdset_done(st_ldap_active_threads);
 }
 
@@ -2403,7 +2431,8 @@ static void netdata_ad_ldap_writes(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE
     rrdset_done(st_ldap_writes_total);
 }
 
-static void netdata_ad_ldap_client_sessions(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_ldap_client_sessions(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA ldapClientSessions = {.key = "LDAP Client Sessions"};
     static RRDSET *st_ldap_client_sessions = NULL;
@@ -2427,8 +2456,7 @@ static void netdata_ad_ldap_client_sessions(PERF_DATA_BLOCK *pDataBlock, PERF_OB
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_ldap_client_sessions =
-            rrddim_add(st_ldap_client_sessions, "sessions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_ldap_client_sessions = rrddim_add(st_ldap_client_sessions, "sessions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -2447,8 +2475,8 @@ static void netdata_ad_ldap(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
     netdata_ad_ldap_client_sessions(pDataBlock, pObjectType, update_every);
 }
 
-static void netdata_ad_cleanup_link_values_cleaned(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_cleanup_link_values_cleaned(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA linkValuesCleanedPerSec = {.key = "Link Values Cleaned/sec"};
     static RRDSET *st_link_values_cleaned_total = NULL;
@@ -2477,12 +2505,14 @@ static void netdata_ad_cleanup_link_values_cleaned(
     }
 
     rrddim_set_by_pointer(
-        st_link_values_cleaned_total, rd_link_values_cleaned_total, (collected_number)linkValuesCleanedPerSec.current.Data);
+        st_link_values_cleaned_total,
+        rd_link_values_cleaned_total,
+        (collected_number)linkValuesCleanedPerSec.current.Data);
     rrdset_done(st_link_values_cleaned_total);
 }
 
-static void netdata_ad_cleanup_phantom_objects_cleaned(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_cleanup_phantom_objects_cleaned(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA phantomsCleanedPerSec = {.key = "Phantoms Cleaned/sec"};
     static RRDSET *st_phantom_objects_cleaned_total = NULL;
@@ -2517,8 +2547,8 @@ static void netdata_ad_cleanup_phantom_objects_cleaned(
     rrdset_done(st_phantom_objects_cleaned_total);
 }
 
-static void netdata_ad_cleanup_phantom_objects_visited(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_cleanup_phantom_objects_visited(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA phantomsVisitedPerSec = {.key = "Phantoms Visited/sec"};
     static RRDSET *st_phantom_objects_visited_total = NULL;
@@ -2554,7 +2584,9 @@ static void netdata_ad_cleanup_phantom_objects_visited(
 }
 
 static void netdata_ad_cleanup_tombstoned_objects_collected(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA tombstonesGarbageCollectedPerSec = {.key = "Tombstones Garbage Collected/sec"};
     static RRDSET *st_tombstoned_objects_collected_total = NULL;
@@ -2590,7 +2622,9 @@ static void netdata_ad_cleanup_tombstoned_objects_collected(
 }
 
 static void netdata_ad_cleanup_tombstoned_objects_visited(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA tombstonesVisitedPerSec = {.key = "Tombstones Visited/sec"};
     static RRDSET *st_tombstoned_objects_visited_total = NULL;
@@ -2634,8 +2668,8 @@ static void netdata_ad_cleanup_metrics(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_
     netdata_ad_cleanup_tombstoned_objects_visited(pDataBlock, pObjectType, update_every);
 }
 
-static void netdata_ad_sam_group_membership_evaluations(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_sam_group_membership_evaluations(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA samGlobalGroupMembershipEvaluationsPerSec = {
         .key = "SAM Global Group Membership Evaluations/sec"};
@@ -2668,12 +2702,12 @@ static void netdata_ad_sam_group_membership_evaluations(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_sam_group_membership_evaluations_global = rrddim_add(
-            st_sam_group_membership_evaluations, "global", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_sam_group_membership_evaluations_domain_local = rrddim_add(
-            st_sam_group_membership_evaluations, "domain_local", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        rd_sam_group_membership_evaluations_universal = rrddim_add(
-            st_sam_group_membership_evaluations, "universal", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_sam_group_membership_evaluations_global =
+            rrddim_add(st_sam_group_membership_evaluations, "global", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_sam_group_membership_evaluations_domain_local =
+            rrddim_add(st_sam_group_membership_evaluations, "domain_local", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_sam_group_membership_evaluations_universal =
+            rrddim_add(st_sam_group_membership_evaluations, "universal", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -2692,7 +2726,9 @@ static void netdata_ad_sam_group_membership_evaluations(
 }
 
 static void netdata_ad_sam_group_membership_global_catalog_evaluations(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA samGCEvaluationsPerSec = {.key = "SAM GC Evaluations/sec"};
     static RRDSET *st_sam_group_membership_global_catalog_evaluations = NULL;
@@ -2717,12 +2753,7 @@ static void netdata_ad_sam_group_membership_global_catalog_evaluations(
             RRDSET_TYPE_LINE);
 
         rd_sam_group_membership_global_catalog_evaluations = rrddim_add(
-            st_sam_group_membership_global_catalog_evaluations,
-            "global_catalog",
-            NULL,
-            1,
-            1,
-            RRD_ALGORITHM_INCREMENTAL);
+            st_sam_group_membership_global_catalog_evaluations, "global_catalog", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -2733,7 +2764,9 @@ static void netdata_ad_sam_group_membership_global_catalog_evaluations(
 }
 
 static void netdata_ad_sam_group_membership_evaluations_nontransitive(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA samNonTransitiveMembershipEvaluationsPerSec = {
         .key = "SAM Non-Transitive Membership Evaluations/sec"};
@@ -2759,12 +2792,7 @@ static void netdata_ad_sam_group_membership_evaluations_nontransitive(
             RRDSET_TYPE_LINE);
 
         rd_sam_group_membership_evaluations_nontransitive = rrddim_add(
-            st_sam_group_membership_evaluations_nontransitive,
-            "nontransitive",
-            NULL,
-            1,
-            1,
-            RRD_ALGORITHM_INCREMENTAL);
+            st_sam_group_membership_evaluations_nontransitive, "nontransitive", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -2775,10 +2803,11 @@ static void netdata_ad_sam_group_membership_evaluations_nontransitive(
 }
 
 static void netdata_ad_sam_group_membership_evaluations_transitive(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
-    static COUNTER_DATA samTransitiveMembershipEvaluationsPerSec = {
-        .key = "SAM Transitive Membership Evaluations/sec"};
+    static COUNTER_DATA samTransitiveMembershipEvaluationsPerSec = {.key = "SAM Transitive Membership Evaluations/sec"};
     static RRDSET *st_sam_group_membership_evaluations_transitive = NULL;
     static RRDDIM *rd_sam_group_membership_evaluations_transitive = NULL;
 
@@ -2811,8 +2840,8 @@ static void netdata_ad_sam_group_membership_evaluations_transitive(
     rrdset_done(st_sam_group_membership_evaluations_transitive);
 }
 
-static void netdata_ad_sam_group_evaluation_latency(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_sam_group_evaluation_latency(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA samAccountGroupEvaluationLatency = {.key = "SAM Account Group Evaluation Latency"};
     static COUNTER_DATA samResourceGroupEvaluationLatency = {.key = "SAM Resource Group Evaluation Latency"};
@@ -2839,10 +2868,10 @@ static void netdata_ad_sam_group_evaluation_latency(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_sam_group_evaluation_latency_account_group = rrddim_add(
-            st_sam_group_evaluation_latency, "account_group", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        rd_sam_group_evaluation_latency_resource_group = rrddim_add(
-            st_sam_group_evaluation_latency, "resource_group", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_sam_group_evaluation_latency_account_group =
+            rrddim_add(st_sam_group_evaluation_latency, "account_group", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_sam_group_evaluation_latency_resource_group =
+            rrddim_add(st_sam_group_evaluation_latency, "resource_group", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(
@@ -2856,8 +2885,8 @@ static void netdata_ad_sam_group_evaluation_latency(
     rrdset_done(st_sam_group_evaluation_latency);
 }
 
-static void netdata_ad_sam_computer_creation_requests(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_sam_computer_creation_requests(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA samMachineCreationAttemptsPerSec = {.key = "SAM Machine Creation Attempts/sec"};
     static RRDSET *st_sam_computer_creation_requests = NULL;
@@ -2881,8 +2910,8 @@ static void netdata_ad_sam_computer_creation_requests(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_sam_computer_creation_requests = rrddim_add(
-            st_sam_computer_creation_requests, "request", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_sam_computer_creation_requests =
+            rrddim_add(st_sam_computer_creation_requests, "request", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -2893,7 +2922,9 @@ static void netdata_ad_sam_computer_creation_requests(
 }
 
 static void netdata_ad_sam_computer_creation_successful_requests(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA samSuccessfulComputerCreationsPerSecIncludesAllRequests = {
         .key = "SAM Successful Computer Creations/sec: Includes all requests"};
@@ -2918,8 +2949,8 @@ static void netdata_ad_sam_computer_creation_successful_requests(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_sam_computer_creation_successful_requests = rrddim_add(
-            st_sam_computer_creation_successful_requests, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_sam_computer_creation_successful_requests =
+            rrddim_add(st_sam_computer_creation_successful_requests, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -2929,8 +2960,8 @@ static void netdata_ad_sam_computer_creation_successful_requests(
     rrdset_done(st_sam_computer_creation_successful_requests);
 }
 
-static void netdata_ad_sam_user_creation_requests(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_sam_user_creation_requests(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA samUserCreationAttemptsPerSec = {.key = "SAM User Creation Attempts/sec"};
     static RRDSET *st_sam_user_creation_requests = NULL;
@@ -2966,7 +2997,9 @@ static void netdata_ad_sam_user_creation_requests(
 }
 
 static void netdata_ad_sam_user_creation_successful_requests(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
 {
     static COUNTER_DATA samSuccessfulUserCreationsPerSec = {.key = "SAM Successful User Creations/sec"};
     static RRDSET *st_sam_user_creation_successful_requests = NULL;
@@ -2990,8 +3023,8 @@ static void netdata_ad_sam_user_creation_successful_requests(
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_sam_user_creation_successful_requests = rrddim_add(
-            st_sam_user_creation_successful_requests, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_sam_user_creation_successful_requests =
+            rrddim_add(st_sam_user_creation_successful_requests, "success", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
@@ -3001,8 +3034,8 @@ static void netdata_ad_sam_user_creation_successful_requests(
     rrdset_done(st_sam_user_creation_successful_requests);
 }
 
-static void netdata_ad_sam_query_display_requests(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_sam_query_display_requests(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA samDisplayInformationQueriesPerSec = {.key = "SAM Display Information Queries/sec"};
     static RRDSET *st_sam_query_display_requests = NULL;
@@ -3037,8 +3070,7 @@ static void netdata_ad_sam_query_display_requests(
     rrdset_done(st_sam_query_display_requests);
 }
 
-static void netdata_ad_sam_enumerations(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void netdata_ad_sam_enumerations(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA samEnumerationsPerSec = {.key = "SAM Enumerations/sec"};
     static RRDSET *st_sam_enumerations = NULL;
@@ -3066,14 +3098,12 @@ static void netdata_ad_sam_enumerations(
     }
 
     rrddim_set_by_pointer(
-        st_sam_enumerations,
-        rd_sam_enumerations,
-        (collected_number)samEnumerationsPerSec.current.Data);
+        st_sam_enumerations, rd_sam_enumerations, (collected_number)samEnumerationsPerSec.current.Data);
     rrdset_done(st_sam_enumerations);
 }
 
-static void netdata_ad_sam_membership_changes(
-    PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_sam_membership_changes(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA samMembershipChangesPerSec = {.key = "SAM Membership Changes/sec"};
     static RRDSET *st_sam_membership_changes = NULL;
@@ -3108,7 +3138,8 @@ static void netdata_ad_sam_membership_changes(
     rrdset_done(st_sam_membership_changes);
 }
 
-static void netdata_ad_sam_password_changes(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+static void
+netdata_ad_sam_password_changes(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
     static COUNTER_DATA samPasswordChangesPerSec = {.key = "SAM Password Changes/sec"};
     static RRDSET *st_sam_password_changes = NULL;
@@ -3132,14 +3163,11 @@ static void netdata_ad_sam_password_changes(PERF_DATA_BLOCK *pDataBlock, PERF_OB
             update_every,
             RRDSET_TYPE_LINE);
 
-        rd_sam_password_changes =
-            rrddim_add(st_sam_password_changes, "change", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_sam_password_changes = rrddim_add(st_sam_password_changes, "change", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
     rrddim_set_by_pointer(
-        st_sam_password_changes,
-        rd_sam_password_changes,
-        (collected_number)samPasswordChangesPerSec.current.Data);
+        st_sam_password_changes, rd_sam_password_changes, (collected_number)samPasswordChangesPerSec.current.Data);
     rrdset_done(st_sam_password_changes);
 }
 
