@@ -21,6 +21,9 @@ impl<'a> StringReverseView<'a> {
 }
 
 pub fn string_reverse_encode(s: &[u8], buf: &mut [u8]) -> usize {
+    if s.len() > u32::MAX as usize {
+        return 0;
+    }
     let total = STRING_REVERSE_HDR_SIZE + s.len() + 1;
     if buf.len() < total {
         return 0;
