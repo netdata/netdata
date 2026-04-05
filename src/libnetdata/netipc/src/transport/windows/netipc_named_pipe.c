@@ -608,8 +608,7 @@ static nipc_np_error_t server_handshake(HANDLE pipe,
 
     /* Reject packet sizes too small for a header */
     if (agreed_pkt <= NIPC_HEADER_LEN) {
-        DisconnectNamedPipe(session_pipe);
-        CloseHandle(session_pipe);
+        send_rejection_ack(pipe, NIPC_STATUS_BAD_ENVELOPE);
         return NIPC_NP_ERR_HANDSHAKE;
     }
 
