@@ -1122,7 +1122,7 @@ static nipc_error_t server_init_raw(nipc_managed_server_t *server,
         (config && config->max_response_payload_bytes > 0)
             ? config->max_response_payload_bytes
             : NIPC_MAX_PAYLOAD_DEFAULT;
-    server->auth_token = config->auth_token;
+    server->auth_token = config ? config->auth_token : 0;
 
 
     /* Initialize session tracking */

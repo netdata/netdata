@@ -191,7 +191,7 @@ func (v *CgroupsResponseView) Item(index uint32) (CgroupsItemView, error) {
 	dirSize := int(uint64(v.ItemCount) * uint64(cgroupsDirEntry))
 	packedAreaStart := dirStart + dirSize
 
-	dirBase := dirStart + int(index)*8
+	dirBase := dirStart + int(index)*cgroupsDirEntry
 	itemOff := int(ne.Uint32(v.payload[dirBase : dirBase+4]))
 	itemLen := int(ne.Uint32(v.payload[dirBase+4 : dirBase+8]))
 
