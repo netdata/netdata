@@ -2798,6 +2798,108 @@ modules:
                 - name: delete
                 - name: modify
                 - name: recycle
+            - name: ad.directory_reads
+              description: Directory reads
+              unit: reads/s
+              chart_type: line
+              dimensions:
+                - name: read
+            - name: ad.directory_searches
+              description: Directory searches
+              unit: searches/s
+              chart_type: line
+              dimensions:
+                - name: search
+            - name: ad.directory_writes
+              description: Directory writes
+              unit: writes/s
+              chart_type: line
+              dimensions:
+                - name: write
+            - name: ad.replication_inbound_object_updates_remaining
+              description: Replication inbound object updates remaining
+              unit: updates
+              chart_type: line
+              dimensions:
+                - name: remaining
+            - name: ad.replication_inbound_values_dns_only
+              description: DRA replication inbound values DNS only
+              unit: values/s
+              chart_type: line
+              dimensions:
+                - name: dns_only
+            - name: ad.replication_inbound_values_total
+              description: DRA replication inbound values total
+              unit: values/s
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: ad.replication_outbound_objects_filtered
+              description: Replication outbound objects filtered
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: filtered
+            - name: ad.replication_outbound_objects
+              description: Replication outbound objects
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: objects
+            - name: ad.replication_outbound_properties
+              description: Replication outbound properties
+              unit: properties/s
+              chart_type: line
+              dimensions:
+                - name: properties
+            - name: ad.replication_outbound_values_dns_only
+              description: DRA replication outbound values DNS only
+              unit: values/s
+              chart_type: line
+              dimensions:
+                - name: dns_only
+            - name: ad.replication_outbound_values_total
+              description: DRA replication outbound values total
+              unit: values/s
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: ad.replication_threads_getting_nc_changes
+              description: DRA threads getting NC changes
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: ad.replication_threads_getting_nc_changes_holding_semaphore
+              description: DRA threads getting NC changes holding semaphore
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: ad.transitive_operations
+              description: Transitive operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: ad.transitive_suboperations
+              description: Transitive suboperations
+              unit: suboperations/s
+              chart_type: line
+              dimensions:
+                - name: suboperations
+            - name: ad.replication_inbound_bytes_total
+              description: DRA replication inbound bytes total
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: inbound
+            - name: ad.replication_outbound_bytes_total
+              description: DRA replication outbound bytes total
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: outbound
             - name: ad.link_values_cleaned
               description: Link values cleaned
               unit: values/s
