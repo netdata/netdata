@@ -417,7 +417,10 @@ impl ShmContext {
             || req_cap % REGION_ALIGNMENT != 0
             || resp_off % REGION_ALIGNMENT != 0
             || resp_cap % REGION_ALIGNMENT != 0
-            || resp_off < align64(req_off + req_cap)
+            || req_off
+                .checked_add(req_cap)
+                .map(align64)
+                .map_or(true, |min| resp_off < min)
         {
             unsafe {
                 libc::munmap(base as *mut libc::c_void, file_size);

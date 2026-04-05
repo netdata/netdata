@@ -301,7 +301,7 @@ pub fn batch_dir_decode(
     packed_area_len: u32,
 ) -> Result<Vec<BatchEntry>, NipcError> {
     let count = item_count as usize;
-    let dir_size = count * 8;
+    let dir_size = count.checked_mul(8).ok_or(NipcError::BadLayout)?;
     if buf.len() < dir_size {
         return Err(NipcError::Truncated);
     }
@@ -332,7 +332,7 @@ pub fn batch_dir_validate(
     packed_area_len: u32,
 ) -> Result<(), NipcError> {
     let count = item_count as usize;
-    let dir_size = count * 8;
+    let dir_size = count.checked_mul(8).ok_or(NipcError::BadLayout)?;
     if buf.len() < dir_size {
         return Err(NipcError::Truncated);
     }
@@ -463,6 +463,13 @@ impl<'a> BatchBuilder<'a> {
         }
 
         let total = final_dir_aligned + align8(self.data_offset);
+        // Zero trailing alignment padding to avoid leaking stale buffer data
+        if total < self.buf.len() {
+            let pad_start = final_dir_aligned + self.data_offset;
+            if pad_start < total {
+                self.buf[pad_start..total].fill(0);
+            }
+        }
         (total, count)
     }
 }
