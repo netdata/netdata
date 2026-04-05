@@ -1,127 +1,85 @@
 - id: deploy
   name: Deploy
   description: ""
-  most_popular: true
-  priority: 1
   children:
     - id: deploy.operating-systems
       name: Operating Systems
       description: ""
-      most_popular: true
-      priority: 1
       children: []
     - id: deploy.docker-kubernetes
       name: Docker & Kubernetes
       description: ""
-      most_popular: true
-      priority: 2
       children: []
     - id: deploy.provisioning-systems
       name: Provisioning Systems
       description: ""
-      most_popular: false
-      priority: -1
       children: []
 - id: data-collection
   name: Data Collection
   description: ""
-  most_popular: true
-  priority: 2
   children:
     - id: data-collection.databases
       name: Databases
       description: ""
-      most_popular: true
-      priority: 1
       children: []
     - id: data-collection.web-servers-and-proxies
       name: Web Servers and Proxies
       description: ""
-      most_popular: true
-      priority: 2
       children: []
     - id: data-collection.containers-and-vms
       name: Containers and VMs
       description: ""
-      most_popular: true
-      priority: 3
       children: []
     - id: data-collection.operating-systems
       name: Operating Systems
       description: ""
-      most_popular: true
-      priority: 4
       children: []
     - id: data-collection.networking
       name: Networking
       description: ""
-      most_popular: true
-      priority: 5
       children: []
     - id: data-collection.cloud-and-devops
       name: Cloud and DevOps
       description: ""
-      most_popular: true
-      priority: 6
       children: []
     - id: data-collection.hardware-and-sensors
       name: Hardware and Sensors
       description: ""
-      most_popular: true
-      priority: 7
       children: []
     - id: data-collection.applications
       name: Applications
       description: ""
-      most_popular: true
-      priority: 8
       collector_default: true
       children: []
     - id: data-collection.storage
       name: Storage and Filesystems
       description: ""
-      most_popular: true
-      priority: 9
       children: []
     - id: data-collection.synthetic-testing
       name: Synthetic Testing
       description: ""
-      most_popular: true
-      priority: 10
       children: []
 - id: logs
   name: Logs
   description: "Monitoring logs on your infrastructure"
-  most_popular: true
-  priority: 3
   children: []
 - id: export
   name: exporters
   description: "Exporter Integrations"
-  most_popular: true
-  priority: 6
   children: []
 - id: notify
   name: notifications
   description: "Notification Integrations"
-  most_popular: true
-  priority: 4
   children:
     - id: notify.agent
       name: Agent Dispatched Notifications
       description: ""
-      most_popular: true
-      priority: 2
       children: []
     - id: notify.cloud
       name: Centralized Cloud Notifications
       description: ""
-      most_popular: true
-      priority: 1
       children: []
 - id: auth
   name: authentication
   description: "Authentication & Authorization"
-  most_popular: true
-  priority: 5
   children: []

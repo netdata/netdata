@@ -26,6 +26,9 @@ bool debug_enabled = false;
 bool enable_detailed_uptime_charts = false;
 bool enable_users_charts = true;
 bool enable_groups_charts = true;
+#if (PROCESSES_HAVE_SERVICE == 1)
+bool enable_services_charts = true;
+#endif
 bool include_exited_childs = true;
 bool proc_pid_cmdline_is_needed = true; // true when we need to read /proc/cmdline
 
@@ -518,6 +521,13 @@ static void parse_args(int argc, char **argv)
         }
 #endif
 
+#if (PROCESSES_HAVE_SERVICE == 1)
+        if(strcmp("no-services", argv[i]) == 0 || strcmp("without-services", argv[i]) == 0) {
+            enable_services_charts = false;
+            continue;
+        }
+#endif
+
         if(strcmp("with-detailed-uptime", argv[i]) == 0) {
             enable_detailed_uptime_charts = 1;
             continue;
@@ -573,6 +583,10 @@ static void parse_args(int argc, char **argv)
 #endif
 #if (PROCESSES_HAVE_GID == 1)
                     " without-groups         disable reporting per user group charts\n"
+                    "\n"
+#endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+                    " without-services       disable reporting per Windows service charts\n"
                     "\n"
 #endif
                     " with-detailed-uptime   enable reporting min/avg/max uptime charts\n"
@@ -874,6 +888,13 @@ int main(int argc, char **argv) {
         if (enable_users_charts) {
             send_charts_updates_to_netdata(sids_root_target, "user", "user", "User Processes");
             send_collected_data_to_netdata(sids_root_target, "user", dt);
+        }
+#endif
+
+#if (PROCESSES_HAVE_SERVICE == 1)
+        if (enable_services_charts) {
+            send_charts_updates_to_netdata(services_root_target, "service", "service", "Windows Service");
+            send_collected_data_to_netdata(services_root_target, "service", dt);
         }
 #endif
 

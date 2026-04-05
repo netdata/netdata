@@ -67,6 +67,14 @@ In the **Raised Alerts** tab:
     - Create a new [silencing rule](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#alert-notification-silencing-rules).
     - Ask AI to troubleshoot the alert.
 
+## Creating and Tuning Alerts
+
+From the Alerts tab, you can create new alerts or tune existing ones:
+
+- **[Alerts Automation](/docs/netdata-ai/alerts-automation/alerts-automation.md)** — Describe what you want in plain English and let AI generate the alert configuration, including thresholds and tuning parameters
+- **[Alerts Configuration Manager](/docs/alerts-and-notifications/creating-alerts-with-netdata-alerts-configuration-manager.md)** — Visual UI wizard for manual alert creation and fine-tuning
+- **[Manual configuration](/src/health/REFERENCE.md)** — Edit `health.d/*.conf` files directly for full control
+
 ## Alert Configurations Tab
 
 The **Alert Configurations** tab shows the configuration of all running alerts in your Room.

@@ -27,8 +27,12 @@ static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *par
         netdata_log_debug(D_PLUGINSD, "PLUGINSD: 'host:%s/chart:%s/dim:%s' SET is setting value to '%s'",
               rrdhost_hostname(host), rrdset_id(st), dimension, value && *value ? value : "UNSET");
 
-    if (value && *value)
-        rrddim_set_by_pointer(st, rd, str2ll_encoded(value));
+    if (value && *value) {
+        if(rrddim_is_float(rd))
+            rrddim_set_by_pointer_double(st, rd, str2ndd_encoded(value, NULL));
+        else
+            rrddim_set_by_pointer(st, rd, str2ll_encoded(value));
+    }
 
     return PARSER_RC_OK;
 }
@@ -98,7 +102,7 @@ static inline PARSER_RC pluginsd_end(char **words, size_t num_words, PARSER *par
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
         netdata_log_debug(D_PLUGINSD, "requested an END on chart '%s'", rrdset_id(st));
 
-    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_END);
+    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_END, NULL);
     parser->user.data_collections_count++;
 
     struct timeval tv = {
@@ -121,6 +125,7 @@ static void pluginsd_host_define_cleanup(PARSER *parser) {
     parser->user.host_define.hostname = NULL;
     parser->user.host_define.rrdlabels = NULL;
     parser->user.host_define.parsing_host = false;
+    parser->user.host_define.node_stale_after_seconds = 0;
 }
 
 static inline bool pluginsd_validate_machine_guid(const char *guid, nd_uuid_t *uuid, char *output) {
@@ -149,6 +154,7 @@ static inline PARSER_RC pluginsd_host_define(char **words, size_t num_words, PAR
     parser->user.host_define.hostname = string_strdupz(hostname);
     parser->user.host_define.rrdlabels = rrdlabels_create();
     parser->user.host_define.parsing_host = true;
+    parser->user.host_define.node_stale_after_seconds = 0;
 
     return PARSER_RC_OK;
 }
@@ -201,14 +207,15 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
 
     struct rrdhost_system_info *system_info = rrdhost_system_info_from_host_labels(parser->user.host_define.rrdlabels);
 
+    SYSTEM_TZ tz = system_tz_get();
     RRDHOST *host = rrdhost_find_or_create(
         string2str(parser->user.host_define.hostname),
         string2str(parser->user.host_define.hostname),
         parser->user.host_define.machine_guid_str,
         NETDATA_VIRTUAL_HOST,
-        netdata_configured_timezone,
-        netdata_configured_abbrev_timezone,
-        netdata_configured_utc_offset,
+        tz.timezone,
+        tz.abbrev_timezone,
+        tz.utc_offset,
         program_name,
         NETDATA_VERSION,
         nd_profile.update_every,
@@ -224,6 +231,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         stream_receive.replication.step,
         system_info,
         false);
+    system_tz_free(&tz);
 
     rrdhost_system_info_free(system_info);
 
@@ -241,11 +249,16 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         parser->user.host_define.rrdlabels = NULL;
     }
 
+    if(SERVING_PLUGINSD(parser)) {
+        rrdlabels_add(host->rrdlabels, "_collector_machine_guid",
+                      localhost->machine_guid, RRDLABEL_SRC_AUTO);
+    }
+
     pluginsd_update_host_ephemerality(host);
     pluginsd_host_define_cleanup(parser);
 
     parser->user.host = host;
-    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END);
+    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, NULL);
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     rrdcontext_host_child_connected(host);
@@ -447,7 +460,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
         pluginsd_rrdset_cache_put_to_slot(parser, st, slot, obsolete);
     }
     else
-        pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_CHART);
+        pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_CHART, NULL);
 
     return PARSER_RC_OK;
 }
@@ -519,6 +532,17 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
             rrddim_option_set(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS);
         if (strstr(options, "nooverflow") != NULL)
             rrddim_option_set(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS);
+
+        if (strstr(options, "type=float") != NULL) {
+            if(!rrddim_is_float(rd))
+                memset(&rd->collector.collected, 0, sizeof(rd->collector.collected));
+            rrddim_option_set(rd, RRDDIM_OPTION_VALUE_FLOAT);
+        }
+        else if (strstr(options, "type=int") != NULL) {
+            if(rrddim_is_float(rd))
+                memset(&rd->collector.collected, 0, sizeof(rd->collector.collected));
+            rrddim_option_clear(rd, RRDDIM_OPTION_VALUE_FLOAT);
+        }
     }
     else
         rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
@@ -632,7 +656,7 @@ static inline PARSER_RC pluginsd_variable(char **words, size_t num_words, PARSER
 
 static inline PARSER_RC pluginsd_flush(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
     netdata_log_debug(D_PLUGINSD, "requested a " PLUGINSD_KEYWORD_FLUSH);
-    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_FLUSH);
+    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_FLUSH, NULL);
     parser->user.replay.start_time = 0;
     parser->user.replay.end_time = 0;
     parser->user.replay.start_time_ut = 0;
@@ -949,11 +973,20 @@ static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, P
     // ------------------------------------------------------------------------
     // parse the parameters
 
-    collected_number collected_value = (collected_number) str2ll_encoded(collected_str);
+    // The sender only sends float baselines when it has STREAM_CAP_FLOAT_BASELINE;
+    // older senders always send int64, even for float dimensions.
+    bool sender_sent_float = rrddim_is_float(rd) && stream_has_capability(&parser->user, STREAM_CAP_FLOAT_BASELINE);
+
+    collected_number collected_value = 0;
+    NETDATA_DOUBLE collected_value_d = 0.0;
+    if(sender_sent_float)
+        collected_value_d = str2ndd_encoded(collected_str, NULL);
+    else
+        collected_value = (collected_number) str2ll_encoded(collected_str);
 
     NETDATA_DOUBLE value;
     if(*value_str == '#')
-        value = (NETDATA_DOUBLE)collected_value;
+        value = sender_sent_float ? collected_value_d : (NETDATA_DOUBLE)collected_value;
     else
         value = str2ndd_encoded(value_str, NULL);
 
@@ -1002,7 +1035,12 @@ static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, P
         // check if receiver and sender have the same number parsing capabilities
         bool can_copy = stream_has_capability(&parser->user, STREAM_CAP_IEEE754) == stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754);
 
-        // check the sender capabilities
+        // check if the float baseline capability matches between incoming and outgoing
+        bool downstream_float = rrddim_is_float(rd) && stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_FLOAT_BASELINE);
+        if(sender_sent_float != downstream_float)
+            can_copy = false;
+
+        // check the downstream parent capabilities
         bool with_slots = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_SLOTS) ? true : false;
         NUMBER_ENCODING integer_encoding = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
         NUMBER_ENCODING doubles_encoding = stream_has_capability(&parser->user.v2.stream_buffer, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
@@ -1021,8 +1059,10 @@ static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, P
         buffer_fast_strcat(wb, "' ", 2);
         if(can_copy)
             buffer_strcat(wb, collected_str);
+        else if(downstream_float)
+            buffer_print_netdata_double_encoded(wb, doubles_encoding, sender_sent_float ? collected_value_d : (NETDATA_DOUBLE)collected_value);
         else
-            buffer_print_int64_encoded(wb, integer_encoding, collected_value); // original v2 had hex
+            buffer_print_int64_encoded(wb, integer_encoding, sender_sent_float ? (int64_t)collected_value_d : collected_value);
         buffer_fast_strcat(wb, " ", 1);
         if(can_copy)
             buffer_strcat(wb, value_str);
@@ -1041,7 +1081,12 @@ static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, P
     rrddim_store_metric(rd, parser->user.v2.end_time * USEC_PER_SEC, value, flags);
     rd->collector.last_collected_time.tv_sec = parser->user.v2.end_time;
     rd->collector.last_collected_time.tv_usec = 0;
-    rd->collector.last_collected_value = collected_value;
+    if(sender_sent_float)
+        rrddim_set_last_collected_float(rd, collected_value_d);
+    else if(rrddim_is_float(rd))
+        rrddim_set_last_collected_float(rd, (NETDATA_DOUBLE)collected_value);
+    else
+        rrddim_set_last_collected_int(rd, collected_value);
     rd->collector.last_stored_value = value;
     rd->collector.last_calculated_value = value;
     rd->collector.counter++;
@@ -1092,15 +1137,22 @@ static ALWAYS_INLINE PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size
     // ------------------------------------------------------------------------
     // cleanup RRDSET / RRDDIM
 
-    if(likely(st->pluginsd.dims_with_slots)) {
-        for(size_t i = 0; i < st->pluginsd.size ;i++) {
-            RRDDIM *rd = st->pluginsd.prd_array[i].rd;
+    // Get the array - we're protected by collector_tid being set, so it won't be freed
+    PRD_ARRAY *prd_arr = prd_array_get_unsafe(&st->pluginsd.prd_array);
+
+    if(likely(st->pluginsd.dims_with_slots && prd_arr && prd_arr->size)) {
+        for(size_t i = 0; i < prd_arr->size ;i++) {
+            RRDDIM *rd = prd_arr->entries[i].rd;
 
             if(!rd)
                 continue;
 
             rd->collector.calculated_value = 0;
-            rd->collector.collected_value = 0;
+            if(rrddim_is_float(rd)) {
+                rrddim_set_collected_float(rd, 0.0);
+            }
+            else
+                rrddim_set_collected_int(rd, 0);
             rrddim_clear_updated(rd);
         }
     }
@@ -1108,7 +1160,11 @@ static ALWAYS_INLINE PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size
         RRDDIM *rd;
         rrddim_foreach_read(rd, st){
             rd->collector.calculated_value = 0;
-            rd->collector.collected_value = 0;
+            if(rrddim_is_float(rd)) {
+                rrddim_set_collected_float(rd, 0.0);
+            }
+            else
+                rrddim_set_collected_int(rd, 0);
             rrddim_clear_updated(rd);
         }
         rrddim_foreach_done(rd);
@@ -1193,7 +1249,7 @@ PARSER_RC stream_receiver_pluginsd_claimed_id(char **words, size_t num_words, PA
 
 void pluginsd_cleanup_v2(PARSER *parser) {
     // this is called when the thread is stopped while processing
-    pluginsd_clear_scope_chart(parser, "THREAD CLEANUP");
+    pluginsd_clear_scope_chart(parser, "THREAD CLEANUP", NULL);
 }
 
 void pluginsd_process_cleanup(PARSER *parser) {

@@ -2,13 +2,13 @@
 
 package nginx
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 type (
-	// Charts is an alias for module.Charts
-	Charts = module.Charts
-	// Dims is an alias for module.Dims
-	Dims = module.Dims
+	// Charts is an alias for collectorapi.Charts
+	Charts = collectorapi.Charts
+	// Dims is an alias for collectorapi.Dims
+	Dims = collectorapi.Dims
 )
 
 var charts = Charts{
@@ -41,8 +41,8 @@ var charts = Charts{
 		Fam:   "connections",
 		Ctx:   "nginx.connections_accepted_handled",
 		Dims: Dims{
-			{ID: "accepts", Name: "accepted", Algo: module.Incremental},
-			{ID: "handled", Algo: module.Incremental},
+			{ID: "accepts", Name: "accepted", Algo: collectorapi.Incremental},
+			{ID: "handled", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -52,7 +52,7 @@ var charts = Charts{
 		Fam:   "requests",
 		Ctx:   "nginx.requests",
 		Dims: Dims{
-			{ID: "requests", Algo: module.Incremental},
+			{ID: "requests", Algo: collectorapi.Incremental},
 		},
 	},
 }

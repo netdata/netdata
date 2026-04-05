@@ -162,17 +162,18 @@ void netdata_conf_dbengine_init(const char *hostname) {
         size_snprintf(buf_oom, sizeof(buf_oom), dbengine_out_of_memory_protection, "B", false);
 
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
-               "DBENGINE Out of Memory Protection. "
-               "System Memory Total: %s, Currently Available: %s, Out of Memory Protection: %s, Use All RAM: %s",
-               buf_total, buf_avail, buf_oom, dbengine_use_all_ram_for_caches ? "enabled" : "disabled");
+               "DBENGINE memory protection enabled. "
+               "Netdata will limit DBENGINE memory usage to help keep at least %s of system RAM available when possible and reduce OOM risk. "
+               "System memory total: %s, currently available: %s, use all RAM for caches: %s",
+               buf_oom, buf_total, buf_avail, dbengine_use_all_ram_for_caches ? "enabled" : "disabled");
     }
     else {
         dbengine_out_of_memory_protection = 0;
         dbengine_use_all_ram_for_caches = false;
 
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "DBENGINE Out of Memory Protection and Use All Ram cannot be enabled. "
-               "Failed to detect memory size on this system.");
+               "DBENGINE memory protection is disabled because Netdata could not detect system memory size. "
+               "\"use all RAM for caches\" is also disabled.");
     }
 
     // ----------------------------------------------------------------------------------------------------------------

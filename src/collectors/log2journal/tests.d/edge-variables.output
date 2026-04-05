@@ -1,0 +1,9 @@
+ESCAPED_VAR=\
+LEVEL=test
+MALFORMED_VAR2=$NO_BRACES
+MESSAGE=message
+MULTIPLE_VARS=Level: test, Message: message
+NESTED_VARS=_PREFIX}_message
+SIMPLE_VAR=test message
+UNDEFINED_VAR=This  does not exist
+

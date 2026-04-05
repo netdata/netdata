@@ -15,7 +15,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor CUPS performance for achieving optimal printing system operations. Monitor job statuses, queue lengths, and error rates to ensure smooth printing tasks."

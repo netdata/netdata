@@ -2,13 +2,13 @@
 
 package cockroachdb
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 type (
-	Charts = module.Charts
-	Chart  = module.Chart
-	Dims   = module.Dims
-	Vars   = module.Vars
+	Charts = collectorapi.Charts
+	Chart  = collectorapi.Chart
+	Dims   = collectorapi.Dims
+	Vars   = collectorapi.Vars
 )
 
 var charts = Charts{
@@ -96,7 +96,7 @@ var (
 		Units: "percentage",
 		Fam:   "process",
 		Ctx:   "cockroachdb.process_cpu_time_combined_percentage",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: metricSysCPUCombinedPercentNormalized, Name: "used", Div: precision},
 		},
@@ -107,7 +107,7 @@ var (
 		Units: "percentage",
 		Fam:   "process",
 		Ctx:   "cockroachdb.process_cpu_time_percentage",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: metricSysCPUUserPercent, Name: "user", Div: precision},
 			{ID: metricSysCPUSysPercent, Name: "sys", Div: precision},
@@ -119,10 +119,10 @@ var (
 		Units: "ms",
 		Fam:   "process",
 		Ctx:   "cockroachdb.process_cpu_time",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: metricSysCPUUserNs, Name: "user", Algo: module.Incremental, Div: 1e6},
-			{ID: metricSysCPUSysNs, Name: "sys", Algo: module.Incremental, Div: 1e6},
+			{ID: metricSysCPUUserNs, Name: "user", Algo: collectorapi.Incremental, Div: 1e6},
+			{ID: metricSysCPUSysNs, Name: "sys", Algo: collectorapi.Incremental, Div: 1e6},
 		},
 	}
 	chartProcessMemory = Chart{
@@ -169,10 +169,10 @@ var (
 		Units: "KiB",
 		Fam:   "host",
 		Ctx:   "cockroachdb.host_disk_bandwidth",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
-			{ID: metricSysHostDiskReadBytes, Name: "read", Div: 1024, Algo: module.Incremental},
-			{ID: metricSysHostDiskWriteBytes, Name: "write", Div: -1024, Algo: module.Incremental},
+			{ID: metricSysHostDiskReadBytes, Name: "read", Div: 1024, Algo: collectorapi.Incremental},
+			{ID: metricSysHostDiskWriteBytes, Name: "write", Div: -1024, Algo: collectorapi.Incremental},
 		},
 	}
 	chartHostDiskOperations = Chart{
@@ -182,8 +182,8 @@ var (
 		Fam:   "host",
 		Ctx:   "cockroachdb.host_disk_operations",
 		Dims: Dims{
-			{ID: metricSysHostDiskReadCount, Name: "reads", Algo: module.Incremental},
-			{ID: metricSysHostDiskWriteCount, Name: "writes", Mul: -1, Algo: module.Incremental},
+			{ID: metricSysHostDiskReadCount, Name: "reads", Algo: collectorapi.Incremental},
+			{ID: metricSysHostDiskWriteCount, Name: "writes", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
 	chartHostDiskIOPS = Chart{
@@ -202,10 +202,10 @@ var (
 		Units: "kilobits",
 		Fam:   "host",
 		Ctx:   "cockroachdb.host_network_bandwidth",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
-			{ID: metricSysHostNetRecvBytes, Name: "received", Div: 1000, Algo: module.Incremental},
-			{ID: metricSysHostNetSendBytes, Name: "sent", Div: -1000, Algo: module.Incremental},
+			{ID: metricSysHostNetRecvBytes, Name: "received", Div: 1000, Algo: collectorapi.Incremental},
+			{ID: metricSysHostNetSendBytes, Name: "sent", Div: -1000, Algo: collectorapi.Incremental},
 		},
 	}
 	chartHostNetworkPackets = Chart{
@@ -215,8 +215,8 @@ var (
 		Fam:   "host",
 		Ctx:   "cockroachdb.host_network_packets",
 		Dims: Dims{
-			{ID: metricSysHostNetRecvPackets, Name: "received", Algo: module.Incremental},
-			{ID: metricSysHostNetSendPackets, Name: "sent", Mul: -1, Algo: module.Incremental},
+			{ID: metricSysHostNetRecvPackets, Name: "received", Algo: collectorapi.Incremental},
+			{ID: metricSysHostNetSendPackets, Name: "sent", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
 )
@@ -239,10 +239,10 @@ var (
 		Units: "heartbeats",
 		Fam:   "liveness",
 		Ctx:   "cockroachdb.node_liveness_heartbeats",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: metricHeartBeatSuccesses, Name: "successful", Algo: module.Incremental},
-			{ID: metricHeartBeatFailures, Name: "failed", Algo: module.Incremental},
+			{ID: metricHeartBeatSuccesses, Name: "successful", Algo: collectorapi.Incremental},
+			{ID: metricHeartBeatFailures, Name: "failed", Algo: collectorapi.Incremental},
 		},
 	}
 )
@@ -265,7 +265,7 @@ var (
 		Units: "KiB",
 		Fam:   "capacity",
 		Ctx:   "cockroachdb.storage_capacity_usability",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: metricCapacityUsable, Name: "usable", Div: 1024},
 			{ID: metricCapacityUnusable, Name: "unusable", Div: 1024},
@@ -277,7 +277,7 @@ var (
 		Units: "KiB",
 		Fam:   "capacity",
 		Ctx:   "cockroachdb.storage_usable_capacity",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: metricCapacityAvailable, Name: "available", Div: 1024},
 			{ID: metricCapacityUsed, Name: "used", Div: 1024},
@@ -314,10 +314,10 @@ var (
 		Units: "KiB",
 		Fam:   "sql",
 		Ctx:   "cockroachdb.sql_bandwidth",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
-			{ID: metricSQLBytesIn, Name: "received", Div: 1024, Algo: module.Incremental},
-			{ID: metricSQLBytesOut, Name: "sent", Div: -1024, Algo: module.Incremental},
+			{ID: metricSQLBytesIn, Name: "received", Div: 1024, Algo: collectorapi.Incremental},
+			{ID: metricSQLBytesOut, Name: "sent", Div: -1024, Algo: collectorapi.Incremental},
 		},
 	}
 	chartSQLStatementsTotal = Chart{
@@ -326,10 +326,10 @@ var (
 		Units: "statements",
 		Fam:   "sql",
 		Ctx:   "cockroachdb.sql_statements_total",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
-			{ID: metricSQLQueryStartedCount, Name: "started", Algo: module.Incremental},
-			{ID: metricSQLQueryCount, Name: "executed", Algo: module.Incremental},
+			{ID: metricSQLQueryStartedCount, Name: "started", Algo: collectorapi.Incremental},
+			{ID: metricSQLQueryCount, Name: "executed", Algo: collectorapi.Incremental},
 		},
 	}
 	chartSQLErrors = Chart{
@@ -339,8 +339,8 @@ var (
 		Fam:   "sql",
 		Ctx:   "cockroachdb.sql_errors",
 		Dims: Dims{
-			{ID: metricSQLFailureCount, Name: "statement", Algo: module.Incremental},
-			{ID: metricSQLTXNAbortCount, Name: "transaction", Algo: module.Incremental},
+			{ID: metricSQLFailureCount, Name: "statement", Algo: collectorapi.Incremental},
+			{ID: metricSQLTXNAbortCount, Name: "transaction", Algo: collectorapi.Incremental},
 		},
 	}
 	chartSQLStartedDDLStatements = Chart{
@@ -369,12 +369,12 @@ var (
 		Units: "statements",
 		Fam:   "sql",
 		Ctx:   "cockroachdb.sql_started_dml_statements",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: metricSQLSelectStartedCount, Name: "SELECT", Algo: module.Incremental},
-			{ID: metricSQLUpdateStartedCount, Name: "UPDATE", Algo: module.Incremental},
-			{ID: metricSQLInsertStartedCount, Name: "INSERT", Algo: module.Incremental},
-			{ID: metricSQLDeleteStartedCount, Name: "DELETE", Algo: module.Incremental},
+			{ID: metricSQLSelectStartedCount, Name: "SELECT", Algo: collectorapi.Incremental},
+			{ID: metricSQLUpdateStartedCount, Name: "UPDATE", Algo: collectorapi.Incremental},
+			{ID: metricSQLInsertStartedCount, Name: "INSERT", Algo: collectorapi.Incremental},
+			{ID: metricSQLDeleteStartedCount, Name: "DELETE", Algo: collectorapi.Incremental},
 		},
 	}
 	chartSQLExecutedDMLStatements = Chart{
@@ -383,12 +383,12 @@ var (
 		Units: "statements",
 		Fam:   "sql",
 		Ctx:   "cockroachdb.sql_executed_dml_statements",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: metricSQLSelectCount, Name: "SELECT", Algo: module.Incremental},
-			{ID: metricSQLUpdateCount, Name: "UPDATE", Algo: module.Incremental},
-			{ID: metricSQLInsertCount, Name: "INSERT", Algo: module.Incremental},
-			{ID: metricSQLDeleteCount, Name: "DELETE", Algo: module.Incremental},
+			{ID: metricSQLSelectCount, Name: "SELECT", Algo: collectorapi.Incremental},
+			{ID: metricSQLUpdateCount, Name: "UPDATE", Algo: collectorapi.Incremental},
+			{ID: metricSQLInsertCount, Name: "INSERT", Algo: collectorapi.Incremental},
+			{ID: metricSQLDeleteCount, Name: "DELETE", Algo: collectorapi.Incremental},
 		},
 	}
 	chartSQLStartedTCLStatements = Chart{
@@ -397,15 +397,15 @@ var (
 		Units: "statements",
 		Fam:   "sql",
 		Ctx:   "cockroachdb.sql_started_tcl_statements",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: metricSQLTXNBeginStartedCount, Name: "BEGIN", Algo: module.Incremental},
-			{ID: metricSQLTXNCommitStartedCount, Name: "COMMIT", Algo: module.Incremental},
-			{ID: metricSQLTXNRollbackStartedCount, Name: "ROLLBACK", Algo: module.Incremental},
-			{ID: metricSQLSavepointStartedCount, Name: "SAVEPOINT", Algo: module.Incremental},
-			{ID: metricSQLRestartSavepointStartedCount, Name: "SAVEPOINT cockroach_restart", Algo: module.Incremental},
-			{ID: metricSQLRestartSavepointReleaseStartedCount, Name: "RELEASE SAVEPOINT cockroach_restart", Algo: module.Incremental},
-			{ID: metricSQLRestartSavepointRollbackStartedCount, Name: "ROLLBACK TO SAVEPOINT cockroach_restart", Algo: module.Incremental},
+			{ID: metricSQLTXNBeginStartedCount, Name: "BEGIN", Algo: collectorapi.Incremental},
+			{ID: metricSQLTXNCommitStartedCount, Name: "COMMIT", Algo: collectorapi.Incremental},
+			{ID: metricSQLTXNRollbackStartedCount, Name: "ROLLBACK", Algo: collectorapi.Incremental},
+			{ID: metricSQLSavepointStartedCount, Name: "SAVEPOINT", Algo: collectorapi.Incremental},
+			{ID: metricSQLRestartSavepointStartedCount, Name: "SAVEPOINT cockroach_restart", Algo: collectorapi.Incremental},
+			{ID: metricSQLRestartSavepointReleaseStartedCount, Name: "RELEASE SAVEPOINT cockroach_restart", Algo: collectorapi.Incremental},
+			{ID: metricSQLRestartSavepointRollbackStartedCount, Name: "ROLLBACK TO SAVEPOINT cockroach_restart", Algo: collectorapi.Incremental},
 		},
 	}
 	chartSQLExecutedTCLStatements = Chart{
@@ -414,15 +414,15 @@ var (
 		Units: "statements",
 		Fam:   "sql",
 		Ctx:   "cockroachdb.sql_executed_tcl_statements",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: metricSQLTXNBeginCount, Name: "BEGIN", Algo: module.Incremental},
-			{ID: metricSQLTXNCommitCount, Name: "COMMIT", Algo: module.Incremental},
-			{ID: metricSQLTXNRollbackCount, Name: "ROLLBACK", Algo: module.Incremental},
-			{ID: metricSQLSavepointCount, Name: "SAVEPOINT", Algo: module.Incremental},
-			{ID: metricSQLRestartSavepointCount, Name: "SAVEPOINT cockroach_restart", Algo: module.Incremental},
-			{ID: metricSQLRestartSavepointReleaseCount, Name: "RELEASE SAVEPOINT cockroach_restart", Algo: module.Incremental},
-			{ID: metricSQLRestartSavepointRollbackCount, Name: "ROLLBACK TO SAVEPOINT cockroach_restart", Algo: module.Incremental},
+			{ID: metricSQLTXNBeginCount, Name: "BEGIN", Algo: collectorapi.Incremental},
+			{ID: metricSQLTXNCommitCount, Name: "COMMIT", Algo: collectorapi.Incremental},
+			{ID: metricSQLTXNRollbackCount, Name: "ROLLBACK", Algo: collectorapi.Incremental},
+			{ID: metricSQLSavepointCount, Name: "SAVEPOINT", Algo: collectorapi.Incremental},
+			{ID: metricSQLRestartSavepointCount, Name: "SAVEPOINT cockroach_restart", Algo: collectorapi.Incremental},
+			{ID: metricSQLRestartSavepointReleaseCount, Name: "RELEASE SAVEPOINT cockroach_restart", Algo: collectorapi.Incremental},
+			{ID: metricSQLRestartSavepointRollbackCount, Name: "ROLLBACK TO SAVEPOINT cockroach_restart", Algo: collectorapi.Incremental},
 		},
 	}
 	chartSQLActiveDistQueries = Chart{
@@ -441,7 +441,7 @@ var (
 		Units: "flows",
 		Fam:   "sql",
 		Ctx:   "cockroachdb.sql_distributed_flows",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: metricSQLDistSQLFlowsActive, Name: "active"},
 			{ID: metricSQLDistSQLFlowsQueued, Name: "queued"},
@@ -468,7 +468,7 @@ var (
 		Units: "KiB",
 		Fam:   "storage",
 		Ctx:   "cockroachdb.logical_data",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: metricKeyBytes, Name: "keys", Div: 1024},
 			{ID: metricValBytes, Name: "values", Div: 1024},
@@ -480,7 +480,7 @@ var (
 		Units: "num",
 		Fam:   "storage",
 		Ctx:   "cockroachdb.logical_data_count",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: metricKeyCount, Name: "keys"},
 			{ID: metricValCount, Name: "values"},
@@ -496,11 +496,11 @@ var (
 		Units: "transactions",
 		Fam:   "kv transactions",
 		Ctx:   "cockroachdb.kv_transactions",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
-			{ID: metricTxnCommits, Name: "committed", Algo: module.Incremental},
-			{ID: metricTxnCommits1PC, Name: "fast-path_committed", Algo: module.Incremental},
-			{ID: metricTxnAborts, Name: "aborted", Algo: module.Incremental},
+			{ID: metricTxnCommits, Name: "committed", Algo: collectorapi.Incremental},
+			{ID: metricTxnCommits1PC, Name: "fast-path_committed", Algo: collectorapi.Incremental},
+			{ID: metricTxnAborts, Name: "aborted", Algo: collectorapi.Incremental},
 		},
 	}
 	chartKVTransactionsRestarts = Chart{
@@ -509,17 +509,17 @@ var (
 		Units: "restarts",
 		Fam:   "kv transactions",
 		Ctx:   "cockroachdb.kv_transaction_restarts",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: metricTxnRestartsWriteTooOld, Name: "write too old", Algo: module.Incremental},
-			{ID: metricTxnRestartsWriteTooOldMulti, Name: "write too old (multiple)", Algo: module.Incremental},
-			{ID: metricTxnRestartsSerializable, Name: "forwarded timestamp (iso=serializable)", Algo: module.Incremental},
-			{ID: metricTxnRestartsPossibleReplay, Name: "possible reply", Algo: module.Incremental},
-			{ID: metricTxnRestartsAsyncWriteFailure, Name: "async consensus failure", Algo: module.Incremental},
-			{ID: metricTxnRestartsReadWithInUncertainty, Name: "read within uncertainty interval", Algo: module.Incremental},
-			{ID: metricTxnRestartsTxnAborted, Name: "aborted", Algo: module.Incremental},
-			{ID: metricTxnRestartsTxnPush, Name: "push failure", Algo: module.Incremental},
-			{ID: metricTxnRestartsUnknown, Name: "unknown", Algo: module.Incremental},
+			{ID: metricTxnRestartsWriteTooOld, Name: "write too old", Algo: collectorapi.Incremental},
+			{ID: metricTxnRestartsWriteTooOldMulti, Name: "write too old (multiple)", Algo: collectorapi.Incremental},
+			{ID: metricTxnRestartsSerializable, Name: "forwarded timestamp (iso=serializable)", Algo: collectorapi.Incremental},
+			{ID: metricTxnRestartsPossibleReplay, Name: "possible reply", Algo: collectorapi.Incremental},
+			{ID: metricTxnRestartsAsyncWriteFailure, Name: "async consensus failure", Algo: collectorapi.Incremental},
+			{ID: metricTxnRestartsReadWithInUncertainty, Name: "read within uncertainty interval", Algo: collectorapi.Incremental},
+			{ID: metricTxnRestartsTxnAborted, Name: "aborted", Algo: collectorapi.Incremental},
+			{ID: metricTxnRestartsTxnPush, Name: "push failure", Algo: collectorapi.Incremental},
+			{ID: metricTxnRestartsUnknown, Name: "unknown", Algo: collectorapi.Incremental},
 		},
 	}
 )
@@ -542,7 +542,7 @@ var (
 		Units: "ranges",
 		Fam:   "ranges",
 		Ctx:   "cockroachdb.ranges_replication_problem",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: metricRangesUnavailable, Name: "unavailable"},
 			{ID: metricRangesUnderReplicated, Name: "under_replicated"},
@@ -555,12 +555,12 @@ var (
 		Units: "events",
 		Fam:   "ranges",
 		Ctx:   "cockroachdb.range_events",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: metricRangeSplits, Name: "split", Algo: module.Incremental},
-			{ID: metricRangeAdds, Name: "add", Algo: module.Incremental},
-			{ID: metricRangeRemoves, Name: "remove", Algo: module.Incremental},
-			{ID: metricRangeMerges, Name: "merge", Algo: module.Incremental},
+			{ID: metricRangeSplits, Name: "split", Algo: collectorapi.Incremental},
+			{ID: metricRangeAdds, Name: "add", Algo: collectorapi.Incremental},
+			{ID: metricRangeRemoves, Name: "remove", Algo: collectorapi.Incremental},
+			{ID: metricRangeMerges, Name: "merge", Algo: collectorapi.Incremental},
 		},
 	}
 	chartRangesSnapshotEvents = Chart{
@@ -569,12 +569,12 @@ var (
 		Units: "events",
 		Fam:   "ranges",
 		Ctx:   "cockroachdb.range_snapshot_events",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: metricRangeSnapshotsGenerated, Name: "generated", Algo: module.Incremental},
-			{ID: metricRangeSnapshotsNormalApplied, Name: "applied (raft-initiated)", Algo: module.Incremental},
-			{ID: metricRangeSnapshotsLearnerApplied, Name: "applied (learner)", Algo: module.Incremental},
-			{ID: metricRangeSnapshotsPreemptiveApplied, Name: "applied (preemptive)", Algo: module.Incremental},
+			{ID: metricRangeSnapshotsGenerated, Name: "generated", Algo: collectorapi.Incremental},
+			{ID: metricRangeSnapshotsNormalApplied, Name: "applied (raft-initiated)", Algo: collectorapi.Incremental},
+			{ID: metricRangeSnapshotsLearnerApplied, Name: "applied (learner)", Algo: collectorapi.Incremental},
+			{ID: metricRangeSnapshotsPreemptiveApplied, Name: "applied (preemptive)", Algo: collectorapi.Incremental},
 		},
 	}
 )
@@ -598,8 +598,8 @@ var (
 		Fam:   "rocksdb",
 		Ctx:   "cockroachdb.rocksdb_table_operations",
 		Dims: Dims{
-			{ID: metricRocksDBCompactions, Name: "compactions", Algo: module.Incremental},
-			{ID: metricRocksDBFlushes, Name: "flushes", Algo: module.Incremental},
+			{ID: metricRocksDBCompactions, Name: "compactions", Algo: collectorapi.Incremental},
+			{ID: metricRocksDBFlushes, Name: "flushes", Algo: collectorapi.Incremental},
 		},
 	}
 	chartRocksDBCacheUsage = Chart{
@@ -608,7 +608,7 @@ var (
 		Units: "KiB",
 		Fam:   "rocksdb",
 		Ctx:   "cockroachdb.rocksdb_cache_usage",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
 			{ID: metricRocksDBBlockCacheUsage, Name: "used", Div: 1024},
 		},
@@ -619,10 +619,10 @@ var (
 		Units: "operations",
 		Fam:   "rocksdb",
 		Ctx:   "cockroachdb.rocksdb_cache_operations",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: metricRocksDBBlockCacheHits, Name: "hits", Algo: module.Incremental},
-			{ID: metricRocksDBBlockCacheMisses, Name: "misses", Algo: module.Incremental},
+			{ID: metricRocksDBBlockCacheHits, Name: "hits", Algo: collectorapi.Incremental},
+			{ID: metricRocksDBBlockCacheMisses, Name: "misses", Algo: collectorapi.Incremental},
 		},
 	}
 	chartRocksDBCacheHitRage = Chart{
@@ -631,7 +631,7 @@ var (
 		Units: "percentage",
 		Fam:   "rocksdb",
 		Ctx:   "cockroachdb.rocksdb_cache_hit_rate",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
 			{ID: metricRocksDBBlockCacheHitRate, Name: "hit rate"},
 		},
@@ -666,7 +666,7 @@ var (
 		Units: "replicas",
 		Fam:   "replication",
 		Ctx:   "cockroachdb.replicas_quiescence",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: metricReplicasQuiescent, Name: "quiescent"},
 			{ID: metricReplicasActive, Name: "active"},
@@ -678,7 +678,7 @@ var (
 		Units: "replicas",
 		Fam:   "replication",
 		Ctx:   "cockroachdb.replicas_leaders",
-		Type:  module.Area,
+		Type:  collectorapi.Area,
 		Dims: Dims{
 			{ID: metricReplicasLeaders, Name: "leaders"},
 			{ID: metricReplicasLeadersNotLeaseholders, Name: "not leaseholders"},
@@ -704,16 +704,16 @@ var (
 		Units: "failures",
 		Fam:   "queues",
 		Ctx:   "cockroachdb.queue_processing_failures",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
-			{ID: metricQueueGCProcessFailure, Name: "gc", Algo: module.Incremental},
-			{ID: metricQueueReplicaGCProcessFailure, Name: "replica gc", Algo: module.Incremental},
-			{ID: metricQueueReplicateProcessFailure, Name: "replication", Algo: module.Incremental},
-			{ID: metricQueueSplitProcessFailure, Name: "split", Algo: module.Incremental},
-			{ID: metricQueueConsistencyProcessFailure, Name: "consistency", Algo: module.Incremental},
-			{ID: metricQueueRaftLogProcessFailure, Name: "raft log", Algo: module.Incremental},
-			{ID: metricQueueRaftSnapshotProcessFailure, Name: "raft snapshot", Algo: module.Incremental},
-			{ID: metricQueueTSMaintenanceProcessFailure, Name: "time series maintenance", Algo: module.Incremental},
+			{ID: metricQueueGCProcessFailure, Name: "gc", Algo: collectorapi.Incremental},
+			{ID: metricQueueReplicaGCProcessFailure, Name: "replica gc", Algo: collectorapi.Incremental},
+			{ID: metricQueueReplicateProcessFailure, Name: "replication", Algo: collectorapi.Incremental},
+			{ID: metricQueueSplitProcessFailure, Name: "split", Algo: collectorapi.Incremental},
+			{ID: metricQueueConsistencyProcessFailure, Name: "consistency", Algo: collectorapi.Incremental},
+			{ID: metricQueueRaftLogProcessFailure, Name: "raft log", Algo: collectorapi.Incremental},
+			{ID: metricQueueRaftSnapshotProcessFailure, Name: "raft snapshot", Algo: collectorapi.Incremental},
+			{ID: metricQueueTSMaintenanceProcessFailure, Name: "time series maintenance", Algo: collectorapi.Incremental},
 		},
 	}
 )
@@ -751,7 +751,7 @@ var (
 		Fam:   "time series",
 		Ctx:   "cockroachdb.timeseries_samples",
 		Dims: Dims{
-			{ID: metricTimeSeriesWriteSamples, Name: "written", Algo: module.Incremental},
+			{ID: metricTimeSeriesWriteSamples, Name: "written", Algo: collectorapi.Incremental},
 		},
 	}
 	chartTimeSeriesWriteErrors = Chart{
@@ -761,7 +761,7 @@ var (
 		Fam:   "time series",
 		Ctx:   "cockroachdb.timeseries_write_errors",
 		Dims: Dims{
-			{ID: metricTimeSeriesWriteErrors, Name: "write", Algo: module.Incremental},
+			{ID: metricTimeSeriesWriteErrors, Name: "write", Algo: collectorapi.Incremental},
 		},
 	}
 	chartTimeSeriesWrittenBytes = Chart{
@@ -771,7 +771,7 @@ var (
 		Fam:   "time series",
 		Ctx:   "cockroachdb.timeseries_write_bytes",
 		Dims: Dims{
-			{ID: metricTimeSeriesWriteBytes, Name: "written", Algo: module.Incremental},
+			{ID: metricTimeSeriesWriteBytes, Name: "written", Algo: collectorapi.Incremental},
 		},
 	}
 )
@@ -784,7 +784,7 @@ var (
 		Units: "requests",
 		Fam:   "slow requests",
 		Ctx:   "cockroachdb.slow_requests",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: metricRequestsSlowLatch, Name: "acquiring latches"},
 			{ID: metricRequestsSlowLease, Name: "acquiring lease"},
@@ -801,7 +801,7 @@ var (
 		Units: "KiB",
 		Fam:   "go/cgo",
 		Ctx:   "cockroachdb.code_heap_memory_usage",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		Dims: Dims{
 			{ID: metricSysGoAllocBytes, Name: "go", Div: 1024},
 			{ID: metricSysCGoAllocBytes, Name: "cgo", Div: 1024},
@@ -824,7 +824,7 @@ var (
 		Fam:   "go/cgo",
 		Ctx:   "cockroachdb.gc_count",
 		Dims: Dims{
-			{ID: metricSysGCCount, Name: "gc", Algo: module.Incremental},
+			{ID: metricSysGCCount, Name: "gc", Algo: collectorapi.Incremental},
 		},
 	}
 	chartGCPauseTime = Chart{
@@ -834,7 +834,7 @@ var (
 		Fam:   "go/cgo",
 		Ctx:   "cockroachdb.gc_pause",
 		Dims: Dims{
-			{ID: metricSysGCPauseNs, Name: "pause", Algo: module.Incremental, Div: 1e3},
+			{ID: metricSysGCPauseNs, Name: "pause", Algo: collectorapi.Incremental, Div: 1e3},
 		},
 	}
 	chartCGoCalls = Chart{
@@ -844,7 +844,7 @@ var (
 		Fam:   "go/cgo",
 		Ctx:   "cockroachdb.cgo_calls",
 		Dims: Dims{
-			{ID: metricSysCGoCalls, Name: "cgo", Algo: module.Incremental},
+			{ID: metricSysCGoCalls, Name: "cgo", Algo: collectorapi.Incremental},
 		},
 	}
 )

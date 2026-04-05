@@ -495,12 +495,12 @@ static void generate_as_collected_from_metric(BUFFER *wb,
     buffer_putc(wb, '}');
     buffer_putc(wb, ' ');
 
-    if (prometheus_collector)
+    if (prometheus_collector || rrddim_is_float(p->rd))
         buffer_print_netdata_double(wb,
-            (NETDATA_DOUBLE)p->rd->collector.last_collected_value * (NETDATA_DOUBLE)p->rd->multiplier /
+            rrddim_last_collected_as_double(p->rd) * (NETDATA_DOUBLE)p->rd->multiplier /
             (NETDATA_DOUBLE)p->rd->divisor);
     else
-        buffer_print_int64(wb, p->rd->collector.last_collected_value);
+        buffer_print_int64(wb, p->rd->collector.collected.i.last_collected_value);
 
     if (p->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS) {
         buffer_putc(wb, ' ');

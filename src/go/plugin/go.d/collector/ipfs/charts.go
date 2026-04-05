@@ -3,11 +3,11 @@
 package ipfs
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioBandwidth = module.Priority + iota
+	prioBandwidth = collectorapi.Priority + iota
 	prioSwarmPeers
 	prioDatastoreSpaceUtilization
 	prioRepoSize
@@ -15,7 +15,7 @@ const (
 	prioRepoPinnedObj
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	bandwidthChart.Copy(),
 	peersChart.Copy(),
 	datastoreUtilizationChart.Copy(),
@@ -25,79 +25,79 @@ var charts = module.Charts{
 }
 
 var (
-	bandwidthChart = module.Chart{
+	bandwidthChart = collectorapi.Chart{
 		ID:       "bandwidth",
 		Title:    "IPFS Bandwidth",
 		Units:    "bytes/s",
 		Fam:      "bandwidth",
 		Ctx:      "ipfs.bandwidth",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioBandwidth,
-		Dims: module.Dims{
-			{ID: "in", Algo: module.Incremental},
-			{ID: "out", Mul: -1, Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "in", Algo: collectorapi.Incremental},
+			{ID: "out", Mul: -1, Algo: collectorapi.Incremental},
 		},
 	}
 
-	peersChart = module.Chart{
+	peersChart = collectorapi.Chart{
 		ID:       "peers",
 		Title:    "IPFS Peers",
 		Units:    "peers",
 		Fam:      "peers",
 		Ctx:      "ipfs.peers",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioSwarmPeers,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peers"},
 		},
 	}
 
-	datastoreUtilizationChart = module.Chart{
+	datastoreUtilizationChart = collectorapi.Chart{
 		ID:       "datastore_space_utilization",
 		Title:    "IPFS Datastore Space Utilization",
 		Units:    "percent",
 		Fam:      "size",
 		Ctx:      "ipfs.datastore_space_utilization",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioDatastoreSpaceUtilization,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "used_percent", Name: "used"},
 		},
 	}
-	repoSizeChart = module.Chart{
+	repoSizeChart = collectorapi.Chart{
 		ID:       "repo_size",
 		Title:    "IPFS Repo Size",
 		Units:    "bytes",
 		Fam:      "size",
 		Ctx:      "ipfs.repo_size",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioRepoSize,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "size"},
 		},
 	}
 
-	repoObjChart = module.Chart{
+	repoObjChart = collectorapi.Chart{
 		ID:       "repo_objects",
 		Title:    "IPFS Repo Objects",
 		Units:    "objects",
 		Fam:      "objects",
 		Ctx:      "ipfs.repo_objects",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioRepoObj,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "objects"},
 		},
 	}
-	repoPinnedObjChart = module.Chart{
+	repoPinnedObjChart = collectorapi.Chart{
 		ID:       "repo_pinned_objects",
 		Title:    "IPFS Repo Pinned Objects",
 		Units:    "objects",
 		Fam:      "objects",
 		Ctx:      "ipfs.repo_pinned_objects",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioRepoPinnedObj,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "pinned"},
 			{ID: "recursive_pins"},
 		},

@@ -19,7 +19,6 @@ modules:
           list: []
       info_provided_to_referring_integrations:
         description: ""
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |
@@ -141,7 +140,7 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf
     functions:
       description: |
-        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+        This collector exposes real-time functions for interactive troubleshooting in the Live tab.
       list:
         - id: top-queries
           name: Top Queries

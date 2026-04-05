@@ -10,6 +10,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
+	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
+	"github.com/netdata/netdata/go/plugins/plugin/agent"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
@@ -17,10 +22,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent"
-	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/nagios"
-	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/modules/scheduler"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios"
 )
 
 func init() {
@@ -31,7 +37,7 @@ func init() {
 }
 
 func main() {
-	_, _ = maxprocs.Set(maxprocs.Logger(func(string, ...interface{}) {}))
+	_, _ = maxprocs.Set(maxprocs.Logger(func(string, ...any) {}))
 
 	opts := parseCLI()
 
@@ -40,7 +46,10 @@ func main() {
 		return
 	}
 
-	pluginconfig.MustInit(opts)
+	pluginconfig.MustInit(pluginconfig.InitInput{
+		ConfDir:   opts.ConfDir,
+		WatchPath: opts.WatchPath,
+	})
 
 	watchPaths := pluginconfig.CollectorsConfigWatchPaths()
 	if len(watchPaths) == 0 {
@@ -55,6 +64,7 @@ func main() {
 	if opts.Debug {
 		logger.Level.Set(slog.LevelDebug)
 	}
+	isTerminal := terminal.IsTerminal()
 
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,
@@ -63,11 +73,17 @@ func main() {
 		ServiceDiscoveryConfigDir: nil,
 		CollectorsConfigWatchPath: watchPaths,
 		VarLibDir:                 pluginconfig.VarLibDir(),
-		RunModule:                 opts.Module,
-		RunJob:                    opts.Job,
-		MinUpdateEvery:            opts.UpdateEvery,
-		DumpSummary:               opts.DumpSummary,
-		DisableServiceDiscovery:   true,
+		ModuleRegistry:            collectorapi.DefaultRegistry,
+		IsInsideK8s:               hostinfo.IsInsideK8sCluster(),
+		RunModePolicy:             policy.Agent(isTerminal),
+		DiscoveryProviders: []discovery.ProviderFactory{
+			discoveryproviders.File(),
+			discoveryproviders.Dummy(),
+		},
+		RunModule:               opts.Module,
+		RunJob:                  opts.Job,
+		MinUpdateEvery:          opts.UpdateEvery,
+		DisableServiceDiscovery: true,
 	})
 
 	a.Debugf("plugin: name=%s, %s", a.Name, buildinfo.Info())
@@ -81,7 +97,7 @@ func main() {
 	a.Infof("directories → config: %s | collectors: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.VarLibDir)
 
-	a.Run()
+	agenthost.Run(a)
 }
 
 func parseCLI() *cli.Option {

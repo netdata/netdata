@@ -8,8 +8,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	mtx "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	mtx "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {
@@ -105,7 +105,7 @@ func (c *Collector) collectRESTClientHTTPRequests(raw prometheus.Series, mx *met
 		}
 		dimID := "rest_client_requests_" + code
 		if !chart.HasDim(dimID) {
-			_ = chart.AddDim(&Dim{ID: dimID, Name: code, Algo: module.Incremental})
+			_ = chart.AddDim(&Dim{ID: dimID, Name: code, Algo: collectorapi.Incremental})
 			chart.MarkNotCreated()
 		}
 		mx.RESTClient.Requests.ByStatusCode[code] = mtx.Gauge(metric.Value)
@@ -120,7 +120,7 @@ func (c *Collector) collectRESTClientHTTPRequests(raw prometheus.Series, mx *met
 		}
 		dimID := "rest_client_requests_" + method
 		if !chart.HasDim(dimID) {
-			_ = chart.AddDim(&Dim{ID: dimID, Name: method, Algo: module.Incremental})
+			_ = chart.AddDim(&Dim{ID: dimID, Name: method, Algo: collectorapi.Incremental})
 			chart.MarkNotCreated()
 		}
 		mx.RESTClient.Requests.ByMethod[method] = mtx.Gauge(metric.Value)

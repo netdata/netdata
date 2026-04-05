@@ -18,7 +18,6 @@ modules:
       keywords:
         - ipfs
         - filesystem
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "This collector monitors IPFS daemon health and network activity."

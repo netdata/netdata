@@ -5,6 +5,7 @@ package ddsnmp
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net"
 	"strconv"
@@ -12,7 +13,7 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 // CompileTransforms exported for testing purposes only
@@ -70,7 +71,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 	fm := sprig.TxtFuncMap()
 
 	extra := map[string]any{
-		"deleteTag": func(m *Metric, key string) interface{} {
+		"deleteTag": func(m *Metric, key string) any {
 			delete(m.Tags, key)
 			return nil
 		},
@@ -105,7 +106,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 			m.MultiValue = make(map[string]int64)
 			for k, v := range mappings {
 				if _, ok := m.MultiValue[v]; !ok || m.Value == k {
-					m.MultiValue[v] = metrix.Bool(m.Value == k)
+					m.MultiValue[v] = oldmetrix.Bool(m.Value == k)
 				}
 			}
 			return ""
@@ -176,7 +177,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 			sensorPrecision := m.Tags["rm:sensor_precision"]
 
 			famPrefix := "Hardware/Sensor/"
-			config := map[string]map[string]interface{}{
+			config := map[string]map[string]any{
 				"1":  {"name": "unspecified", "family": "Generic", "desc": "Unspecified or vendor-specific sensor"},
 				"2":  {"name": "unknown", "family": "Unknown", "desc": "Unknown sensor type"},
 				"3":  {"name": "voltage_ac", "unit": "V", "family": "Voltage/AC", "desc": "AC voltage"},
@@ -209,9 +210,9 @@ func newMetricTransformFuncMap() template.FuncMap {
 					m.Family = famPrefix + family + "/Status"
 				}
 				m.MultiValue = map[string]int64{
-					"ok":             metrix.Bool(m.Value == 1),
-					"unavailable":    metrix.Bool(m.Value == 2),
-					"nonoperational": metrix.Bool(m.Value == 3),
+					"ok":             oldmetrix.Bool(m.Value == 1),
+					"unavailable":    oldmetrix.Bool(m.Value == 2),
+					"nonoperational": oldmetrix.Bool(m.Value == 3),
 				}
 			case "entPhySensorValue", "entSensorValue":
 				scaleMap := map[string]float64{
@@ -257,7 +258,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 					m.MultiValue = make(map[string]int64)
 					for k, v := range mapping {
 						if _, ok := m.MultiValue[v]; !ok || m.Value == k {
-							m.MultiValue[v] = metrix.Bool(m.Value == k)
+							m.MultiValue[v] = oldmetrix.Bool(m.Value == k)
 						}
 					}
 				} else {
@@ -322,9 +323,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 		},
 	}
 
-	for name, fn := range extra {
-		fm[name] = fn
-	}
+	maps.Copy(fm, extra)
 
 	return fm
 }

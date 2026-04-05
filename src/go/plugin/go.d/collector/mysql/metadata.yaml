@@ -28,7 +28,6 @@ modules:
         - "maria"
         - "mariadb"
         - "sql"
-      most_popular: true
     overview:
       multi_instance: true
       data_collection:
@@ -93,8 +92,27 @@ modules:
                 FLUSH PRIVILEGES;
                 ```
 
-              The `netdata` user will have the ability to connect to the MySQL server on localhost without a password. 
+              The `netdata` user will have the ability to connect to the MySQL server on localhost without a password.
               It will only be able to gather statistics without being able to alter or affect operations in any way.
+          - title: Enable User Statistics (optional)
+            description: |
+              To collect per-user statistics, the [User Statistics](https://mariadb.com/docs/server/ha-and-performance/optimization-and-tuning/query-optimizations/statistics-for-optimizing-queries/user-statistics) plugin must be enabled.
+              This is available for **MariaDB** and **Percona**, not for MySQL.
+
+              By default, statistics are not collected. To enable the plugin, set the `userstat` system variable.
+
+              - **In a configuration file** (persistent, requires restart):
+
+                ```ini
+                [mariadb]
+                userstat = 1
+                ```
+
+              - **Dynamically** (takes effect immediately, does not persist across restarts):
+
+                ```mysql
+                SET GLOBAL userstat=1;
+                ```
       configuration:
         file:
           name: go.d/mysql.conf
@@ -270,7 +288,7 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf
     functions:
       description: |
-        This collector exposes real-time functions for interactive troubleshooting in the Top tab.
+        This collector exposes real-time functions for interactive troubleshooting in the Live tab.
       list:
         - id: top-queries
           name: Top Queries
@@ -1305,7 +1323,6 @@ modules:
     meta:
       <<: *meta
       id: collector-go.d.plugin-percona_mysql
-      most_popular: false
       monitored_instance:
         name: Percona MySQL
         link: https://www.percona.com/software/mysql-database/percona-server

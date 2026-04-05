@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 	"k8s.io/client-go/kubernetes"
 )
@@ -19,12 +19,12 @@ import (
 var configSchema string
 
 func init() {
-	module.Register("k8s_state", module.Creator{
+	collectorapi.Register("k8s_state", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults: module.Defaults{
+		Defaults: collectorapi.Defaults{
 			Disabled: true,
 		},
-		Create: func() module.Module { return New() },
+		Create: func() collectorapi.CollectorV1 { return New() },
 		Config: func() any { return &Config{} },
 	})
 }
@@ -45,10 +45,10 @@ type Config struct {
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts *module.Charts
+	charts *collectorapi.Charts
 
 	client        kubernetes.Interface
 	newKubeClient func() (kubernetes.Interface, error)
@@ -99,7 +99,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

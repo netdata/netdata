@@ -25,22 +25,6 @@ void json_escape_string(char *dst, const char *src, size_t size) {
     *d = '\0';
 }
 
-void json_fix_string(char *s) {
-    unsigned char c;
-    while((c = (unsigned char)*s)) {
-        if(unlikely(c == '\\'))
-            *s++ = '/';
-        else if(unlikely(c == '"'))
-            *s++ = '\'';
-        else if(unlikely(isspace(c) || iscntrl(c)))
-            *s++ = ' ';
-        else if(unlikely(!isprint(c) || c > 127))
-            *s++ = '_';
-        else
-            s++;
-    }
-}
-
 char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
     char *s = fgets(buf, (int)buf_size, fp);
     if (!s) return NULL;
@@ -63,7 +47,12 @@ char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
 
 // vsnprintfz() returns the number of bytes actually written - after possible truncation
 int vsnprintfz(char *dst, size_t n, const char *fmt, va_list args) {
-    if(unlikely(!n)) return 0;
+    if(unlikely(!dst || !n)) return 0;
+
+    if(unlikely(!fmt)) {
+        dst[0] = '\0';
+        return 0;
+    }
 
     int size = vsnprintf(dst, n, fmt, args);
     dst[n - 1] = '\0';

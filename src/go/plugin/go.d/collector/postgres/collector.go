@@ -11,21 +11,22 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
-
-	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth/sqladapter"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
 func init() {
-	module.Register("postgres", module.Creator{
+	collectorapi.Register("postgres", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         pgMethods,
 		MethodHandler:   pgFunctionHandler,
@@ -71,6 +72,7 @@ type Config struct {
 	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	DSN                string           `yaml:"dsn" json:"dsn"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	CloudAuth          cloudauth.Config `yaml:"cloud_auth" json:"cloud_auth"`
 	DBSelector         string           `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`
 	XactTimeHistogram  []float64        `yaml:"transaction_time_histogram,omitempty" json:"transaction_time_histogram"`
 	QueryTimeHistogram []float64        `yaml:"query_time_histogram,omitempty" json:"query_time_histogram"`
@@ -105,10 +107,10 @@ func (c Config) topQueriesLimit() int {
 
 type (
 	Collector struct {
-		module.Base
+		collectorapi.Base
 		Config `yaml:",inline" json:""`
 
-		charts                            *module.Charts
+		charts                            *collectorapi.Charts
 		addXactQueryRunningTimeChartsOnce *sync.Once
 		addWALFilesChartsOnce             *sync.Once
 
@@ -130,6 +132,8 @@ type (
 		doSlowTime              time.Time
 		doSlowEvery             time.Duration
 
+		azureTokenProvider *cloudauth.TokenProvider
+
 		mx *pgMetrics
 
 		funcRouter *funcRouter
@@ -150,6 +154,24 @@ func (c *Collector) Init(context.Context) error {
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
+	if err := c.CloudAuth.Validate(); err != nil {
+		return fmt.Errorf("config validation: %v", err)
+	}
+	if c.CloudAuth.IsEnabled() {
+		cred, err := c.CloudAuth.NewCredential()
+		if err != nil {
+			return fmt.Errorf("config validation: creating cloud auth credential: %v", err)
+		}
+		provider, err := cloudauth.NewTokenProvider(
+			cred,
+			[]string{sqladapter.AzurePostgreSQLAADScope},
+			cloudauth.DefaultTokenRefreshMargin,
+		)
+		if err != nil {
+			return fmt.Errorf("config validation: creating cloud auth token provider: %v", err)
+		}
+		c.azureTokenProvider = provider
+	}
 
 	sr, err := c.initDBSelector()
 	if err != nil {
@@ -157,8 +179,8 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.dbSr = sr
 
-	c.mx.xactTimeHist = metrix.NewHistogramWithRangeBuckets(c.XactTimeHistogram)
-	c.mx.queryTimeHist = metrix.NewHistogramWithRangeBuckets(c.QueryTimeHistogram)
+	c.mx.xactTimeHist = oldmetrix.NewHistogramWithRangeBuckets(c.XactTimeHistogram)
+	c.mx.queryTimeHist = oldmetrix.NewHistogramWithRangeBuckets(c.QueryTimeHistogram)
 
 	c.funcRouter = newFuncRouter(c)
 
@@ -176,7 +198,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

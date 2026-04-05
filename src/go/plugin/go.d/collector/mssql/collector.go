@@ -12,21 +12,23 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 
 	_ "github.com/microsoft/go-mssqldb"
+	_ "github.com/microsoft/go-mssqldb/azuread"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
 func init() {
-	module.Register("mssql", module.Creator{
+	collectorapi.Register("mssql", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults: module.Defaults{
+		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		Create:        func() module.Module { return New() },
+		Create:        func() collectorapi.CollectorV1 { return New() },
 		Config:        func() any { return &Config{} },
 		Methods:       mssqlMethods,
 		MethodHandler: mssqlFunctionHandler,
@@ -54,6 +56,12 @@ func New() *Collector {
 		seenLockStatsTypes: make(map[string]bool),
 		seenJobs:           make(map[string]bool),
 		seenReplications:   make(map[string]bool),
+
+		seenAGs:                make(map[string]bool),
+		seenAGReplicas:         make(map[string]bool),
+		seenAGDatabaseReplicas: make(map[string]bool),
+		seenAGClusterMembers:   make(map[string]bool),
+		seenAGPageRepairDBs:    make(map[string]bool),
 	}
 }
 
@@ -62,6 +70,7 @@ type Config struct {
 	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
 	DSN         string           `yaml:"dsn" json:"dsn"`
 	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	CloudAuth   cloudauth.Config `yaml:"cloud_auth" json:"cloud_auth"`
 	Functions   FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
 }
 
@@ -137,10 +146,10 @@ func (c Config) errorInfoSessionName() string {
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts *module.Charts
+	charts *collectorapi.Charts
 
 	db *sql.DB
 
@@ -152,6 +161,17 @@ type Collector struct {
 	seenLockStatsTypes map[string]bool
 	seenJobs           map[string]bool
 	seenReplications   map[string]bool
+
+	hadrEnabled  bool // true if Always On AG is enabled on this instance
+	hadrChecked  bool // true after the HADR check has been performed
+	majorVersion int  // parsed from version string (11=2012, 12=2014, 13=2016, etc.)
+
+	seenAGs                map[string]bool // key: ag_name
+	seenAGReplicas         map[string]bool // key: ag_name + "_" + replica_server_name
+	seenAGDatabaseReplicas map[string]bool // key: ag_name + "_" + replica_server_name + "_" + db_name
+	seenAGClusterMembers   map[string]bool // key: member_name
+	seenAGPageRepairDBs    map[string]bool // key: database_name
+	agClusterChartAdded    bool            // true after cluster quorum chart has been added
 
 	// Query Store column cache (per-instance to handle different SQL Server versions)
 	queryStoreColsMu sync.RWMutex // protects queryStoreCols for concurrent access
@@ -167,6 +187,9 @@ func (c *Collector) Configuration() any {
 func (c *Collector) Init(context.Context) error {
 	if c.DSN == "" {
 		return errors.New("config: dsn not set")
+	}
+	if err := c.CloudAuth.Validate(); err != nil {
+		return err
 	}
 	c.Debugf("using DSN [%s]", c.DSN)
 
@@ -186,7 +209,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

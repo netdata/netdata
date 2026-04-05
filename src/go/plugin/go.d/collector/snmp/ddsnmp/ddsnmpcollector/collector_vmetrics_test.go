@@ -364,7 +364,7 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 			collectedMetrics: func() []ddsnmp.Metric {
 				// Simulate 1000 interfaces
 				metrics := make([]ddsnmp.Metric, 0, 1000)
-				for i := 0; i < 1000; i++ {
+				for i := range 1000 {
 					metrics = append(metrics, ddsnmp.Metric{
 						Name:    "ifHCInOctets",
 						Value:   int64(i * 100),
@@ -1607,7 +1607,7 @@ var (
 
 func makeTags(n int) map[string]string {
 	t := make(map[string]string, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		t["label"+strconv.Itoa(i)] = "v" + strconv.Itoa(i)
 	}
 	return t

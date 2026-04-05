@@ -15,7 +15,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "System Load Average"
@@ -114,7 +113,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect Virtual Memory information from host."
@@ -216,7 +214,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Total CPU utilization"
@@ -330,7 +327,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Get current CPU temperature"
@@ -407,7 +403,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Read current CPU Scaling frequency."
@@ -484,7 +479,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Get total number of interrupts"
@@ -567,7 +561,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Device interrupts"
@@ -644,7 +637,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Software Interrupt"
@@ -721,7 +713,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "CPU context switch"
@@ -804,7 +795,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information about SWAP memory."
@@ -887,7 +877,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Show information about system memory usage."
@@ -996,7 +985,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "The metric swap amount of data read from and written to SWAP."
@@ -1079,7 +1067,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect memory page faults events."
@@ -1160,7 +1147,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information about semaphore."
@@ -1253,7 +1239,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect shared memory information."
@@ -1336,7 +1321,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect number of IPC message Queues"
@@ -1426,7 +1410,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Show period of time server is up."
@@ -1503,7 +1486,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information about system softnet stat."
@@ -1617,7 +1599,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information per hard disk available on host."
@@ -1809,7 +1790,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: ""
@@ -1891,7 +1871,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect overall information about TCP connections."
@@ -2078,7 +2057,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information about UDP connections."
@@ -2180,7 +2158,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information about ICMP traffic."
@@ -2283,7 +2260,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect IP stats"
@@ -2402,7 +2378,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information abou IPv6 stats."
@@ -2523,7 +2498,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information abou IPv6 ICMP"
@@ -2689,7 +2663,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information about FreeBSD firewall."
@@ -2799,7 +2772,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect traffic per network interface."
@@ -3019,7 +2991,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect information per mount point."
@@ -3132,7 +3103,6 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
       keywords: []
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Collect metrics for ZFS filesystem"

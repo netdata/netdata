@@ -2,10 +2,10 @@
 
 package apache
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 const (
-	prioRequests = module.Priority + iota
+	prioRequests = collectorapi.Priority + iota
 	prioConnection
 	prioConnsAsync
 	prioScoreboard
@@ -17,14 +17,14 @@ const (
 	prioUptime
 )
 
-var baseCharts = module.Charts{
+var baseCharts = collectorapi.Charts{
 	chartConnections.Copy(),
 	chartConnsAsync.Copy(),
 	chartWorkers.Copy(),
 	chartScoreboard.Copy(),
 }
 
-var extendedCharts = module.Charts{
+var extendedCharts = collectorapi.Charts{
 	chartRequests.Copy(),
 	chartBandwidth.Copy(),
 	chartReqPerSec.Copy(),
@@ -33,7 +33,7 @@ var extendedCharts = module.Charts{
 	chartUptime.Copy(),
 }
 
-func newCharts(s *serverStatus) *module.Charts {
+func newCharts(s *serverStatus) *collectorapi.Charts {
 	charts := baseCharts.Copy()
 
 	// ServerMPM: prefork
@@ -53,52 +53,52 @@ func newCharts(s *serverStatus) *module.Charts {
 
 // simple status
 var (
-	chartConnections = module.Chart{
+	chartConnections = collectorapi.Chart{
 		ID:       "connections",
 		Title:    "Connections",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "apache.connections",
 		Priority: prioConnection,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "conns_total", Name: "connections"},
 		},
 	}
-	chartConnsAsync = module.Chart{
+	chartConnsAsync = collectorapi.Chart{
 		ID:       "conns_async",
 		Title:    "Async Connections",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "apache.conns_async",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioConnsAsync,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "conns_async_keep_alive", Name: "keepalive"},
 			{ID: "conns_async_closing", Name: "closing"},
 			{ID: "conns_async_writing", Name: "writing"},
 		},
 	}
-	chartWorkers = module.Chart{
+	chartWorkers = collectorapi.Chart{
 		ID:       "workers",
 		Title:    "Workers Threads",
 		Units:    "workers",
 		Fam:      "workers",
 		Ctx:      "apache.workers",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioWorkers,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "idle_workers", Name: "idle"},
 			{ID: "busy_workers", Name: "busy"},
 		},
 	}
-	chartScoreboard = module.Chart{
+	chartScoreboard = collectorapi.Chart{
 		ID:       "scoreboard",
 		Title:    "Scoreboard",
 		Units:    "connections",
 		Fam:      "connections",
 		Ctx:      "apache.scoreboard",
 		Priority: prioScoreboard,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "scoreboard_waiting", Name: "waiting"},
 			{ID: "scoreboard_starting", Name: "starting"},
 			{ID: "scoreboard_reading", Name: "reading"},
@@ -116,73 +116,73 @@ var (
 
 // extended status
 var (
-	chartRequests = module.Chart{
+	chartRequests = collectorapi.Chart{
 		ID:       "requests",
 		Title:    "Requests",
 		Units:    "requests/s",
 		Fam:      "requests",
 		Ctx:      "apache.requests",
 		Priority: prioRequests,
-		Dims: module.Dims{
-			{ID: "total_accesses", Name: "requests", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "total_accesses", Name: "requests", Algo: collectorapi.Incremental},
 		},
 	}
-	chartBandwidth = module.Chart{
+	chartBandwidth = collectorapi.Chart{
 		ID:       "net",
 		Title:    "Bandwidth",
 		Units:    "kilobits/s",
 		Fam:      "bandwidth",
 		Ctx:      "apache.net",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioNet,
-		Dims: module.Dims{
-			{ID: "total_kBytes", Name: "sent", Algo: module.Incremental, Mul: 8},
+		Dims: collectorapi.Dims{
+			{ID: "total_kBytes", Name: "sent", Algo: collectorapi.Incremental, Mul: 8},
 		},
 	}
-	chartReqPerSec = module.Chart{
+	chartReqPerSec = collectorapi.Chart{
 		ID:       "reqpersec",
 		Title:    "Lifetime Average Number Of Requests Per Second",
 		Units:    "requests/s",
 		Fam:      "statistics",
 		Ctx:      "apache.reqpersec",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioReqPerSec,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "req_per_sec", Name: "requests", Div: 100000},
 		},
 	}
-	chartBytesPerSec = module.Chart{
+	chartBytesPerSec = collectorapi.Chart{
 		ID:       "bytespersec",
 		Title:    "Lifetime Average Number Of Bytes Served Per Second",
 		Units:    "KiB/s",
 		Fam:      "statistics",
 		Ctx:      "apache.bytespersec",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioBytesPerSec,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "bytes_per_sec", Name: "served", Mul: 8, Div: 1024 * 100000},
 		},
 	}
-	chartBytesPerReq = module.Chart{
+	chartBytesPerReq = collectorapi.Chart{
 		ID:       "bytesperreq",
 		Title:    "Lifetime Average Response Size",
 		Units:    "KiB",
 		Fam:      "statistics",
 		Ctx:      "apache.bytesperreq",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioBytesPerReq,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "bytes_per_req", Name: "size", Div: 1024 * 100000},
 		},
 	}
-	chartUptime = module.Chart{
+	chartUptime = collectorapi.Chart{
 		ID:       "uptime",
 		Title:    "Uptime",
 		Units:    "seconds",
 		Fam:      "availability",
 		Ctx:      "apache.uptime",
 		Priority: prioUptime,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "uptime"},
 		},
 	}

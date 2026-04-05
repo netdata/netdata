@@ -269,13 +269,15 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
         time_t db_update_every_s;
     } tier_retention[nd_profile.storage_tiers];
 
+    RRDDIM *rd = rrdmetric_rrddim_get_and_lock(rm);
+
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         STORAGE_ENGINE *eng = qn->rrdhost->db[tier].eng;
         tier_retention[tier].eng = eng;
         tier_retention[tier].db_update_every_s = (time_t) (qn->rrdhost->db[tier].tier_grouping * ri->update_every_s);
 
-        if(rm->rrddim && rm->rrddim->tiers[tier].smh)
-            tier_retention[tier].smh = eng->api.metric_dup(rm->rrddim->tiers[tier].smh);
+        if(rd && rd->tiers[tier].smh)
+            tier_retention[tier].smh = eng->api.metric_dup(rd->tiers[tier].smh);
         else
             tier_retention[tier].smh = eng->api.metric_get_by_id(qn->rrdhost->db[tier].si, rm->uuid);
 
@@ -306,6 +308,8 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
             tier_retention[tier].db_update_every_s = 0;
         }
     }
+
+    rrdmetric_rrddim_unlock(rd);
 
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         if(!qt->db.tiers[tier].update_every || (tier_retention[tier].db_update_every_s && tier_retention[tier].db_update_every_s < qt->db.tiers[tier].update_every))
@@ -481,8 +485,11 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
             // we don't have a dimensions pattern
             // so this is a selected dimension
             // if it is not hidden
+            RRDDIM *rd = rrdmetric_rrddim_get_and_lock(rm);
+            bool hidden = rrd_flag_check(rm, RRD_FLAG_HIDDEN) || (rd && rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN));
+            rrdmetric_rrddim_unlock(rd);
 
-            if(rrd_flag_check(rm, RRD_FLAG_HIDDEN) || (rm->rrddim && rrddim_option_check(rm->rrddim, RRDDIM_OPTION_HIDDEN))) {
+            if(hidden) {
                 // this is a hidden dimension
                 // we don't need to query it
                 status |= QUERY_STATUS_DIMENSION_HIDDEN;
@@ -902,31 +909,42 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         if(query_instance_add(qtl, qn, qc, qt->request.ria, queryable_context, false))
             added++;
     }
-    else if(unlikely(qtl->st && qtl->st->rrdcontexts.rrdcontext == rca && qtl->st->rrdcontexts.rrdinstance)) {
+    else if(unlikely(qtl->st && qtl->st->rrdcontexts.rrdcontext == rca)) {
         // Single chart requested
-        RRDINSTANCE *ri = rrdinstance_acquired_value(qtl->st->rrdcontexts.rrdinstance);
+        RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_get_and_acquire_item(
+            rc->rrdinstances, string2str(qtl->st->id));
+        if(unlikely(!ria))
+            return 0;
+
+        RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
         
         // Check scope_instances
         if(qt->instances.scope_pattern) {
-            QUERY_INSTANCE qi = { .ria = qtl->st->rrdcontexts.rrdinstance };
+            QUERY_INSTANCE qi = { .ria = ria };
             SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri,
                 qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
                 qt->request.version, qtl->host_node_id_str);
             query_instance_strings_free(&qi);
-            if(ret != SP_MATCHED_POSITIVE)
+            if(ret != SP_MATCHED_POSITIVE) {
+                rrdinstance_release(ria);
                 return 0;
+            }
         }
         
         // Check scope_labels
         if(qt->instances.scope_labels_pa || qt->instances.scope_chart_label_key_pattern) {
             if(!query_instance_matches_labels(ri,
                 qt->instances.scope_chart_label_key_pattern,
-                qt->instances.scope_labels_pa))
+                qt->instances.scope_labels_pa)) {
+                rrdinstance_release(ria);
                 return 0;
+            }
         }
         
-        if(query_instance_add(qtl, qn, qc, qtl->st->rrdcontexts.rrdinstance, queryable_context, false))
+        if(query_instance_add(qtl, qn, qc, ria, queryable_context, false))
             added++;
+
+        rrdinstance_release(ria);
     }
     else {
         // Pattern query - iterate through all instances
@@ -1151,7 +1169,11 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , tier_buffer
         );
 
-    json_fix_string(qt->id);
+    // Sanitize the query ID - safe because qt->id is ASCII-only (from snprintfz)
+    char buf[MAX_QUERY_TARGET_ID_LENGTH + 1];
+    text_sanitize((unsigned char *)buf, (const unsigned char *)qt->id, sizeof(buf),
+                  rrd_string_allowed_chars, true, "", NULL);
+    strcpy(qt->id, buf);
 }
 
 QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {

@@ -92,8 +92,8 @@ func parsePhysDevInfo(bs []byte) (map[string]*physicalDevice, error) {
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 
-		if strings.HasPrefix(line, "Device #") {
-			num := strings.TrimPrefix(line, "Device #")
+		if after, ok := strings.CutPrefix(line, "Device #"); ok {
+			num := after
 			pd = &physicalDevice{number: num}
 			devices[num] = pd
 			continue

@@ -1,0 +1,1 @@
+[{"id":"V1","name":"prod-vol-01","size":107374182400,"logical_used":53687091200,"state":"Ready","type":"Primary","appliance_id":"A1"},{"id":"V2","name":"test-vol-01","size":53687091200,"logical_used":10737418240,"state":"Ready","type":"Primary","appliance_id":"A1"}]

@@ -11,6 +11,7 @@
 #include "ws_client.h"
 #include "common_internal.h"
 #include "../aclk.h"
+#include "../aclk_util.h"
 
 #define PIPE_READ_END  0
 #define PIPE_WRITE_END 1
@@ -217,7 +218,7 @@ void mqtt_wss_destroy(mqtt_wss_client client)
     if (client->host)
         freez(client->host);
 
-    freez(client->proxy_passwd);
+    aclk_sensitive_free(&client->proxy_passwd);
     freez(client->proxy_uname);
 
     if (client->ssl)
@@ -255,166 +256,6 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
     return preverify_ok;
 }
 
-#define PROXY_CONNECT "CONNECT"
-#define PROXY_HTTP "HTTP/1.1"
-#define PROXY_HTTP10 "HTTP/1.0"
-#define HTTP_ENDLINE "\x0D\x0A"
-#define HTTP_HDR_TERMINATOR "\x0D\x0A\x0D\x0A"
-#define HTTP_CODE_LEN 4
-#define HTTP_REASON_MAX_LEN 512
-static int http_parse_reply(rbuf_t buf)
-{
-    char http_code_s[4];
-    int idx;
-
-    if (rbuf_memcmp_n(buf, PROXY_HTTP, strlen(PROXY_HTTP))) {
-        if (rbuf_memcmp_n(buf, PROXY_HTTP10, strlen(PROXY_HTTP10))) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "http_proxy expected reply with \"" PROXY_HTTP "\" or \"" PROXY_HTTP10  "\"");
-            return 1;
-        }
-    }
-
-    rbuf_bump_tail(buf, strlen(PROXY_HTTP));
-
-    if (!rbuf_pop(buf, http_code_s, 1) || http_code_s[0] != 0x20) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "http_proxy missing space after \"" PROXY_HTTP "\" or \"" PROXY_HTTP10  "\"");
-        return 2;
-    }
-
-    if (!rbuf_pop(buf, http_code_s, HTTP_CODE_LEN)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "http_proxy missing HTTP code");
-        return 3;
-    }
-
-    for (int i = 0; i < HTTP_CODE_LEN - 1; i++)
-        if (http_code_s[i] > 0x39 || http_code_s[i] < 0x30) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "http_proxy HTTP code non numeric");
-            return 4;
-        }
-
-    http_code_s[HTTP_CODE_LEN - 1] = 0;
-    int http_code = str2i(http_code_s);
-
-    // TODO check if we ever have more headers here
-    rbuf_find_bytes(buf, HTTP_ENDLINE, strlen(HTTP_ENDLINE), &idx);
-    if (idx >= HTTP_REASON_MAX_LEN) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "http_proxy returned reason that is too long");
-        return 5;
-    }
-
-    if (http_code != 200) {
-        char *ptr = mallocz(idx + 1);
-        rbuf_pop(buf, ptr, idx);
-        ptr[idx] = 0;
-
-        nd_log(NDLS_DAEMON, NDLP_ERR, "http_proxy returned error code %d \"%s\"", http_code, ptr);
-        freez(ptr);
-        return 7;
-    }/* else
-        rbuf_bump_tail(buf, idx);*/
-
-    rbuf_find_bytes(buf, HTTP_HDR_TERMINATOR, strlen(HTTP_HDR_TERMINATOR), &idx);
-    if (idx)
-        rbuf_bump_tail(buf, idx);
-
-    rbuf_bump_tail(buf, strlen(HTTP_HDR_TERMINATOR));
-
-    if (rbuf_bytes_available(buf)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "http_proxy unexpected trailing bytes after end of HTTP hdr");
-        return 8;
-    }
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG, "http_proxy CONNECT succeeded");
-    return 0;
-}
-
-static int http_proxy_connect(mqtt_wss_client client)
-{
-    int rc;
-    struct pollfd poll_fd;
-    rbuf_t r_buf = rbuf_create(4096);
-    if (!r_buf)
-        return 1;
-    size_t r_buf_linear_insert_capacity;
-
-    poll_fd.fd = client->sockfd;
-    poll_fd.events = POLLIN;
-
-    char *r_buf_ptr = rbuf_get_linear_insert_range(r_buf, &r_buf_linear_insert_capacity);
-    snprintf(r_buf_ptr, r_buf_linear_insert_capacity,"%s %s:%d %s" HTTP_ENDLINE "Host: %s" HTTP_ENDLINE, PROXY_CONNECT,
-             client->target_host, client->target_port, PROXY_HTTP, client->target_host);
-
-    if(write(client->sockfd, r_buf_ptr, strlen(r_buf_ptr)) <= 0) { ; }
-
-    if (client->proxy_uname) {
-        size_t pass_len = client->proxy_passwd ? strlen(client->proxy_passwd) : 0;
-        size_t creds_plain_len = strlen(client->proxy_uname) + pass_len + 2;
-
-        char *creds_plain = mallocz(creds_plain_len);
-        size_t creds_base64_len = (((4 * creds_plain_len / 3) + 3) & ~3);
-        // OpenSSL encoder puts newline every 64 output bytes
-        // we remove those but during encoding we need that space in the buffer
-        creds_base64_len += (1 + (creds_base64_len / 64)) * strlen("\n");
-
-        char *creds_base64 = mallocz(creds_base64_len + 1);
-        char *ptr = creds_plain;
-        strcpy(ptr, client->proxy_uname);
-        ptr += strlen(client->proxy_uname);
-        *ptr++ = ':';
-        if (pass_len)
-            strcpy(ptr, client->proxy_passwd);
-
-        (void) netdata_base64_encode((unsigned char*)creds_base64, (unsigned char*)creds_plain, strlen(creds_plain));
-        freez(creds_plain);
-
-        r_buf_ptr = rbuf_get_linear_insert_range(r_buf, &r_buf_linear_insert_capacity);
-        snprintf(r_buf_ptr, r_buf_linear_insert_capacity,"Proxy-Authorization: Basic %s" HTTP_ENDLINE, creds_base64);
-
-        if(write(client->sockfd, r_buf_ptr, strlen(r_buf_ptr)) <= 0)  { ; }
-
-        freez(creds_base64);
-    }
-    if(write(client->sockfd, HTTP_ENDLINE, strlen(HTTP_ENDLINE)) <= 0)  { ; }
-
-    // read until you find CRLF, CRLF (HTTP HDR end)
-    // or ring buffer is full
-    // or timeout
-    while ((rc = poll(&poll_fd, 1, 1000)) >= 0) {
-        if (!rc) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "http_proxy timeout waiting reply from proxy server");
-            rc = 2;
-            goto cleanup;
-        }
-        r_buf_ptr = rbuf_get_linear_insert_range(r_buf, &r_buf_linear_insert_capacity);
-        if (!r_buf_ptr) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "http_proxy read ring buffer full");
-            rc = 3;
-            goto cleanup;
-        }
-        if ((rc = read(client->sockfd, r_buf_ptr, r_buf_linear_insert_capacity)) < 0) {
-            if (errno == EWOULDBLOCK || errno == EAGAIN) {
-                continue;
-            }
-            nd_log(NDLS_DAEMON, NDLP_ERR, "http_proxy error reading from socket \"%s\"", strerror(errno));
-            rc = 4;
-            goto cleanup;
-        }
-        rbuf_bump_head(r_buf, rc);
-        if (rbuf_find_bytes(r_buf, HTTP_HDR_TERMINATOR, strlen(HTTP_HDR_TERMINATOR), &rc)) {
-            rc = 0;
-            if (http_parse_reply(r_buf))
-                rc = 5;
-
-            goto cleanup;
-        }
-    }
-    nd_log(NDLS_DAEMON, NDLP_ERR, "proxy negotiation poll error \"%s\"", strerror(errno));
-    rc = 5;
-cleanup:
-    rbuf_free(r_buf);
-    return rc;
-}
-
 int mqtt_wss_connect(
     mqtt_wss_client client,
     char *host,
@@ -450,8 +291,7 @@ int mqtt_wss_connect(
     }
 
     if (client->proxy_passwd) {
-        freez(client->proxy_passwd);
-        client->proxy_passwd = NULL;
+        aclk_sensitive_free(&client->proxy_passwd);
     }
 
     if (proxy && proxy->type != MQTT_WSS_DIRECT) {
@@ -469,6 +309,7 @@ int mqtt_wss_connect(
         client->port = port;
         client->target_host = client->host;
         client->target_port = port;
+        client->proxy_type = MQTT_WSS_DIRECT;
     }
 
     client->ssl_flags = ssl_flags;
@@ -479,11 +320,16 @@ int mqtt_wss_connect(
     char port_str[16];
     snprintf(port_str, sizeof(port_str) -1, "%d", client->port);
 
-    bool proxy_used = (proxy && proxy->proxy_destination != NULL);
-
-    nd_log_daemon(NDLP_INFO, "ACLK: Connecting to %s:%d%s%s",
-                  client->target_host, client->target_port,
-                  proxy_used ? " via proxy " : " (no proxy)", proxy_used ? proxy->proxy_destination : "");
+    if (proxy && proxy->type != MQTT_WSS_DIRECT) {
+        const char *proxy_proto = aclk_mqtt_proxy_type_to_scheme(proxy->type);
+        nd_log_daemon(NDLP_INFO, "ACLK: connecting to %s:%d via proxy %s%s:%d%s",
+                      client->target_host, client->target_port,
+                      proxy_proto, client->host, client->port,
+                      client->proxy_uname ? " (with credentials)" : " (without credentials)");
+    }
+    else
+        nd_log_daemon(NDLP_INFO, "ACLK: connecting to %s:%d (no proxy)",
+                      client->target_host, client->target_port);
 
     struct timeval timeout = { .tv_sec = 10, .tv_usec = 0 };
     int fd = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, client->host, 0, port_str, &timeout, fallback_ipv4);
@@ -512,9 +358,14 @@ int mqtt_wss_connect(
         return -8;
     }
 
-    if (client->proxy_type != MQTT_WSS_DIRECT)
-        if (http_proxy_connect(client))
+    if (client->proxy_type != MQTT_WSS_DIRECT) {
+        if (aclk_proxy_negotiation_connect(client->sockfd, client->proxy_type, client->proxy_uname, client->proxy_passwd,
+                                           client->target_host, client->target_port, 10000))
             return -4;
+
+        // Credentials are only needed for proxy negotiation; wipe them now.
+        aclk_sensitive_free(&client->proxy_passwd);
+    }
 
 #if OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
 #if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)

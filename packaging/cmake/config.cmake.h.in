@@ -85,6 +85,9 @@
 #cmakedefine HAVE_GETRANDOM
 #cmakedefine HAVE_SYSINFO
 #cmakedefine HAVE_TIMEGM
+#cmakedefine HAVE_TZALLOC
+#cmakedefine HAVE_LOCALTIME_RZ
+#cmakedefine HAVE_TZFREE
 #cmakedefine HAVE_TM_GMTOFF
 
 #cmakedefine HAVE_LIBBACKTRACE

@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +35,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -172,7 +172,7 @@ func TestCollector_Collect(t *testing.T) {
 			assert.Equal(t, test.wantCharts, len(*collr.Charts()), "want charts")
 
 			if len(test.wantMetrics) > 0 {
-				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 
 			collr.Cleanup(context.Background())
@@ -316,7 +316,7 @@ func (m *mockTorDaemon) handleGetInfo(conn io.Writer, keywords string) error {
 
 	keywords = strings.Trim(keywords, "\"")
 
-	for _, k := range strings.Fields(keywords) {
+	for k := range strings.FieldsSeq(keywords) {
 		s := fmt.Sprintf("250-%s=%d\n", k, 100)
 
 		if _, err := conn.Write([]byte(s)); err != nil {

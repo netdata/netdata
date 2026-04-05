@@ -17,7 +17,6 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = { workspace = true }
-atty = { workspace = true }
 bytesize-serde = { workspace = true }
 bytesize = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
@@ -26,10 +25,11 @@ humantime = { workspace = true }
 regex = { workspace = true }
 serde_json = { workspace = true, features = ["preserve_order"] }
 serde_regex = { workspace = true }
-serde = { workspace=true }
+serde = { workspace=true, features = ["rc"] }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true, features = ["gzip", "tls-ring"] }
+twox-hash = { workspace = true, features = ["xxhash64"] }
 
 journal-common = { workspace = true }
 journal-core = { workspace = true }

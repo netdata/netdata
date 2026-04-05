@@ -14,19 +14,19 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
 func init() {
-	module.Register("pulsar", module.Creator{
+	collectorapi.Register("pulsar", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults: module.Defaults{
+		Defaults: collectorapi.Defaults{
 			UpdateEvery: 60,
 		},
-		Create: func() module.Module { return New() },
+		Create: func() collectorapi.CollectorV1 { return New() },
 		Config: func() any { return &Config{} },
 	})
 }
@@ -65,7 +65,7 @@ type Config struct {
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
 	charts   *Charts

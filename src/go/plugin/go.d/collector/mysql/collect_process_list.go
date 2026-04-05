@@ -3,6 +3,8 @@
 package mysql
 
 import (
+	"context"
+
 	"github.com/blang/semver/v4"
 )
 
@@ -39,12 +41,10 @@ ORDER BY
   time;`
 )
 
-func (c *Collector) collectProcessListStatistics(mx map[string]int64) error {
+func (c *Collector) collectProcessListStatistics(ctx context.Context) error {
 	var q string
 	mysqlMinVer := semver.Version{Major: 8, Minor: 0, Patch: 22}
-	c.varPerfSchemaMu.RLock()
 	perfSchema := c.varPerformanceSchema
-	c.varPerfSchemaMu.RUnlock()
 	if !c.isMariaDB && c.version.GTE(mysqlMinVer) && perfSchema == "ON" {
 		q = queryShowProcessListPS
 	} else {
@@ -53,8 +53,10 @@ func (c *Collector) collectProcessListStatistics(mx map[string]int64) error {
 	c.Debugf("executing query: '%s'", q)
 
 	var maxTime int64 // slowest query milliseconds in process list
+	var countSystem int64
+	var countUser int64
 
-	duration, err := c.collectQuery(q, func(column, value string, _ bool) {
+	duration, err := c.collectQuery(ctx, q, func(column, value string, _ bool) {
 		switch column {
 		case "time":
 			maxTime = parseInt(value)
@@ -67,9 +69,9 @@ func (c *Collector) collectProcessListStatistics(mx map[string]int64) error {
 			// https://dev.mysql.com/doc/refman/8.0/en/information-schema-processlist-table.html
 			switch value {
 			case "system user", "event_scheduler":
-				mx["process_list_queries_count_system"] += 1
+				countSystem++
 			default:
-				mx["process_list_queries_count_user"] += 1
+				countUser++
 			}
 		}
 	})
@@ -77,14 +79,10 @@ func (c *Collector) collectProcessListStatistics(mx map[string]int64) error {
 		return err
 	}
 
-	if _, ok := mx["process_list_queries_count_system"]; !ok {
-		mx["process_list_queries_count_system"] = 0
-	}
-	if _, ok := mx["process_list_queries_count_user"]; !ok {
-		mx["process_list_queries_count_user"] = 0
-	}
-	mx["process_list_fetch_query_duration"] = duration
-	mx["process_list_longest_query_duration"] = maxTime
+	c.mx.set("process_list_queries_count_system", countSystem)
+	c.mx.set("process_list_queries_count_user", countUser)
+	c.mx.set("process_list_fetch_query_duration", duration)
+	c.mx.set("process_list_longest_query_duration", maxTime)
 
 	return nil
 }

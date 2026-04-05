@@ -9,6 +9,7 @@
 #include "web/mcp/mcp.h"
 
 #include "database/engine/page_test.h"
+#include "database/rrdset-slots.h"
 #include <curl/curl.h>
 
 #ifdef OS_WINDOWS
@@ -154,6 +155,7 @@ int help(int exitcode) {
             "                           size of E MiB, an optional disk space limit\n"
             "                           of F MiB, G libuv workers (default 16) and exit.\n\n"
 #endif
+            "  -W prd-array-stress      Run PRD_ARRAY refcount stress test and exit.\n\n"
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W buildinfo             Print the version, the configure options,\n"
@@ -220,6 +222,12 @@ int dyncfg_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
 int health_config_unittest(void);
+int utf8_sanitizer_unittest(void);
+int yaml_unittest(void);
+int json_c_parser_unittest(void);
+#ifdef ENABLE_ML
+int ml_unittest(void);
+#endif
 bool netdata_random_session_id_generate(void);
 
 #ifdef OS_WINDOWS
@@ -252,6 +260,7 @@ int netdata_main(int argc, char **argv) {
     libjudy_malloc_init();
     string_init();
     analytics_init();
+    nd_log_initialize_mutexes();
 
     netdata_start_time = now_realtime_sec();
     usec_t started_ut = now_monotonic_usec();
@@ -271,7 +280,7 @@ int netdata_main(int argc, char **argv) {
 
     static_threads = static_threads_get();
 
-    netdata_ready = false;
+    netdata_ready_store(false);
     // set the name for logging
     program_name = "netdata";
 
@@ -372,6 +381,32 @@ int netdata_main(int argc, char **argv) {
                             return 0;
                         }
 
+                        if(strcmp(optarg, "jsonctest") == 0) {
+                            unittest_running = true;
+                            if (json_c_parser_unittest()) return 1;
+                            fprintf(stderr, "\n\nJSON-C PARSER TESTS PASSED\n\n");
+                            return 0;
+                        }
+
+                        if(strcmp(optarg, "yamltest") == 0) {
+                            unittest_running = true;
+                            if (yaml_unittest()) return 1;
+                            fprintf(stderr, "\n\nYAML TESTS PASSED\n\n");
+                            return 0;
+                        }
+
+                        if(strcmp(optarg, "mltest") == 0) {
+#ifdef ENABLE_ML
+                            unittest_running = true;
+                            if (ml_unittest()) return 1;
+                            fprintf(stderr, "\n\nML TESTS PASSED\n\n");
+                            return 0;
+#else
+                            fprintf(stderr, "ML support is disabled in this build.\n");
+                            return 1;
+#endif
+                        }
+
                         if(strcmp(optarg, "unittest") == 0) {
                             unittest_running = true;
 
@@ -403,12 +438,16 @@ int netdata_main(int argc, char **argv) {
                             if (dictionary_unittest(10000)) return 1;
                             if (aral_unittest(10000)) return 1;
                             if (rrdlabels_unittest()) return 1;
+                            if (rrdhost_labels_unittest()) return 1;
                             if (ctx_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
+                            if (utf8_sanitizer_unittest()) return 1;
                             if (health_config_unittest()) return 1;
+                            if (yaml_unittest()) return 1;
+                            if (json_c_parser_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
                             if (uuidmap_unittest()) return 1;
 #ifdef HAVE_LIBBACKTRACE
@@ -430,6 +469,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return dictionary_unittest(10000);
                         }
+                        else if(strcmp(optarg, "dicttest-benchmark") == 0) {
+                            unittest_running = true;
+                            return dictionary_unittest_benchmark();
+                        }
                         else if(strcmp(optarg, "araltest") == 0) {
                             unittest_running = true;
                             return aral_unittest(10000);
@@ -449,6 +492,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "rwlockstest") == 0) {
                             unittest_running = true;
                             return rwlocks_stress_test();
+                        }
+                        else if(strcmp(optarg, "prd-array-stress") == 0) {
+                            unittest_running = true;
+                            return prd_array_stress_test();
                         }
                         else if(strcmp(optarg, "stringtest") == 0)  {
                             unittest_running = true;
@@ -488,6 +535,10 @@ int netdata_main(int argc, char **argv) {
                             return perflibnamestest_main();
                         }
 #endif
+                        else if(strcmp(optarg, "utf8sanitizertest") == 0) {
+                            unittest_running = true;
+                            return utf8_sanitizer_unittest();
+                        }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
                             unittest_running = true;
@@ -508,6 +559,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "mrgtest") == 0) {
                             unittest_running = true;
                             return mrg_unittest();
+                        }
+                        else if(strcmp(optarg, "mrgretentionbench") == 0) {
+                            unittest_running = true;
+                            return mrg_retention_benchmark();
                         }
                         else if(strcmp(optarg, "parsertest") == 0) {
                             unittest_running = true;
@@ -1124,7 +1179,7 @@ int netdata_main(int argc, char **argv) {
         (ready_ut - started_ut) / USEC_PER_MS, median_start_time / USEC_PER_MS);
 
     cleanup_agent_event_log();
-    netdata_ready = true;
+    netdata_ready_store(true);
 
     // ----------------------------------------------------------------------------------------------------------------
 

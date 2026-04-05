@@ -349,7 +349,7 @@ inline void rrdinstance_from_rrdset(RRDSET *st) {
 
                     RRDMETRIC *rm_old = rrdmetric_acquired_value(rd->rrdcontexts.rrdmetric);
                     rrdmetric_set_deleted_overwrite(rm_old, RRD_FLAG_UPDATED|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
-                    rm_old->rrddim = NULL;
+                    rrdmetric_rrddim_atomic_store(rm_old, NULL);
                     rm_old->first_time_s = 0;
                     rm_old->last_time_s = 0;
 

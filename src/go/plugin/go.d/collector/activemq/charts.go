@@ -2,13 +2,13 @@
 
 package activemq
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 type (
-	// Charts is an alias for module.Charts
-	Charts = module.Charts
-	// Dims is an alias for module.Dims
-	Dims = module.Dims
+	// Charts is an alias for collectorapi.Charts
+	Charts = collectorapi.Charts
+	// Dims is an alias for collectorapi.Dims
+	Dims = collectorapi.Dims
 )
 
 var charts = Charts{
@@ -19,8 +19,8 @@ var charts = Charts{
 		Fam:   "",
 		Ctx:   "activemq.messages",
 		Dims: Dims{
-			{ID: "%s_%s_enqueued", Name: "enqueued", Algo: module.Incremental},
-			{ID: "%s_%s_dequeued", Name: "dequeued", Algo: module.Incremental},
+			{ID: "%s_%s_enqueued", Name: "enqueued", Algo: collectorapi.Incremental},
+			{ID: "%s_%s_dequeued", Name: "dequeued", Algo: collectorapi.Incremental},
 		},
 	},
 	{

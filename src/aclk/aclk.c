@@ -770,7 +770,8 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         freez((char*)mqtt_conn_params.will_msg);
         freez((char*)proxy_conf.host);
         freez((char*)proxy_conf.username);
-        freez((char*)proxy_conf.password);
+        char *proxy_password = (char *)proxy_conf.password;
+        aclk_sensitive_free(&proxy_password);
 
         if (!mqtt_rc) {
             last_conn_time_mqtt = now_realtime_sec();
@@ -841,14 +842,6 @@ void aclk_main(void *ptr)
     worker_register_job_name(WORKER_ACLK_WAITING_TO_CONNECT, "conn wait");
     worker_register_job_name(WORKER_ACLK_RECLAIM_MEMORY, "reclaim");
     worker_register_job_name(WORKER_ACLK_BUFFER_COMPACT, "compact");
-
-    ACLK_PROXY_TYPE proxy_type;
-    aclk_get_proxy(&proxy_type, false);
-    if (proxy_type == PROXY_TYPE_SOCKS5) {
-        netdata_log_error("ACLK: SOCKS5 proxy is not supported by ACLK-NG yet.");
-        static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return;
-    }
 
     aclk_init_rx_msg_handlers();
 
@@ -1096,11 +1089,14 @@ char *aclk_state(void)
         buffer_strcat(wb, "No\n");
     else {
         const char *cloud_base_url = cloud_config_url_get();
-        char *aclk_proxy = (char *)aclk_get_proxy(NULL, true);
+
+        char proxy_display[512];
+        aclk_proxy_get_full_display(proxy_display, sizeof(proxy_display));
+
         usec_t latency = __atomic_load_n(&publish_latency, __ATOMIC_RELAXED);
         char latency_str[64];
         duration_snprintf(latency_str, sizeof(latency_str), (int64_t) latency, "us", true);
-        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\nACLK Proxy: %s\nPublish Latency: %s\n", claim_id.str, cloud_base_url ? cloud_base_url : "null", aclk_proxy ? aclk_proxy : "none", latency_str);
+        buffer_sprintf(wb, "Yes\nClaimed Id: %s\nCloud URL: %s\nACLK Proxy: %s\nPublish Latency: %s\n", claim_id.str, cloud_base_url ? cloud_base_url : "null", proxy_display, latency_str);
     }
 
     bool aclk_is_online = aclk_online();
@@ -1244,9 +1240,12 @@ char *aclk_state_json(void)
     tmp = cloud_base_url ? json_object_new_string(cloud_base_url) : NULL;
     json_object_object_add(msg, "cloud-url", tmp);
 
-    char *aclk_proxy = (char *)aclk_get_proxy(NULL, true);
-    tmp = aclk_proxy ? json_object_new_string(aclk_proxy) : NULL;
-    json_object_object_add(msg, "aclk_proxy", tmp);
+    {
+        char proxy_display[512];
+        aclk_proxy_get_full_display(proxy_display, sizeof(proxy_display));
+        tmp = json_object_new_string(proxy_display);
+        json_object_object_add(msg, "aclk_proxy", tmp);
+    }
 
     usec_t latency = __atomic_load_n(&publish_latency, __ATOMIC_RELAXED);
     tmp =json_object_new_int64((int64_t) latency);
@@ -1348,6 +1347,9 @@ void add_aclk_host_labels(void) {
     switch(aclk_proxy) {
         case PROXY_TYPE_SOCKS5:
             proxy_str = "SOCKS5";
+            break;
+        case PROXY_TYPE_SOCKS5H:
+            proxy_str = "SOCKS5H";
             break;
         case PROXY_TYPE_HTTP:
             proxy_str = "HTTP";

@@ -3,7 +3,7 @@
 package selector
 
 import (
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/selectorcore"
 
 	"github.com/prometheus/prometheus/model/labels"
 )
@@ -13,28 +13,13 @@ type Selector interface {
 }
 
 const (
-	OpEqual             = "="
-	OpNegEqual          = "!="
-	OpRegexp            = "=~"
-	OpNegRegexp         = "!~"
-	OpSimplePatterns    = "=*"
-	OpNegSimplePatterns = "!*"
+	OpEqual             = selectorcore.OpEqual
+	OpNegEqual          = selectorcore.OpNegEqual
+	OpRegexp            = selectorcore.OpRegexp
+	OpNegRegexp         = selectorcore.OpNegRegexp
+	OpSimplePatterns    = selectorcore.OpSimplePatterns
+	OpNegSimplePatterns = selectorcore.OpNegSimplePatterns
 )
-
-type labelSelector struct {
-	name string
-	m    matcher.Matcher
-}
-
-func (s labelSelector) Matches(lbs labels.Labels) bool {
-	if s.name == labels.MetricName {
-		return s.m.MatchString(lbs[0].Value)
-	}
-	if label, ok := lookupLabel(s.name, lbs[1:]); ok {
-		return s.m.MatchString(label.Value)
-	}
-	return false
-}
 
 type Func func(lbs labels.Labels) bool
 
@@ -42,11 +27,45 @@ func (fn Func) Matches(lbs labels.Labels) bool {
 	return fn(lbs)
 }
 
-func lookupLabel(name string, lbs labels.Labels) (labels.Label, bool) {
-	for _, label := range lbs {
-		if label.Name == name {
-			return label, true
+type corePromSelector struct {
+	core selectorcore.Selector
+}
+
+func (s corePromSelector) Matches(lbs labels.Labels) bool {
+	return s.core.Matches(metricNameFromPromLabels(lbs), promLabelsView{labels: lbs})
+}
+
+func wrapCoreSelector(sel selectorcore.Selector) Selector {
+	if sel == nil {
+		return nil
+	}
+	return corePromSelector{core: sel}
+}
+
+type promLabelsView struct {
+	labels labels.Labels
+}
+
+func (v promLabelsView) Get(key string) (string, bool) {
+	for _, label := range v.labels {
+		if label.Name == key {
+			return label.Value, true
 		}
 	}
-	return labels.Label{}, false
+	return "", false
+}
+
+func metricNameFromPromLabels(lbs labels.Labels) string {
+	if len(lbs) == 0 {
+		return ""
+	}
+	if lbs[0].Name == labels.MetricName {
+		return lbs[0].Value
+	}
+	for _, label := range lbs {
+		if label.Name == labels.MetricName {
+			return label.Value
+		}
+	}
+	return ""
 }

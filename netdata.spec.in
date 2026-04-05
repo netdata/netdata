@@ -448,6 +448,7 @@ advanced correlations and fast root cause analysis, native horizontal scalabilit
 	-DENABLE_PLUGIN_SCRIPTS=On \
 	%if %{_have_ibm_plugin}
 	-DENABLE_PLUGIN_IBM=On \
+	$([ -d "%{_topdir}/SOURCES/%{name}-%{version}/tmp/ibm_mq" ] && echo -DFETCHCONTENT_SOURCE_DIR_IBM_MQ=%{_topdir}/SOURCES/%{name}-%{version}/tmp/ibm_mq) \
 	%else
 	-DENABLE_PLUGIN_IBM=Off \
 	%endif

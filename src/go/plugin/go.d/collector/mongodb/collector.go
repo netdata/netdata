@@ -12,16 +12,16 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
 func init() {
-	module.Register("mongodb", module.Creator{
+	collectorapi.Register("mongodb", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
+		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
 		Methods:         mongoMethods,
 		MethodHandler:   mongoFunctionHandler,
@@ -39,7 +39,8 @@ func New() *Collector {
 			},
 			Functions: FunctionsConfig{
 				TopQueries: TopQueriesConfig{
-					Limit: 500,
+					Timeout: confopt.Duration(10 * time.Second),
+					Limit:   500,
 				},
 			},
 		},
@@ -91,10 +92,10 @@ func (c Config) topQueriesLimit() int {
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts                *module.Charts
+	charts                *collectorapi.Charts
 	addShardingChartsOnce *sync.Once
 
 	conn mongoConn
@@ -141,7 +142,7 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
+func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 

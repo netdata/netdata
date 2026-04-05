@@ -79,6 +79,9 @@ void ml_host_stop(RRDHOST *rh) {
     if (!host || !host->ml_running)
         return;
 
+    // Prevent new ML activity from publishing while we reset host/dimension state.
+    host->ml_running = false;
+
     netdata_mutex_lock(&host->mutex);
 
     // reset host stats
@@ -112,8 +115,8 @@ void ml_host_stop(RRDHOST *rh) {
             dim->suppression_anomaly_counter = 0;
             dim->suppression_window_counter = 0;
             dim->cns.clear();
-
-            ml_kmeans_init(&dim->kmeans);
+            dim->cns_head = 0;
+            dim->km_contexts.clear();
 
             spinlock_unlock(&dim->slock);
         }
@@ -122,8 +125,6 @@ void ml_host_stop(RRDHOST *rh) {
     rrdset_foreach_done(rsp);
 
     netdata_mutex_unlock(&host->mutex);
-
-    host->ml_running = false;
 }
 
 void ml_host_get_info(RRDHOST *rh, BUFFER *wb)
@@ -273,6 +274,7 @@ void ml_dimension_new(RRDDIM *rd)
     dim->suppression_anomaly_counter = 0;
     dim->suppression_window_counter = 0;
     dim->training_in_progress = false;
+    dim->cns_head = 0;
 
     ml_kmeans_init(&dim->kmeans);
 

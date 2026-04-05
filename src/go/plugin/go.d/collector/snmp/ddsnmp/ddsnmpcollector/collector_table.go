@@ -5,6 +5,7 @@ package ddsnmpcollector
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -413,8 +414,8 @@ func (tc *tableCollector) organizePDUsByRow(ctx *tableProcessingContext) (rows m
 
 	for oid, pdu := range ctx.pdus {
 		for _, columnOID := range allColumnOIDs {
-			if strings.HasPrefix(oid, columnOID+".") {
-				index := strings.TrimPrefix(oid, columnOID+".")
+			if after, ok := strings.CutPrefix(oid, columnOID+"."); ok {
+				index := after
 
 				if rows[index] == nil {
 					rows[index] = make(map[string]gosnmp.SnmpPDU)
@@ -465,9 +466,7 @@ func (tc *tableCollector) processRows(ctx *tableProcessingContext, stats *ddsnmp
 		}
 
 		// Copy processed tags to cache
-		for k, v := range row.tags {
-			ctx.tagCache[index][k] = v
-		}
+		maps.Copy(ctx.tagCache[index], row.tags)
 
 		metrics = append(metrics, rowMetrics...)
 	}
@@ -521,9 +520,7 @@ func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext, sta
 		// Get cached tags for this row
 		rowTags := make(map[string]string)
 		if tags, ok := ctx.cachedTags[index]; ok {
-			for k, v := range tags {
-				rowTags[k] = v
-			}
+			maps.Copy(rowTags, tags)
 		}
 
 		// Process each metric column

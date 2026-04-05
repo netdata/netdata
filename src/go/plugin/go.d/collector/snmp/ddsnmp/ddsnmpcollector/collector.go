@@ -35,7 +35,6 @@ func New(cfg Config) *Collector {
 	}
 
 	for _, prof := range cfg.Profiles {
-		prof := prof
 		handleCrossTableTagsWithoutMetrics(prof)
 		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
 	}

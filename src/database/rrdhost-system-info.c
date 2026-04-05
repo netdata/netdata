@@ -60,8 +60,11 @@ int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, cha
     }
     else if(!strcmp(name, "NETDATA_HOST_OS_NAME")){
         freez(system_info->host_os_name);
-        system_info->host_os_name = strdupz(value);
-        json_fix_string(system_info->host_os_name);
+        size_t len = strlen(value);
+        size_t dst_size = (len * 2) + 1;
+        system_info->host_os_name = mallocz(dst_size);
+        text_sanitize((unsigned char *)system_info->host_os_name, (const unsigned char *)value,
+                      dst_size, rrd_string_allowed_chars, true, "", NULL);
     }
     else if(!strcmp(name, "NETDATA_HOST_OS_ID")){
         freez(system_info->host_os_id);

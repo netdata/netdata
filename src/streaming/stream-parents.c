@@ -45,6 +45,16 @@ struct stream_parent {
     STREAM_PARENT *next;
 };
 
+static const char *stream_parent_effective_service(const char *definition, int default_port, char *service, size_t service_size) {
+    if(!service || !service_size)
+        return "";
+
+    if(!connect_to_definition_get_service(definition, default_port, service, service_size))
+        snprintfz(service, service_size, "%d", default_port);
+
+    return service;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // block unresponsive parents for some time, to allow speeding up the connection of the rest
 
@@ -343,21 +353,21 @@ int stream_info_to_json_v1(BUFFER *wb, const char *machine_guid) {
 
 static bool stream_info_json_parse_v1(struct json_object *jobj, const char *path, STREAM_PARENT *d, BUFFER *error) {
     uint32_t version = 0; (void)version;
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "version", version, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "version", version, error, JSONC_REQUIRED);
 
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "status", d->remote.status, error, true);
-    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "host_id", d->remote.host_id.uuid, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nodes", d->remote.nodes, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "receivers", d->remote.receivers, error, true);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nonce", d->remote.nonce, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "status", d->remote.status, error, JSONC_REQUIRED);
+    JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "host_id", d->remote.host_id.uuid, error, JSONC_REQUIRED);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nodes", d->remote.nodes, error, JSONC_REQUIRED);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "receivers", d->remote.receivers, error, JSONC_REQUIRED);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "nonce", d->remote.nonce, error, JSONC_REQUIRED);
 
     if(d->remote.status == HTTP_RESP_OK) {
-        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "first_time_s", d->remote.db_first_time_s, error, true);
-        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "last_time_s", d->remote.db_last_time_s, error, true);
-        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_status", RRDHOST_DB_STATUS_2id, d->remote.db_status, error, true);
-        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_liveness", RRDHOST_DB_LIVENESS_2id, d->remote.db_liveness, error, true);
-        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ingest_type", RRDHOST_INGEST_TYPE_2id, d->remote.ingest_type, error, true);
-        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ingest_status", RRDHOST_INGEST_STATUS_2id, d->remote.ingest_status, error, true);
+        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "first_time_s", d->remote.db_first_time_s, error, JSONC_REQUIRED);
+        JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "last_time_s", d->remote.db_last_time_s, error, JSONC_REQUIRED);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_status", RRDHOST_DB_STATUS_2id, d->remote.db_status, error, JSONC_REQUIRED);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "db_liveness", RRDHOST_DB_LIVENESS_2id, d->remote.db_liveness, error, JSONC_REQUIRED);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ingest_type", RRDHOST_INGEST_TYPE_2id, d->remote.ingest_type, error, JSONC_REQUIRED);
+        JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "ingest_status", RRDHOST_INGEST_STATUS_2id, d->remote.ingest_status, error, JSONC_REQUIRED);
         return true;
     }
 
@@ -374,9 +384,12 @@ static bool stream_info_json_parse_v1(struct json_object *jobj, const char *path
 }
 
 static bool stream_info_fetch(STREAM_PARENT *d, const char *uuid, int default_port, ND_SOCK *sender_sock, bool ssl, const char *hostname) {
+    char effective_service[NI_MAXSERV + 1];
+    stream_parent_effective_service(string2str(d->destination), default_port, effective_service, sizeof(effective_service));
+
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_STR(NDF_DST_IP, d->destination),
-        ND_LOG_FIELD_I64(NDF_DST_PORT, default_port),
+        ND_LOG_FIELD_TXT(NDF_DST_PORT, effective_service),
         ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, "GET"),
         ND_LOG_FIELD_END(),
     };
@@ -826,9 +839,11 @@ bool stream_parent_connect_to_one_unsafe(
                rrdhost_hostname(host), string2str(d->destination), default_port,
                i + 1, count);
 
+        char effective_service[NI_MAXSERV + 1];
+        stream_parent_effective_service(string2str(d->destination), default_port, effective_service, sizeof(effective_service));
         ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_STR(NDF_DST_IP, d->destination),
-            ND_LOG_FIELD_I64(NDF_DST_PORT, default_port),
+            ND_LOG_FIELD_TXT(NDF_DST_PORT, effective_service),
             ND_LOG_FIELD_END(),
         };
         ND_LOG_STACK_PUSH(lgs);

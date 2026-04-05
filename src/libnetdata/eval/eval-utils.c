@@ -93,18 +93,8 @@ void print_parsed_as_constant(BUFFER *out, NETDATA_DOUBLE n) {
         return;
     }
 
-    char b[100+1], *s;
-    snprintfz(b, sizeof(b) - 1, NETDATA_DOUBLE_FORMAT, n);
-
-    s = &b[strlen(b) - 1];
-    while(s > b && *s == '0') {
-        *s ='\0';
-        s--;
-    }
-
-    if(s > b && *s == '.')
-        *s = '\0';
-
+    char b[DOUBLE_MAX_LENGTH];
+    print_netdata_double(b, n);
     buffer_strcat(out, b);
 }
 

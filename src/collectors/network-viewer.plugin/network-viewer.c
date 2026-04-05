@@ -470,8 +470,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
     buffer_json_array_close(wb); // required_params
 #endif
 
-    char function_copy[strlen(function) + 1];
-    memcpy(function_copy, function, sizeof(function_copy));
+    char *function_copy = strdupz(function);
     char *words[1024];
     size_t num_words = quoted_strings_splitter_whitespace(function_copy, words, 1024);
     for(size_t i = 1; i < num_words ;i++) {
@@ -483,9 +482,12 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             aggregated = false;
         }
         else if(strcmp(param, "info") == 0) {
+            freez(function_copy);
             goto close_and_send;
         }
     }
+
+    freez(function_copy);
 
     if(aggregated) {
         buffer_json_member_add_object(wb, "aggregated_view");

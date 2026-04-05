@@ -25,7 +25,6 @@ modules:
         - fd
         - open
         - close
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor calls for functions responsible to open or close a file descriptor and possible errors."
@@ -75,7 +74,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -249,7 +248,6 @@ modules:
         - fork
         - process
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor calls for function creating tasks (threads and processes) inside Linux kernel."
@@ -302,7 +300,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -500,7 +498,6 @@ modules:
         - eBPF
         - latency
         - partition
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Measure latency for I/O events on disk."
@@ -553,7 +550,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -606,7 +603,6 @@ modules:
       keywords:
         - HardIRQ
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor latency for each HardIRQ available."
@@ -659,7 +655,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -718,7 +714,6 @@ modules:
         - Page cache
         - Hit ratio
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor Linux page cache events giving for users a general vision about how his kernel is manipulating files."
@@ -768,7 +763,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -947,7 +942,6 @@ modules:
         - eBPF
         - hard disk
         - memory
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor syscall responsible to move data from memory to storage device."
@@ -1000,7 +994,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -1128,7 +1122,6 @@ modules:
         - MD
         - RAID
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor when flush events happen between disks."
@@ -1178,7 +1171,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -1238,7 +1231,6 @@ modules:
         - memory
         - eBPF
         - Hard Disk
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitors when swap has I/O events and applications executing events."
@@ -1288,7 +1280,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -1417,7 +1409,6 @@ modules:
       keywords:
         - application
         - memory
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor applications that reach out of memory."
@@ -1478,7 +1469,7 @@ modules:
         list:
           - name: update every
             description: Data collection frequency.
-            default_value: 5
+            default_value: 10
             required: false
           - name: ebpf load mode
             description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -1550,7 +1541,6 @@ modules:
         - server
         - connection
         - socket
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor bandwidth consumption per application for protocols TCP and UDP."
@@ -1600,7 +1590,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -1907,7 +1897,6 @@ modules:
         - Directory Cache
         - File system
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor directory cache events per application given an overall vision about files on memory or storage device."
@@ -1957,7 +1946,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -2131,7 +2120,6 @@ modules:
         - eBPF
         - latency
         - I/O
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor latency for main actions on filesystem like I/O events."
@@ -2181,7 +2169,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -2292,7 +2280,6 @@ modules:
         - syscall
         - shared memory
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor syscall responsible to manipulate shared memory."
@@ -2345,7 +2332,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -2523,7 +2510,6 @@ modules:
       keywords:
         - SoftIRQ
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor latency for each SoftIRQ available."
@@ -2576,7 +2562,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -2631,7 +2617,6 @@ modules:
         - umount
         - device
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor calls for mount and umount syscall."
@@ -2684,7 +2669,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -2761,7 +2746,6 @@ modules:
         - eBPF
         - I/O
         - files
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor I/O events on Linux Virtual Filesystem."
@@ -2811,7 +2795,7 @@ modules:
           list:
             - name: update every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 10
               required: false
             - name: ebpf load mode
               description: Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
@@ -3190,7 +3174,6 @@ modules:
         - Memory
         - plugin
         - eBPF
-      most_popular: false
     overview:
       data_collection:
         metrics_description: "Monitor internal memory usage."

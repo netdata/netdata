@@ -32,7 +32,7 @@ jobs:
       - name: Init python env
         uses: actions/setup-python@v6
         with:
-          python-version: "3.9"
+          python-version: "3.10"
 
       - name: Setup python dependencies
         run: |
@@ -55,6 +55,11 @@ jobs:
         run: |
           source ./venv/bin/activate
           cd netdata && python3 integrations/gen_doc_collector_page.py
+
+      - name: Generate src/collectors/SECRETS.md
+        run: |
+          source ./venv/bin/activate
+          cd netdata && python3 integrations/gen_doc_secrets_page.py
 
       - name: Run Ingest
         working-directory: learn

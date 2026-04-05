@@ -20,9 +20,9 @@ func (c *Collector) collect() (map[string]int64, error) {
 }
 
 func getColonSepValue(line string) string {
-	i := strings.IndexByte(line, ':')
-	if i == -1 {
+	_, after, ok := strings.Cut(line, ":")
+	if !ok {
 		return ""
 	}
-	return strings.TrimSpace(line[i+1:])
+	return strings.TrimSpace(after)
 }

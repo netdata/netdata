@@ -7,25 +7,25 @@ package runit
 import (
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioSummary = module.Priority + iota
+	prioSummary = collectorapi.Priority + iota
 	prioState
 	prioStateDuration
 )
 
-var summaryCharts = module.Charts{
+var summaryCharts = collectorapi.Charts{
 	{
 		ID:       "services",
 		Title:    "Services",
 		Units:    "services",
 		Fam:      "summary",
 		Ctx:      "runit.services",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioSummary,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "running_services", Name: "running"},
 			{ID: "not_running_services", Name: "not_running"},
 		},
@@ -64,42 +64,42 @@ func serviceDimID(chartID, state string) string {
 }
 
 func (c *Collector) addServiceCharts(service string) {
-	stateChart := &module.Chart{
+	stateChart := &collectorapi.Chart{
 		ID:       serviceStateChartID(service),
 		Title:    "Service State",
 		Units:    "state",
 		Fam:      "state",
 		Ctx:      "runit.service_state",
 		Priority: prioState,
-		Labels: []module.Label{
+		Labels: []collectorapi.Label{
 			{Key: "service_name", Value: service},
 		},
 	}
 	chartID := stateChart.ID
 	for _, s := range serviceStates {
-		stateChart.Dims = append(stateChart.Dims, &module.Dim{
+		stateChart.Dims = append(stateChart.Dims, &collectorapi.Dim{
 			ID:   serviceDimID(chartID, s),
 			Name: s,
 		})
 	}
-	stateChart.Dims = append(stateChart.Dims, &module.Dim{
+	stateChart.Dims = append(stateChart.Dims, &collectorapi.Dim{
 		ID:      serviceDimID(chartID, stateEnabled),
 		Name:    stateEnabled,
-		DimOpts: module.DimOpts{Hidden: true},
+		DimOpts: collectorapi.DimOpts{Hidden: true},
 	})
 
-	durationChart := &module.Chart{
+	durationChart := &collectorapi.Chart{
 		ID:       serviceStateDurationChartID(service),
 		Title:    "Service State Duration",
 		Units:    "seconds",
 		Fam:      "uptime",
 		Ctx:      "runit.service_state_duration",
-		Type:     module.Line,
+		Type:     collectorapi.Line,
 		Priority: prioStateDuration,
-		Labels: []module.Label{
+		Labels: []collectorapi.Label{
 			{Key: "service_name", Value: service},
 		},
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: serviceDimID(serviceStateDurationChartID(service), stateDown), Name: stateDown},
 			{ID: serviceDimID(serviceStateDurationChartID(service), stateRunning), Name: stateRunning},
 		},

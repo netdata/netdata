@@ -250,7 +250,7 @@ When sending multiple metrics in a UDP message, keep the total size under the ne
 
 :::important
 
-Netdata will accept UDP packets up to 9000 bytes, but your network equipment may fragment any packets exceeding the MTU.
+Netdata can accept UDP datagrams up to the maximum UDP payload size (65,507 bytes for IPv4), but packets larger than the network MTU will be fragmented at the IP layer (or dropped if fragmentation is not allowed).
 
 :::
 

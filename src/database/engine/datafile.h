@@ -79,6 +79,7 @@ struct rrdengine_datafile {
         unsigned lockers;
         unsigned lockers_by_reason[DATAFILE_ACQUIRE_MAX];
         bool available;
+        bool pending_deletion;
         time_t time_to_evict;
     } users;
 

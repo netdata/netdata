@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
@@ -60,17 +60,17 @@ func (c *Collector) collect() (map[string]int64, error) {
 }
 
 func (c *Collector) addProxyToCharts(proxy string) {
-	c.addDimToChart(chartBackendCurrentSessions.ID, &module.Dim{
+	c.addDimToChart(chartBackendCurrentSessions.ID, &collectorapi.Dim{
 		ID:   proxyDimID(metricBackendCurrentSessions, proxy),
 		Name: proxy,
 	})
-	c.addDimToChart(chartBackendSessions.ID, &module.Dim{
+	c.addDimToChart(chartBackendSessions.ID, &collectorapi.Dim{
 		ID:   proxyDimID(metricBackendSessionsTotal, proxy),
 		Name: proxy,
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	})
 
-	c.addDimToChart(chartBackendResponseTimeAverage.ID, &module.Dim{
+	c.addDimToChart(chartBackendResponseTimeAverage.ID, &collectorapi.Dim{
 		ID:   proxyDimID(metricBackendResponseTimeAverageSeconds, proxy),
 		Name: proxy,
 	})
@@ -78,11 +78,11 @@ func (c *Collector) addProxyToCharts(proxy string) {
 		c.Warning(err)
 	}
 
-	c.addDimToChart(chartBackendCurrentQueue.ID, &module.Dim{
+	c.addDimToChart(chartBackendCurrentQueue.ID, &collectorapi.Dim{
 		ID:   proxyDimID(metricBackendCurrentQueue, proxy),
 		Name: proxy,
 	})
-	c.addDimToChart(chartBackendQueueTimeAverage.ID, &module.Dim{
+	c.addDimToChart(chartBackendQueueTimeAverage.ID, &collectorapi.Dim{
 		ID:   proxyDimID(metricBackendQueueTimeAverageSeconds, proxy),
 		Name: proxy,
 	})
@@ -92,7 +92,7 @@ func (c *Collector) addProxyToCharts(proxy string) {
 	}
 }
 
-func (c *Collector) addDimToChart(chartID string, dim *module.Dim) {
+func (c *Collector) addDimToChart(chartID string, dim *collectorapi.Dim) {
 	chart := c.Charts().Get(chartID)
 	if chart == nil {
 		c.Warningf("error on adding '%s' dimension: can not find '%s' chart", dim.ID, chartID)

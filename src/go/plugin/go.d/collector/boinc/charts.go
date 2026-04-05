@@ -3,43 +3,43 @@
 package boinc
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioTasks = module.Priority + iota
+	prioTasks = collectorapi.Priority + iota
 	prioTasksState
 	prioActiveTasksState
 	prioActiveTasksSchedulerState
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	tasksChart.Copy(),
 	tasksStateChart.Copy(),
 	activeTasksStateChart.Copy(),
 	activeTasksSchedulerStateChart.Copy(),
 }
 var (
-	tasksChart = module.Chart{
+	tasksChart = collectorapi.Chart{
 		ID:       "tasks",
 		Title:    "Overall Tasks",
 		Units:    "tasks",
 		Fam:      "tasks",
 		Ctx:      "boinc.tasks",
 		Priority: prioTasks,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "total"},
 			{ID: "active"},
 		},
 	}
-	tasksStateChart = module.Chart{
+	tasksStateChart = collectorapi.Chart{
 		ID:       "tasks_state",
 		Title:    "Tasks per State",
 		Units:    "tasks",
 		Fam:      "tasks",
 		Ctx:      "boinc.tasks_per_state",
 		Priority: prioTasksState,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "new"},
 			{ID: "files_downloading", Name: "downloading"},
 			{ID: "files_downloaded", Name: "downloaded"},
@@ -50,14 +50,14 @@ var (
 			{ID: "upload_failed"},
 		},
 	}
-	activeTasksStateChart = module.Chart{
+	activeTasksStateChart = collectorapi.Chart{
 		ID:       "active_tasks_state",
 		Title:    "Active Tasks per State",
 		Units:    "tasks",
 		Fam:      "tasks",
 		Ctx:      "boinc.active_tasks_per_state",
 		Priority: prioActiveTasksState,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "uninitialized"},
 			{ID: "executing"},
 			{ID: "abort_pending"},
@@ -66,14 +66,14 @@ var (
 			{ID: "copy_pending"},
 		},
 	}
-	activeTasksSchedulerStateChart = module.Chart{
+	activeTasksSchedulerStateChart = collectorapi.Chart{
 		ID:       "active_tasks_scheduler_state",
 		Title:    "Active Tasks per Scheduler State",
 		Units:    "tasks",
 		Fam:      "tasks",
 		Ctx:      "boinc.active_tasks_per_scheduler_state",
 		Priority: prioActiveTasksSchedulerState,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "uninitialized"},
 			{ID: "preempted"},
 			{ID: "scheduled"},

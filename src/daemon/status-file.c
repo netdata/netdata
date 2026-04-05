@@ -93,16 +93,10 @@ static void fill_dmi_info(DAEMON_STATUS_FILE *ds) {
 
 // --------------------------------------------------------------------------------------------------------------------
 // json generation
+// Each section is a separate function to stay within GCC's -fvar-tracking-assignments size limit.
+// IMPORTANT: ALL functions here are called from signal handlers — no locks, no allocations.
 
-static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
-    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
-    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
-
-    dsf_acquire(*ds);
-
-    buffer_json_member_add_string(wb, "@timestamp", ds->timestamp_ut_rfc3339);
-    buffer_json_member_add_uint64(wb, "version", STATUS_FILE_VERSION);
-
+static void dsf_json_agent(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "agent");
     {
         buffer_json_member_add_uuid(wb, "id", ds->host_id.uuid.uuid);
@@ -121,7 +115,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         if(ds->v >= 24)
             buffer_json_member_add_uint64(wb, "crashes", ds->crashes);
-            
+
         // Only include PID if we're at version 27 or later
         if(ds->v >= 27)
             buffer_json_member_add_uint64(wb, "pid", (uint64_t)ds->pid);
@@ -159,7 +153,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_metrics(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     // Add metrics stats as a top-level node
     buffer_json_member_add_object(wb, "metrics");
     {
@@ -194,7 +190,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_host(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "host");
     {
         buffer_json_member_add_uuid_compact(wb, "id", ds->machine_id.uuid);
@@ -209,7 +207,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_string_or_empty(wb, "cloud_instance", ds->cloud_instance_type);
             buffer_json_member_add_string_or_empty(wb, "cloud_region", ds->cloud_instance_region);
         }
-        
+
         buffer_json_member_add_uint64(wb, "system_cpus", ds->system_cpus);
 
         buffer_json_member_add_object(wb, "boot");
@@ -241,7 +239,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
                 buffer_json_member_add_boolean(wb, "read_only", ds->var_cache.is_read_only);
             }
             buffer_json_object_close(wb);
-            
+
             buffer_json_member_add_object(wb, "netdata");
             buffer_json_member_add_uint64(wb, "dbengine", ds->disk_footprint.dbengine);
             buffer_json_member_add_uint64(wb, "sqlite", ds->disk_footprint.sqlite);
@@ -252,7 +250,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
-    
+}
+
+static void dsf_json_os(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "os");
     {
         buffer_json_member_add_string(wb, "type", DAEMON_OS_TYPE_2str(ds->os_type));
@@ -263,7 +263,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string_or_empty(wb, "platform", ds->os_id_like);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_hw(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "hw");
     {
         buffer_json_member_add_object(wb, "sys");
@@ -314,7 +316,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_object_close(wb);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_product(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "product");
     {
         buffer_json_member_add_string(wb, "vendor", ds->product.vendor);
@@ -322,7 +326,9 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_string(wb, "type", ds->product.type);
     }
     buffer_json_object_close(wb);
+}
 
+static void dsf_json_fatal(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "fatal");
     {
         buffer_json_member_add_uint64(wb, "line", ds->fatal.line);
@@ -358,6 +364,24 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_uint64(wb, "worker_job_id", ds->fatal.worker_job_id);
     }
     buffer_json_object_close(wb);
+}
+
+static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
+    dsf_acquire(*ds);
+
+    buffer_json_member_add_string(wb, "@timestamp", ds->timestamp_ut_rfc3339);
+    buffer_json_member_add_uint64(wb, "version", STATUS_FILE_VERSION);
+
+    dsf_json_agent(wb, ds);
+    dsf_json_metrics(wb, ds);
+    dsf_json_host(wb, ds);
+    dsf_json_os(wb, ds);
+    dsf_json_hw(wb, ds);
+    dsf_json_product(wb, ds);
+    dsf_json_fatal(wb, ds);
 
     dsf_release(*ds);
 }
@@ -372,27 +396,27 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
     // change management, version to know which fields to expect
     uint64_t version = 0;
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "version", version, error, true);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "version", version, error, JSONC_REQUIRED);
     ds->v = version;
 
-    bool strict = false; // allow missing fields and values
-    bool required_v1 = version >= 1 ? strict : false;
-    bool required_v3 = version >= 3 ? strict : false;
-    bool required_v4 = version >= 4 ? strict : false;
-    bool required_v5 = version >= 5 ? strict : false;
-    bool required_v10 = version >= 10 ? strict : false;
-    bool required_v14 = version >= 14 ? strict : false;
-    bool required_v16 = version >= 16 ? strict : false;
-    bool required_v17 = version >= 17 ? strict : false;
-    bool required_v18 = version >= 18 ? strict : false;
-    bool required_v20 = version >= 20 ? strict : false;
-    bool required_v21 = version >= 21 ? strict : false;
-    bool required_v22 = version >= 22 ? strict : false;
-    bool required_v23 = version >= 23 ? strict : false;
-    bool required_v24 = version >= 24 ? strict : false;
-    bool required_v25 = version >= 25 ? strict : false;
-    bool required_v26 = version >= 26 ? strict : false;
-    bool required_v27 = version >= 27 ? strict : false;
+    unsigned strict = JSONC_OPTIONAL; // allow missing fields and values
+    unsigned required_v1 = version >= 1 ? strict : JSONC_OPTIONAL;
+    unsigned required_v3 = version >= 3 ? strict : JSONC_OPTIONAL;
+    unsigned required_v4 = version >= 4 ? strict : JSONC_OPTIONAL;
+    unsigned required_v5 = version >= 5 ? strict : JSONC_OPTIONAL;
+    unsigned required_v10 = version >= 10 ? strict : JSONC_OPTIONAL;
+    unsigned required_v14 = version >= 14 ? strict : JSONC_OPTIONAL;
+    unsigned required_v16 = version >= 16 ? strict : JSONC_OPTIONAL;
+    unsigned required_v17 = version >= 17 ? strict : JSONC_OPTIONAL;
+    unsigned required_v18 = version >= 18 ? strict : JSONC_OPTIONAL;
+    unsigned required_v20 = version >= 20 ? strict : JSONC_OPTIONAL;
+    unsigned required_v21 = version >= 21 ? strict : JSONC_OPTIONAL;
+    unsigned required_v22 = version >= 22 ? strict : JSONC_OPTIONAL;
+    unsigned required_v23 = version >= 23 ? strict : JSONC_OPTIONAL;
+    unsigned required_v24 = version >= 24 ? strict : JSONC_OPTIONAL;
+    unsigned required_v25 = version >= 25 ? strict : JSONC_OPTIONAL;
+    unsigned required_v26 = version >= 26 ? strict : JSONC_OPTIONAL;
+    unsigned required_v27 = version >= 27 ? strict : JSONC_OPTIONAL;
 
     // Parse timestamp
     JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", ds->timestamp_ut, error, required_v1);
@@ -441,7 +465,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
             
         // Only try to parse PID if we're at version 27 or later
         if(version >= 27)
-            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "pid", ds->pid, error, false);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "pid", ds->pid, error, JSONC_OPTIONAL);
 
         if(version >= 22) {
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "posts", ds->posts, error, required_v22);
@@ -483,8 +507,8 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         });
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "memory", error, required_v1, {
-            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->memory.ram_total_bytes, error, false);
-            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->memory.ram_available_bytes, error, false);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->memory.ram_total_bytes, error, JSONC_OPTIONAL);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->memory.ram_available_bytes, error, JSONC_OPTIONAL);
             if(!OS_SYSTEM_MEMORY_OK(ds->memory))
                 ds->memory = OS_SYSTEM_MEMORY_EMPTY;
 
@@ -496,11 +520,11 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "disk", error, required_v1, {
             JSONC_PARSE_SUBOBJECT(jobj, path, "db", error, required_v1, {
-                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->var_cache.total_bytes, error, false);
-                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->var_cache.free_bytes, error, false);
-                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_total", ds->var_cache.total_inodes, error, false);
-                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_free", ds->var_cache.free_inodes, error, false);
-                JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "read_only", ds->var_cache.is_read_only, error, false);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "total", ds->var_cache.total_bytes, error, JSONC_OPTIONAL);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "free", ds->var_cache.free_bytes, error, JSONC_OPTIONAL);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_total", ds->var_cache.total_inodes, error, JSONC_OPTIONAL);
+                JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "inodes_free", ds->var_cache.free_inodes, error, JSONC_OPTIONAL);
+                JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "read_only", ds->var_cache.is_read_only, error, JSONC_OPTIONAL);
                 if(!OS_SYSTEM_DISK_SPACE_OK(ds->var_cache))
                     ds->var_cache = OS_SYSTEM_DISK_SPACE_EMPTY;
             });
@@ -789,8 +813,11 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     if(get_daemon_status_fields_from_system_info(&session_status))
         product_name_vendor_type(&session_status);
 
-    if(netdata_configured_timezone)
-        safecpy(session_status.timezone, netdata_configured_timezone);
+    {
+        SYSTEM_TZ tz = system_tz_get();
+        safecpy(session_status.timezone, tz.timezone);
+        system_tz_free(&tz);
+    }
 
     session_status.exit_reason = exit_initiated_get();
     session_status.profile = nd_profile_detect_and_configure(false);

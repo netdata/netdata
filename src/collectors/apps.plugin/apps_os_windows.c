@@ -565,8 +565,7 @@ STRING *GetProcessFriendlyNameFromPathSanitized(WCHAR *path) {
 static STRING *GetNameFromCmdlineSanitized(struct pid_stat *p) {
     if(!p->cmdline) return NULL;
 
-    char buf[string_strlen(p->cmdline) + 1];
-    memcpy(buf, string2str(p->cmdline), sizeof(buf));
+    char *buf = strdupz(string2str(p->cmdline));
     char *words[100];
     size_t num_words = quoted_strings_splitter(buf, words, 100, isspace_map_pluginsd);
 
@@ -574,15 +573,19 @@ static STRING *GetNameFromCmdlineSanitized(struct pid_stat *p) {
         // find -s SERVICE in the command line
         for(size_t i = 0; i < num_words ;i++) {
             if(strcmp(words[i], "-s") == 0 && i + 1 < num_words) {
-                char service[strlen(words[i + 1]) + sizeof(SERVICE_PREFIX)]; // sizeof() includes a null
+                char *service = mallocz(strlen(words[i + 1]) + sizeof(SERVICE_PREFIX)); // sizeof() includes a null
                 strcpy(service, SERVICE_PREFIX);
                 strcpy(&service[sizeof(SERVICE_PREFIX) - 1], words[i + 1]);
                 sanitize_apps_plugin_chart_meta(service);
-                return string_strdupz(service);
+                STRING *sanitized = string_strdupz(service);
+                freez(service);
+                freez(buf);
+                return sanitized;
             }
         }
     }
 
+    freez(buf);
     return NULL;
 }
 
@@ -630,6 +633,10 @@ static void GetServiceNames(void) {
                 sanitize_apps_plugin_chart_meta(name);
                 string_freez(p->name);
                 p->name = string_strdupz(name);
+#if (PROCESSES_HAVE_SERVICE == 1)
+                string_freez(p->service_name);
+                p->service_name = string_strdupz(name);
+#endif
             }
         }
     }
@@ -819,7 +826,7 @@ static inline kernel_uint_t perflib_cpu_utilization(COUNTER_DATA *d) {
      */
 
     LONGLONG dt = time1 - time0;
-    if(dt > 0)
+    if(dt > 0 && data1 >= data0)
         return NSEC_PER_SEC * (data1 - data0) / dt;
     else
         return 0;
@@ -832,7 +839,7 @@ static inline kernel_uint_t perflib_rate(COUNTER_DATA *d) {
     LONGLONG time0 = d->previous.Time;
 
     LONGLONG dt = (time1 - time0);
-    if(dt > 0)
+    if(dt > 0 && data1 >= data0)
         return (RATES_DETAIL * (data1 - data0)) / dt;
     else
         return 0;
@@ -945,6 +952,69 @@ bool apps_os_collect_all_pids_windows(void) {
         if(failed) {
             pid_collection_failed(p);
             continue;
+        }
+
+        // Detect PID reuse: if the process creation time changed, the PID was recycled
+        // by a different process. Without this check, the unsigned subtraction in
+        // perflib_cpu_utilization() and perflib_rate() would underflow, producing
+        // massive bogus values (e.g., 184725% CPU).
+        if(p->perflib[PDF_UPTIME].previous.Data != 0 &&
+           p->perflib[PDF_UPTIME].current.Data != p->perflib[PDF_UPTIME].previous.Data) {
+
+            nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                   "APPS: PID %d (%s) creation time changed "
+                   "(0x%" PRIx64 " -> 0x%" PRIx64 "), "
+                   "PID reuse detected, resetting counters",
+                   (int)p->pid, pid_stat_comm(p),
+                   (uint64_t)p->perflib[PDF_UPTIME].previous.Data,
+                   (uint64_t)p->perflib[PDF_UPTIME].current.Data);
+
+            // Reset all counter history to prevent unsigned underflow in rate calculations
+            for(PID_FIELD f = 0; f < PDF_MAX; f++) {
+                if(p->perflib[f].key)
+                    p->perflib[f].previous = RAW_DATA_EMPTY;
+            }
+
+            // Reset process identity so GetAllProcessesInfo() re-reads everything
+            p->got_info = false;
+            p->got_service = false;
+
+            string_freez(p->sid_name);
+            p->sid_name = NULL;
+
+            string_freez(p->service_name);
+            p->service_name = NULL;
+
+            string_freez(p->name);
+            p->name = NULL;
+
+            string_freez(p->cmdline);
+            p->cmdline = NULL;
+
+            // Re-read comm name from the perflib instance
+            {
+                char reuse_comm[MAX_PATH];
+                if(getInstanceName(d.pDataBlock, d.pObjectType, d.pi, reuse_comm, sizeof(reuse_comm)))
+                    fix_windows_comm(p, reuse_comm);
+                else
+                    strncpyz(reuse_comm, "unknown", sizeof(reuse_comm) - 1);
+
+                update_pid_comm(p, reuse_comm);
+            }
+
+            // Update parent PID
+            {
+                COUNTER_DATA ppid = {.key = "Creating Process ID"};
+                perflibGetInstanceCounter(d.pDataBlock, d.pObjectType, d.pi, &ppid);
+                p->ppid = (pid_t)ppid.current.Data;
+            }
+
+            // Reset target assignment — the new process may belong to a different group
+            p->target = NULL;
+            p->matched_by_config = false;
+
+            // Trigger GetAllProcessesInfo() to re-read cmdline, name, SID, service
+            added++;
         }
 
         // CPU time

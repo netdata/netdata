@@ -69,7 +69,7 @@ Once logged into Netdata Cloud, you'll see connection instructions. There are th
 <details>
 <summary><strong>Method 1: Through the Cloud Interface</strong></summary><br/>
 
-1. Navigate to **Space Settings** (cogwheel icon)
+1. Navigate to **Space Settings** (⚙️) on the left sidebar below the spaces list
 2. Select **Nodes** tab
 3. Click the **"+"** button to add a new node
 4. Copy and run the generated connection command
@@ -100,7 +100,7 @@ Once logged into Netdata Cloud, you'll see connection instructions. There are th
 All methods will show you a command like this:
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --claim-token YOUR_TOKEN --claim-rooms YOUR_ROOMS --claim-url https://app.netdata.cloud
+bash <(curl -Ss https://get.netdata.cloud/kickstart.sh) --claim-token YOUR_TOKEN --claim-rooms YOUR_ROOMS --claim-url https://app.netdata.cloud
 ```
 
 :::
@@ -228,7 +228,7 @@ Click "Invite Users" in your Space sidebar to add team members. Set appropriate 
 **Organize by Your Needs:**
 
 | **Category**       | **Examples**                         |
-|--------------------|--------------------------------------|
+| ------------------ | ------------------------------------ |
 | **By Service**     | Web servers, databases, applications |
 | **By Location**    | Data centers, cloud regions          |
 | **By Team**        | DevOps, SRE, development teams       |
@@ -248,7 +248,7 @@ Click "Invite Users" in your Space sidebar to add team members. Set appropriate 
 ### Traditional Monitoring vs Netdata Business
 
 | **Traditional Monitoring**                       |        | **Netdata Business**                               |
-|--------------------------------------------------|:------:|----------------------------------------------------|
+| ------------------------------------------------ | :----: | -------------------------------------------------- |
 | **Navigate complex interfaces** during incidents |        | **Get instant analysis** with natural language     |
 | **Build dashboards** during incidents            | **VS** | **Automatic dashboards** with zero configuration   |
 | **Manually correlate data** across systems       |        | **AI-powered correlation** and root cause analysis |
@@ -262,7 +262,7 @@ Experience the future of infrastructure monitoring with AI that actually works. 
 **AI Features Overview:**
 
 | **Capability**           | **What It Does**                    | **Access**                           |
-|--------------------------|-------------------------------------|--------------------------------------|
+| ------------------------ | ----------------------------------- | ------------------------------------ |
 | **AI Chat with Netdata** | Ask questions in natural language   | Available now for all deployments    |
 | **AI DevOps Copilot**    | CLI-based AI automation             | Available now with MCP tools         |
 | **AI Insights**          | Professional reports in 2-3 minutes | Business plans get unlimited reports |

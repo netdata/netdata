@@ -19,7 +19,6 @@ modules:
         - am2320
         - sensor
         - humidity
-      most_popular: false
     overview:
       data_collection:
         metrics_description: 'This collector monitors AM2320 sensor metrics about temperature and humidity.'

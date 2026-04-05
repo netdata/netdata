@@ -46,11 +46,12 @@ The following options can be defined for this notification
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | SEND_NTFY | Set `SEND_NTFY` to YES | YES | yes |
-| DEFAULT_RECIPIENT_NTFY | URL formed by the server-topic combination you want the alert notifications to be sent to. Unless hosting your own server, the server should always be set to https://ntfy.sh. |  | yes |
-| NTFY_USERNAME | The username for netdata to use to authenticate with an ntfy server. |  | no |
-| NTFY_PASSWORD | The password for netdata to use to authenticate with an ntfy server. |  | no |
-| NTFY_ACCESS_TOKEN | The access token for netdata to use to authenticate with an ntfy server. |  | no |
+| [DEFAULT_RECIPIENT_NTFY](#option-default-recipient-ntfy) | URL formed by the server-topic combination you want the alert notifications to be sent to. Unless hosting your own server, the server should always be set to https://ntfy.sh. |  | yes |
+| [NTFY_USERNAME](#option-ntfy-username) | The username for netdata to use to authenticate with an ntfy server. |  | no |
+| [NTFY_PASSWORD](#option-ntfy-password) | The password for netdata to use to authenticate with an ntfy server. |  | no |
+| [NTFY_ACCESS_TOKEN](#option-ntfy-access-token) | The access token for netdata to use to authenticate with an ntfy server. |  | no |
 
+<a id="option-default-recipient-ntfy"></a>
 ##### DEFAULT_RECIPIENT_NTFY
 
 You can define multiple recipient URLs like this: `https://SERVER1/TOPIC1` `https://SERVER2/TOPIC2`
@@ -68,18 +69,21 @@ role_recipients_ntfy[sitemgr]="https://SERVER6/TOPIC6"
 ```
 
 
+<a id="option-ntfy-username"></a>
 ##### NTFY_USERNAME
 
 Only useful on self-hosted ntfy instances. See [users and roles](https://docs.ntfy.sh/config/#users-and-roles) for details.
 Ensure that your user has proper read/write access to the provided topic in `DEFAULT_RECIPIENT_NTFY`
 
 
+<a id="option-ntfy-password"></a>
 ##### NTFY_PASSWORD
 
 Only useful on self-hosted ntfy instances. See [users and roles](https://docs.ntfy.sh/config/#users-and-roles) for details.
 Ensure that your user has proper read/write access to the provided topic in `DEFAULT_RECIPIENT_NTFY`
 
 
+<a id="option-ntfy-access-token"></a>
 ##### NTFY_ACCESS_TOKEN
 
 This can be used in place of `NTFY_USERNAME` and `NTFY_PASSWORD` to authenticate with a self-hosted ntfy instance. See [access tokens](https://docs.ntfy.sh/config/?h=access+to#access-tokens) for details.

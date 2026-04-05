@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
@@ -162,7 +162,7 @@ func (c *Collector) collectEntrypointOpenConnections(mx map[string]int64, pms pr
 
 		if !ce.openConnMethods[method] {
 			ce.openConnMethods[method] = true
-			dim := &module.Dim{ID: key, Name: method}
+			dim := &collectorapi.Dim{ID: key, Name: method}
 			if err := ce.openConn.AddDim(dim); err != nil {
 				c.Warning(err)
 			}

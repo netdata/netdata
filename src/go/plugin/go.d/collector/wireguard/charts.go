@@ -6,86 +6,86 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 const (
-	prioDeviceNetworkIO = module.Priority + iota
+	prioDeviceNetworkIO = collectorapi.Priority + iota
 	prioDevicePeers
 	prioPeerNetworkIO
 	prioPeerLatestHandShake
 )
 
 var (
-	deviceChartsTmpl = module.Charts{
+	deviceChartsTmpl = collectorapi.Charts{
 		deviceNetworkIOChartTmpl.Copy(),
 		devicePeersChartTmpl.Copy(),
 	}
 
-	deviceNetworkIOChartTmpl = module.Chart{
+	deviceNetworkIOChartTmpl = collectorapi.Chart{
 		ID:       "device_%s_network_io",
 		Title:    "Device traffic",
 		Units:    "B/s",
 		Fam:      "device traffic",
 		Ctx:      "wireguard.device_network_io",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioDeviceNetworkIO,
-		Dims: module.Dims{
-			{ID: "device_%s_receive", Name: "receive", Algo: module.Incremental},
-			{ID: "device_%s_transmit", Name: "transmit", Algo: module.Incremental, Mul: -1},
+		Dims: collectorapi.Dims{
+			{ID: "device_%s_receive", Name: "receive", Algo: collectorapi.Incremental},
+			{ID: "device_%s_transmit", Name: "transmit", Algo: collectorapi.Incremental, Mul: -1},
 		},
 	}
-	devicePeersChartTmpl = module.Chart{
+	devicePeersChartTmpl = collectorapi.Chart{
 		ID:       "device_%s_peers",
 		Title:    "Device peers",
 		Units:    "peers",
 		Fam:      "device peers",
 		Ctx:      "wireguard.device_peers",
 		Priority: prioDevicePeers,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "device_%s_peers", Name: "peers"},
 		},
 	}
 )
 
 var (
-	peerChartsTmpl = module.Charts{
+	peerChartsTmpl = collectorapi.Charts{
 		peerNetworkIOChartTmpl.Copy(),
 		peerLatestHandShakeChartTmpl.Copy(),
 	}
 
-	peerNetworkIOChartTmpl = module.Chart{
+	peerNetworkIOChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_network_io",
 		Title:    "Peer traffic",
 		Units:    "B/s",
 		Fam:      "peer traffic",
 		Ctx:      "wireguard.peer_network_io",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioPeerNetworkIO,
-		Dims: module.Dims{
-			{ID: "peer_%s_receive", Name: "receive", Algo: module.Incremental},
-			{ID: "peer_%s_transmit", Name: "transmit", Algo: module.Incremental, Mul: -1},
+		Dims: collectorapi.Dims{
+			{ID: "peer_%s_receive", Name: "receive", Algo: collectorapi.Incremental},
+			{ID: "peer_%s_transmit", Name: "transmit", Algo: collectorapi.Incremental, Mul: -1},
 		},
 	}
-	peerLatestHandShakeChartTmpl = module.Chart{
+	peerLatestHandShakeChartTmpl = collectorapi.Chart{
 		ID:       "peer_%s_latest_handshake_ago",
 		Title:    "Peer time elapsed since the latest handshake",
 		Units:    "seconds",
 		Fam:      "peer latest handshake",
 		Ctx:      "wireguard.peer_latest_handshake_ago",
 		Priority: prioPeerLatestHandShake,
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "peer_%s_latest_handshake_ago", Name: "time"},
 		},
 	}
 )
 
-func newDeviceCharts(device string) *module.Charts {
+func newDeviceCharts(device string) *collectorapi.Charts {
 	charts := deviceChartsTmpl.Copy()
 
 	for _, c := range *charts {
 		c.ID = fmt.Sprintf(c.ID, device)
-		c.Labels = []module.Label{
+		c.Labels = []collectorapi.Label{
 			{Key: "device", Value: device},
 		}
 		for _, d := range c.Dims {
@@ -115,12 +115,12 @@ func (c *Collector) removeDeviceCharts(device string) {
 	}
 }
 
-func newPeerCharts(id, device, pubKey string) *module.Charts {
+func newPeerCharts(id, device, pubKey string) *collectorapi.Charts {
 	charts := peerChartsTmpl.Copy()
 
 	for _, c := range *charts {
 		c.ID = fmt.Sprintf(c.ID, id)
-		c.Labels = []module.Label{
+		c.Labels = []collectorapi.Label{
 			{Key: "device", Value: device},
 			{Key: "public_key", Value: pubKey},
 		}

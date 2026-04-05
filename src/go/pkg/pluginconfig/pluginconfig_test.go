@@ -7,8 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/netdata/netdata/go/plugins/pkg/cli"
 )
 
 // helpers
@@ -34,14 +32,14 @@ func TestDirectoriesBuild(t *testing.T) {
 	mkdir(t, probeStock)
 
 	tests := map[string]struct {
-		opts    *cli.Option
+		input   InitInput
 		env     envData
 		want    directories
 		wantErr bool
 	}{
 		// ─────────────────────────────────── core (no cygwinBase) ───────────────────────────────────
 		"cli_dirs_only": {
-			opts: &cli.Option{
+			input: InitInput{
 				ConfDir: []string{"/tmp/user1", "/tmp/user2"},
 			},
 			env: envData{
@@ -59,7 +57,7 @@ func TestDirectoriesBuild(t *testing.T) {
 			},
 		},
 		"env_dirs_only": {
-			opts: &cli.Option{},
+			input: InitInput{},
 			env: envData{
 				userDir:  "/tmp/env/user",
 				stockDir: "/tmp/env/stock",
@@ -76,7 +74,7 @@ func TestDirectoriesBuild(t *testing.T) {
 			},
 		},
 		"cli_overrides_env": {
-			opts: &cli.Option{
+			input: InitInput{
 				ConfDir: []string{"/tmp/cli/dir"},
 			},
 			env: envData{
@@ -95,8 +93,8 @@ func TestDirectoriesBuild(t *testing.T) {
 			},
 		},
 		"fallback_dirs_when_no_config": {
-			opts: &cli.Option{},
-			env:  envData{},
+			input: InitInput{},
+			env:   envData{},
 			// build-relative fallback from execDir
 			want: directories{
 				userConfigDirs:     []string{filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata")},
@@ -110,7 +108,7 @@ func TestDirectoriesBuild(t *testing.T) {
 			},
 		},
 		"multiple_cli_dirs": {
-			opts: &cli.Option{
+			input: InitInput{
 				ConfDir: []string{"/tmp/dir1", "/tmp/dir2", "/tmp/dir3"},
 			},
 			env: envData{
@@ -138,7 +136,7 @@ func TestDirectoriesBuild(t *testing.T) {
 
 		// ─────────────────────────────── explicit cygwinBase cases ───────────────────────────────
 		"watch_paths_from_cli_and_env (cygwinBase)": {
-			opts: &cli.Option{
+			input: InitInput{
 				WatchPath: []string{"/tmp/watch1", "/tmp/watch2"},
 			},
 			env: envData{
@@ -157,7 +155,7 @@ func TestDirectoriesBuild(t *testing.T) {
 			},
 		},
 		"varlib_from_env (cygwinBase + probes)": {
-			opts: &cli.Option{},
+			input: InitInput{},
 			env: envData{
 				cygwinBase: tmp,
 				varLibDir:  "/var/lib/netdata",
@@ -174,7 +172,7 @@ func TestDirectoriesBuild(t *testing.T) {
 			},
 		},
 		"empty_stock_dir_from_env (cygwinBase + probes)": {
-			opts: &cli.Option{},
+			input: InitInput{},
 			env: envData{
 				userDir:    "/tmp/user", // explicit user
 				stockDir:   "",          // missing -> probe for stock
@@ -192,7 +190,7 @@ func TestDirectoriesBuild(t *testing.T) {
 			},
 		},
 		"env_user_pre_normalized (cygwinBase set)": {
-			opts: &cli.Option{},
+			input: InitInput{},
 			env: envData{
 				cygwinBase: tmp,                                   // present but build() expects env already normalized
 				userDir:    filepath.Join(tmp, "etc", "netdata"),  // pre-normalized
@@ -210,7 +208,7 @@ func TestDirectoriesBuild(t *testing.T) {
 			},
 		},
 		"cli_dirs_remapped (cygwinBase)": {
-			opts: &cli.Option{
+			input: InitInput{
 				ConfDir: []string{"/etc/netdata", "/opt/netdata/etc/netdata"},
 			},
 			env: envData{
@@ -243,7 +241,7 @@ func TestDirectoriesBuild(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel() // safe: build() uses only inputs, no globals
 			var got directories
-			err := got.build(tc.opts, tc.env, testPluginName, execDir)
+			err := got.build(tc.input, tc.env, testPluginName, execDir)
 
 			if tc.wantErr {
 				require.Error(t, err)
@@ -343,4 +341,22 @@ func TestDirectoriesBuildValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsStock(t *testing.T) {
+	orig := dirs
+	t.Cleanup(func() { dirs = orig })
+
+	t.Run("fallback heuristic when stock dir is not initialized", func(t *testing.T) {
+		dirs = directories{}
+		assert.True(t, IsStock("/usr/lib/netdata/conf.d/go.d/module.conf"))
+		assert.False(t, IsStock("/etc/netdata/go.d/module.conf"))
+	})
+
+	t.Run("uses configured stock root when available", func(t *testing.T) {
+		dirs = directories{stockConfigDir: "/custom/stock"}
+		assert.True(t, IsStock("/custom/stock/go.d/module.conf"))
+		assert.False(t, IsStock("/usr/lib/netdata/conf.d/go.d/module.conf"))
+		assert.False(t, IsStock("/etc/netdata/go.d/module.conf"))
+	})
 }

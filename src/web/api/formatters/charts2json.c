@@ -52,7 +52,11 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
     buffer_json_member_add_string(wb, "version", rrdhost_program_version(host));
     buffer_json_member_add_string(wb, "release_channel", get_release_channel());
     buffer_json_member_add_string(wb, "os", rrdhost_os(host));
-    buffer_json_member_add_string(wb, "timezone", rrdhost_timezone(host));
+    {
+        RRDHOST_TZ host_tz = rrdhost_tz_get(host);
+        buffer_json_member_add_string(wb, "timezone", host_tz.timezone);
+        rrdhost_tz_free(&host_tz);
+    }
     buffer_json_member_add_int64(wb, "update_every", host->rrd_update_every);
     buffer_json_member_add_int64(wb, "history", host->rrd_history_entries);
     buffer_json_member_add_string(wb, "memory_mode", rrd_memory_mode_name(host->rrd_memory_mode));

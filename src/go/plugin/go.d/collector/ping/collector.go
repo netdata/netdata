@@ -11,24 +11,30 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
+//go:embed "charts.yaml"
+var pingChartTemplateV2 string
+
 func init() {
-	module.Register("ping", module.Creator{
+	collectorapi.Register("ping", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Defaults: module.Defaults{
+		Defaults: collectorapi.Defaults{
 			UpdateEvery: 5,
 		},
-		Create: func() module.Module { return New() },
-		Config: func() any { return &Config{} },
+		CreateV2: func() collectorapi.CollectorV2 { return New() },
+		Config:   func() any { return &Config{} },
 	})
 }
 
 func New() *Collector {
+	store := metrix.NewCollectorStore()
+
 	return &Collector{
 		Config: Config{
 			ProberConfig: ProberConfig{
@@ -41,11 +47,10 @@ func New() *Collector {
 			JitterSMAWindow:   10,
 		},
 
-		charts:     &module.Charts{},
-		hosts:      make(map[string]bool),
 		newProber:  NewProber,
 		jitterEWMA: make(map[string]float64),
 		jitterSMA:  make(map[string][]float64),
+		store:      store,
 	}
 }
 
@@ -59,15 +64,13 @@ type Config struct {
 }
 
 type Collector struct {
-	module.Base
+	collectorapi.Base
 	Config `yaml:",inline" json:""`
-
-	charts *module.Charts
 
 	prober    Prober
 	newProber func(ProberConfig, *logger.Logger) Prober
 
-	hosts      map[string]bool
+	store      metrix.CollectorStore
 	jitterEWMA map[string]float64   // EWMA jitter state per host
 	jitterSMA  map[string][]float64 // SMA jitter window per host
 }
@@ -92,31 +95,17 @@ func (c *Collector) Init(context.Context) error {
 }
 
 func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
-	if err != nil {
-		return err
-	}
-	if len(mx) == 0 {
+	samples := c.collectSamples(false)
+	if len(samples) == 0 {
 		return errors.New("no metrics collected")
-
 	}
 	return nil
 }
 
-func (c *Collector) Charts() *module.Charts {
-	return c.charts
-}
-
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
-	if err != nil {
-		c.Error(err)
-	}
-
-	if len(mx) == 0 {
-		return nil
-	}
-	return mx
-}
+func (c *Collector) Collect(ctx context.Context) error { return c.collect(ctx) }
 
 func (c *Collector) Cleanup(context.Context) {}
+
+func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
+
+func (c *Collector) ChartTemplateYAML() string { return pingChartTemplateV2 }

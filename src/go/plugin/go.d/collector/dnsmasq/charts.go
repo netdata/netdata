@@ -2,18 +2,18 @@
 
 package dnsmasq
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
-var cacheCharts = module.Charts{
+var cacheCharts = collectorapi.Charts{
 	{
 		ID:    "servers_queries",
 		Title: "Queries forwarded to the upstream servers",
 		Units: "queries/s",
 		Fam:   "servers",
 		Ctx:   "dnsmasq.servers_queries",
-		Dims: module.Dims{
-			{ID: "queries", Name: "success", Algo: module.Incremental},
-			{ID: "failed_queries", Name: "failed", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "queries", Name: "success", Algo: collectorapi.Incremental},
+			{ID: "failed_queries", Name: "failed", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -22,9 +22,9 @@ var cacheCharts = module.Charts{
 		Units: "events/s",
 		Fam:   "cache",
 		Ctx:   "dnsmasq.cache_performance",
-		Dims: module.Dims{
-			{ID: "hits", Algo: module.Incremental},
-			{ID: "misses", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "hits", Algo: collectorapi.Incremental},
+			{ID: "misses", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -33,9 +33,9 @@ var cacheCharts = module.Charts{
 		Units: "operations/s",
 		Fam:   "cache",
 		Ctx:   "dnsmasq.cache_operations",
-		Dims: module.Dims{
-			{ID: "insertions", Algo: module.Incremental},
-			{ID: "evictions", Algo: module.Incremental},
+		Dims: collectorapi.Dims{
+			{ID: "insertions", Algo: collectorapi.Incremental},
+			{ID: "evictions", Algo: collectorapi.Incremental},
 		},
 	},
 	{
@@ -44,7 +44,7 @@ var cacheCharts = module.Charts{
 		Units: "entries",
 		Fam:   "cache",
 		Ctx:   "dnsmasq.cache_size",
-		Dims: module.Dims{
+		Dims: collectorapi.Dims{
 			{ID: "cachesize", Name: "size"},
 		},
 	},

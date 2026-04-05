@@ -32,6 +32,7 @@ typedef struct nd_sock {
     int fd;
     NETDATA_SSL ssl;
     SSL_CTX *ctx;
+    char *sni_hostname;  // hostname for SNI in SSL/TLS connections
 } ND_SOCK;
 
 #define ND_SOCK_INIT(ssl_ctx, ssl_verify) (ND_SOCK){ \
@@ -40,6 +41,7 @@ typedef struct nd_sock {
         .fd = -1,                                    \
         .ssl = NETDATA_SSL_UNSET_CONNECTION,         \
         .ctx = ssl_ctx,                              \
+        .sni_hostname = NULL,                        \
 }
 
 static inline void nd_sock_init(ND_SOCK *s, SSL_CTX *ctx, bool verify_certificate) {
@@ -48,6 +50,7 @@ static inline void nd_sock_init(ND_SOCK *s, SSL_CTX *ctx, bool verify_certificat
     s->fd = -1;
     s->ssl = NETDATA_SSL_UNSET_CONNECTION;
     s->ctx = ctx;
+    s->sni_hostname = NULL;
 }
 
 ALWAYS_INLINE
@@ -69,6 +72,8 @@ static void nd_sock_close(ND_SOCK *s) {
         s->fd = -1;
     }
 
+    freez(s->sni_hostname);
+    s->sni_hostname = NULL;
     s->error = ND_SOCK_ERR_NONE;
 }
 

@@ -216,7 +216,7 @@ include:
 
   - &fedora
     distro: fedora
-    version: "43"
+    version: "44"
     support_type: Core
     notes: ''
     eol_check: true
@@ -225,11 +225,18 @@ include:
       dnf remove -y json-c-devel
     packages: &fedora_packages
       type: rpm
-      repo_distro: fedora/43
+      repo_distro: fedora/44
       builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
+    test:
+      ebpf-core: true
+  - <<: *fedora
+    version: "43"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/43
     test:
       ebpf-core: true
   - <<: *fedora
@@ -356,7 +363,7 @@ include:
 
   - &ubuntu
     distro: ubuntu
-    version: "24.04"
+    version: "26.04"
     support_type: Core
     notes: ''
     eol_check: true
@@ -369,7 +376,7 @@ include:
       apt-get remove -y libjson-c-dev
     packages: &ubuntu_packages
       type: deb
-      repo_distro: ubuntu/noble
+      repo_distro: ubuntu/resolute
       builder_rev: v2
       arches:
         - amd64
@@ -383,15 +390,15 @@ include:
       <<: *ubuntu_packages
       repo_distro: ubuntu/questing
   - <<: *ubuntu
+    version: "24.04"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/noble
+  - <<: *ubuntu
     version: "22.04"
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/jammy
-  - <<: *ubuntu
-    version: "20.04"
-    packages:
-      <<: *ubuntu_packages
-      repo_distro: ubuntu/focal
 legacy: # Info for platforms we used to support and still need to handle packages for
   - <<: *debian
     version: "10"
@@ -461,6 +468,11 @@ legacy: # Info for platforms we used to support and still need to handle package
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/plucky
+  - <<: *ubuntu
+    version: "20.04"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/focal
 no_include: # Info for platforms not covered in CI
   - distro: docker
     version: "19.03 or newer"

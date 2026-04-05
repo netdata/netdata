@@ -2,13 +2,13 @@
 
 package k8s_apiserver
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 type (
-	Charts = module.Charts
-	Chart  = module.Chart
-	Dims   = module.Dims
-	Dim    = module.Dim
+	Charts = collectorapi.Charts
+	Chart  = collectorapi.Chart
+	Dims   = collectorapi.Dims
+	Dim    = collectorapi.Dim
 )
 
 var baseCharts = Charts{
@@ -61,9 +61,9 @@ var requestsTotalChart = Chart{
 	Units: "requests/s",
 	Fam:   "requests",
 	Ctx:   "k8s_apiserver.requests_total",
-	Type:  module.Line,
+	Type:  collectorapi.Line,
 	Dims: Dims{
-		{ID: "request_total", Name: "requests", Algo: module.Incremental},
+		{ID: "request_total", Name: "requests", Algo: collectorapi.Incremental},
 	},
 }
 
@@ -73,9 +73,9 @@ var requestsDroppedChart = Chart{
 	Units: "requests/s",
 	Fam:   "requests",
 	Ctx:   "k8s_apiserver.requests_dropped",
-	Type:  module.Line,
+	Type:  collectorapi.Line,
 	Dims: Dims{
-		{ID: "request_dropped_total", Name: "dropped", Algo: module.Incremental},
+		{ID: "request_dropped_total", Name: "dropped", Algo: collectorapi.Incremental},
 	},
 }
 
@@ -87,7 +87,7 @@ var requestsByVerbChart = Chart{
 	Units: "requests/s",
 	Fam:   "requests",
 	Ctx:   "k8s_apiserver.requests_by_verb",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 	// Dims added dynamically
 }
 
@@ -97,7 +97,7 @@ var requestsByCodeChart = Chart{
 	Units: "requests/s",
 	Fam:   "requests",
 	Ctx:   "k8s_apiserver.requests_by_code",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 	// Dims added dynamically
 }
 
@@ -107,7 +107,7 @@ var requestsByResourceChart = Chart{
 	Units: "requests/s",
 	Fam:   "requests",
 	Ctx:   "k8s_apiserver.requests_by_resource",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 	// Dims added dynamically
 }
 
@@ -119,7 +119,7 @@ var requestLatencyChart = Chart{
 	Units: "milliseconds",
 	Fam:   "latency",
 	Ctx:   "k8s_apiserver.request_latency",
-	Type:  module.Line,
+	Type:  collectorapi.Line,
 	Dims: Dims{
 		{ID: "request_latency_p50", Name: "p50", Div: 1000},
 		{ID: "request_latency_p90", Name: "p90", Div: 1000},
@@ -133,7 +133,7 @@ var responseSizeChart = Chart{
 	Units: "bytes",
 	Fam:   "latency",
 	Ctx:   "k8s_apiserver.response_size",
-	Type:  module.Line,
+	Type:  collectorapi.Line,
 	Dims: Dims{
 		{ID: "request_response_size_p50", Name: "p50"},
 		{ID: "request_response_size_p90", Name: "p90"},
@@ -149,7 +149,7 @@ var inflightRequestsChart = Chart{
 	Units: "requests",
 	Fam:   "inflight",
 	Ctx:   "k8s_apiserver.inflight_requests",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 	Dims: Dims{
 		{ID: "inflight_mutating", Name: "mutating"},
 		{ID: "inflight_readonly", Name: "read_only"},
@@ -162,7 +162,7 @@ var longrunningRequestsChart = Chart{
 	Units: "requests",
 	Fam:   "inflight",
 	Ctx:   "k8s_apiserver.longrunning_requests",
-	Type:  module.Line,
+	Type:  collectorapi.Line,
 	Dims: Dims{
 		{ID: "inflight_longrunning", Name: "longrunning"},
 	},
@@ -176,7 +176,7 @@ var restClientRequestsByCodeChart = Chart{
 	Units: "requests/s",
 	Fam:   "rest client",
 	Ctx:   "k8s_apiserver.rest_client_requests_by_code",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 	// Dims added dynamically
 }
 
@@ -186,7 +186,7 @@ var restClientRequestsByMethodChart = Chart{
 	Units: "requests/s",
 	Fam:   "rest client",
 	Ctx:   "k8s_apiserver.rest_client_requests_by_method",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 	// Dims added dynamically
 }
 
@@ -196,7 +196,7 @@ var restClientLatencyChart = Chart{
 	Units: "milliseconds",
 	Fam:   "rest client",
 	Ctx:   "k8s_apiserver.rest_client_latency",
-	Type:  module.Line,
+	Type:  collectorapi.Line,
 	Dims: Dims{
 		{ID: "rest_client_latency_p50", Name: "p50", Div: 1000},
 		{ID: "rest_client_latency_p90", Name: "p90", Div: 1000},
@@ -212,7 +212,7 @@ var admissionStepLatencyChart = Chart{
 	Units: "milliseconds",
 	Fam:   "admission",
 	Ctx:   "k8s_apiserver.admission_step_latency",
-	Type:  module.Line,
+	Type:  collectorapi.Line,
 	Dims: Dims{
 		{ID: "admission_step_latency_validate", Name: "validate", Div: 1000},
 		{ID: "admission_step_latency_admit", Name: "admit", Div: 1000},
@@ -233,10 +233,10 @@ var auditEventsChart = Chart{
 	Units: "events/s",
 	Fam:   "audit",
 	Ctx:   "k8s_apiserver.audit_events",
-	Type:  module.Line,
+	Type:  collectorapi.Line,
 	Dims: Dims{
-		{ID: "audit_events_total", Name: "events", Algo: module.Incremental},
-		{ID: "audit_rejected_total", Name: "rejected", Algo: module.Incremental},
+		{ID: "audit_events_total", Name: "events", Algo: collectorapi.Incremental},
+		{ID: "audit_rejected_total", Name: "rejected", Algo: collectorapi.Incremental},
 	},
 }
 
@@ -248,9 +248,9 @@ var authRequestsChart = Chart{
 	Units: "requests/s",
 	Fam:   "authentication",
 	Ctx:   "k8s_apiserver.authentication_requests",
-	Type:  module.Line,
+	Type:  collectorapi.Line,
 	Dims: Dims{
-		{ID: "auth_authenticated_requests_total", Name: "authenticated", Algo: module.Incremental},
+		{ID: "auth_authenticated_requests_total", Name: "authenticated", Algo: collectorapi.Incremental},
 	},
 }
 
@@ -262,7 +262,7 @@ var goroutinesChart = Chart{
 	Units: "goroutines",
 	Fam:   "process",
 	Ctx:   "k8s_apiserver.goroutines",
-	Type:  module.Line,
+	Type:  collectorapi.Line,
 	Dims: Dims{
 		{ID: "process_goroutines", Name: "goroutines"},
 	},
@@ -274,7 +274,7 @@ var threadsChart = Chart{
 	Units: "threads",
 	Fam:   "process",
 	Ctx:   "k8s_apiserver.threads",
-	Type:  module.Line,
+	Type:  collectorapi.Line,
 	Dims: Dims{
 		{ID: "process_threads", Name: "threads"},
 	},
@@ -286,7 +286,7 @@ var processMemoryChart = Chart{
 	Units: "bytes",
 	Fam:   "process",
 	Ctx:   "k8s_apiserver.process_memory",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 	Dims: Dims{
 		{ID: "process_resident_memory_bytes", Name: "resident"},
 		{ID: "process_virtual_memory_bytes", Name: "virtual"},
@@ -299,7 +299,7 @@ var heapMemoryChart = Chart{
 	Units: "bytes",
 	Fam:   "process",
 	Ctx:   "k8s_apiserver.heap_memory",
-	Type:  module.Stacked,
+	Type:  collectorapi.Stacked,
 	Dims: Dims{
 		{ID: "process_heap_alloc_bytes", Name: "alloc"},
 		{ID: "process_heap_inuse_bytes", Name: "inuse"},
@@ -313,7 +313,7 @@ var gcDurationChart = Chart{
 	Units: "seconds",
 	Fam:   "process",
 	Ctx:   "k8s_apiserver.gc_duration",
-	Type:  module.Line,
+	Type:  collectorapi.Line,
 	Dims: Dims{
 		{ID: "process_gc_duration_min", Name: "min", Div: 1000000},
 		{ID: "process_gc_duration_p25", Name: "p25", Div: 1000000},
@@ -329,7 +329,7 @@ var openFDsChart = Chart{
 	Units: "file descriptors",
 	Fam:   "process",
 	Ctx:   "k8s_apiserver.open_fds",
-	Type:  module.Line,
+	Type:  collectorapi.Line,
 	Dims: Dims{
 		{ID: "process_open_fds", Name: "open"},
 		{ID: "process_max_fds", Name: "max"},
@@ -342,9 +342,9 @@ var cpuUsageChart = Chart{
 	Units: "seconds/s",
 	Fam:   "process",
 	Ctx:   "k8s_apiserver.cpu_usage",
-	Type:  module.Line,
+	Type:  collectorapi.Line,
 	Dims: Dims{
-		{ID: "process_cpu_seconds_total", Name: "cpu", Algo: module.Incremental, Div: 1000},
+		{ID: "process_cpu_seconds_total", Name: "cpu", Algo: collectorapi.Incremental, Div: 1000},
 	},
 }
 
@@ -357,7 +357,7 @@ func newWorkqueueDepthChart(name string) *Chart {
 		Units: "items",
 		Fam:   "workqueue",
 		Ctx:   "k8s_apiserver.workqueue_depth",
-		Type:  module.Line,
+		Type:  collectorapi.Line,
 		Dims: Dims{
 			{ID: "workqueue_" + name + "_depth", Name: "depth"},
 		},
@@ -371,7 +371,7 @@ func newWorkqueueLatencyChart(name string) *Chart {
 		Units: "microseconds",
 		Fam:   "workqueue",
 		Ctx:   "k8s_apiserver.workqueue_latency",
-		Type:  module.Line,
+		Type:  collectorapi.Line,
 		Dims: Dims{
 			{ID: "workqueue_" + name + "_latency_p50", Name: "p50"},
 			{ID: "workqueue_" + name + "_latency_p90", Name: "p90"},
@@ -387,10 +387,10 @@ func newWorkqueueAddsChart(name string) *Chart {
 		Units: "items/s",
 		Fam:   "workqueue",
 		Ctx:   "k8s_apiserver.workqueue_adds",
-		Type:  module.Line,
+		Type:  collectorapi.Line,
 		Dims: Dims{
-			{ID: "workqueue_" + name + "_adds_total", Name: "adds", Algo: module.Incremental},
-			{ID: "workqueue_" + name + "_retries_total", Name: "retries", Algo: module.Incremental},
+			{ID: "workqueue_" + name + "_adds_total", Name: "adds", Algo: collectorapi.Incremental},
+			{ID: "workqueue_" + name + "_retries_total", Name: "retries", Algo: collectorapi.Incremental},
 		},
 	}
 }
@@ -402,7 +402,7 @@ func newWorkqueueDurationChart(name string) *Chart {
 		Units: "microseconds",
 		Fam:   "workqueue",
 		Ctx:   "k8s_apiserver.workqueue_duration",
-		Type:  module.Line,
+		Type:  collectorapi.Line,
 		Dims: Dims{
 			{ID: "workqueue_" + name + "_duration_p50", Name: "p50"},
 			{ID: "workqueue_" + name + "_duration_p90", Name: "p90"},
@@ -420,15 +420,15 @@ func newAdmissionControllerLatencyChart(name string) *Chart {
 		Units: "events/s",
 		Fam:   "admission",
 		Ctx:   "k8s_apiserver.admission_controller_latency",
-		Type:  module.Heatmap,
+		Type:  collectorapi.Heatmap,
 		Dims: Dims{
-			{ID: "admission_controller_" + name + "_bucket_5ms", Name: "5ms", Algo: module.Incremental},
-			{ID: "admission_controller_" + name + "_bucket_25ms", Name: "25ms", Algo: module.Incremental},
-			{ID: "admission_controller_" + name + "_bucket_100ms", Name: "100ms", Algo: module.Incremental},
-			{ID: "admission_controller_" + name + "_bucket_500ms", Name: "500ms", Algo: module.Incremental},
-			{ID: "admission_controller_" + name + "_bucket_1s", Name: "1s", Algo: module.Incremental},
-			{ID: "admission_controller_" + name + "_bucket_2500ms", Name: "2.5s", Algo: module.Incremental},
-			{ID: "admission_controller_" + name + "_bucket_inf", Name: "+Inf", Algo: module.Incremental},
+			{ID: "admission_controller_" + name + "_bucket_5ms", Name: "5ms", Algo: collectorapi.Incremental},
+			{ID: "admission_controller_" + name + "_bucket_25ms", Name: "25ms", Algo: collectorapi.Incremental},
+			{ID: "admission_controller_" + name + "_bucket_100ms", Name: "100ms", Algo: collectorapi.Incremental},
+			{ID: "admission_controller_" + name + "_bucket_500ms", Name: "500ms", Algo: collectorapi.Incremental},
+			{ID: "admission_controller_" + name + "_bucket_1s", Name: "1s", Algo: collectorapi.Incremental},
+			{ID: "admission_controller_" + name + "_bucket_2500ms", Name: "2.5s", Algo: collectorapi.Incremental},
+			{ID: "admission_controller_" + name + "_bucket_inf", Name: "+Inf", Algo: collectorapi.Incremental},
 		},
 	}
 }
@@ -442,15 +442,15 @@ func newAdmissionWebhookLatencyChart(name string) *Chart {
 		Units: "events/s",
 		Fam:   "admission",
 		Ctx:   "k8s_apiserver.admission_webhook_latency",
-		Type:  module.Heatmap,
+		Type:  collectorapi.Heatmap,
 		Dims: Dims{
-			{ID: "admission_webhook_" + name + "_bucket_5ms", Name: "5ms", Algo: module.Incremental},
-			{ID: "admission_webhook_" + name + "_bucket_25ms", Name: "25ms", Algo: module.Incremental},
-			{ID: "admission_webhook_" + name + "_bucket_100ms", Name: "100ms", Algo: module.Incremental},
-			{ID: "admission_webhook_" + name + "_bucket_500ms", Name: "500ms", Algo: module.Incremental},
-			{ID: "admission_webhook_" + name + "_bucket_1s", Name: "1s", Algo: module.Incremental},
-			{ID: "admission_webhook_" + name + "_bucket_2500ms", Name: "2.5s", Algo: module.Incremental},
-			{ID: "admission_webhook_" + name + "_bucket_inf", Name: "+Inf", Algo: module.Incremental},
+			{ID: "admission_webhook_" + name + "_bucket_5ms", Name: "5ms", Algo: collectorapi.Incremental},
+			{ID: "admission_webhook_" + name + "_bucket_25ms", Name: "25ms", Algo: collectorapi.Incremental},
+			{ID: "admission_webhook_" + name + "_bucket_100ms", Name: "100ms", Algo: collectorapi.Incremental},
+			{ID: "admission_webhook_" + name + "_bucket_500ms", Name: "500ms", Algo: collectorapi.Incremental},
+			{ID: "admission_webhook_" + name + "_bucket_1s", Name: "1s", Algo: collectorapi.Incremental},
+			{ID: "admission_webhook_" + name + "_bucket_2500ms", Name: "2.5s", Algo: collectorapi.Incremental},
+			{ID: "admission_webhook_" + name + "_bucket_inf", Name: "+Inf", Algo: collectorapi.Incremental},
 		},
 	}
 }
@@ -462,7 +462,7 @@ func newEtcdObjectCountsChart() *Chart {
 		Units: "objects",
 		Fam:   "etcd",
 		Ctx:   "k8s_apiserver.etcd_object_counts",
-		Type:  module.Stacked,
+		Type:  collectorapi.Stacked,
 		// Dims added dynamically per resource type
 	}
 }

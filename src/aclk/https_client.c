@@ -26,8 +26,8 @@ ENUM_STR_MAP_DEFINE(https_client_resp_t) = {
         .name = "cannot set socket to non-blocking mode",
     },
     {
-        .id = HTTPS_CLIENT_RESP_PROXY_NOT_200,
-        .name = "proxy did not return http/200",
+        .id = HTTPS_CLIENT_RESP_PROXY_NEGOTIATION_FAILED,
+        .name = "proxy negotiation failed",
     },
     {
         .id = HTTPS_CLIENT_RESP_NO_SSL_CTX,
@@ -138,8 +138,6 @@ static const char *http_req_type_to_str(http_req_type_t req) {
             return "GET";
         case HTTP_REQ_POST:
             return "POST";
-        case HTTP_REQ_CONNECT:
-            return "CONNECT";
         default:
             return "unknown";
     }
@@ -186,6 +184,7 @@ void http_parse_ctx_create(http_parse_ctx *ctx, enum http_parse_state parse_stat
 #define POLL_TO_MS 100
 
 #define HTTP_LINE_TERM "\x0D\x0A"
+#define HTTP_LINE_TERM_LEN (sizeof(HTTP_LINE_TERM) - 1)
 #define RESP_PROTO "HTTP/1.1 "
 #define RESP_PROTO10 "HTTP/1.0 "
 #define HTTP_KEYVAL_SEPARATOR ": "
@@ -335,7 +334,7 @@ static int process_chunked_content(rbuf_t buf, http_parse_ctx *parse_ctx)
                 }
                 parse_ctx->chunk_got = 0;
                 chunked_response_buffer_grow_by(parse_ctx, parse_ctx->chunk_size);
-                rbuf_bump_tail(buf, strlen(HTTP_LINE_TERM));
+                rbuf_bump_tail(buf, HTTP_LINE_TERM_LEN);
                 parse_ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_DATA;
                 // fallthrough
             case CHUNKED_CONTENT_CHUNK_DATA:
@@ -352,11 +351,11 @@ static int process_chunked_content(rbuf_t buf, http_parse_ctx *parse_ctx)
                 // fallthrough
             case CHUNKED_CONTENT_FINAL_CRLF:
             case CHUNKED_CONTENT_CHUNK_END_CRLF:
-                if (rbuf_bytes_available(buf) < strlen(HTTP_LINE_TERM))
+                if (rbuf_bytes_available(buf) < HTTP_LINE_TERM_LEN)
                     return HTTP_PARSE_NEED_MORE_DATA;
-                char buf_crlf[strlen(HTTP_LINE_TERM)];
-                rbuf_pop(buf, buf_crlf, strlen(HTTP_LINE_TERM));
-                if (memcmp(buf_crlf, HTTP_LINE_TERM, strlen(HTTP_LINE_TERM))) {
+                char buf_crlf[HTTP_LINE_TERM_LEN];
+                rbuf_pop(buf, buf_crlf, HTTP_LINE_TERM_LEN);
+                if (memcmp(buf_crlf, HTTP_LINE_TERM, HTTP_LINE_TERM_LEN)) {
                     netdata_log_error("ACLK: CRLF expected");
                     return HTTP_PARSE_ERROR;
                 }
@@ -645,7 +644,6 @@ static https_client_resp_t read_parse_response(https_req_ctx_t *ctx) {
 static const char *http_methods[] = {
     [HTTP_REQ_GET] = "GET ",
     [HTTP_REQ_POST] = "POST ",
-    [HTTP_REQ_CONNECT] = "CONNECT ",
 };
 
 
@@ -664,15 +662,8 @@ static https_client_resp_t handle_http_request(https_req_ctx_t *ctx) {
     }
     buffer_strcat(hdr, http_methods[req_type]);
 
-    if (req_type == HTTP_REQ_CONNECT) {
-        buffer_strcat(hdr, ctx->request->host);
-        buffer_sprintf(hdr, ":%d", ctx->request->port);
-        http_parse_ctx_create(&ctx->parse_ctx, HTTP_PARSE_PROXY_CONNECT);
-    }
-    else {
-        buffer_strcat(hdr, ctx->request->url);
-        http_parse_ctx_create(&ctx->parse_ctx, HTTP_PARSE_INITIAL);
-    }
+    buffer_strcat(hdr, ctx->request->url);
+    http_parse_ctx_create(&ctx->parse_ctx, HTTP_PARSE_INITIAL);
 
     buffer_strcat(hdr, HTTP_1_1 HTTP_ENDL);
 
@@ -682,25 +673,6 @@ static https_client_resp_t handle_http_request(https_req_ctx_t *ctx) {
     if (req_type == HTTP_REQ_POST && ctx->request->payload && ctx->request->payload_size) {
         buffer_sprintf(hdr, "Content-Length: %zu\x0D\x0A", ctx->request->payload_size);
     }
-    if (ctx->request->proxy_username) {
-        size_t creds_plain_len = strlen(ctx->request->proxy_username) + strlen(ctx->request->proxy_password) + 1 /* ':' */;
-        char *creds_plain = callocz(1, creds_plain_len + 1);
-        char *ptr = creds_plain;
-        strcpy(ptr, ctx->request->proxy_username);
-        ptr += strlen(ctx->request->proxy_username);
-        *ptr++ = ':';
-        strcpy(ptr, ctx->request->proxy_password);
-
-        int creds_base64_len = (((4 * creds_plain_len / 3) + 3) & ~3);
-        // OpenSSL encoder puts newline every 64 output bytes
-        // we remove those but during encoding we need that space in the buffer
-        creds_base64_len += (1+(creds_base64_len/64)) * strlen("\n");
-        char *creds_base64 = callocz(1, creds_base64_len + 1);
-        (void) netdata_base64_encode((unsigned char *)creds_base64, (unsigned char *)creds_plain, creds_plain_len);
-        buffer_sprintf(hdr, "Proxy-Authorization: Basic %s\x0D\x0A", creds_base64);
-        freez(creds_plain);
-    }
-
     buffer_strcat(hdr, "\x0D\x0A");
 
     // Send the request
@@ -763,16 +735,28 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
 
     bool proxy_used = (request->proxy_host != NULL);
 
+    // extract protocol prefix from proxy URL for logging
+    const char *proxy_proto = "";
+    char proto_buf[16];
+    if (proxy_used && request->proxy) {
+        const char *sep = strstr(request->proxy, "://");
+        if (sep) {
+            size_t len = (size_t)(sep - request->proxy) + 3;
+            if (len < sizeof(proto_buf)) {
+                memcpy(proto_buf, request->proxy, len);
+                proto_buf[len] = '\0';
+                proxy_proto = proto_buf;
+            }
+        }
+    }
+
     // assume no proxy
     const char *connect_host;
     int connect_port;
-    const char *proxy_used_str = " (no proxy)";
-
 
     if (unlikely(proxy_used)) {
         connect_host = request->proxy_host;
         connect_port = request->proxy_port;
-        proxy_used_str = request->proxy;
     } else {
         connect_host = request->host;
         connect_port = request->port;
@@ -790,9 +774,14 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
 
     snprintfz(connect_port_str, PORT_STR_MAX_BYTES, "%d", connect_port);
 
-    nd_log_daemon(NDLP_INFO, "ACLK: Connecting to %s:%d%s%s",
-                  request->host, request->port,
-                  proxy_used ? " via proxy " : "", proxy_used_str);
+    if (proxy_used)
+        nd_log_daemon(NDLP_INFO, "ACLK: connecting to %s:%d via proxy %s%s:%d%s",
+                      request->host, request->port,
+                      proxy_proto, request->proxy_host, request->proxy_port,
+                      request->proxy_username ? " (with credentials)" : " (without credentials)");
+    else
+        nd_log_daemon(NDLP_INFO, "ACLK: connecting to %s:%d (no proxy)",
+                      request->host, request->port);
 
     struct timeval timeout = { .tv_sec = 10, .tv_usec = 0 };
     ctx->sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, connect_host, 0, connect_port_str, &timeout, fallback_ipv4);
@@ -810,30 +799,27 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
 
     ctx->poll_fd.fd = ctx->sock;
 
-    // Do the CONNECT if proxy is used
+    // Do proxy negotiation if proxy is used.
     if (request->proxy_host) {
-        https_req_t req = HTTPS_REQ_T_INITIALIZER;
-        req.request_type = HTTP_REQ_CONNECT;
-        req.timeout_s = request->timeout_s;
-        req.host = request->host;
-        req.port = request->port;
-        req.url = request->url;
-        req.proxy_username = request->proxy_username;
-        req.proxy_password = request->proxy_password;
-        ctx->request = &req;
-        rc = handle_http_request(ctx);
-        if (rc != HTTPS_CLIENT_RESP_OK) {
-            netdata_log_error("ACLK: failed to CONNECT with proxy");
-            http_parse_ctx_destroy(&ctx->parse_ctx);
+        enum mqtt_wss_proxy_type proxy_type = (enum mqtt_wss_proxy_type)request->proxy_type;
+        if (proxy_type == MQTT_WSS_DIRECT)
+            proxy_type = aclk_proxy_type_from_scheme(request->proxy);
+        if (proxy_type == MQTT_WSS_DIRECT)
+            proxy_type = MQTT_WSS_PROXY_HTTP;
+
+        int proxy_timeout_ms = (request->timeout_s > 0 && request->timeout_s <= 2000000)
+                                    ? (int)request->timeout_s * 1000
+                                    : 30000;
+
+        if (aclk_proxy_negotiation_connect(ctx->sock, proxy_type, request->proxy_username, request->proxy_password,
+                                           request->host, request->port, proxy_timeout_ms)) {
+            rc = HTTPS_CLIENT_RESP_PROXY_NEGOTIATION_FAILED;
+            netdata_log_error("ACLK: %sproxy negotiation failed via %s:%d to %s:%d",
+                              aclk_mqtt_proxy_type_to_scheme(proxy_type),
+                              request->proxy_host, request->proxy_port,
+                              request->host, request->port);
             goto exit_sock;
         }
-        if (ctx->parse_ctx.http_code != 200) {
-            rc = HTTPS_CLIENT_RESP_PROXY_NOT_200;
-            netdata_log_error("ACLK: proxy didn't return 200 OK (got %d)", ctx->parse_ctx.http_code);
-            http_parse_ctx_destroy(&ctx->parse_ctx);
-            goto exit_sock;
-        }
-        http_parse_ctx_destroy(&ctx->parse_ctx);
     }
     ctx->request = request;
 

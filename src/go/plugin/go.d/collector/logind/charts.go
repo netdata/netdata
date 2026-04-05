@@ -4,75 +4,75 @@
 
 package logind
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 const (
-	prioSessions = module.Priority + iota
+	prioSessions = collectorapi.Priority + iota
 	prioSessionsType
 	prioSessionsState
 	prioUsersState
 )
 
-var charts = module.Charts{
+var charts = collectorapi.Charts{
 	sessionsChart.Copy(),
 	sessionsTypeChart.Copy(),
 	sessionsStateChart.Copy(),
 	usersStateChart.Copy(),
 }
 
-var sessionsChart = module.Chart{
+var sessionsChart = collectorapi.Chart{
 	ID:       "sessions",
 	Title:    "Logind Sessions",
 	Units:    "sessions",
 	Fam:      "sessions",
 	Ctx:      "logind.sessions",
 	Priority: prioSessions,
-	Type:     module.Stacked,
-	Dims: module.Dims{
+	Type:     collectorapi.Stacked,
+	Dims: collectorapi.Dims{
 		{ID: "sessions_remote", Name: "remote"},
 		{ID: "sessions_local", Name: "local"},
 	},
 }
 
-var sessionsTypeChart = module.Chart{
+var sessionsTypeChart = collectorapi.Chart{
 	ID:       "sessions_type",
 	Title:    "Logind Sessions By Type",
 	Units:    "sessions",
 	Fam:      "sessions",
 	Ctx:      "logind.sessions_type",
 	Priority: prioSessionsType,
-	Type:     module.Stacked,
-	Dims: module.Dims{
+	Type:     collectorapi.Stacked,
+	Dims: collectorapi.Dims{
 		{ID: "sessions_type_console", Name: "console"},
 		{ID: "sessions_type_graphical", Name: "graphical"},
 		{ID: "sessions_type_other", Name: "other"},
 	},
 }
 
-var sessionsStateChart = module.Chart{
+var sessionsStateChart = collectorapi.Chart{
 	ID:       "sessions_state",
 	Title:    "Logind Sessions By State",
 	Units:    "sessions",
 	Fam:      "sessions",
 	Ctx:      "logind.sessions_state",
 	Priority: prioSessionsState,
-	Type:     module.Stacked,
-	Dims: module.Dims{
+	Type:     collectorapi.Stacked,
+	Dims: collectorapi.Dims{
 		{ID: "sessions_state_online", Name: "online"},
 		{ID: "sessions_state_closing", Name: "closing"},
 		{ID: "sessions_state_active", Name: "active"},
 	},
 }
 
-var usersStateChart = module.Chart{
+var usersStateChart = collectorapi.Chart{
 	ID:       "users_state",
 	Title:    "Logind Users By State",
 	Units:    "users",
 	Fam:      "users",
 	Ctx:      "logind.users_state",
 	Priority: prioUsersState,
-	Type:     module.Stacked,
-	Dims: module.Dims{
+	Type:     collectorapi.Stacked,
+	Dims: collectorapi.Dims{
 		{ID: "users_state_offline", Name: "offline"},
 		{ID: "users_state_closing", Name: "closing"},
 		{ID: "users_state_online", Name: "online"},

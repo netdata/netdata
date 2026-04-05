@@ -182,7 +182,7 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v6.0.0
+        uses: actions/upload-artifact@v7.0.0
         with:
           name: dist-tarball
           path: artifacts/*.tar.gz
@@ -313,7 +313,7 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v6.0.0
+        uses: actions/upload-artifact@v7.0.0
         with:
           name: dist-static-${{ matrix.arch }}
           path: artifacts/*.gz.run
@@ -380,7 +380,7 @@ jobs:
       - name: Sign Agent Code
         id: sign-agent
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: azure/artifact-signing-action@v1.1.0
+        uses: azure/artifact-signing-action@v1.2.0
         with:
           azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
           azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
@@ -403,7 +403,7 @@ jobs:
       - name: Sign Installer
         id: sign-installer
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: azure/artifact-signing-action@v1.1.0
+        uses: azure/artifact-signing-action@v1.2.0
         with:
           azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
           azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
@@ -418,7 +418,7 @@ jobs:
           timestamp-digest: SHA256
       - name: Upload Installer
         id: upload
-        uses: actions/upload-artifact@v6.0.0
+        uses: actions/upload-artifact@v7.0.0
         with:
           name: windows-x86_64-installer
           path: packaging\windows\netdata*.msi
@@ -440,6 +440,75 @@ jobs:
               Package Netdata: ${{ steps.package.outcome }}
               Sign Installer: ${{ steps.sign-installer.outcome }}
               Upload Installer: ${{ steps.upload.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
+          }}
+
+  windows-test: # Test the Windows installer
+    name: Test Windows installer
+    runs-on: windows-latest
+    needs:
+      - windows-build
+      - file-check
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: Write-Output "SKIPPED"
+      - name: Checkout
+        uses: actions/checkout@v6
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        with:
+          submodules: false
+          lfs: false
+      - name: Retrieve Windows Artifacts
+        id: fetch-windows
+        if: needs.file-check.outputs.run == 'true'
+        uses: Wandalen/wretry.action@v3
+        with:
+          action: actions/download-artifact@v4
+          with: |
+            pattern: windows-*-installer
+            path: dist-artifacts
+            merge-multiple: true
+          attempt_limit: 3
+          attempt_delay: 2000
+      - name: Install Netdata
+        id: install-netdata
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          $installerProc = Start-Process "msiexec" "/qn /i `"$PWD\dist-artifacts\netdata-x64.msi`" /l* `"$PWD\msi.log`" NDDRVINST=0" -Wait -NoNewWindow -PassThru
+          Write-Output "Exit Code: $installerProc.ExitCode"
+          Get-Content "$PWD\msi.log"
+          $successCodes = @(0, 3010)
+          if ($installerProc.ExitCode -notin $successCodes) {
+              exit 1
+          }
+      - name: Check agent linking
+        id: linker-check
+        if: needs.file-check.outputs.run == 'true'
+        run: ./.github/scripts/windows-linker-check.ps1
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Windows install test failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Windows install test failed.
+              Checkout agent sources: ${{ steps.checkout.outcome }}
+              Fetch Windows installers: ${{ steps.fetch-windows.outcome }}
+              Install Netdata: ${{ steps.install-netdata.outcome }}
+              Check agent linking: ${{ steps.linker-check.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
@@ -508,7 +577,7 @@ jobs:
       - name: Store Artifacts
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v6.0.0
+        uses: actions/upload-artifact@v7.0.0
         with:
           name: final-artifacts
           path: artifacts/*
@@ -754,6 +823,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly' && github.repository == 'netdata/netdata'
     needs:
       - prepare-upload
+      - windows-test
       - artifact-verification-dist
       - artifact-verification-static
     steps:
@@ -889,6 +959,7 @@ jobs:
     needs:
       - artifact-verification-dist
       - artifact-verification-static
+      - windows-test
       - normalize-tag
     steps:
       - name: Checkout
@@ -1018,7 +1089,7 @@ jobs:
           submodules: recursive
       - name: Setup Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Build test environment
         id: build
         uses: Wandalen/wretry.action@v3

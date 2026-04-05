@@ -37,12 +37,17 @@ if(STATIC_BUILD)
 endif()
 
 set(CMAKE_INSTALL_MESSAGE LAZY)
-
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME "netdata")
 
-option(USE_CXX_11 "Use C++11 instead of C++14 (should only be used on legacy systems that cannot support C++14, may disable some features)" False)
+if("c_std_17" IN_LIST CMAKE_C_KNOWN_FEATURES)
+    set(CMAKE_C_STANDARD 17)
+else()
+    set(CMAKE_C_STANDARD 11)
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
+
+option(USE_CXX_11 "Use C++11 instead of C++17 (should only be used on legacy systems that cannot support C++17, may disable some features)" False)
 mark_as_advanced(USE_CXX_11)
 
 if(USE_CXX_11)
@@ -197,6 +202,12 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
         GIT_TAG f3b91559efca32c6b54837866ef35ba98ff5b2ca # stable/v0.5
     )
     FetchContent_MakeAvailable(Corrosion)
+
+    # Corrosion places cargo build artifacts under ${CMAKE_BINARY_DIR}/cargo/
+    # (see Corrosion.cmake cargo_target_dir). Register it for cleanup so that
+    # `ninja clean` removes it.  If a future Corrosion version changes this
+    # path, this line must be updated to match.
+    set_directory_properties(PROPERTIES ADDITIONAL_CLEAN_FILES "${CMAKE_BINARY_DIR}/cargo")
 
     if(ENABLE_NETDATA_JOURNAL_FILE_READER)
         corrosion_import_crate(MANIFEST_PATH src/crates/jf/Cargo.toml
@@ -520,6 +531,9 @@ check_function_exists(getrandom HAVE_GETRANDOM)
 check_function_exists(sysinfo HAVE_SYSINFO)
 
 check_function_exists(timegm HAVE_TIMEGM)
+check_function_exists(tzalloc HAVE_TZALLOC)
+check_function_exists(localtime_rz HAVE_LOCALTIME_RZ)
+check_function_exists(tzfree HAVE_TZFREE)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     # -fno-omit-frame-pointer = add frame pointers to all functions
@@ -892,6 +906,10 @@ set(LIBNETDATA_FILES
         src/libnetdata/json/json-keys.h
         src/libnetdata/json/vendored/jsmn.c
         src/libnetdata/json/vendored/jsmn.h
+        src/libnetdata/yaml/yaml.c
+        src/libnetdata/yaml/yaml.h
+        src/libnetdata/yaml/yaml-unittest.c
+        src/libnetdata/yaml/yaml-comprehensive-unittest.c
         src/libnetdata/libnetdata.c
         src/libnetdata/libnetdata.h
         src/libnetdata/line_splitter/line_splitter.c
@@ -1023,6 +1041,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/paths/paths.c
         src/libnetdata/paths/paths.h
         src/libnetdata/json/json-c-parser-inline.c
+        src/libnetdata/json/json-c-parser-unittest.c
         src/libnetdata/parsers/duration.h
         src/libnetdata/parsers/timeframe.c
         src/libnetdata/parsers/timeframe.h
@@ -1039,6 +1058,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/sanitizers/chart_id_and_name.h
         src/libnetdata/sanitizers/utf8-sanitizer.c
         src/libnetdata/sanitizers/utf8-sanitizer.h
+        src/libnetdata/sanitizers/utf8-sanitizer-unittest.c
         src/libnetdata/sanitizers/sanitizers.h
         src/libnetdata/sanitizers/sanitizers-labels.c
         src/libnetdata/sanitizers/sanitizers-labels.h
@@ -1504,6 +1524,7 @@ if(ENABLE_ML)
                 src/ml/ml_private.h
                 src/ml/ml_public.h
                 src/ml/ml_public.cc
+                src/ml/ml-unittest.cc
         )
 
         if(NOT ENABLE_MIMALLOC)
@@ -1983,20 +2004,17 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetServicesStatus.c
         src/collectors/windows.plugin/GetSensors.c
         src/collectors/windows.plugin/GetHardwareInfo.c
-        src/collectors/windows.plugin/MonitorSQL.c
         src/collectors/windows.plugin/perflib-adcs.c
         src/collectors/windows.plugin/perflib-adfs.c
         src/collectors/windows.plugin/perflib-rrd.c
         src/collectors/windows.plugin/perflib-rrd.h
         src/collectors/windows.plugin/perflib-ad.c
-        src/collectors/windows.plugin/perflib-mssql-queries.h
         src/collectors/windows.plugin/perflib-storage.c
         src/collectors/windows.plugin/perflib-processor.c
         src/collectors/windows.plugin/perflib-thermalzone.c
         src/collectors/windows.plugin/perflib-objects.c
         src/collectors/windows.plugin/perflib-network.c
         src/collectors/windows.plugin/perflib-netframework.c
-        src/collectors/windows.plugin/perflib-mssql.c
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
         src/collectors/windows.plugin/perflib-web-service.c
@@ -2007,8 +2025,8 @@ set(WINDOWS_PLUGIN_FILES
 )
 
 set(WINDOWS_PLUGIN_DRIVER
-        src/collectors/windows.plugin/netdata_win_driver.c
-        src/collectors/windows.plugin/netdata_win_driver.h
+        src/collectors/windows.plugin/driver/netdata_driver.c
+        src/collectors/windows.plugin/driver/netdata_driver.h
 )
 
 set(PROC_PLUGIN_FILES
@@ -2895,9 +2913,11 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_unittest.h
             src/collectors/ebpf.plugin/ebpf_functions.c
             src/collectors/ebpf.plugin/ebpf_functions.h
-            src/collectors/ebpf.plugin/libbpf_api/ebpf.c
-            src/collectors/ebpf.plugin/libbpf_api/ebpf.h
-    )
+             src/collectors/ebpf.plugin/libbpf_api/ebpf.c
+             src/collectors/ebpf.plugin/libbpf_api/ebpf.h
+             src/collectors/ebpf.plugin/libbpf_api/ebpf_library.c
+             src/collectors/ebpf.plugin/libbpf_api/ebpf_library.h
+     )
 
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES} ${INTERCOMMUNICATION_COLLECTORS_FILES})
     target_link_libraries(ebpf.plugin libnetdata)
@@ -3055,6 +3075,7 @@ if(OS_WINDOWS)
         configure_file(packaging/windows/eula.rtf eula.rtf COPYONLY)
         configure_file(packaging/windows/Top.bmp Top.bmp COPYONLY)
         configure_file(packaging/windows/BackGround.bmp BackGround.bmp COPYONLY)
+        configure_file(src/collectors/windows.plugin/driver/netdata_driver.inf netdata_driver.inf COPYONLY)
 endif()
 
 add_executable(netdata
@@ -3075,12 +3096,13 @@ if(OS_WINDOWS)
         target_compile_options(NetdataClaim PUBLIC -mwindows)
 
         set(NETDATA_DRIVER_FILE "${CMAKE_BINARY_DIR}/netdata_driver.sys")
+        set(NETDATA_DRIVER_FILE_INF "${CMAKE_BINARY_DIR}/netdata_driver.inf")
 
         add_library(netdata_driver SHARED ${WINDOWS_PLUGIN_DRIVER})
         set_target_properties(netdata_driver PROPERTIES LIBRARY_OUTPUT_NAME "netdata_driver")
         set_target_properties(netdata_driver PROPERTIES PREFIX "")
         set_target_properties(netdata_driver PROPERTIES SUFFIX ".sys")
-        target_include_directories(netdata_driver PRIVATE BEFORE "/mingw64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin")
+        target_include_directories(netdata_driver PRIVATE BEFORE "/mingw64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
         target_compile_options(netdata_driver PRIVATE
                 -Wall
                 -Wextra
@@ -3100,7 +3122,11 @@ if(OS_WINDOWS)
         target_link_libraries(netdata_driver kernel32 ntoskrnl)
 
         install(FILES "${NETDATA_DRIVER_FILE}"
-                COMPONENT netdata_win_driver
+                COMPONENT netdata_driver
+                DESTINATION "${BINDIR}")
+
+        install(FILES "${NETDATA_DRIVER_FILE_INF}"
+                COMPONENT netdata_driver_inf
                 DESTINATION "${BINDIR}")
 endif()
 
@@ -3937,6 +3963,14 @@ if(ENABLE_PLUGIN_GO)
 
     install(DIRECTORY
             COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/ss)
+    file(GLOB GO_SS_CONF_FILES src/go/plugin/go.d/config/go.d/ss/*.conf)
+    install(FILES ${GO_SS_CONF_FILES}
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/ss)
+
+    install(DIRECTORY
+            COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles)
     install(DIRECTORY
             COMPONENT plugin-go
@@ -3953,6 +3987,17 @@ if(ENABLE_PLUGIN_GO)
     install(FILES ${GO_SNMP_META_FILES}
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata)
+
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles)
+    install(DIRECTORY
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default)
+    file(GLOB GO_AZURE_MON_PROFILE_FILES src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default/*.yaml)
+    install(FILES ${GO_AZURE_MON_PROFILE_FILES}
+            COMPONENT plugin-go
+            DESTINATION usr/lib/netdata/conf.d/go.d/azure_monitor.profiles/default)
 
     if(BUILD_FOR_PACKAGING)
         install(FILES
@@ -3999,6 +4044,7 @@ install(CODE "
 
 if(OS_WINDOWS)
         install(FILES /usr/bin/msys-protobuf-32.dll
+                      /usr/bin/msys-yaml-0-2.dll
                       /usr/bin/msys-uv-1.dll
                       DESTINATION "${BINDIR}")
 
@@ -4008,6 +4054,12 @@ if(OS_WINDOWS)
         # Make curl work with ssl
         install(DIRECTORY /usr/ssl DESTINATION usr)
 endif()
+
+#
+# Optional: render integration docs from metadata.yaml
+#
+
+include(NetdataRenderDocs)
 
 #
 # Include packaging logic

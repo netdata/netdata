@@ -4,10 +4,11 @@ package mongo
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 // collectServerStatus creates the map[string]int64 for the available dims.
@@ -22,9 +23,7 @@ func (c *Collector) collectServerStatus(mx map[string]int64) error {
 
 	c.addOptionalCharts(s)
 
-	for k, v := range stm.ToMap(s) {
-		mx[k] = v
-	}
+	maps.Copy(mx, stm.ToMap(s))
 
 	if s.Transactions != nil && s.Transactions.CommitTypes != nil {
 		px := "txn_commit_types_"
@@ -112,7 +111,7 @@ func (c *Collector) addOptionalCharts(s *documentServerStatus) {
 	}
 }
 
-func (c *Collector) addOptionalChart(iface any, charts ...*module.Chart) {
+func (c *Collector) addOptionalChart(iface any, charts ...*collectorapi.Chart) {
 	if reflect.ValueOf(iface).IsNil() {
 		return
 	}

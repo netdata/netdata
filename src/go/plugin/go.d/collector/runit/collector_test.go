@@ -9,7 +9,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,7 +31,7 @@ func Test_testDataIsValid(t *testing.T) {
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
-	module.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
+	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNew(t *testing.T) {
@@ -283,7 +284,7 @@ func TestCollector_Collect(t *testing.T) {
 			assert.Equal(t, test.wantCollected, mx)
 			if test.wantCharts > 0 {
 				assert.Equal(t, test.wantCharts, calcActiveCharts(collr.Charts()))
-				module.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
 			}
 		})
 	}
@@ -473,7 +474,7 @@ func prepareMockCollector(mock svCli) *Collector {
 	return collr
 }
 
-func calcActiveCharts(charts *module.Charts) int {
+func calcActiveCharts(charts *collectorapi.Charts) int {
 	n := 0
 	for _, c := range *charts {
 		if !c.Obsolete {

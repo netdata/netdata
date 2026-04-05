@@ -6,18 +6,18 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 type (
-	Charts = module.Charts
-	Chart  = module.Chart
-	Dims   = module.Dims
-	Dim    = module.Dim
+	Charts = collectorapi.Charts
+	Chart  = collectorapi.Chart
+	Dims   = collectorapi.Dims
+	Dim    = collectorapi.Dim
 )
 
 const (
-	prioReqTotal = module.Priority + iota
+	prioReqTotal = collectorapi.Priority + iota
 	prioReqExcluded
 	prioReqType
 
@@ -69,7 +69,7 @@ var (
 		Ctx:      "web_log.requests",
 		Priority: prioReqTotal,
 		Dims: Dims{
-			{ID: "requests", Algo: module.Incremental},
+			{ID: "requests", Algo: collectorapi.Incremental},
 		},
 	}
 	reqExcluded = Chart{
@@ -78,10 +78,10 @@ var (
 		Units:    "requests/s",
 		Fam:      "requests",
 		Ctx:      "web_log.excluded_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReqExcluded,
 		Dims: Dims{
-			{ID: "req_unmatched", Name: "unmatched", Algo: module.Incremental},
+			{ID: "req_unmatched", Name: "unmatched", Algo: collectorapi.Incremental},
 		},
 	}
 	// netdata specific grouping
@@ -91,13 +91,13 @@ var (
 		Units:    "requests/s",
 		Fam:      "requests",
 		Ctx:      "web_log.type_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReqType,
 		Dims: Dims{
-			{ID: "req_type_success", Name: "success", Algo: module.Incremental},
-			{ID: "req_type_bad", Name: "bad", Algo: module.Incremental},
-			{ID: "req_type_redirect", Name: "redirect", Algo: module.Incremental},
-			{ID: "req_type_error", Name: "error", Algo: module.Incremental},
+			{ID: "req_type_success", Name: "success", Algo: collectorapi.Incremental},
+			{ID: "req_type_bad", Name: "bad", Algo: collectorapi.Incremental},
+			{ID: "req_type_redirect", Name: "redirect", Algo: collectorapi.Incremental},
+			{ID: "req_type_error", Name: "error", Algo: collectorapi.Incremental},
 		},
 	}
 )
@@ -110,14 +110,14 @@ var (
 		Units:    "responses/s",
 		Fam:      "responses",
 		Ctx:      "web_log.status_code_class_responses",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioRespCodesClass,
 		Dims: Dims{
-			{ID: "resp_2xx", Name: "2xx", Algo: module.Incremental},
-			{ID: "resp_5xx", Name: "5xx", Algo: module.Incremental},
-			{ID: "resp_3xx", Name: "3xx", Algo: module.Incremental},
-			{ID: "resp_4xx", Name: "4xx", Algo: module.Incremental},
-			{ID: "resp_1xx", Name: "1xx", Algo: module.Incremental},
+			{ID: "resp_2xx", Name: "2xx", Algo: collectorapi.Incremental},
+			{ID: "resp_5xx", Name: "5xx", Algo: collectorapi.Incremental},
+			{ID: "resp_3xx", Name: "3xx", Algo: collectorapi.Incremental},
+			{ID: "resp_4xx", Name: "4xx", Algo: collectorapi.Incremental},
+			{ID: "resp_1xx", Name: "1xx", Algo: collectorapi.Incremental},
 		},
 	}
 	respCodes = Chart{
@@ -126,7 +126,7 @@ var (
 		Units:    "responses/s",
 		Fam:      "responses",
 		Ctx:      "web_log.status_code_responses",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioRespCodes,
 	}
 	respCodes1xx = Chart{
@@ -135,7 +135,7 @@ var (
 		Units:    "responses/s",
 		Fam:      "responses",
 		Ctx:      "web_log.status_code_class_1xx_responses",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioRespCodes1xx,
 	}
 	respCodes2xx = Chart{
@@ -144,7 +144,7 @@ var (
 		Units:    "responses/s",
 		Fam:      "responses",
 		Ctx:      "web_log.status_code_class_2xx_responses",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioRespCodes2xx,
 	}
 	respCodes3xx = Chart{
@@ -153,7 +153,7 @@ var (
 		Units:    "responses/s",
 		Fam:      "responses",
 		Ctx:      "web_log.status_code_class_3xx_responses",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioRespCodes3xx,
 	}
 	respCodes4xx = Chart{
@@ -162,7 +162,7 @@ var (
 		Units:    "responses/s",
 		Fam:      "responses",
 		Ctx:      "web_log.status_code_class_4xx_responses",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioRespCodes4xx,
 	}
 	respCodes5xx = Chart{
@@ -171,7 +171,7 @@ var (
 		Units:    "responses/s",
 		Fam:      "responses",
 		Ctx:      "web_log.status_code_class_5xx_responses",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioRespCodes5xx,
 	}
 )
@@ -184,11 +184,11 @@ var (
 		Units:    "kilobits/s",
 		Fam:      "bandwidth",
 		Ctx:      "web_log.bandwidth",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioBandwidth,
 		Dims: Dims{
-			{ID: "bytes_received", Name: "received", Algo: module.Incremental, Mul: 8, Div: 1000},
-			{ID: "bytes_sent", Name: "sent", Algo: module.Incremental, Mul: -8, Div: 1000},
+			{ID: "bytes_received", Name: "received", Algo: collectorapi.Incremental, Mul: 8, Div: 1000},
+			{ID: "bytes_sent", Name: "sent", Algo: collectorapi.Incremental, Mul: -8, Div: 1000},
 		},
 	}
 )
@@ -251,11 +251,11 @@ var (
 		Units:    "clients",
 		Fam:      "client",
 		Ctx:      "web_log.current_poll_uniq_clients",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioUniqIP,
 		Dims: Dims{
-			{ID: "uniq_ipv4", Name: "ipv4", Algo: module.Absolute},
-			{ID: "uniq_ipv6", Name: "ipv6", Algo: module.Absolute},
+			{ID: "uniq_ipv4", Name: "ipv4", Algo: collectorapi.Absolute},
+			{ID: "uniq_ipv6", Name: "ipv6", Algo: collectorapi.Absolute},
 		},
 	}
 )
@@ -268,7 +268,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "vhost",
 		Ctx:      "web_log.vhost_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReqVhost,
 	}
 	reqByPort = Chart{
@@ -277,7 +277,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "port",
 		Ctx:      "web_log.port_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReqPort,
 	}
 	reqByScheme = Chart{
@@ -286,11 +286,11 @@ var (
 		Units:    "requests/s",
 		Fam:      "scheme",
 		Ctx:      "web_log.scheme_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReqScheme,
 		Dims: Dims{
-			{ID: "req_http_scheme", Name: "http", Algo: module.Incremental},
-			{ID: "req_https_scheme", Name: "https", Algo: module.Incremental},
+			{ID: "req_http_scheme", Name: "http", Algo: collectorapi.Incremental},
+			{ID: "req_https_scheme", Name: "https", Algo: collectorapi.Incremental},
 		},
 	}
 	reqByMethod = Chart{
@@ -299,7 +299,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "http method",
 		Ctx:      "web_log.http_method_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReqMethod,
 	}
 	reqByVersion = Chart{
@@ -308,7 +308,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "http version",
 		Ctx:      "web_log.http_version_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReqVersion,
 	}
 	reqByIPProto = Chart{
@@ -317,11 +317,11 @@ var (
 		Units:    "requests/s",
 		Fam:      "ip proto",
 		Ctx:      "web_log.ip_proto_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReqIPProto,
 		Dims: Dims{
-			{ID: "req_ipv4", Name: "ipv4", Algo: module.Incremental},
-			{ID: "req_ipv6", Name: "ipv6", Algo: module.Incremental},
+			{ID: "req_ipv4", Name: "ipv4", Algo: collectorapi.Incremental},
+			{ID: "req_ipv6", Name: "ipv6", Algo: collectorapi.Incremental},
 		},
 	}
 	reqBySSLProto = Chart{
@@ -330,7 +330,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "ssl conn",
 		Ctx:      "web_log.ssl_proto_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReqSSLProto,
 	}
 	reqBySSLCipherSuite = Chart{
@@ -339,7 +339,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "ssl conn",
 		Ctx:      "web_log.ssl_cipher_suite_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReqSSLCipherSuite,
 	}
 )
@@ -352,7 +352,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "url ptn",
 		Ctx:      "web_log.url_pattern_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReqURLPattern,
 	}
 	reqByCustomFieldPattern = Chart{
@@ -361,7 +361,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "custom field ptn",
 		Ctx:      "web_log.custom_field_pattern_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioReqCustomFieldPattern,
 	}
 )
@@ -415,7 +415,7 @@ var (
 		Units:    "responses/s",
 		Fam:      "url ptn %s",
 		Ctx:      "web_log.url_pattern_status_code_responses",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioURLPatternStats,
 	}
 	urlPatternReqMethods = Chart{
@@ -424,7 +424,7 @@ var (
 		Units:    "requests/s",
 		Fam:      "url ptn %s",
 		Ctx:      "web_log.url_pattern_http_method_requests",
-		Type:     module.Stacked,
+		Type:     collectorapi.Stacked,
 		Priority: prioURLPatternStats + 1,
 	}
 	urlPatternBandwidth = Chart{
@@ -433,11 +433,11 @@ var (
 		Units:    "kilobits/s",
 		Fam:      "url ptn %s",
 		Ctx:      "web_log.url_pattern_bandwidth",
-		Type:     module.Area,
+		Type:     collectorapi.Area,
 		Priority: prioURLPatternStats + 2,
 		Dims: Dims{
-			{ID: "url_ptn_%s_bytes_received", Name: "received", Algo: module.Incremental, Mul: 8, Div: 1000},
-			{ID: "url_ptn_%s_bytes_sent", Name: "sent", Algo: module.Incremental, Mul: -8, Div: 1000},
+			{ID: "url_ptn_%s_bytes_received", Name: "received", Algo: collectorapi.Incremental, Mul: 8, Div: 1000},
+			{ID: "url_ptn_%s_bytes_sent", Name: "sent", Algo: collectorapi.Incremental, Mul: -8, Div: 1000},
 		},
 	}
 	urlPatternReqProcTime = Chart{
@@ -461,7 +461,7 @@ func newReqProcTimeHistChart(histogram []float64) (*Chart, error) {
 		dim := &Dim{
 			ID:   fmt.Sprintf("req_proc_time_hist_bucket_%d", i+1),
 			Name: fmt.Sprintf("%.3f", v),
-			Algo: module.Incremental,
+			Algo: collectorapi.Incremental,
 		}
 		if err := chart.AddDim(dim); err != nil {
 			return nil, err
@@ -470,7 +470,7 @@ func newReqProcTimeHistChart(histogram []float64) (*Chart, error) {
 	if err := chart.AddDim(&Dim{
 		ID:   "req_proc_time_hist_count",
 		Name: "+Inf",
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	}); err != nil {
 		return nil, err
 	}
@@ -483,7 +483,7 @@ func newUpsRespTimeHistChart(histogram []float64) (*Chart, error) {
 		dim := &Dim{
 			ID:   fmt.Sprintf("upstream_resp_time_hist_bucket_%d", i+1),
 			Name: fmt.Sprintf("%.3f", v),
-			Algo: module.Incremental,
+			Algo: collectorapi.Incremental,
 		}
 		if err := chart.AddDim(dim); err != nil {
 			return nil, err
@@ -492,7 +492,7 @@ func newUpsRespTimeHistChart(histogram []float64) (*Chart, error) {
 	if err := chart.AddDim(&Dim{
 		ID:   "upstream_resp_time_hist_count",
 		Name: "+Inf",
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	}); err != nil {
 		return nil, err
 	}
@@ -505,7 +505,7 @@ func newURLPatternChart(patterns []userPattern) (*Chart, error) {
 		dim := &Dim{
 			ID:   "req_url_ptn_" + p.Name,
 			Name: p.Name,
-			Algo: module.Incremental,
+			Algo: collectorapi.Incremental,
 		}
 		if err := chart.AddDim(dim); err != nil {
 			return nil, err
@@ -570,7 +570,7 @@ func newCustomFieldChart(f customField) (*Chart, error) {
 		dim := &Dim{
 			ID:   fmt.Sprintf("custom_field_%s_%s", f.Name, p.Name),
 			Name: p.Name,
-			Algo: module.Incremental,
+			Algo: collectorapi.Incremental,
 		}
 		if err := chart.AddDim(dim); err != nil {
 			return nil, err
@@ -625,7 +625,7 @@ func newCustomTimeFieldHistChart(f customTimeField) (*Chart, error) {
 		dim := &Dim{
 			ID:   fmt.Sprintf("custom_time_field_%s_time_hist_bucket_%d", f.Name, i+1),
 			Name: fmt.Sprintf("%.3f", v),
-			Algo: module.Incremental,
+			Algo: collectorapi.Incremental,
 		}
 		if err := chart.AddDim(dim); err != nil {
 			return nil, err
@@ -634,7 +634,7 @@ func newCustomTimeFieldHistChart(f customTimeField) (*Chart, error) {
 	if err := chart.AddDim(&Dim{
 		ID:   fmt.Sprintf("custom_time_field_%s_time_hist_count", f.Name),
 		Name: "+Inf",
-		Algo: module.Incremental,
+		Algo: collectorapi.Incremental,
 	}); err != nil {
 		return nil, err
 	}
@@ -870,7 +870,7 @@ func addCustomTimeFieldsCharts(charts *Charts, fields []customTimeField) error {
 	return charts.Add(cs...)
 }
 
-func addCustomNumericFieldsCharts(charts *module.Charts, fields []customNumericField) error {
+func addCustomNumericFieldsCharts(charts *collectorapi.Charts, fields []customNumericField) error {
 	for _, f := range fields {
 		chart := customNumericFieldSummaryChartTmpl.Copy()
 		chart.ID = fmt.Sprintf(chart.ID, f.Name)

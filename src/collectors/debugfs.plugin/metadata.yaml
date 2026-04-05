@@ -18,7 +18,6 @@ modules:
         - extfrag
         - extfrag_threshold
         - memory fragmentation
-      most_popular: false
     overview:
       data_collection:
         metrics_description: 'Collects memory fragmentation statistics from the Linux kernel'
@@ -161,7 +160,6 @@ modules:
         - zswap
         - frontswap
         - swap cache
-      most_popular: false
     overview:
       data_collection:
         metrics_description: >
@@ -304,7 +302,6 @@ modules:
       keywords:
         - power capping
         - energy
-      most_popular: false
     overview:
       data_collection:
         metrics_description: >
