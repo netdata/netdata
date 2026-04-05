@@ -1789,6 +1789,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: gpa
+            - name: hyperv.root_partition_io_tlb_flush_cost
+              description: Root partition I/O TLB flush cost
+              unit: "ns"
+              chart_type: line
+              dimensions:
+                - name: cost
             - name: hyperv.root_partition_virtual_tlb_flush_entries
               description: Root partition flushes of the entire virtual TLB
               unit: "flushes/s"
@@ -1825,6 +1831,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: illegal_interrupt
+            - name: hyperv.root_partition_device_interrupt_mappings
+              description: Root partition device interrupt mappings
+              unit: "mappings"
+              chart_type: line
+              dimensions:
+                - name: mappings
             - name: hyperv.root_partition_device_interrupt_throttle_events
               description: Root partition throttled interrupts
               unit: "events"
@@ -1853,12 +1865,30 @@ modules:
                 - name: 4K
                 - name: 2M
                 - name: 1G
+            - name: hyperv.root_partition_gpa_pages
+              description: Root partition GPA pages
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: gpa
             - name: hyperv.root_partition_gpa_space_modifications
               description: Root partition GPA space modifications
               unit: "modifications/s"
               chart_type: line
               dimensions:
                 - name: gpa
+            - name: hyperv.root_partition_recommended_virtual_tlb_size
+              description: Root partition recommended virtual TLB size
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: recommended
+            - name: hyperv.root_partition_skipped_timer_ticks
+              description: Root partition skipped timer ticks
+              unit: "ticks"
+              chart_type: line
+              dimensions:
+                - name: skipped
 
         - name: Virtual Machine
           description: "These metrics refer to the Virtual Machine."
@@ -1899,12 +1929,39 @@ modules:
               chart_type: line
               dimensions:
                 - name: pressure
+            - name: hyperv.vm_memory_pressure_limits
+              description: VM memory pressure limits
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: max
+                - name: min
+            - name: hyperv.vm_memory_operations
+              description: VM dynamic memory operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: add
+                - name: remove
+            - name: hyperv.vm_memory_added_removed
+              description: VM dynamic memory adjustments
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: added
+                - name: removed
             - name: hyperv.vm_vid_physical_pages_allocated
               description: VM physical pages allocated
               unit: "pages"
               chart_type: line
               dimensions:
                 - name: allocated
+            - name: hyperv.vm_vid_preferred_numa_node
+              description: VM preferred NUMA node index
+              unit: "node"
+              chart_type: line
+              dimensions:
+                - name: index
             - name: hyperv.vm_vid_remote_physical_pages
               description: VM physical pages not allocated from the preferred NUMA node
               unit: "pages"
@@ -1937,6 +1994,38 @@ modules:
               chart_type: line
               dimensions:
                 - name: errors
+            - name: hyperv.vm_storage_device_queue_length
+              description: VM storage device queue length
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: device
+                - name: lower
+            - name: hyperv.vm_storage_device_latency
+              description: VM storage device latency
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: device
+                - name: lower
+            - name: hyperv.vm_storage_device_throughput
+              description: VM storage device throughput
+              unit: "transfers/s"
+              chart_type: line
+              dimensions:
+                - name: throughput
+            - name: hyperv.vm_storage_device_normalized_throughput
+              description: VM storage device normalized throughput
+              unit: "transfers"
+              chart_type: line
+              dimensions:
+                - name: normalized
+            - name: hyperv.vm_storage_device_io_quota_replenishment_rate
+              description: VM storage device IO quota replenishment rate
+              unit: "quota"
+              chart_type: line
+              dimensions:
+                - name: replenishment
         - name: Virtual Machine Network Interface
           description: "These metrics refer to the Virtual Machine Network Interface."
           labels:
@@ -1998,6 +2087,12 @@ modules:
             - name: vswitch
               description: The name of the Virtual Switch.
           metrics:
+            - name: hyperv.vswitch_total_traffic
+              description: Virtual switch total traffic
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: total
             - name: hyperv.vswitch_traffic
               description: Virtual switch traffic
               unit: "kilobits/s"
@@ -2005,6 +2100,12 @@ modules:
               dimensions:
                 - name: received
                 - name: sent
+            - name: hyperv.vswitch_total_packets
+              description: Virtual switch total packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: total
             - name: hyperv.vswitch_packets
               description: Virtual switch packets
               unit: "packets/s"
@@ -2065,6 +2166,18 @@ modules:
               chart_type: line
               dimensions:
                 - name: purged
+            - name: hyperv.vswitch_send_channel_moves
+              description: Virtual switch send channel moves
+              unit: "moves/s"
+              chart_type: line
+              dimensions:
+                - name: moves
+            - name: hyperv.vswitch_vmq_moves
+              description: Virtual switch VMQ moves
+              unit: "moves/s"
+              chart_type: line
+              dimensions:
+                - name: moves
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNetFramework
