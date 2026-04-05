@@ -123,6 +123,24 @@ The 5-node limit on multi-node dashboards applies to Community plans:
 1. **Upgrade to Business** for unlimited nodes
 2. **Or select preferred nodes** in Space settings to choose which 5 nodes appear in multi-node views
 
+## Parent-Child Deployments and Access Levels
+
+When using parent-child streaming architectures, the access level for your dashboards depends on whether you connect to Netdata Cloud:
+
+| Deployment Type | Access Level | Sensitive Functions | AI Features | Dashboard Access |
+|-----------------|--------------|---------------------|-------------|------------------|
+| **Parent-Child WITHOUT Cloud** | Anonymous | Blocked | Not available | Local dashboard only |
+| **Parent-Child WITH Cloud (Community)** | Community | Unlocked for authenticated users | Available | Cloud dashboards |
+| **Parent-Child WITH Cloud (Business)** | Business | Unlocked for authenticated users | Available | Cloud dashboards + Dynamic Configuration |
+
+:::note
+
+Streaming API keys authenticate the data connection between Children and Parents, but they do not unlock sensitive dashboard functions. Only Netdata Cloud authentication grants access to sensitive functions, AI features, and advanced configuration options.
+
+:::
+
+For more information about setting up parent-child streaming, see [Parents: Your Centralization Points](/docs/deployment-guides/deployment-with-centralization-points.md).
+
 ## Summary
 
 | What You Get | Anonymous | Community | Business |
