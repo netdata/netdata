@@ -898,6 +898,16 @@ nipc_win_shm_error_t nipc_win_shm_receive(
         return NIPC_WIN_SHM_ERR_MSG_TOO_LARGE;
     }
 
+    /* mlen==0 after sequence advance indicates SHM corruption (send rejects 0-length) */
+    if (mlen == 0) {
+        if (ctx->role == NIPC_WIN_SHM_ROLE_SERVER)
+            ctx->local_req_seq = expected_seq;
+        else
+            ctx->local_resp_seq = expected_seq;
+        *msg_len_out = 0;
+        return NIPC_WIN_SHM_ERR_BAD_HEADER;
+    }
+
     *msg_len_out = (size_t)mlen;
 
     /* Advance local tracking */

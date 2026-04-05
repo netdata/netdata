@@ -898,6 +898,11 @@ impl WinShmContext {
 
         self.advance_seq(expected_seq);
 
+        // mlen==0 after sequence advance indicates SHM corruption (send rejects 0-length)
+        if mlen == 0 {
+            return Err(WinShmError::BadHeader);
+        }
+
         if (mlen as usize) > max_copy {
             return Err(WinShmError::MsgTooLarge);
         }

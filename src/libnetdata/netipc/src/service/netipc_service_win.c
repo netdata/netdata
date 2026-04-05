@@ -488,9 +488,11 @@ static nipc_error_t do_raw_call(nipc_client_ctx_t *ctx,
     case NIPC_STATUS_OK:
         break;
     case NIPC_STATUS_LIMIT_EXCEEDED:
-        if (ctx->session.max_response_payload_bytes > 0)
+        if (ctx->session.max_response_payload_bytes > 0) {
+            uint32_t current = ctx->session.max_response_payload_bytes;
             client_note_response_capacity(
-                ctx, ctx->session.max_response_payload_bytes * 2u);
+                ctx, current >= UINT32_MAX / 2u ? UINT32_MAX : current * 2u);
+        }
         return NIPC_ERR_OVERFLOW;
     case NIPC_STATUS_UNSUPPORTED:
         return NIPC_ERR_BAD_LAYOUT;
