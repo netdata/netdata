@@ -299,6 +299,9 @@ nipc_win_shm_error_t nipc_win_shm_server_create(
     resp_capacity = align_cacheline(resp_capacity);
 
     uint32_t req_off  = align_cacheline(NIPC_WIN_SHM_HEADER_LEN);
+    /* Guard against uint32 overflow before computing resp_off */
+    if (req_capacity > UINT32_MAX - req_off)
+        return NIPC_WIN_SHM_ERR_BAD_PARAM;
     uint32_t resp_off = align_cacheline(req_off + req_capacity);
     size_t region_size = (size_t)resp_off + resp_capacity;
 
@@ -539,12 +542,23 @@ nipc_win_shm_error_t nipc_win_shm_client_attach(
         return NIPC_WIN_SHM_ERR_BAD_PROFILE;
     }
 
-    /* Cache header values */
+    /* Cache and validate header values */
     uint32_t req_off  = hdr->request_offset;
     uint32_t req_cap  = hdr->request_capacity;
     uint32_t resp_off = hdr->response_offset;
     uint32_t resp_cap = hdr->response_capacity;
     uint32_t spin     = hdr->spin_tries;
+
+    /* Validate offsets and capacities from shared memory */
+    if (req_off == 0 || req_cap == 0 || resp_off == 0 || resp_cap == 0 ||
+        req_off % 64 != 0 || req_cap % 64 != 0 ||
+        resp_off % 64 != 0 || resp_cap % 64 != 0 ||
+        req_off > UINT32_MAX - req_cap ||
+        resp_off < req_off + req_cap) {
+        UnmapViewOfFile(base);
+        CloseHandle(mapping);
+        return NIPC_WIN_SHM_ERR_BAD_HEADER;
+    }
 
     /* Read current sequence numbers */
     LONG64 cur_req_seq  = atomic_load_64(
