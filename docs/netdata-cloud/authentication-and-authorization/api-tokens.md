@@ -76,6 +76,54 @@ curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://ap
 curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/data?contexts=system.cpu&after=-600
 ```
 
+**Advanced Metric Queries with Aggregation**
+
+For more advanced queries with aggregation, use the POST endpoint with a JSON body. This allows you to query metrics with time aggregation (like average values) and control grouping and filtering.
+
+```console
+TOKEN="YOUR_API_TOKEN"
+SPACE="YOUR_SPACE_ID"
+ROOM="YOUR_ROOM_ID"
+
+read -r -d '' PAYLOAD <<'EOF'
+{
+  "scope": {"contexts": ["system.cpu"]},
+  "selectors": {"nodes": ["*"], "contexts": ["*"], "instances": ["*"], "dimensions": ["*"], "labels": ["*"], "alerts": ["*"]},
+  "window": {"after": -600, "before": 0, "points": 5},
+  "aggregations": {
+    "metrics": [{"group_by": ["selected"], "aggregation": "sum"}],
+    "time": {"time_group": "average"}
+  },
+  "format": "json2",
+  "options": ["jsonwrap", "minify", "unaligned"],
+  "timeout": 30000
+}
+EOF
+
+curl -s -X POST \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/data" \
+  -d "$PAYLOAD"
+```
+
+**Time Aggregation Options**
+
+The `time_group` parameter in `aggregations.time` controls how data points within each time interval are combined:
+
+| Option | Description | Use Case |
+|--------|-------------|----------|
+| `average` | Mean value (default) | Average resource consumption over time |
+| `min` | Minimum value | Find lowest values in each interval |
+| `max` | Maximum value | Find spikes or peaks |
+| `sum` | Sum of values | Total volume transferred (counters) |
+
+:::tip
+
+For complete parameter reference, including additional aggregation functions and advanced grouping options, see the [Query Metrics skill documentation](/docs/netdata-ai/skills/query-netdata-cloud-metrics.md).
+
+:::
+
 **Get context information**
 
 ```console
