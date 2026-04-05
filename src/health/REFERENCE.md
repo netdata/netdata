@@ -1171,7 +1171,69 @@ template: disk_full_percent
 </details>
 
 <details>
-<summary><strong>Example 4: Network Packet Drops</strong></summary><br/>
+<summary><strong>Example 4: Comparing Current vs Historical Values</strong></summary><br/>
+
+**Scenario:** Compare current CPU usage against a historical baseline to provide context.
+
+**Why This Matters:** Understanding context helps identify if current values are unusual compared to normal patterns, not just exceeding fixed thresholds.
+
+**Important:** Each alert definition supports **only ONE `lookup` line**. To compare current values against historical baselines, you must create **separate alerts** and reference values between them using alert names as variables.
+
+**Alert 1: Historical Baseline (1-Hour Average)**
+
+```text
+ alarm: cpu_user_1h_average
+    on: system.cpu
+lookup: average -1h of user
+ units: %
+ every: 30s
+```
+
+This alert calculates the 1-hour average CPU user time. The alert name `cpu_user_1h_average` becomes a variable that other alerts can reference.
+
+**Alert 2: Current Value with Historical Context**
+
+```text
+ alarm: cpu_user_with_context
+    on: system.cpu
+lookup: average -1m of user
+  calc: $this
+ units: %
+ every: 10s
+  warn: $this > 80
+  crit: $this > 90
+   info: Current CPU user: $this%, 1-hour average: $cpu_user_1h_average%
+```
+
+**How Cross-Alert References Work:**
+
+| Concept                    | Implementation                               |
+|----------------------------|---------------------------------------------|
+| Historical baseline alert  | First alert computes 1h average             |
+| Current value alert        | Second alert computes current 1m average    |
+| Reference between alerts   | Use `$cpu_user_1h_average` in any expression |
+
+**Accessing Values:**
+
+In Alert 2, you can reference Alert 1's value using `$cpu_user_1h_average` in expressions like:
+- `calc: $this - $cpu_user_1h_average` (difference from baseline)
+- `warn: $this > $cpu_user_1h_average * 1.5` (50% above baseline)
+- `info: Current CPU user: $this%, 1-hour average: $cpu_user_1h_average%` (display both values in notifications)
+
+The `info` line supports variable interpolation using `$this` (current alert value) and `$alert_name` (value from another alert). This allows you to include dynamic values in alert notifications, making it clear why an alert triggered.
+
+**Key Points:**
+
+- Only **one** `lookup` line is allowed per alert
+- Use multiple coordinated alerts for complex comparisons
+- Reference other alert values using `$alert_name` syntax
+- Both alerts must be on the same chart context
+
+<br/>
+</details>
+
+<details>
+<summary><strong>Example 5: Network Packet Drops</strong></summary><br/>
 
 **Scenario:** Alert on any network packet drops.
 
@@ -1203,7 +1265,7 @@ template: 30min_packet_drops
 </details>
 
 <details>
-<summary><strong>Example 5: Z-Score Based Alert</strong></summary><br/>
+<summary><strong>Example 6: Z-Score Based Alert</strong></summary><br/>
 
 **Scenario:** Detect CPU usage anomalies using statistical analysis.
 
@@ -1248,7 +1310,7 @@ lookup: mean -10s of user
 </details>
 
 <details>
-<summary><strong>Example 6: Machine Learning Anomaly Detection</strong></summary><br/>
+<summary><strong>Example 7: Machine Learning Anomaly Detection</strong></summary><br/>
 
 **Scenario:** Use Netdata's built-in ML for chart-level anomaly detection.
 
@@ -1278,7 +1340,7 @@ template: ml_5min_cpu_chart
 </details>
 
 <details>
-<summary><strong>Example 7: Node-Level ML Monitoring</strong></summary><br/>
+<summary><strong>Example 8: Node-Level ML Monitoring</strong></summary><br/>
 
 **Scenario:** Monitor overall system health using ML across all metrics.
 
