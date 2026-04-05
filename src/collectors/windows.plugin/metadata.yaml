@@ -3128,12 +3128,30 @@ modules:
               chart_type: line
               dimensions:
                 - name: active
+            - name: exchange.transport_queues_external_largest_delivery
+              description: External Largest Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: largest
             - name: exchange.transport_queues_internal_active_remote_delivery
               description: Internal Active Remote Delivery Queue length.
               unit: messages
               chart_type: line
               dimensions:
                 - name: active
+            - name: exchange.transport_queues_internal_largest_delivery
+              description: Internal Largest Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: largest
+            - name: exchange.transport_queues_retry_mailbox_delivery
+              description: Retry Mailbox Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: retry
             - name: exchange.transport_queues_unreachable
               description: Unreachable Queue length.
               unit: messages
@@ -3146,6 +3164,72 @@ modules:
               chart_type: line
               dimensions:
                 - name: unreachable
+            - name: exchange.transport_queues_messages_queued_for_delivery_total
+              description: Messages queued for delivery.
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: exchange.transport_queues_messages_submitted_total
+              description: Messages submitted.
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: submitted
+            - name: exchange.transport_queues_messages_delayed_total
+              description: Messages delayed.
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: delayed
+            - name: exchange.transport_queues_messages_completed_delivery_total
+              description: Messages completed delivery.
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: delivered
+            - name: exchange.transport_queues_aggregate_shadow_queue_length
+              description: Current number of messages in shadow queues.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: exchange.transport_queues_submission_queue_length
+              description: Submission Queue Length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: exchange.transport_queues_delay_queue_length
+              description: Delay Queue Length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: exchange.transport_queues_items_completed_delivery_total
+              description: Items completed delivery.
+              unit: items/s
+              chart_type: line
+              dimensions:
+                - name: completed
+            - name: exchange.transport_queues_items_queued_for_delivery_expired_total
+              description: Items queued for delivery that expired.
+              unit: items/s
+              chart_type: line
+              dimensions:
+                - name: expired
+            - name: exchange.transport_queues_items_queued_for_delivery_total
+              description: Items queued for delivery.
+              unit: items/s
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: exchange.transport_queues_items_resubmitted_total
+              description: Items resubmitted.
+              unit: items/s
+              chart_type: line
+              dimensions:
+                - name: resubmitted
             - name: exchange.activesync_ping_cmds_pending
               description: Ping commands pending in queue.
               unit: commands
@@ -3303,6 +3387,42 @@ modules:
               chart_type: line
               dimensions:
                 - name: serviced
+            - name: exchange.ldap_read_time_sec
+              description: Time to send an LDAP read request and receive a response.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: read
+            - name: exchange.ldap_search_time_sec
+              description: Time to send an LDAP search request and receive a response.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: search
+            - name: exchange.ldap_write_time_sec
+              description: Time to send an LDAP add, modify, or delete request and receive a response.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: write
+            - name: exchange.ldap_timeout_errors_total
+              description: LDAP timeout errors.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: timeouts
+            - name: exchange.ldap_long_running_ops_per_sec
+              description: Long running LDAP operations.
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: exchange.mapihttp_emsmdb_active_user_count
+              description: Unique MAPI HTTP EMSMDB users active in the last 2 minutes.
+              unit: users
+              chart_type: line
+              dimensions:
+                - name: active
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNUMA
