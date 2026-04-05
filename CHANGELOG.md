@@ -251,6 +251,9 @@
 - Regenerate integrations docs ([#22131](https://github.com/netdata/netdata/issues/22131))
 - Chore(go): go fix ([#22133](https://github.com/netdata/netdata/issues/22133))
 - Feat(go.d/azure_monitor): add per-profile resource filters ([#22132](https://github.com/netdata/netdata/issues/22132))
+- Regenerate integrations docs ([#22135](https://github.com/netdata/netdata/issues/22135))
+- Chore(go.d/azure_monitor): shorten stock profile selectors ([#22137](https://github.com/netdata/netdata/issues/22137))
+- Chartengine: fix validated framework issues ([#22138](https://github.com/netdata/netdata/issues/22138))
 
 ## [2.9.0] - 2026-02-16
 
