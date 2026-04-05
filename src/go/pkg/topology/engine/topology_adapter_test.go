@@ -1746,12 +1746,12 @@ func TestProbableCandidateSegmentsFromReporterHints_PrefersManagedReporterSegmen
 			"managed-switch": {"segment:managed": {}},
 		},
 		byDeviceIfIndex: map[string]map[string]struct{}{
-			"ghost-switch|7":   {"segment:ghost": {}},
-			"managed-switch|7": {"segment:managed": {}},
+			"ghost-switch\x007":   {"segment:ghost": {}},
+			"managed-switch\x007": {"segment:managed": {}},
 		},
 		byDeviceIfName: map[string]map[string]struct{}{
-			"ghost-switch|swp06":   {"segment:ghost": {}},
-			"managed-switch|swp06": {"segment:managed": {}},
+			"ghost-switch\x00swp06":   {"segment:ghost": {}},
+			"managed-switch\x00swp06": {"segment:managed": {}},
 		},
 	}
 
@@ -2938,7 +2938,7 @@ func topologyLinkSignatures(links []topology.Link) map[string]struct{} {
 			dstKey,
 			strings.ToLower(strings.TrimSpace(link.State)),
 			strings.ToLower(topologyMetricString(link.Metrics, "attachment_mode")),
-		}, "|")
+		}, keySep)
 		out[key] = struct{}{}
 	}
 	return out

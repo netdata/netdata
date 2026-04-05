@@ -312,11 +312,11 @@ func (s *bridgeDomainSegment) portIdentityKey(port bridgePortRef) string {
 	if nodeID == "" || bridgePort == "" {
 		return ""
 	}
-	return nodeID + "|" + strings.ToLower(bridgePort)
+	return nodeID + keySep + strings.ToLower(bridgePort)
 }
 
 func (s *bridgeDomainSegment) sortKey() string {
-	return portSortKey(s.designatedPort) + "|" + strings.Join(sortedBridgePortSet(s.ports), ",")
+	return portSortKey(s.designatedPort) + keySep + strings.Join(sortedBridgePortSet(s.ports), ",")
 }
 
 func (d *bridgeBroadcastDomain) loadSegment(segment *bridgeDomainSegment) bool {
@@ -369,7 +369,7 @@ func portSortKey(port bridgePortRef) string {
 		strings.TrimSpace(port.ifName),
 		strconvItoa(port.ifIndex),
 		strings.TrimSpace(port.vlanID),
-	}, "|")
+	}, keySep)
 }
 
 func strconvItoa(v int) string {

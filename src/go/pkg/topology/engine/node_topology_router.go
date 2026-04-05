@@ -115,7 +115,7 @@ func BuildNetworkRouterTopology(service *NodeTopologyService, ipv4prefix, ipv6pr
 		sourcePort := createNodePort(createNodeVertex(source, ipPrimaryMap[source.ID]), sourceIP, snmpByID[sourceIP.SnmpInterfaceID])
 		targetPort := createNodePort(createNodeVertex(target, ipPrimaryMap[target.ID]), targetIP, snmpByID[targetIP.SnmpInterfaceID])
 		addEdge(NetworkRouterEdge{
-			ID:         sourcePort.Vertex + "|" + sourcePort.ID + "->" + targetPort.Vertex + "|" + targetPort.ID,
+			ID:         sourcePort.Vertex + keySep + sourcePort.ID + "->" + targetPort.Vertex + keySep + targetPort.ID,
 			SourcePort: sourcePort,
 			TargetPort: targetPort,
 		})
@@ -140,7 +140,7 @@ func BuildNetworkRouterTopology(service *NodeTopologyService, ipv4prefix, ipv6pr
 			sourcePort := createNetworkPort(networkVertex, targetIP)
 			targetPort := createNodePort(targetVertex, targetIP, snmpByID[targetIP.SnmpInterfaceID])
 			addEdge(NetworkRouterEdge{
-				ID:         sourcePort.Vertex + "|" + sourcePort.ID + "->" + targetPort.Vertex + "|" + targetPort.ID,
+				ID:         sourcePort.Vertex + keySep + sourcePort.ID + "->" + targetPort.Vertex + keySep + targetPort.ID,
 				SourcePort: sourcePort,
 				TargetPort: targetPort,
 			})

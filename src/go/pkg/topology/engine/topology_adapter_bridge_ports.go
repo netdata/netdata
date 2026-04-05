@@ -96,7 +96,7 @@ func bridgeAttachmentSortKey(attachment Attachment) string {
 		strings.ToLower(strings.TrimSpace(attachment.Method)),
 		strings.TrimSpace(attachment.EndpointID),
 	}
-	return strings.Join(parts, "|")
+	return strings.Join(parts, keySep)
 }
 
 func bridgePairKey(left, right bridgePortRef) string {
@@ -135,7 +135,7 @@ func bridgePortRefKey(port bridgePortRef, includeBridgePort bool, includeVLAN bo
 		parts = append(parts, "bp:"+strings.ToLower(bridgePort))
 	}
 	parts = append(parts, "vlan:"+strings.ToLower(vlanID))
-	return strings.Join(parts, "|")
+	return strings.Join(parts, keySep)
 }
 
 func bridgePortRefSortKey(port bridgePortRef) string {

@@ -209,7 +209,7 @@ func lldpCompositeKey(parts ...string) string {
 	var b strings.Builder
 	for i, part := range parts {
 		if i > 0 {
-			b.WriteByte('|')
+			b.WriteString(keySep)
 		}
 		b.WriteString(strconv.Itoa(len(part)))
 		b.WriteByte(':')
@@ -259,6 +259,12 @@ func matchLLDPLinksEnlinkdPassOrder(links []lldpMatchLink) []lldpMatchedPair {
 		if !ok {
 			continue
 		}
+		if source.index == targetIndex {
+			continue
+		}
+		if _, targetParsed := parsed[targetIndex]; targetParsed {
+			continue
+		}
 		addPair(source.index, targetIndex, lldpMatchPassDefault)
 	}
 
@@ -277,6 +283,12 @@ func matchLLDPLinksEnlinkdPassOrder(links []lldpMatchLink) []lldpMatchedPair {
 		)
 		targetIndex, ok := lookup[key]
 		if !ok {
+			continue
+		}
+		if source.index == targetIndex {
+			continue
+		}
+		if _, targetParsed := parsed[targetIndex]; targetParsed {
 			continue
 		}
 		addPair(source.index, targetIndex, lldpMatchPassPortDesc)
@@ -298,6 +310,12 @@ func matchLLDPLinksEnlinkdPassOrder(links []lldpMatchLink) []lldpMatchedPair {
 		if !ok {
 			continue
 		}
+		if source.index == targetIndex {
+			continue
+		}
+		if _, targetParsed := parsed[targetIndex]; targetParsed {
+			continue
+		}
 		addPair(source.index, targetIndex, lldpMatchPassSysName)
 	}
 
@@ -313,6 +331,12 @@ func matchLLDPLinksEnlinkdPassOrder(links []lldpMatchLink) []lldpMatchedPair {
 		)
 		targetIndex, ok := lookup[key]
 		if !ok {
+			continue
+		}
+		if source.index == targetIndex {
+			continue
+		}
+		if _, targetParsed := parsed[targetIndex]; targetParsed {
 			continue
 		}
 		addPair(source.index, targetIndex, lldpMatchPassChassisPort)
@@ -331,6 +355,12 @@ func matchLLDPLinksEnlinkdPassOrder(links []lldpMatchLink) []lldpMatchedPair {
 		if !ok {
 			continue
 		}
+		if source.index == targetIndex {
+			continue
+		}
+		if _, targetParsed := parsed[targetIndex]; targetParsed {
+			continue
+		}
 		addPair(source.index, targetIndex, lldpMatchPassChassisDescr)
 	}
 
@@ -344,6 +374,12 @@ func matchLLDPLinksEnlinkdPassOrder(links []lldpMatchLink) []lldpMatchedPair {
 		)
 		targetIndex, ok := lookup[key]
 		if !ok {
+			continue
+		}
+		if source.index == targetIndex {
+			continue
+		}
+		if _, targetParsed := parsed[targetIndex]; targetParsed {
 			continue
 		}
 		addPair(source.index, targetIndex, lldpMatchPassChassis)

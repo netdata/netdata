@@ -66,7 +66,7 @@ func buildFDBCandidates(entries []FDBObservation, bridgePortToIfIndex map[string
 		}
 		candidateKey := mac
 		if candidate.vlanID != "" {
-			candidateKey = mac + "|vlan:" + strings.ToLower(candidate.vlanID)
+			candidateKey = mac + keySep + "vlan:" + strings.ToLower(candidate.vlanID)
 		}
 
 		existing, exists := candidatesByEndpoint[candidateKey]

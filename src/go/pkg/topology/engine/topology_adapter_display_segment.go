@@ -61,7 +61,7 @@ func parseTopologySegmentPortRef(raw string) topologySegmentPortRef {
 	if raw == "" {
 		return topologySegmentPortRef{}
 	}
-	parts := strings.Split(raw, "|")
+	parts := strings.Split(raw, keySep)
 	if len(parts) == 0 {
 		return topologySegmentPortRef{}
 	}

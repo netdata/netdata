@@ -118,7 +118,7 @@ func pairedEntryDeterministicKey(entry *builtAdjacencyLink) string {
 		strings.TrimSpace(entry.adj.SourcePort),
 		strings.TrimSpace(entry.adj.TargetID),
 		strings.TrimSpace(entry.adj.TargetPort),
-	}, "|")
+	}, keySep)
 }
 
 func backfillPairGroupMissingEndpointPorts(entries []*builtAdjacencyLink) {
@@ -136,7 +136,7 @@ func backfillPairGroupMissingEndpointPorts(entries []*builtAdjacencyLink) {
 		if src == "" || dst == "" {
 			continue
 		}
-		key := src + "|" + dst
+		key := src + keySep + dst
 		directionToIndexes[key] = append(directionToIndexes[key], i)
 	}
 
@@ -150,7 +150,7 @@ func backfillPairGroupMissingEndpointPorts(entries []*builtAdjacencyLink) {
 			continue
 		}
 
-		reverseKey := dst + "|" + src
+		reverseKey := dst + keySep + src
 		candidates := directionToIndexes[reverseKey]
 		if len(candidates) != 1 {
 			continue

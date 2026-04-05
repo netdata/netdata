@@ -172,9 +172,9 @@ func topologyUndirectedPairKey(left, right string) string {
 		return ""
 	}
 	if left <= right {
-		return left + "|" + right
+		return left + keySep + right
 	}
-	return right + "|" + left
+	return right + keySep + left
 }
 
 type topologyLinkCounts struct {

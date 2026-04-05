@@ -135,10 +135,10 @@ func buildSegmentReporterIndex(
 			}
 			addStringSet(index.byDevice, deviceID, segmentID)
 			if port.ifIndex > 0 {
-				addStringSet(index.byDeviceIfIndex, deviceID+"|"+strconv.Itoa(port.ifIndex), segmentID)
+				addStringSet(index.byDeviceIfIndex, deviceID+keySep+strconv.Itoa(port.ifIndex), segmentID)
 			}
 			if ifName := strings.ToLower(strings.TrimSpace(port.ifName)); ifName != "" {
-				addStringSet(index.byDeviceIfName, deviceID+"|"+ifName, segmentID)
+				addStringSet(index.byDeviceIfName, deviceID+keySep+ifName, segmentID)
 			}
 		}
 	}
@@ -210,7 +210,7 @@ func probableCandidateSegmentsFromReporterHints(
 			if ifIndex == "" {
 				continue
 			}
-			for segmentID := range reporterSegmentIndex.byDeviceIfIndex[deviceID+"|"+ifIndex] {
+			for segmentID := range reporterSegmentIndex.byDeviceIfIndex[deviceID+keySep+ifIndex] {
 				candidateSet[segmentID] = struct{}{}
 			}
 		}
@@ -219,7 +219,7 @@ func probableCandidateSegmentsFromReporterHints(
 			if ifName == "" {
 				continue
 			}
-			for segmentID := range reporterSegmentIndex.byDeviceIfName[deviceID+"|"+ifName] {
+			for segmentID := range reporterSegmentIndex.byDeviceIfName[deviceID+keySep+ifName] {
 				candidateSet[segmentID] = struct{}{}
 			}
 		}

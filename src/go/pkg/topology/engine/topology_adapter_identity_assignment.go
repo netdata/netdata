@@ -254,7 +254,7 @@ func topologyLinkSortKey(link topology.Link) string {
 		topologyAttrKey(link.Dst.Attributes, "if_name"),
 		topologyAttrKey(link.Dst.Attributes, "port_id"),
 		link.State,
-	}, "|")
+	}, keySep)
 }
 
 func topologyAttrKey(attrs map[string]any, key string) string {
