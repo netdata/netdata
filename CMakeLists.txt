@@ -2988,12 +2988,28 @@ if(ENABLE_PLUGIN_LOCAL_LISTENERS)
 endif()
 
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
+        if(USE_LTO AND CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_SIZEOF_VOID_P EQUAL 4)
+                # GCC still performs LTO when linking slim LTO static archives into a
+                # non-LTO target. Build these archives as fat objects and force a
+                # regular final link to avoid exhausting the i386 linker.
+                if(TARGET judy)
+                        target_compile_options(judy PRIVATE -ffat-lto-objects)
+                endif()
+                if(TARGET libnetdata)
+                        target_compile_options(libnetdata PRIVATE -ffat-lto-objects)
+                endif()
+        endif()
+
         set(NETWORK_VIEWER_FILES
                 src/libnetdata/local-sockets/local-sockets.h
                 src/collectors/network-viewer.plugin/network-viewer.c
         )
 
         add_executable(network-viewer.plugin ${NETWORK_VIEWER_FILES})
+        if(USE_LTO AND CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_SIZEOF_VOID_P EQUAL 4)
+                set_property(TARGET network-viewer.plugin PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
+                target_link_options(network-viewer.plugin PRIVATE -fno-lto)
+        endif()
 
         target_compile_options(network-viewer.plugin PRIVATE
                                "$<$<BOOL:${MNL_FOUND}>:${MNL_CFLAGS_OTHER}>")

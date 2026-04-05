@@ -589,6 +589,37 @@ void rrdhost_system_info_to_node_info(struct rrdhost_system_info *system_info, s
     node_info->data.ml_info.ml_enabled = system_info->ml_enabled;
 }
 
+// emit system info as named key-value pairs into an open JSON object
+void rrdhost_system_info_to_json_object_fields(BUFFER *wb, struct rrdhost_system_info *si) {
+    buffer_json_member_add_string(wb, "os_name",                si && si->host_os_name ? si->host_os_name : "");
+    buffer_json_member_add_string(wb, "os_id",                  si && si->host_os_id ? si->host_os_id : "");
+    buffer_json_member_add_string(wb, "os_id_like",             si && si->host_os_id_like ? si->host_os_id_like : "");
+    buffer_json_member_add_string(wb, "os_version",             si && si->host_os_version ? si->host_os_version : "");
+    buffer_json_member_add_string(wb, "os_version_id",          si && si->host_os_version_id ? si->host_os_version_id : "");
+    buffer_json_member_add_string(wb, "os_detection",           si && si->host_os_detection ? si->host_os_detection : "");
+    buffer_json_member_add_uint64(wb, "cpu_cores",              si && si->host_cores ? str2uint64_t(si->host_cores, NULL) : 0);
+    buffer_json_member_add_uint64(wb, "disk_space",             si && si->host_disk_space ? str2uint64_t(si->host_disk_space, NULL) : 0);
+    buffer_json_member_add_uint64(wb, "cpu_freq",               si && si->host_cpu_freq ? str2uint64_t(si->host_cpu_freq, NULL) : 0);
+    buffer_json_member_add_uint64(wb, "ram_total",              si && si->host_ram_total ? str2uint64_t(si->host_ram_total, NULL) : 0);
+    buffer_json_member_add_string(wb, "container_os_name",      si && si->container_os_name ? si->container_os_name : "");
+    buffer_json_member_add_string(wb, "container_os_id",        si && si->container_os_id ? si->container_os_id : "");
+    buffer_json_member_add_string(wb, "container_os_id_like",   si && si->container_os_id_like ? si->container_os_id_like : "");
+    buffer_json_member_add_string(wb, "container_os_version",   si && si->container_os_version ? si->container_os_version : "");
+    buffer_json_member_add_string(wb, "container_os_version_id",si && si->container_os_version_id ? si->container_os_version_id : "");
+    buffer_json_member_add_string(wb, "container_os_detection", si && si->container_os_detection ? si->container_os_detection : "");
+    buffer_json_member_add_string(wb, "is_k8s_node",            si && si->is_k8s_node ? si->is_k8s_node : "");
+    buffer_json_member_add_string(wb, "kernel_name",            si && si->kernel_name ? si->kernel_name : "");
+    buffer_json_member_add_string(wb, "kernel_version",         si && si->kernel_version ? si->kernel_version : "");
+    buffer_json_member_add_string(wb, "architecture",           si && si->architecture ? si->architecture : "");
+    buffer_json_member_add_string(wb, "virtualization",         si && si->virtualization ? si->virtualization : "");
+    buffer_json_member_add_string(wb, "virt_detection",         si && si->virt_detection ? si->virt_detection : "");
+    buffer_json_member_add_string(wb, "container_type",         si && si->container ? si->container : "");
+    buffer_json_member_add_string(wb, "container_detection",    si && si->container_detection ? si->container_detection : "");
+    buffer_json_member_add_string(wb, "cloud_provider_type",    si && si->cloud_provider_type ? si->cloud_provider_type : "");
+    buffer_json_member_add_string(wb, "cloud_instance_type",    si && si->cloud_instance_type ? si->cloud_instance_type : "");
+    buffer_json_member_add_string(wb, "cloud_instance_region",  si && si->cloud_instance_region ? si->cloud_instance_region : "");
+}
+
 void rrdhost_system_info_to_streaming_function_array(BUFFER *wb, struct rrdhost_system_info *system_info) {
     if(system_info) {
         buffer_json_add_array_item_string(wb, system_info->host_os_name ? system_info->host_os_name : "");
