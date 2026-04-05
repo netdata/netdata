@@ -1,0 +1,3 @@
+# Ignore all test results
+*
+!.gitignore
