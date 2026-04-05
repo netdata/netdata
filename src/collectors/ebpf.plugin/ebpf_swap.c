@@ -695,7 +695,7 @@ void ebpf_read_swap_thread(void *ptr)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active)
             ebpf_update_swap_cgroup();
 
         if (sem_post(shm_mutex_ebpf_integration)) {
@@ -1018,7 +1018,7 @@ void ebpf_swap_send_cgroup_data(int update_every)
         return;
     }
 
-    if (shm_ebpf_cgroup.header->systemd_enabled) {
+    if (ebpf_cgroup_systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_swap_charts(update_every);
             fflush(stdout);
@@ -1094,7 +1094,7 @@ static void swap_collector(ebpf_module_t *em)
             break;
         }
 
-        if (cgroup && shm_ebpf_cgroup.header)
+        if (cgroup && ebpf_cgroup_integration_active)
             ebpf_swap_send_cgroup_data(update_every);
 
         netdata_mutex_unlock(&lock);

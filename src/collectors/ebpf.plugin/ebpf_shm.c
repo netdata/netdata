@@ -1051,7 +1051,7 @@ void ebpf_shm_send_cgroup_data(int update_every)
         return;
     }
 
-    if (shm_ebpf_cgroup.header->systemd_enabled) {
+    if (ebpf_cgroup_systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_shm_charts(update_every);
         }
@@ -1154,7 +1154,7 @@ void ebpf_read_shm_thread(void *ptr)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active)
             ebpf_update_shm_cgroup();
 
         if (sem_post(shm_mutex_ebpf_integration)) {
@@ -1217,7 +1217,7 @@ static void shm_collector(ebpf_module_t *em)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header) {
+        if (cgroups && ebpf_cgroup_integration_active) {
             ebpf_shm_send_cgroup_data(update_every);
         }
 

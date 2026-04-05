@@ -1050,7 +1050,7 @@ void ebpf_read_cachestat_thread(void *ptr)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active)
             ebpf_update_cachestat_cgroup();
         if (sem_post(shm_mutex_ebpf_integration)) {
             netdata_log_error("CACHESTAT: Failed to post semaphore.");
@@ -1545,7 +1545,7 @@ void ebpf_cachestat_send_cgroup_data(int update_every)
     ebpf_cgroup_target_t *ect;
     ebpf_cachestat_calc_chart_values();
 
-    if (shm_ebpf_cgroup.header->systemd_enabled) {
+    if (ebpf_cgroup_systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_cachestat_charts(update_every);
         }
@@ -1624,7 +1624,7 @@ static void cachestat_collector(ebpf_module_t *em)
             break;
         }
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active)
             ebpf_cachestat_send_cgroup_data(update_every);
 
         netdata_mutex_unlock(&lock);
