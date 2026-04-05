@@ -1,0 +1,474 @@
+# Alcatel-Lucent AOS7 BGP peer monitoring via ALCATEL-IND1-BGP-MIB.
+# Extends _std-bgp4-mib.yaml which provides standard BGP4-MIB metrics for IPv4 peers.
+# This profile adds:
+#   - Alcatel-specific metrics not in standard BGP4-MIB (prefix counts, transitions, notifications, route refresh)
+#   - Complete IPv6 BGP peer monitoring (the standard BGP4-MIB is IPv4-only)
+
+extends:
+  - _std-bgp4-mib.yaml
+
+virtual_metrics:
+  - name: bgpPeerAvailability
+    per_row: true
+    alternatives:
+      - sources:
+          - {metric: bgpPeerAdminStatus, table: alaBgpPeer6Table, as: admin_enabled, dim: start}
+          - {metric: bgpPeerState, table: alaBgpPeer6Table, as: established, dim: established}
+      - sources:
+          - {metric: bgpPeerAdminStatus, table: bgpPeerTable, as: admin_enabled, dim: start}
+          - {metric: bgpPeerState, table: bgpPeerTable, as: established, dim: established}
+    chart_meta:
+      description: BGP peer administrative and established availability
+      family: 'Network/Routing/BGP/Peer/Availability'
+      unit: "{status}"
+  - name: bgpPeerUpdates
+    per_row: true
+    alternatives:
+      - sources:
+          - {metric: bgpPeerInUpdates, table: alaBgpPeer6Table, as: received}
+          - {metric: bgpPeerOutUpdates, table: alaBgpPeer6Table, as: sent}
+      - sources:
+          - {metric: bgpPeerInUpdates, table: bgpPeerTable, as: received}
+          - {metric: bgpPeerOutUpdates, table: bgpPeerTable, as: sent}
+    chart_meta:
+      description: BGP peer update traffic by direction
+      family: 'Network/Routing/BGP/Peer/Message/Update'
+      unit: "{message}"
+
+metrics:
+  # =====================================================================
+  # IPv4 Peer Table — unique Alcatel metrics (state/messages from std BGP4-MIB)
+  # Table: alaBgpPeerTable  OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2
+  # Index: alaBgpPeerAddr (IpAddress)
+  # =====================================================================
+  - MIB: ALCATEL-IND1-BGP-MIB
+    table:
+      name: alaBgpPeerTable
+      OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2
+    symbols:
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.25
+        name: bgpPeerPrefixesReceived
+        metric_type: gauge
+        chart_meta:
+          description: The number of prefixes received from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Received'
+          unit: "{prefix}"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.47
+        name: bgpPeerUpTransitions
+        metric_type: monotonic_count
+        chart_meta:
+          description: The number of times the peer session transitioned to ESTABLISHED state
+          family: 'Network/Routing/BGP/Peer/FSM/Transition/Up/Count'
+          unit: "{transition}"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.26
+        name: bgpPeerDownTransitions
+        metric_type: monotonic_count
+        chart_meta:
+          description: The number of times the peer session transitioned to IDLE state
+          family: 'Network/Routing/BGP/Peer/FSM/Transition/Down/Count'
+          unit: "{transition}"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.13
+        name: alcatel.bgpPeerInRouteRefreshMessages
+        chart_meta:
+          description: The number of route refresh messages received from this peer
+          family: 'Network/Routing/BGP/Peer/Message/RouteRefresh/In'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.14
+        name: alcatel.bgpPeerOutRouteRefreshMessages
+        chart_meta:
+          description: The number of route refresh messages sent to this peer
+          family: 'Network/Routing/BGP/Peer/Message/RouteRefresh/Out'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.21
+        name: alcatel.bgpPeerInNotifications
+        chart_meta:
+          description: The number of NOTIFICATION messages received from this peer
+          family: 'Network/Routing/BGP/Peer/Message/Notification/In'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.22
+        name: alcatel.bgpPeerOutNotifications
+        chart_meta:
+          description: The number of NOTIFICATION messages sent to this peer
+          family: 'Network/Routing/BGP/Peer/Message/Notification/Out'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.18
+        name: alcatel.bgpPeerLastDownReason
+        chart_meta:
+          description: The reason for the last session termination
+          family: 'Network/Routing/BGP/Peer/Error/LastDown/Reason'
+          unit: "{reason}"
+        mapping:
+          1: user_request
+          2: connection_timeout
+          3: hold_timeout
+          4: bad_message
+          5: fsm_unexpected_event
+          6: peer_closed
+          7: peer_notify
+          8: transport_error
+          9: none
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.23
+        name: alcatel.bgpPeerLastSentNotifyReason
+        chart_meta:
+          description: The last NOTIFICATION reason code sent to this peer
+          family: 'Network/Routing/BGP/Peer/Error/LastNotify/Sent'
+          unit: "{reason}"
+        mapping:
+          1: msg_hdr_no_sync
+          2: msg_hdr_bad_len
+          3: msg_hdr_bad_type
+          4: open_unsupp_version
+          5: open_bad_as
+          6: open_bad_id
+          7: open_unsupp_option
+          8: open_auth_fail
+          9: open_bad_holdtime
+          10: open_unsupp_capability
+          11: update_malform_attr
+          12: update_unsupp_wknwn_attr
+          13: update_missing_wknwn_attr
+          14: update_bad_attr_flags
+          15: update_bad_attr_len
+          16: update_bad_origin
+          17: update_as_loop
+          18: update_bad_nexthop
+          19: update_bad_opt_attr
+          20: update_bad_net
+          21: update_bad_aspath
+          22: hold_timeout
+          23: fsm_error
+          24: cease_max_prefix_reached
+          25: cease_admin_shutdown
+          26: cease_peer_deconfigured
+          27: cease_admin_reset
+          28: cease_conn_rejected
+          29: cease_other_conf_change
+          30: cease_conn_collision_resolution
+          31: cease_out_of_resources
+          32: none
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.24
+        name: alcatel.bgpPeerLastRecvNotifyReason
+        chart_meta:
+          description: The last NOTIFICATION reason code received from this peer
+          family: 'Network/Routing/BGP/Peer/Error/LastNotify/Received'
+          unit: "{reason}"
+        mapping:
+          1: msg_hdr_no_sync
+          2: msg_hdr_bad_len
+          3: msg_hdr_bad_type
+          4: open_unsupp_version
+          5: open_bad_as
+          6: open_bad_id
+          7: open_unsupp_option
+          8: open_auth_fail
+          9: open_bad_holdtime
+          10: open_unsupp_capability
+          11: update_malform_attr
+          12: update_unsupp_wknwn_attr
+          13: update_missing_wknwn_attr
+          14: update_bad_attr_flags
+          15: update_bad_attr_len
+          16: update_bad_origin
+          17: update_as_loop
+          18: update_bad_nexthop
+          19: update_bad_opt_attr
+          20: update_bad_net
+          21: update_bad_aspath
+          22: hold_timeout
+          23: fsm_error
+          24: cease_max_prefix_reached
+          25: cease_admin_shutdown
+          26: cease_peer_deconfigured
+          27: cease_admin_reset
+          28: cease_conn_rejected
+          29: cease_other_conf_change
+          30: cease_conn_collision_resolution
+          31: cease_out_of_resources
+          32: none
+    metric_tags: &alcatel_ipv4_peer_tags
+      - tag: neighbor
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.1
+          name: alaBgpPeerAddr
+          format: ip_address
+      - tag: remote_as
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.2
+          name: alaBgpPeerAS
+      - tag: peer_description
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.4
+          name: alaBgpPeerName
+      - tag: local_address
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.17
+          name: alaBgpPeerLocalAddr
+          format: ip_address
+      - tag: peer_type
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.2.1.27
+          name: alaBgpPeerType
+        mapping:
+          1: internal
+          2: external
+
+  # =====================================================================
+  # IPv6 Peer Table — complete self-contained BGP monitoring for IPv6 peers
+  # Table: alaBgpPeer6Table  OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12
+  # Index: alaBgpPeer6Addr (Ipv6Address, 16 bytes)
+  # The standard BGP4-MIB is IPv4-only, so IPv6 peers exist only here.
+  # =====================================================================
+  - MIB: ALCATEL-IND1-BGP-MIB
+    table:
+      name: alaBgpPeer6Table
+      OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12
+    symbols:
+      # State and admin status (no standard BGP4-MIB equivalent for IPv6)
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.68
+        name: bgpPeerAdminStatus
+        chart_meta:
+          description: The desired state of the BGP connection
+          family: 'Network/Routing/BGP/Peer/Admin/Status'
+          unit: "{status}"
+        mapping:
+          1: stop
+          2: start
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.69
+        name: bgpPeerState
+        chart_meta:
+          description: The BGP peer connection state
+          family: 'Network/Routing/BGP/Peer/Connection/Status'
+          unit: "{status}"
+        mapping:
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
+      # Message counts
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.49
+        name: bgpPeerInTotalMessages
+        chart_meta:
+          description: The total number of messages received from the remote peer on this connection
+          family: 'Network/Routing/BGP/Peer/Message/Total/In'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.50
+        name: bgpPeerOutTotalMessages
+        chart_meta:
+          description: The total number of messages transmitted to the remote peer on this connection
+          family: 'Network/Routing/BGP/Peer/Message/Total/Out'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.51
+        name: bgpPeerInUpdates
+        chart_meta:
+          description: The number of BGP UPDATE messages received on this connection
+          family: 'Network/Routing/BGP/Peer/Message/Update/In'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.52
+        name: bgpPeerOutUpdates
+        chart_meta:
+          description: The number of BGP UPDATE messages transmitted on this connection
+          family: 'Network/Routing/BGP/Peer/Message/Update/Out'
+          unit: "{message}"
+      # Prefix counts
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.25
+        name: bgpPeerPrefixesReceived
+        metric_type: gauge
+        chart_meta:
+          description: The number of prefixes received from this peer
+          family: 'Network/Routing/BGP/Peer/Prefix/Received'
+          unit: "{prefix}"
+      # Transitions
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.47
+        name: bgpPeerUpTransitions
+        metric_type: monotonic_count
+        chart_meta:
+          description: The number of times the peer session transitioned to ESTABLISHED state
+          family: 'Network/Routing/BGP/Peer/FSM/Transition/Up/Count'
+          unit: "{transition}"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.26
+        name: bgpPeerDownTransitions
+        metric_type: monotonic_count
+        chart_meta:
+          description: The number of times the peer session transitioned to IDLE state
+          family: 'Network/Routing/BGP/Peer/FSM/Transition/Down/Count'
+          unit: "{transition}"
+      # Route refresh messages
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.13
+        name: alcatel.bgpPeerInRouteRefreshMessages
+        chart_meta:
+          description: The number of route refresh messages received from this peer
+          family: 'Network/Routing/BGP/Peer/Message/RouteRefresh/In'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.14
+        name: alcatel.bgpPeerOutRouteRefreshMessages
+        chart_meta:
+          description: The number of route refresh messages sent to this peer
+          family: 'Network/Routing/BGP/Peer/Message/RouteRefresh/Out'
+          unit: "{message}"
+      # Notification messages
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.21
+        name: alcatel.bgpPeerInNotifications
+        chart_meta:
+          description: The number of NOTIFICATION messages received from this peer
+          family: 'Network/Routing/BGP/Peer/Message/Notification/In'
+          unit: "{message}"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.22
+        name: alcatel.bgpPeerOutNotifications
+        chart_meta:
+          description: The number of NOTIFICATION messages sent to this peer
+          family: 'Network/Routing/BGP/Peer/Message/Notification/Out'
+          unit: "{message}"
+      # Error/reason codes
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.18
+        name: alcatel.bgpPeerLastDownReason
+        chart_meta:
+          description: The reason for the last session termination
+          family: 'Network/Routing/BGP/Peer/Error/LastDown/Reason'
+          unit: "{reason}"
+        mapping:
+          1: user_request
+          2: connection_timeout
+          3: hold_timeout
+          4: bad_message
+          5: fsm_unexpected_event
+          6: peer_closed
+          7: peer_notify
+          8: transport_error
+          9: none
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.23
+        name: alcatel.bgpPeerLastSentNotifyReason
+        chart_meta:
+          description: The last NOTIFICATION reason code sent to this peer
+          family: 'Network/Routing/BGP/Peer/Error/LastNotify/Sent'
+          unit: "{reason}"
+        mapping:
+          1: msg_hdr_no_sync
+          2: msg_hdr_bad_len
+          3: msg_hdr_bad_type
+          4: open_unsupp_version
+          5: open_bad_as
+          6: open_bad_id
+          7: open_unsupp_option
+          8: open_auth_fail
+          9: open_bad_holdtime
+          10: open_unsupp_capability
+          11: update_malform_attr
+          12: update_unsupp_wknwn_attr
+          13: update_missing_wknwn_attr
+          14: update_bad_attr_flags
+          15: update_bad_attr_len
+          16: update_bad_origin
+          17: update_as_loop
+          18: update_bad_nexthop
+          19: update_bad_opt_attr
+          20: update_bad_net
+          21: update_bad_aspath
+          22: hold_timeout
+          23: fsm_error
+          24: cease_max_prefix_reached
+          25: cease_admin_shutdown
+          26: cease_peer_deconfigured
+          27: cease_admin_reset
+          28: cease_conn_rejected
+          29: cease_other_conf_change
+          30: cease_conn_collision_resolution
+          31: cease_out_of_resources
+          32: none
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.24
+        name: alcatel.bgpPeerLastRecvNotifyReason
+        chart_meta:
+          description: The last NOTIFICATION reason code received from this peer
+          family: 'Network/Routing/BGP/Peer/Error/LastNotify/Received'
+          unit: "{reason}"
+        mapping:
+          1: msg_hdr_no_sync
+          2: msg_hdr_bad_len
+          3: msg_hdr_bad_type
+          4: open_unsupp_version
+          5: open_bad_as
+          6: open_bad_id
+          7: open_unsupp_option
+          8: open_auth_fail
+          9: open_bad_holdtime
+          10: open_unsupp_capability
+          11: update_malform_attr
+          12: update_unsupp_wknwn_attr
+          13: update_missing_wknwn_attr
+          14: update_bad_attr_flags
+          15: update_bad_attr_len
+          16: update_bad_origin
+          17: update_as_loop
+          18: update_bad_nexthop
+          19: update_bad_opt_attr
+          20: update_bad_net
+          21: update_bad_aspath
+          22: hold_timeout
+          23: fsm_error
+          24: cease_max_prefix_reached
+          25: cease_admin_shutdown
+          26: cease_peer_deconfigured
+          27: cease_admin_reset
+          28: cease_conn_rejected
+          29: cease_other_conf_change
+          30: cease_conn_collision_resolution
+          31: cease_out_of_resources
+          32: none
+      # Timers (IPv6 table has its own timer columns, unlike IPv4 which uses std BGP4-MIB)
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.61
+        name: bgpPeerHoldTime
+        chart_meta:
+          description: The negotiated hold timer interval currently in use with the peer
+          family: 'Network/Routing/BGP/Peer/Timer/Hold/Negotiated'
+          unit: "s"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.62
+        name: bgpPeerKeepAlive
+        chart_meta:
+          description: The negotiated keepalive timer interval currently in use with the peer
+          family: 'Network/Routing/BGP/Peer/Timer/KeepAlive/Negotiated'
+          unit: "s"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.63
+        name: bgpPeerConnectRetryInterval
+        chart_meta:
+          description: The configured interval for retrying TCP connection establishment to the peer
+          family: 'Network/Routing/BGP/Peer/Timer/ConnectRetry/Configured'
+          unit: "s"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.64
+        name: bgpPeerHoldTimeConfigured
+        chart_meta:
+          description: The locally configured hold timer interval for the peer
+          family: 'Network/Routing/BGP/Peer/Timer/Hold/Configured'
+          unit: "s"
+      - OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.65
+        name: bgpPeerKeepAliveConfigured
+        chart_meta:
+          description: The locally configured keepalive timer interval for the peer
+          family: 'Network/Routing/BGP/Peer/Timer/KeepAlive/Configured'
+          unit: "s"
+    metric_tags:
+      - tag: neighbor
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.1
+          name: alaBgpPeer6Addr
+          format: ip_address
+      - tag: remote_as
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.2
+          name: alaBgpPeer6AS
+      - tag: peer_description
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.4
+          name: alaBgpPeer6Name
+      - tag: local_address
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.17
+          name: alaBgpPeer6LocalAddr
+          format: ip_address
+      - tag: peer_type
+        symbol:
+          OID: 1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.12.1.27
+          name: alaBgpPeer6Type
+        mapping:
+          1: internal
+          2: external
