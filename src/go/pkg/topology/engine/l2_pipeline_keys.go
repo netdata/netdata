@@ -9,7 +9,7 @@ import (
 )
 
 // keySep is a NUL byte used as composite map-key separator.
-// NUL cannot appear in SNMP string values, so field collisions are impossible.
+// NUL is absent from normalized SNMP display strings (names, MACs, IPs), so collisions are effectively impossible.
 const keySep = "\x00"
 
 func adjacencyKey(adj Adjacency) string {
