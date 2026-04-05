@@ -10,7 +10,9 @@ extends:
   - _std-tcp-mib.yaml
   - _std-udp-mib.yaml
   - _std-ospf-mib.yaml
+  - _juniper-bgp-virtual.yaml
   - _std-bgp4-mib.yaml
+  - _juniper-bgp4-v2.yaml
   - _std-host-resources-mib.yaml
   - _juniper-userfirewall.yaml
   - _juniper-scu.yaml

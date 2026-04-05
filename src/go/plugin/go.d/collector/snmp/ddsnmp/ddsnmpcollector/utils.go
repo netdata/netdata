@@ -57,30 +57,13 @@ func convPduToStringf(pdu gosnmp.SnmpPDU, format string) (string, error) {
 	case "mac_address":
 		return convPhysAddressToString(pdu)
 	case "ip_address":
-		if pdu.Type == gosnmp.IPAddress {
-			// Use the default handler for IP addresses
-			return convPduToString(pdu)
+		return convPduToIPAddress(pdu)
+	case "uint32":
+		value, err := convNumericPduToInt64f(pdu, format)
+		if err != nil {
+			return "", err
 		}
-
-		// Try to handle as bytes that represent an IP
-		bs, ok := pdu.Value.([]byte)
-		if !ok {
-			return "", fmt.Errorf("cannot convert %T to IP address", pdu.Value)
-		}
-
-		if len(bs) == 4 {
-			// IPv4
-			return fmt.Sprintf("%d.%d.%d.%d", bs[0], bs[1], bs[2], bs[3]), nil
-		} else if len(bs) == 16 {
-			// IPv6
-			parts := make([]string, 0, 8)
-			for i := 0; i < 16; i += 2 {
-				parts = append(parts, fmt.Sprintf("%02x%02x", bs[i], bs[i+1]))
-			}
-			return strings.Join(parts, ":"), nil
-		}
-
-		return "", fmt.Errorf("cannot convert %v to IP address (incorrect length)", pdu.Value)
+		return strconv.FormatInt(value, 10), nil
 	case "hex":
 		// Convert any value to hex string
 		bs, ok := pdu.Value.([]byte)
@@ -92,6 +75,23 @@ func convPduToStringf(pdu gosnmp.SnmpPDU, format string) (string, error) {
 		// For unknown formats, use the default string conversion
 		return convPduToString(pdu)
 	}
+}
+
+func convNumericPduToInt64f(pdu gosnmp.SnmpPDU, format string) (int64, error) {
+	if !isPduNumericType(pdu) {
+		return 0, fmt.Errorf("cannot convert %T to numeric value", pdu.Value)
+	}
+
+	value := gosnmp.ToBigInt(pdu.Value).Int64()
+
+	switch format {
+	case "uint32":
+		if value < 0 {
+			return int64(uint32(value)), nil
+		}
+	}
+
+	return value, nil
 }
 
 func convPduToString(pdu gosnmp.SnmpPDU) (string, error) {

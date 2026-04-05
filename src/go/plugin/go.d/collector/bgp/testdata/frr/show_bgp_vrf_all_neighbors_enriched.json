@@ -1,0 +1,33 @@
+{
+  "default": {
+    "vrfId": 0,
+    "vrfName": "default",
+    "192.168.0.2": {
+      "nbrDesc": "{\"desc\":\"edge-01\"}",
+      "peerGroup": "transit",
+      "lastReset": "never"
+    },
+    "192.168.0.3": {
+      "nbrDesc": "backup-peer",
+      "peerGroup": "transit",
+      "lastReset": "never"
+    },
+    "192.168.0.4": {
+      "peerGroup": "standby",
+      "lastReset": "never"
+    }
+  },
+  "red": {
+    "vrfId": 39,
+    "vrfName": "red",
+    "192.168.1.2": {
+      "nbrDesc": "{\"description\":\"branch-west\"}",
+      "peerGroup": "branches",
+      "lastReset": "never"
+    },
+    "192.168.1.3": {
+      "nbrDesc": "{\"desc\":\"branch-backup\"}",
+      "lastReset": "never"
+    }
+  }
+}

@@ -121,6 +121,19 @@ func TestManager_RuntimeMetricsScenarios(t *testing.T) {
 				close(release)
 				close(in.ch)
 				waitForDone(t, done)
+				waitForCondition(t, time.Second, func() bool {
+					reader := mgr.runtimeStore.Read(metrix.ReadRaw())
+					active, ok := reader.Value(functionsRuntimeMetricPrefix+".invocations_active", nil)
+					if !ok || active != 0 {
+						return false
+					}
+					awaiting, ok := reader.Value(functionsRuntimeMetricPrefix+".invocations_awaiting_result", nil)
+					if !ok || awaiting != 0 {
+						return false
+					}
+					pending, ok := reader.Value(functionsRuntimeMetricPrefix+".scheduler_pending", nil)
+					return ok && pending == 0
+				}, "runtime gauges settle after shutdown")
 
 				assert.GreaterOrEqual(t, runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".queue_full_total", nil), float64(1))
 				assert.GreaterOrEqual(t, runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".cancel_fallback_total", nil), float64(1))

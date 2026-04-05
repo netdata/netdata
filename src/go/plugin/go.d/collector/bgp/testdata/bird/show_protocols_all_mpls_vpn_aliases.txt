@@ -1,0 +1,58 @@
+BIRD 3.1.0 ready.
+Name       Proto      Table      State  Since         Info
+device1    Device     ---        up     2026-04-03 17:44:30.187
+  Created:            2026-04-03 17:44:30.187
+
+bgp_mpls   BGP        ---        start  2026-04-03 17:44:30.187  Active        Socket: Connection closed
+  Description:        MPLS VPN probe
+  Created:            2026-04-03 17:44:30.187
+  BGP state:          Active
+    Neighbor address: 198.51.100.2
+    Neighbor AS:      65001
+    Local AS:         64512
+    Connect delay:    2.649/5
+    Last error:       Socket: Connection closed
+  Channel ipv4-mpls
+    State:          DOWN
+    Import state:   DOWN
+    Export state:   DOWN
+    Table:          label4
+    Preference:     100
+    Input filter:   ACCEPT
+    Output filter:  ACCEPT
+    IGP IPv4 table: label4
+  Channel ipv6-mpls
+    State:          DOWN
+    Import state:   DOWN
+    Export state:   DOWN
+    Table:          label6
+    Preference:     100
+    Input filter:   ACCEPT
+    Output filter:  ACCEPT
+    IGP IPv6 table: label6
+  Channel vpn4-mpls
+    State:          DOWN
+    Import state:   DOWN
+    Export state:   DOWN
+    Table:          vpn4tab
+    Preference:     100
+    Input filter:   ACCEPT
+    Output filter:  ACCEPT
+    IGP IPv4 table: master4
+  Channel vpn6-mpls
+    State:          DOWN
+    Import state:   DOWN
+    Export state:   DOWN
+    Table:          vpn6tab
+    Preference:     100
+    Input filter:   ACCEPT
+    Output filter:  ACCEPT
+    IGP IPv6 table: master6
+  Channel mpls
+    State:          DOWN
+    Import state:   DOWN
+    Export state:   DOWN
+    Table:          mtab
+    Preference:     100
+    Input filter:   ACCEPT
+    Output filter:  REJECT

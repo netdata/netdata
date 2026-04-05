@@ -1,0 +1,345 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "BGP collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero means no recheck will be scheduled.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 60
+      },
+      "backend": {
+        "title": "Backend",
+        "description": "BGP backend type. `frr` uses FRR VTY sockets. `bird` uses the BIRD control socket and `show protocols all`. `gobgp` uses the GoBGP gRPC API. `openbgpd` uses a read-only HTTP JSON endpoint such as bgplgd or an equivalent state-server.",
+        "type": "string",
+        "enum": [
+          "frr",
+          "bird",
+          "gobgp",
+          "openbgpd"
+        ],
+        "default": "frr"
+      },
+      "socket_path": {
+        "title": "Socket path",
+        "description": "Absolute path to the backend control socket. FRR usually uses `/var/run/frr/bgpd.vty`. BIRD usually uses `/var/run/bird.ctl`. Ignored for `backend: gobgp` and `backend: openbgpd`.",
+        "type": "string",
+        "default": "/var/run/frr/bgpd.vty",
+        "pattern": "^/"
+      },
+      "zebra_socket_path": {
+        "title": "Zebra socket path",
+        "description": "Absolute path to the FRR `zebra.vty` Unix socket. Netdata uses this for EVPN VNI queries such as `show evpn vni json`. If omitted, Netdata derives it from `socket_path` by replacing the filename with `zebra.vty`. This option is ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`.",
+        "type": "string",
+        "default": "/var/run/frr/zebra.vty",
+        "pattern": "^/"
+      },
+      "address": {
+        "title": "Address",
+        "description": "The GoBGP gRPC endpoint in `host:port` form. Required for `backend: gobgp`.",
+        "type": "string",
+        "default": "127.0.0.1:50051"
+      },
+      "api_url": {
+        "title": "API URL",
+        "description": "Base URL for a read-only OpenBGPD JSON endpoint such as bgplgd or an equivalent state-server. Netdata detects the common path layout once from this base URL. Required for `backend: openbgpd`.",
+        "type": "string",
+        "default": "http://127.0.0.1:8080",
+        "pattern": "^https?://"
+      },
+      "server_name": {
+        "title": "TLS server name",
+        "description": "Optional TLS server name override for GoBGP gRPC connections. Ignored for other backends.",
+        "type": "string"
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "If set, TLS certificate verification will be skipped for GoBGP gRPC connections.",
+        "type": "boolean"
+      },
+      "tls_ca": {
+        "title": "TLS CA",
+        "description": "The path to the CA certificate file for GoBGP TLS verification.",
+        "type": "string"
+      },
+      "tls_cert": {
+        "title": "TLS certificate",
+        "description": "The path to the client certificate file for GoBGP TLS authentication.",
+        "type": "string"
+      },
+      "tls_key": {
+        "title": "TLS key",
+        "description": "The path to the client key file for GoBGP TLS authentication.",
+        "type": "string"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for socket connect, gRPC dial, HTTP, read, and write operations in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 1
+      },
+      "collect_rib_summaries": {
+        "title": "Collect RIB summaries",
+        "description": "Enable cached deeper family summaries when the backend exposes them. GoBGP uses this to enable cached per-family validation summaries from `ListPath`, while OpenBGPD uses this to enable cached `/rib` summaries for family route-table counts and correctness. This option is ignored for `backend: frr` and `backend: bird`.",
+        "type": "boolean",
+        "default": false
+      },
+      "rib_summary_every": {
+        "title": "RIB summary interval",
+        "description": "Minimum time between optional cached summary refreshes when `collect_rib_summaries` is enabled. GoBGP uses this for validation-summary refreshes, and OpenBGPD uses this for `/rib` refreshes. Set this to a value greater than zero when `collect_rib_summaries` is enabled. This option is ignored for `backend: frr` and `backend: bird`.",
+        "type": "number",
+        "minimum": 0,
+        "default": 60
+      },
+      "max_families": {
+        "title": "Max families",
+        "description": "If the number of discovered VRF and AFI/SAFI families is at most this value, Netdata creates family charts for all of them.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 50
+      },
+      "select_families": {
+        "title": "Family selector",
+        "description": "When the number of discovered families exceeds `max_families`, Netdata prefers families matched by `vrf/afi/safi` strings such as `default/ipv4/unicast`. If the selector matches more than `max_families`, Netdata keeps the matched set bounded with deterministic first-`max_families` truncation. If no selector is configured, Netdata keeps a deterministic first-`max_families` fallback.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "includes": {
+            "title": "Include",
+            "description": "Include families that match any of the specified `vrf/afi/safi` patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Family pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "excludes": {
+            "title": "Exclude",
+            "description": "Exclude families that match any of the specified `vrf/afi/safi` patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Family pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "max_peers": {
+        "title": "Max peers",
+        "description": "If the number of discovered peers is at most this value, Netdata creates peer charts for all of them.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 100
+      },
+      "max_vnis": {
+        "title": "Max VNIs",
+        "description": "If the number of discovered EVPN VNIs is at most this value, Netdata creates VNI charts for all of them.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 100
+      },
+      "select_vnis": {
+        "title": "VNI selector",
+        "description": "When the number of discovered EVPN VNIs exceeds `max_vnis`, Netdata prefers matched `tenant_vrf/vni` values such as `default/172192`. If the selector matches more than `max_vnis`, Netdata keeps the matched set bounded with deterministic first-`max_vnis` truncation. If no selector is configured, Netdata keeps a deterministic first-`max_vnis` fallback.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "includes": {
+            "title": "Include",
+            "description": "Include EVPN VNIs that match any of the specified `tenant_vrf/vni` patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "VNI pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "excludes": {
+            "title": "Exclude",
+            "description": "Exclude EVPN VNIs that match any of the specified `tenant_vrf/vni` patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "VNI pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "deep_peer_prefix_metrics": {
+        "title": "Deep peer prefix metrics",
+        "description": "Enable extra per-peer FRR route queries only when FRR summary and neighbors JSON do not already expose accepted, filtered, or advertised prefix counts. These queries run only for charted peers and may be expensive on routers with many charted peers. This option is ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`.",
+        "type": "boolean",
+        "default": false
+      },
+      "max_deep_queries_per_scrape": {
+        "title": "Max deep queries per scrape",
+        "description": "Maximum number of optional deep FRR route queries Netdata will issue in one scrape when `deep_peer_prefix_metrics` is enabled. This budget is global for the whole scrape, not per peer. Set this to `0` to disable the budget cap. This option is ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 40
+      },
+      "select_peers": {
+        "title": "Peer selector",
+        "description": "When the number of discovered peers exceeds `max_peers`, Netdata prefers peer addresses matched by this selector. If the selector matches more than `max_peers`, Netdata keeps the matched set bounded with deterministic first-`max_peers` truncation. If no selector is configured, Netdata keeps a deterministic first-`max_peers` fallback.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "includes": {
+            "title": "Include",
+            "description": "Include peer addresses that match any of the specified patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Peer address pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "excludes": {
+            "title": "Exclude",
+            "description": "Exclude peer addresses that match any of the specified patterns.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "title": "Peer address pattern",
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a Virtual Node.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "backend"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    },
+    "autodetection_retry": {
+      "ui:help": "This option determines how frequently Netdata retries jobs that failed initially. Set 0 to disable retries."
+    },
+    "backend": {
+      "ui:help": "Use `frr` for FRR VTY sockets, `bird` for the BIRD control socket, `gobgp` for the GoBGP gRPC API, and `openbgpd` for a read-only HTTP JSON endpoint."
+    },
+    "socket_path": {
+      "ui:help": "FRR usually uses `/var/run/frr/bgpd.vty`. BIRD usually uses `/var/run/bird.ctl`. Ignored for `backend: gobgp` and `backend: openbgpd`."
+    },
+    "zebra_socket_path": {
+      "ui:help": "Only used by `backend: frr` for EVPN VNI queries. Ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`."
+    },
+    "address": {
+      "ui:help": "Required for `backend: gobgp`. Use `host:port`, for example `127.0.0.1:50051`."
+    },
+    "api_url": {
+      "ui:help": "Required for `backend: openbgpd`. Netdata detects the common bgplgd or state-server path layout from this base URL."
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control, for example 1.5."
+    },
+    "collect_rib_summaries": {
+      "ui:help": "GoBGP and OpenBGPD only. GoBGP uses this for cached validation summaries. OpenBGPD uses this for cached `/rib` summaries."
+    },
+    "rib_summary_every": {
+      "ui:help": "GoBGP and OpenBGPD only. Use a conservative interval because validation or `/rib` summary refreshes can be expensive on large routers."
+    },
+    "select_families": {
+      "ui:help": "This selector matches `vrf/afi/safi` values, for example `default/ipv4/unicast`. The logic is `(include1 OR include2) AND !(exclude1 OR exclude2)`."
+    },
+    "select_peers": {
+      "ui:help": "This selector matches peer addresses. The logic is `(include1 OR include2) AND !(exclude1 OR exclude2)`."
+    },
+    "select_vnis": {
+      "ui:help": "This selector matches `tenant_vrf/vni` values, for example `default/172192`. The logic is `(include1 OR include2) AND !(exclude1 OR exclude2)`."
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "backend",
+            "socket_path",
+            "zebra_socket_path",
+            "address",
+            "api_url",
+            "timeout",
+            "vnode"
+          ]
+        },
+        {
+          "title": "TLS",
+          "fields": [
+            "server_name",
+            "tls_skip_verify",
+            "tls_ca",
+            "tls_cert",
+            "tls_key"
+          ]
+        },
+        {
+          "title": "Peer charts",
+          "fields": [
+            "collect_rib_summaries",
+            "rib_summary_every",
+            "max_families",
+            "select_families",
+            "max_peers",
+            "max_vnis",
+            "select_vnis",
+            "deep_peer_prefix_metrics",
+            "max_deep_queries_per_scrape",
+            "select_peers"
+          ]
+        }
+      ]
+    }
+  }
+}

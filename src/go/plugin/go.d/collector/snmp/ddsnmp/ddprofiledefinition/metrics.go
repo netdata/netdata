@@ -176,6 +176,11 @@ type MetricTagConfig struct {
 	// pattern is deprecated
 	Symbol SymbolConfigCompat `yaml:"symbol,omitempty" json:"symbol"`
 
+	// LookupSymbol optionally resolves cross-table tags by matching a value from the
+	// current row index against a column in the referenced table, then reading Symbol
+	// from the matched row in that table.
+	LookupSymbol SymbolConfigCompat `yaml:"lookup_symbol,omitempty" json:"lookup_symbol,omitempty"`
+
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
 
 	MappingRef string            `yaml:"mapping_ref,omitempty" json:"mapping_ref,omitempty"`
@@ -196,6 +201,7 @@ func (m MetricTagConfig) Clone() MetricTagConfig {
 	// deep copy symbols and structures
 	m2.Column = m.Column.Clone()
 	m2.Symbol = m.Symbol.Clone()
+	m2.LookupSymbol = m.LookupSymbol.Clone()
 	m2.IndexTransform = slices.Clone(m.IndexTransform)
 	m2.Mapping = maps.Clone(m.Mapping)
 	m2.Tags = maps.Clone(m.Tags)
@@ -219,8 +225,9 @@ type MetricTagConfigList []MetricTagConfig
 
 // MetricIndexTransform holds configs for metric index transform
 type MetricIndexTransform struct {
-	Start uint `yaml:"start" json:"start"`
-	End   uint `yaml:"end" json:"end"`
+	Start     uint `yaml:"start" json:"start"`
+	End       uint `yaml:"end" json:"end"`
+	DropRight uint `yaml:"drop_right,omitempty" json:"drop_right,omitempty"`
 }
 
 // MetricsConfigOption holds config for metrics options

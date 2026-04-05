@@ -149,3 +149,15 @@ func TestCollector_Collect_StatsSnapshot(t *testing.T) {
 
 	assert.Equal(t, expected, pm.Stats)
 }
+
+func TestLongestCommonPrefix(t *testing.T) {
+	assert.Equal(t, "1.3.6.1.2.1.31.1.1.1", longestCommonPrefix([]string{
+		"1.3.6.1.2.1.31.1.1.1.1",
+		"1.3.6.1.2.1.31.1.1.1.18",
+	}))
+
+	assert.Equal(t, "1.3.6.1.4.1.2636.5.1.1.2.1.1.1", longestCommonPrefix([]string{
+		"1.3.6.1.4.1.2636.5.1.1.2.1.1.1.11",
+		"1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14",
+	}))
+}

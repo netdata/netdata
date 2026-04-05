@@ -38,8 +38,6 @@ func (p *vmetricsCollector) accumulate(lookup map[vmetricsSourceKey][]vmetricsSi
 			continue
 		}
 
-		v, mv := vmCollapseMetricValue(m)
-
 		type gke struct {
 			key string
 			ok  bool
@@ -51,6 +49,12 @@ func (p *vmetricsCollector) accumulate(lookup map[vmetricsSourceKey][]vmetricsSi
 			if agg == nil {
 				continue
 			}
+
+			v, mv, ok := vmResolveSourceValue(m, sink)
+			if !ok {
+				continue
+			}
+			tags := vmMetricTags(m)
 
 			if agg.metricType == "" {
 				agg.metricType = m.MetricType
@@ -66,14 +70,14 @@ func (p *vmetricsCollector) accumulate(lookup map[vmetricsSourceKey][]vmetricsSi
 			}
 			entry, found := gkCache[agg]
 			if !found {
-				k, ok := vmBuildGroupKey(m.Tags, agg)
+				k, ok := vmBuildGroupKey(tags, agg)
 				entry = gke{key: k, ok: ok}
 				gkCache[agg] = entry
 			}
 			if !entry.ok {
 				continue
 			}
-			agg.accumulateGroupedWithKey(sink, entry.key, v, m.Tags)
+			agg.accumulateGroupedWithKey(sink, entry.key, v, tags)
 		}
 	}
 }
@@ -170,8 +174,9 @@ type (
 
 	// sink binding; dimIdx == -1 for non-composite
 	vmetricsSink struct {
-		agg    *vmetricsAggregator
-		dimIdx int16
+		agg       *vmetricsAggregator
+		dimIdx    int16
+		sourceDim string
 	}
 
 	// per-group accumulator (emitted as one table row)
@@ -384,6 +389,19 @@ func vmBuildGroupKey(tags map[string]string, agg *vmetricsAggregator) (string, b
 
 // vmBuildEmitTags captures labels to emit for a group (called once per new group)
 func vmBuildEmitTags(tags map[string]string, agg *vmetricsAggregator) map[string]string {
+	if len(agg.config.EmitTags) > 0 {
+		out := make(map[string]string, len(agg.config.EmitTags))
+		for _, spec := range agg.config.EmitTags {
+			if spec.Tag == "" || spec.From == "" {
+				continue
+			}
+			if v := tags[spec.From]; v != "" {
+				out[spec.Tag] = v
+			}
+		}
+		return out
+	}
+
 	if agg.perRow {
 		// per-row: reuse pointer; we never mutate it here
 		return tags
@@ -397,7 +415,25 @@ func vmBuildEmitTags(tags map[string]string, agg *vmetricsAggregator) map[string
 	return out
 }
 
-// vmCollapseMetricValue a metric to an int64 quickly; return mv if present for merge path
+func vmMetricTags(m ddsnmp.Metric) map[string]string {
+	switch {
+	case len(m.StaticTags) == 0:
+		return m.Tags
+	case len(m.Tags) == 0:
+		return m.StaticTags
+	default:
+		out := make(map[string]string, len(m.Tags)+len(m.StaticTags))
+		for k, v := range m.StaticTags {
+			out[k] = v
+		}
+		for k, v := range m.Tags {
+			out[k] = v
+		}
+		return out
+	}
+}
+
+// vmCollapseMetricValue collapses a metric to an int64 quickly; return mv if present for merge path.
 func vmCollapseMetricValue(m ddsnmp.Metric) (v int64, mv map[string]int64) {
 	if len(m.MultiValue) == 0 {
 		return m.Value, nil
@@ -407,6 +443,24 @@ func vmCollapseMetricValue(m ddsnmp.Metric) (v int64, mv map[string]int64) {
 		sum += x
 	}
 	return sum, m.MultiValue
+}
+
+func vmResolveSourceValue(m ddsnmp.Metric, sink vmetricsSink) (v int64, mv map[string]int64, ok bool) {
+	if sink.sourceDim == "" {
+		v, mv = vmCollapseMetricValue(m)
+		return v, mv, true
+	}
+
+	if len(m.MultiValue) == 0 {
+		return 0, nil, false
+	}
+
+	v, ok = m.MultiValue[sink.sourceDim]
+	if !ok {
+		return 0, nil, false
+	}
+
+	return v, nil, true
 }
 
 type aggregatorsBuilder struct {
@@ -569,6 +623,10 @@ func (b *aggregatorsBuilder) bindSinks(
 				dimIdx = int16(idx)
 			}
 		}
-		b.sourceToSinks[key] = append(b.sourceToSinks[key], vmetricsSink{agg: agg, dimIdx: dimIdx})
+		b.sourceToSinks[key] = append(b.sourceToSinks[key], vmetricsSink{
+			agg:       agg,
+			dimIdx:    dimIdx,
+			sourceDim: src.Dim,
+		})
 	}
 }

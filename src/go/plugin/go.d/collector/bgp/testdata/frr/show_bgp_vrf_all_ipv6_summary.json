@@ -1,0 +1,98 @@
+{
+  "default": {
+    "ipv6Unicast": {
+      "routerId": "192.168.0.1",
+      "as": 64512,
+      "vrfId": 0,
+      "vrfName": "default",
+      "tableVersion": 6,
+      "ribCount": 3,
+      "ribMemory": 456,
+      "peerCount": 2,
+      "peerMemory": 59904,
+      "peers": {
+        "fd00::1": {
+          "remoteAs": 64513,
+          "version": 4,
+          "msgRcvd": 29285,
+          "msgSent": 29285,
+          "tableVersion": 0,
+          "outq": 0,
+          "inq": 0,
+          "peerUptime": "1d00h24m",
+          "peerUptimeMsec": 8465643000000,
+          "prefixReceivedCount": 1,
+          "state": "Established",
+          "idType": "ipv6"
+        },
+        "fd00::5": {
+          "remoteAs": 64514,
+          "version": 4,
+          "msgRcvd": 0,
+          "msgSent": 0,
+          "tableVersion": 0,
+          "outq": 0,
+          "inq": 0,
+          "peerUptime": "never",
+          "peerUptimeMsec": 0,
+          "prefixReceivedCount": 0,
+          "state": "Active",
+          "idType": "ipv6"
+        }
+      },
+      "totalPeers": 2,
+      "dynamicPeers": 0,
+      "bestPath": {
+        "multiPathRelax": "false"
+      }
+    }
+  },
+  "red": {
+    "ipv6Unicast": {
+      "routerId": "192.168.1.1",
+      "as": 64612,
+      "vrfId": 0,
+      "vrfName": "default",
+      "tableVersion": 6,
+      "ribCount": 3,
+      "ribMemory": 456,
+      "peerCount": 2,
+      "peerMemory": 59904,
+      "peers": {
+        "fd00::101": {
+          "remoteAs": 64613,
+          "version": 4,
+          "msgRcvd": 29285,
+          "msgSent": 29285,
+          "tableVersion": 0,
+          "outq": 0,
+          "inq": 0,
+          "peerUptime": "1d00h24m",
+          "peerUptimeMsec": 87873000,
+          "prefixReceivedCount": 1,
+          "state": "Established",
+          "idType": "ipv6"
+        },
+        "fd00::105": {
+          "remoteAs": 64614,
+          "version": 4,
+          "msgRcvd": 0,
+          "msgSent": 0,
+          "tableVersion": 0,
+          "outq": 0,
+          "inq": 0,
+          "peerUptime": "never",
+          "peerUptimeMsec": 0,
+          "prefixReceivedCount": 0,
+          "state": "Active",
+          "idType": "ipv6"
+        }
+      },
+      "totalPeers": 2,
+      "dynamicPeers": 0,
+      "bestPath": {
+        "multiPathRelax": "false"
+      }
+    }
+  }
+}

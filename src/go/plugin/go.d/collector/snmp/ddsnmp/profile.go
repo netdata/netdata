@@ -149,7 +149,7 @@ func (p *Profile) mergeMetrics(base *Profile) {
 			seen[m.Symbol.Name+"|"+m.Symbol.OID] = true
 		case m.IsColumn():
 			for _, sym := range m.Symbols {
-				seen[sym.Name] = true
+				seen[columnMetricSymbolKey(m.Table, sym)] = true
 			}
 		}
 	}
@@ -164,8 +164,9 @@ func (p *Profile) mergeMetrics(base *Profile) {
 			}
 		case bm.IsColumn():
 			bm.Symbols = slices.DeleteFunc(bm.Symbols, func(sym ddprofiledefinition.SymbolConfig) bool {
-				v := seen[sym.Name]
-				seen[sym.Name] = true
+				key := columnMetricSymbolKey(bm.Table, sym)
+				v := seen[key]
+				seen[key] = true
 				return v
 			})
 			if len(bm.Symbols) > 0 {
@@ -185,6 +186,10 @@ func (p *Profile) mergeMetrics(base *Profile) {
 			seenVmetrics[bm.Name] = true
 		}
 	}
+}
+
+func columnMetricSymbolKey(table ddprofiledefinition.SymbolConfig, sym ddprofiledefinition.SymbolConfig) string {
+	return table.OID + "|" + table.Name + "|" + sym.OID + "|" + sym.Name
 }
 
 func (p *Profile) mergeMetadata(base *Profile) {

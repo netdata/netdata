@@ -5,7 +5,9 @@ extends:
   - _std-ip-mib.yaml
   - _std-tcp-mib.yaml
   - _std-udp-mib.yaml
+  - _juniper-bgp-virtual.yaml
   - _std-bgp4-mib.yaml
+  - _juniper-bgp4-v2.yaml
   - _std-ospf-mib.yaml
   - _std-host-resources-mib.yaml
   - _juniper-junos-generic.yaml

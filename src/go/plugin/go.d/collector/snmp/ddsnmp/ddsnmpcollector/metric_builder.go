@@ -38,6 +38,15 @@ func (mb *metricBuilder) withTags(tags map[string]string) *metricBuilder {
 func (mb *metricBuilder) withStaticTags(tags map[string]string) *metricBuilder {
 	if len(tags) > 0 {
 		mb.metric.StaticTags = maps.Clone(tags)
+		if mb.metric.Tags == nil {
+			mb.metric.Tags = maps.Clone(tags)
+		} else {
+			for k, v := range tags {
+				if _, ok := mb.metric.Tags[k]; !ok {
+					mb.metric.Tags[k] = v
+				}
+			}
+		}
 	}
 	return mb
 }

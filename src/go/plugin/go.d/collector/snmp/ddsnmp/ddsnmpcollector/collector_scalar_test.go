@@ -291,6 +291,10 @@ func TestScalarCollector_Collect(t *testing.T) {
 				{
 					Name:  "sysUpTime",
 					Value: 123456,
+					Tags: map[string]string{
+						"source": "system",
+						"type":   "uptime",
+					},
 					StaticTags: map[string]string{
 						"source": "system",
 						"type":   "uptime",

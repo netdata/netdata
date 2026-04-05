@@ -6,8 +6,29 @@ extends:
   - _std-udp-mib.yaml
   - _std-ospf-mib.yaml
   - _std-bgp4-mib.yaml
+  - _cisco-bgp4-mib.yaml
   - _std-ip-mib.yaml
   - _cisco-metadata.yaml
+
+virtual_metrics:
+  - name: bgpPeerAvailability
+    per_row: true
+    sources:
+      - {metric: bgpPeerAdminStatus, table: cbgpPeer3Table, as: admin_enabled, dim: start}
+      - {metric: bgpPeerState, table: cbgpPeer3Table, as: established, dim: established}
+    chart_meta:
+      description: BGP peer administrative and established availability
+      family: 'Network/Routing/BGP/Peer/Availability'
+      unit: "{status}"
+  - name: bgpPeerUpdates
+    per_row: true
+    sources:
+      - {metric: bgpPeerInUpdates, table: cbgpPeer3Table, as: received}
+      - {metric: bgpPeerOutUpdates, table: cbgpPeer3Table, as: sent}
+    chart_meta:
+      description: BGP peer update traffic by direction
+      family: 'Network/Routing/BGP/Peer/Message/Update'
+      unit: "{message}"
 
 metrics:
   - MIB: CISCO-ENTITY-FRU-CONTROL-MIB

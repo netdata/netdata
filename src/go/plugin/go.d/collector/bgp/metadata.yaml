@@ -1,0 +1,619 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-bgp
+      plugin_name: go.d.plugin
+      module_name: bgp
+      monitored_instance:
+        name: BGP daemon or service
+        link: https://datatracker.ietf.org/doc/html/rfc4271
+        icon_filename: network-wired.svg
+        categories:
+          - data-collection.networking
+      keywords:
+        - bgp
+        - frr
+        - bird
+        - gobgp
+        - openbgpd
+        - routing
+        - network
+      info_provided_to_referring_integrations:
+        description: ""
+      related_resources:
+        integrations:
+          list: []
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors BGP family summaries, family-scoped peer activity, session-scoped neighbor churn, backend-specific neighbor diagnostics when the daemon exposes them cheaply, optional aggregated correctness summaries, FRR EVPN VNI counts, and the collector's own scrape health. It intentionally avoids per-prefix analytics.
+        method_description: |
+          The current implementation supports four backends. `backend: frr` connects to FRR `bgpd.vty` and `zebra.vty` sockets for BGP summary JSON, neighbors JSON, and EVPN VNI queries. `backend: bird` connects to the BIRD control socket and uses one `show protocols all` query in the normal loop. `backend: gobgp` connects to the GoBGP gRPC API, uses `GetBgp` and `ListPeer` for cheap peer and family health, and uses `GetTable` for per-family route-table counts. `backend: openbgpd` connects to a read-only HTTP JSON endpoint such as bgplgd or an equivalent state-server, uses the cheap `neighbors` path for family and session health, and can optionally refresh cached `/rib` summaries for route-table and correctness counts. FRR provides richer session diagnostics and EVPN support. BIRD provides BGP state, peer identity, route summaries, and route-change statistics without route-table walking. GoBGP provides VRF-aware peer context plus optional cached validation summaries through the upstream gRPC API. OpenBGPD provides read-only native session data without direct control-socket access.
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector does not auto-detect BGP daemons yet. Configure jobs explicitly.
+        limits:
+          description: |
+            If the number of discovered families exceeds `max_families`, Netdata charts families matched by `select_families`, or a deterministic first-`max_families` fallback when no selector is configured. If the selector matches more than `max_families`, Netdata keeps the matched set bounded with deterministic first-`max_families` truncation. If the number of discovered peers inside the selected families exceeds `max_peers`, Netdata charts peers matched by `select_peers`, or a deterministic first-`max_peers` fallback when no selector is configured. If the selector matches more than `max_peers`, Netdata keeps the matched set bounded with deterministic first-`max_peers` truncation. If the number of discovered EVPN VNIs exceeds `max_vnis`, Netdata charts VNIs matched by `select_vnis`, or a deterministic first-`max_vnis` fallback when no selector is configured. If the selector matches more than `max_vnis`, Netdata keeps the matched set bounded with deterministic first-`max_vnis` truncation. Stock alerts evaluate only charted families and charted peers.
+        performance_impact:
+          description: |
+            Low by default. FRR runs IPv4 and IPv6 summary commands plus a best-effort neighbors query, and adds EVPN or deeper peer queries only when needed. BIRD runs one `show protocols all` query per scrape. GoBGP runs `GetBgp`, `ListPeer`, and per-family `GetTable` requests each scrape, and only refreshes cached validation summaries when `collect_rib_summaries` is enabled and the cache interval expires. OpenBGPD runs one `neighbors` query per scrape and only refreshes `/rib` summaries when `collect_rib_summaries` is enabled and the cache interval expires. Enabling `deep_peer_prefix_metrics` affects FRR only.
+      additional_permissions:
+        description: |
+          The `netdata` user must be able to access the configured backend endpoint. FRR EVPN VNI charts also require access to `zebra.vty`. FRR VTY access is a trust boundary, so prefer group-based access instead of making these sockets world-readable. For BIRD, prefer a restricted read-only control socket when the deployment allows it. For GoBGP, prefer a localhost-only gRPC listener or a TLS-protected gRPC listener with deliberate certificate management. For OpenBGPD, prefer a read-only HTTP JSON endpoint instead of direct `bgpd` control-socket access.
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: Enable FRR BGP JSON access
+            description: |
+              FRR must support JSON output for `show bgp vrf all ipv4 summary json` and `show bgp vrf all ipv6 summary json`. EVPN family summaries require `show bgp vrf all l2vpn evpn summary json`, and EVPN VNI charts require `show evpn vni json`. Peer descriptions, peer groups, session-level neighbor message-type counters, neighbor transition counters, cheap accepted-prefix counters, and last-reset details require `show bgp vrf all neighbors json`.
+          - title: Check BIRD control socket access
+            description: |
+              BIRD collection requires a control socket, usually `/var/run/bird.ctl`, and `show protocols all` output with BGP protocol details, channel sections, route summaries, and route-change statistics. Prefer a restricted read-only socket when possible. On BIRD 3, prefer `cli { v2 attributes; }` when you need current daemons to keep the control output compatible with this collector path.
+          - title: Check OpenBGPD read-only JSON access
+            description: |
+              OpenBGPD collection requires a read-only HTTP JSON endpoint such as bgplgd or an equivalent state-server. `api_url` must point to the base URL for that service. If `collect_rib_summaries` is enabled, the same endpoint must also expose a JSON RIB path.
+          - title: Check GoBGP gRPC access
+            description: |
+              GoBGP collection requires the `GoBgpService` gRPC API. `address` must point to that endpoint in `host:port` form. If TLS is enabled on the listener, set the matching TLS options in Netdata. If `collect_rib_summaries` is enabled, the same gRPC endpoint must allow `ListPath` for the relevant families.
+          - title: Check socket permissions
+            description: |
+              The `netdata` user must be able to open the configured backend socket or reach the configured HTTP or gRPC endpoint. FRR usually uses `/var/run/frr/bgpd.vty`, and EVPN VNI charts also require `/var/run/frr/zebra.vty`. BIRD usually uses `/var/run/bird.ctl`.
+      configuration:
+        file:
+          name: go.d/bgp.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 60
+              required: false
+              group: Collection
+
+            - name: backend
+              description: |
+                BGP backend type. `frr` uses FRR VTY sockets. `bird` uses the BIRD control socket and `show protocols all`. `gobgp` uses the GoBGP gRPC API. `openbgpd` uses a read-only HTTP JSON endpoint such as bgplgd or an equivalent state-server.
+              default_value: frr
+              required: true
+              group: Target
+            - name: socket_path
+              description: |
+                Absolute path to the backend control socket. FRR usually uses `/var/run/frr/bgpd.vty`. BIRD usually uses `/var/run/bird.ctl`. Ignored for `backend: gobgp` and `backend: openbgpd`.
+              default_value: /var/run/frr/bgpd.vty
+              required: false
+              group: Target
+            - name: zebra_socket_path
+              description: |
+                Absolute path to the FRR `zebra.vty` Unix socket. Netdata uses this for EVPN VNI queries. If omitted, Netdata derives it from `socket_path` by replacing the filename with `zebra.vty`. Ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`.
+              default_value: sibling of socket_path named zebra.vty
+              required: false
+              group: Target
+            - name: address
+              description: |
+                The GoBGP gRPC endpoint in `host:port` form. Required for `backend: gobgp`.
+              default_value: 127.0.0.1:50051
+              required: false
+              group: Target
+            - name: api_url
+              description: |
+                Base URL for a read-only OpenBGPD JSON endpoint such as bgplgd or an equivalent state-server. Required for `backend: openbgpd`.
+              default_value: http://127.0.0.1:8080
+              required: false
+              group: Target
+            - name: server_name
+              description: Optional TLS server name override for GoBGP gRPC connections.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_skip_verify
+              description: Skip TLS certificate verification for GoBGP gRPC connections.
+              default_value: "no"
+              required: false
+              group: TLS
+            - name: tls_ca
+              description: CA certificate file for GoBGP TLS verification.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_cert
+              description: Client certificate file for GoBGP TLS authentication.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_key
+              description: Client key file for GoBGP TLS authentication.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: timeout
+              description: Socket connect, gRPC dial, HTTP, read, and write timeout.
+              default_value: 1
+              required: false
+              group: Target
+
+            - name: max_families
+              description: Create family charts for all discovered `vrf/afi/safi` combinations only when their count is at most this value.
+              default_value: 50
+              required: false
+              group: Family charts
+            - name: select_families
+              description: When the discovered family count exceeds `max_families`, prefer matched `vrf/afi/safi` values such as `default/ipv4/unicast`. If the selector matches more than `max_families`, Netdata keeps the matched set bounded with deterministic first-`max_families` truncation. If no selector is configured, Netdata keeps a deterministic first-`max_families` fallback.
+              default_value: ""
+              required: false
+              group: Family charts
+            - name: max_peers
+              description: Create peer charts for all peers only when the discovered peer count is at most this value.
+              default_value: 100
+              required: false
+              group: Peer charts
+            - name: max_vnis
+              description: Create EVPN VNI charts for all discovered VNIs only when their count is at most this value.
+              default_value: 100
+              required: false
+              group: EVPN VNI charts
+            - name: select_vnis
+              description: When the discovered EVPN VNI count exceeds `max_vnis`, prefer matched `tenant_vrf/vni` values such as `default/172192`. If the selector matches more than `max_vnis`, Netdata keeps the matched set bounded with deterministic first-`max_vnis` truncation. If no selector is configured, Netdata keeps a deterministic first-`max_vnis` fallback.
+              default_value: ""
+              required: false
+              group: EVPN VNI charts
+            - name: deep_peer_prefix_metrics
+              description: |
+                Enable extra per-peer FRR route queries only when FRR summary and neighbors JSON do not already expose accepted, filtered, or advertised prefix counts. Use this only with a bounded charted peer set. Ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`.
+              default_value: "no"
+              required: false
+              group: Peer charts
+            - name: max_deep_queries_per_scrape
+              description: |
+                Maximum number of optional deep FRR route queries Netdata will issue in one scrape when `deep_peer_prefix_metrics` is enabled. This budget is global for the scrape, not per peer. Set this to `0` to disable the budget cap. Ignored for `backend: bird`, `backend: gobgp`, and `backend: openbgpd`.
+              default_value: 40
+              required: false
+              group: Peer charts
+            - name: select_peers
+              description: When the discovered peer count exceeds `max_peers`, prefer matched peer addresses. If the selector matches more than `max_peers`, Netdata keeps the matched set bounded with deterministic first-`max_peers` truncation. If no selector is configured, Netdata keeps a deterministic first-`max_peers` fallback.
+              default_value: ""
+              required: false
+              group: Peer charts
+            - name: collect_rib_summaries
+              description: |
+                Enable cached deeper family summaries when the backend exposes them. GoBGP uses this for cached validation summaries from `ListPath`, while OpenBGPD uses this for cached `/rib` summaries. Ignored for `backend: frr` and `backend: bird`.
+              default_value: "no"
+              required: false
+              group: Family charts
+            - name: rib_summary_every
+              description: Minimum time between optional cached summary refreshes when `collect_rib_summaries` is enabled. Set this to a value greater than zero when `collect_rib_summaries` is enabled.
+              default_value: 60
+              required: false
+              group: Family charts
+
+            - name: vnode
+              description: Associates this data collection job with a Virtual Node.
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: Collect BGP metrics from a local FRR instance.
+              config: |
+                jobs:
+                  - name: local
+                    backend: frr
+                    socket_path: /var/run/frr/bgpd.vty
+                    zebra_socket_path: /var/run/frr/zebra.vty
+            - name: Basic BIRD
+              description: Collect BGP metrics from a local BIRD instance through its control socket.
+              config: |
+                jobs:
+                  - name: local-bird
+                    backend: bird
+                    socket_path: /var/run/bird.ctl
+            - name: Basic OpenBGPD
+              description: Collect BGP metrics from a read-only OpenBGPD HTTP JSON endpoint.
+              config: |
+                jobs:
+                  - name: local-openbgpd
+                    backend: openbgpd
+                    api_url: http://127.0.0.1:8080
+            - name: Basic GoBGP
+              description: Collect BGP metrics from a GoBGP gRPC endpoint.
+              config: |
+                jobs:
+                  - name: local-gobgp
+                    backend: gobgp
+                    address: 127.0.0.1:50051
+            - name: Bounded peer charts
+              description: Bound both family charts and peer charts when a router has many VRFs or neighbors.
+              config: |
+                jobs:
+                  - name: edge
+                    backend: frr
+                    socket_path: /var/run/frr/bgpd.vty
+                    zebra_socket_path: /var/run/frr/zebra.vty
+                    max_families: 10
+                    select_families:
+                      includes:
+                        - "=default/ipv4/unicast"
+                    max_peers: 100
+                    select_peers:
+                      includes:
+                        - "=192.0.2.1"
+                        - "=2001:db8::1"
+                    max_vnis: 20
+                    select_vnis:
+                      includes:
+                        - "=default/172192"
+            - name: Deep peer prefix counters
+              description: Enable fallback accepted, filtered, and advertised prefix counters for a small selected peer set when FRR does not expose enough prefix counters in its summary and neighbors JSON output.
+              config: |
+                jobs:
+                  - name: edge-deep
+                    backend: frr
+                    socket_path: /var/run/frr/bgpd.vty
+                    zebra_socket_path: /var/run/frr/zebra.vty
+                    max_families: 10
+                    select_families:
+                      includes:
+                        - "=default/ipv4/unicast"
+                    max_peers: 10
+                    deep_peer_prefix_metrics: yes
+                    max_deep_queries_per_scrape: 20
+                    select_peers:
+                      includes:
+                        - "=192.0.2.1"
+                        - "=2001:db8::1"
+            - name: Cached OpenBGPD RIB summaries
+              description: Enable cached OpenBGPD route-table and correctness summaries while keeping the full `/rib` query out of the normal per-scrape healthy path.
+              config: |
+                jobs:
+                  - name: local-openbgpd-rib
+                    backend: openbgpd
+                    api_url: http://127.0.0.1:8080
+                    collect_rib_summaries: yes
+                    rib_summary_every: 60
+            - name: Cached GoBGP validation summaries
+              description: Enable cached GoBGP validation summaries while keeping the healthy path on `GetBgp`, `ListPeer`, and `GetTable`.
+              config: |
+                jobs:
+                  - name: local-gobgp-rpki
+                    backend: gobgp
+                    address: 127.0.0.1:50051
+                    collect_rib_summaries: yes
+                    rib_summary_every: 60
+    troubleshooting:
+      problems:
+        list:
+          - name: EVPN VNI query errors
+            description: |
+              EVPN VNI collection is best-effort. If `zebra.vty` is missing or `show evpn vni json` fails, Netdata still collects family, peer, and neighbor charts from `bgpd.vty`. The failed VNI query increments `bgp.collector_failures`.
+          - name: OpenBGPD RIB summary limits
+            description: |
+              OpenBGPD family route-table counts and correctness summaries come from a cached `/rib` query. If `collect_rib_summaries` is disabled, Netdata still collects family state, peer state, and neighbor session counters from the cheap `neighbors` path, but it will not emit `bgp.family_correctness`.
+          - name: GoBGP gRPC access
+            description: |
+              If the GoBGP backend fails, verify the configured `address`, confirm whether the listener expects TLS, and verify that the daemon allows `GetBgp`, `ListPeer`, `GetTable`, and, when enabled, `ListPath`.
+    alerts:
+      - name: bgp_collector_backend_unreachable
+        metric: bgp.collector_status
+        info: "Netdata cannot collect BGP data from the configured ${label:backend} target ${label:target}; current scrape failure is a permission, timeout, query, or parse error"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/bgp.conf
+      - name: bgp_peer_down
+        metric: bgp.peer_state
+        info: "BGP peer ${label:peer} (AS${label:peer_as}) has remained out of the established state for the full 2-minute evaluation window"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/bgp.conf
+      - name: bgp_family_no_established_peers
+        metric: bgp.family_peer_states
+        info: "All non-admin-disabled peers are down for the BGP family ${label:vrf}/${label:afi}/${label:safi}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/bgp.conf
+      - name: bgp_peer_prefixes_received_anomaly
+        metric: bgp.peer_prefixes_received
+        info: "Rolling ML anomaly rate for received prefixes on peer ${label:peer} (AS${label:peer_as}); sustained anomalies usually mean unexpected route loss or route growth"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/bgp.conf
+      - name: bgp_family_messages_anomaly
+        metric: bgp.family_messages
+        info: "Rolling ML anomaly rate for BGP family activity in ${label:vrf}/${label:afi}/${label:safi}; sustained anomalies usually indicate unstable peers or unusual route churn"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/bgp.conf
+      - name: bgp_neighbor_churn_anomaly
+        metric: bgp.neighbor_churn
+        info: "Rolling ML anomaly rate for backend-native churn traffic on peer ${label:peer} (AS${label:peer_as}); sustained anomalies usually indicate instability or abnormal route churn"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/bgp.conf
+      - name: bgp_peer_transitions_anomaly
+        metric: bgp.neighbor_transitions
+        info: "Rolling ML anomaly rate for BGP session drops on peer ${label:peer} (AS${label:peer_as}) when the backend exposes transition counters; sustained anomalies usually indicate flaps or unstable reachability"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/bgp.conf
+      - name: bgp_family_correctness_invalid
+        metric: bgp.family_correctness
+        info: "Netdata sees one or more invalid routes in the aggregated daemon-native correctness view for ${label:vrf}/${label:afi}/${label:safi}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/bgp.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: collector
+          description: These metrics refer to the BGP collector job itself.
+          labels:
+            - name: backend
+              description: BGP backend type.
+            - name: target
+              description: Backend endpoint or socket target configured for this job.
+          metrics:
+            - name: bgp.collector_status
+              description: BGP collector scrape status
+              unit: status
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: permission_error
+                - name: timeout
+                - name: query_error
+                - name: parse_error
+            - name: bgp.collector_scrape_duration
+              description: BGP collector scrape duration
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: bgp.collector_failures
+              description: BGP collector failures during the current scrape
+              unit: errors
+              chart_type: stacked
+              dimensions:
+                - name: query
+                - name: parse
+                - name: deep_query
+            - name: bgp.collector_deep_queries
+              description: Optional deeper backend query activity during the current scrape. FRR uses this for per-peer route fallback queries.
+              unit: queries
+              chart_type: stacked
+              dimensions:
+                - name: attempted
+                - name: failed
+                - name: skipped
+        - name: family
+          description: These metrics refer to a BGP family summary for one VRF and AFI/SAFI pair. For BIRD, Netdata maps the routing table name into the current `vrf` selector slot and also exposes the raw table name explicitly.
+          labels:
+            - name: backend
+              description: BGP backend type.
+            - name: vrf
+              description: VRF name. For BIRD, this is the routing table name mapped into the common family selector slot.
+            - name: table
+              description: Raw BIRD routing table name when the backend exposes it.
+            - name: afi
+              description: Address family identifier.
+            - name: safi
+              description: Subsequent address family identifier.
+            - name: local_as
+              description: Local autonomous system number.
+          metrics:
+            - name: bgp.family_peer_states
+              description: BGP peer states
+              unit: peers
+              chart_type: stacked
+              dimensions:
+                - name: established
+                - name: admin_down
+                - name: down
+            - name: bgp.family_peer_inventory
+              description: BGP peer inventory
+              unit: peers
+              chart_type: line
+              dimensions:
+                - name: configured
+                - name: charted
+            - name: bgp.family_messages
+              description: Backend-native BGP family activity counters. FRR uses summary message counters. BIRD uses route-change statistics as the nearest cheap daemon-native signal. GoBGP only attaches family message totals when one session enables exactly one family, so Netdata does not double-count multi-family sessions.
+              unit: messages/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: bgp.family_prefixes_received
+              description: BGP received prefixes
+              unit: prefixes
+              chart_type: line
+              dimensions:
+                - name: received
+            - name: bgp.family_rib_routes
+              description: BGP RIB routes
+              unit: routes
+              chart_type: line
+              dimensions:
+                - name: routes
+            - name: bgp.family_correctness
+              description: Aggregated daemon-native route correctness counts when the backend exposes them and the collector enables the required deeper summary path. GoBGP uses cached validation summaries from `ListPath`. OpenBGPD uses cached `/rib` summaries for this context.
+              unit: routes
+              chart_type: stacked
+              dimensions:
+                - name: valid
+                - name: invalid
+                - name: not_found
+        - name: peer
+          description: These metrics refer to a single BGP peer.
+          labels:
+            - name: backend
+              description: BGP backend type.
+            - name: vrf
+              description: VRF name. For BIRD, this is the routing table name mapped into the common family selector slot.
+            - name: table
+              description: Raw BIRD routing table name when the backend exposes it.
+            - name: afi
+              description: Address family identifier.
+            - name: safi
+              description: Subsequent address family identifier.
+            - name: local_as
+              description: Local autonomous system number.
+            - name: peer
+              description: Peer address.
+            - name: peer_as
+              description: Peer autonomous system number.
+            - name: protocol
+              description: Backend-native BGP protocol instance name when the backend exposes it, for example a BIRD protocol instance.
+            - name: peer_desc
+              description: Peer description when the backend exposes it cheaply, for example FRR `show bgp vrf all neighbors json` or the BIRD `Description:` field.
+            - name: peer_group
+              description: Peer group when the backend exposes it cheaply.
+            - name: local_address
+              description: Local session address when the backend exposes it.
+          metrics:
+            - name: bgp.peer_messages
+              description: Backend-native peer activity counters. FRR uses session message counters. BIRD uses route-change statistics as the nearest cheap daemon-native signal. GoBGP only attaches peer message totals to family-scoped peer charts when the session enables exactly one family, so Netdata does not double-count multi-family sessions.
+              unit: messages/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: bgp.peer_prefixes_received
+              description: BGP peer received prefixes
+              unit: prefixes
+              chart_type: line
+              dimensions:
+                - name: received
+            - name: bgp.peer_prefixes_policy
+              description: BGP peer accepted and filtered prefixes when the backend exposes them cheaply. FRR prefers neighbors JSON and optionally falls back to deeper route queries. BIRD uses channel route summaries.
+              unit: prefixes
+              chart_type: stacked
+              dimensions:
+                - name: accepted
+                - name: filtered
+            - name: bgp.peer_prefixes_advertised
+              description: BGP peer advertised prefixes when the backend exposes them cheaply. FRR prefers summary `pfxSnt` and optionally falls back to deeper route queries. BIRD uses channel route summaries.
+              unit: prefixes
+              chart_type: line
+              dimensions:
+                - name: advertised
+            - name: bgp.peer_uptime
+              description: BGP peer uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: bgp.peer_state
+              description: BGP peer state where `0=down`, `1=established`, and `2=admin_down`
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: state
+        - name: neighbor
+          description: These metrics refer to one BGP session in one VRF. Netdata models session-scoped counters here so the same session is not counted once per AFI/SAFI family. For BIRD, Netdata maps the routing table name into the current `vrf` selector slot and also exposes the raw table name explicitly.
+          labels:
+            - name: backend
+              description: BGP backend type.
+            - name: vrf
+              description: VRF name. For BIRD, this is the routing table name mapped into the common family selector slot.
+            - name: table
+              description: Raw BIRD routing table name when the backend exposes it.
+            - name: peer
+              description: Peer address.
+            - name: peer_as
+              description: Peer autonomous system number.
+            - name: protocol
+              description: Backend-native BGP protocol instance name when the backend exposes it, for example a BIRD protocol instance.
+            - name: peer_desc
+              description: Peer description when the backend exposes it cheaply, for example FRR `show bgp vrf all neighbors json` or the BIRD `Description:` field.
+            - name: peer_group
+              description: Peer group when the backend exposes it cheaply.
+            - name: local_address
+              description: Local session address when the backend exposes it.
+          metrics:
+            - name: bgp.neighbor_transitions
+              description: BGP neighbor session transitions derived from daemon-native connection lifecycle counters when the backend exposes them
+              unit: sessions/s
+              chart_type: stacked
+              dimensions:
+                - name: established
+                - name: dropped
+            - name: bgp.neighbor_churn
+              description: Backend-native BGP neighbor churn. FRR uses session updates, notifications, and route-refresh counters, excluding keepalives. BIRD uses import and export update and withdraw route-change counters. GoBGP uses session update, withdraw, notification, and route-refresh counters from `ListPeer`. OpenBGPD uses session update, withdraw, notification, and route-refresh counters from the read-only neighbor JSON path.
+              unit: messages/s
+              chart_type: area
+              dimensions:
+                - name: updates_received
+                - name: updates_sent
+                - name: withdraws_received
+                - name: withdraws_sent
+                - name: notifications_received
+                - name: notifications_sent
+                - name: route_refresh_received
+                - name: route_refresh_sent
+            - name: bgp.neighbor_message_types
+              description: BGP neighbor message types derived from session-level counters when the backend exposes them. FRR, GoBGP, and OpenBGPD all provide this path.
+              unit: messages/s
+              chart_type: area
+              dimensions:
+                - name: updates_received
+                - name: updates_sent
+                - name: notifications_received
+                - name: notifications_sent
+                - name: keepalives_received
+                - name: keepalives_sent
+                - name: route_refresh_received
+                - name: route_refresh_sent
+            - name: bgp.neighbor_last_reset_state
+              description: BGP neighbor last-reset state where `never=1` means FRR reports no prior reset, `soft_or_unknown=1` means a prior reset exists without a hard-reset flag, and `hard=1` means FRR marked the last reset as hard
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: never
+                - name: soft_or_unknown
+                - name: hard
+            - name: bgp.neighbor_last_reset_age
+              description: Age of the last FRR-reported neighbor reset
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
+            - name: bgp.neighbor_last_error_codes
+              description: Last FRR-reported reset code plus BGP notification code and subcode for the neighbor session when FRR exposes them
+              unit: code
+              chart_type: line
+              dimensions:
+                - name: reset_code
+                - name: error_code
+                - name: error_subcode
+        - name: evpn_vni
+          description: These metrics refer to one EVPN VNI in one tenant VRF. Netdata keeps VNI charts separate from peer charts so EVPN VNI objects remain a clean instance type.
+          labels:
+            - name: backend
+              description: BGP backend type.
+            - name: tenant_vrf
+              description: Tenant VRF that owns the EVPN VNI.
+            - name: vni
+              description: EVPN VNI number.
+            - name: vni_type
+              description: EVPN VNI type as exposed by FRR, for example `l2`.
+            - name: vxlan_interface
+              description: Linux VXLAN interface name when FRR exposes it.
+          metrics:
+            - name: bgp.evpn_vni_entries
+              description: EVPN VNI MAC and ARP/ND entry counts
+              unit: entries
+              chart_type: stacked
+              dimensions:
+                - name: macs
+                - name: arp_nd
+            - name: bgp.evpn_vni_remote_vteps
+              description: EVPN VNI remote VTEP count. A value of `-1` means FRR reported a non-numeric value such as `n/a`.
+              unit: VTEPs
+              chart_type: line
+              dimensions:
+                - name: remote_vteps

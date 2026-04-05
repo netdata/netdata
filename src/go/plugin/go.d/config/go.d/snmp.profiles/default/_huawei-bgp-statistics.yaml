@@ -1,0 +1,103 @@
+metrics:
+  - MIB: HUAWEI-BGP-VPN-MIB
+    table:
+      name: hwBgpPeerStatisticTable
+      OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7
+    static_tags:
+      - {tag: _address_family, value: all}
+      - {tag: _subsequent_address_family, value: all}
+    symbols:
+      - name: huawei.hwBgpPeerFsmEstablishedTransitions
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7.1.4
+        chart_meta:
+          description: The total number of times the BGP FSM transitioned into the established state
+          family: 'Network/Routing/BGP/Peer/FSM/Transition/Established/Count'
+          unit: "{transition}/s"
+      - name: huawei.hwBgpPeerDownCounts
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7.1.5
+        chart_meta:
+          description: The total number of times the BGP peer went down
+          family: 'Network/Routing/BGP/Peer/Connection/Down/Count'
+          unit: "{event}/s"
+      - name: huawei.hwBgpPeerInUpdateMsgs
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7.1.6
+        chart_meta:
+          description: The total number of update messages received from the remote BGP peer across all families
+          family: 'Network/Routing/BGP/Peer/Message/Update/In'
+          unit: "{message}/s"
+      - name: huawei.hwBgpPeerOutUpdateMsgs
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7.1.7
+        chart_meta:
+          description: The total number of update messages sent to the remote BGP peer across all families
+          family: 'Network/Routing/BGP/Peer/Message/Update/Out'
+          unit: "{message}/s"
+      - name: huawei.hwBgpPeerInTotalMsgs
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7.1.8
+        chart_meta:
+          description: The total number of protocol messages received from the remote BGP peer across all families
+          family: 'Network/Routing/BGP/Peer/Message/Total/In'
+          unit: "{message}/s"
+      - name: huawei.hwBgpPeerOutTotalMsgs
+        OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7.1.9
+        chart_meta:
+          description: The total number of protocol messages sent to the remote BGP peer across all families
+          family: 'Network/Routing/BGP/Peer/Message/Total/Out'
+          unit: "{message}/s"
+    metric_tags:
+      - tag: _routing_instance
+        symbol:
+          name: huawei.hwBgpPeerStatisticVrfInstanceId
+          extract_value: '^[^.]+\.([^.]+)\..*$'
+      - tag: huawei_hw_bgp_peer_vrf_instance_id
+        symbol:
+          name: huawei.hwBgpPeerStatisticVrfInstanceId
+          extract_value: '^[^.]+\.([^.]+)\..*$'
+      - tag: _neighbor
+        table: hwBgpPeerTable
+        symbol:
+          name: huawei.hwBgpPeerRemoteAddr
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
+          format: ip_address
+        lookup_symbol:
+          name: huawei.hwBgpPeerRemoteAddr
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
+          extract_value: '^(?:[^.]+\.){2}(?:4|16)\.(.*)$'
+          format: ip_address
+      - tag: huawei_hw_bgp_peer_remote_addr
+        table: hwBgpPeerTable
+        symbol:
+          name: huawei.hwBgpPeerRemoteAddr
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
+          format: ip_address
+        lookup_symbol:
+          name: huawei.hwBgpPeerRemoteAddr
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
+          extract_value: '^(?:[^.]+\.){2}(?:4|16)\.(.*)$'
+          format: ip_address
+      - tag: _neighbor_address_type
+        symbol:
+          name: huawei.hwBgpPeerStatisticRemoteAddrType
+          extract_value: '^(?:[^.]+\.){2}([^.]+)\..*$'
+        mapping:
+          4: ipv4
+          16: ipv6
+      - tag: _remote_as
+        table: hwBgpPeerTable
+        symbol:
+          name: huawei.hwBgpPeerRemoteAs
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2
+        lookup_symbol:
+          name: huawei.hwBgpPeerRemoteAddr
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
+          extract_value: '^(?:[^.]+\.){2}(?:4|16)\.(.*)$'
+          format: ip_address
+      - tag: _peer_description
+        table: hwBgpPeerTable
+        symbol:
+          name: huawei.hwBgpPeerDescription
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.12
+        lookup_symbol:
+          name: huawei.hwBgpPeerRemoteAddr
+          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
+          extract_value: '^(?:[^.]+\.){2}(?:4|16)\.(.*)$'
+          format: ip_address

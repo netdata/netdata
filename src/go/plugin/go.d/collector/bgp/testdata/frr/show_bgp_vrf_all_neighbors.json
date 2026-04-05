@@ -1,0 +1,22 @@
+{
+  "default": {
+    "vrfId": 0,
+    "vrfName": "default",
+    "swp2": {
+      "nbrDesc": "{\"desc\":\"fw1\"}",
+      "lastReset": "never"
+    },
+    "10.1.1.10": {
+      "nbrDesc": "{\"desc\":\"rt1\"}",
+      "lastReset": "never"
+    }
+  },
+  "vrf1": {
+    "vrfId": -1,
+    "vrfName": "vrf1",
+    "10.2.0.1": {
+      "nbrDesc": "{\"desc\":\"remote\"}",
+      "lastReset": "never"
+    }
+  }
+}
