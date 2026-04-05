@@ -1195,7 +1195,7 @@ func serverHandshake(handle syscall.Handle, config *ServerConfig, sessionID uint
 	}
 
 	// Negotiate limits
-	agreedReqPay := maxU32(hello.MaxRequestPayloadBytes, sReqPay)
+	agreedReqPay := minU32(maxU32(hello.MaxRequestPayloadBytes, sReqPay), protocol.MaxPayloadCap)
 	agreedReqBat := maxU32(hello.MaxRequestBatchItems, sReqBat)
 	agreedRespPay := sRespPay
 	agreedRespBat := sRespBat

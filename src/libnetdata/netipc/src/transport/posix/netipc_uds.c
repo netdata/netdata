@@ -409,8 +409,10 @@ static nipc_uds_error_t server_handshake(int fd,
     else
         selected = highest_bit(intersection);
 
-    /* Negotiate limits: requests are sender-driven, responses are server-driven. */
-    uint32_t agreed_req_pay  = max_u32(hello.max_request_payload_bytes, s_req_pay);
+    /* Negotiate limits: requests are sender-driven, responses are server-driven.
+     * Cap at NIPC_MAX_PAYLOAD_CAP to prevent a peer from forcing excessive allocation. */
+    uint32_t agreed_req_pay  = min_u32(max_u32(hello.max_request_payload_bytes, s_req_pay),
+                                        NIPC_MAX_PAYLOAD_CAP);
     uint32_t agreed_req_bat  = max_u32(hello.max_request_batch_items, s_req_bat);
     uint32_t agreed_resp_pay = s_resp_pay;
     uint32_t agreed_resp_bat = s_resp_bat;

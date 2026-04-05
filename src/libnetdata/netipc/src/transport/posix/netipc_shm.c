@@ -225,6 +225,9 @@ nipc_shm_error_t nipc_shm_server_create(const char *run_dir,
     resp_capacity = align64(resp_capacity);
 
     uint32_t req_off  = align64(NIPC_SHM_HEADER_LEN);
+    /* Guard against uint32 overflow before computing resp_off */
+    if (req_capacity > UINT32_MAX - req_off)
+        return NIPC_SHM_ERR_BAD_PARAM;
     uint32_t resp_off = align64(req_off + req_capacity);
     size_t region_size = (size_t)resp_off + resp_capacity;
 
@@ -673,6 +676,16 @@ nipc_shm_error_t nipc_shm_receive(nipc_shm_ctx_t *ctx,
         else
             ctx->local_resp_seq = expected_seq;
         return NIPC_SHM_ERR_MSG_TOO_LARGE;
+    }
+
+    /* mlen==0 after a sequence advance indicates corruption (send rejects 0-length) */
+    if (mlen == 0) {
+        if (ctx->role == NIPC_SHM_ROLE_SERVER)
+            ctx->local_req_seq = expected_seq;
+        else
+            ctx->local_resp_seq = expected_seq;
+        *msg_len_out = 0;
+        return NIPC_SHM_ERR_PROTOCOL;
     }
 
     *msg_len_out = mlen;

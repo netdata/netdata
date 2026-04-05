@@ -1000,7 +1000,7 @@ func serverHandshake(fd int, config *ServerConfig, sessionID uint64) (*Session, 
 	// Negotiate limits:
 	// - requests use the larger of client/server advertised capacities
 	// - responses are server-authoritative
-	agreedReqPay := maxU32(hello.MaxRequestPayloadBytes, sReqPay)
+	agreedReqPay := minU32(maxU32(hello.MaxRequestPayloadBytes, sReqPay), protocol.MaxPayloadCap)
 	agreedReqBat := maxU32(hello.MaxRequestBatchItems, sReqBat)
 	agreedRespPay := sRespPay
 	agreedRespBat := sRespBat

@@ -598,12 +598,20 @@ static nipc_np_error_t server_handshake(HANDLE pipe,
     else
         selected = highest_bit(intersection);
 
-    /* Negotiate limits */
-    uint32_t agreed_req_pay  = max_u32(hello.max_request_payload_bytes, s_req_pay);
+    /* Negotiate limits — cap at NIPC_MAX_PAYLOAD_CAP to prevent excessive allocation */
+    uint32_t agreed_req_pay  = min_u32(max_u32(hello.max_request_payload_bytes, s_req_pay),
+                                        NIPC_MAX_PAYLOAD_CAP);
     uint32_t agreed_req_bat  = max_u32(hello.max_request_batch_items, s_req_bat);
     uint32_t agreed_resp_pay = s_resp_pay;
     uint32_t agreed_resp_bat = s_resp_bat;
     uint32_t agreed_pkt      = min_u32(hello.packet_size, server_pkt_size);
+
+    /* Reject packet sizes too small for a header */
+    if (agreed_pkt <= NIPC_HEADER_LEN) {
+        DisconnectNamedPipe(session_pipe);
+        CloseHandle(session_pipe);
+        return NIPC_NP_ERR_HANDSHAKE;
+    }
 
     /* Send HELLO_ACK (success) */
     nipc_hello_ack_t ack = {

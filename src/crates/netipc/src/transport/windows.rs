@@ -6,7 +6,8 @@
 
 use crate::protocol::{
     self, align8, ChunkHeader, Header, Hello, HelloAck, FLAG_BATCH, HEADER_SIZE, KIND_REQUEST,
-    KIND_RESPONSE, MAGIC_CHUNK, MAGIC_MSG, MAX_PAYLOAD_DEFAULT, PROFILE_BASELINE, VERSION,
+    KIND_RESPONSE, MAGIC_CHUNK, MAGIC_MSG, MAX_PAYLOAD_CAP, MAX_PAYLOAD_DEFAULT, PROFILE_BASELINE,
+    VERSION,
 };
 use std::collections::HashSet;
 use std::ptr;
@@ -1342,7 +1343,7 @@ fn server_handshake(
     // Negotiate limits:
     // - requests use the larger of client/server advertised capacities
     // - responses are server-authoritative
-    let agreed_req_pay = max_u32(hello.max_request_payload_bytes, s_req_pay);
+    let agreed_req_pay = max_u32(hello.max_request_payload_bytes, s_req_pay).min(MAX_PAYLOAD_CAP);
     let agreed_req_bat = max_u32(hello.max_request_batch_items, s_req_bat);
     let agreed_resp_pay = s_resp_pay;
     let agreed_resp_bat = s_resp_bat;
