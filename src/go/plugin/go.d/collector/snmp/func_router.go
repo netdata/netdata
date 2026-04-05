@@ -8,24 +8,25 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
 // funcRouter routes method calls to appropriate function handlers.
 type funcRouter struct {
-	ifaceCache    *ifaceCache
-	topologyCache *topologyCache
+	ifaceCache *ifaceCache
 
 	handlers map[string]funcapi.MethodHandler
 }
 
-func newFuncRouter(cache *ifaceCache, topoCache *topologyCache) *funcRouter {
+func newFuncRouter(cache *ifaceCache) *funcRouter {
 	r := &funcRouter{
-		ifaceCache:    cache,
-		topologyCache: topoCache,
-		handlers:      make(map[string]funcapi.MethodHandler),
+		ifaceCache: cache,
+		handlers:   make(map[string]funcapi.MethodHandler),
 	}
 	r.handlers[ifacesMethodID] = newFuncInterfaces(r)
-	r.handlers[topologyMethodID] = newFuncTopology(r)
+	if ddsnmp.TopologyHandler != nil {
+		r.handlers["topology:snmp"] = ddsnmp.TopologyHandler
+	}
 	return r
 }
 
@@ -53,10 +54,13 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 }
 
 func snmpMethods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
+	methods := []funcapi.MethodConfig{
 		ifacesMethodConfig(),
-		topologyMethodConfig(),
 	}
+	if ddsnmp.TopologyMethodConfig != nil {
+		methods = append(methods, *ddsnmp.TopologyMethodConfig)
+	}
+	return methods
 }
 
 func snmpFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {

@@ -14,17 +14,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
-func (c *Collector) setupProfiles(si *snmputils.SysInfo) ([]*ddsnmp.Profile, []*ddsnmp.Profile) {
+func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
 	matchedProfiles := ddsnmp.FindProfiles(si.SysObjectID, si.Descr, c.ManualProfiles)
 	c.logMatchedProfiles(matchedProfiles, si.SysObjectID)
 
-	collectionProfiles := selectCollectionProfiles(matchedProfiles)
-
-	topologyProfiles := ddsnmp.FindProfiles(si.SysObjectID, si.Descr, c.ManualProfiles)
-	topologyProfiles = c.appendTopologyProfiles(topologyProfiles)
-	topologyProfiles = selectTopologyRefreshProfiles(topologyProfiles)
-
-	return collectionProfiles, topologyProfiles
+	return selectCollectionProfiles(matchedProfiles)
 }
 
 func (c *Collector) logMatchedProfiles(profiles []*ddsnmp.Profile, sysObjectID string) {
@@ -47,15 +41,9 @@ func (c *Collector) logMatchedProfiles(profiles []*ddsnmp.Profile, sysObjectID s
 	}
 }
 
+// selectCollectionProfiles filters out topology metrics from profiles,
+// keeping only metrics intended for regular SNMP data collection.
 func selectCollectionProfiles(profiles []*ddsnmp.Profile) []*ddsnmp.Profile {
-	return filterProfilesByTopologyRole(profiles, false)
-}
-
-func selectTopologyRefreshProfiles(profiles []*ddsnmp.Profile) []*ddsnmp.Profile {
-	return filterProfilesByTopologyRole(profiles, true)
-}
-
-func filterProfilesByTopologyRole(profiles []*ddsnmp.Profile, topologyOnly bool) []*ddsnmp.Profile {
 	if len(profiles) == 0 {
 		return nil
 	}
@@ -66,16 +54,9 @@ func filterProfilesByTopologyRole(profiles []*ddsnmp.Profile, topologyOnly bool)
 			continue
 		}
 
-		filterProfileByTopologyRole(prof, topologyOnly)
+		stripTopologyFromProfile(prof)
 
-		if topologyOnly {
-			// Topology snapshots do not use device metadata, so avoid the extra SNMP work.
-			prof.Definition.Metadata = nil
-			prof.Definition.SysobjectIDMetadata = nil
-			if len(prof.Definition.Metrics) == 0 && len(prof.Definition.VirtualMetrics) == 0 {
-				continue
-			}
-		} else if !profileHasCollectionData(prof.Definition) {
+		if !ddsnmp.ProfileHasCollectionData(prof.Definition) {
 			continue
 		}
 
@@ -88,27 +69,47 @@ func filterProfilesByTopologyRole(profiles []*ddsnmp.Profile, topologyOnly bool)
 	return selected
 }
 
-func filterProfileByTopologyRole(prof *ddsnmp.Profile, topologyOnly bool) {
+// stripTopologyFromProfile removes topology metrics and tags from a profile,
+// leaving only data intended for regular SNMP collection.
+func stripTopologyFromProfile(prof *ddsnmp.Profile) {
 	def := prof.Definition
-	hadTopologyData := profileContainsTopologyData(prof)
-	def.Metrics = filterMetricsByTopologyRole(def.Metrics, topologyOnly)
+	hadTopologyData := ddsnmp.ProfileContainsTopologyData(prof)
+
+	def.Metrics = stripTopologyMetrics(def.Metrics)
 	def.VirtualMetrics = filterVirtualMetricsBySources(def.VirtualMetrics, def.Metrics)
 	if hadTopologyData {
-		def.MetricTags = filterGlobalMetricTagsByTopologyRole(def.MetricTags, topologyOnly)
+		def.MetricTags = stripTopologyMetricTags(def.MetricTags)
 	}
 }
 
-func filterMetricsByTopologyRole(metrics []ddprofiledefinition.MetricsConfig, topologyOnly bool) []ddprofiledefinition.MetricsConfig {
+func stripTopologyMetrics(metrics []ddprofiledefinition.MetricsConfig) []ddprofiledefinition.MetricsConfig {
 	if len(metrics) == 0 {
 		return nil
 	}
 
 	filtered := metrics[:0]
 	for _, metric := range metrics {
-		if metricConfigContainsTopologyData(&metric) != topologyOnly {
-			continue
+		if !ddsnmp.MetricConfigContainsTopologyData(&metric) {
+			filtered = append(filtered, metric)
 		}
-		filtered = append(filtered, metric)
+	}
+
+	if len(filtered) == 0 {
+		return nil
+	}
+	return filtered
+}
+
+func stripTopologyMetricTags(tags []ddprofiledefinition.MetricTagConfig) []ddprofiledefinition.MetricTagConfig {
+	if len(tags) == 0 {
+		return nil
+	}
+
+	filtered := tags[:0]
+	for _, tag := range tags {
+		if !ddsnmp.MetricTagConfigContainsTopologyData(&tag) {
+			filtered = append(filtered, tag)
+		}
 	}
 
 	if len(filtered) == 0 {
@@ -164,7 +165,7 @@ func addMetricConfigNames(names map[string]struct{}, metric *ddprofiledefinition
 		return
 	}
 
-	if name := strings.TrimSpace(firstNonEmpty(metric.Symbol.Name, metric.Name)); name != "" {
+	if name := strings.TrimSpace(ddsnmp.FirstNonEmpty(metric.Symbol.Name, metric.Name)); name != "" {
 		names[name] = struct{}{}
 	}
 	for i := range metric.Symbols {
@@ -185,110 +186,4 @@ func virtualMetricSourcesAvailable(sources []ddprofiledefinition.VirtualMetricSo
 		}
 	}
 	return true
-}
-
-func filterGlobalMetricTagsByTopologyRole(tags []ddprofiledefinition.MetricTagConfig, topologyOnly bool) []ddprofiledefinition.MetricTagConfig {
-	if len(tags) == 0 {
-		return nil
-	}
-
-	filtered := tags[:0]
-	for _, tag := range tags {
-		if metricTagConfigContainsTopologyData(&tag) != topologyOnly {
-			continue
-		}
-		filtered = append(filtered, tag)
-	}
-
-	if len(filtered) == 0 {
-		return nil
-	}
-	return filtered
-}
-
-func metricTagConfigContainsTopologyData(tag *ddprofiledefinition.MetricTagConfig) bool {
-	if tag == nil {
-		return false
-	}
-
-	values := []string{
-		tag.Tag,
-		tag.Table,
-		tag.OID,
-		tag.Symbol.Name,
-		tag.Symbol.OID,
-		tag.Column.Name,
-		tag.Column.OID,
-	}
-	for _, value := range values {
-		if looksLikeTopologyIdentifier(value) {
-			return true
-		}
-	}
-	return false
-}
-
-func looksLikeTopologyIdentifier(value string) bool {
-	value = strings.ToLower(strings.TrimSpace(value))
-	switch {
-	case value == "":
-		return false
-	case strings.HasPrefix(value, "lldp"),
-		strings.HasPrefix(value, "cdp"),
-		strings.HasPrefix(value, "topology"),
-		strings.HasPrefix(value, "dot1d"),
-		strings.HasPrefix(value, "dot1q"),
-		strings.HasPrefix(value, "stp"),
-		strings.HasPrefix(value, "vtp"),
-		strings.HasPrefix(value, "fdb"),
-		strings.HasPrefix(value, "bridge"),
-		strings.HasPrefix(value, "arp"):
-		return true
-	default:
-		return false
-	}
-}
-
-func profileHasCollectionData(def *ddprofiledefinition.ProfileDefinition) bool {
-	if def == nil {
-		return false
-	}
-	return len(def.Metrics) > 0 ||
-		len(def.VirtualMetrics) > 0 ||
-		len(def.MetricTags) > 0 ||
-		len(def.Metadata) > 0 ||
-		len(def.SysobjectIDMetadata) > 0
-}
-
-func profileContainsTopologyData(prof *ddsnmp.Profile) bool {
-	if prof == nil || prof.Definition == nil {
-		return false
-	}
-
-	for i := range prof.Definition.Metrics {
-		if metricConfigContainsTopologyData(&prof.Definition.Metrics[i]) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func metricConfigContainsTopologyData(metric *ddprofiledefinition.MetricsConfig) bool {
-	if metric == nil {
-		return false
-	}
-
-	if name := firstNonEmpty(metric.Symbol.Name, metric.Name); isTopologyMetric(name) || isTopologySysUptimeMetric(name) {
-		return true
-	}
-
-	for i := range metric.Symbols {
-		name := metric.Symbols[i].Name
-		if isTopologyMetric(name) || isTopologySysUptimeMetric(name) {
-			return true
-		}
-	}
-
-	return false
 }

@@ -60,8 +60,7 @@ type ifaceEntry struct {
 	rates ifaceRates
 
 	// Tracking
-	availableMetrics map[string]struct{} // metric names with charts seen for this interface in cycle
-	updated          bool                // true if seen in current collection cycle
+	updated bool // true if seen in current collection cycle
 }
 
 // ifaceCounters holds raw cumulative counter values.
@@ -122,9 +121,6 @@ func (c *Collector) resetIfaceCache() {
 
 	for _, entry := range c.ifaceCache.interfaces {
 		entry.updated = false
-		if entry.availableMetrics != nil {
-			clear(entry.availableMetrics)
-		}
 	}
 }
 
@@ -147,12 +143,9 @@ func (c *Collector) updateIfaceCacheEntry(m ddsnmp.Metric) {
 	entry := c.ifaceCache.interfaces[ifaceName]
 	if entry == nil {
 		entry = &ifaceEntry{
-			name:             ifaceName,
-			availableMetrics: make(map[string]struct{}),
+			name: ifaceName,
 		}
 		c.ifaceCache.interfaces[ifaceName] = entry
-	} else if entry.availableMetrics == nil {
-		entry.availableMetrics = make(map[string]struct{})
 	}
 
 	if ifType := m.Tags[tagIfType]; ifType != "" {
@@ -210,7 +203,6 @@ func (c *Collector) updateIfaceCacheEntry(m ddsnmp.Metric) {
 	case "ifOperStatus":
 		entry.operStatus = extractStatus(m.MultiValue)
 	}
-	entry.availableMetrics[m.Name] = struct{}{}
 
 	entry.updated = true
 }

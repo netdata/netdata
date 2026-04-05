@@ -5,11 +5,6 @@ vnode_device_down_threshold: 123
 manual_profiles:
   - "ok"
 
-topology:
-  autoprobe: yes
-  refresh_every: 30m
-  stale_after: 1h
-
 vnode:
   name: "ok"
   guid: "ok"

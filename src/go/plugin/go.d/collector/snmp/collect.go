@@ -94,14 +94,8 @@ func (c *Collector) ensureInitialized() error {
 		return err
 	}
 
-	if c.snmpProfiles == nil || c.topologyProfiles == nil {
-		snmpProfiles, topologyProfiles := c.setupProfiles(si)
-		if c.snmpProfiles == nil {
-			c.snmpProfiles = snmpProfiles
-		}
-		if c.topologyProfiles == nil {
-			c.topologyProfiles = topologyProfiles
-		}
+	if c.snmpProfiles == nil {
+		c.snmpProfiles = c.setupProfiles(si)
 	}
 
 	if c.ddSnmpColl == nil && len(c.snmpProfiles) > 0 {
@@ -114,7 +108,7 @@ func (c *Collector) ensureInitialized() error {
 		})
 	}
 
-	if c.ddSnmpColl == nil && len(c.topologyProfiles) == 0 && !c.Ping.Enabled {
+	if c.ddSnmpColl == nil && !c.Ping.Enabled {
 		return errors.New("no profiles found and ping disabled")
 	}
 
@@ -136,7 +130,7 @@ func (c *Collector) ensureInitialized() error {
 		c.addPingCharts()
 	}
 
-	c.ensureTopologySchedulerStarted()
+	c.registerDeviceForTopology(si)
 
 	return nil
 }

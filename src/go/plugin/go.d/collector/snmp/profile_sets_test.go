@@ -3,16 +3,13 @@
 package snmp
 
 import (
-	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 )
 
 func TestSelectCollectionProfiles_RemovesTopologyPollWork(t *testing.T) {
@@ -31,60 +28,6 @@ func TestSelectCollectionProfiles_RemovesTopologyPollWork(t *testing.T) {
 	assert.Equal(t, "ups_model", prof.Definition.MetricTags[0].Tag)
 	require.Len(t, prof.Definition.Metadata, 1)
 	require.Len(t, prof.Definition.SysobjectIDMetadata, 1)
-}
-
-func TestSelectTopologyRefreshProfiles_KeepsOnlyTopologyData(t *testing.T) {
-	profiles := []*ddsnmp.Profile{newMixedTopologyProfile()}
-
-	selected := selectTopologyRefreshProfiles(profiles)
-	require.Len(t, selected, 1)
-
-	prof := selected[0]
-	require.NotNil(t, prof.Definition)
-	require.Len(t, prof.Definition.Metrics, 1)
-	assert.Equal(t, metricLldpLocPortEntry, prof.Definition.Metrics[0].Symbol.Name)
-	require.Len(t, prof.Definition.VirtualMetrics, 1)
-	assert.Equal(t, "lldpLocalPortRows", prof.Definition.VirtualMetrics[0].Name)
-	require.Len(t, prof.Definition.MetricTags, 1)
-	assert.Equal(t, "lldp_loc_chassis_id", prof.Definition.MetricTags[0].Tag)
-	assert.Empty(t, prof.Definition.Metadata)
-	assert.Empty(t, prof.Definition.SysobjectIDMetadata)
-}
-
-func TestCollectorEnsureInitializedAllowsTopologyOnlyProfiles(t *testing.T) {
-	mockSNMP, cleanup := mockInit(t)
-	defer cleanup()
-
-	setMockClientInitExpect(mockSNMP)
-	setMockClientSysInfoExpect(mockSNMP)
-	mockSNMP.EXPECT().Close().Return(nil).AnyTimes()
-
-	coll := New()
-	coll.Config = prepareV2Config()
-	coll.Ping.Enabled = false
-	coll.CreateVnode = false
-	coll.snmpClient = mockSNMP
-	coll.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
-	coll.snmpProfiles = []*ddsnmp.Profile{}
-	coll.topologyProfiles = []*ddsnmp.Profile{
-		{
-			Definition: &ddprofiledefinition.ProfileDefinition{
-				Metrics: []ddprofiledefinition.MetricsConfig{
-					{
-						Symbol: ddprofiledefinition.SymbolConfig{Name: metricLldpLocPortEntry},
-					},
-				},
-			},
-		},
-	}
-	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector { return &mockDdSnmpCollector{} }
-
-	require.NoError(t, coll.ensureInitialized())
-	assert.Nil(t, coll.ddSnmpColl)
-	assert.NotNil(t, coll.sysInfo)
-
-	coll.stopTopologyScheduler()
-	coll.Cleanup(context.Background())
 }
 
 func newMixedTopologyProfile() *ddsnmp.Profile {
@@ -125,7 +68,7 @@ func newMixedTopologyProfile() *ddsnmp.Profile {
 				{
 					Symbol: ddprofiledefinition.SymbolConfig{
 						OID:  "1.0.8802.1.1.2.1.3.7.1.2",
-						Name: metricLldpLocPortEntry,
+						Name: "lldpLocPortEntry",
 					},
 				},
 				{
@@ -139,7 +82,7 @@ func newMixedTopologyProfile() *ddsnmp.Profile {
 				{
 					Name: "lldpLocalPortRows",
 					Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
-						{Metric: metricLldpLocPortEntry, Table: "lldpLocPortTable"},
+						{Metric: "lldpLocPortEntry", Table: "lldpLocPortTable"},
 					},
 				},
 				{

@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
@@ -280,5 +279,5 @@ func prepareNewTarget(sub subnet, ip string) *target {
 		Organization: "net-snmp",
 		Category:     "Server",
 		Model:        "Linux",
-	}, confopt.LongDuration(defaultRescanInterval).String())
+	})
 }

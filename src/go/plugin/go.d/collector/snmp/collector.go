@@ -6,7 +6,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
@@ -65,9 +64,6 @@ func New() *Collector {
 					Network:    "ip",
 				},
 			},
-			Topology: TopologyConfig{
-				Autoprobe: true,
-			},
 		},
 
 		charts:            &collectorapi.Charts{},
@@ -75,8 +71,7 @@ func New() *Collector {
 		seenTableMetrics:  make(map[string]bool),
 		seenProfiles:      make(map[string]bool),
 
-		ifaceCache:    newIfaceCache(),
-		topologyCache: newTopologyCache(),
+		ifaceCache: newIfaceCache(),
 
 		newProber:     ping.NewProber,
 		newSnmpClient: gosnmp.NewHandler,
@@ -85,7 +80,7 @@ func New() *Collector {
 		},
 	}
 
-	c.funcRouter = newFuncRouter(c.ifaceCache, c.topologyCache)
+	c.funcRouter = newFuncRouter(c.ifaceCache)
 
 	return c
 }
@@ -97,15 +92,13 @@ type (
 
 		vnode *vnodes.VirtualNode
 
-		charts              *collectorapi.Charts
-		seenScalarMetrics   map[string]bool
-		seenTableMetrics    map[string]bool
-		seenProfiles        map[string]bool
-		topologyChartsAdded bool
+		charts            *collectorapi.Charts
+		seenScalarMetrics map[string]bool
+		seenTableMetrics  map[string]bool
+		seenProfiles      map[string]bool
 
-		ifaceCache    *ifaceCache    // interface metrics cache for functions
-		topologyCache *topologyCache // topology cache for functions
-		funcRouter    *funcRouter    // function router for method handlers
+		ifaceCache *ifaceCache  // interface metrics cache for functions
+		funcRouter *funcRouter  // function router for method handlers
 
 		prober    ping.Prober
 		newProber func(ping.ProberConfig, *logger.Logger) ping.Prober
@@ -116,18 +109,12 @@ type (
 		ddSnmpColl    ddCollector
 		newDdSnmpColl func(ddsnmpcollector.Config) ddCollector
 
-		sysInfo          *snmputils.SysInfo
-		snmpProfiles     []*ddsnmp.Profile
-		topologyProfiles []*ddsnmp.Profile
+		sysInfo      *snmputils.SysInfo
+		snmpProfiles []*ddsnmp.Profile
 
 		adjMaxRepetitions uint32
 
 		disableBulkWalk bool
-
-		topologyMu      sync.Mutex
-		topologyCancel  context.CancelFunc
-		topologyRunning bool
-		topologyWG      sync.WaitGroup
 	}
 	ddCollector interface {
 		Collect() ([]*ddsnmp.ProfileMetrics, error)
@@ -155,8 +142,6 @@ func (c *Collector) Init(context.Context) error {
 		}
 		c.prober = pr
 	}
-
-	snmpTopologyRegistry.register(c.topologyCache)
 
 	return nil
 }
@@ -198,8 +183,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	if c.funcRouter != nil {
 		c.funcRouter.Cleanup(ctx)
 	}
-	snmpTopologyRegistry.unregister(c.topologyCache)
-	c.stopTopologyScheduler()
+	ddsnmp.DeviceRegistry.Unregister(c.deviceRegistryKey())
 	if c.snmpClient != nil {
 		_ = c.snmpClient.Close()
 	}
