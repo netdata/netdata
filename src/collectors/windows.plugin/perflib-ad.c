@@ -2225,6 +2225,619 @@ static void netdata_ad_op_total(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
     rrdset_done(st_database_operation_total);
 }
 
+static void netdata_ad_directory_reads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA directoryReadsPerSec = {.key = "DS Directory Reads/sec"};
+    static RRDSET *st_directory_reads = NULL;
+    static RRDDIM *rd_directory_reads = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &directoryReadsPerSec))
+        return;
+
+    if (unlikely(!st_directory_reads)) {
+        st_directory_reads = rrdset_create_localhost(
+            "ad",
+            "directory_reads",
+            NULL,
+            "directory",
+            "ad.directory_reads",
+            "Directory reads",
+            "reads/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_DIRECTORY_READS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_directory_reads = rrddim_add(st_directory_reads, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_directory_reads, rd_directory_reads, (collected_number)directoryReadsPerSec.current.Data);
+    rrdset_done(st_directory_reads);
+}
+
+static void netdata_ad_directory_searches(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA directorySearchesPerSec = {.key = "DS Directory Searches/sec"};
+    static RRDSET *st_directory_searches = NULL;
+    static RRDDIM *rd_directory_searches = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &directorySearchesPerSec))
+        return;
+
+    if (unlikely(!st_directory_searches)) {
+        st_directory_searches = rrdset_create_localhost(
+            "ad",
+            "directory_searches",
+            NULL,
+            "directory",
+            "ad.directory_searches",
+            "Directory searches",
+            "searches/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_DIRECTORY_SEARCHES,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_directory_searches = rrddim_add(st_directory_searches, "search", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_directory_searches, rd_directory_searches, (collected_number)directorySearchesPerSec.current.Data);
+    rrdset_done(st_directory_searches);
+}
+
+static void netdata_ad_directory_writes(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA directoryWritesPerSec = {.key = "DS Directory Writes/sec"};
+    static RRDSET *st_directory_writes = NULL;
+    static RRDDIM *rd_directory_writes = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &directoryWritesPerSec))
+        return;
+
+    if (unlikely(!st_directory_writes)) {
+        st_directory_writes = rrdset_create_localhost(
+            "ad",
+            "directory_writes",
+            NULL,
+            "directory",
+            "ad.directory_writes",
+            "Directory writes",
+            "writes/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_DIRECTORY_WRITES,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_directory_writes = rrddim_add(st_directory_writes, "write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_directory_writes, rd_directory_writes, (collected_number)directoryWritesPerSec.current.Data);
+    rrdset_done(st_directory_writes);
+}
+
+static void netdata_ad_replication_inbound_object_updates_remaining(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    static COUNTER_DATA replicationInboundObjectUpdatesRemainingInPacket = {
+        .key = "DRA Inbound Object Updates Remaining in Packet"};
+    static RRDSET *st_replication_inbound_object_updates_remaining = NULL;
+    static RRDDIM *rd_replication_inbound_object_updates_remaining = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundObjectUpdatesRemainingInPacket))
+        return;
+
+    if (unlikely(!st_replication_inbound_object_updates_remaining)) {
+        st_replication_inbound_object_updates_remaining = rrdset_create_localhost(
+            "ad",
+            "replication_inbound_object_updates_remaining",
+            NULL,
+            "replication",
+            "ad.replication_inbound_object_updates_remaining",
+            "Replication inbound object updates remaining",
+            "updates",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_REPLICATION_INBOUND_OBJECT_UPDATES_REMAINING,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_replication_inbound_object_updates_remaining = rrddim_add(
+            st_replication_inbound_object_updates_remaining, "remaining", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        st_replication_inbound_object_updates_remaining,
+        rd_replication_inbound_object_updates_remaining,
+        (collected_number)replicationInboundObjectUpdatesRemainingInPacket.current.Data);
+    rrdset_done(st_replication_inbound_object_updates_remaining);
+}
+
+static void netdata_ad_replication_inbound_values_dns_only(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    static COUNTER_DATA replicationInboundValuesDNsOnlyPerSec = {.key = "DRA Inbound Values (DNs only)/sec"};
+    static RRDSET *st_replication_inbound_values_dns_only = NULL;
+    static RRDDIM *rd_replication_inbound_values_dns_only = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundValuesDNsOnlyPerSec))
+        return;
+
+    if (unlikely(!st_replication_inbound_values_dns_only)) {
+        st_replication_inbound_values_dns_only = rrdset_create_localhost(
+            "ad",
+            "replication_inbound_values_dns_only",
+            NULL,
+            "replication",
+            "ad.replication_inbound_values_dns_only",
+            "DRA replication inbound values DNS only",
+            "values/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_REPLICATION_INBOUND_VALUES_DNS_ONLY,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_replication_inbound_values_dns_only =
+            rrddim_add(st_replication_inbound_values_dns_only, "dns_only", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_replication_inbound_values_dns_only,
+        rd_replication_inbound_values_dns_only,
+        (collected_number)replicationInboundValuesDNsOnlyPerSec.current.Data);
+    rrdset_done(st_replication_inbound_values_dns_only);
+}
+
+static void
+netdata_ad_replication_inbound_values_total(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA replicationInboundValuesTotalPerSec = {.key = "DRA Inbound Values Total/sec"};
+    static RRDSET *st_replication_inbound_values_total = NULL;
+    static RRDDIM *rd_replication_inbound_values_total = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundValuesTotalPerSec))
+        return;
+
+    if (unlikely(!st_replication_inbound_values_total)) {
+        st_replication_inbound_values_total = rrdset_create_localhost(
+            "ad",
+            "replication_inbound_values_total",
+            NULL,
+            "replication",
+            "ad.replication_inbound_values_total",
+            "DRA replication inbound values total",
+            "values/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_REPLICATION_INBOUND_VALUES_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_replication_inbound_values_total =
+            rrddim_add(st_replication_inbound_values_total, "total", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_replication_inbound_values_total,
+        rd_replication_inbound_values_total,
+        (collected_number)replicationInboundValuesTotalPerSec.current.Data);
+    rrdset_done(st_replication_inbound_values_total);
+}
+
+static void netdata_ad_replication_outbound_objects_filtered(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    static COUNTER_DATA replicationOutboundObjectsFilteredPerSec = {.key = "DRA Outbound Objects Filtered/sec"};
+    static RRDSET *st_replication_outbound_objects_filtered = NULL;
+    static RRDDIM *rd_replication_outbound_objects_filtered = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationOutboundObjectsFilteredPerSec))
+        return;
+
+    if (unlikely(!st_replication_outbound_objects_filtered)) {
+        st_replication_outbound_objects_filtered = rrdset_create_localhost(
+            "ad",
+            "replication_outbound_objects_filtered",
+            NULL,
+            "replication",
+            "ad.replication_outbound_objects_filtered",
+            "Replication outbound objects filtered",
+            "objects/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_REPLICATION_OUTBOUND_OBJECTS_FILTERED,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_replication_outbound_objects_filtered =
+            rrddim_add(st_replication_outbound_objects_filtered, "filtered", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_replication_outbound_objects_filtered,
+        rd_replication_outbound_objects_filtered,
+        (collected_number)replicationOutboundObjectsFilteredPerSec.current.Data);
+    rrdset_done(st_replication_outbound_objects_filtered);
+}
+
+static void
+netdata_ad_replication_outbound_objects(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA replicationOutboundObjectsPerSec = {.key = "DRA Outbound Objects/sec"};
+    static RRDSET *st_replication_outbound_objects = NULL;
+    static RRDDIM *rd_replication_outbound_objects = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationOutboundObjectsPerSec))
+        return;
+
+    if (unlikely(!st_replication_outbound_objects)) {
+        st_replication_outbound_objects = rrdset_create_localhost(
+            "ad",
+            "replication_outbound_objects",
+            NULL,
+            "replication",
+            "ad.replication_outbound_objects",
+            "Replication outbound objects",
+            "objects/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_REPLICATION_OUTBOUND_OBJECTS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_replication_outbound_objects =
+            rrddim_add(st_replication_outbound_objects, "objects", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_replication_outbound_objects,
+        rd_replication_outbound_objects,
+        (collected_number)replicationOutboundObjectsPerSec.current.Data);
+    rrdset_done(st_replication_outbound_objects);
+}
+
+static void
+netdata_ad_replication_outbound_properties(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA replicationOutboundPropertiesPerSec = {.key = "DRA Outbound Properties/sec"};
+    static RRDSET *st_replication_outbound_properties = NULL;
+    static RRDDIM *rd_replication_outbound_properties = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationOutboundPropertiesPerSec))
+        return;
+
+    if (unlikely(!st_replication_outbound_properties)) {
+        st_replication_outbound_properties = rrdset_create_localhost(
+            "ad",
+            "replication_outbound_properties",
+            NULL,
+            "replication",
+            "ad.replication_outbound_properties",
+            "Replication outbound properties",
+            "properties/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_REPLICATION_OUTBOUND_PROPERTIES,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_replication_outbound_properties =
+            rrddim_add(st_replication_outbound_properties, "properties", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_replication_outbound_properties,
+        rd_replication_outbound_properties,
+        (collected_number)replicationOutboundPropertiesPerSec.current.Data);
+    rrdset_done(st_replication_outbound_properties);
+}
+
+static void netdata_ad_replication_outbound_values_dns_only(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    static COUNTER_DATA replicationOutboundValuesDNsOnlyPerSec = {.key = "DRA Outbound Values (DNs only)/sec"};
+    static RRDSET *st_replication_outbound_values_dns_only = NULL;
+    static RRDDIM *rd_replication_outbound_values_dns_only = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationOutboundValuesDNsOnlyPerSec))
+        return;
+
+    if (unlikely(!st_replication_outbound_values_dns_only)) {
+        st_replication_outbound_values_dns_only = rrdset_create_localhost(
+            "ad",
+            "replication_outbound_values_dns_only",
+            NULL,
+            "replication",
+            "ad.replication_outbound_values_dns_only",
+            "DRA replication outbound values DNS only",
+            "values/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_REPLICATION_OUTBOUND_VALUES_DNS_ONLY,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_replication_outbound_values_dns_only =
+            rrddim_add(st_replication_outbound_values_dns_only, "dns_only", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_replication_outbound_values_dns_only,
+        rd_replication_outbound_values_dns_only,
+        (collected_number)replicationOutboundValuesDNsOnlyPerSec.current.Data);
+    rrdset_done(st_replication_outbound_values_dns_only);
+}
+
+static void netdata_ad_replication_outbound_values_total(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    static COUNTER_DATA replicationOutboundValuesTotalPerSec = {.key = "DRA Outbound Values Total/sec"};
+    static RRDSET *st_replication_outbound_values_total = NULL;
+    static RRDDIM *rd_replication_outbound_values_total = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationOutboundValuesTotalPerSec))
+        return;
+
+    if (unlikely(!st_replication_outbound_values_total)) {
+        st_replication_outbound_values_total = rrdset_create_localhost(
+            "ad",
+            "replication_outbound_values_total",
+            NULL,
+            "replication",
+            "ad.replication_outbound_values_total",
+            "DRA replication outbound values total",
+            "values/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_REPLICATION_OUTBOUND_VALUES_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_replication_outbound_values_total =
+            rrddim_add(st_replication_outbound_values_total, "total", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_replication_outbound_values_total,
+        rd_replication_outbound_values_total,
+        (collected_number)replicationOutboundValuesTotalPerSec.current.Data);
+    rrdset_done(st_replication_outbound_values_total);
+}
+
+static void netdata_ad_replication_threads_getting_nc_changes(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    static COUNTER_DATA draThreadsGettingNCChanges = {.key = "DRA Threads Getting NC Changes"};
+    static RRDSET *st_replication_threads_getting_nc_changes = NULL;
+    static RRDDIM *rd_replication_threads_getting_nc_changes = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &draThreadsGettingNCChanges))
+        return;
+
+    if (unlikely(!st_replication_threads_getting_nc_changes)) {
+        st_replication_threads_getting_nc_changes = rrdset_create_localhost(
+            "ad",
+            "replication_threads_getting_nc_changes",
+            NULL,
+            "replication",
+            "ad.replication_threads_getting_nc_changes",
+            "DRA threads getting NC changes",
+            "threads",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_REPLICATION_THREADS_GETTING_NC_CHANGES,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_replication_threads_getting_nc_changes =
+            rrddim_add(st_replication_threads_getting_nc_changes, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        st_replication_threads_getting_nc_changes,
+        rd_replication_threads_getting_nc_changes,
+        (collected_number)draThreadsGettingNCChanges.current.Data);
+    rrdset_done(st_replication_threads_getting_nc_changes);
+}
+
+static void netdata_ad_replication_threads_getting_nc_changes_holding_semaphore(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    int update_every)
+{
+    static COUNTER_DATA draThreadsGettingNCChangesHoldingSemaphore = {
+        .key = "DRA Threads Getting NC Changes Holding Semaphore"};
+    static RRDSET *st_replication_threads_getting_nc_changes_holding_semaphore = NULL;
+    static RRDDIM *rd_replication_threads_getting_nc_changes_holding_semaphore = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &draThreadsGettingNCChangesHoldingSemaphore))
+        return;
+
+    if (unlikely(!st_replication_threads_getting_nc_changes_holding_semaphore)) {
+        st_replication_threads_getting_nc_changes_holding_semaphore = rrdset_create_localhost(
+            "ad",
+            "replication_threads_getting_nc_changes_holding_semaphore",
+            NULL,
+            "replication",
+            "ad.replication_threads_getting_nc_changes_holding_semaphore",
+            "DRA threads getting NC changes holding semaphore",
+            "threads",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_REPLICATION_THREADS_GETTING_NC_CHANGES_HOLDING_SEMAPHORE,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_replication_threads_getting_nc_changes_holding_semaphore = rrddim_add(
+            st_replication_threads_getting_nc_changes_holding_semaphore, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+        st_replication_threads_getting_nc_changes_holding_semaphore,
+        rd_replication_threads_getting_nc_changes_holding_semaphore,
+        (collected_number)draThreadsGettingNCChangesHoldingSemaphore.current.Data);
+    rrdset_done(st_replication_threads_getting_nc_changes_holding_semaphore);
+}
+
+static void
+netdata_ad_transitive_operations(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA transitiveOperationsPerSec = {.key = "Transitive operations/sec"};
+    static RRDSET *st_transitive_operations = NULL;
+    static RRDDIM *rd_transitive_operations = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &transitiveOperationsPerSec))
+        return;
+
+    if (unlikely(!st_transitive_operations)) {
+        st_transitive_operations = rrdset_create_localhost(
+            "ad",
+            "transitive_operations",
+            NULL,
+            "database",
+            "ad.transitive_operations",
+            "Transitive operations",
+            "operations/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_TRANSITIVE_OPERATIONS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_transitive_operations =
+            rrddim_add(st_transitive_operations, "operations", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_transitive_operations, rd_transitive_operations, (collected_number)transitiveOperationsPerSec.current.Data);
+    rrdset_done(st_transitive_operations);
+}
+
+static void
+netdata_ad_transitive_suboperations(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA transitiveSubOperationsPerSec = {.key = "Transitive suboperations/sec"};
+    static RRDSET *st_transitive_suboperations = NULL;
+    static RRDDIM *rd_transitive_suboperations = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &transitiveSubOperationsPerSec))
+        return;
+
+    if (unlikely(!st_transitive_suboperations)) {
+        st_transitive_suboperations = rrdset_create_localhost(
+            "ad",
+            "transitive_suboperations",
+            NULL,
+            "database",
+            "ad.transitive_suboperations",
+            "Transitive suboperations",
+            "suboperations/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_TRANSITIVE_SUBOPERATIONS,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_transitive_suboperations =
+            rrddim_add(st_transitive_suboperations, "suboperations", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_transitive_suboperations,
+        rd_transitive_suboperations,
+        (collected_number)transitiveSubOperationsPerSec.current.Data);
+    rrdset_done(st_transitive_suboperations);
+}
+
+static void
+netdata_ad_replication_inbound_bytes_total(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA replicationInboundBytesTotalPerSec = {.key = "DRA Inbound Bytes Total/sec"};
+    static RRDSET *st_replication_inbound_bytes_total = NULL;
+    static RRDDIM *rd_replication_inbound_bytes_total = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationInboundBytesTotalPerSec))
+        return;
+
+    if (unlikely(!st_replication_inbound_bytes_total)) {
+        st_replication_inbound_bytes_total = rrdset_create_localhost(
+            "ad",
+            "replication_inbound_bytes_total",
+            NULL,
+            "replication",
+            "ad.replication_inbound_bytes_total",
+            "DRA replication inbound bytes total",
+            "bytes/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_REPLICATION_INBOUND_BYTES_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_replication_inbound_bytes_total =
+            rrddim_add(st_replication_inbound_bytes_total, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_replication_inbound_bytes_total,
+        rd_replication_inbound_bytes_total,
+        (collected_number)replicationInboundBytesTotalPerSec.current.Data);
+    rrdset_done(st_replication_inbound_bytes_total);
+}
+
+static void
+netdata_ad_replication_outbound_bytes_total(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
+{
+    static COUNTER_DATA replicationOutboundBytesTotalPerSec = {.key = "DRA Outbound Bytes Total/sec"};
+    static RRDSET *st_replication_outbound_bytes_total = NULL;
+    static RRDDIM *rd_replication_outbound_bytes_total = NULL;
+
+    if (!perflibGetObjectCounter(pDataBlock, pObjectType, &replicationOutboundBytesTotalPerSec))
+        return;
+
+    if (unlikely(!st_replication_outbound_bytes_total)) {
+        st_replication_outbound_bytes_total = rrdset_create_localhost(
+            "ad",
+            "replication_outbound_bytes_total",
+            NULL,
+            "replication",
+            "ad.replication_outbound_bytes_total",
+            "DRA replication outbound bytes total",
+            "bytes/s",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibAD",
+            PRIO_AD_REPLICATION_OUTBOUND_BYTES_TOTAL,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rd_replication_outbound_bytes_total =
+            rrddim_add(st_replication_outbound_bytes_total, "outbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(
+        st_replication_outbound_bytes_total,
+        rd_replication_outbound_bytes_total,
+        (collected_number)replicationOutboundBytesTotalPerSec.current.Data);
+    rrdset_done(st_replication_outbound_bytes_total);
+}
+
 static void
 netdata_ad_ldap_closed_connections(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, int update_every)
 {
@@ -3223,6 +3836,23 @@ static bool do_AD(PERF_DATA_BLOCK *pDataBlock, int update_every)
         netdata_ad_atq_latency,
         netdata_ad_atq_current_threads,
         netdata_ad_op_total,
+        netdata_ad_directory_reads,
+        netdata_ad_directory_searches,
+        netdata_ad_directory_writes,
+        netdata_ad_replication_inbound_object_updates_remaining,
+        netdata_ad_replication_inbound_values_dns_only,
+        netdata_ad_replication_inbound_values_total,
+        netdata_ad_replication_outbound_objects_filtered,
+        netdata_ad_replication_outbound_objects,
+        netdata_ad_replication_outbound_properties,
+        netdata_ad_replication_outbound_values_dns_only,
+        netdata_ad_replication_outbound_values_total,
+        netdata_ad_replication_threads_getting_nc_changes,
+        netdata_ad_replication_threads_getting_nc_changes_holding_semaphore,
+        netdata_ad_transitive_operations,
+        netdata_ad_transitive_suboperations,
+        netdata_ad_replication_inbound_bytes_total,
+        netdata_ad_replication_outbound_bytes_total,
 
         // This must be the end
         NULL};
