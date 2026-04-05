@@ -125,8 +125,8 @@ func inferFDBPairwiseBridgeLinks(
 		return nil
 	}
 	sort.SliceStable(records, func(i, j int) bool {
-		li := portSortKey(records[i].designatedPort) + "|" + portSortKey(records[i].port)
-		lj := portSortKey(records[j].designatedPort) + "|" + portSortKey(records[j].port)
+		li := portSortKey(records[i].designatedPort) + keySep + portSortKey(records[i].port)
+		lj := portSortKey(records[j].designatedPort) + keySep + portSortKey(records[j].port)
 		return li < lj
 	})
 	return records

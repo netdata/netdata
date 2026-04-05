@@ -197,7 +197,11 @@ func subnetKey(network, netmask netip.Addr) string {
 	if !network.IsValid() || !netmask.IsValid() {
 		return ""
 	}
-	return network.String() + "|" + netmask.String()
+	// Unmap IPv4-mapped IPv6 addresses so that ::ffff:10.0.0.0 and 10.0.0.0
+	// produce the same key.
+	network = network.Unmap()
+	netmask = netmask.Unmap()
+	return network.String() + keySep + netmask.String()
 }
 
 func sortedSubnetworkKeys(subnets map[string]*SubNetwork) []string {

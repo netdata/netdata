@@ -3,7 +3,6 @@
 package engine
 
 import (
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -12,7 +11,7 @@ import (
 )
 
 func deviceIfNameKey(deviceID, ifName string) string {
-	return fmt.Sprintf("%s|%s", strings.TrimSpace(deviceID), strings.ToLower(strings.TrimSpace(ifName)))
+	return strings.TrimSpace(deviceID) + keySep + strings.ToLower(strings.TrimSpace(ifName))
 }
 
 func interfaceNameLookupAliases(values ...string) []string {

@@ -76,7 +76,7 @@ func topologyPortNeighborStatusKey(status topologyPortNeighborStatus) string {
 		remotePort,
 		remoteIP,
 		remoteChassisID,
-	}, "|")
+	}, keySep)
 }
 
 func sortedTopologyPortNeighbors(neighbors map[string]topologyPortNeighborStatus) []topologyPortNeighborStatus {

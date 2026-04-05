@@ -12,7 +12,7 @@ func bridgePortObservationKey(port bridgePortRef) string {
 	if base == "" {
 		return ""
 	}
-	return base + "|vlan:"
+	return base + keySep + "vlan:"
 }
 
 func bridgePortObservationVLANKey(port bridgePortRef) string {
@@ -20,7 +20,7 @@ func bridgePortObservationVLANKey(port bridgePortRef) string {
 	if base == "" {
 		return ""
 	}
-	return base + "|vlan:" + strings.ToLower(strings.TrimSpace(port.vlanID))
+	return base + keySep + "vlan:" + strings.ToLower(strings.TrimSpace(port.vlanID))
 }
 
 func bridgePortObservationBaseKey(port bridgePortRef) string {
@@ -29,14 +29,14 @@ func bridgePortObservationBaseKey(port bridgePortRef) string {
 		return ""
 	}
 	if port.ifIndex > 0 {
-		return deviceID + "|if:" + strconv.Itoa(port.ifIndex)
+		return deviceID + keySep + "if:" + strconv.Itoa(port.ifIndex)
 	}
 	name := firstNonEmpty(port.ifName, port.bridgePort)
 	name = normalizeInterfaceNameForLookup(name)
 	if name == "" {
 		return ""
 	}
-	return deviceID + "|name:" + name
+	return deviceID + keySep + "name:" + name
 }
 
 func addBridgePortObservationKeys(set map[string]struct{}, port bridgePortRef) {

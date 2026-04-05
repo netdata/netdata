@@ -39,8 +39,8 @@ func TestSubNetworkLifecycleAndHelpers(t *testing.T) {
 	require.Equal(t, []int{1, 2}, subnet.NodeIDs())
 	require.Equal(t, []int{2}, cloned.NodeIDs())
 
-	require.Equal(t, "192.0.2.0|255.255.255.252", subnet.key())
-	require.Equal(t, "192.0.2.0|255.255.255.252", subnetKey(subnet.Network(), subnet.Netmask()))
+	require.Equal(t, "192.0.2.0\x00255.255.255.252", subnet.key())
+	require.Equal(t, "192.0.2.0\x00255.255.255.252", subnetKey(subnet.Network(), subnet.Netmask()))
 	require.Equal(t, []string{"a", "b"}, sortedSubnetworkKeys(map[string]*SubNetwork{
 		"b": subnet,
 		"a": cloned,
@@ -158,22 +158,22 @@ func TestNodeTopologyServiceAndRouterTopology(t *testing.T) {
 	})
 
 	require.Equal(t, []string{
-		"192.168.1.0/24|192.168.1.0/24to:192.168.1.2->2|192.168.1.2",
-		"192.168.1.0/24|192.168.1.0/24to:192.168.1.3->3|192.168.1.3",
-		"1|10.0.0.1->2|10.0.0.2",
+		"1\x0010.0.0.1->2\x0010.0.0.2",
+		"192.168.1.0/24\x00192.168.1.0/24to:192.168.1.2->2\x00192.168.1.2",
+		"192.168.1.0/24\x00192.168.1.0/24to:192.168.1.3->3\x00192.168.1.3",
 	}, []string{
 		router.Edges[0].ID,
 		router.Edges[1].ID,
 		router.Edges[2].ID,
 	})
-	require.Equal(t, "192.168.1.0/24", router.Edges[0].SourcePort.Vertex)
+	require.Equal(t, "1", router.Edges[0].SourcePort.Vertex)
 	require.Equal(t, "2", router.Edges[0].TargetPort.Vertex)
-	require.Equal(t, "", router.Edges[0].SourcePort.IfName)
-	require.Equal(t, "eth3", router.Edges[0].TargetPort.IfName)
+	require.Equal(t, "eth1", router.Edges[0].SourcePort.IfName)
+	require.Equal(t, "eth2", router.Edges[0].TargetPort.IfName)
 	require.Equal(t, "192.168.1.0/24", router.Edges[1].SourcePort.Vertex)
-	require.Equal(t, "3", router.Edges[1].TargetPort.Vertex)
-	require.Equal(t, "1", router.Edges[2].SourcePort.Vertex)
-	require.Equal(t, "2", router.Edges[2].TargetPort.Vertex)
-	require.Equal(t, "eth1", router.Edges[2].SourcePort.IfName)
-	require.Equal(t, "eth2", router.Edges[2].TargetPort.IfName)
+	require.Equal(t, "2", router.Edges[1].TargetPort.Vertex)
+	require.Equal(t, "", router.Edges[1].SourcePort.IfName)
+	require.Equal(t, "eth3", router.Edges[1].TargetPort.IfName)
+	require.Equal(t, "192.168.1.0/24", router.Edges[2].SourcePort.Vertex)
+	require.Equal(t, "3", router.Edges[2].TargetPort.Vertex)
 }

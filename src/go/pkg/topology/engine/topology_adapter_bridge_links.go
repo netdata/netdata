@@ -61,8 +61,8 @@ func collectBridgeLinkRecords(
 	}
 
 	sort.SliceStable(records, func(i, j int) bool {
-		li := portSortKey(records[i].designatedPort) + "|" + portSortKey(records[i].port)
-		lj := portSortKey(records[j].designatedPort) + "|" + portSortKey(records[j].port)
+		li := portSortKey(records[i].designatedPort) + keySep + portSortKey(records[i].port)
+		lj := portSortKey(records[j].designatedPort) + keySep + portSortKey(records[j].port)
 		return li < lj
 	})
 	return records
@@ -105,8 +105,8 @@ func mergeBridgeLinkRecordSets(base, extra []bridgeBridgeLinkRecord) []bridgeBri
 		out = append(out, link)
 	}
 	sort.SliceStable(out, func(i, j int) bool {
-		li := portSortKey(out[i].designatedPort) + "|" + portSortKey(out[i].port)
-		lj := portSortKey(out[j].designatedPort) + "|" + portSortKey(out[j].port)
+		li := portSortKey(out[i].designatedPort) + keySep + portSortKey(out[i].port)
+		lj := portSortKey(out[j].designatedPort) + keySep + portSortKey(out[j].port)
 		return li < lj
 	})
 	return out
@@ -145,7 +145,7 @@ func collectBridgeMacLinkRecords(
 			}
 		}
 
-		key := portKey + "|" + endpointID + "|" + method
+		key := portKey + keySep + endpointID + keySep + method
 		if _, ok := seen[key]; ok {
 			continue
 		}

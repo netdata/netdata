@@ -45,7 +45,7 @@ func (b *segmentProjectionBuilder) emitLinks() {
 			if localPort == "" {
 				continue
 			}
-			edgeKey := segmentID + "|" + portID
+			edgeKey := segmentID + keySep + portID
 			if _, seen := b.deviceSegmentEdgeSeen[edgeKey]; seen {
 				continue
 			}
@@ -166,7 +166,7 @@ func (b *segmentProjectionBuilder) emitLinks() {
 				if ok {
 					localPort := bridgePortDisplay(owner.port)
 					if localPort != "" {
-						edgeKey := "direct|" + bridgePortObservationVLANKey(owner.port) + "|" + endpointID
+						edgeKey := "direct" + keySep + bridgePortObservationVLANKey(owner.port) + keySep + endpointID
 						if _, seen := b.endpointSegmentEdgeSeen[edgeKey]; !seen {
 							b.endpointSegmentEdgeSeen[edgeKey] = struct{}{}
 							metrics := map[string]any{
@@ -202,7 +202,7 @@ func (b *segmentProjectionBuilder) emitLinks() {
 				}
 			}
 
-			edgeKey := segmentID + "|" + endpointID
+			edgeKey := segmentID + keySep + endpointID
 			if _, seen := b.endpointSegmentEdgeSeen[edgeKey]; seen {
 				continue
 			}
