@@ -86,6 +86,10 @@ modules:
         - f5
         - big-ip
         - fireeye
+        - bluecoat
+        - proxysg
+        - sgos
+        - symantec
         - fortinet
         - fortigate
         - fortiswitch
@@ -174,6 +178,8 @@ modules:
           - **Automatic vendor/model detection**: Devices are matched to the right profile using selectors such as `sysObjectID` and `sysDescr`.
           - **ICMP ping**: Optional round-trip latency monitoring alongside SNMP, with a `ping_only` mode available.
           - **SNMP v1, v2c, and v3 support**: Fully implemented via the [gosnmp](https://github.com/gosnmp/gosnmp) library.
+          - **Shared device-level licensing metrics for supported profiles**: When a profile exposes license telemetry, Netdata emits compact per-device licensing charts for earliest expiry, license-state counts (`healthy`, `degraded`, `broken`, `ignored`), and highest usage pressure. Current branch coverage includes Check Point, Fortinet FortiGate contract/service/account expirations, Cisco traditional licensing end-date/remaining-time/state/usage telemetry, Cisco Smart Licensing authorization, certificate, evaluation, and state telemetry, Sophos Firewall subscription state/expiry telemetry, and Blue Coat ProxySG application/feature/component expiry, expire-type, and state telemetry.
+          - **Interactive licensing drill-down**: The `snmp:licenses` function follows the existing SNMP function pattern and shows normalized licensing rows for the selected SNMP job/device using cached collector data.
 
 
           **Built-in profiles for major vendors:**
@@ -181,7 +187,7 @@ modules:
           | Category | Vendors |
           |----------|---------|
           | Switches & Routers | Cisco (Catalyst, Nexus, ASR, ISR), Arista, Juniper, HP/HPE, Dell, Extreme |
-          | Firewalls | Palo Alto, Fortinet FortiGate, Cisco ASA, Checkpoint, SonicWall |
+          | Firewalls | Palo Alto, Fortinet FortiGate, Cisco ASA, Checkpoint, SonicWall, Sophos |
           | Wireless | Aruba, Cisco WLC, Ubiquiti, Alcatel-Lucent |
           | Load Balancers | F5 BIG-IP, Citrix NetScaler, A10 Thunder |
           | Infrastructure | APC UPS/PDU, Dell servers, plus standard MIBs (BGP, OSPF, TCP/UDP) |
@@ -513,7 +519,35 @@ modules:
                   - <<: *snmp_v3_job
                     name: switch3
                     hostname: 192.0.2.3
-    alerts: []
+    alerts:
+      - name: snmp_license_expiring
+        metric: snmp.license.remaining_time
+        info: "The earliest monitored SNMP license or subscription on this device is close to expiration."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf
+      - name: snmp_license_authorization_expiring
+        metric: snmp.license.authorization_remaining_time
+        info: "The license authorization timer on this device is close to expiration."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf
+      - name: snmp_license_certificate_expiring
+        metric: snmp.license.certificate_remaining_time
+        info: "The license certificate timer on this device is close to expiration."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf
+      - name: snmp_license_grace_period_ending
+        metric: snmp.license.grace_remaining_time
+        info: "The licensing grace or evaluation period on this device is ending or already expired."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf
+      - name: snmp_license_state_warning
+        metric: snmp.license.state
+        info: "One or more monitored licenses on this device are degraded, in grace, in evaluation, or otherwise in warning state."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf
+      - name: snmp_license_state_critical
+        metric: snmp.license.state
+        info: "One or more monitored licenses on this device are expired, invalid, unauthorized, or otherwise in critical state."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf
+      - name: snmp_license_usage_high
+        metric: snmp.license.usage_percent
+        info: "The most constrained monitored license pool on this device is nearing exhaustion."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf
     functions:
       description: |
         This collector exposes real-time functions for interactive troubleshooting in the Live tab.
@@ -641,12 +675,114 @@ modules:
             Exposes interface names, operational status, and traffic counters only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed
           availability: |
             Available when:<br/>• The collector has completed at least one data collection cycle<br/>• Interface data is cached from the last successful SNMP collection<br/>• Returns HTTP 503 if cache is not ready yet
+        - id: licenses
+          name: Licenses
+          description: |
+            Provides normalized licensing rows for the selected SNMP device.
+
+            This function reads the collector's cached licensing rows and shows one row per normalized license entry. It is the drill-down view behind the device-level licensing charts: expiry timers, authorization/certificate/grace timers, usage/capacity, raw vendor state, normalized state bucket, and operational impact.
+
+            It follows the same pattern as the SNMP `interfaces` function:
+            - the function itself is global for the SNMP collector
+            - the Live tab targets the selected SNMP job/device automatically using the standard SNMP function context
+            - the returned rows belong only to that selected device
+
+            Use cases:
+            - See which exact license rows make the device show degraded or broken counts
+            - Inspect expiry and grace timers for subscriptions, support, and smart-licensing signals
+            - Review usage/capacity for finite license pools on the selected device
+
+            Data is sourced from the last successful SNMP collection. No extra SNMP requests are triggered when calling this function.
+          parameters: []
+          returns:
+            description: Normalized licensing rows for the selected SNMP device. Each row represents one cached normalized licensing entry from the collector.
+            columns:
+              - name: License
+                type: string
+                unit: ""
+                description: Human-readable license row name, or the normalized license identifier when no name exists.
+              - name: ID
+                type: string
+                unit: ""
+                visibility: hidden
+                description: Stable row identifier used by the UI to track one normalized licensing row across updates.
+              - name: Bucket
+                type: string
+                unit: ""
+                description: "Normalized health bucket for the row: healthy, degraded, broken, or ignored."
+              - name: State
+                type: string
+                unit: ""
+                description: Raw vendor licensing state when the device exposes one.
+              - name: Component
+                type: string
+                unit: ""
+                description: Normalized component or area associated with the license row.
+              - name: Type
+                type: string
+                unit: ""
+                description: Normalized license type such as subscription, certificate, authorization, evaluation, or usage pool.
+              - name: Remaining
+                type: duration
+                unit: "milliseconds"
+                description: Time remaining until the row's primary expiry, when applicable.
+              - name: Expiry
+                type: timestamp
+                unit: ""
+                description: Absolute expiry time for the row, when known.
+              - name: Usage
+                type: integer
+                unit: "licenses"
+                description: Used license units for finite pools.
+              - name: Capacity
+                type: integer
+                unit: "licenses"
+                description: Total capacity for finite license pools.
+              - name: Usage %
+                type: float
+                unit: "percentage"
+                description: Usage pressure for finite license pools.
+              - name: Impact
+                type: string
+                unit: ""
+                description: Operational impact text when the vendor or profile provides it.
+          performance: |
+            Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many licensing rows may return many rows
+          security: |
+            Exposes licensing names, states, timers, counts, and impact notes only:<br/>• No credentials or secrets are exposed<br/>• No device configuration is modified
+          availability: |
+            Available when:<br/>• The collector has completed at least one licensing-aware data collection cycle<br/>• Licensing data is cached from the last successful SNMP collection<br/>• Returns HTTP 503 if cache is not ready yet
     metrics:
       folding:
         title: Metrics
         enabled: false
       description: |
         Metrics and charts are **defined by the matched SNMP profile(s)** at runtime. They differ by vendor/model/OS and may include, for example, interface counters, optics, CPU/memory, temperature, VLANs, and more. Use the **Metrics** tab on the device’s dashboard to see exactly what is collected for that device.
+
+        Supported licensing profiles also emit a small set of shared **device-level licensing contexts**:
+
+        - `snmp.license.remaining_time`: earliest remaining time to expiry across monitored licenses and subscriptions on the device
+        - `snmp.license.authorization_remaining_time`: earliest remaining time for license authorization timers
+        - `snmp.license.certificate_remaining_time`: earliest remaining time for licensing certificate timers
+        - `snmp.license.grace_remaining_time`: earliest remaining time for grace or evaluation timers
+        - `snmp.license.usage_percent`: highest license pool pressure across finite usage pools on the device
+        - `snmp.license.state`: count of licensing rows on the device by normalized state bucket (`healthy`, `degraded`, `broken`, `ignored`)
+
+        The licensing charts are intentionally aggregated to keep one clean device view:
+
+        - Netdata reports the **earliest** expiry-related deadline on the device.
+        - Netdata reports how many licensing rows are **healthy**, **degraded**, **broken**, and **ignored** on the device.
+        - Netdata reports the **highest** usage pressure across finite license pools on the device.
+
+        Licensing support is intentionally conditional:
+
+        - licensing charts appear only for devices whose matched SNMP profile exposes licensing telemetry
+        - not every supported device exposes all licensing dimensions
+        - `remaining_time` and related time charts appear only when the device exposes expiry-like timers
+        - `usage_percent` appears only when the device exposes finite usage and capacity data
+        - `snmp.license.state` appears only when the device exposes enough state/compliance/validity data to normalize rows
+
+        Default alerts from `src/health/health.d/snmp.conf` use `30d/7d` for expiry-related timers, `7d/0d` for grace timers, and `80/95` for usage pressure. You can override them like any other Netdata health configuration.
 
         :::tip
 
@@ -656,7 +792,52 @@ modules:
 
         If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided (or exclusively, when `ping_only: true`).
       availability: []
-      scopes: []
+      scopes:
+        - name: device licensing
+          description: Shared device-level licensing health metrics emitted when the matched SNMP profile provides licensing telemetry. Current branch coverage includes Check Point, Fortinet FortiGate contract/service/account expirations, Cisco traditional licensing end-date/remaining-time/state/usage telemetry, Cisco Smart Licensing authorization, certificate, evaluation, and state telemetry, Sophos Firewall subscription state/expiry telemetry, and Blue Coat ProxySG application/feature/component expiry, expire-type, and state telemetry.
+          labels:
+            - name: component
+              description: Always `licensing` for the shared SNMP licensing charts.
+          metrics:
+            - name: snmp.license.remaining_time
+              description: Earliest remaining time to expiry across monitored licenses and subscriptions on the device.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: remaining_time
+            - name: snmp.license.authorization_remaining_time
+              description: Earliest remaining time for licensing authorization timers on the device.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: remaining_time
+            - name: snmp.license.certificate_remaining_time
+              description: Earliest remaining time for licensing certificate timers on the device.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: remaining_time
+            - name: snmp.license.grace_remaining_time
+              description: Earliest remaining time for licensing grace or evaluation timers on the device.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: remaining_time
+            - name: snmp.license.usage_percent
+              description: Highest usage pressure across finite licensing pools on the device.
+              unit: percentage
+              chart_type: area
+              dimensions:
+                - name: usage_percent
+            - name: snmp.license.state
+              description: "Count of licensing rows on the device by normalized state bucket: healthy, degraded, broken, and ignored."
+              unit: licenses
+              chart_type: stacked
+              dimensions:
+                - name: healthy
+                - name: degraded
+                - name: broken
+                - name: ignored
     troubleshooting:
       problems:
         list:

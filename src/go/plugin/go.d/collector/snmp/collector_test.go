@@ -6,8 +6,10 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
@@ -343,6 +345,359 @@ func TestCollector_Collect(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
+}
+
+func TestCollector_Collect_LicensingAggregation(t *testing.T) {
+	mockCtl := gomock.NewController(t)
+	defer mockCtl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(mockCtl)
+	setMockClientInitExpect(mockSNMP)
+	setMockClientSysInfoExpect(mockSNMP)
+
+	expiry := time.Now().UTC().Add(48 * time.Hour).Unix()
+
+	collr := New()
+	collr.Config = prepareV2Config()
+	collr.CreateVnode = false
+	collr.Ping.Enabled = false
+	collr.snmpProfiles = []*ddsnmp.Profile{{}}
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		pm := &ddsnmp.ProfileMetrics{
+			Source: "checkpoint.yaml",
+			HiddenMetrics: []ddsnmp.Metric{
+				{
+					Name:  licenseSourceMetricName,
+					Value: 17,
+					Tags: map[string]string{
+						tagLicenseID:          "17",
+						tagLicenseName:        "Application Control",
+						tagLicenseStateRaw:    "about-to-expire",
+						tagLicenseExpiryRaw:   strconv.FormatInt(expiry, 10),
+						tagLicenseUsageRaw:    "95",
+						tagLicenseCapacityRaw: "100",
+					},
+				},
+			},
+		}
+		for i := range pm.HiddenMetrics {
+			pm.HiddenMetrics[i].Profile = pm
+		}
+		return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{pm}}
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+	_ = collr.Check(context.Background())
+
+	got := collr.Collect(context.Background())
+	require.NotNil(t, got)
+
+	assert.EqualValues(t, 0, got[metricIDLicenseStateHealthy])
+	assert.EqualValues(t, 1, got[metricIDLicenseStateDegraded])
+	assert.EqualValues(t, 0, got[metricIDLicenseStateBroken])
+	assert.EqualValues(t, 0, got[metricIDLicenseStateIgnored])
+	assert.EqualValues(t, 95, got[metricIDLicenseUsagePercent])
+	assert.GreaterOrEqual(t, got[metricIDLicenseRemainingTime], int64((48*time.Hour/time.Second)-5))
+	assert.LessOrEqual(t, got[metricIDLicenseRemainingTime], int64(48*time.Hour/time.Second))
+	assert.Contains(t, got, "snmp_device_prof_checkpoint_stats_metrics_table")
+}
+
+func TestCollector_Collect_LicensingAggregation_CiscoSmartPartialData(t *testing.T) {
+	mockCtl := gomock.NewController(t)
+	defer mockCtl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(mockCtl)
+	setMockClientInitExpect(mockSNMP)
+	setMockClientSysInfoExpect(mockSNMP)
+
+	authExpiry := time.Now().UTC().Add(48 * time.Hour).Unix()
+	certExpiry := time.Now().UTC().Add(72 * time.Hour).Unix()
+
+	collr := New()
+	collr.Config = prepareV2Config()
+	collr.CreateVnode = false
+	collr.Ping.Enabled = false
+	collr.snmpProfiles = []*ddsnmp.Profile{{}}
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		pm := &ddsnmp.ProfileMetrics{
+			Source: "cisco.yaml",
+			HiddenMetrics: []ddsnmp.Metric{
+				{
+					Name:  licenseSourceMetricName,
+					Value: 2,
+					StaticTags: map[string]string{
+						tagLicenseID:        "smart_authorization_state",
+						tagLicenseName:      "Smart Licensing authorization state",
+						tagLicenseComponent: "smart_licensing",
+						tagLicenseType:      "authorization",
+						tagLicenseValueKind: licenseValueKindStateSeverity,
+					},
+				},
+				{
+					Name:  licenseSourceMetricName,
+					Value: authExpiry,
+					StaticTags: map[string]string{
+						tagLicenseID:                  "smart_authorization_expiry",
+						tagLicenseName:                "Smart Licensing authorization",
+						tagLicenseComponent:           "smart_licensing",
+						tagLicenseType:                "authorization",
+						tagLicenseValueKind:           licenseValueKindAuthorizationTimestamp,
+						tagLicenseAuthorizationSource: "ciscoSlaAuthExpireTime",
+					},
+				},
+				{
+					Name:  licenseSourceMetricName,
+					Value: certExpiry,
+					StaticTags: map[string]string{
+						tagLicenseID:                "smart_id_certificate_expiry",
+						tagLicenseName:              "Smart Licensing ID certificate",
+						tagLicenseComponent:         "smart_licensing",
+						tagLicenseType:              "certificate",
+						tagLicenseValueKind:         licenseValueKindCertificateTimestamp,
+						tagLicenseCertificateSource: "ciscoSlaNextCertificateExpireTime",
+					},
+				},
+				{
+					Name:  licenseSourceMetricName,
+					Value: 1,
+					Tags: map[string]string{
+						tagLicenseID:               "dna_advantage",
+						tagLicenseName:             "network-advantage",
+						tagLicenseStateRaw:         "authorization_expired",
+						tagLicenseStateSeverityRaw: "2",
+						tagLicenseUsageRaw:         "42",
+					},
+					StaticTags: map[string]string{
+						tagLicenseComponent: "smart_licensing",
+						tagLicenseType:      "entitlement",
+					},
+				},
+			},
+		}
+		for i := range pm.HiddenMetrics {
+			pm.HiddenMetrics[i].Profile = pm
+		}
+		return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{pm}}
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+	_ = collr.Check(context.Background())
+
+	got := collr.Collect(context.Background())
+	require.NotNil(t, got)
+
+	assert.EqualValues(t, 2, got[metricIDLicenseStateHealthy])
+	assert.EqualValues(t, 0, got[metricIDLicenseStateDegraded])
+	assert.EqualValues(t, 2, got[metricIDLicenseStateBroken])
+	assert.EqualValues(t, 0, got[metricIDLicenseStateIgnored])
+	assert.GreaterOrEqual(t, got[metricIDLicenseAuthorizationRemainingTime], int64((48*time.Hour/time.Second)-5))
+	assert.LessOrEqual(t, got[metricIDLicenseAuthorizationRemainingTime], int64(48*time.Hour/time.Second))
+	assert.GreaterOrEqual(t, got[metricIDLicenseCertificateRemainingTime], int64((72*time.Hour/time.Second)-5))
+	assert.LessOrEqual(t, got[metricIDLicenseCertificateRemainingTime], int64(72*time.Hour/time.Second))
+	assert.NotContains(t, got, metricIDLicenseRemainingTime)
+	assert.NotContains(t, got, metricIDLicenseGraceRemainingTime)
+	assert.NotContains(t, got, metricIDLicenseUsagePercent)
+}
+
+func TestCollector_Collect_LicensingAggregation_CiscoTraditional(t *testing.T) {
+	mockCtl := gomock.NewController(t)
+	defer mockCtl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(mockCtl)
+	setMockClientInitExpect(mockSNMP)
+	setMockClientSysInfoExpect(mockSNMP)
+
+	expiry := time.Now().UTC().Add(72 * time.Hour).Unix()
+
+	collr := New()
+	collr.Config = prepareV2Config()
+	collr.CreateVnode = false
+	collr.Ping.Enabled = false
+	collr.snmpProfiles = []*ddsnmp.Profile{{}}
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		pm := &ddsnmp.ProfileMetrics{
+			Source: "cisco.yaml",
+			HiddenMetrics: []ddsnmp.Metric{
+				{
+					Name:  licenseSourceMetricName,
+					Value: 0,
+					Tags: map[string]string{
+						tagLicenseID:           "17",
+						tagLicenseName:         "SECURITYK9",
+						tagLicenseType:         "paid_subscription",
+						tagLicenseExpiryRaw:    strconv.FormatInt(expiry, 10),
+						tagLicenseCapacityRaw:  "100",
+						tagLicenseAvailableRaw: "15",
+						tagLicenseStateRaw:     "in_use",
+					},
+				},
+				{
+					Name:  licenseSourceMetricName,
+					Value: 3600,
+					Tags: map[string]string{
+						tagLicenseID:               "23",
+						tagLicenseName:             "APPXK9",
+						tagLicenseType:             "grace_period",
+						tagLicenseCapacityRaw:      "10",
+						tagLicenseAvailableRaw:     "0",
+						tagLicenseStateRaw:         "usage_count_consumed",
+						tagLicenseStateSeverityRaw: "2",
+						tagLicenseValueKind:        licenseValueKindExpiryRemaining,
+						tagLicenseComponent:        "traditional_licensing",
+					},
+				},
+			},
+		}
+		for i := range pm.HiddenMetrics {
+			pm.HiddenMetrics[i].Profile = pm
+		}
+		return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{pm}}
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+	_ = collr.Check(context.Background())
+
+	got := collr.Collect(context.Background())
+	require.NotNil(t, got)
+
+	assert.EqualValues(t, 1, got[metricIDLicenseStateHealthy])
+	assert.EqualValues(t, 0, got[metricIDLicenseStateDegraded])
+	assert.EqualValues(t, 1, got[metricIDLicenseStateBroken])
+	assert.EqualValues(t, 0, got[metricIDLicenseStateIgnored])
+	assert.EqualValues(t, 100, got[metricIDLicenseUsagePercent])
+	assert.GreaterOrEqual(t, got[metricIDLicenseRemainingTime], int64((time.Hour/time.Second)-5))
+	assert.LessOrEqual(t, got[metricIDLicenseRemainingTime], int64(time.Hour/time.Second))
+}
+
+func TestCollector_Collect_LicensingAggregation_SelectsWorstCaseAcrossMixedRows(t *testing.T) {
+	mockCtl := gomock.NewController(t)
+	defer mockCtl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(mockCtl)
+	setMockClientInitExpect(mockSNMP)
+	setMockClientSysInfoExpect(mockSNMP)
+
+	now := time.Now().UTC()
+	perpetualExpiry := now.Add(30 * time.Minute).Unix()
+	earliestRealExpiry := now.Add(6 * time.Hour).Unix()
+	authExpiry := now.Add(30 * time.Hour).Unix()
+	certExpiry := now.Add(20 * time.Hour).Unix()
+	graceExpiry := now.Add(10 * time.Hour).Unix()
+
+	collr := New()
+	collr.Config = prepareV2Config()
+	collr.CreateVnode = false
+	collr.Ping.Enabled = false
+	collr.snmpProfiles = []*ddsnmp.Profile{{}}
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		pm := &ddsnmp.ProfileMetrics{
+			Source: "mixed-licensing.yaml",
+			HiddenMetrics: []ddsnmp.Metric{
+				{
+					Name:  licenseSourceMetricName,
+					Value: 0,
+					Tags: map[string]string{
+						tagLicenseID:          "perpetual",
+						tagLicenseName:        "Perpetual base",
+						tagLicenseExpiryRaw:   strconv.FormatInt(perpetualExpiry, 10),
+						tagLicensePerpetual:   "true",
+						tagLicenseStateRaw:    "active",
+						tagLicenseUsageRaw:    "50",
+						tagLicenseCapacityRaw: "100",
+					},
+				},
+				{
+					Name:  licenseSourceMetricName,
+					Value: 0,
+					Tags: map[string]string{
+						tagLicenseID:          "soonest_expiring",
+						tagLicenseName:        "Threat prevention",
+						tagLicenseExpiryRaw:   strconv.FormatInt(earliestRealExpiry, 10),
+						tagLicenseStateRaw:    "about-to-expire",
+						tagLicenseUsageRaw:    "90",
+						tagLicenseCapacityRaw: "100",
+					},
+				},
+				{
+					Name:  licenseSourceMetricName,
+					Value: 0,
+					Tags: map[string]string{
+						tagLicenseID:                  "auth",
+						tagLicenseName:                "Smart auth",
+						tagLicenseAuthorizationRaw:    strconv.FormatInt(authExpiry, 10),
+						tagLicenseAuthorizationSource: "auth_timer",
+					},
+				},
+				{
+					Name:  licenseSourceMetricName,
+					Value: 0,
+					Tags: map[string]string{
+						tagLicenseID:                "cert",
+						tagLicenseName:              "Smart cert",
+						tagLicenseCertificateRaw:    strconv.FormatInt(certExpiry, 10),
+						tagLicenseCertificateSource: "cert_timer",
+					},
+				},
+				{
+					Name:  licenseSourceMetricName,
+					Value: 0,
+					Tags: map[string]string{
+						tagLicenseID:               "grace",
+						tagLicenseName:             "Eval grace",
+						tagLicenseGraceRaw:         strconv.FormatInt(graceExpiry, 10),
+						tagLicenseStateSeverityRaw: "1",
+					},
+				},
+				{
+					Name:  licenseSourceMetricName,
+					Value: 0,
+					Tags: map[string]string{
+						tagLicenseID:               "broken",
+						tagLicenseName:             "Broken feature",
+						tagLicenseStateSeverityRaw: "2",
+					},
+				},
+				{
+					Name:  licenseSourceMetricName,
+					Value: 0,
+					Tags: map[string]string{
+						tagLicenseID:              "unlimited",
+						tagLicenseName:            "Unlimited pool",
+						tagLicenseUsagePercentRaw: "100",
+						tagLicenseUnlimited:       "true",
+					},
+				},
+			},
+		}
+		for i := range pm.HiddenMetrics {
+			pm.HiddenMetrics[i].Profile = pm
+		}
+		return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{pm}}
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+	_ = collr.Check(context.Background())
+
+	got := collr.Collect(context.Background())
+	require.NotNil(t, got)
+
+	assert.EqualValues(t, 4, got[metricIDLicenseStateHealthy])
+	assert.EqualValues(t, 2, got[metricIDLicenseStateDegraded])
+	assert.EqualValues(t, 1, got[metricIDLicenseStateBroken])
+	assert.EqualValues(t, 0, got[metricIDLicenseStateIgnored])
+	assert.EqualValues(t, 90, got[metricIDLicenseUsagePercent])
+	assert.GreaterOrEqual(t, got[metricIDLicenseRemainingTime], int64((6*time.Hour/time.Second)-5))
+	assert.LessOrEqual(t, got[metricIDLicenseRemainingTime], int64(6*time.Hour/time.Second))
+	assert.GreaterOrEqual(t, got[metricIDLicenseAuthorizationRemainingTime], int64((30*time.Hour/time.Second)-5))
+	assert.LessOrEqual(t, got[metricIDLicenseAuthorizationRemainingTime], int64(30*time.Hour/time.Second))
+	assert.GreaterOrEqual(t, got[metricIDLicenseCertificateRemainingTime], int64((20*time.Hour/time.Second)-5))
+	assert.LessOrEqual(t, got[metricIDLicenseCertificateRemainingTime], int64(20*time.Hour/time.Second))
+	assert.GreaterOrEqual(t, got[metricIDLicenseGraceRemainingTime], int64((10*time.Hour/time.Second)-5))
+	assert.LessOrEqual(t, got[metricIDLicenseGraceRemainingTime], int64(10*time.Hour/time.Second))
 }
 
 type mockDdSnmpCollector struct {

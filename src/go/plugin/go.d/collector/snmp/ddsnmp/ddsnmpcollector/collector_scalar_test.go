@@ -103,6 +103,67 @@ func TestScalarCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
+		"scalar metric with dynamic metric tags": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Symbol: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.2604.5.1.5.1.1.0",
+								Name: "_license_row",
+								Mapping: map[string]string{
+									"1": "1",
+									"4": "2",
+								},
+							},
+							StaticTags: []ddprofiledefinition.StaticMetricTagConfig{
+								{Tag: "_license_id", Value: "base_firewall"},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Tag: "license_state",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID: "1.3.6.1.4.1.2604.5.1.5.1.1.0",
+									},
+									Mapping: map[string]string{
+										"1": "trial",
+										"4": "expired",
+									},
+								},
+								{
+									Tag: "license_expiry",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID: "1.3.6.1.4.1.2604.5.1.5.1.2.0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.2604.5.1.5.1.1.0", "1.3.6.1.4.1.2604.5.1.5.1.2.0"}, []gosnmp.SnmpPDU{
+					createIntegerPDU("1.3.6.1.4.1.2604.5.1.5.1.1.0", 4),
+					createStringPDU("1.3.6.1.4.1.2604.5.1.5.1.2.0", "11 Nov 2031"),
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:       "_license_row",
+					Value:      2,
+					MetricType: "gauge",
+					Tags: map[string]string{
+						"license_state":  "expired",
+						"license_expiry": "11 Nov 2031",
+					},
+					StaticTags: map[string]string{
+						"_license_id": "base_firewall",
+					},
+				},
+			},
+			expectedError: false,
+		},
 		"OID not found - returns empty metrics": {
 			profile: createTestProfile("test-profile.yaml", []ddprofiledefinition.MetricsConfig{
 				createScalarMetric("1.3.6.1.2.1.1.3.0", "sysUpTime"),
@@ -728,4 +789,32 @@ func TestScalarCollector_Collect(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestScalarCollector_IdentifyScalarOIDs_SkipsTagOIDsWhenPrimaryOIDIsKnownMissing(t *testing.T) {
+	sc := &scalarCollector{
+		missingOIDs: map[string]bool{
+			"1.3.6.1.4.1.2604.5.1.5.1.1.0": true,
+		},
+	}
+
+	oids, missing := sc.identifyScalarOIDs([]ddprofiledefinition.MetricsConfig{
+		{
+			Symbol: ddprofiledefinition.SymbolConfig{
+				OID:  "1.3.6.1.4.1.2604.5.1.5.1.1.0",
+				Name: "_license_row",
+			},
+			MetricTags: []ddprofiledefinition.MetricTagConfig{
+				{
+					Tag: "license_state",
+					Symbol: ddprofiledefinition.SymbolConfigCompat{
+						OID: "1.3.6.1.4.1.2604.5.1.5.1.2.0",
+					},
+				},
+			},
+		},
+	})
+
+	assert.Empty(t, oids)
+	assert.Equal(t, []string{"1.3.6.1.4.1.2604.5.1.5.1.1.0"}, missing)
 }

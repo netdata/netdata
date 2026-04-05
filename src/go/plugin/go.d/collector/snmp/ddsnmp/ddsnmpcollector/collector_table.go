@@ -51,7 +51,6 @@ func (tc *tableCollector) collect(prof *ddsnmp.Profile, stats *ddsnmp.Collection
 }
 
 // tableWalkResult holds the walked data for a single table
-// tableWalkResult holds the walked data for a single table
 type tableWalkResult struct {
 	// tableOID is the base OID of the table (e.g., "1.3.6.1.2.1.2.2" for ifTable)
 	// Used to identify which table this result belongs to
@@ -490,23 +489,22 @@ func (tc *tableCollector) collectWithCache(ctx *cacheProcessingContext, stats *d
 		}
 	}
 
-	if len(oidsToGet) == 0 {
-		return nil, nil
+	ctx.pdus = make(map[string]gosnmp.SnmpPDU)
+	if len(oidsToGet) > 0 {
+		// GET current values
+		pdus, err := tc.snmpGet(oidsToGet, stats)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get cached OIDs: %w", err)
+		}
+
+		// Validate response
+		if len(pdus) < len(oidsToGet)/2 {
+			return nil, fmt.Errorf("table structure may have changed, got %d/%d PDUs", len(pdus), len(oidsToGet))
+		}
+
+		ctx.pdus = pdus
 	}
 
-	// GET current values
-	pdus, err := tc.snmpGet(oidsToGet, stats)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get cached OIDs: %w", err)
-	}
-
-	// Validate response
-	if len(pdus) < len(oidsToGet)/2 {
-		return nil, fmt.Errorf("table structure may have changed, got %d/%d PDUs", len(pdus), len(oidsToGet))
-	}
-
-	// Add PDUs to context and build metrics
-	ctx.pdus = pdus
 	return tc.buildMetricsFromCache(ctx, stats)
 }
 
@@ -521,6 +519,21 @@ func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext, sta
 		rowTags := make(map[string]string)
 		if tags, ok := ctx.cachedTags[index]; ok {
 			maps.Copy(rowTags, tags)
+		}
+
+		for _, sym := range ctx.config.Symbols {
+			if !sym.ConstantValueOne {
+				continue
+			}
+
+			metric, err := buildTableMetric(sym, gosnmp.SnmpPDU{Type: gosnmp.Gauge32, Value: uint(1)}, 1, rowTags, staticTags, ctx.tableName)
+			if err != nil {
+				stats.Errors.Processing.Table++
+				errs = append(errs, err)
+				continue
+			}
+
+			metrics = append(metrics, *metric)
 		}
 
 		// Process each metric column
@@ -636,6 +649,9 @@ func parseStaticTags(staticTags []ddprofiledefinition.StaticMetricTagConfig) map
 func buildColumnOIDs(cfg ddprofiledefinition.MetricsConfig) map[string]ddprofiledefinition.SymbolConfig {
 	columnOIDs := make(map[string]ddprofiledefinition.SymbolConfig)
 	for _, sym := range cfg.Symbols {
+		if sym.OID == "" {
+			continue
+		}
 		columnOIDs[trimOID(sym.OID)] = sym
 	}
 	return columnOIDs

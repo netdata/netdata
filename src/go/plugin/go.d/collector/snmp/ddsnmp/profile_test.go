@@ -174,6 +174,44 @@ func Test_FindProfiles(t *testing.T) {
 	}
 }
 
+func TestProfile_removeConstantMetrics_PreservesHiddenTableHelpers(t *testing.T) {
+	prof := &Profile{
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Metrics: []ddprofiledefinition.MetricsConfig{
+				{
+					Table: ddprofiledefinition.SymbolConfig{
+						OID:  "1.2.5",
+						Name: "helperTable",
+					},
+					Symbols: []ddprofiledefinition.SymbolConfig{
+						{
+							OID:              "1.2.5.1.1",
+							Name:             "visible_table_helper",
+							ConstantValueOne: true,
+						},
+						{
+							OID:              "1.2.5.1.2",
+							Name:             "_hidden_table_helper",
+							ConstantValueOne: true,
+						},
+						{
+							OID:  "1.2.5.1.3",
+							Name: "real_metric",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	prof.removeConstantMetrics()
+
+	require.Len(t, prof.Definition.Metrics, 1)
+	require.Len(t, prof.Definition.Metrics[0].Symbols, 2)
+	assert.Equal(t, "_hidden_table_helper", prof.Definition.Metrics[0].Symbols[0].Name)
+	assert.Equal(t, "real_metric", prof.Definition.Metrics[0].Symbols[1].Name)
+}
+
 func Test_Profile_merge(t *testing.T) {
 	profiles := FindProfiles("1.3.6.1.4.1.9.1.1216", "", nil) // cisco-nexus
 

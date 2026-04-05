@@ -68,6 +68,119 @@ metadata:
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/fortinet/FORTINET-FORTIGATE-MIB
 
 metrics:
+  # Licensing
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.4.6.3.1.2
+      name: fgLicContractTable
+    disable_table_cache: true
+    symbols:
+      - name: _license_row
+        constant_value_one: true
+        metric_type: gauge
+        chart_meta:
+          description: Hidden licensing row helper
+          family: 'Internal/Licensing'
+          unit: "{row}"
+    static_tags:
+      - tag: _license_type
+        value: contract
+      - tag: _license_component
+        value: device
+      - tag: _license_expiry_source
+        value: fgLicContractExpiry
+    metric_tags:
+      - tag: _license_index
+        index: 1
+      - tag: _license_id
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.1.2.1.1
+          name: fgLicContractDesc
+      - tag: _license_name
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.1.2.1.1
+          name: fgLicContractDesc
+      - tag: _license_expiry_raw
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.1.2.1.2
+          name: fgLicContractExpiry
+
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2
+      name: fgLicVersionTable
+    disable_table_cache: true
+    symbols:
+      - name: _license_row
+        constant_value_one: true
+        metric_type: gauge
+        chart_meta:
+          description: Hidden licensing row helper
+          family: 'Internal/Licensing'
+          unit: "{row}"
+    static_tags:
+      - tag: _license_type
+        value: service
+      - tag: _license_component
+        value: fortiguard
+      - tag: _license_expiry_source
+        value: fgLicVersionExpiry
+    metric_tags:
+      - tag: _license_index
+        index: 1
+      - tag: _license_id
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.1
+          name: fgLicVersionDesc
+      - tag: _license_name
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.1
+          name: fgLicVersionDesc
+      - tag: _license_feature
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.3
+          name: fgLicVersionNumber
+      - tag: _license_expiry_raw
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.2.2.1.2
+          name: fgLicVersionExpiry
+
+  - MIB: FORTINET-FORTIGATE-MIB
+    table:
+      OID: 1.3.6.1.4.1.12356.101.4.6.3.3.2
+      name: fgLicAlContractTable
+    disable_table_cache: true
+    symbols:
+      - name: _license_row
+        constant_value_one: true
+        metric_type: gauge
+        chart_meta:
+          description: Hidden licensing row helper
+          family: 'Internal/Licensing'
+          unit: "{row}"
+    static_tags:
+      - tag: _license_type
+        value: account_contract
+      - tag: _license_component
+        value: account
+      - tag: _license_expiry_source
+        value: fgLicAlContractExpiry
+    metric_tags:
+      - tag: _license_index
+        index: 1
+      - tag: _license_id
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.3.2.1.1
+          name: fgLicAlContractDesc
+      - tag: _license_name
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.3.2.1.1
+          name: fgLicAlContractDesc
+      - tag: _license_expiry_raw
+        symbol:
+          OID: 1.3.6.1.4.1.12356.101.4.6.3.3.2.1.2
+          name: fgLicAlContractExpiry
+
   ### VPN
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:

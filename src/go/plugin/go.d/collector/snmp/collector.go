@@ -71,7 +71,8 @@ func New() *Collector {
 		seenTableMetrics:  make(map[string]bool),
 		seenProfiles:      make(map[string]bool),
 
-		ifaceCache: newIfaceCache(),
+		ifaceCache:   newIfaceCache(),
+		licenseCache: newLicenseCache(),
 
 		newProber:     ping.NewProber,
 		newSnmpClient: gosnmp.NewHandler,
@@ -80,7 +81,7 @@ func New() *Collector {
 		},
 	}
 
-	c.funcRouter = newFuncRouter(c.ifaceCache)
+	c.funcRouter = newFuncRouter(c.ifaceCache, c.licenseCache)
 
 	return c
 }
@@ -97,8 +98,9 @@ type (
 		seenTableMetrics  map[string]bool
 		seenProfiles      map[string]bool
 
-		ifaceCache *ifaceCache // interface metrics cache for functions
-		funcRouter *funcRouter // function router for method handlers
+		ifaceCache   *ifaceCache   // interface metrics cache for functions
+		licenseCache *licenseCache // licensing rows cache for future drill-down functions
+		funcRouter   *funcRouter   // function router for method handlers
 
 		prober    ping.Prober
 		newProber func(ping.ProberConfig, *logger.Logger) ping.Prober

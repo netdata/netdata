@@ -62,8 +62,9 @@ func (mb *metricBuilder) build() ddsnmp.Metric {
 	return mb.metric
 }
 
-func buildScalarMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, value int64, staticTags map[string]string) (*ddsnmp.Metric, error) {
+func buildScalarMetric(cfg ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU, value int64, tags, staticTags map[string]string) (*ddsnmp.Metric, error) {
 	metric := newMetricBuilder(cfg.Name, value).
+		withTags(tags).
 		withStaticTags(staticTags).
 		fromSymbol(cfg, pdu).
 		build()

@@ -58,6 +58,9 @@ type MetricsConfig struct {
 	// `static_tags` is not exposed as json at the moment since we need to evaluate if we want to expose it via UI
 	StaticTags []StaticMetricTagConfig `yaml:"static_tags,omitempty" json:"-"`
 	MetricTags MetricTagConfigList     `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
+	// DisableTableCache forces a fresh walk for this table on every collection.
+	// Use it for volatile rows where cached structure/tags would serve stale results.
+	DisableTableCache bool `yaml:"disable_table_cache,omitempty" json:"disable_table_cache,omitempty"`
 
 	Options MetricsConfigOption `yaml:"options,omitempty" json:"options"`
 
@@ -72,13 +75,14 @@ type MetricsConfig struct {
 // Clone duplicates this MetricsConfig
 func (m MetricsConfig) Clone() MetricsConfig {
 	return MetricsConfig{
-		MIB:        m.MIB,
-		Table:      m.Table.Clone(),
-		Symbol:     m.Symbol.Clone(),
-		Symbols:    cloneSlice(m.Symbols),
-		StaticTags: slices.Clone(m.StaticTags),
-		MetricTags: cloneSlice(m.MetricTags),
-		Options:    m.Options,
+		MIB:               m.MIB,
+		Table:             m.Table.Clone(),
+		Symbol:            m.Symbol.Clone(),
+		Symbols:           cloneSlice(m.Symbols),
+		StaticTags:        slices.Clone(m.StaticTags),
+		MetricTags:        cloneSlice(m.MetricTags),
+		DisableTableCache: m.DisableTableCache,
+		Options:           m.Options,
 
 		OID:        m.OID,
 		Name:       m.Name,

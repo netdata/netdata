@@ -5,6 +5,7 @@ package ddsnmpcollector
 import (
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
@@ -104,6 +105,20 @@ func createCounter64PDU(name string, value uint64) gosnmp.SnmpPDU {
 
 func createGauge32PDU(name string, value uint) gosnmp.SnmpPDU {
 	return createPDU(name, gosnmp.Gauge32, value)
+}
+
+func createDateAndTimePDU(name string, value time.Time) gosnmp.SnmpPDU {
+	value = value.UTC()
+	return createPDU(name, gosnmp.OctetString, []byte{
+		byte(value.Year() >> 8),
+		byte(value.Year()),
+		byte(value.Month()),
+		byte(value.Day()),
+		byte(value.Hour()),
+		byte(value.Minute()),
+		byte(value.Second()),
+		byte(value.Nanosecond() / 100_000_000),
+	})
 }
 
 func createTimeTicksPDU(name string, value uint32) gosnmp.SnmpPDU {

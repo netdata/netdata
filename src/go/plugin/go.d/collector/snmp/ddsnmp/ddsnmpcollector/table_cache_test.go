@@ -194,6 +194,45 @@ func TestTableCacheMultipleConfigs(t *testing.T) {
 	assert.Equal(t, cachedOIDs1, cachedOIDs1Reordered)
 }
 
+func TestTableCacheDisableTableCache(t *testing.T) {
+	cache := newTableCache(1*time.Hour, 0)
+
+	cfg := ddprofiledefinition.MetricsConfig{
+		Table: ddprofiledefinition.SymbolConfig{
+			OID:  "1.3.6.1.2.1.2.2",
+			Name: "ifTable",
+		},
+		Symbols: []ddprofiledefinition.SymbolConfig{
+			{
+				OID:  "1.3.6.1.2.1.2.2.1.10",
+				Name: "ifInOctets",
+			},
+		},
+		DisableTableCache: true,
+	}
+
+	oidMap := map[string]map[string]string{
+		"1": {
+			"1.3.6.1.2.1.2.2.1.10": "1.3.6.1.2.1.2.2.1.10.1",
+		},
+	}
+	tagValues := map[string]map[string]string{
+		"1": {"interface": "eth0"},
+	}
+
+	cache.cacheData(cfg, oidMap, tagValues, nil)
+
+	cachedOIDs, cachedTags, found := cache.getCachedData(cfg)
+	assert.False(t, found)
+	assert.Nil(t, cachedOIDs)
+	assert.Nil(t, cachedTags)
+	assert.False(t, cache.isConfigCached(cfg))
+
+	tables, configs, _, _ := cache.stats()
+	assert.Equal(t, 0, tables)
+	assert.Equal(t, 0, configs)
+}
+
 func TestTableCacheDependencies(t *testing.T) {
 	cache := newTableCache(200*time.Millisecond, 0)
 

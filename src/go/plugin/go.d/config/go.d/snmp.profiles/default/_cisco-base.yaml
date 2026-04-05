@@ -10,6 +10,310 @@ extends:
   - _cisco-metadata.yaml
 
 metrics:
+  # Traditional Cisco licensing
+  - MIB: CISCO-LICENSE-MGMT-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.543.1.2.3.1
+      name: clmgmtLicenseInfoTable
+    disable_table_cache: true
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.8
+        name: _license_row_cisco_traditional
+        metric_type: gauge
+        chart_meta:
+          description: Hidden licensing row helper
+          family: 'Internal/Licensing'
+          unit: "{row}"
+    static_tags:
+      - tag: _license_component
+        value: traditional_licensing
+      - tag: _license_value_kind
+        value: expiry_remaining
+    metric_tags:
+      - tag: _license_index
+        index: 3
+      - tag: _license_id
+        index: 3
+      - tag: _license_name
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.3
+          name: clmgmtLicenseFeatureName
+      - tag: _license_feature
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.4
+          name: clmgmtLicenseFeatureVersion
+      - tag: _license_type
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.5
+          name: clmgmtLicenseType
+        mapping:
+          1: demo
+          2: extension
+          3: grace_period
+          4: permanent
+          5: paid_subscription
+          6: evaluation_subscription
+          7: extension_subscription
+          8: eval_right_to_use
+          9: right_to_use
+          10: permanent_right_to_use
+      - tag: _license_perpetual
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.5
+          name: clmgmtLicenseType
+        mapping:
+          1: "false"
+          2: "false"
+          3: "false"
+          4: "true"
+          5: "false"
+          6: "false"
+          7: "false"
+          8: "false"
+          9: "true"
+          10: "true"
+      - tag: _license_capacity_raw
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.10
+          name: clmgmtLicenseMaxUsageCount
+      - tag: _license_available_raw
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.11
+          name: clmgmtLicenseUsageCountRemaining
+      - tag: _license_impact
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.13
+          name: clmgmtLicenseComments
+      - tag: _license_state_raw
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.14
+          name: clmgmtLicenseStatus
+        mapping:
+          1: inactive
+          2: not_in_use
+          3: in_use
+          4: expired_in_use
+          5: expired_not_in_use
+          6: usage_count_consumed
+      - tag: _license_state_severity_raw
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.14
+          name: clmgmtLicenseStatus
+        mapping:
+          1: 0
+          2: 0
+          3: 0
+          4: 2
+          5: 2
+          6: 2
+      - tag: _license_expiry_raw
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.543.1.2.3.1.16
+          name: clmgmtLicenseEndDate
+          format: snmp_dateandtime
+
+  # Smart Licensing
+  - MIB: CISCO-SMART-LIC-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.831.0.6.1
+      name: _license_row
+      mapping:
+        1: 1
+        2: 0
+        3: 2
+        4: 1
+        5: 0
+    static_tags:
+      - tag: _license_id
+        value: smart_registration
+      - tag: _license_name
+        value: Smart Licensing registration
+      - tag: _license_type
+        value: registration
+      - tag: _license_component
+        value: smart_licensing
+      - tag: _license_value_kind
+        value: state_severity
+      - tag: _license_impact
+        value: Smart Licensing registration state on the device
+
+  - MIB: CISCO-SMART-LIC-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.831.0.7.2
+      name: _license_row
+      mapping:
+        Authorized: 0
+        AUTHORIZED: 0
+        In Compliance: 0
+        IN COMPLIANCE: 0
+        Out of Compliance: 2
+        OUT OF COMPLIANCE: 2
+        Evaluation Mode: 1
+        EVALUATION MODE: 1
+        Eval Mode: 1
+        EVAL MODE: 1
+        Evaluation Expired: 2
+        EVALUATION EXPIRED: 2
+        Eval Expired: 2
+        EVAL EXPIRED: 2
+        Authorization Expired: 2
+        AUTHORIZATION EXPIRED: 2
+        Overage: 1
+        OVERAGE: 1
+        Not In Use: 0
+        NOT IN USE: 0
+    static_tags:
+      - tag: _license_id
+        value: smart_authorization_state
+      - tag: _license_name
+        value: Smart Licensing authorization state
+      - tag: _license_type
+        value: authorization
+      - tag: _license_component
+        value: smart_licensing
+      - tag: _license_value_kind
+        value: state_severity
+      - tag: _license_impact
+        value: Overall Smart Licensing compliance or authorization state on the device
+
+  - MIB: CISCO-SMART-LIC-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.831.0.7.1
+      name: _license_row
+    static_tags:
+      - tag: _license_id
+        value: smart_authorization_expiry
+      - tag: _license_name
+        value: Smart Licensing authorization
+      - tag: _license_type
+        value: authorization
+      - tag: _license_component
+        value: smart_licensing
+      - tag: _license_value_kind
+        value: authorization_timestamp
+      - tag: _license_authorization_source
+        value: ciscoSlaAuthExpireTime
+
+  - MIB: CISCO-SMART-LIC-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.831.0.6.3
+      name: _license_row
+    static_tags:
+      - tag: _license_id
+        value: smart_id_certificate_expiry
+      - tag: _license_name
+        value: Smart Licensing ID certificate
+      - tag: _license_type
+        value: certificate
+      - tag: _license_component
+        value: smart_licensing
+      - tag: _license_value_kind
+        value: certificate_timestamp
+      - tag: _license_certificate_source
+        value: ciscoSlaNextCertificateExpireTime
+
+  - MIB: CISCO-SMART-LIC-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.9.9.831.0.7.4.2
+      name: _license_row
+    static_tags:
+      - tag: _license_id
+        value: smart_evaluation_expiry
+      - tag: _license_name
+        value: Smart Licensing evaluation period
+      - tag: _license_type
+        value: evaluation
+      - tag: _license_component
+        value: smart_licensing
+      - tag: _license_value_kind
+        value: grace_timestamp
+      - tag: _license_grace_source
+        value: ciscoSlaAuthEvalExpiredTime
+
+  - MIB: CISCO-SMART-LIC-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.831.0.5.1
+      name: ciscoSlaEntitlementInfoTable
+    disable_table_cache: true
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.2
+        name: _license_row_cisco_smart
+        metric_type: gauge
+        chart_meta:
+          description: Hidden licensing row helper
+          family: 'Internal/Licensing'
+          unit: "{row}"
+    static_tags:
+      - tag: _license_type
+        value: entitlement
+      - tag: _license_component
+        value: smart_licensing
+    metric_tags:
+      - tag: _license_index
+        index: 1
+      - tag: _license_id
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.3
+          name: ciscoSlaEntitlementTag
+      - tag: _license_name
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.7
+          name: ciscoSlaEntitlementFeatureName
+      - tag: _license_feature
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.4
+          name: ciscoSlaEntitlementVersion
+      - tag: _license_impact
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.6
+          name: ciscoSlaEntitlementDescription
+      - tag: _license_usage_raw
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.2
+          name: ciscoSlaEntitlementRequestCount
+      - tag: _license_state_raw
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.5
+          name: ciscoSlaEntitlementEnforceMode
+        mapping:
+          1: initialized
+          2: waiting
+          3: authorized
+          4: out_of_compliance
+          5: overage
+          6: evaluation_period
+          7: evaluation_expired
+          8: authorization_expired
+          9: grace_period_expired
+          10: disabled
+          11: reserved_authorized
+          12: invalid_tag
+          13: not_authorized
+          14: not_applicable
+          15: in_use
+          16: not_in_use
+      - tag: _license_state_severity_raw
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.5
+          name: ciscoSlaEntitlementEnforceMode
+        mapping:
+          1: 1
+          2: 1
+          3: 0
+          4: 2
+          5: 1
+          6: 1
+          7: 2
+          8: 2
+          9: 2
+          10: 2
+          11: 0
+          12: 2
+          13: 2
+          14: 0
+          15: 0
+          16: 0
+
   - MIB: CISCO-ENTITY-FRU-CONTROL-MIB
     table:
       OID: 1.3.6.1.4.1.9.9.117.1.1.2
