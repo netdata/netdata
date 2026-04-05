@@ -204,6 +204,7 @@ Usage:
 
 Application Options:
   -m, --modules=    module name to run (default: all)
+  -j, --job=        job name to run (repeatable)
   -c, --config-dir= config dir to read
   -w, --watch-path= config path to watch
   -d, --debug       debug mode
@@ -232,3 +233,17 @@ Then run the plugin in debug mode, specifying your target collector:
 ```
 
 Replace `<collector_name>` with the [specific collector](#available-collectors) you wish to debug.
+
+### Debugging a Specific Job
+
+To debug a specific job within a collector (useful when a collector has multiple configured jobs), use the `-j` flag:
+
+```bash
+# For standard installations
+/usr/libexec/netdata/plugins.d/go.d.plugin -d -m web_log -j nginx
+
+# For static installations (e.g., in /opt)
+/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin -d -m web_log -j nginx
+```
+
+Replace `nginx` with the job name as configured in the collector's configuration file (e.g., in `go.d/web_log.conf`). You can specify multiple `-j` flags to debug multiple jobs.
