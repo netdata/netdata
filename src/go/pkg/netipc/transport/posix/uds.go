@@ -757,9 +757,13 @@ func checkAndRecoverStale(path string) staleResult {
 		return staleLiveServer
 	}
 
-	// Connection refused => stale, unlink
-	os.Remove(path)
-	return staleRecovered
+	// Only unlink on connection-refused (stale socket).
+	// Other errors (EACCES, etc.) should not remove the file.
+	if errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ENOENT) {
+		os.Remove(path)
+		return staleRecovered
+	}
+	return staleNotExist
 }
 
 // ---------------------------------------------------------------------------

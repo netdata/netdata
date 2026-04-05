@@ -898,10 +898,14 @@ fn check_and_recover_stale(path: &str) -> StaleResult {
             // Connected => live server
             StaleResult::LiveServer
         }
-        Err(_) => {
-            // Connection refused => stale, unlink
+        Err(UdsError::Connect(e)) if e == libc::ECONNREFUSED || e == libc::ENOENT => {
+            // Connection refused or no such socket => stale, unlink
             let _ = std::fs::remove_file(path);
             StaleResult::Stale
+        }
+        Err(_) => {
+            // Other errors (EACCES, etc.) — don't unlink, treat as not-exist
+            StaleResult::NotExist
         }
     };
 

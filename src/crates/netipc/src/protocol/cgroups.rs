@@ -130,9 +130,13 @@ impl<'a> CgroupsResponseView<'a> {
             return Err(NipcError::BadLayout);
         }
 
-        // Validate directory fits
-        let dir_size = item_count as usize * CGROUPS_DIR_ENTRY_SIZE;
-        let dir_end = CGROUPS_RESP_HDR_SIZE + dir_size;
+        // Validate directory fits (checked arithmetic for 32-bit safety)
+        let dir_size = (item_count as usize)
+            .checked_mul(CGROUPS_DIR_ENTRY_SIZE)
+            .ok_or(NipcError::BadLayout)?;
+        let dir_end = CGROUPS_RESP_HDR_SIZE
+            .checked_add(dir_size)
+            .ok_or(NipcError::BadLayout)?;
         if dir_end > buf.len() {
             return Err(NipcError::Truncated);
         }
@@ -287,7 +291,9 @@ impl<'a> CgroupsBuilder<'a> {
     /// # Panics
     /// Panics if `buf` is too small for the response header and item directory.
     pub fn new(buf: &'a mut [u8], max_items: u32, systemd_enabled: u32, generation: u64) -> Self {
-        let data_offset = CGROUPS_RESP_HDR_SIZE + max_items as usize * CGROUPS_DIR_ENTRY_SIZE;
+        let data_offset = CGROUPS_RESP_HDR_SIZE
+            .saturating_add((max_items as usize).saturating_mul(CGROUPS_DIR_ENTRY_SIZE))
+            .min(buf.len());
         assert!(
             buf.len() >= CGROUPS_RESP_HDR_SIZE,
             "CgroupsBuilder buffer too small: need at least {} bytes, got {}",

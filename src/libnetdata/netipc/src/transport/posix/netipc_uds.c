@@ -502,10 +502,15 @@ static int check_and_recover_stale(const char *path)
         close(probe);
         ret = 1;
     } else {
-        /* Connection refused / failed -> stale */
         close(probe);
-        unlink(path);
-        ret = 0;
+        /* Only unlink on ECONNREFUSED/ENOENT (stale socket).
+         * Other errors (EACCES, etc.) should not remove the file. */
+        if (errno == ECONNREFUSED || errno == ENOENT) {
+            unlink(path);
+            ret = 0;
+        } else {
+            ret = -1;
+        }
     }
     return ret;
 }

@@ -142,12 +142,13 @@ func DecodeCgroupsResponse(buf []byte) (CgroupsResponseView, error) {
 		return CgroupsResponseView{}, ErrBadLayout
 	}
 
-	// Validate directory fits.
-	dirSize := int(itemCount) * cgroupsDirEntry
-	dirEnd := cgroupsRespHdr + dirSize
-	if dirEnd > len(buf) {
+	// Validate directory fits (use uint64 to prevent int overflow on 32-bit).
+	dirSize64 := uint64(itemCount) * uint64(cgroupsDirEntry)
+	dirEnd64 := uint64(cgroupsRespHdr) + dirSize64
+	if dirEnd64 > uint64(len(buf)) {
 		return CgroupsResponseView{}, ErrTruncated
 	}
+	dirEnd := int(dirEnd64)
 
 	packedAreaLen := len(buf) - dirEnd
 
@@ -288,7 +289,11 @@ type CgroupsBuilder struct {
 // NewCgroupsBuilder initializes a cgroups response builder. buf must be
 // caller-owned and large enough for the expected snapshot.
 func NewCgroupsBuilder(buf []byte, maxItems uint32, systemdEnabled uint32, generation uint64) *CgroupsBuilder {
-	dataOffset := cgroupsRespHdr + int(maxItems)*cgroupsDirEntry
+	dataOffset64 := uint64(cgroupsRespHdr) + uint64(maxItems)*uint64(cgroupsDirEntry)
+	if dataOffset64 > uint64(len(buf)) {
+		dataOffset64 = uint64(len(buf))
+	}
+	dataOffset := int(dataOffset64)
 	return &CgroupsBuilder{
 		buf:            buf,
 		systemdEnabled: systemdEnabled,
