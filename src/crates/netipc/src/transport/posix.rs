@@ -1033,6 +1033,11 @@ fn connect_and_handshake(
         Err(e) => return Err(UdsError::Protocol(format!("ack payload: {e}"))),
     };
 
+    // Sanity: reject a packet_size too small for chunking arithmetic
+    if ack.agreed_packet_size <= HEADER_SIZE as u32 {
+        return Err(UdsError::Protocol("agreed packet_size too small".into()));
+    }
+
     Ok(UdsSession {
         fd,
         role: Role::Client,
@@ -1167,7 +1172,12 @@ fn server_handshake(
     let agreed_req_bat = hello.max_request_batch_items.max(s_req_bat);
     let agreed_resp_pay = s_resp_pay;
     let agreed_resp_bat = s_resp_bat;
-    let agreed_pkt = hello.packet_size.min(server_pkt_size);
+    let mut agreed_pkt = hello.packet_size.min(server_pkt_size);
+
+    // packet_size must be large enough for at least a header + 1 byte payload
+    if agreed_pkt <= HEADER_SIZE as u32 {
+        agreed_pkt = server_pkt_size;
+    }
 
     // Send HELLO_ACK (success)
     let ack = HelloAck {

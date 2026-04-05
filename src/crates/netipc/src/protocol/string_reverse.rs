@@ -42,7 +42,11 @@ pub fn string_reverse_decode(buf: &[u8]) -> Result<StringReverseView<'_>, NipcEr
     }
     let str_offset = u32::from_ne_bytes(buf[0..4].try_into().unwrap()) as usize;
     let str_length = u32::from_ne_bytes(buf[4..8].try_into().unwrap()) as usize;
-    if str_offset + str_length + 1 > buf.len() {
+    let end = str_offset
+        .checked_add(str_length)
+        .and_then(|v| v.checked_add(1))
+        .ok_or(NipcError::OutOfBounds)?;
+    if end > buf.len() {
         return Err(NipcError::OutOfBounds);
     }
     if buf[str_offset + str_length] != 0 {

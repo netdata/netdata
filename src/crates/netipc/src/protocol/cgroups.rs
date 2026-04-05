@@ -281,8 +281,19 @@ pub struct CgroupsBuilder<'a> {
 impl<'a> CgroupsBuilder<'a> {
     /// Initialize the builder. `buf` must be caller-owned and large enough
     /// for the expected snapshot.
+    /// Initialize the builder. `buf` must be at least `CGROUPS_RESP_HDR_SIZE`
+    /// (24) bytes plus `max_items * 8` directory bytes.
+    ///
+    /// # Panics
+    /// Panics if `buf` is too small for the response header and item directory.
     pub fn new(buf: &'a mut [u8], max_items: u32, systemd_enabled: u32, generation: u64) -> Self {
         let data_offset = CGROUPS_RESP_HDR_SIZE + max_items as usize * CGROUPS_DIR_ENTRY_SIZE;
+        assert!(
+            buf.len() >= CGROUPS_RESP_HDR_SIZE,
+            "CgroupsBuilder buffer too small: need at least {} bytes, got {}",
+            CGROUPS_RESP_HDR_SIZE,
+            buf.len()
+        );
         CgroupsBuilder {
             buf,
             systemd_enabled,

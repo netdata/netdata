@@ -324,6 +324,10 @@ static nipc_uds_error_t client_handshake(int fd,
     session->recv_buf                  = NULL;
     session->recv_buf_size             = 0;
 
+    /* Sanity: reject a packet_size too small for chunking arithmetic */
+    if (session->packet_size <= NIPC_HEADER_LEN)
+        return NIPC_UDS_ERR_PROTOCOL;
+
     return NIPC_UDS_OK;
 }
 
@@ -411,6 +415,10 @@ static nipc_uds_error_t server_handshake(int fd,
     uint32_t agreed_resp_pay = s_resp_pay;
     uint32_t agreed_resp_bat = s_resp_bat;
     uint32_t agreed_pkt      = min_u32(hello.packet_size, server_pkt_size);
+
+    /* packet_size must be large enough for at least a header + 1 byte payload */
+    if (agreed_pkt <= NIPC_HEADER_LEN)
+        agreed_pkt = server_pkt_size;
 
     /* Send HELLO_ACK (success) */
     nipc_hello_ack_t ack = {

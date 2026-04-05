@@ -330,14 +330,23 @@ size_t nipc_batch_builder_finish(nipc_batch_builder_t *b,
                 b->data_offset);
     }
 
-    /* Zero trailing alignment padding for deterministic output. */
+    /* Zero trailing alignment padding for deterministic output,
+     * but only within the caller's buffer. */
     size_t data_aligned = nipc_align8(b->data_offset);
     if (data_aligned > b->data_offset) {
-        memset(b->buf + final_dir_aligned + b->data_offset,
-               0, data_aligned - b->data_offset);
+        size_t total_with_pad = final_dir_aligned + data_aligned;
+        if (total_with_pad <= b->buf_len) {
+            memset(b->buf + final_dir_aligned + b->data_offset,
+                   0, data_aligned - b->data_offset);
+        } else if (final_dir_aligned + b->data_offset < b->buf_len) {
+            /* Partial padding: zero only within bounds */
+            memset(b->buf + final_dir_aligned + b->data_offset,
+                   0, b->buf_len - (final_dir_aligned + b->data_offset));
+        }
     }
 
-    return final_dir_aligned + data_aligned;
+    size_t total = final_dir_aligned + data_aligned;
+    return total <= b->buf_len ? total : final_dir_aligned + b->data_offset;
 }
 
 /* ------------------------------------------------------------------ */

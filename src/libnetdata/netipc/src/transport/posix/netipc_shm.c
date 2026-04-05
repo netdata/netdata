@@ -205,11 +205,11 @@ nipc_shm_error_t nipc_shm_server_create(const char *run_dir,
                                           uint32_t resp_capacity,
                                           nipc_shm_ctx_t *out)
 {
-    memset(out, 0, sizeof(*out));
-    out->fd = -1;
-
     if (!run_dir || !service_name || !out)
         return NIPC_SHM_ERR_BAD_PARAM;
+
+    memset(out, 0, sizeof(*out));
+    out->fd = -1;
 
     /* Build per-session path (validates service_name) */
     char path[256];
@@ -335,11 +335,11 @@ nipc_shm_error_t nipc_shm_client_attach(const char *run_dir,
                                           uint64_t session_id,
                                           nipc_shm_ctx_t *out)
 {
-    memset(out, 0, sizeof(*out));
-    out->fd = -1;
-
     if (!run_dir || !service_name || !out)
         return NIPC_SHM_ERR_BAD_PARAM;
+
+    memset(out, 0, sizeof(*out));
+    out->fd = -1;
 
     char path[256];
     int path_rc = build_shm_path(path, sizeof(path), run_dir, service_name,

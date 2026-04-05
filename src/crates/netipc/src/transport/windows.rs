@@ -1029,7 +1029,19 @@ impl NpListener {
 
         // Create new pipe instance for next client
         let buf_size = pipe_buffer_size(self.config.packet_size);
-        let next = create_pipe_instance(&self.pipe_name, buf_size, false)?;
+        let next = match create_pipe_instance(&self.pipe_name, buf_size, false) {
+            Ok(h) => h,
+            Err(e) => {
+                // Failed to create replacement instance; disconnect and close
+                // the accepted client to avoid an orphaned connection.
+                unsafe {
+                    ffi::DisconnectNamedPipe(session_handle);
+                }
+                close_handle(session_handle);
+                self.handle = ffi::INVALID_HANDLE_VALUE;
+                return Err(e);
+            }
+        };
         self.handle = next;
 
         // Perform handshake

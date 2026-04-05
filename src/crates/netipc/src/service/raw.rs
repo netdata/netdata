@@ -44,6 +44,11 @@ fn next_power_of_2_u32(n: u32) -> u32 {
         return 16;
     }
 
+    // Cap at 2^31 — the largest power of 2 that fits in u32
+    if n > (1u32 << 31) {
+        return 1u32 << 31;
+    }
+
     let mut value = n - 1;
     value |= value >> 1;
     value |= value >> 2;
