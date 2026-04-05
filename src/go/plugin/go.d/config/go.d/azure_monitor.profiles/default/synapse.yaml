@@ -1,367 +1,366 @@
 ---
-id: synapse
-name: Azure Synapse Analytics Workspace
+display_name: Azure Synapse Analytics Workspace
 resource_type: Microsoft.Synapse/workspaces
 metrics:
-- id: builtin_sql_pool_data_processed_bytes
-  azure_name: BuiltinSqlPoolDataProcessedBytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: builtin_sql_pool_login_attempts
-  azure_name: BuiltinSqlPoolLoginAttempts
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: builtin_sql_pool_requests_ended
-  azure_name: BuiltinSqlPoolRequestsEnded
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: integration_activity_runs_ended
-  azure_name: IntegrationActivityRunsEnded
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: integration_link_connection_events
-  azure_name: IntegrationLinkConnectionEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: integration_link_processed_changed_rows
-  azure_name: IntegrationLinkProcessedChangedRows
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: integration_link_processed_data_volume
-  azure_name: IntegrationLinkProcessedDataVolume
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: integration_link_processing_latency_in_seconds
-  azure_name: IntegrationLinkProcessingLatencyInSeconds
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-  - aggregation: minimum
-    kind: gauge
-- id: integration_link_table_events
-  azure_name: IntegrationLinkTableEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: integration_pipeline_runs_ended
-  azure_name: IntegrationPipelineRunsEnded
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: integration_trigger_runs_ended
-  azure_name: IntegrationTriggerRunsEnded
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: sql_streaming_input_events
-  azure_name: SQLStreamingInputEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: sql_streaming_input_event_bytes
-  azure_name: SQLStreamingInputEventBytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: sql_streaming_input_events_sources_per_second
-  azure_name: SQLStreamingInputEventsSourcesPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: sql_streaming_output_events
-  azure_name: SQLStreamingOutputEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: sql_streaming_backlogged_input_event_sources
-  azure_name: SQLStreamingBackloggedInputEventSources
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: sql_streaming_early_input_events
-  azure_name: SQLStreamingEarlyInputEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: sql_streaming_late_input_events
-  azure_name: SQLStreamingLateInputEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: sql_streaming_out_of_order_events
-  azure_name: SQLStreamingOutOfOrderEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: sql_streaming_output_watermark_delay_seconds
-  azure_name: SQLStreamingOutputWatermarkDelaySeconds
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-  - aggregation: minimum
-    kind: gauge
-- id: sql_streaming_conversion_errors
-  azure_name: SQLStreamingConversionErrors
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: sql_streaming_deserialization_error
-  azure_name: SQLStreamingDeserializationError
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: sql_streaming_runtime_errors
-  azure_name: SQLStreamingRuntimeErrors
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: sql_streaming_resource_utilization
-  azure_name: SQLStreamingResourceUtilization
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-  - aggregation: minimum
-    kind: gauge
+  - id: builtin_sql_pool_data_processed_bytes
+    azure_name: BuiltinSqlPoolDataProcessedBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: builtin_sql_pool_login_attempts
+    azure_name: BuiltinSqlPoolLoginAttempts
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: builtin_sql_pool_requests_ended
+    azure_name: BuiltinSqlPoolRequestsEnded
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: integration_activity_runs_ended
+    azure_name: IntegrationActivityRunsEnded
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: integration_link_connection_events
+    azure_name: IntegrationLinkConnectionEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: integration_link_processed_changed_rows
+    azure_name: IntegrationLinkProcessedChangedRows
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: integration_link_processed_data_volume
+    azure_name: IntegrationLinkProcessedDataVolume
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: integration_link_processing_latency_in_seconds
+    azure_name: IntegrationLinkProcessingLatencyInSeconds
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+      - aggregation: minimum
+        kind: gauge
+  - id: integration_link_table_events
+    azure_name: IntegrationLinkTableEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: integration_pipeline_runs_ended
+    azure_name: IntegrationPipelineRunsEnded
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: integration_trigger_runs_ended
+    azure_name: IntegrationTriggerRunsEnded
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: sql_streaming_input_events
+    azure_name: SQLStreamingInputEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: sql_streaming_input_event_bytes
+    azure_name: SQLStreamingInputEventBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: sql_streaming_input_events_sources_per_second
+    azure_name: SQLStreamingInputEventsSourcesPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: sql_streaming_output_events
+    azure_name: SQLStreamingOutputEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: sql_streaming_backlogged_input_event_sources
+    azure_name: SQLStreamingBackloggedInputEventSources
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: sql_streaming_early_input_events
+    azure_name: SQLStreamingEarlyInputEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: sql_streaming_late_input_events
+    azure_name: SQLStreamingLateInputEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: sql_streaming_out_of_order_events
+    azure_name: SQLStreamingOutOfOrderEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: sql_streaming_output_watermark_delay_seconds
+    azure_name: SQLStreamingOutputWatermarkDelaySeconds
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+      - aggregation: minimum
+        kind: gauge
+  - id: sql_streaming_conversion_errors
+    azure_name: SQLStreamingConversionErrors
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: sql_streaming_deserialization_error
+    azure_name: SQLStreamingDeserializationError
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: sql_streaming_runtime_errors
+    azure_name: SQLStreamingRuntimeErrors
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: sql_streaming_resource_utilization
+    azure_name: SQLStreamingResourceUtilization
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+      - aggregation: minimum
+        kind: gauge
 template:
   family: Azure Synapse Analytics Workspace
   context_namespace: synapse
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_synapse__builtin_sql_pool_data_processed
-    title: Azure Synapse Built-in SQL Pool Data Processed
-    context: builtin_sql_pool_data_processed
-    family: Built-in SQL Pool
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.builtin_sql_pool_data_processed_bytes_total
-      name: processed
-  - id: am_azure_synapse__builtin_sql_pool_login_attempts
-    title: Azure Synapse Built-in SQL Pool Login Attempts
-    context: builtin_sql_pool_login_attempts
-    family: Built-in SQL Pool
-    type: line
-    units: attempts/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.builtin_sql_pool_login_attempts_total
-      name: login_attempts
-  - id: am_azure_synapse__builtin_sql_pool_requests
-    title: Azure Synapse Built-in SQL Pool Requests Ended
-    context: builtin_sql_pool_requests
-    family: Built-in SQL Pool
-    type: line
-    units: requests/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.builtin_sql_pool_requests_ended_total
-      name: requests
-  - id: am_azure_synapse__activity_runs
-    title: Azure Synapse Activity Runs
-    context: activity_runs
-    family: Integration
-    type: line
-    units: runs/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.integration_activity_runs_ended_total
-      name: ended
-  - id: am_azure_synapse__pipeline_runs
-    title: Azure Synapse Pipeline Runs
-    context: pipeline_runs
-    family: Integration
-    type: line
-    units: runs/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.integration_pipeline_runs_ended_total
-      name: ended
-  - id: am_azure_synapse__trigger_runs
-    title: Azure Synapse Trigger Runs
-    context: trigger_runs
-    family: Integration
-    type: line
-    units: runs/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.integration_trigger_runs_ended_total
-      name: ended
-  - id: am_azure_synapse__link_connection_events
-    title: Azure Synapse Link Connection Events
-    context: link_connection_events
-    family: Link
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.integration_link_connection_events_total
-      name: events
-  - id: am_azure_synapse__link_table_events
-    title: Azure Synapse Link Table Events
-    context: link_table_events
-    family: Link
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.integration_link_table_events_total
-      name: events
-  - id: am_azure_synapse__link_processed_rows
-    title: Azure Synapse Link Processed Changed Rows
-    context: link_processed_rows
-    family: Link
-    type: line
-    units: rows/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.integration_link_processed_changed_rows_total
-      name: changed_rows
-  - id: am_azure_synapse__link_data_volume
-    title: Azure Synapse Link Processed Data Volume
-    context: link_data_volume
-    family: Link
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.integration_link_processed_data_volume_total
-      name: processed
-  - id: am_azure_synapse__link_processing_latency
-    title: Azure Synapse Link Processing Latency
-    context: link_processing_latency
-    family: Link
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: synapse.integration_link_processing_latency_in_seconds_average
-      name: average
-  - id: am_azure_synapse__streaming_event_flow
-    title: Azure Synapse Streaming Event Flow
-    context: streaming_event_flow
-    family: Streaming Job
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.sql_streaming_input_events_total
-      name: in
-    - selector: synapse.sql_streaming_output_events_total
-      name: out
-  - id: am_azure_synapse__streaming_input_throughput
-    title: Azure Synapse Streaming Input Data Throughput
-    context: streaming_input_throughput
-    family: Streaming Job
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.sql_streaming_input_event_bytes_total
-      name: received
-  - id: am_azure_synapse__streaming_input_sources
-    title: Azure Synapse Streaming Input Sources Received
-    context: streaming_input_sources
-    family: Streaming Job
-    type: line
-    units: sources/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.sql_streaming_input_events_sources_per_second_total
-      name: received
-  - id: am_azure_synapse__streaming_event_timing
-    title: Azure Synapse Streaming Event Timing Issues
-    context: streaming_event_timing
-    family: Streaming Job
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.sql_streaming_late_input_events_total
-      name: late
-    - selector: synapse.sql_streaming_early_input_events_total
-      name: early
-    - selector: synapse.sql_streaming_out_of_order_events_total
-      name: out_of_order
-    - selector: synapse.sql_streaming_backlogged_input_event_sources_total
-      name: backlogged
-  - id: am_azure_synapse__streaming_watermark_delay
-    title: Azure Synapse Streaming Watermark Delay
-    context: streaming_watermark_delay
-    family: Streaming Job
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: synapse.sql_streaming_output_watermark_delay_seconds_maximum
-      name: delay
-  - id: am_azure_synapse__streaming_errors
-    title: Azure Synapse Streaming Errors
-    context: streaming_errors
-    family: Streaming Job
-    type: line
-    units: errors/s
-    algorithm: incremental
-    dimensions:
-    - selector: synapse.sql_streaming_runtime_errors_total
-      name: runtime
-    - selector: synapse.sql_streaming_conversion_errors_total
-      name: data_conversion
-    - selector: synapse.sql_streaming_deserialization_error_total
-      name: deserialization
-  - id: am_azure_synapse__streaming_resource_utilization
-    title: Azure Synapse Streaming Resource Utilization
-    context: streaming_resource_utilization
-    family: Streaming Job
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: synapse.sql_streaming_resource_utilization_average
-      name: utilization
+    - id: am_azure_synapse__builtin_sql_pool_data_processed
+      title: Azure Synapse Built-in SQL Pool Data Processed
+      context: builtin_sql_pool_data_processed
+      family: Built-in SQL Pool
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: builtin_sql_pool_data_processed_bytes_total
+          name: processed
+    - id: am_azure_synapse__builtin_sql_pool_login_attempts
+      title: Azure Synapse Built-in SQL Pool Login Attempts
+      context: builtin_sql_pool_login_attempts
+      family: Built-in SQL Pool
+      type: line
+      units: attempts/s
+      algorithm: incremental
+      dimensions:
+        - selector: builtin_sql_pool_login_attempts_total
+          name: login_attempts
+    - id: am_azure_synapse__builtin_sql_pool_requests
+      title: Azure Synapse Built-in SQL Pool Requests Ended
+      context: builtin_sql_pool_requests
+      family: Built-in SQL Pool
+      type: line
+      units: requests/s
+      algorithm: incremental
+      dimensions:
+        - selector: builtin_sql_pool_requests_ended_total
+          name: requests
+    - id: am_azure_synapse__activity_runs
+      title: Azure Synapse Activity Runs
+      context: activity_runs
+      family: Integration
+      type: line
+      units: runs/s
+      algorithm: incremental
+      dimensions:
+        - selector: integration_activity_runs_ended_total
+          name: ended
+    - id: am_azure_synapse__pipeline_runs
+      title: Azure Synapse Pipeline Runs
+      context: pipeline_runs
+      family: Integration
+      type: line
+      units: runs/s
+      algorithm: incremental
+      dimensions:
+        - selector: integration_pipeline_runs_ended_total
+          name: ended
+    - id: am_azure_synapse__trigger_runs
+      title: Azure Synapse Trigger Runs
+      context: trigger_runs
+      family: Integration
+      type: line
+      units: runs/s
+      algorithm: incremental
+      dimensions:
+        - selector: integration_trigger_runs_ended_total
+          name: ended
+    - id: am_azure_synapse__link_connection_events
+      title: Azure Synapse Link Connection Events
+      context: link_connection_events
+      family: Link
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: integration_link_connection_events_total
+          name: events
+    - id: am_azure_synapse__link_table_events
+      title: Azure Synapse Link Table Events
+      context: link_table_events
+      family: Link
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: integration_link_table_events_total
+          name: events
+    - id: am_azure_synapse__link_processed_rows
+      title: Azure Synapse Link Processed Changed Rows
+      context: link_processed_rows
+      family: Link
+      type: line
+      units: rows/s
+      algorithm: incremental
+      dimensions:
+        - selector: integration_link_processed_changed_rows_total
+          name: changed_rows
+    - id: am_azure_synapse__link_data_volume
+      title: Azure Synapse Link Processed Data Volume
+      context: link_data_volume
+      family: Link
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: integration_link_processed_data_volume_total
+          name: processed
+    - id: am_azure_synapse__link_processing_latency
+      title: Azure Synapse Link Processing Latency
+      context: link_processing_latency
+      family: Link
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: integration_link_processing_latency_in_seconds_average
+          name: average
+    - id: am_azure_synapse__streaming_event_flow
+      title: Azure Synapse Streaming Event Flow
+      context: streaming_event_flow
+      family: Streaming Job
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: sql_streaming_input_events_total
+          name: in
+        - selector: sql_streaming_output_events_total
+          name: out
+    - id: am_azure_synapse__streaming_input_throughput
+      title: Azure Synapse Streaming Input Data Throughput
+      context: streaming_input_throughput
+      family: Streaming Job
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: sql_streaming_input_event_bytes_total
+          name: received
+    - id: am_azure_synapse__streaming_input_sources
+      title: Azure Synapse Streaming Input Sources Received
+      context: streaming_input_sources
+      family: Streaming Job
+      type: line
+      units: sources/s
+      algorithm: incremental
+      dimensions:
+        - selector: sql_streaming_input_events_sources_per_second_total
+          name: received
+    - id: am_azure_synapse__streaming_event_timing
+      title: Azure Synapse Streaming Event Timing Issues
+      context: streaming_event_timing
+      family: Streaming Job
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: sql_streaming_late_input_events_total
+          name: late
+        - selector: sql_streaming_early_input_events_total
+          name: early
+        - selector: sql_streaming_out_of_order_events_total
+          name: out_of_order
+        - selector: sql_streaming_backlogged_input_event_sources_total
+          name: backlogged
+    - id: am_azure_synapse__streaming_watermark_delay
+      title: Azure Synapse Streaming Watermark Delay
+      context: streaming_watermark_delay
+      family: Streaming Job
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: sql_streaming_output_watermark_delay_seconds_maximum
+          name: delay
+    - id: am_azure_synapse__streaming_errors
+      title: Azure Synapse Streaming Errors
+      context: streaming_errors
+      family: Streaming Job
+      type: line
+      units: errors/s
+      algorithm: incremental
+      dimensions:
+        - selector: sql_streaming_runtime_errors_total
+          name: runtime
+        - selector: sql_streaming_conversion_errors_total
+          name: data_conversion
+        - selector: sql_streaming_deserialization_error_total
+          name: deserialization
+    - id: am_azure_synapse__streaming_resource_utilization
+      title: Azure Synapse Streaming Resource Utilization
+      context: streaming_resource_utilization
+      family: Streaming Job
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: sql_streaming_resource_utilization_average
+          name: utilization

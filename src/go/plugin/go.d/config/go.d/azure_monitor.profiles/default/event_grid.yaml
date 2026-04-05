@@ -1,155 +1,154 @@
 ---
-id: event_grid
-name: Azure Event Grid Topic
+display_name: Azure Event Grid Topic
 resource_type: Microsoft.EventGrid/topics
 metrics:
-- id: publish_success_count
-  azure_name: PublishSuccessCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: publish_fail_count
-  azure_name: PublishFailCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: publish_success_latency_in_ms
-  azure_name: PublishSuccessLatencyInMs
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: matched_event_count
-  azure_name: MatchedEventCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: unmatched_event_count
-  azure_name: UnmatchedEventCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: advanced_filter_evaluation_count
-  azure_name: AdvancedFilterEvaluationCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: delivery_success_count
-  azure_name: DeliverySuccessCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: delivery_attempt_fail_count
-  azure_name: DeliveryAttemptFailCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: dropped_event_count
-  azure_name: DroppedEventCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: dead_lettered_count
-  azure_name: DeadLetteredCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: destination_processing_duration_in_ms
-  azure_name: DestinationProcessingDurationInMs
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
+  - id: publish_success_count
+    azure_name: PublishSuccessCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: publish_fail_count
+    azure_name: PublishFailCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: publish_success_latency_in_ms
+    azure_name: PublishSuccessLatencyInMs
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: matched_event_count
+    azure_name: MatchedEventCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: unmatched_event_count
+    azure_name: UnmatchedEventCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: advanced_filter_evaluation_count
+    azure_name: AdvancedFilterEvaluationCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: delivery_success_count
+    azure_name: DeliverySuccessCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: delivery_attempt_fail_count
+    azure_name: DeliveryAttemptFailCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: dropped_event_count
+    azure_name: DroppedEventCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: dead_lettered_count
+    azure_name: DeadLetteredCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: destination_processing_duration_in_ms
+    azure_name: DestinationProcessingDurationInMs
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
 template:
   family: Azure Event Grid Topic
   context_namespace: event_grid
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_event_grid__publish_rate
-    title: Azure Event Grid Publish Rate
-    context: publish_rate
-    family: Publishing
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: event_grid.publish_success_count_total
-      name: success
-    - selector: event_grid.publish_fail_count_total
-      name: failed
-  - id: am_azure_event_grid__publish_latency
-    title: Azure Event Grid Publish Latency
-    context: publish_latency
-    family: Publishing
-    type: line
-    units: milliseconds
-    algorithm: incremental
-    dimensions:
-    - selector: event_grid.publish_success_latency_in_ms_total
-      name: latency
-  - id: am_azure_event_grid__routing
-    title: Azure Event Grid Event Routing
-    context: routing
-    family: Routing
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: event_grid.matched_event_count_total
-      name: matched
-    - selector: event_grid.unmatched_event_count_total
-      name: unmatched
-  - id: am_azure_event_grid__advanced_filter_evaluations
-    title: Azure Event Grid Advanced Filter Evaluations
-    context: advanced_filter_evaluations
-    family: Routing
-    type: line
-    units: evaluations/s
-    algorithm: incremental
-    dimensions:
-    - selector: event_grid.advanced_filter_evaluation_count_total
-      name: evaluations
-  - id: am_azure_event_grid__delivery
-    title: Azure Event Grid Event Delivery
-    context: delivery
-    family: Delivery
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: event_grid.delivery_success_count_total
-      name: delivered
-    - selector: event_grid.delivery_attempt_fail_count_total
-      name: failed
-    - selector: event_grid.dropped_event_count_total
-      name: dropped
-    - selector: event_grid.dead_lettered_count_total
-      name: dead_lettered
-  - id: am_azure_event_grid__destination_processing_duration
-    title: Azure Event Grid Destination Processing Duration
-    context: destination_processing_duration
-    family: Performance
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: event_grid.destination_processing_duration_in_ms_average
-      name: average
+    - id: am_azure_event_grid__publish_rate
+      title: Azure Event Grid Publish Rate
+      context: publish_rate
+      family: Publishing
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: publish_success_count_total
+          name: success
+        - selector: publish_fail_count_total
+          name: failed
+    - id: am_azure_event_grid__publish_latency
+      title: Azure Event Grid Publish Latency
+      context: publish_latency
+      family: Publishing
+      type: line
+      units: milliseconds
+      algorithm: incremental
+      dimensions:
+        - selector: publish_success_latency_in_ms_total
+          name: latency
+    - id: am_azure_event_grid__routing
+      title: Azure Event Grid Event Routing
+      context: routing
+      family: Routing
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: matched_event_count_total
+          name: matched
+        - selector: unmatched_event_count_total
+          name: unmatched
+    - id: am_azure_event_grid__advanced_filter_evaluations
+      title: Azure Event Grid Advanced Filter Evaluations
+      context: advanced_filter_evaluations
+      family: Routing
+      type: line
+      units: evaluations/s
+      algorithm: incremental
+      dimensions:
+        - selector: advanced_filter_evaluation_count_total
+          name: evaluations
+    - id: am_azure_event_grid__delivery
+      title: Azure Event Grid Event Delivery
+      context: delivery
+      family: Delivery
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: delivery_success_count_total
+          name: delivered
+        - selector: delivery_attempt_fail_count_total
+          name: failed
+        - selector: dropped_event_count_total
+          name: dropped
+        - selector: dead_lettered_count_total
+          name: dead_lettered
+    - id: am_azure_event_grid__destination_processing_duration
+      title: Azure Event Grid Destination Processing Duration
+      context: destination_processing_duration
+      family: Performance
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: destination_processing_duration_in_ms_average
+          name: average

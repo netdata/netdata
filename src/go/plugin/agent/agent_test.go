@@ -5,6 +5,7 @@ package agent
 import (
 	"bytes"
 	"context"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNew(t *testing.T) {
@@ -31,6 +33,74 @@ func TestNew(t *testing.T) {
 	})
 }
 
+func TestAgent_serviceDiscoveryEnabled(t *testing.T) {
+	tests := map[string]struct {
+		agent *Agent
+		want  bool
+	}{
+		"non-terminal policy enables service discovery": {
+			agent: &Agent{runModePolicy: policy.Agent(false)},
+			want:  true,
+		},
+		"terminal policy disables service discovery": {
+			agent: &Agent{runModePolicy: policy.Agent(true)},
+			want:  false,
+		},
+		"plugin-level disable wins over policy": {
+			agent: &Agent{
+				runModePolicy:           policy.Agent(false),
+				DisableServiceDiscovery: true,
+			},
+			want: false,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.NotNil(t, test.agent)
+			assert.Equal(t, test.want, test.agent.serviceDiscoveryEnabled())
+		})
+	}
+}
+
+func TestAgent_setupRuntimeService(t *testing.T) {
+	tests := map[string]struct {
+		policy      policy.RunModePolicy
+		wantEnabled bool
+	}{
+		"terminal mode disables runtime service": {
+			policy:      policy.Agent(true),
+			wantEnabled: false,
+		},
+		"non-terminal mode enables runtime service": {
+			policy:      policy.Agent(false),
+			wantEnabled: true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			a := New(Config{
+				Name:          "test",
+				RunModePolicy: test.policy,
+			})
+			require.NotNil(t, a)
+			a.Out = io.Discard
+
+			svc, stop := a.setupRuntimeService()
+			if !test.wantEnabled {
+				assert.Nil(t, svc)
+				assert.Nil(t, stop)
+				return
+			}
+
+			require.NotNil(t, svc)
+			require.NotNil(t, stop)
+			stop()
+		})
+	}
+}
+
 func TestAgent_Run(t *testing.T) {
 	a := New(Config{
 		Name: "test",
@@ -38,6 +108,7 @@ func TestAgent_Run(t *testing.T) {
 			IsTerminal:               false,
 			AutoEnableDiscovered:     true,
 			UseFileStatusPersistence: true,
+			EnableRuntimeCharts:      true,
 		},
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discovery.NewProviderFactory("dummy", func(ctx discovery.BuildContext) (discovery.Discoverer, bool, error) {
@@ -66,8 +137,7 @@ func TestAgent_Run(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 
-	wg.Add(1)
-	go func() { defer wg.Done(); a.run(ctx) }()
+	wg.Go(func() { a.run(ctx) })
 
 	time.Sleep(time.Second * 2)
 	cancel()
@@ -89,7 +159,6 @@ func TestAgent_Run(t *testing.T) {
 func prepareRegistry(mux *sync.Mutex, stats map[string]int, names ...string) collectorapi.Registry {
 	reg := collectorapi.Registry{}
 	for _, name := range names {
-		name := name
 		reg.Register(name, collectorapi.Creator{
 			Create: func() collectorapi.CollectorV1 {
 				return prepareMockModule(name, mux, stats)

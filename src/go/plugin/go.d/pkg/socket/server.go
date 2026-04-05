@@ -64,11 +64,9 @@ func (t *tcpServer) handleConnections() (err error) {
 				}
 				return fmt.Errorf("could not accept connection: %v", err)
 			}
-			t.wg.Add(1)
-			go func() {
-				defer t.wg.Done()
+			t.wg.Go(func() {
 				t.handleConnection(conn)
-			}()
+			})
 		}
 	}
 }
@@ -225,11 +223,9 @@ func (u *unixServer) handleConnections() error {
 				continue
 			}
 
-			u.wg.Add(1)
-			go func() {
-				defer u.wg.Done()
+			u.wg.Go(func() {
 				u.handleConnection(conn)
-			}()
+			})
 		}
 	}
 }

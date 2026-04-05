@@ -122,7 +122,7 @@ WHERE object_name LIKE '%Locks%'
 const queryDatabaseSize = `
 SELECT
   DB_NAME(database_id) AS database_name,
-  SUM(size) * 8 * 1024 AS size_bytes
+  SUM(CAST(size AS BIGINT)) * 8 * 1024 AS size_bytes
 FROM sys.master_files
 WHERE type = 0 -- data files only
   AND database_id > 4 -- exclude system databases

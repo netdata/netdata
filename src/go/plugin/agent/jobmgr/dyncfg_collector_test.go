@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -362,6 +363,57 @@ func TestCollectorCallbacks_ParseAndValidate_SuppressesAuditSideEffects(t *testi
 	require.NoError(t, err)
 	assert.Empty(t, entries)
 	assert.Empty(t, analyzer.registered)
+}
+
+func TestCollectorCallbacks_ApplyConfigLoggingHonorsValidationMode(t *testing.T) {
+	tests := map[string]struct {
+		run            func(t *testing.T, mgr *Manager, logBuf *bytes.Buffer)
+		wantLogMessage bool
+	}{
+		"validation suppresses expected applyConfig error logs": {
+			run: func(t *testing.T, mgr *Manager, _ *bytes.Buffer) {
+				cb := &collectorCallbacks{mgr: mgr}
+				cfg := prepareDyncfgCfg("success", "payload-name").Set("option_str", "one").Set("option_int", "bad")
+				fn := dyncfg.NewFunction(functions.Function{
+					UID:         "validation-no-log",
+					ContentType: "application/json",
+					Payload:     mustMarshalCollectorConfigPayload(t, cfg),
+					Args:        collectorTestArgs(mgr, "success", string(dyncfg.CommandAdd), "validated"),
+				})
+
+				_, err := cb.ParseAndValidate(fn, "validated")
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "failed to apply configuration")
+			},
+		},
+		"runtime creation still logs applyConfig errors": {
+			run: func(t *testing.T, mgr *Manager, _ *bytes.Buffer) {
+				cfg := prepareDyncfgCfg("success", "runtime-job").Set("option_str", "one").Set("option_int", "bad")
+
+				_, err := mgr.createCollectorJob(cfg)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "cannot unmarshal")
+			},
+			wantLogMessage: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var logBuf bytes.Buffer
+			mgr := newCollectorTestManager()
+			mgr.Logger = logger.NewWithWriter(&logBuf)
+
+			tc.run(t, mgr, &logBuf)
+
+			const msg = "failed to apply config for"
+			if tc.wantLogMessage {
+				assert.Contains(t, logBuf.String(), msg)
+			} else {
+				assert.NotContains(t, logBuf.String(), msg)
+			}
+		})
+	}
 }
 
 func TestCollectorCallbacks_Start(t *testing.T) {

@@ -93,29 +93,28 @@ func (s *observationState) reobserveCachedObservations(dueInstruments, observedT
 	}
 }
 
-// pruneStaleResources removes cache entries for resources no longer in the discovery set.
-func (s *observationState) pruneStaleResources(current []resourceInfo) {
-	activeUIDs := make(map[string]struct{}, len(current))
-	for _, r := range current {
-		activeUIDs[r.UID] = struct{}{}
+// pruneStaleResources removes cache entries for resources that are no longer
+// active for a specific profile/label identity.
+func (s *observationState) pruneStaleResources(current map[string][]resourceInfo) {
+	activeLabels := make(map[string]struct{})
+	for profileName, resources := range current {
+		for _, resource := range resources {
+			activeLabels[labelIdentity(labelValues(resourceLabels(resource, profileName)))] = struct{}{}
+		}
 	}
 
 	for key, obs := range s.lastObserved {
 		if len(obs.labelValues) == 0 {
 			continue
 		}
-		if _, ok := activeUIDs[obs.labelValues[0]]; ok {
+		if _, ok := activeLabels[labelIdentity(obs.labelValues)]; ok {
 			continue
 		}
 		delete(s.lastObserved, key)
 	}
 
 	for key := range s.accumulators {
-		uid := accumulatorResourceUID(key)
-		if uid == "" {
-			continue
-		}
-		if _, ok := activeUIDs[uid]; ok {
+		if _, ok := activeLabels[labelIdentityFromObservationKey(key)]; ok {
 			continue
 		}
 		delete(s.accumulators, key)
@@ -126,8 +125,12 @@ func sampleObservationKey(instrument string, values []string) string {
 	return instrument + "\x00" + strings.Join(values, "\x00")
 }
 
-func accumulatorResourceUID(key string) string {
-	parts := strings.SplitN(key, "\x00", 3)
+func labelIdentity(values []string) string {
+	return strings.Join(values, "\x00")
+}
+
+func labelIdentityFromObservationKey(key string) string {
+	parts := strings.SplitN(key, "\x00", 2)
 	if len(parts) < 2 {
 		return ""
 	}

@@ -131,7 +131,7 @@ func (s *runSim) run(t *testing.T) {
 
 	var lines []string
 	skipNextEmpty := false
-	for _, s := range strings.Split(out.String(), "\n") {
+	for s := range strings.SplitSeq(out.String(), "\n") {
 		if strings.HasPrefix(s, "CONFIG") && strings.Contains(s, " template ") {
 			skipNextEmpty = false
 			continue

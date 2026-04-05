@@ -195,7 +195,7 @@ func TestModuleFuncRegistry_Concurrency(t *testing.T) {
 	done := make(chan bool)
 
 	go func() {
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			job := newTestRuntimeJob("postgres", "job", true)
 			r.addJob("postgres", "job", job)
 			r.removeJob("postgres", "job")
@@ -204,7 +204,7 @@ func TestModuleFuncRegistry_Concurrency(t *testing.T) {
 	}()
 
 	go func() {
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			_ = r.getJobNames("postgres")
 			_ = r.getMethods("postgres")
 			_, _ = r.getJob("postgres", "job")

@@ -1,1155 +1,1154 @@
 ---
-id: data_factory
-name: Azure Data Factory
+display_name: Azure Data Factory
 resource_type: Microsoft.DataFactory/factories
 metrics:
-- id: pipeline_succeeded_runs
-  azure_name: PipelineSucceededRuns
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: pipeline_failed_runs
-  azure_name: PipelineFailedRuns
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: pipeline_cancelled_runs
-  azure_name: PipelineCancelledRuns
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: pipeline_elapsed_time_runs
-  azure_name: PipelineElapsedTimeRuns
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: activity_succeeded_runs
-  azure_name: ActivitySucceededRuns
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: activity_failed_runs
-  azure_name: ActivityFailedRuns
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: activity_cancelled_runs
-  azure_name: ActivityCancelledRuns
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: trigger_succeeded_runs
-  azure_name: TriggerSucceededRuns
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: trigger_failed_runs
-  azure_name: TriggerFailedRuns
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: trigger_cancelled_runs
-  azure_name: TriggerCancelledRuns
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: ssis_integration_runtime_start_succeeded
-  azure_name: SSISIntegrationRuntimeStartSucceeded
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: ssis_integration_runtime_start_failed
-  azure_name: SSISIntegrationRuntimeStartFailed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: ssis_integration_runtime_start_cancel
-  azure_name: SSISIntegrationRuntimeStartCancel
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: ssis_integration_runtime_stop_succeeded
-  azure_name: SSISIntegrationRuntimeStopSucceeded
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: ssis_integration_runtime_stop_stuck
-  azure_name: SSISIntegrationRuntimeStopStuck
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: ssis_package_execution_succeeded
-  azure_name: SSISPackageExecutionSucceeded
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: ssis_package_execution_failed
-  azure_name: SSISPackageExecutionFailed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: ssis_package_execution_cancel
-  azure_name: SSISPackageExecutionCancel
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: integration_runtime_cpu_percentage
-  azure_name: IntegrationRuntimeCpuPercentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: integration_runtime_available_memory
-  azure_name: IntegrationRuntimeAvailableMemory
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: integration_runtime_available_node_number
-  azure_name: IntegrationRuntimeAvailableNodeNumber
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: integration_runtime_queue_length
-  azure_name: IntegrationRuntimeQueueLength
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: integration_runtime_average_task_pickup_delay
-  azure_name: IntegrationRuntimeAverageTaskPickupDelay
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: factory_size_in_gb_units
-  azure_name: FactorySizeInGbUnits
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: max_allowed_factory_size_in_gb_units
-  azure_name: MaxAllowedFactorySizeInGbUnits
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: resource_count
-  azure_name: ResourceCount
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: max_allowed_resource_count
-  azure_name: MaxAllowedResourceCount
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: mv_net_ir_copy_available_capacity_pct
-  azure_name: MVNetIRCopyAvailableCapacityPCT
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: mv_net_ir_copy_capacity_utilization
-  azure_name: MVNetIRCopyCapacityUtilization
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: mv_net_ir_copy_waiting_queue_length
-  azure_name: MVNetIRCopyWaitingQueueLength
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: mv_net_ir_external_available_capacity_pct
-  azure_name: MVNetIRExternalAvailableCapacityPCT
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: mv_net_ir_external_capacity_utilization
-  azure_name: MVNetIRExternalCapacityUtilization
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: mv_net_ir_external_waiting_queue_length
-  azure_name: MVNetIRExternalWaitingQueueLength
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: mv_net_ir_pipeline_available_capacity_pct
-  azure_name: MVNetIRPipelineAvailableCapacityPCT
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: mv_net_ir_pipeline_capacity_utilization
-  azure_name: MVNetIRPipelineCapacityUtilization
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: mv_net_ir_pipeline_waiting_queue_length
-  azure_name: MVNetIRPipelineWaitingQueueLength
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_cpu_percentage
-  azure_name: AirflowIntegrationRuntimeCpuPercentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_cpu_usage
-  azure_name: AirflowIntegrationRuntimeCpuUsage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_memory_percentage
-  azure_name: AirflowIntegrationRuntimeMemoryPercentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_memory_usage
-  azure_name: AirflowIntegrationRuntimeMemoryUsage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_node_count
-  azure_name: AirflowIntegrationRuntimeNodeCount
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_collect_db_dags
-  azure_name: AirflowIntegrationRuntimeCollectDBDags
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_dag_bag_size
-  azure_name: AirflowIntegrationRuntimeDagBagSize
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_dag_callback_exceptions
-  azure_name: AirflowIntegrationRuntimeDagCallbackExceptions
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_dag_file_refresh_error
-  azure_name: AirflowIntegrationRuntimeDAGFileRefreshError
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_dag_processing_import_errors
-  azure_name: AirflowIntegrationRuntimeDAGProcessingImportErrors
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_dag_processing_last_duration
-  azure_name: AirflowIntegrationRuntimeDAGProcessingLastDuration
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_dag_processing_last_run_seconds_ago
-  azure_name: AirflowIntegrationRuntimeDAGProcessingLastRunSecondsAgo
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_dag_processing_manager_stalls
-  azure_name: AirflowIntegrationRuntimeDAGProcessingManagerStalls
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_dag_processing_processes
-  azure_name: AirflowIntegrationRuntimeDAGProcessingProcesses
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_dag_processing_processor_timeouts
-  azure_name: AirflowIntegrationRuntimeDAGProcessingProcessorTimeouts
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_dag_processing_total_parse_time
-  azure_name: AirflowIntegrationRuntimeDAGProcessingTotalParseTime
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_dag_run_dependency_check
-  azure_name: AirflowIntegrationRuntimeDAGRunDependencyCheck
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_dag_run_duration_failed
-  azure_name: AirflowIntegrationRuntimeDAGRunDurationFailed
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_dag_run_duration_success
-  azure_name: AirflowIntegrationRuntimeDAGRunDurationSuccess
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_dag_run_first_task_scheduling_delay
-  azure_name: AirflowIntegrationRuntimeDAGRunFirstTaskSchedulingDelay
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_dag_run_schedule_delay
-  azure_name: AirflowIntegrationRuntimeDAGRunScheduleDelay
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_executor_open_slots
-  azure_name: AirflowIntegrationRuntimeExecutorOpenSlots
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_executor_queued_tasks
-  azure_name: AirflowIntegrationRuntimeExecutorQueuedTasks
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_executor_running_tasks
-  azure_name: AirflowIntegrationRuntimeExecutorRunningTasks
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_job_start
-  azure_name: AirflowIntegrationRuntimeJobStart
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_job_end
-  azure_name: AirflowIntegrationRuntimeJobEnd
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_job_heartbeat_failure
-  azure_name: AirflowIntegrationRuntimeJobHeartbeatFailure
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_operator_successes
-  azure_name: AirflowIntegrationRuntimeOperatorSuccesses
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_operator_failures
-  azure_name: AirflowIntegrationRuntimeOperatorFailures
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_pool_open_slots
-  azure_name: AirflowIntegrationRuntimePoolOpenSlots
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_pool_queued_slots
-  azure_name: AirflowIntegrationRuntimePoolQueuedSlots
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_pool_running_slots
-  azure_name: AirflowIntegrationRuntimePoolRunningSlots
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_pool_starving_tasks
-  azure_name: AirflowIntegrationRuntimePoolStarvingTasks
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_scheduler_critical_section_busy
-  azure_name: AirflowIntegrationRuntimeSchedulerCriticalSectionBusy
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_scheduler_critical_section_duration
-  azure_name: AirflowIntegrationRuntimeSchedulerCriticalSectionDuration
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_scheduler_failed_sla_email_attempts
-  azure_name: AirflowIntegrationRuntimeSchedulerFailedSLAEmailAttempts
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_scheduler_heartbeat
-  azure_name: AirflowIntegrationRuntimeSchedulerHeartbeat
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_scheduler_orphaned_tasks_adopted
-  azure_name: AirflowIntegrationRuntimeSchedulerOrphanedTasksAdopted
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_scheduler_orphaned_tasks_cleared
-  azure_name: AirflowIntegrationRuntimeSchedulerOrphanedTasksCleared
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_scheduler_tasks_executable
-  azure_name: AirflowIntegrationRuntimeSchedulerTasksExecutable
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_scheduler_tasks_killed_externally
-  azure_name: AirflowIntegrationRuntimeSchedulerTasksKilledExternally
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_scheduler_tasks_running
-  azure_name: AirflowIntegrationRuntimeSchedulerTasksRunning
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_scheduler_tasks_starving
-  azure_name: AirflowIntegrationRuntimeSchedulerTasksStarving
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_started_task_instances
-  azure_name: AirflowIntegrationRuntimeStartedTaskInstances
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_task_instance_created_using_operator
-  azure_name: AirflowIntegrationRuntimeTaskInstanceCreatedUsingOperator
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_task_instance_duration
-  azure_name: AirflowIntegrationRuntimeTaskInstanceDuration
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: airflow_integration_runtime_task_instance_successes
-  azure_name: AirflowIntegrationRuntimeTaskInstanceSuccesses
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_task_instance_failures
-  azure_name: AirflowIntegrationRuntimeTaskInstanceFailures
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_task_instance_finished
-  azure_name: AirflowIntegrationRuntimeTaskInstanceFinished
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_task_instance_previously_succeeded
-  azure_name: AirflowIntegrationRuntimeTaskInstancePreviouslySucceeded
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_task_removed_from_dag
-  azure_name: AirflowIntegrationRuntimeTaskRemovedFromDAG
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_task_restored_to_dag
-  azure_name: AirflowIntegrationRuntimeTaskRestoredToDAG
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_celery_task_timeout_error
-  azure_name: AirflowIntegrationRuntimeCeleryTaskTimeoutError
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_triggers_blocked_main_thread
-  azure_name: AirflowIntegrationRuntimeTriggersBlockedMainThread
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_triggers_failed
-  azure_name: AirflowIntegrationRuntimeTriggersFailed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_triggers_running
-  azure_name: AirflowIntegrationRuntimeTriggersRunning
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_triggers_succeeded
-  azure_name: AirflowIntegrationRuntimeTriggersSucceeded
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: airflow_integration_runtime_zombies_killed
-  azure_name: AirflowIntegrationRuntimeZombiesKilled
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
+  - id: pipeline_succeeded_runs
+    azure_name: PipelineSucceededRuns
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: pipeline_failed_runs
+    azure_name: PipelineFailedRuns
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: pipeline_cancelled_runs
+    azure_name: PipelineCancelledRuns
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: pipeline_elapsed_time_runs
+    azure_name: PipelineElapsedTimeRuns
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: activity_succeeded_runs
+    azure_name: ActivitySucceededRuns
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: activity_failed_runs
+    azure_name: ActivityFailedRuns
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: activity_cancelled_runs
+    azure_name: ActivityCancelledRuns
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: trigger_succeeded_runs
+    azure_name: TriggerSucceededRuns
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: trigger_failed_runs
+    azure_name: TriggerFailedRuns
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: trigger_cancelled_runs
+    azure_name: TriggerCancelledRuns
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: ssis_integration_runtime_start_succeeded
+    azure_name: SSISIntegrationRuntimeStartSucceeded
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: ssis_integration_runtime_start_failed
+    azure_name: SSISIntegrationRuntimeStartFailed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: ssis_integration_runtime_start_cancel
+    azure_name: SSISIntegrationRuntimeStartCancel
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: ssis_integration_runtime_stop_succeeded
+    azure_name: SSISIntegrationRuntimeStopSucceeded
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: ssis_integration_runtime_stop_stuck
+    azure_name: SSISIntegrationRuntimeStopStuck
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: ssis_package_execution_succeeded
+    azure_name: SSISPackageExecutionSucceeded
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: ssis_package_execution_failed
+    azure_name: SSISPackageExecutionFailed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: ssis_package_execution_cancel
+    azure_name: SSISPackageExecutionCancel
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: integration_runtime_cpu_percentage
+    azure_name: IntegrationRuntimeCpuPercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: integration_runtime_available_memory
+    azure_name: IntegrationRuntimeAvailableMemory
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: integration_runtime_available_node_number
+    azure_name: IntegrationRuntimeAvailableNodeNumber
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: integration_runtime_queue_length
+    azure_name: IntegrationRuntimeQueueLength
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: integration_runtime_average_task_pickup_delay
+    azure_name: IntegrationRuntimeAverageTaskPickupDelay
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: factory_size_in_gb_units
+    azure_name: FactorySizeInGbUnits
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: max_allowed_factory_size_in_gb_units
+    azure_name: MaxAllowedFactorySizeInGbUnits
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: resource_count
+    azure_name: ResourceCount
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: max_allowed_resource_count
+    azure_name: MaxAllowedResourceCount
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: mv_net_ir_copy_available_capacity_pct
+    azure_name: MVNetIRCopyAvailableCapacityPCT
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: mv_net_ir_copy_capacity_utilization
+    azure_name: MVNetIRCopyCapacityUtilization
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: mv_net_ir_copy_waiting_queue_length
+    azure_name: MVNetIRCopyWaitingQueueLength
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: mv_net_ir_external_available_capacity_pct
+    azure_name: MVNetIRExternalAvailableCapacityPCT
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: mv_net_ir_external_capacity_utilization
+    azure_name: MVNetIRExternalCapacityUtilization
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: mv_net_ir_external_waiting_queue_length
+    azure_name: MVNetIRExternalWaitingQueueLength
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: mv_net_ir_pipeline_available_capacity_pct
+    azure_name: MVNetIRPipelineAvailableCapacityPCT
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: mv_net_ir_pipeline_capacity_utilization
+    azure_name: MVNetIRPipelineCapacityUtilization
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: mv_net_ir_pipeline_waiting_queue_length
+    azure_name: MVNetIRPipelineWaitingQueueLength
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_cpu_percentage
+    azure_name: AirflowIntegrationRuntimeCpuPercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_cpu_usage
+    azure_name: AirflowIntegrationRuntimeCpuUsage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_memory_percentage
+    azure_name: AirflowIntegrationRuntimeMemoryPercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_memory_usage
+    azure_name: AirflowIntegrationRuntimeMemoryUsage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_node_count
+    azure_name: AirflowIntegrationRuntimeNodeCount
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_collect_db_dags
+    azure_name: AirflowIntegrationRuntimeCollectDBDags
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_dag_bag_size
+    azure_name: AirflowIntegrationRuntimeDagBagSize
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_dag_callback_exceptions
+    azure_name: AirflowIntegrationRuntimeDagCallbackExceptions
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_dag_file_refresh_error
+    azure_name: AirflowIntegrationRuntimeDAGFileRefreshError
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_dag_processing_import_errors
+    azure_name: AirflowIntegrationRuntimeDAGProcessingImportErrors
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_dag_processing_last_duration
+    azure_name: AirflowIntegrationRuntimeDAGProcessingLastDuration
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_dag_processing_last_run_seconds_ago
+    azure_name: AirflowIntegrationRuntimeDAGProcessingLastRunSecondsAgo
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_dag_processing_manager_stalls
+    azure_name: AirflowIntegrationRuntimeDAGProcessingManagerStalls
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_dag_processing_processes
+    azure_name: AirflowIntegrationRuntimeDAGProcessingProcesses
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_dag_processing_processor_timeouts
+    azure_name: AirflowIntegrationRuntimeDAGProcessingProcessorTimeouts
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_dag_processing_total_parse_time
+    azure_name: AirflowIntegrationRuntimeDAGProcessingTotalParseTime
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_dag_run_dependency_check
+    azure_name: AirflowIntegrationRuntimeDAGRunDependencyCheck
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_dag_run_duration_failed
+    azure_name: AirflowIntegrationRuntimeDAGRunDurationFailed
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_dag_run_duration_success
+    azure_name: AirflowIntegrationRuntimeDAGRunDurationSuccess
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_dag_run_first_task_scheduling_delay
+    azure_name: AirflowIntegrationRuntimeDAGRunFirstTaskSchedulingDelay
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_dag_run_schedule_delay
+    azure_name: AirflowIntegrationRuntimeDAGRunScheduleDelay
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_executor_open_slots
+    azure_name: AirflowIntegrationRuntimeExecutorOpenSlots
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_executor_queued_tasks
+    azure_name: AirflowIntegrationRuntimeExecutorQueuedTasks
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_executor_running_tasks
+    azure_name: AirflowIntegrationRuntimeExecutorRunningTasks
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_job_start
+    azure_name: AirflowIntegrationRuntimeJobStart
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_job_end
+    azure_name: AirflowIntegrationRuntimeJobEnd
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_job_heartbeat_failure
+    azure_name: AirflowIntegrationRuntimeJobHeartbeatFailure
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_operator_successes
+    azure_name: AirflowIntegrationRuntimeOperatorSuccesses
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_operator_failures
+    azure_name: AirflowIntegrationRuntimeOperatorFailures
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_pool_open_slots
+    azure_name: AirflowIntegrationRuntimePoolOpenSlots
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_pool_queued_slots
+    azure_name: AirflowIntegrationRuntimePoolQueuedSlots
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_pool_running_slots
+    azure_name: AirflowIntegrationRuntimePoolRunningSlots
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_pool_starving_tasks
+    azure_name: AirflowIntegrationRuntimePoolStarvingTasks
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_scheduler_critical_section_busy
+    azure_name: AirflowIntegrationRuntimeSchedulerCriticalSectionBusy
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_scheduler_critical_section_duration
+    azure_name: AirflowIntegrationRuntimeSchedulerCriticalSectionDuration
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_scheduler_failed_sla_email_attempts
+    azure_name: AirflowIntegrationRuntimeSchedulerFailedSLAEmailAttempts
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_scheduler_heartbeat
+    azure_name: AirflowIntegrationRuntimeSchedulerHeartbeat
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_scheduler_orphaned_tasks_adopted
+    azure_name: AirflowIntegrationRuntimeSchedulerOrphanedTasksAdopted
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_scheduler_orphaned_tasks_cleared
+    azure_name: AirflowIntegrationRuntimeSchedulerOrphanedTasksCleared
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_scheduler_tasks_executable
+    azure_name: AirflowIntegrationRuntimeSchedulerTasksExecutable
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_scheduler_tasks_killed_externally
+    azure_name: AirflowIntegrationRuntimeSchedulerTasksKilledExternally
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_scheduler_tasks_running
+    azure_name: AirflowIntegrationRuntimeSchedulerTasksRunning
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_scheduler_tasks_starving
+    azure_name: AirflowIntegrationRuntimeSchedulerTasksStarving
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_started_task_instances
+    azure_name: AirflowIntegrationRuntimeStartedTaskInstances
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_task_instance_created_using_operator
+    azure_name: AirflowIntegrationRuntimeTaskInstanceCreatedUsingOperator
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_task_instance_duration
+    azure_name: AirflowIntegrationRuntimeTaskInstanceDuration
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: airflow_integration_runtime_task_instance_successes
+    azure_name: AirflowIntegrationRuntimeTaskInstanceSuccesses
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_task_instance_failures
+    azure_name: AirflowIntegrationRuntimeTaskInstanceFailures
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_task_instance_finished
+    azure_name: AirflowIntegrationRuntimeTaskInstanceFinished
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_task_instance_previously_succeeded
+    azure_name: AirflowIntegrationRuntimeTaskInstancePreviouslySucceeded
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_task_removed_from_dag
+    azure_name: AirflowIntegrationRuntimeTaskRemovedFromDAG
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_task_restored_to_dag
+    azure_name: AirflowIntegrationRuntimeTaskRestoredToDAG
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_celery_task_timeout_error
+    azure_name: AirflowIntegrationRuntimeCeleryTaskTimeoutError
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_triggers_blocked_main_thread
+    azure_name: AirflowIntegrationRuntimeTriggersBlockedMainThread
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_triggers_failed
+    azure_name: AirflowIntegrationRuntimeTriggersFailed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_triggers_running
+    azure_name: AirflowIntegrationRuntimeTriggersRunning
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_triggers_succeeded
+    azure_name: AirflowIntegrationRuntimeTriggersSucceeded
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: airflow_integration_runtime_zombies_killed
+    azure_name: AirflowIntegrationRuntimeZombiesKilled
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
 template:
   family: Azure Data Factory
   context_namespace: data_factory
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_data_factory__pipeline_runs
-    title: Azure Data Factory Pipeline Runs
-    context: pipeline_runs
-    family: Pipelines
-    type: line
-    units: runs/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.pipeline_succeeded_runs_total
-      name: succeeded
-    - selector: data_factory.pipeline_failed_runs_total
-      name: failed
-    - selector: data_factory.pipeline_cancelled_runs_total
-      name: cancelled
-  - id: am_azure_data_factory__pipeline_elapsed_time
-    title: Azure Data Factory Pipeline Elapsed Time Runs
-    context: pipeline_elapsed_time
-    family: Pipelines
-    type: line
-    units: runs/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.pipeline_elapsed_time_runs_total
-      name: elapsed_time
-  - id: am_azure_data_factory__activity_runs
-    title: Azure Data Factory Activity Runs
-    context: activity_runs
-    family: Activities
-    type: line
-    units: runs/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.activity_succeeded_runs_total
-      name: succeeded
-    - selector: data_factory.activity_failed_runs_total
-      name: failed
-    - selector: data_factory.activity_cancelled_runs_total
-      name: cancelled
-  - id: am_azure_data_factory__trigger_runs
-    title: Azure Data Factory Trigger Runs
-    context: trigger_runs
-    family: Triggers
-    type: line
-    units: runs/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.trigger_succeeded_runs_total
-      name: succeeded
-    - selector: data_factory.trigger_failed_runs_total
-      name: failed
-    - selector: data_factory.trigger_cancelled_runs_total
-      name: cancelled
-  - id: am_azure_data_factory__ssis_ir_starts
-    title: Azure Data Factory SSIS IR Start Operations
-    context: ssis_ir_starts
-    family: SSIS
-    type: line
-    units: runs/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.ssis_integration_runtime_start_succeeded_total
-      name: succeeded
-    - selector: data_factory.ssis_integration_runtime_start_failed_total
-      name: failed
-    - selector: data_factory.ssis_integration_runtime_start_cancel_total
-      name: cancelled
-  - id: am_azure_data_factory__ssis_ir_stops
-    title: Azure Data Factory SSIS IR Stop Operations
-    context: ssis_ir_stops
-    family: SSIS
-    type: line
-    units: runs/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.ssis_integration_runtime_stop_succeeded_total
-      name: succeeded
-    - selector: data_factory.ssis_integration_runtime_stop_stuck_total
-      name: stuck
-  - id: am_azure_data_factory__ssis_package_executions
-    title: Azure Data Factory SSIS Package Executions
-    context: ssis_package_executions
-    family: SSIS
-    type: line
-    units: executions/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.ssis_package_execution_succeeded_total
-      name: succeeded
-    - selector: data_factory.ssis_package_execution_failed_total
-      name: failed
-    - selector: data_factory.ssis_package_execution_cancel_total
-      name: cancelled
-  - id: am_azure_data_factory__ir_cpu
-    title: Azure Data Factory Integration Runtime CPU
-    context: ir_cpu
-    family: Integration Runtime
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.integration_runtime_cpu_percentage_average
-      name: average
-  - id: am_azure_data_factory__ir_memory
-    title: Azure Data Factory Integration Runtime Available Memory
-    context: ir_memory
-    family: Integration Runtime
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.integration_runtime_available_memory_average
-      name: available
-  - id: am_azure_data_factory__ir_nodes
-    title: Azure Data Factory Integration Runtime Available Nodes
-    context: ir_nodes
-    family: Integration Runtime
-    type: line
-    units: nodes
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.integration_runtime_available_node_number_average
-      name: available
-  - id: am_azure_data_factory__ir_queue
-    title: Azure Data Factory Integration Runtime Queue
-    context: ir_queue
-    family: Integration Runtime
-    type: line
-    units: tasks
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.integration_runtime_queue_length_average
-      name: queue_length
-  - id: am_azure_data_factory__ir_task_pickup_delay
-    title: Azure Data Factory Integration Runtime Task Pickup Delay
-    context: ir_task_pickup_delay
-    family: Integration Runtime
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.integration_runtime_average_task_pickup_delay_average
-      name: average
-  - id: am_azure_data_factory__factory_size
-    title: Azure Data Factory Factory Size
-    context: factory_size
-    family: Capacity
-    type: line
-    units: GiB
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.factory_size_in_gb_units_maximum
-      name: current
-    - selector: data_factory.max_allowed_factory_size_in_gb_units_maximum
-      name: max_allowed
-  - id: am_azure_data_factory__entity_count
-    title: Azure Data Factory Entity Count
-    context: entity_count
-    family: Capacity
-    type: line
-    units: entities
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.resource_count_maximum
-      name: current
-    - selector: data_factory.max_allowed_resource_count_maximum
-      name: max_allowed
-  - id: am_azure_data_factory__mvnet_ir_copy_capacity
-    title: Azure Data Factory MVNet IR Copy Capacity
-    context: mvnet_ir_copy_capacity
-    family: MVNet IR
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.mv_net_ir_copy_capacity_utilization_maximum
-      name: utilization
-    - selector: data_factory.mv_net_ir_copy_available_capacity_pct_maximum
-      name: available
-  - id: am_azure_data_factory__mvnet_ir_copy_queue
-    title: Azure Data Factory MVNet IR Copy Queue
-    context: mvnet_ir_copy_queue
-    family: MVNet IR
-    type: line
-    units: tasks
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.mv_net_ir_copy_waiting_queue_length_average
-      name: waiting
-  - id: am_azure_data_factory__mvnet_ir_external_capacity
-    title: Azure Data Factory MVNet IR External Capacity
-    context: mvnet_ir_external_capacity
-    family: MVNet IR
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.mv_net_ir_external_capacity_utilization_maximum
-      name: utilization
-    - selector: data_factory.mv_net_ir_external_available_capacity_pct_maximum
-      name: available
-  - id: am_azure_data_factory__mvnet_ir_external_queue
-    title: Azure Data Factory MVNet IR External Queue
-    context: mvnet_ir_external_queue
-    family: MVNet IR
-    type: line
-    units: tasks
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.mv_net_ir_external_waiting_queue_length_average
-      name: waiting
-  - id: am_azure_data_factory__mvnet_ir_pipeline_capacity
-    title: Azure Data Factory MVNet IR Pipeline Capacity
-    context: mvnet_ir_pipeline_capacity
-    family: MVNet IR
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.mv_net_ir_pipeline_capacity_utilization_maximum
-      name: utilization
-    - selector: data_factory.mv_net_ir_pipeline_available_capacity_pct_maximum
-      name: available
-  - id: am_azure_data_factory__mvnet_ir_pipeline_queue
-    title: Azure Data Factory MVNet IR Pipeline Queue
-    context: mvnet_ir_pipeline_queue
-    family: MVNet IR
-    type: line
-    units: tasks
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.mv_net_ir_pipeline_waiting_queue_length_average
-      name: waiting
-  - id: am_azure_data_factory__airflow_ir_cpu
-    title: Azure Data Factory Airflow IR CPU
-    context: airflow_ir_cpu
-    family: Airflow IR
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_cpu_percentage_average
-      name: percentage
-  - id: am_azure_data_factory__airflow_ir_cpu_usage
-    title: Azure Data Factory Airflow IR CPU Usage
-    context: airflow_ir_cpu_usage
-    family: Airflow IR
-    type: line
-    units: millicores
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_cpu_usage_average
-      name: average
-  - id: am_azure_data_factory__airflow_ir_memory
-    title: Azure Data Factory Airflow IR Memory
-    context: airflow_ir_memory
-    family: Airflow IR
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_memory_percentage_average
-      name: percentage
-  - id: am_azure_data_factory__airflow_ir_memory_usage
-    title: Azure Data Factory Airflow IR Memory Usage
-    context: airflow_ir_memory_usage
-    family: Airflow IR
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_memory_usage_average
-      name: average
-  - id: am_azure_data_factory__airflow_ir_nodes
-    title: Azure Data Factory Airflow IR Node Count
-    context: airflow_ir_nodes
-    family: Airflow IR
-    type: line
-    units: nodes
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_node_count_average
-      name: average
-  - id: am_azure_data_factory__airflow_ir_dag_collection
-    title: Azure Data Factory Airflow IR DAG DB Collection Time
-    context: airflow_ir_dag_collection
-    family: Airflow DAG Processing
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_collect_db_dags_average
-      name: average
-  - id: am_azure_data_factory__airflow_ir_dag_bag
-    title: Azure Data Factory Airflow IR DAG Bag Size
-    context: airflow_ir_dag_bag
-    family: Airflow DAG Processing
-    type: line
-    units: dags/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_dag_bag_size_total
-      name: total
-  - id: am_azure_data_factory__airflow_ir_dag_errors
-    title: Azure Data Factory Airflow IR DAG Errors
-    context: airflow_ir_dag_errors
-    family: Airflow DAG Processing
-    type: line
-    units: errors/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_dag_callback_exceptions_total
-      name: callback_exceptions
-    - selector: data_factory.airflow_integration_runtime_dag_file_refresh_error_total
-      name: file_refresh
-    - selector: data_factory.airflow_integration_runtime_dag_processing_import_errors_total
-      name: import
-  - id: am_azure_data_factory__airflow_ir_dag_processing_duration
-    title: Azure Data Factory Airflow IR DAG Processing Duration
-    context: airflow_ir_dag_processing_duration
-    family: Airflow DAG Processing
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_dag_processing_last_duration_average
-      name: last_duration
-  - id: am_azure_data_factory__airflow_ir_dag_processing_lag
-    title: Azure Data Factory Airflow IR DAG Processing Lag
-    context: airflow_ir_dag_processing_lag
-    family: Airflow DAG Processing
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_dag_processing_last_run_seconds_ago_average
-      name: last_run_seconds_ago
-    - selector: data_factory.airflow_integration_runtime_dag_processing_processor_timeouts_average
-      name: processor_timeouts
-    - selector: data_factory.airflow_integration_runtime_dag_processing_total_parse_time_average
-      name: total_parse_time
-  - id: am_azure_data_factory__airflow_ir_dag_processing_activity
-    title: Azure Data Factory Airflow IR DAG Processing Activity
-    context: airflow_ir_dag_processing_activity
-    family: Airflow DAG Processing
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_dag_processing_manager_stalls_total
-      name: manager_stalls
-    - selector: data_factory.airflow_integration_runtime_dag_processing_processes_total
-      name: processes
-  - id: am_azure_data_factory__airflow_ir_dag_run_duration
-    title: Azure Data Factory Airflow IR DAG Run Duration
-    context: airflow_ir_dag_run_duration
-    family: Airflow DAG Runs
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_dag_run_duration_success_average
-      name: success
-    - selector: data_factory.airflow_integration_runtime_dag_run_duration_failed_average
-      name: failed
-  - id: am_azure_data_factory__airflow_ir_dag_run_scheduling
-    title: Azure Data Factory Airflow IR DAG Run Scheduling Delays
-    context: airflow_ir_dag_run_scheduling
-    family: Airflow DAG Runs
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_dag_run_dependency_check_average
-      name: dependency_check
-    - selector: data_factory.airflow_integration_runtime_dag_run_first_task_scheduling_delay_average
-      name: first_task_delay
-    - selector: data_factory.airflow_integration_runtime_dag_run_schedule_delay_average
-      name: schedule_delay
-  - id: am_azure_data_factory__airflow_ir_executor
-    title: Azure Data Factory Airflow IR Executor
-    context: airflow_ir_executor
-    family: Airflow Executor
-    type: line
-    units: slots/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_executor_open_slots_total
-      name: open_slots
-    - selector: data_factory.airflow_integration_runtime_executor_queued_tasks_total
-      name: queued_tasks
-    - selector: data_factory.airflow_integration_runtime_executor_running_tasks_total
-      name: running_tasks
-  - id: am_azure_data_factory__airflow_ir_jobs
-    title: Azure Data Factory Airflow IR Jobs
-    context: airflow_ir_jobs
-    family: Airflow Jobs
-    type: line
-    units: jobs/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_job_start_total
-      name: started
-    - selector: data_factory.airflow_integration_runtime_job_end_total
-      name: ended
-    - selector: data_factory.airflow_integration_runtime_job_heartbeat_failure_total
-      name: heartbeat_failures
-  - id: am_azure_data_factory__airflow_ir_operators
-    title: Azure Data Factory Airflow IR Operators
-    context: airflow_ir_operators
-    family: Airflow Operators
-    type: line
-    units: operations/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_operator_successes_total
-      name: successes
-    - selector: data_factory.airflow_integration_runtime_operator_failures_total
-      name: failures
-  - id: am_azure_data_factory__airflow_ir_pool_slots
-    title: Azure Data Factory Airflow IR Pool Slots
-    context: airflow_ir_pool_slots
-    family: Airflow Pools
-    type: line
-    units: slots/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_pool_open_slots_total
-      name: open
-    - selector: data_factory.airflow_integration_runtime_pool_queued_slots_total
-      name: queued
-    - selector: data_factory.airflow_integration_runtime_pool_running_slots_total
-      name: running
-  - id: am_azure_data_factory__airflow_ir_pool_starving
-    title: Azure Data Factory Airflow IR Pool Starving Tasks
-    context: airflow_ir_pool_starving
-    family: Airflow Pools
-    type: line
-    units: tasks/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_pool_starving_tasks_total
-      name: starving
-  - id: am_azure_data_factory__airflow_ir_scheduler_critical_section
-    title: Azure Data Factory Airflow IR Scheduler Critical Section
-    context: airflow_ir_scheduler_critical_section
-    family: Airflow Scheduler
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_scheduler_critical_section_duration_average
-      name: duration
-  - id: am_azure_data_factory__airflow_ir_scheduler_activity
-    title: Azure Data Factory Airflow IR Scheduler Activity
-    context: airflow_ir_scheduler_activity
-    family: Airflow Scheduler
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_scheduler_critical_section_busy_total
-      name: critical_section_busy
-    - selector: data_factory.airflow_integration_runtime_scheduler_heartbeat_total
-      name: heartbeats
-    - selector: data_factory.airflow_integration_runtime_scheduler_failed_sla_email_attempts_total
-      name: failed_sla_emails
-  - id: am_azure_data_factory__airflow_ir_scheduler_orphaned_tasks
-    title: Azure Data Factory Airflow IR Scheduler Orphaned Tasks
-    context: airflow_ir_scheduler_orphaned_tasks
-    family: Airflow Scheduler
-    type: line
-    units: tasks/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_scheduler_orphaned_tasks_adopted_total
-      name: adopted
-    - selector: data_factory.airflow_integration_runtime_scheduler_orphaned_tasks_cleared_total
-      name: cleared
-  - id: am_azure_data_factory__airflow_ir_scheduler_tasks
-    title: Azure Data Factory Airflow IR Scheduler Tasks
-    context: airflow_ir_scheduler_tasks
-    family: Airflow Scheduler
-    type: line
-    units: tasks/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_scheduler_tasks_executable_total
-      name: executable
-    - selector: data_factory.airflow_integration_runtime_scheduler_tasks_running_total
-      name: running
-    - selector: data_factory.airflow_integration_runtime_scheduler_tasks_starving_total
-      name: starving
-    - selector: data_factory.airflow_integration_runtime_scheduler_tasks_killed_externally_total
-      name: killed_externally
-  - id: am_azure_data_factory__airflow_ir_task_instances
-    title: Azure Data Factory Airflow IR Task Instances
-    context: airflow_ir_task_instances
-    family: Airflow Tasks
-    type: line
-    units: instances/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_started_task_instances_total
-      name: started
-    - selector: data_factory.airflow_integration_runtime_task_instance_successes_total
-      name: succeeded
-    - selector: data_factory.airflow_integration_runtime_task_instance_failures_total
-      name: failed
-    - selector: data_factory.airflow_integration_runtime_task_instance_finished_total
-      name: finished
-    - selector: data_factory.airflow_integration_runtime_task_instance_previously_succeeded_total
-      name: previously_succeeded
-    - selector: data_factory.airflow_integration_runtime_task_instance_created_using_operator_total
-      name: created_via_operator
-  - id: am_azure_data_factory__airflow_ir_task_instance_duration
-    title: Azure Data Factory Airflow IR Task Instance Duration
-    context: airflow_ir_task_instance_duration
-    family: Airflow Tasks
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_task_instance_duration_average
-      name: average
-  - id: am_azure_data_factory__airflow_ir_task_dag_changes
-    title: Azure Data Factory Airflow IR Task DAG Changes
-    context: airflow_ir_task_dag_changes
-    family: Airflow Tasks
-    type: line
-    units: tasks/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_task_removed_from_dag_total
-      name: removed
-    - selector: data_factory.airflow_integration_runtime_task_restored_to_dag_total
-      name: restored
-  - id: am_azure_data_factory__airflow_ir_triggers
-    title: Azure Data Factory Airflow IR Triggers
-    context: airflow_ir_triggers
-    family: Airflow Triggers
-    type: line
-    units: triggers/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_triggers_succeeded_total
-      name: succeeded
-    - selector: data_factory.airflow_integration_runtime_triggers_failed_total
-      name: failed
-    - selector: data_factory.airflow_integration_runtime_triggers_running_total
-      name: running
-  - id: am_azure_data_factory__airflow_ir_trigger_issues
-    title: Azure Data Factory Airflow IR Trigger Issues
-    context: airflow_ir_trigger_issues
-    family: Airflow Triggers
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_triggers_blocked_main_thread_total
-      name: blocked_main_thread
-    - selector: data_factory.airflow_integration_runtime_celery_task_timeout_error_total
-      name: celery_timeout_errors
-  - id: am_azure_data_factory__airflow_ir_zombies
-    title: Azure Data Factory Airflow IR Zombie Tasks Killed
-    context: airflow_ir_zombies
-    family: Airflow Triggers
-    type: line
-    units: tasks/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_factory.airflow_integration_runtime_zombies_killed_total
-      name: killed
+    - id: am_azure_data_factory__pipeline_runs
+      title: Azure Data Factory Pipeline Runs
+      context: pipeline_runs
+      family: Pipelines
+      type: line
+      units: runs/s
+      algorithm: incremental
+      dimensions:
+        - selector: pipeline_succeeded_runs_total
+          name: succeeded
+        - selector: pipeline_failed_runs_total
+          name: failed
+        - selector: pipeline_cancelled_runs_total
+          name: cancelled
+    - id: am_azure_data_factory__pipeline_elapsed_time
+      title: Azure Data Factory Pipeline Elapsed Time Runs
+      context: pipeline_elapsed_time
+      family: Pipelines
+      type: line
+      units: runs/s
+      algorithm: incremental
+      dimensions:
+        - selector: pipeline_elapsed_time_runs_total
+          name: elapsed_time
+    - id: am_azure_data_factory__activity_runs
+      title: Azure Data Factory Activity Runs
+      context: activity_runs
+      family: Activities
+      type: line
+      units: runs/s
+      algorithm: incremental
+      dimensions:
+        - selector: activity_succeeded_runs_total
+          name: succeeded
+        - selector: activity_failed_runs_total
+          name: failed
+        - selector: activity_cancelled_runs_total
+          name: cancelled
+    - id: am_azure_data_factory__trigger_runs
+      title: Azure Data Factory Trigger Runs
+      context: trigger_runs
+      family: Triggers
+      type: line
+      units: runs/s
+      algorithm: incremental
+      dimensions:
+        - selector: trigger_succeeded_runs_total
+          name: succeeded
+        - selector: trigger_failed_runs_total
+          name: failed
+        - selector: trigger_cancelled_runs_total
+          name: cancelled
+    - id: am_azure_data_factory__ssis_ir_starts
+      title: Azure Data Factory SSIS IR Start Operations
+      context: ssis_ir_starts
+      family: SSIS
+      type: line
+      units: runs/s
+      algorithm: incremental
+      dimensions:
+        - selector: ssis_integration_runtime_start_succeeded_total
+          name: succeeded
+        - selector: ssis_integration_runtime_start_failed_total
+          name: failed
+        - selector: ssis_integration_runtime_start_cancel_total
+          name: cancelled
+    - id: am_azure_data_factory__ssis_ir_stops
+      title: Azure Data Factory SSIS IR Stop Operations
+      context: ssis_ir_stops
+      family: SSIS
+      type: line
+      units: runs/s
+      algorithm: incremental
+      dimensions:
+        - selector: ssis_integration_runtime_stop_succeeded_total
+          name: succeeded
+        - selector: ssis_integration_runtime_stop_stuck_total
+          name: stuck
+    - id: am_azure_data_factory__ssis_package_executions
+      title: Azure Data Factory SSIS Package Executions
+      context: ssis_package_executions
+      family: SSIS
+      type: line
+      units: executions/s
+      algorithm: incremental
+      dimensions:
+        - selector: ssis_package_execution_succeeded_total
+          name: succeeded
+        - selector: ssis_package_execution_failed_total
+          name: failed
+        - selector: ssis_package_execution_cancel_total
+          name: cancelled
+    - id: am_azure_data_factory__ir_cpu
+      title: Azure Data Factory Integration Runtime CPU
+      context: ir_cpu
+      family: Integration Runtime
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: integration_runtime_cpu_percentage_average
+          name: average
+    - id: am_azure_data_factory__ir_memory
+      title: Azure Data Factory Integration Runtime Available Memory
+      context: ir_memory
+      family: Integration Runtime
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: integration_runtime_available_memory_average
+          name: available
+    - id: am_azure_data_factory__ir_nodes
+      title: Azure Data Factory Integration Runtime Available Nodes
+      context: ir_nodes
+      family: Integration Runtime
+      type: line
+      units: nodes
+      algorithm: absolute
+      dimensions:
+        - selector: integration_runtime_available_node_number_average
+          name: available
+    - id: am_azure_data_factory__ir_queue
+      title: Azure Data Factory Integration Runtime Queue
+      context: ir_queue
+      family: Integration Runtime
+      type: line
+      units: tasks
+      algorithm: absolute
+      dimensions:
+        - selector: integration_runtime_queue_length_average
+          name: queue_length
+    - id: am_azure_data_factory__ir_task_pickup_delay
+      title: Azure Data Factory Integration Runtime Task Pickup Delay
+      context: ir_task_pickup_delay
+      family: Integration Runtime
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: integration_runtime_average_task_pickup_delay_average
+          name: average
+    - id: am_azure_data_factory__factory_size
+      title: Azure Data Factory Factory Size
+      context: factory_size
+      family: Capacity
+      type: line
+      units: GiB
+      algorithm: absolute
+      dimensions:
+        - selector: factory_size_in_gb_units_maximum
+          name: current
+        - selector: max_allowed_factory_size_in_gb_units_maximum
+          name: max_allowed
+    - id: am_azure_data_factory__entity_count
+      title: Azure Data Factory Entity Count
+      context: entity_count
+      family: Capacity
+      type: line
+      units: entities
+      algorithm: absolute
+      dimensions:
+        - selector: resource_count_maximum
+          name: current
+        - selector: max_allowed_resource_count_maximum
+          name: max_allowed
+    - id: am_azure_data_factory__mvnet_ir_copy_capacity
+      title: Azure Data Factory MVNet IR Copy Capacity
+      context: mvnet_ir_copy_capacity
+      family: MVNet IR
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: mv_net_ir_copy_capacity_utilization_maximum
+          name: utilization
+        - selector: mv_net_ir_copy_available_capacity_pct_maximum
+          name: available
+    - id: am_azure_data_factory__mvnet_ir_copy_queue
+      title: Azure Data Factory MVNet IR Copy Queue
+      context: mvnet_ir_copy_queue
+      family: MVNet IR
+      type: line
+      units: tasks
+      algorithm: absolute
+      dimensions:
+        - selector: mv_net_ir_copy_waiting_queue_length_average
+          name: waiting
+    - id: am_azure_data_factory__mvnet_ir_external_capacity
+      title: Azure Data Factory MVNet IR External Capacity
+      context: mvnet_ir_external_capacity
+      family: MVNet IR
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: mv_net_ir_external_capacity_utilization_maximum
+          name: utilization
+        - selector: mv_net_ir_external_available_capacity_pct_maximum
+          name: available
+    - id: am_azure_data_factory__mvnet_ir_external_queue
+      title: Azure Data Factory MVNet IR External Queue
+      context: mvnet_ir_external_queue
+      family: MVNet IR
+      type: line
+      units: tasks
+      algorithm: absolute
+      dimensions:
+        - selector: mv_net_ir_external_waiting_queue_length_average
+          name: waiting
+    - id: am_azure_data_factory__mvnet_ir_pipeline_capacity
+      title: Azure Data Factory MVNet IR Pipeline Capacity
+      context: mvnet_ir_pipeline_capacity
+      family: MVNet IR
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: mv_net_ir_pipeline_capacity_utilization_maximum
+          name: utilization
+        - selector: mv_net_ir_pipeline_available_capacity_pct_maximum
+          name: available
+    - id: am_azure_data_factory__mvnet_ir_pipeline_queue
+      title: Azure Data Factory MVNet IR Pipeline Queue
+      context: mvnet_ir_pipeline_queue
+      family: MVNet IR
+      type: line
+      units: tasks
+      algorithm: absolute
+      dimensions:
+        - selector: mv_net_ir_pipeline_waiting_queue_length_average
+          name: waiting
+    - id: am_azure_data_factory__airflow_ir_cpu
+      title: Azure Data Factory Airflow IR CPU
+      context: airflow_ir_cpu
+      family: Airflow IR
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: airflow_integration_runtime_cpu_percentage_average
+          name: percentage
+    - id: am_azure_data_factory__airflow_ir_cpu_usage
+      title: Azure Data Factory Airflow IR CPU Usage
+      context: airflow_ir_cpu_usage
+      family: Airflow IR
+      type: line
+      units: millicores
+      algorithm: absolute
+      dimensions:
+        - selector: airflow_integration_runtime_cpu_usage_average
+          name: average
+    - id: am_azure_data_factory__airflow_ir_memory
+      title: Azure Data Factory Airflow IR Memory
+      context: airflow_ir_memory
+      family: Airflow IR
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: airflow_integration_runtime_memory_percentage_average
+          name: percentage
+    - id: am_azure_data_factory__airflow_ir_memory_usage
+      title: Azure Data Factory Airflow IR Memory Usage
+      context: airflow_ir_memory_usage
+      family: Airflow IR
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: airflow_integration_runtime_memory_usage_average
+          name: average
+    - id: am_azure_data_factory__airflow_ir_nodes
+      title: Azure Data Factory Airflow IR Node Count
+      context: airflow_ir_nodes
+      family: Airflow IR
+      type: line
+      units: nodes
+      algorithm: absolute
+      dimensions:
+        - selector: airflow_integration_runtime_node_count_average
+          name: average
+    - id: am_azure_data_factory__airflow_ir_dag_collection
+      title: Azure Data Factory Airflow IR DAG DB Collection Time
+      context: airflow_ir_dag_collection
+      family: Airflow DAG Processing
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: airflow_integration_runtime_collect_db_dags_average
+          name: average
+    - id: am_azure_data_factory__airflow_ir_dag_bag
+      title: Azure Data Factory Airflow IR DAG Bag Size
+      context: airflow_ir_dag_bag
+      family: Airflow DAG Processing
+      type: line
+      units: dags/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_dag_bag_size_total
+          name: total
+    - id: am_azure_data_factory__airflow_ir_dag_errors
+      title: Azure Data Factory Airflow IR DAG Errors
+      context: airflow_ir_dag_errors
+      family: Airflow DAG Processing
+      type: line
+      units: errors/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_dag_callback_exceptions_total
+          name: callback_exceptions
+        - selector: airflow_integration_runtime_dag_file_refresh_error_total
+          name: file_refresh
+        - selector: airflow_integration_runtime_dag_processing_import_errors_total
+          name: import
+    - id: am_azure_data_factory__airflow_ir_dag_processing_duration
+      title: Azure Data Factory Airflow IR DAG Processing Duration
+      context: airflow_ir_dag_processing_duration
+      family: Airflow DAG Processing
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: airflow_integration_runtime_dag_processing_last_duration_average
+          name: last_duration
+    - id: am_azure_data_factory__airflow_ir_dag_processing_lag
+      title: Azure Data Factory Airflow IR DAG Processing Lag
+      context: airflow_ir_dag_processing_lag
+      family: Airflow DAG Processing
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: airflow_integration_runtime_dag_processing_last_run_seconds_ago_average
+          name: last_run_seconds_ago
+        - selector: airflow_integration_runtime_dag_processing_processor_timeouts_average
+          name: processor_timeouts
+        - selector: airflow_integration_runtime_dag_processing_total_parse_time_average
+          name: total_parse_time
+    - id: am_azure_data_factory__airflow_ir_dag_processing_activity
+      title: Azure Data Factory Airflow IR DAG Processing Activity
+      context: airflow_ir_dag_processing_activity
+      family: Airflow DAG Processing
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_dag_processing_manager_stalls_total
+          name: manager_stalls
+        - selector: airflow_integration_runtime_dag_processing_processes_total
+          name: processes
+    - id: am_azure_data_factory__airflow_ir_dag_run_duration
+      title: Azure Data Factory Airflow IR DAG Run Duration
+      context: airflow_ir_dag_run_duration
+      family: Airflow DAG Runs
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: airflow_integration_runtime_dag_run_duration_success_average
+          name: success
+        - selector: airflow_integration_runtime_dag_run_duration_failed_average
+          name: failed
+    - id: am_azure_data_factory__airflow_ir_dag_run_scheduling
+      title: Azure Data Factory Airflow IR DAG Run Scheduling Delays
+      context: airflow_ir_dag_run_scheduling
+      family: Airflow DAG Runs
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: airflow_integration_runtime_dag_run_dependency_check_average
+          name: dependency_check
+        - selector: airflow_integration_runtime_dag_run_first_task_scheduling_delay_average
+          name: first_task_delay
+        - selector: airflow_integration_runtime_dag_run_schedule_delay_average
+          name: schedule_delay
+    - id: am_azure_data_factory__airflow_ir_executor
+      title: Azure Data Factory Airflow IR Executor
+      context: airflow_ir_executor
+      family: Airflow Executor
+      type: line
+      units: slots/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_executor_open_slots_total
+          name: open_slots
+        - selector: airflow_integration_runtime_executor_queued_tasks_total
+          name: queued_tasks
+        - selector: airflow_integration_runtime_executor_running_tasks_total
+          name: running_tasks
+    - id: am_azure_data_factory__airflow_ir_jobs
+      title: Azure Data Factory Airflow IR Jobs
+      context: airflow_ir_jobs
+      family: Airflow Jobs
+      type: line
+      units: jobs/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_job_start_total
+          name: started
+        - selector: airflow_integration_runtime_job_end_total
+          name: ended
+        - selector: airflow_integration_runtime_job_heartbeat_failure_total
+          name: heartbeat_failures
+    - id: am_azure_data_factory__airflow_ir_operators
+      title: Azure Data Factory Airflow IR Operators
+      context: airflow_ir_operators
+      family: Airflow Operators
+      type: line
+      units: operations/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_operator_successes_total
+          name: successes
+        - selector: airflow_integration_runtime_operator_failures_total
+          name: failures
+    - id: am_azure_data_factory__airflow_ir_pool_slots
+      title: Azure Data Factory Airflow IR Pool Slots
+      context: airflow_ir_pool_slots
+      family: Airflow Pools
+      type: line
+      units: slots/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_pool_open_slots_total
+          name: open
+        - selector: airflow_integration_runtime_pool_queued_slots_total
+          name: queued
+        - selector: airflow_integration_runtime_pool_running_slots_total
+          name: running
+    - id: am_azure_data_factory__airflow_ir_pool_starving
+      title: Azure Data Factory Airflow IR Pool Starving Tasks
+      context: airflow_ir_pool_starving
+      family: Airflow Pools
+      type: line
+      units: tasks/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_pool_starving_tasks_total
+          name: starving
+    - id: am_azure_data_factory__airflow_ir_scheduler_critical_section
+      title: Azure Data Factory Airflow IR Scheduler Critical Section
+      context: airflow_ir_scheduler_critical_section
+      family: Airflow Scheduler
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: airflow_integration_runtime_scheduler_critical_section_duration_average
+          name: duration
+    - id: am_azure_data_factory__airflow_ir_scheduler_activity
+      title: Azure Data Factory Airflow IR Scheduler Activity
+      context: airflow_ir_scheduler_activity
+      family: Airflow Scheduler
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_scheduler_critical_section_busy_total
+          name: critical_section_busy
+        - selector: airflow_integration_runtime_scheduler_heartbeat_total
+          name: heartbeats
+        - selector: airflow_integration_runtime_scheduler_failed_sla_email_attempts_total
+          name: failed_sla_emails
+    - id: am_azure_data_factory__airflow_ir_scheduler_orphaned_tasks
+      title: Azure Data Factory Airflow IR Scheduler Orphaned Tasks
+      context: airflow_ir_scheduler_orphaned_tasks
+      family: Airflow Scheduler
+      type: line
+      units: tasks/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_scheduler_orphaned_tasks_adopted_total
+          name: adopted
+        - selector: airflow_integration_runtime_scheduler_orphaned_tasks_cleared_total
+          name: cleared
+    - id: am_azure_data_factory__airflow_ir_scheduler_tasks
+      title: Azure Data Factory Airflow IR Scheduler Tasks
+      context: airflow_ir_scheduler_tasks
+      family: Airflow Scheduler
+      type: line
+      units: tasks/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_scheduler_tasks_executable_total
+          name: executable
+        - selector: airflow_integration_runtime_scheduler_tasks_running_total
+          name: running
+        - selector: airflow_integration_runtime_scheduler_tasks_starving_total
+          name: starving
+        - selector: airflow_integration_runtime_scheduler_tasks_killed_externally_total
+          name: killed_externally
+    - id: am_azure_data_factory__airflow_ir_task_instances
+      title: Azure Data Factory Airflow IR Task Instances
+      context: airflow_ir_task_instances
+      family: Airflow Tasks
+      type: line
+      units: instances/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_started_task_instances_total
+          name: started
+        - selector: airflow_integration_runtime_task_instance_successes_total
+          name: succeeded
+        - selector: airflow_integration_runtime_task_instance_failures_total
+          name: failed
+        - selector: airflow_integration_runtime_task_instance_finished_total
+          name: finished
+        - selector: airflow_integration_runtime_task_instance_previously_succeeded_total
+          name: previously_succeeded
+        - selector: airflow_integration_runtime_task_instance_created_using_operator_total
+          name: created_via_operator
+    - id: am_azure_data_factory__airflow_ir_task_instance_duration
+      title: Azure Data Factory Airflow IR Task Instance Duration
+      context: airflow_ir_task_instance_duration
+      family: Airflow Tasks
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: airflow_integration_runtime_task_instance_duration_average
+          name: average
+    - id: am_azure_data_factory__airflow_ir_task_dag_changes
+      title: Azure Data Factory Airflow IR Task DAG Changes
+      context: airflow_ir_task_dag_changes
+      family: Airflow Tasks
+      type: line
+      units: tasks/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_task_removed_from_dag_total
+          name: removed
+        - selector: airflow_integration_runtime_task_restored_to_dag_total
+          name: restored
+    - id: am_azure_data_factory__airflow_ir_triggers
+      title: Azure Data Factory Airflow IR Triggers
+      context: airflow_ir_triggers
+      family: Airflow Triggers
+      type: line
+      units: triggers/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_triggers_succeeded_total
+          name: succeeded
+        - selector: airflow_integration_runtime_triggers_failed_total
+          name: failed
+        - selector: airflow_integration_runtime_triggers_running_total
+          name: running
+    - id: am_azure_data_factory__airflow_ir_trigger_issues
+      title: Azure Data Factory Airflow IR Trigger Issues
+      context: airflow_ir_trigger_issues
+      family: Airflow Triggers
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_triggers_blocked_main_thread_total
+          name: blocked_main_thread
+        - selector: airflow_integration_runtime_celery_task_timeout_error_total
+          name: celery_timeout_errors
+    - id: am_azure_data_factory__airflow_ir_zombies
+      title: Azure Data Factory Airflow IR Zombie Tasks Killed
+      context: airflow_ir_zombies
+      family: Airflow Triggers
+      type: line
+      units: tasks/s
+      algorithm: incremental
+      dimensions:
+        - selector: airflow_integration_runtime_zombies_killed_total
+          name: killed

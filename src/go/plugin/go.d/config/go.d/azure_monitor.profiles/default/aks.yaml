@@ -1,459 +1,458 @@
 ---
-id: aks
-name: Azure Kubernetes Service Cluster
+display_name: Azure Kubernetes Service Cluster
 resource_type: Microsoft.ContainerService/managedClusters
 metrics:
-- id: apiserver_cpu_usage_percentage
-  azure_name: apiserver_cpu_usage_percentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: apiserver_memory_usage_percentage
-  azure_name: apiserver_memory_usage_percentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: apiserver_current_inflight_requests
-  azure_name: apiserver_current_inflight_requests
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: etcd_cpu_usage_percentage
-  azure_name: etcd_cpu_usage_percentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: etcd_memory_usage_percentage
-  azure_name: etcd_memory_usage_percentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: etcd_database_usage_percentage
-  azure_name: etcd_database_usage_percentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: kube_pod_status_phase
-  azure_name: kube_pod_status_phase
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: kube_pod_status_ready
-  azure_name: kube_pod_status_ready
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: kube_node_status_allocatable_cpu_cores
-  azure_name: kube_node_status_allocatable_cpu_cores
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: kube_node_status_allocatable_memory_bytes
-  azure_name: kube_node_status_allocatable_memory_bytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: kube_node_status_condition
-  azure_name: kube_node_status_condition
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cluster_autoscaler_cluster_safe_to_autoscale
-  azure_name: cluster_autoscaler_cluster_safe_to_autoscale
-  time_grain: PT5M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cluster_autoscaler_unschedulable_pods_count
-  azure_name: cluster_autoscaler_unschedulable_pods_count
-  time_grain: PT5M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cluster_autoscaler_unneeded_nodes_count
-  azure_name: cluster_autoscaler_unneeded_nodes_count
-  time_grain: PT5M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cluster_autoscaler_scale_down_in_cooldown
-  azure_name: cluster_autoscaler_scale_down_in_cooldown
-  time_grain: PT5M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: node_cpu_usage_millicores
-  azure_name: node_cpu_usage_millicores
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: node_cpu_usage_percentage
-  azure_name: node_cpu_usage_percentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: node_memory_working_set_bytes
-  azure_name: node_memory_working_set_bytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: node_memory_working_set_percentage
-  azure_name: node_memory_working_set_percentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: node_memory_rss_bytes
-  azure_name: node_memory_rss_bytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: node_memory_rss_percentage
-  azure_name: node_memory_rss_percentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: node_disk_usage_bytes
-  azure_name: node_disk_usage_bytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: node_disk_usage_percentage
-  azure_name: node_disk_usage_percentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: node_network_in_bytes
-  azure_name: node_network_in_bytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: node_network_out_bytes
-  azure_name: node_network_out_bytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
+  - id: apiserver_cpu_usage_percentage
+    azure_name: apiserver_cpu_usage_percentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: apiserver_memory_usage_percentage
+    azure_name: apiserver_memory_usage_percentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: apiserver_current_inflight_requests
+    azure_name: apiserver_current_inflight_requests
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: etcd_cpu_usage_percentage
+    azure_name: etcd_cpu_usage_percentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: etcd_memory_usage_percentage
+    azure_name: etcd_memory_usage_percentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: etcd_database_usage_percentage
+    azure_name: etcd_database_usage_percentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: kube_pod_status_phase
+    azure_name: kube_pod_status_phase
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: kube_pod_status_ready
+    azure_name: kube_pod_status_ready
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: kube_node_status_allocatable_cpu_cores
+    azure_name: kube_node_status_allocatable_cpu_cores
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: kube_node_status_allocatable_memory_bytes
+    azure_name: kube_node_status_allocatable_memory_bytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: kube_node_status_condition
+    azure_name: kube_node_status_condition
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cluster_autoscaler_cluster_safe_to_autoscale
+    azure_name: cluster_autoscaler_cluster_safe_to_autoscale
+    time_grain: PT5M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cluster_autoscaler_unschedulable_pods_count
+    azure_name: cluster_autoscaler_unschedulable_pods_count
+    time_grain: PT5M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cluster_autoscaler_unneeded_nodes_count
+    azure_name: cluster_autoscaler_unneeded_nodes_count
+    time_grain: PT5M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cluster_autoscaler_scale_down_in_cooldown
+    azure_name: cluster_autoscaler_scale_down_in_cooldown
+    time_grain: PT5M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: node_cpu_usage_millicores
+    azure_name: node_cpu_usage_millicores
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: node_cpu_usage_percentage
+    azure_name: node_cpu_usage_percentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: node_memory_working_set_bytes
+    azure_name: node_memory_working_set_bytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: node_memory_working_set_percentage
+    azure_name: node_memory_working_set_percentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: node_memory_rss_bytes
+    azure_name: node_memory_rss_bytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: node_memory_rss_percentage
+    azure_name: node_memory_rss_percentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: node_disk_usage_bytes
+    azure_name: node_disk_usage_bytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: node_disk_usage_percentage
+    azure_name: node_disk_usage_percentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: node_network_in_bytes
+    azure_name: node_network_in_bytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: node_network_out_bytes
+    azure_name: node_network_out_bytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
 template:
   family: Azure Kubernetes Service Cluster
   context_namespace: aks
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_aks__apiserver_cpu
-    title: AKS API Server CPU Utilization
-    context: apiserver_cpu
-    family: API Server
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: aks.apiserver_cpu_usage_percentage_average
-      name: average
-    - selector: aks.apiserver_cpu_usage_percentage_maximum
-      name: maximum
-  - id: am_azure_aks__apiserver_memory
-    title: AKS API Server Memory Utilization
-    context: apiserver_memory
-    family: API Server
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: aks.apiserver_memory_usage_percentage_average
-      name: average
-    - selector: aks.apiserver_memory_usage_percentage_maximum
-      name: maximum
-  - id: am_azure_aks__apiserver_inflight_requests
-    title: AKS API Server Inflight Requests
-    context: apiserver_inflight_requests
-    family: API Server
-    type: line
-    units: requests
-    algorithm: absolute
-    dimensions:
-    - selector: aks.apiserver_current_inflight_requests_average
-      name: average
-  - id: am_azure_aks__etcd_cpu
-    title: AKS etcd CPU Utilization
-    context: etcd_cpu
-    family: Control Plane
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: aks.etcd_cpu_usage_percentage_average
-      name: average
-    - selector: aks.etcd_cpu_usage_percentage_maximum
-      name: maximum
-  - id: am_azure_aks__etcd_memory
-    title: AKS etcd Memory Utilization
-    context: etcd_memory
-    family: Control Plane
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: aks.etcd_memory_usage_percentage_average
-      name: average
-    - selector: aks.etcd_memory_usage_percentage_maximum
-      name: maximum
-  - id: am_azure_aks__etcd_database
-    title: AKS etcd Database Utilization
-    context: etcd_database
-    family: Control Plane
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: aks.etcd_database_usage_percentage_average
-      name: average
-    - selector: aks.etcd_database_usage_percentage_maximum
-      name: maximum
-  - id: am_azure_aks__pod_status_phase
-    title: AKS Pods by Phase
-    context: pod_status_phase
-    family: Pods
-    type: line
-    units: pods
-    algorithm: absolute
-    dimensions:
-    - selector: aks.kube_pod_status_phase_average
-      name: average
-  - id: am_azure_aks__pod_status_ready
-    title: AKS Pods in Ready State
-    context: pod_status_ready
-    family: Pods
-    type: line
-    units: pods
-    algorithm: absolute
-    dimensions:
-    - selector: aks.kube_pod_status_ready_average
-      name: average
-  - id: am_azure_aks__allocatable_cpu
-    title: AKS Allocatable CPU Cores
-    context: allocatable_cpu
-    family: Capacity
-    type: line
-    units: cores
-    algorithm: absolute
-    dimensions:
-    - selector: aks.kube_node_status_allocatable_cpu_cores_average
-      name: average
-  - id: am_azure_aks__allocatable_memory
-    title: AKS Allocatable Memory
-    context: allocatable_memory
-    family: Capacity
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: aks.kube_node_status_allocatable_memory_bytes_average
-      name: average
-  - id: am_azure_aks__node_conditions
-    title: AKS Node Conditions
-    context: node_conditions
-    family: Capacity
-    type: line
-    units: nodes
-    algorithm: absolute
-    dimensions:
-    - selector: aks.kube_node_status_condition_average
-      name: average
-  - id: am_azure_aks__autoscaler_health
-    title: AKS Cluster Autoscaler Health
-    context: autoscaler_health
-    family: Autoscaler
-    type: line
-    units: state
-    algorithm: absolute
-    dimensions:
-    - selector: aks.cluster_autoscaler_cluster_safe_to_autoscale_average
-      name: safe_to_autoscale
-    - selector: aks.cluster_autoscaler_scale_down_in_cooldown_average
-      name: cooldown
-  - id: am_azure_aks__autoscaler_unschedulable_pods
-    title: AKS Autoscaler Unschedulable Pods
-    context: autoscaler_unschedulable_pods
-    family: Autoscaler
-    type: line
-    units: pods
-    algorithm: absolute
-    dimensions:
-    - selector: aks.cluster_autoscaler_unschedulable_pods_count_average
-      name: average
-  - id: am_azure_aks__autoscaler_unneeded_nodes
-    title: AKS Autoscaler Unneeded Nodes
-    context: autoscaler_unneeded_nodes
-    family: Autoscaler
-    type: line
-    units: nodes
-    algorithm: absolute
-    dimensions:
-    - selector: aks.cluster_autoscaler_unneeded_nodes_count_average
-      name: average
-  - id: am_azure_aks__node_cpu_millicores
-    title: AKS Node CPU Usage
-    context: node_cpu_millicores
-    family: Nodes
-    type: line
-    units: millicores
-    algorithm: absolute
-    dimensions:
-    - selector: aks.node_cpu_usage_millicores_average
-      name: average
-    - selector: aks.node_cpu_usage_millicores_maximum
-      name: maximum
-  - id: am_azure_aks__node_cpu_percentage
-    title: AKS Node CPU Percentage
-    context: node_cpu_percentage
-    family: Nodes
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: aks.node_cpu_usage_percentage_average
-      name: average
-    - selector: aks.node_cpu_usage_percentage_maximum
-      name: maximum
-  - id: am_azure_aks__node_memory_working_set
-    title: AKS Node Memory Working Set
-    context: node_memory_working_set
-    family: Nodes
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: aks.node_memory_working_set_bytes_average
-      name: average
-    - selector: aks.node_memory_working_set_bytes_maximum
-      name: maximum
-  - id: am_azure_aks__node_memory_working_set_percentage
-    title: AKS Node Memory Working Set Percentage
-    context: node_memory_working_set_percentage
-    family: Nodes
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: aks.node_memory_working_set_percentage_average
-      name: average
-    - selector: aks.node_memory_working_set_percentage_maximum
-      name: maximum
-  - id: am_azure_aks__node_memory_rss
-    title: AKS Node Memory RSS
-    context: node_memory_rss
-    family: Nodes
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: aks.node_memory_rss_bytes_average
-      name: average
-    - selector: aks.node_memory_rss_bytes_maximum
-      name: maximum
-  - id: am_azure_aks__node_memory_rss_percentage
-    title: AKS Node Memory RSS Percentage
-    context: node_memory_rss_percentage
-    family: Nodes
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: aks.node_memory_rss_percentage_average
-      name: average
-    - selector: aks.node_memory_rss_percentage_maximum
-      name: maximum
-  - id: am_azure_aks__node_disk_usage
-    title: AKS Node Disk Usage
-    context: node_disk_usage
-    family: Nodes
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: aks.node_disk_usage_bytes_average
-      name: average
-    - selector: aks.node_disk_usage_bytes_maximum
-      name: maximum
-  - id: am_azure_aks__node_disk_percentage
-    title: AKS Node Disk Usage Percentage
-    context: node_disk_percentage
-    family: Nodes
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: aks.node_disk_usage_percentage_average
-      name: average
-    - selector: aks.node_disk_usage_percentage_maximum
-      name: maximum
-  - id: am_azure_aks__node_network
-    title: AKS Node Network Traffic
-    context: node_network
-    family: Network
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: aks.node_network_in_bytes_average
-      name: in
-    - selector: aks.node_network_out_bytes_average
-      name: out
+    - id: am_azure_aks__apiserver_cpu
+      title: AKS API Server CPU Utilization
+      context: apiserver_cpu
+      family: API Server
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: apiserver_cpu_usage_percentage_average
+          name: average
+        - selector: apiserver_cpu_usage_percentage_maximum
+          name: maximum
+    - id: am_azure_aks__apiserver_memory
+      title: AKS API Server Memory Utilization
+      context: apiserver_memory
+      family: API Server
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: apiserver_memory_usage_percentage_average
+          name: average
+        - selector: apiserver_memory_usage_percentage_maximum
+          name: maximum
+    - id: am_azure_aks__apiserver_inflight_requests
+      title: AKS API Server Inflight Requests
+      context: apiserver_inflight_requests
+      family: API Server
+      type: line
+      units: requests
+      algorithm: absolute
+      dimensions:
+        - selector: apiserver_current_inflight_requests_average
+          name: average
+    - id: am_azure_aks__etcd_cpu
+      title: AKS etcd CPU Utilization
+      context: etcd_cpu
+      family: Control Plane
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: etcd_cpu_usage_percentage_average
+          name: average
+        - selector: etcd_cpu_usage_percentage_maximum
+          name: maximum
+    - id: am_azure_aks__etcd_memory
+      title: AKS etcd Memory Utilization
+      context: etcd_memory
+      family: Control Plane
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: etcd_memory_usage_percentage_average
+          name: average
+        - selector: etcd_memory_usage_percentage_maximum
+          name: maximum
+    - id: am_azure_aks__etcd_database
+      title: AKS etcd Database Utilization
+      context: etcd_database
+      family: Control Plane
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: etcd_database_usage_percentage_average
+          name: average
+        - selector: etcd_database_usage_percentage_maximum
+          name: maximum
+    - id: am_azure_aks__pod_status_phase
+      title: AKS Pods by Phase
+      context: pod_status_phase
+      family: Pods
+      type: line
+      units: pods
+      algorithm: absolute
+      dimensions:
+        - selector: kube_pod_status_phase_average
+          name: average
+    - id: am_azure_aks__pod_status_ready
+      title: AKS Pods in Ready State
+      context: pod_status_ready
+      family: Pods
+      type: line
+      units: pods
+      algorithm: absolute
+      dimensions:
+        - selector: kube_pod_status_ready_average
+          name: average
+    - id: am_azure_aks__allocatable_cpu
+      title: AKS Allocatable CPU Cores
+      context: allocatable_cpu
+      family: Capacity
+      type: line
+      units: cores
+      algorithm: absolute
+      dimensions:
+        - selector: kube_node_status_allocatable_cpu_cores_average
+          name: average
+    - id: am_azure_aks__allocatable_memory
+      title: AKS Allocatable Memory
+      context: allocatable_memory
+      family: Capacity
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: kube_node_status_allocatable_memory_bytes_average
+          name: average
+    - id: am_azure_aks__node_conditions
+      title: AKS Node Conditions
+      context: node_conditions
+      family: Capacity
+      type: line
+      units: nodes
+      algorithm: absolute
+      dimensions:
+        - selector: kube_node_status_condition_average
+          name: average
+    - id: am_azure_aks__autoscaler_health
+      title: AKS Cluster Autoscaler Health
+      context: autoscaler_health
+      family: Autoscaler
+      type: line
+      units: state
+      algorithm: absolute
+      dimensions:
+        - selector: cluster_autoscaler_cluster_safe_to_autoscale_average
+          name: safe_to_autoscale
+        - selector: cluster_autoscaler_scale_down_in_cooldown_average
+          name: cooldown
+    - id: am_azure_aks__autoscaler_unschedulable_pods
+      title: AKS Autoscaler Unschedulable Pods
+      context: autoscaler_unschedulable_pods
+      family: Autoscaler
+      type: line
+      units: pods
+      algorithm: absolute
+      dimensions:
+        - selector: cluster_autoscaler_unschedulable_pods_count_average
+          name: average
+    - id: am_azure_aks__autoscaler_unneeded_nodes
+      title: AKS Autoscaler Unneeded Nodes
+      context: autoscaler_unneeded_nodes
+      family: Autoscaler
+      type: line
+      units: nodes
+      algorithm: absolute
+      dimensions:
+        - selector: cluster_autoscaler_unneeded_nodes_count_average
+          name: average
+    - id: am_azure_aks__node_cpu_millicores
+      title: AKS Node CPU Usage
+      context: node_cpu_millicores
+      family: Nodes
+      type: line
+      units: millicores
+      algorithm: absolute
+      dimensions:
+        - selector: node_cpu_usage_millicores_average
+          name: average
+        - selector: node_cpu_usage_millicores_maximum
+          name: maximum
+    - id: am_azure_aks__node_cpu_percentage
+      title: AKS Node CPU Percentage
+      context: node_cpu_percentage
+      family: Nodes
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: node_cpu_usage_percentage_average
+          name: average
+        - selector: node_cpu_usage_percentage_maximum
+          name: maximum
+    - id: am_azure_aks__node_memory_working_set
+      title: AKS Node Memory Working Set
+      context: node_memory_working_set
+      family: Nodes
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: node_memory_working_set_bytes_average
+          name: average
+        - selector: node_memory_working_set_bytes_maximum
+          name: maximum
+    - id: am_azure_aks__node_memory_working_set_percentage
+      title: AKS Node Memory Working Set Percentage
+      context: node_memory_working_set_percentage
+      family: Nodes
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: node_memory_working_set_percentage_average
+          name: average
+        - selector: node_memory_working_set_percentage_maximum
+          name: maximum
+    - id: am_azure_aks__node_memory_rss
+      title: AKS Node Memory RSS
+      context: node_memory_rss
+      family: Nodes
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: node_memory_rss_bytes_average
+          name: average
+        - selector: node_memory_rss_bytes_maximum
+          name: maximum
+    - id: am_azure_aks__node_memory_rss_percentage
+      title: AKS Node Memory RSS Percentage
+      context: node_memory_rss_percentage
+      family: Nodes
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: node_memory_rss_percentage_average
+          name: average
+        - selector: node_memory_rss_percentage_maximum
+          name: maximum
+    - id: am_azure_aks__node_disk_usage
+      title: AKS Node Disk Usage
+      context: node_disk_usage
+      family: Nodes
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: node_disk_usage_bytes_average
+          name: average
+        - selector: node_disk_usage_bytes_maximum
+          name: maximum
+    - id: am_azure_aks__node_disk_percentage
+      title: AKS Node Disk Usage Percentage
+      context: node_disk_percentage
+      family: Nodes
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: node_disk_usage_percentage_average
+          name: average
+        - selector: node_disk_usage_percentage_maximum
+          name: maximum
+    - id: am_azure_aks__node_network
+      title: AKS Node Network Traffic
+      context: node_network
+      family: Network
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: node_network_in_bytes_average
+          name: in
+        - selector: node_network_out_bytes_average
+          name: out

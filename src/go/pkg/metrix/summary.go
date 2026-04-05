@@ -265,10 +265,7 @@ func newSummaryQuantileSketch(capacity int, seed uint64) *summaryQuantileSketch 
 	if seed == 0 {
 		seed = 1
 	}
-	initCap := capacity
-	if initCap > initialSummaryReservoirCapacity {
-		initCap = initialSummaryReservoirCapacity
-	}
+	initCap := min(capacity, initialSummaryReservoirCapacity)
 	return &summaryQuantileSketch{
 		capacity: capacity,
 		rng:      seed,

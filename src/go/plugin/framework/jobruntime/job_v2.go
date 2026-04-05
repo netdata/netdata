@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -29,6 +30,7 @@ type JobV2Config struct {
 	Name            string
 	ModuleName      string
 	FullName        string
+	Source          string
 	Module          collectorapi.CollectorV2
 	Labels          map[string]string
 	Out             io.Writer
@@ -71,10 +73,7 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 		j.out = io.Discard
 	}
 
-	log := logger.New().With(
-		slog.String("collector", j.ModuleName()),
-		slog.String("job", j.Name()),
-	)
+	log := logger.New().With(jobLoggerAttrs(j.ModuleName(), j.Name(), cfg.Source)...)
 	j.Logger = log
 	if j.module != nil {
 		j.module.GetBase().Logger = log
@@ -524,9 +523,7 @@ func cloneLabels(in map[string]string) map[string]string {
 		return nil
 	}
 	out := make(map[string]string, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
+	maps.Copy(out, in)
 	return out
 }
 

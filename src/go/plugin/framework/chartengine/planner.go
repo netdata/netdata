@@ -324,10 +324,7 @@ func (e *Engine) preparePlanBuildContext(
 			dimCapHints[chartID] = n
 		}
 	}
-	chartsCap := e.state.hints.chartsByID
-	if chartsCap < len(materialized.charts) {
-		chartsCap = len(materialized.charts)
-	}
+	chartsCap := max(e.state.hints.chartsByID, len(materialized.charts))
 	seenInferCap := e.state.hints.seenInfer
 	return &planBuildContext{
 		out:              out,

@@ -5,6 +5,7 @@ package beanstalk
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 
@@ -38,9 +39,7 @@ func (c *Collector) collectStats(mx map[string]int64) error {
 	if err != nil {
 		return err
 	}
-	for k, v := range stm.ToMap(stats) {
-		mx[k] = v
-	}
+	maps.Copy(mx, stm.ToMap(stats))
 	return nil
 }
 

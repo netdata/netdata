@@ -1,891 +1,890 @@
 ---
-id: log_analytics
-name: Azure Log Analytics Workspace
+display_name: Azure Log Analytics Workspace
 resource_type: Microsoft.OperationalInsights/workspaces
 metrics:
-- id: availability_rate_query
-  azure_name: AvailabilityRate_Query
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: ingestion_time
-  azure_name: Ingestion Time
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-  - aggregation: minimum
-    kind: gauge
-- id: ingestion_volume
-  azure_name: Ingestion Volume
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: query_count
-  azure_name: Query Count
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: query_failure_count
-  azure_name: Query Failure Count
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: bytes_exported
-  azure_name: BytesExported
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: records_exported
-  azure_name: RecordsExported
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: export_failed
-  azure_name: ExportFailed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: average_processor_time
-  azure_name: Average_% Processor Time
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_privileged_time
-  azure_name: Average_% Privileged Time
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_user_time
-  azure_name: Average_% User Time
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_dpc_time
-  azure_name: Average_% DPC Time
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_interrupt_time
-  azure_name: Average_% Interrupt Time
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_idle_time
-  azure_name: Average_% Idle Time
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_io_wait_time
-  azure_name: Average_% IO Wait Time
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_nice_time
-  azure_name: Average_% Nice Time
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_pct_privileged_time
-  azure_name: Average_Pct Privileged Time
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_pct_user_time
-  azure_name: Average_Pct User Time
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_available_memory
-  azure_name: Average_% Available Memory
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_used_memory
-  azure_name: Average_% Used Memory
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_committed_bytes_in_use
-  azure_name: Average_% Committed Bytes In Use
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_available_m_bytes
-  azure_name: Average_Available MBytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_available_m_bytes_memory
-  azure_name: Average_Available MBytes Memory
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_used_memory_k_bytes
-  azure_name: Average_Used Memory kBytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_used_memory_m_bytes
-  azure_name: Average_Used Memory MBytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_free_physical_memory
-  azure_name: Average_Free Physical Memory
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_free_virtual_memory
-  azure_name: Average_Free Virtual Memory
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_virtual_shared_memory
-  azure_name: Average_Virtual Shared Memory
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_available_swap_space
-  azure_name: Average_% Available Swap Space
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_used_swap_space
-  azure_name: Average_% Used Swap Space
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_available_m_bytes_swap
-  azure_name: Average_Available MBytes Swap
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_used_m_bytes_swap_space
-  azure_name: Average_Used MBytes Swap Space
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_free_space
-  azure_name: Average_% Free Space
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_used_space
-  azure_name: Average_% Used Space
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_free_inodes
-  azure_name: Average_% Free Inodes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_used_inodes
-  azure_name: Average_% Used Inodes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_free_megabytes
-  azure_name: Average_Free Megabytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_disk_read_bytes_sec
-  azure_name: Average_Disk Read Bytes/sec
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_disk_write_bytes_sec
-  azure_name: Average_Disk Write Bytes/sec
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_disk_reads_sec
-  azure_name: Average_Disk Reads/sec
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_disk_writes_sec
-  azure_name: Average_Disk Writes/sec
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_disk_transfers_sec
-  azure_name: Average_Disk Transfers/sec
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_logical_disk_bytes_sec
-  azure_name: Average_Logical Disk Bytes/sec
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_physical_disk_bytes_sec
-  azure_name: Average_Physical Disk Bytes/sec
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_avg_disk_sec_read
-  azure_name: Average_Avg. Disk sec/Read
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_avg_disk_sec_write
-  azure_name: Average_Avg. Disk sec/Write
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_avg_disk_sec_transfer
-  azure_name: Average_Avg. Disk sec/Transfer
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_current_disk_queue_length
-  azure_name: Average_Current Disk Queue Length
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_page_reads_sec
-  azure_name: Average_Page Reads/sec
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_page_writes_sec
-  azure_name: Average_Page Writes/sec
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_pages_sec
-  azure_name: Average_Pages/sec
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_free_space_in_paging_files
-  azure_name: Average_Free Space in Paging Files
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_size_stored_in_paging_files
-  azure_name: Average_Size Stored In Paging Files
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_bytes_received_sec
-  azure_name: Average_Bytes Received/sec
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_bytes_sent_sec
-  azure_name: Average_Bytes Sent/sec
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_bytes_total_sec
-  azure_name: Average_Bytes Total/sec
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_total_bytes
-  azure_name: Average_Total Bytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_total_bytes_received
-  azure_name: Average_Total Bytes Received
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_total_bytes_transmitted
-  azure_name: Average_Total Bytes Transmitted
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_total_packets_received
-  azure_name: Average_Total Packets Received
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_total_packets_transmitted
-  azure_name: Average_Total Packets Transmitted
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_total_collisions
-  azure_name: Average_Total Collisions
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_total_rx_errors
-  azure_name: Average_Total Rx Errors
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_total_tx_errors
-  azure_name: Average_Total Tx Errors
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_processes
-  azure_name: Average_Processes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_processor_queue_length
-  azure_name: Average_Processor Queue Length
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_uptime
-  azure_name: Average_Uptime
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: average_users
-  azure_name: Average_Users
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: event
-  azure_name: Event
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: heartbeat
-  azure_name: Heartbeat
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: update
-  azure_name: Update
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
+  - id: availability_rate_query
+    azure_name: AvailabilityRate_Query
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: ingestion_time
+    azure_name: Ingestion Time
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+      - aggregation: minimum
+        kind: gauge
+  - id: ingestion_volume
+    azure_name: Ingestion Volume
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: query_count
+    azure_name: Query Count
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: query_failure_count
+    azure_name: Query Failure Count
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: bytes_exported
+    azure_name: BytesExported
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: records_exported
+    azure_name: RecordsExported
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: export_failed
+    azure_name: ExportFailed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: average_processor_time
+    azure_name: Average_% Processor Time
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_privileged_time
+    azure_name: Average_% Privileged Time
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_user_time
+    azure_name: Average_% User Time
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_dpc_time
+    azure_name: Average_% DPC Time
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_interrupt_time
+    azure_name: Average_% Interrupt Time
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_idle_time
+    azure_name: Average_% Idle Time
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_io_wait_time
+    azure_name: Average_% IO Wait Time
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_nice_time
+    azure_name: Average_% Nice Time
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_pct_privileged_time
+    azure_name: Average_Pct Privileged Time
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_pct_user_time
+    azure_name: Average_Pct User Time
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_available_memory
+    azure_name: Average_% Available Memory
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_used_memory
+    azure_name: Average_% Used Memory
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_committed_bytes_in_use
+    azure_name: Average_% Committed Bytes In Use
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_available_m_bytes
+    azure_name: Average_Available MBytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_available_m_bytes_memory
+    azure_name: Average_Available MBytes Memory
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_used_memory_k_bytes
+    azure_name: Average_Used Memory kBytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_used_memory_m_bytes
+    azure_name: Average_Used Memory MBytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_free_physical_memory
+    azure_name: Average_Free Physical Memory
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_free_virtual_memory
+    azure_name: Average_Free Virtual Memory
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_virtual_shared_memory
+    azure_name: Average_Virtual Shared Memory
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_available_swap_space
+    azure_name: Average_% Available Swap Space
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_used_swap_space
+    azure_name: Average_% Used Swap Space
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_available_m_bytes_swap
+    azure_name: Average_Available MBytes Swap
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_used_m_bytes_swap_space
+    azure_name: Average_Used MBytes Swap Space
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_free_space
+    azure_name: Average_% Free Space
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_used_space
+    azure_name: Average_% Used Space
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_free_inodes
+    azure_name: Average_% Free Inodes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_used_inodes
+    azure_name: Average_% Used Inodes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_free_megabytes
+    azure_name: Average_Free Megabytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_disk_read_bytes_sec
+    azure_name: Average_Disk Read Bytes/sec
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_disk_write_bytes_sec
+    azure_name: Average_Disk Write Bytes/sec
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_disk_reads_sec
+    azure_name: Average_Disk Reads/sec
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_disk_writes_sec
+    azure_name: Average_Disk Writes/sec
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_disk_transfers_sec
+    azure_name: Average_Disk Transfers/sec
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_logical_disk_bytes_sec
+    azure_name: Average_Logical Disk Bytes/sec
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_physical_disk_bytes_sec
+    azure_name: Average_Physical Disk Bytes/sec
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_avg_disk_sec_read
+    azure_name: Average_Avg. Disk sec/Read
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_avg_disk_sec_write
+    azure_name: Average_Avg. Disk sec/Write
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_avg_disk_sec_transfer
+    azure_name: Average_Avg. Disk sec/Transfer
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_current_disk_queue_length
+    azure_name: Average_Current Disk Queue Length
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_page_reads_sec
+    azure_name: Average_Page Reads/sec
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_page_writes_sec
+    azure_name: Average_Page Writes/sec
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_pages_sec
+    azure_name: Average_Pages/sec
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_free_space_in_paging_files
+    azure_name: Average_Free Space in Paging Files
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_size_stored_in_paging_files
+    azure_name: Average_Size Stored In Paging Files
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_bytes_received_sec
+    azure_name: Average_Bytes Received/sec
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_bytes_sent_sec
+    azure_name: Average_Bytes Sent/sec
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_bytes_total_sec
+    azure_name: Average_Bytes Total/sec
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_total_bytes
+    azure_name: Average_Total Bytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_total_bytes_received
+    azure_name: Average_Total Bytes Received
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_total_bytes_transmitted
+    azure_name: Average_Total Bytes Transmitted
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_total_packets_received
+    azure_name: Average_Total Packets Received
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_total_packets_transmitted
+    azure_name: Average_Total Packets Transmitted
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_total_collisions
+    azure_name: Average_Total Collisions
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_total_rx_errors
+    azure_name: Average_Total Rx Errors
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_total_tx_errors
+    azure_name: Average_Total Tx Errors
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_processes
+    azure_name: Average_Processes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_processor_queue_length
+    azure_name: Average_Processor Queue Length
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_uptime
+    azure_name: Average_Uptime
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: average_users
+    azure_name: Average_Users
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: event
+    azure_name: Event
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: heartbeat
+    azure_name: Heartbeat
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: update
+    azure_name: Update
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
 template:
   family: Azure Log Analytics Workspace
   context_namespace: log_analytics
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_log_analytics__query_availability
-    title: Azure Log Analytics Query Availability
-    context: query_availability
-    family: Availability
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.availability_rate_query_average
-      name: availability
-  - id: am_azure_log_analytics__ingestion_latency
-    title: Azure Log Analytics Ingestion Latency
-    context: ingestion_latency
-    family: Ingestion
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.ingestion_time_average
-      name: average
-    - selector: log_analytics.ingestion_time_maximum
-      name: maximum
-    - selector: log_analytics.ingestion_time_minimum
-      name: minimum
-  - id: am_azure_log_analytics__ingestion_volume
-    title: Azure Log Analytics Ingestion Volume
-    context: ingestion_volume
-    family: Ingestion
-    type: line
-    units: records/s
-    algorithm: incremental
-    dimensions:
-    - selector: log_analytics.ingestion_volume_count
-      name: records
-  - id: am_azure_log_analytics__queries
-    title: Azure Log Analytics Queries
-    context: queries
-    family: Queries
-    type: line
-    units: queries/s
-    algorithm: incremental
-    dimensions:
-    - selector: log_analytics.query_count_count
-      name: total
-    - selector: log_analytics.query_failure_count_count
-      name: failed
-  - id: am_azure_log_analytics__export_data
-    title: Azure Log Analytics Exported Data
-    context: export_data
-    family: DataExport
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: log_analytics.bytes_exported_total
-      name: exported
-  - id: am_azure_log_analytics__export_records
-    title: Azure Log Analytics Exported Records
-    context: export_records
-    family: DataExport
-    type: line
-    units: records/s
-    algorithm: incremental
-    dimensions:
-    - selector: log_analytics.records_exported_total
-      name: exported
-  - id: am_azure_log_analytics__export_failures
-    title: Azure Log Analytics Export Failures
-    context: export_failures
-    family: DataExport
-    type: line
-    units: exports/s
-    algorithm: incremental
-    dimensions:
-    - selector: log_analytics.export_failed_total
-      name: failed
-  - id: am_azure_log_analytics__legacy_cpu_utilization
-    title: Azure Log Analytics Legacy CPU Utilization
-    context: legacy_cpu_utilization
-    family: 'Legacy: CPU'
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_processor_time_average
-      name: processor
-    - selector: log_analytics.average_privileged_time_average
-      name: privileged
-    - selector: log_analytics.average_user_time_average
-      name: user
-    - selector: log_analytics.average_idle_time_average
-      name: idle
-  - id: am_azure_log_analytics__legacy_cpu_detailed
-    title: Azure Log Analytics Legacy CPU Detailed
-    context: legacy_cpu_detailed
-    family: 'Legacy: CPU'
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_dpc_time_average
-      name: dpc
-    - selector: log_analytics.average_interrupt_time_average
-      name: interrupt
-    - selector: log_analytics.average_io_wait_time_average
-      name: io_wait
-    - selector: log_analytics.average_nice_time_average
-      name: nice
-  - id: am_azure_log_analytics__legacy_cpu_pct
-    title: Azure Log Analytics Legacy CPU Pct Time
-    context: legacy_cpu_pct
-    family: 'Legacy: CPU'
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_pct_privileged_time_average
-      name: privileged
-    - selector: log_analytics.average_pct_user_time_average
-      name: user
-  - id: am_azure_log_analytics__legacy_memory_utilization
-    title: Azure Log Analytics Legacy Memory Utilization
-    context: legacy_memory_utilization
-    family: 'Legacy: Memory'
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_available_memory_average
-      name: available
-    - selector: log_analytics.average_used_memory_average
-      name: used
-    - selector: log_analytics.average_committed_bytes_in_use_average
-      name: committed
-  - id: am_azure_log_analytics__legacy_memory_available
-    title: Azure Log Analytics Legacy Available Memory
-    context: legacy_memory_available
-    family: 'Legacy: Memory'
-    type: line
-    units: megabytes
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_available_m_bytes_average
-      name: available_mbytes
-    - selector: log_analytics.average_available_m_bytes_memory_average
-      name: available_mbytes_memory
-  - id: am_azure_log_analytics__legacy_memory_used_kbytes
-    title: Azure Log Analytics Legacy Used Memory (kBytes)
-    context: legacy_memory_used_kbytes
-    family: 'Legacy: Memory'
-    type: line
-    units: kilobytes
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_used_memory_k_bytes_average
-      name: used
-  - id: am_azure_log_analytics__legacy_memory_used_mbytes
-    title: Azure Log Analytics Legacy Used Memory (MBytes)
-    context: legacy_memory_used_mbytes
-    family: 'Legacy: Memory'
-    type: line
-    units: megabytes
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_used_memory_m_bytes_average
-      name: used
-  - id: am_azure_log_analytics__legacy_memory_free
-    title: Azure Log Analytics Legacy Free Memory
-    context: legacy_memory_free
-    family: 'Legacy: Memory'
-    type: line
-    units: megabytes
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_free_physical_memory_average
-      name: physical
-    - selector: log_analytics.average_free_virtual_memory_average
-      name: virtual
-    - selector: log_analytics.average_virtual_shared_memory_average
-      name: shared
-  - id: am_azure_log_analytics__legacy_swap_utilization
-    title: Azure Log Analytics Legacy Swap Utilization
-    context: legacy_swap_utilization
-    family: 'Legacy: Swap'
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_available_swap_space_average
-      name: available
-    - selector: log_analytics.average_used_swap_space_average
-      name: used
-  - id: am_azure_log_analytics__legacy_swap_size
-    title: Azure Log Analytics Legacy Swap Size
-    context: legacy_swap_size
-    family: 'Legacy: Swap'
-    type: line
-    units: megabytes
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_available_m_bytes_swap_average
-      name: available
-    - selector: log_analytics.average_used_m_bytes_swap_space_average
-      name: used
-  - id: am_azure_log_analytics__legacy_disk_space_utilization
-    title: Azure Log Analytics Legacy Disk Space Utilization
-    context: legacy_disk_space_utilization
-    family: 'Legacy: Disk'
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_free_space_average
-      name: free
-    - selector: log_analytics.average_used_space_average
-      name: used
-  - id: am_azure_log_analytics__legacy_disk_inodes
-    title: Azure Log Analytics Legacy Disk Inodes
-    context: legacy_disk_inodes
-    family: 'Legacy: Disk'
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_free_inodes_average
-      name: free
-    - selector: log_analytics.average_used_inodes_average
-      name: used
-  - id: am_azure_log_analytics__legacy_disk_free
-    title: Azure Log Analytics Legacy Disk Free Space
-    context: legacy_disk_free
-    family: 'Legacy: Disk'
-    type: line
-    units: megabytes
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_free_megabytes_average
-      name: free
-  - id: am_azure_log_analytics__legacy_disk_io_throughput
-    title: Azure Log Analytics Legacy Disk I/O Throughput
-    context: legacy_disk_io_throughput
-    family: 'Legacy: Disk'
-    type: line
-    units: bytes/s
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_disk_read_bytes_sec_average
-      name: read
-    - selector: log_analytics.average_disk_write_bytes_sec_average
-      name: write
-    - selector: log_analytics.average_logical_disk_bytes_sec_average
-      name: logical
-    - selector: log_analytics.average_physical_disk_bytes_sec_average
-      name: physical
-  - id: am_azure_log_analytics__legacy_disk_io_operations
-    title: Azure Log Analytics Legacy Disk I/O Operations
-    context: legacy_disk_io_operations
-    family: 'Legacy: Disk'
-    type: line
-    units: operations/s
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_disk_reads_sec_average
-      name: reads
-    - selector: log_analytics.average_disk_writes_sec_average
-      name: writes
-    - selector: log_analytics.average_disk_transfers_sec_average
-      name: transfers
-  - id: am_azure_log_analytics__legacy_disk_io_latency
-    title: Azure Log Analytics Legacy Disk I/O Latency
-    context: legacy_disk_io_latency
-    family: 'Legacy: Disk'
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_avg_disk_sec_read_average
-      name: read
-    - selector: log_analytics.average_avg_disk_sec_write_average
-      name: write
-    - selector: log_analytics.average_avg_disk_sec_transfer_average
-      name: transfer
-  - id: am_azure_log_analytics__legacy_disk_queue
-    title: Azure Log Analytics Legacy Disk Queue Length
-    context: legacy_disk_queue
-    family: 'Legacy: Disk'
-    type: line
-    units: operations
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_current_disk_queue_length_average
-      name: queue_length
-  - id: am_azure_log_analytics__legacy_paging
-    title: Azure Log Analytics Legacy Paging Activity
-    context: legacy_paging
-    family: 'Legacy: Memory'
-    type: line
-    units: pages/s
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_page_reads_sec_average
-      name: reads
-    - selector: log_analytics.average_page_writes_sec_average
-      name: writes
-    - selector: log_analytics.average_pages_sec_average
-      name: total
-  - id: am_azure_log_analytics__legacy_paging_files
-    title: Azure Log Analytics Legacy Paging Files
-    context: legacy_paging_files
-    family: 'Legacy: Memory'
-    type: line
-    units: megabytes
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_free_space_in_paging_files_average
-      name: free
-    - selector: log_analytics.average_size_stored_in_paging_files_average
-      name: stored
-  - id: am_azure_log_analytics__legacy_network_throughput_win
-    title: Azure Log Analytics Legacy Network Throughput (Windows)
-    context: legacy_network_throughput_win
-    family: 'Legacy: Network'
-    type: line
-    units: bytes/s
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_bytes_received_sec_average
-      name: received
-    - selector: log_analytics.average_bytes_sent_sec_average
-      name: sent
-    - selector: log_analytics.average_bytes_total_sec_average
-      name: total
-  - id: am_azure_log_analytics__legacy_network_traffic
-    title: Azure Log Analytics Legacy Network Traffic
-    context: legacy_network_traffic
-    family: 'Legacy: Network'
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_total_bytes_average
-      name: total
-    - selector: log_analytics.average_total_bytes_received_average
-      name: received
-    - selector: log_analytics.average_total_bytes_transmitted_average
-      name: transmitted
-  - id: am_azure_log_analytics__legacy_network_packets
-    title: Azure Log Analytics Legacy Network Packets
-    context: legacy_network_packets
-    family: 'Legacy: Network'
-    type: line
-    units: packets
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_total_packets_received_average
-      name: received
-    - selector: log_analytics.average_total_packets_transmitted_average
-      name: transmitted
-  - id: am_azure_log_analytics__legacy_network_errors
-    title: Azure Log Analytics Legacy Network Errors
-    context: legacy_network_errors
-    family: 'Legacy: Network'
-    type: line
-    units: errors
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_total_rx_errors_average
-      name: rx
-    - selector: log_analytics.average_total_tx_errors_average
-      name: tx
-    - selector: log_analytics.average_total_collisions_average
-      name: collisions
-  - id: am_azure_log_analytics__legacy_system
-    title: Azure Log Analytics Legacy System
-    context: legacy_system
-    family: 'Legacy: System'
-    type: line
-    units: processes
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_processes_average
-      name: processes
-  - id: am_azure_log_analytics__legacy_processor_queue
-    title: Azure Log Analytics Legacy Processor Queue
-    context: legacy_processor_queue
-    family: 'Legacy: System'
-    type: line
-    units: threads
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_processor_queue_length_average
-      name: queue_length
-  - id: am_azure_log_analytics__legacy_uptime
-    title: Azure Log Analytics Legacy Uptime
-    context: legacy_uptime
-    family: 'Legacy: System'
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_uptime_average
-      name: uptime
-  - id: am_azure_log_analytics__legacy_users
-    title: Azure Log Analytics Legacy Users
-    context: legacy_users
-    family: 'Legacy: System'
-    type: line
-    units: users
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.average_users_average
-      name: users
-  - id: am_azure_log_analytics__legacy_events
-    title: Azure Log Analytics Legacy Events
-    context: legacy_events
-    family: 'Legacy: Events'
-    type: line
-    units: events/s
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.event_average
-      name: events
-  - id: am_azure_log_analytics__legacy_heartbeat
-    title: Azure Log Analytics Legacy Heartbeat
-    context: legacy_heartbeat
-    family: 'Legacy: Events'
-    type: line
-    units: heartbeats/s
-    algorithm: incremental
-    dimensions:
-    - selector: log_analytics.heartbeat_total
-      name: heartbeats
-  - id: am_azure_log_analytics__legacy_updates
-    title: Azure Log Analytics Legacy Updates
-    context: legacy_updates
-    family: 'Legacy: Events'
-    type: line
-    units: updates
-    algorithm: absolute
-    dimensions:
-    - selector: log_analytics.update_average
-      name: updates
+    - id: am_azure_log_analytics__query_availability
+      title: Azure Log Analytics Query Availability
+      context: query_availability
+      family: Availability
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: availability_rate_query_average
+          name: availability
+    - id: am_azure_log_analytics__ingestion_latency
+      title: Azure Log Analytics Ingestion Latency
+      context: ingestion_latency
+      family: Ingestion
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: ingestion_time_average
+          name: average
+        - selector: ingestion_time_maximum
+          name: maximum
+        - selector: ingestion_time_minimum
+          name: minimum
+    - id: am_azure_log_analytics__ingestion_volume
+      title: Azure Log Analytics Ingestion Volume
+      context: ingestion_volume
+      family: Ingestion
+      type: line
+      units: records/s
+      algorithm: incremental
+      dimensions:
+        - selector: ingestion_volume_count
+          name: records
+    - id: am_azure_log_analytics__queries
+      title: Azure Log Analytics Queries
+      context: queries
+      family: Queries
+      type: line
+      units: queries/s
+      algorithm: incremental
+      dimensions:
+        - selector: query_count_count
+          name: total
+        - selector: query_failure_count_count
+          name: failed
+    - id: am_azure_log_analytics__export_data
+      title: Azure Log Analytics Exported Data
+      context: export_data
+      family: DataExport
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: bytes_exported_total
+          name: exported
+    - id: am_azure_log_analytics__export_records
+      title: Azure Log Analytics Exported Records
+      context: export_records
+      family: DataExport
+      type: line
+      units: records/s
+      algorithm: incremental
+      dimensions:
+        - selector: records_exported_total
+          name: exported
+    - id: am_azure_log_analytics__export_failures
+      title: Azure Log Analytics Export Failures
+      context: export_failures
+      family: DataExport
+      type: line
+      units: exports/s
+      algorithm: incremental
+      dimensions:
+        - selector: export_failed_total
+          name: failed
+    - id: am_azure_log_analytics__legacy_cpu_utilization
+      title: Azure Log Analytics Legacy CPU Utilization
+      context: legacy_cpu_utilization
+      family: 'Legacy: CPU'
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: average_processor_time_average
+          name: processor
+        - selector: average_privileged_time_average
+          name: privileged
+        - selector: average_user_time_average
+          name: user
+        - selector: average_idle_time_average
+          name: idle
+    - id: am_azure_log_analytics__legacy_cpu_detailed
+      title: Azure Log Analytics Legacy CPU Detailed
+      context: legacy_cpu_detailed
+      family: 'Legacy: CPU'
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: average_dpc_time_average
+          name: dpc
+        - selector: average_interrupt_time_average
+          name: interrupt
+        - selector: average_io_wait_time_average
+          name: io_wait
+        - selector: average_nice_time_average
+          name: nice
+    - id: am_azure_log_analytics__legacy_cpu_pct
+      title: Azure Log Analytics Legacy CPU Pct Time
+      context: legacy_cpu_pct
+      family: 'Legacy: CPU'
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: average_pct_privileged_time_average
+          name: privileged
+        - selector: average_pct_user_time_average
+          name: user
+    - id: am_azure_log_analytics__legacy_memory_utilization
+      title: Azure Log Analytics Legacy Memory Utilization
+      context: legacy_memory_utilization
+      family: 'Legacy: Memory'
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: average_available_memory_average
+          name: available
+        - selector: average_used_memory_average
+          name: used
+        - selector: average_committed_bytes_in_use_average
+          name: committed
+    - id: am_azure_log_analytics__legacy_memory_available
+      title: Azure Log Analytics Legacy Available Memory
+      context: legacy_memory_available
+      family: 'Legacy: Memory'
+      type: line
+      units: megabytes
+      algorithm: absolute
+      dimensions:
+        - selector: average_available_m_bytes_average
+          name: available_mbytes
+        - selector: average_available_m_bytes_memory_average
+          name: available_mbytes_memory
+    - id: am_azure_log_analytics__legacy_memory_used_kbytes
+      title: Azure Log Analytics Legacy Used Memory (kBytes)
+      context: legacy_memory_used_kbytes
+      family: 'Legacy: Memory'
+      type: line
+      units: kilobytes
+      algorithm: absolute
+      dimensions:
+        - selector: average_used_memory_k_bytes_average
+          name: used
+    - id: am_azure_log_analytics__legacy_memory_used_mbytes
+      title: Azure Log Analytics Legacy Used Memory (MBytes)
+      context: legacy_memory_used_mbytes
+      family: 'Legacy: Memory'
+      type: line
+      units: megabytes
+      algorithm: absolute
+      dimensions:
+        - selector: average_used_memory_m_bytes_average
+          name: used
+    - id: am_azure_log_analytics__legacy_memory_free
+      title: Azure Log Analytics Legacy Free Memory
+      context: legacy_memory_free
+      family: 'Legacy: Memory'
+      type: line
+      units: megabytes
+      algorithm: absolute
+      dimensions:
+        - selector: average_free_physical_memory_average
+          name: physical
+        - selector: average_free_virtual_memory_average
+          name: virtual
+        - selector: average_virtual_shared_memory_average
+          name: shared
+    - id: am_azure_log_analytics__legacy_swap_utilization
+      title: Azure Log Analytics Legacy Swap Utilization
+      context: legacy_swap_utilization
+      family: 'Legacy: Swap'
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: average_available_swap_space_average
+          name: available
+        - selector: average_used_swap_space_average
+          name: used
+    - id: am_azure_log_analytics__legacy_swap_size
+      title: Azure Log Analytics Legacy Swap Size
+      context: legacy_swap_size
+      family: 'Legacy: Swap'
+      type: line
+      units: megabytes
+      algorithm: absolute
+      dimensions:
+        - selector: average_available_m_bytes_swap_average
+          name: available
+        - selector: average_used_m_bytes_swap_space_average
+          name: used
+    - id: am_azure_log_analytics__legacy_disk_space_utilization
+      title: Azure Log Analytics Legacy Disk Space Utilization
+      context: legacy_disk_space_utilization
+      family: 'Legacy: Disk'
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: average_free_space_average
+          name: free
+        - selector: average_used_space_average
+          name: used
+    - id: am_azure_log_analytics__legacy_disk_inodes
+      title: Azure Log Analytics Legacy Disk Inodes
+      context: legacy_disk_inodes
+      family: 'Legacy: Disk'
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: average_free_inodes_average
+          name: free
+        - selector: average_used_inodes_average
+          name: used
+    - id: am_azure_log_analytics__legacy_disk_free
+      title: Azure Log Analytics Legacy Disk Free Space
+      context: legacy_disk_free
+      family: 'Legacy: Disk'
+      type: line
+      units: megabytes
+      algorithm: absolute
+      dimensions:
+        - selector: average_free_megabytes_average
+          name: free
+    - id: am_azure_log_analytics__legacy_disk_io_throughput
+      title: Azure Log Analytics Legacy Disk I/O Throughput
+      context: legacy_disk_io_throughput
+      family: 'Legacy: Disk'
+      type: line
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: average_disk_read_bytes_sec_average
+          name: read
+        - selector: average_disk_write_bytes_sec_average
+          name: write
+        - selector: average_logical_disk_bytes_sec_average
+          name: logical
+        - selector: average_physical_disk_bytes_sec_average
+          name: physical
+    - id: am_azure_log_analytics__legacy_disk_io_operations
+      title: Azure Log Analytics Legacy Disk I/O Operations
+      context: legacy_disk_io_operations
+      family: 'Legacy: Disk'
+      type: line
+      units: operations/s
+      algorithm: absolute
+      dimensions:
+        - selector: average_disk_reads_sec_average
+          name: reads
+        - selector: average_disk_writes_sec_average
+          name: writes
+        - selector: average_disk_transfers_sec_average
+          name: transfers
+    - id: am_azure_log_analytics__legacy_disk_io_latency
+      title: Azure Log Analytics Legacy Disk I/O Latency
+      context: legacy_disk_io_latency
+      family: 'Legacy: Disk'
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: average_avg_disk_sec_read_average
+          name: read
+        - selector: average_avg_disk_sec_write_average
+          name: write
+        - selector: average_avg_disk_sec_transfer_average
+          name: transfer
+    - id: am_azure_log_analytics__legacy_disk_queue
+      title: Azure Log Analytics Legacy Disk Queue Length
+      context: legacy_disk_queue
+      family: 'Legacy: Disk'
+      type: line
+      units: operations
+      algorithm: absolute
+      dimensions:
+        - selector: average_current_disk_queue_length_average
+          name: queue_length
+    - id: am_azure_log_analytics__legacy_paging
+      title: Azure Log Analytics Legacy Paging Activity
+      context: legacy_paging
+      family: 'Legacy: Memory'
+      type: line
+      units: pages/s
+      algorithm: absolute
+      dimensions:
+        - selector: average_page_reads_sec_average
+          name: reads
+        - selector: average_page_writes_sec_average
+          name: writes
+        - selector: average_pages_sec_average
+          name: total
+    - id: am_azure_log_analytics__legacy_paging_files
+      title: Azure Log Analytics Legacy Paging Files
+      context: legacy_paging_files
+      family: 'Legacy: Memory'
+      type: line
+      units: megabytes
+      algorithm: absolute
+      dimensions:
+        - selector: average_free_space_in_paging_files_average
+          name: free
+        - selector: average_size_stored_in_paging_files_average
+          name: stored
+    - id: am_azure_log_analytics__legacy_network_throughput_win
+      title: Azure Log Analytics Legacy Network Throughput (Windows)
+      context: legacy_network_throughput_win
+      family: 'Legacy: Network'
+      type: line
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: average_bytes_received_sec_average
+          name: received
+        - selector: average_bytes_sent_sec_average
+          name: sent
+        - selector: average_bytes_total_sec_average
+          name: total
+    - id: am_azure_log_analytics__legacy_network_traffic
+      title: Azure Log Analytics Legacy Network Traffic
+      context: legacy_network_traffic
+      family: 'Legacy: Network'
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: average_total_bytes_average
+          name: total
+        - selector: average_total_bytes_received_average
+          name: received
+        - selector: average_total_bytes_transmitted_average
+          name: transmitted
+    - id: am_azure_log_analytics__legacy_network_packets
+      title: Azure Log Analytics Legacy Network Packets
+      context: legacy_network_packets
+      family: 'Legacy: Network'
+      type: line
+      units: packets
+      algorithm: absolute
+      dimensions:
+        - selector: average_total_packets_received_average
+          name: received
+        - selector: average_total_packets_transmitted_average
+          name: transmitted
+    - id: am_azure_log_analytics__legacy_network_errors
+      title: Azure Log Analytics Legacy Network Errors
+      context: legacy_network_errors
+      family: 'Legacy: Network'
+      type: line
+      units: errors
+      algorithm: absolute
+      dimensions:
+        - selector: average_total_rx_errors_average
+          name: rx
+        - selector: average_total_tx_errors_average
+          name: tx
+        - selector: average_total_collisions_average
+          name: collisions
+    - id: am_azure_log_analytics__legacy_system
+      title: Azure Log Analytics Legacy System
+      context: legacy_system
+      family: 'Legacy: System'
+      type: line
+      units: processes
+      algorithm: absolute
+      dimensions:
+        - selector: average_processes_average
+          name: processes
+    - id: am_azure_log_analytics__legacy_processor_queue
+      title: Azure Log Analytics Legacy Processor Queue
+      context: legacy_processor_queue
+      family: 'Legacy: System'
+      type: line
+      units: threads
+      algorithm: absolute
+      dimensions:
+        - selector: average_processor_queue_length_average
+          name: queue_length
+    - id: am_azure_log_analytics__legacy_uptime
+      title: Azure Log Analytics Legacy Uptime
+      context: legacy_uptime
+      family: 'Legacy: System'
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: average_uptime_average
+          name: uptime
+    - id: am_azure_log_analytics__legacy_users
+      title: Azure Log Analytics Legacy Users
+      context: legacy_users
+      family: 'Legacy: System'
+      type: line
+      units: users
+      algorithm: absolute
+      dimensions:
+        - selector: average_users_average
+          name: users
+    - id: am_azure_log_analytics__legacy_events
+      title: Azure Log Analytics Legacy Events
+      context: legacy_events
+      family: 'Legacy: Events'
+      type: line
+      units: events/s
+      algorithm: absolute
+      dimensions:
+        - selector: event_average
+          name: events
+    - id: am_azure_log_analytics__legacy_heartbeat
+      title: Azure Log Analytics Legacy Heartbeat
+      context: legacy_heartbeat
+      family: 'Legacy: Events'
+      type: line
+      units: heartbeats/s
+      algorithm: incremental
+      dimensions:
+        - selector: heartbeat_total
+          name: heartbeats
+    - id: am_azure_log_analytics__legacy_updates
+      title: Azure Log Analytics Legacy Updates
+      context: legacy_updates
+      family: 'Legacy: Events'
+      type: line
+      units: updates
+      algorithm: absolute
+      dimensions:
+        - selector: update_average
+          name: updates

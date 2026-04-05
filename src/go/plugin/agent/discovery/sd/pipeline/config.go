@@ -21,7 +21,7 @@ type Config struct {
 	Name     string `yaml:"name" json:"name"`
 
 	// Canonical format: discoverer: { <type>: <config> }
-	Discoverer DiscovererPayload `yaml:"discoverer,omitempty" json:"discoverer,omitempty"`
+	Discoverer DiscovererPayload `yaml:"discoverer,omitempty" json:"discoverer"`
 
 	// New single-step format for service rules:
 	Services []ServiceRuleConfig `yaml:"services,omitempty" json:"services,omitempty"`

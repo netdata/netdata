@@ -8,10 +8,7 @@ func Batch[T any](items []T, size int) <-chan []T {
 		defer close(ch)
 
 		for i := 0; i < len(items); i += size {
-			end := i + size
-			if end > len(items) {
-				end = len(items)
-			}
+			end := min(i+size, len(items))
 
 			ch <- items[i:end]
 		}
@@ -40,7 +37,7 @@ func ParallelBatch[T any](items []T, batchSize int, workers int, fn func([]T) er
 	results := make(chan result, workers)
 
 	// Start workers
-	for i := 0; i < workers; i++ {
+	for range workers {
 		go func() {
 			for batch := range work {
 				results <- result{err: fn(batch)}
@@ -59,7 +56,7 @@ func ParallelBatch[T any](items []T, batchSize int, workers int, fn func([]T) er
 	// Collect results
 	var firstErr error
 	batchCount := (len(items) + batchSize - 1) / batchSize
-	for i := 0; i < batchCount; i++ {
+	for range batchCount {
 		res := <-results
 		if res.err != nil && firstErr == nil {
 			firstErr = res.err

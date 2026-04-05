@@ -3,6 +3,7 @@
 package pipeline
 
 import (
+	"maps"
 	"regexp"
 	"strconv"
 	"text/template"
@@ -27,9 +28,7 @@ func newFuncMap() template.FuncMap {
 		},
 	}
 
-	for name, fn := range extra {
-		fm[name] = fn
-	}
+	maps.Copy(fm, extra)
 
 	return fm
 }

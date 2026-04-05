@@ -78,7 +78,7 @@ func expectSNMPWalkError(mockHandler *snmpmock.MockHandler, version gosnmp.SnmpV
 	}
 }
 
-func createPDU(name string, pduType gosnmp.Asn1BER, value interface{}) gosnmp.SnmpPDU {
+func createPDU(name string, pduType gosnmp.Asn1BER, value any) gosnmp.SnmpPDU {
 	return gosnmp.SnmpPDU{
 		Name:  name,
 		Type:  pduType,

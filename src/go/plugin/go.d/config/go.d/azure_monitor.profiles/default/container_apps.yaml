@@ -1,463 +1,462 @@
 ---
-id: container_apps
-name: Azure Container Apps
+display_name: Azure Container Apps
 resource_type: Microsoft.App/containerApps
 metrics:
-- id: usage_nano_cores
-  azure_name: UsageNanoCores
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: cpu_percentage
-  azure_name: CpuPercentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: working_set_bytes
-  azure_name: WorkingSetBytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: memory_percentage
-  azure_name: MemoryPercentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: replicas
-  azure_name: Replicas
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cores_quota_used
-  azure_name: CoresQuotaUsed
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: total_cores_quota_used
-  azure_name: TotalCoresQuotaUsed
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: restart_count
-  azure_name: RestartCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: requests
-  azure_name: Requests
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: response_time
-  azure_name: ResponseTime
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: rx_bytes
-  azure_name: RxBytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: tx_bytes
-  azure_name: TxBytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: resiliency_connect_timeouts
-  azure_name: ResiliencyConnectTimeouts
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: resiliency_request_timeouts
-  azure_name: ResiliencyRequestTimeouts
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: resiliency_request_retries
-  azure_name: ResiliencyRequestRetries
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: resiliency_requests_pending_connection_pool
-  azure_name: ResiliencyRequestsPendingConnectionPool
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: resiliency_ejected_hosts
-  azure_name: ResiliencyEjectedHosts
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: resiliency_ejections_aborted
-  azure_name: ResiliencyEjectionsAborted
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: gpu_utilization_percentage
-  azure_name: GpuUtilizationPercentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: jvm_buffer_count
-  azure_name: JvmBufferCount
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: jvm_buffer_memory_limit
-  azure_name: JvmBufferMemoryLimit
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: jvm_buffer_memory_usage
-  azure_name: JvmBufferMemoryUsage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: jvm_gc_count
-  azure_name: JvmGcCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: jvm_gc_duration
-  azure_name: JvmGcDuration
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: jvm_memory_committed
-  azure_name: JvmMemoryCommitted
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: jvm_memory_limit
-  azure_name: JvmMemoryLimit
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: jvm_memory_used
-  azure_name: JvmMemoryUsed
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: jvm_memory_total_committed
-  azure_name: JvmMemoryTotalCommitted
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: jvm_memory_total_limit
-  azure_name: JvmMemoryTotalLimit
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: jvm_memory_total_used
-  azure_name: JvmMemoryTotalUsed
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: jvm_thread_count
-  azure_name: JvmThreadCount
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
+  - id: usage_nano_cores
+    azure_name: UsageNanoCores
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: cpu_percentage
+    azure_name: CpuPercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: working_set_bytes
+    azure_name: WorkingSetBytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: memory_percentage
+    azure_name: MemoryPercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: replicas
+    azure_name: Replicas
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cores_quota_used
+    azure_name: CoresQuotaUsed
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: total_cores_quota_used
+    azure_name: TotalCoresQuotaUsed
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: restart_count
+    azure_name: RestartCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: requests
+    azure_name: Requests
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: response_time
+    azure_name: ResponseTime
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: rx_bytes
+    azure_name: RxBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tx_bytes
+    azure_name: TxBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: resiliency_connect_timeouts
+    azure_name: ResiliencyConnectTimeouts
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: resiliency_request_timeouts
+    azure_name: ResiliencyRequestTimeouts
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: resiliency_request_retries
+    azure_name: ResiliencyRequestRetries
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: resiliency_requests_pending_connection_pool
+    azure_name: ResiliencyRequestsPendingConnectionPool
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: resiliency_ejected_hosts
+    azure_name: ResiliencyEjectedHosts
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: resiliency_ejections_aborted
+    azure_name: ResiliencyEjectionsAborted
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: gpu_utilization_percentage
+    azure_name: GpuUtilizationPercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: jvm_buffer_count
+    azure_name: JvmBufferCount
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: jvm_buffer_memory_limit
+    azure_name: JvmBufferMemoryLimit
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: jvm_buffer_memory_usage
+    azure_name: JvmBufferMemoryUsage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: jvm_gc_count
+    azure_name: JvmGcCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: jvm_gc_duration
+    azure_name: JvmGcDuration
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: jvm_memory_committed
+    azure_name: JvmMemoryCommitted
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: jvm_memory_limit
+    azure_name: JvmMemoryLimit
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: jvm_memory_used
+    azure_name: JvmMemoryUsed
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: jvm_memory_total_committed
+    azure_name: JvmMemoryTotalCommitted
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: jvm_memory_total_limit
+    azure_name: JvmMemoryTotalLimit
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: jvm_memory_total_used
+    azure_name: JvmMemoryTotalUsed
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: jvm_thread_count
+    azure_name: JvmThreadCount
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
 template:
   family: Azure Container Apps
   context_namespace: container_apps
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_container_apps__cpu_usage
-    title: Azure Container Apps CPU Usage
-    context: cpu_usage
-    family: CPU
-    type: line
-    units: nanocores
-    algorithm: absolute
-    dimensions:
-    - selector: container_apps.usage_nano_cores_average
-      name: average
-    - selector: container_apps.usage_nano_cores_maximum
-      name: maximum
-  - id: am_azure_container_apps__cpu_percentage
-    title: Azure Container Apps CPU Percentage
-    context: cpu_percentage
-    family: CPU
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: container_apps.cpu_percentage_average
-      name: average
-    - selector: container_apps.cpu_percentage_maximum
-      name: maximum
-  - id: am_azure_container_apps__memory_working_set
-    title: Azure Container Apps Memory Working Set
-    context: memory_working_set
-    family: Memory
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: container_apps.working_set_bytes_average
-      name: average
-    - selector: container_apps.working_set_bytes_maximum
-      name: maximum
-  - id: am_azure_container_apps__memory_percentage
-    title: Azure Container Apps Memory Percentage
-    context: memory_percentage
-    family: Memory
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: container_apps.memory_percentage_average
-      name: average
-    - selector: container_apps.memory_percentage_maximum
-      name: maximum
-  - id: am_azure_container_apps__replicas
-    title: Azure Container Apps Replica Count
-    context: replicas
-    family: Scaling
-    type: line
-    units: replicas
-    algorithm: absolute
-    dimensions:
-    - selector: container_apps.replicas_average
-      name: average
-  - id: am_azure_container_apps__reserved_cores
-    title: Azure Container Apps Reserved Cores
-    context: reserved_cores
-    family: Scaling
-    type: line
-    units: cores
-    algorithm: absolute
-    dimensions:
-    - selector: container_apps.cores_quota_used_maximum
-      name: per_revision
-    - selector: container_apps.total_cores_quota_used_average
-      name: total
-  - id: am_azure_container_apps__restart_count
-    title: Azure Container Apps Replica Restarts
-    context: restart_count
-    family: Scaling
-    type: line
-    units: restarts/s
-    algorithm: incremental
-    dimensions:
-    - selector: container_apps.restart_count_total
-      name: restarts
-  - id: am_azure_container_apps__requests
-    title: Azure Container Apps Requests
-    context: requests
-    family: Requests
-    type: line
-    units: requests/s
-    algorithm: incremental
-    dimensions:
-    - selector: container_apps.requests_total
-      name: requests
-  - id: am_azure_container_apps__response_time
-    title: Azure Container Apps Response Time
-    context: response_time
-    family: Requests
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: container_apps.response_time_average
-      name: average
-  - id: am_azure_container_apps__network
-    title: Azure Container Apps Network Traffic
-    context: network
-    family: Network
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: container_apps.rx_bytes_total
-      name: received
-    - selector: container_apps.tx_bytes_total
-      name: sent
-  - id: am_azure_container_apps__resiliency_timeouts
-    title: Azure Container Apps Resiliency Timeouts
-    context: resiliency_timeouts
-    family: Resiliency
-    type: line
-    units: timeouts/s
-    algorithm: incremental
-    dimensions:
-    - selector: container_apps.resiliency_connect_timeouts_total
-      name: connection
-    - selector: container_apps.resiliency_request_timeouts_total
-      name: request
-  - id: am_azure_container_apps__resiliency_retries
-    title: Azure Container Apps Resiliency Request Retries
-    context: resiliency_retries
-    family: Resiliency
-    type: line
-    units: retries/s
-    algorithm: incremental
-    dimensions:
-    - selector: container_apps.resiliency_request_retries_total
-      name: retries
-  - id: am_azure_container_apps__resiliency_pending_connections
-    title: Azure Container Apps Resiliency Pending Connection Pool
-    context: resiliency_pending_connections
-    family: Resiliency
-    type: line
-    units: requests/s
-    algorithm: incremental
-    dimensions:
-    - selector: container_apps.resiliency_requests_pending_connection_pool_total
-      name: pending
-  - id: am_azure_container_apps__resiliency_ejections
-    title: Azure Container Apps Resiliency Host Ejections
-    context: resiliency_ejections
-    family: Resiliency
-    type: line
-    units: ejections/s
-    algorithm: incremental
-    dimensions:
-    - selector: container_apps.resiliency_ejected_hosts_total
-      name: ejected
-    - selector: container_apps.resiliency_ejections_aborted_total
-      name: aborted
-  - id: am_azure_container_apps__gpu_utilization
-    title: Azure Container Apps GPU Utilization
-    context: gpu_utilization
-    family: GPU
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: container_apps.gpu_utilization_percentage_average
-      name: average
-    - selector: container_apps.gpu_utilization_percentage_maximum
-      name: maximum
-  - id: am_azure_container_apps__jvm_buffer_count
-    title: Azure Container Apps JVM Buffer Count
-    context: jvm_buffer_count
-    family: JVM Buffers
-    type: line
-    units: buffers
-    algorithm: absolute
-    dimensions:
-    - selector: container_apps.jvm_buffer_count_average
-      name: average
-  - id: am_azure_container_apps__jvm_buffer_memory
-    title: Azure Container Apps JVM Buffer Memory
-    context: jvm_buffer_memory
-    family: JVM Buffers
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: container_apps.jvm_buffer_memory_usage_average
-      name: used
-    - selector: container_apps.jvm_buffer_memory_limit_average
-      name: limit
-  - id: am_azure_container_apps__jvm_gc_count
-    title: Azure Container Apps JVM Garbage Collections
-    context: jvm_gc_count
-    family: JVM GC
-    type: line
-    units: collections/s
-    algorithm: incremental
-    dimensions:
-    - selector: container_apps.jvm_gc_count_total
-      name: collections
-  - id: am_azure_container_apps__jvm_gc_duration
-    title: Azure Container Apps JVM GC Duration
-    context: jvm_gc_duration
-    family: JVM GC
-    type: line
-    units: milliseconds/s
-    algorithm: incremental
-    dimensions:
-    - selector: container_apps.jvm_gc_duration_total
-      name: duration
-  - id: am_azure_container_apps__jvm_memory_pool
-    title: Azure Container Apps JVM Memory per Pool
-    context: jvm_memory_pool
-    family: JVM Memory
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: container_apps.jvm_memory_used_average
-      name: used
-    - selector: container_apps.jvm_memory_committed_average
-      name: committed
-    - selector: container_apps.jvm_memory_limit_average
-      name: limit
-  - id: am_azure_container_apps__jvm_memory_total
-    title: Azure Container Apps JVM Memory Total
-    context: jvm_memory_total
-    family: JVM Memory
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: container_apps.jvm_memory_total_used_average
-      name: used
-    - selector: container_apps.jvm_memory_total_committed_average
-      name: committed
-    - selector: container_apps.jvm_memory_total_limit_average
-      name: limit
-  - id: am_azure_container_apps__jvm_thread_count
-    title: Azure Container Apps JVM Thread Count
-    context: jvm_thread_count
-    family: JVM Threads
-    type: line
-    units: threads
-    algorithm: absolute
-    dimensions:
-    - selector: container_apps.jvm_thread_count_average
-      name: average
+    - id: am_azure_container_apps__cpu_usage
+      title: Azure Container Apps CPU Usage
+      context: cpu_usage
+      family: CPU
+      type: line
+      units: nanocores
+      algorithm: absolute
+      dimensions:
+        - selector: usage_nano_cores_average
+          name: average
+        - selector: usage_nano_cores_maximum
+          name: maximum
+    - id: am_azure_container_apps__cpu_percentage
+      title: Azure Container Apps CPU Percentage
+      context: cpu_percentage
+      family: CPU
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_percentage_average
+          name: average
+        - selector: cpu_percentage_maximum
+          name: maximum
+    - id: am_azure_container_apps__memory_working_set
+      title: Azure Container Apps Memory Working Set
+      context: memory_working_set
+      family: Memory
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: working_set_bytes_average
+          name: average
+        - selector: working_set_bytes_maximum
+          name: maximum
+    - id: am_azure_container_apps__memory_percentage
+      title: Azure Container Apps Memory Percentage
+      context: memory_percentage
+      family: Memory
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: memory_percentage_average
+          name: average
+        - selector: memory_percentage_maximum
+          name: maximum
+    - id: am_azure_container_apps__replicas
+      title: Azure Container Apps Replica Count
+      context: replicas
+      family: Scaling
+      type: line
+      units: replicas
+      algorithm: absolute
+      dimensions:
+        - selector: replicas_average
+          name: average
+    - id: am_azure_container_apps__reserved_cores
+      title: Azure Container Apps Reserved Cores
+      context: reserved_cores
+      family: Scaling
+      type: line
+      units: cores
+      algorithm: absolute
+      dimensions:
+        - selector: cores_quota_used_maximum
+          name: per_revision
+        - selector: total_cores_quota_used_average
+          name: total
+    - id: am_azure_container_apps__restart_count
+      title: Azure Container Apps Replica Restarts
+      context: restart_count
+      family: Scaling
+      type: line
+      units: restarts/s
+      algorithm: incremental
+      dimensions:
+        - selector: restart_count_total
+          name: restarts
+    - id: am_azure_container_apps__requests
+      title: Azure Container Apps Requests
+      context: requests
+      family: Requests
+      type: line
+      units: requests/s
+      algorithm: incremental
+      dimensions:
+        - selector: requests_total
+          name: requests
+    - id: am_azure_container_apps__response_time
+      title: Azure Container Apps Response Time
+      context: response_time
+      family: Requests
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: response_time_average
+          name: average
+    - id: am_azure_container_apps__network
+      title: Azure Container Apps Network Traffic
+      context: network
+      family: Network
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: rx_bytes_total
+          name: received
+        - selector: tx_bytes_total
+          name: sent
+    - id: am_azure_container_apps__resiliency_timeouts
+      title: Azure Container Apps Resiliency Timeouts
+      context: resiliency_timeouts
+      family: Resiliency
+      type: line
+      units: timeouts/s
+      algorithm: incremental
+      dimensions:
+        - selector: resiliency_connect_timeouts_total
+          name: connection
+        - selector: resiliency_request_timeouts_total
+          name: request
+    - id: am_azure_container_apps__resiliency_retries
+      title: Azure Container Apps Resiliency Request Retries
+      context: resiliency_retries
+      family: Resiliency
+      type: line
+      units: retries/s
+      algorithm: incremental
+      dimensions:
+        - selector: resiliency_request_retries_total
+          name: retries
+    - id: am_azure_container_apps__resiliency_pending_connections
+      title: Azure Container Apps Resiliency Pending Connection Pool
+      context: resiliency_pending_connections
+      family: Resiliency
+      type: line
+      units: requests/s
+      algorithm: incremental
+      dimensions:
+        - selector: resiliency_requests_pending_connection_pool_total
+          name: pending
+    - id: am_azure_container_apps__resiliency_ejections
+      title: Azure Container Apps Resiliency Host Ejections
+      context: resiliency_ejections
+      family: Resiliency
+      type: line
+      units: ejections/s
+      algorithm: incremental
+      dimensions:
+        - selector: resiliency_ejected_hosts_total
+          name: ejected
+        - selector: resiliency_ejections_aborted_total
+          name: aborted
+    - id: am_azure_container_apps__gpu_utilization
+      title: Azure Container Apps GPU Utilization
+      context: gpu_utilization
+      family: GPU
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: gpu_utilization_percentage_average
+          name: average
+        - selector: gpu_utilization_percentage_maximum
+          name: maximum
+    - id: am_azure_container_apps__jvm_buffer_count
+      title: Azure Container Apps JVM Buffer Count
+      context: jvm_buffer_count
+      family: JVM Buffers
+      type: line
+      units: buffers
+      algorithm: absolute
+      dimensions:
+        - selector: jvm_buffer_count_average
+          name: average
+    - id: am_azure_container_apps__jvm_buffer_memory
+      title: Azure Container Apps JVM Buffer Memory
+      context: jvm_buffer_memory
+      family: JVM Buffers
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: jvm_buffer_memory_usage_average
+          name: used
+        - selector: jvm_buffer_memory_limit_average
+          name: limit
+    - id: am_azure_container_apps__jvm_gc_count
+      title: Azure Container Apps JVM Garbage Collections
+      context: jvm_gc_count
+      family: JVM GC
+      type: line
+      units: collections/s
+      algorithm: incremental
+      dimensions:
+        - selector: jvm_gc_count_total
+          name: collections
+    - id: am_azure_container_apps__jvm_gc_duration
+      title: Azure Container Apps JVM GC Duration
+      context: jvm_gc_duration
+      family: JVM GC
+      type: line
+      units: milliseconds/s
+      algorithm: incremental
+      dimensions:
+        - selector: jvm_gc_duration_total
+          name: duration
+    - id: am_azure_container_apps__jvm_memory_pool
+      title: Azure Container Apps JVM Memory per Pool
+      context: jvm_memory_pool
+      family: JVM Memory
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: jvm_memory_used_average
+          name: used
+        - selector: jvm_memory_committed_average
+          name: committed
+        - selector: jvm_memory_limit_average
+          name: limit
+    - id: am_azure_container_apps__jvm_memory_total
+      title: Azure Container Apps JVM Memory Total
+      context: jvm_memory_total
+      family: JVM Memory
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: jvm_memory_total_used_average
+          name: used
+        - selector: jvm_memory_total_committed_average
+          name: committed
+        - selector: jvm_memory_total_limit_average
+          name: limit
+    - id: am_azure_container_apps__jvm_thread_count
+      title: Azure Container Apps JVM Thread Count
+      context: jvm_thread_count
+      family: JVM Threads
+      type: line
+      units: threads
+      algorithm: absolute
+      dimensions:
+        - selector: jvm_thread_count_average
+          name: average

@@ -70,11 +70,9 @@ func (c *Collector) collect() (map[string]int64, error) {
 		c.startTime = time.Now()
 		in := make(chan resource)
 
-		c.wg.Add(1)
-		go func() { defer c.wg.Done(); c.runUpdateState(in) }()
+		c.wg.Go(func() { c.runUpdateState(in) })
 
-		c.wg.Add(1)
-		go func() { defer c.wg.Done(); c.discoverer.run(c.ctx, in) }()
+		c.wg.Go(func() { c.discoverer.run(c.ctx, in) })
 
 		c.kubeClusterID = c.getKubeClusterID()
 		c.kubeClusterName = c.getKubeClusterName()

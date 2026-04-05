@@ -5,6 +5,7 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -277,9 +278,7 @@ func doGetAllPages[T any](c *Client, urlPath string, params url.Values) ([]T, er
 
 	for {
 		reqParams := make(url.Values)
-		for k, v := range params {
-			reqParams[k] = v
-		}
+		maps.Copy(reqParams, params)
 		if offset > 0 {
 			reqParams.Set("offset", strconv.Itoa(offset))
 		}

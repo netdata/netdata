@@ -1,119 +1,118 @@
 ---
-id: sql_managed_instance
-name: Azure SQL Managed Instance
+display_name: Azure SQL Managed Instance
 resource_type: Microsoft.Sql/managedInstances
 metrics:
-- id: avg_cpu_percent
-  azure_name: avg_cpu_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: io_bytes_read
-  azure_name: io_bytes_read
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: io_bytes_written
-  azure_name: io_bytes_written
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: io_requests
-  azure_name: io_requests
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: reserved_storage_mb
-  azure_name: reserved_storage_mb
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: storage_space_used_mb
-  azure_name: storage_space_used_mb
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: virtual_core_count
-  azure_name: virtual_core_count
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
+  - id: avg_cpu_percent
+    azure_name: avg_cpu_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: io_bytes_read
+    azure_name: io_bytes_read
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: io_bytes_written
+    azure_name: io_bytes_written
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: io_requests
+    azure_name: io_requests
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: reserved_storage_mb
+    azure_name: reserved_storage_mb
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: storage_space_used_mb
+    azure_name: storage_space_used_mb
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: virtual_core_count
+    azure_name: virtual_core_count
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
 template:
   family: Azure SQL Managed Instance
   context_namespace: sql_managed_instance
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_sql_managed_instance__cpu
-    title: Azure SQL Managed Instance CPU Utilization
-    context: cpu
-    family: Utilization
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: sql_managed_instance.avg_cpu_percent_average
-      name: average
-    - selector: sql_managed_instance.avg_cpu_percent_maximum
-      name: maximum
-  - id: am_azure_sql_managed_instance__io_throughput
-    title: Azure SQL Managed Instance I/O Throughput
-    context: io_throughput
-    family: I/O
-    type: line
-    units: bytes/s
-    algorithm: absolute
-    dimensions:
-    - selector: sql_managed_instance.io_bytes_read_average
-      name: read
-    - selector: sql_managed_instance.io_bytes_written_average
-      name: written
-  - id: am_azure_sql_managed_instance__io_requests
-    title: Azure SQL Managed Instance I/O Requests
-    context: io_requests
-    family: I/O
-    type: line
-    units: requests/s
-    algorithm: absolute
-    dimensions:
-    - selector: sql_managed_instance.io_requests_average
-      name: average
-  - id: am_azure_sql_managed_instance__storage
-    title: Azure SQL Managed Instance Storage
-    context: storage
-    family: Capacity
-    type: line
-    units: MiB
-    algorithm: absolute
-    dimensions:
-    - selector: sql_managed_instance.reserved_storage_mb_average
-      name: reserved
-    - selector: sql_managed_instance.storage_space_used_mb_average
-      name: used
-  - id: am_azure_sql_managed_instance__virtual_core_count
-    title: Azure SQL Managed Instance Virtual Core Count
-    context: virtual_core_count
-    family: Capacity
-    type: line
-    units: cores
-    algorithm: absolute
-    dimensions:
-    - selector: sql_managed_instance.virtual_core_count_average
-      name: average
+    - id: am_azure_sql_managed_instance__cpu
+      title: Azure SQL Managed Instance CPU Utilization
+      context: cpu
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: avg_cpu_percent_average
+          name: average
+        - selector: avg_cpu_percent_maximum
+          name: maximum
+    - id: am_azure_sql_managed_instance__io_throughput
+      title: Azure SQL Managed Instance I/O Throughput
+      context: io_throughput
+      family: IO
+      type: line
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: io_bytes_read_average
+          name: read
+        - selector: io_bytes_written_average
+          name: written
+    - id: am_azure_sql_managed_instance__io_requests
+      title: Azure SQL Managed Instance I/O Requests
+      context: io_requests
+      family: IO
+      type: line
+      units: requests/s
+      algorithm: absolute
+      dimensions:
+        - selector: io_requests_average
+          name: average
+    - id: am_azure_sql_managed_instance__storage
+      title: Azure SQL Managed Instance Storage
+      context: storage
+      family: Capacity
+      type: line
+      units: MiB
+      algorithm: absolute
+      dimensions:
+        - selector: reserved_storage_mb_average
+          name: reserved
+        - selector: storage_space_used_mb_average
+          name: used
+    - id: am_azure_sql_managed_instance__virtual_core_count
+      title: Azure SQL Managed Instance Virtual Core Count
+      context: virtual_core_count
+      family: Capacity
+      type: line
+      units: cores
+      algorithm: absolute
+      dimensions:
+        - selector: virtual_core_count_average
+          name: average

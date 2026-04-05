@@ -158,6 +158,67 @@
                 "properties": {
                   "mode": {
                     "const": "auto"
+                  },
+                  "mode_auto": {
+                    "title": "Auto profile overrides",
+                    "type": "object",
+                    "properties": {
+                      "entries": {
+                        "title": "Profile entries",
+                        "description": "Optional per-profile overrides applied only to profiles that auto-activate at bootstrap. Unmatched entries stay dormant.",
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "title": "Profile basename",
+                              "description": "Canonical profile basename. Must be lowercase letters, digits, or underscores and start with a letter.",
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9_]*$"
+                            },
+                            "filters": {
+                              "title": "Filters",
+                              "description": "Optional per-profile resource filters that narrow the globally discovered set for this profile.",
+                              "type": "object",
+                              "properties": {
+                                "resource_groups": {
+                                  "title": "Resource groups",
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "regions": {
+                                  "title": "Regions",
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "tags": {
+                                  "title": "Tags",
+                                  "description": "Optional tag filters for this profile. Supported only when `discovery.mode` is `filters`; in `query` mode, encode per-profile tag filtering in the KQL.",
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "minItems": 1
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
+                        }
+                      }
+                    }
                   }
                 }
               },
@@ -170,17 +231,64 @@
                     "title": "Exact profiles",
                     "type": "object",
                     "properties": {
-                      "names": {
-                        "title": "Profile basenames",
-                        "description": "Explicit profile file basenames used by `exact` mode. Matching is case-insensitive.",
+                      "entries": {
+                        "title": "Profile entries",
+                        "description": "Explicit profile entries used by `exact` mode.",
                         "type": "array",
                         "items": {
-                          "type": "string"
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "title": "Profile basename",
+                              "description": "Canonical profile basename. Must be lowercase letters, digits, or underscores and start with a letter.",
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9_]*$"
+                            },
+                            "filters": {
+                              "title": "Filters",
+                              "description": "Optional per-profile resource filters that narrow the globally discovered set for this profile.",
+                              "type": "object",
+                              "properties": {
+                                "resource_groups": {
+                                  "title": "Resource groups",
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "regions": {
+                                  "title": "Regions",
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "tags": {
+                                  "title": "Tags",
+                                  "description": "Optional tag filters for this profile. Supported only when `discovery.mode` is `filters`; in `query` mode, encode per-profile tag filtering in the KQL.",
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "minItems": 1
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
                         }
                       }
                     },
                     "required": [
-                      "names"
+                      "entries"
                     ]
                   }
                 },
@@ -197,17 +305,64 @@
                     "title": "Combined profiles",
                     "type": "object",
                     "properties": {
-                      "names": {
-                        "title": "Profile basenames",
-                        "description": "Explicit profile file basenames merged with auto-discovered profiles in `combined` mode. Matching is case-insensitive.",
+                      "entries": {
+                        "title": "Profile entries",
+                        "description": "Explicit profile entries merged with auto-discovered profiles in `combined` mode.",
                         "type": "array",
                         "items": {
-                          "type": "string"
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "title": "Profile basename",
+                              "description": "Canonical profile basename. Must be lowercase letters, digits, or underscores and start with a letter.",
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9_]*$"
+                            },
+                            "filters": {
+                              "title": "Filters",
+                              "description": "Optional per-profile resource filters that narrow the globally discovered set for this profile.",
+                              "type": "object",
+                              "properties": {
+                                "resource_groups": {
+                                  "title": "Resource groups",
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "regions": {
+                                  "title": "Regions",
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "tags": {
+                                  "title": "Tags",
+                                  "description": "Optional tag filters for this profile. Supported only when `discovery.mode` is `filters`; in `query` mode, encode per-profile tag filtering in the KQL.",
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "minItems": 1
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
                         }
                       }
                     },
                     "required": [
-                      "names"
+                      "entries"
                     ]
                   }
                 },
@@ -431,29 +586,87 @@
     },
     "profiles": {
       "mode": {
-        "ui:help": "Choose how metric profiles are activated: `auto` enables profiles for discovered resource types, `exact` uses only the listed profile basenames, and `combined` merges both.",
+        "ui:help": "Choose how metric profiles are activated: `auto` enables profiles for discovered resource types, `exact` uses only the listed profile entries, and `combined` merges both.",
         "ui:widget": "radio",
         "ui:options": {
           "inline": true
         }
       },
-      "mode_exact": {
-        "names": {
+      "mode_auto": {
+        "entries": {
           "ui:listFlavour": "list",
-          "ui:help": "Add Azure Monitor profile file basenames to enable explicitly in `exact` mode. Matching is case-insensitive.",
+          "ui:help": "Optional per-profile overrides applied only to profiles that auto-activate at bootstrap.",
           "items": {
-            "ui:help": "Profile file basename from the Azure Monitor profile catalog.",
-            "ui:placeholder": "sql_database"
+            "name": {
+              "ui:help": "Canonical profile basename.",
+              "ui:placeholder": "sql_database"
+            },
+            "filters": {
+              "resource_groups": {
+                "ui:listFlavour": "list"
+              },
+              "regions": {
+                "ui:listFlavour": "list"
+              },
+              "tags": {
+                "ui:help": "Only supported when `discovery.mode` is `filters`. In `query` mode, encode per-profile tag filtering in the KQL.",
+                "additionalProperties": {
+                  "ui:listFlavour": "list"
+                }
+              }
+            }
+          }
+        }
+      },
+      "mode_exact": {
+        "entries": {
+          "ui:listFlavour": "list",
+          "ui:help": "Add explicit profile entries for `exact` mode.",
+          "items": {
+            "name": {
+              "ui:help": "Canonical profile basename.",
+              "ui:placeholder": "sql_database"
+            },
+            "filters": {
+              "resource_groups": {
+                "ui:listFlavour": "list"
+              },
+              "regions": {
+                "ui:listFlavour": "list"
+              },
+              "tags": {
+                "ui:help": "Only supported when `discovery.mode` is `filters`. In `query` mode, encode per-profile tag filtering in the KQL.",
+                "additionalProperties": {
+                  "ui:listFlavour": "list"
+                }
+              }
+            }
           }
         }
       },
       "mode_combined": {
-        "names": {
+        "entries": {
           "ui:listFlavour": "list",
-          "ui:help": "Add profile file basenames to merge with auto-discovered profiles in `combined` mode. Matching is case-insensitive.",
+          "ui:help": "Add explicit profile entries to merge with auto-discovered profiles in `combined` mode.",
           "items": {
-            "ui:help": "Profile file basename from the Azure Monitor profile catalog.",
-            "ui:placeholder": "sql_database"
+            "name": {
+              "ui:help": "Canonical profile basename.",
+              "ui:placeholder": "sql_database"
+            },
+            "filters": {
+              "resource_groups": {
+                "ui:listFlavour": "list"
+              },
+              "regions": {
+                "ui:listFlavour": "list"
+              },
+              "tags": {
+                "ui:help": "Only supported when `discovery.mode` is `filters`. In `query` mode, encode per-profile tag filtering in the KQL.",
+                "additionalProperties": {
+                  "ui:listFlavour": "list"
+                }
+              }
+            }
           }
         }
       }

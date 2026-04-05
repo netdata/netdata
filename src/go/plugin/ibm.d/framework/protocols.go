@@ -36,23 +36,23 @@ func (p *ProtocolClient) MarkConnected() {
 }
 
 // Debugf logs a debug message prefixed with the protocol name
-func (p *ProtocolClient) Debugf(format string, args ...interface{}) {
-	p.state.Debugf("[%s] "+format, append([]interface{}{p.name}, args...)...)
+func (p *ProtocolClient) Debugf(format string, args ...any) {
+	p.state.Debugf("[%s] "+format, append([]any{p.name}, args...)...)
 }
 
 // Warningf logs a warning message prefixed with the protocol name
-func (p *ProtocolClient) Warningf(format string, args ...interface{}) {
-	p.state.Warningf("[%s] "+format, append([]interface{}{p.name}, args...)...)
+func (p *ProtocolClient) Warningf(format string, args ...any) {
+	p.state.Warningf("[%s] "+format, append([]any{p.name}, args...)...)
 }
 
 // Errorf logs an error message prefixed with the protocol name
-func (p *ProtocolClient) Errorf(format string, args ...interface{}) {
-	p.state.Errorf("[%s] "+format, append([]interface{}{p.name}, args...)...)
+func (p *ProtocolClient) Errorf(format string, args ...any) {
+	p.state.Errorf("[%s] "+format, append([]any{p.name}, args...)...)
 }
 
 // Infof logs an info message prefixed with the protocol name
-func (p *ProtocolClient) Infof(format string, args ...interface{}) {
-	p.state.Infof("[%s] "+format, append([]interface{}{p.name}, args...)...)
+func (p *ProtocolClient) Infof(format string, args ...any) {
+	p.state.Infof("[%s] "+format, append([]any{p.name}, args...)...)
 }
 
 // IsReconnect returns true if this is the same iteration as when connected
@@ -182,10 +182,7 @@ func NewExponentialBackoff() *ExponentialBackoff {
 // NextInterval returns the next backoff interval
 func (b *ExponentialBackoff) NextInterval() time.Duration {
 	defer func() {
-		b.currentInterval = time.Duration(float64(b.currentInterval) * b.Multiplier)
-		if b.currentInterval > b.MaxInterval {
-			b.currentInterval = b.MaxInterval
-		}
+		b.currentInterval = min(time.Duration(float64(b.currentInterval)*b.Multiplier), b.MaxInterval)
 		b.attempt++
 	}()
 

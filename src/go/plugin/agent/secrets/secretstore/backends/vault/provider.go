@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
 
 //go:embed config_schema.json
 var configSchema string
+
+var defaultTimeout = confopt.Duration(3 * time.Second)
 
 type Config struct {
 	Mode          string               `json:"mode" yaml:"mode"`
@@ -22,6 +24,7 @@ type Config struct {
 	Addr          string               `json:"addr" yaml:"addr"`
 	Namespace     string               `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	TLSSkipVerify bool                 `json:"tls_skip_verify,omitempty" yaml:"tls_skip_verify,omitempty"`
+	Timeout       confopt.Duration     `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
 
 type ModeTokenConfig struct {
@@ -32,19 +35,19 @@ type ModeTokenFileConfig struct {
 	Path string `json:"path" yaml:"path"`
 }
 
-type provider struct {
+type runtime struct {
 	httpClient         *http.Client
 	httpClientInsecure *http.Client
 }
 
 type store struct {
 	Config    `yaml:",inline" json:""`
-	provider  *provider
+	runtime   *runtime
 	published *publishedStore
 }
 
 type publishedStore struct {
-	provider       *provider
+	runtime        *runtime
 	mode           string
 	tokenValue     string
 	tokenFilePath  string
@@ -54,21 +57,18 @@ type publishedStore struct {
 }
 
 func New() secretstore.Creator {
-	p := &provider{
-		httpClient:         httpx.VaultClient(10 * time.Second),
-		httpClientInsecure: httpx.VaultInsecureClient(10 * time.Second),
-	}
-
 	return secretstore.Creator{
 		Kind:        secretstore.KindVault,
 		DisplayName: "Vault",
 		Schema:      configSchema,
-		Create:      p.create,
+		Create: func() secretstore.Store {
+			return &store{
+				Config: Config{
+					Timeout: defaultTimeout,
+				},
+			}
+		},
 	}
-}
-
-func (p *provider) create() secretstore.Store {
-	return &store{provider: p}
 }
 
 func (s *store) Configuration() any { return &s.Config }

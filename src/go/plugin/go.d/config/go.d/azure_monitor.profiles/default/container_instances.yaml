@@ -1,83 +1,82 @@
 ---
-id: container_instances
-name: Azure Container Instances
+display_name: Azure Container Instances
 resource_type: Microsoft.ContainerInstance/containerGroups
 metrics:
-- id: cpu_usage
-  azure_name: CpuUsage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: memory_usage
-  azure_name: MemoryUsage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: network_bytes_received_per_second
-  azure_name: NetworkBytesReceivedPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: network_bytes_transmitted_per_second
-  azure_name: NetworkBytesTransmittedPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
+  - id: cpu_usage
+    azure_name: CpuUsage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: memory_usage
+    azure_name: MemoryUsage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: network_bytes_received_per_second
+    azure_name: NetworkBytesReceivedPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: network_bytes_transmitted_per_second
+    azure_name: NetworkBytesTransmittedPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
 template:
   family: Azure Container Instances
   context_namespace: container_instances
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_container_instances__cpu_usage
-    title: Azure Container Instances CPU Usage
-    context: cpu_usage
-    family: CPU
-    type: line
-    units: millicores
-    algorithm: absolute
-    dimensions:
-    - selector: container_instances.cpu_usage_average
-      name: average
-    - selector: container_instances.cpu_usage_maximum
-      name: maximum
-  - id: am_azure_container_instances__memory_usage
-    title: Azure Container Instances Memory Usage
-    context: memory_usage
-    family: Memory
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: container_instances.memory_usage_average
-      name: average
-    - selector: container_instances.memory_usage_maximum
-      name: maximum
-  - id: am_azure_container_instances__network
-    title: Azure Container Instances Network Traffic
-    context: network
-    family: Network
-    type: line
-    units: bytes/s
-    algorithm: absolute
-    dimensions:
-    - selector: container_instances.network_bytes_received_per_second_average
-      name: received
-    - selector: container_instances.network_bytes_transmitted_per_second_average
-      name: sent
+    - id: am_azure_container_instances__cpu_usage
+      title: Azure Container Instances CPU Usage
+      context: cpu_usage
+      family: CPU
+      type: line
+      units: millicores
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_usage_average
+          name: average
+        - selector: cpu_usage_maximum
+          name: maximum
+    - id: am_azure_container_instances__memory_usage
+      title: Azure Container Instances Memory Usage
+      context: memory_usage
+      family: Memory
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: memory_usage_average
+          name: average
+        - selector: memory_usage_maximum
+          name: maximum
+    - id: am_azure_container_instances__network
+      title: Azure Container Instances Network Traffic
+      context: network
+      family: Network
+      type: line
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: network_bytes_received_per_second_average
+          name: received
+        - selector: network_bytes_transmitted_per_second_average
+          name: sent

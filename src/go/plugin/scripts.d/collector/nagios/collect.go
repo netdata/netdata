@@ -124,6 +124,7 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
 				metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
 				metrix.WithUnit(measureSet.unit),
+				metrix.WithFloat(true),
 			).ObserveTotalFields(fields)
 		} else {
 			jobMeter.MeasureSetGauge(
@@ -131,6 +132,7 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
 				metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
 				metrix.WithUnit(measureSet.unit),
+				metrix.WithFloat(true),
 			).ObserveFields(fields)
 		}
 	}

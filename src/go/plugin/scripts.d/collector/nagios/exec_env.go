@@ -4,6 +4,7 @@ package nagios
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"os/user"
 	"runtime"
@@ -15,9 +16,7 @@ func buildRunEnv(workingDir string, jobEnv map[string]string, macroEnv map[strin
 	for k, v := range jobEnv {
 		merged[k] = replaceMacro(v, macroEnv)
 	}
-	for k, v := range macroEnv {
-		merged[k] = v
-	}
+	maps.Copy(merged, macroEnv)
 
 	keys := make([]string, 0, len(merged))
 	for k := range merged {

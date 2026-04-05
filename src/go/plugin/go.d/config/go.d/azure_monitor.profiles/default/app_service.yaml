@@ -1,571 +1,570 @@
 ---
-id: app_service
-name: Azure App Service
+display_name: Azure App Service
 resource_type: Microsoft.Web/sites
 metrics:
-- id: requests
-  azure_name: Requests
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: http_response_time
-  azure_name: HttpResponseTime
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: http2xx
-  azure_name: Http2xx
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: http3xx
-  azure_name: Http3xx
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: http4xx
-  azure_name: Http4xx
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: http5xx
-  azure_name: Http5xx
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: cpu_percentage
-  azure_name: CpuPercentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cpu_time
-  azure_name: CpuTime
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: average_memory_working_set
-  azure_name: AverageMemoryWorkingSet
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: memory_working_set
-  azure_name: MemoryWorkingSet
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: private_bytes
-  azure_name: PrivateBytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: bytes_received
-  azure_name: BytesReceived
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: bytes_sent
-  azure_name: BytesSent
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: health_check_status
-  azure_name: HealthCheckStatus
-  time_grain: PT5M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: app_connections
-  azure_name: AppConnections
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: io_read_bytes_per_second
-  azure_name: IoReadBytesPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: io_write_bytes_per_second
-  azure_name: IoWriteBytesPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: io_read_operations_per_second
-  azure_name: IoReadOperationsPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: io_write_operations_per_second
-  azure_name: IoWriteOperationsPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: io_other_bytes_per_second
-  azure_name: IoOtherBytesPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: io_other_operations_per_second
-  azure_name: IoOtherOperationsPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: threads
-  azure_name: Threads
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: handles
-  azure_name: Handles
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: gen0_collections
-  azure_name: Gen0Collections
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: gen1_collections
-  azure_name: Gen1Collections
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: gen2_collections
-  azure_name: Gen2Collections
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: http101
-  azure_name: Http101
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: http401
-  azure_name: Http401
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: http403
-  azure_name: Http403
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: http404
-  azure_name: Http404
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: http406
-  azure_name: Http406
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: requests_in_application_queue
-  azure_name: RequestsInApplicationQueue
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: instance_count
-  azure_name: InstanceCount
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: current_assemblies
-  azure_name: CurrentAssemblies
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: total_app_domains
-  azure_name: TotalAppDomains
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: total_app_domains_unloaded
-  azure_name: TotalAppDomainsUnloaded
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: function_execution_count
-  azure_name: FunctionExecutionCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: function_execution_units
-  azure_name: FunctionExecutionUnits
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: always_ready_function_execution_count
-  azure_name: AlwaysReadyFunctionExecutionCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: always_ready_function_execution_units
-  azure_name: AlwaysReadyFunctionExecutionUnits
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: always_ready_units
-  azure_name: AlwaysReadyUnits
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: gauge
-- id: on_demand_function_execution_count
-  azure_name: OnDemandFunctionExecutionCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: on_demand_function_execution_units
-  azure_name: OnDemandFunctionExecutionUnits
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
+  - id: requests
+    azure_name: Requests
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: http_response_time
+    azure_name: HttpResponseTime
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: http2xx
+    azure_name: Http2xx
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: http3xx
+    azure_name: Http3xx
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: http4xx
+    azure_name: Http4xx
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: http5xx
+    azure_name: Http5xx
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: cpu_percentage
+    azure_name: CpuPercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cpu_time
+    azure_name: CpuTime
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: average_memory_working_set
+    azure_name: AverageMemoryWorkingSet
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: memory_working_set
+    azure_name: MemoryWorkingSet
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: private_bytes
+    azure_name: PrivateBytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: bytes_received
+    azure_name: BytesReceived
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: bytes_sent
+    azure_name: BytesSent
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: health_check_status
+    azure_name: HealthCheckStatus
+    time_grain: PT5M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: app_connections
+    azure_name: AppConnections
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: io_read_bytes_per_second
+    azure_name: IoReadBytesPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: io_write_bytes_per_second
+    azure_name: IoWriteBytesPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: io_read_operations_per_second
+    azure_name: IoReadOperationsPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: io_write_operations_per_second
+    azure_name: IoWriteOperationsPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: io_other_bytes_per_second
+    azure_name: IoOtherBytesPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: io_other_operations_per_second
+    azure_name: IoOtherOperationsPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: threads
+    azure_name: Threads
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: handles
+    azure_name: Handles
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: gen0_collections
+    azure_name: Gen0Collections
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: gen1_collections
+    azure_name: Gen1Collections
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: gen2_collections
+    azure_name: Gen2Collections
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: http101
+    azure_name: Http101
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: http401
+    azure_name: Http401
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: http403
+    azure_name: Http403
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: http404
+    azure_name: Http404
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: http406
+    azure_name: Http406
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: requests_in_application_queue
+    azure_name: RequestsInApplicationQueue
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: instance_count
+    azure_name: InstanceCount
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: current_assemblies
+    azure_name: CurrentAssemblies
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: total_app_domains
+    azure_name: TotalAppDomains
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: total_app_domains_unloaded
+    azure_name: TotalAppDomainsUnloaded
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: function_execution_count
+    azure_name: FunctionExecutionCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: function_execution_units
+    azure_name: FunctionExecutionUnits
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: always_ready_function_execution_count
+    azure_name: AlwaysReadyFunctionExecutionCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: always_ready_function_execution_units
+    azure_name: AlwaysReadyFunctionExecutionUnits
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: always_ready_units
+    azure_name: AlwaysReadyUnits
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: on_demand_function_execution_count
+    azure_name: OnDemandFunctionExecutionCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: on_demand_function_execution_units
+    azure_name: OnDemandFunctionExecutionUnits
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
 template:
   family: Azure App Service
   context_namespace: app_service
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_app_service__requests
-    title: Azure App Service Requests
-    context: requests
-    family: HTTP
-    type: line
-    units: requests/s
-    algorithm: incremental
-    dimensions:
-    - selector: app_service.requests_total
-      name: requests
-  - id: am_azure_app_service__response_time
-    title: Azure App Service Response Time
-    context: response_time
-    family: HTTP
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: app_service.http_response_time_average
-      name: average
-  - id: am_azure_app_service__http_status
-    title: Azure App Service HTTP Status Codes
-    context: http_status
-    family: HTTP
-    type: line
-    units: responses/s
-    algorithm: incremental
-    dimensions:
-    - selector: app_service.http2xx_total
-      name: 2xx
-    - selector: app_service.http3xx_total
-      name: 3xx
-    - selector: app_service.http4xx_total
-      name: 4xx
-    - selector: app_service.http5xx_total
-      name: 5xx
-  - id: am_azure_app_service__http_error_detail
-    title: Azure App Service HTTP Error Detail
-    context: http_error_detail
-    family: HTTP
-    type: line
-    units: responses/s
-    algorithm: incremental
-    dimensions:
-    - selector: app_service.http101_total
-      name: 101_websocket
-    - selector: app_service.http401_total
-      name: 401_unauthorized
-    - selector: app_service.http403_total
-      name: 403_forbidden
-    - selector: app_service.http404_total
-      name: 404_not_found
-    - selector: app_service.http406_total
-      name: 406_not_acceptable
-  - id: am_azure_app_service__cpu
-    title: Azure App Service CPU Utilization
-    context: cpu
-    family: Compute
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: app_service.cpu_percentage_average
-      name: average
-  - id: am_azure_app_service__cpu_time
-    title: Azure App Service CPU Time
-    context: cpu_time
-    family: Compute
-    type: line
-    units: seconds
-    algorithm: incremental
-    dimensions:
-    - selector: app_service.cpu_time_total
-      name: total
-  - id: am_azure_app_service__memory_usage
-    title: Azure App Service Memory Usage
-    context: memory_usage
-    family: Compute
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: app_service.average_memory_working_set_average
-      name: average_working_set
-    - selector: app_service.memory_working_set_average
-      name: working_set
-    - selector: app_service.private_bytes_average
-      name: private
-  - id: am_azure_app_service__health
-    title: Azure App Service Health Check Status
-    context: health
-    family: Health
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: app_service.health_check_status_average
-      name: average
-  - id: am_azure_app_service__network_traffic
-    title: Azure App Service Network Traffic
-    context: network_traffic
-    family: Network
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: app_service.bytes_received_total
-      name: received
-    - selector: app_service.bytes_sent_total
-      name: sent
-  - id: am_azure_app_service__connections
-    title: Azure App Service Connections
-    context: connections
-    family: Connections
-    type: line
-    units: connections
-    algorithm: absolute
-    dimensions:
-    - selector: app_service.app_connections_average
-      name: average
-  - id: am_azure_app_service__io_throughput
-    title: Azure App Service IO Throughput
-    context: io_throughput
-    family: IO
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: app_service.io_read_bytes_per_second_total
-      name: read
-    - selector: app_service.io_write_bytes_per_second_total
-      name: write
-    - selector: app_service.io_other_bytes_per_second_total
-      name: other
-  - id: am_azure_app_service__io_operations
-    title: Azure App Service IO Operations
-    context: io_operations
-    family: IO
-    type: line
-    units: operations/s
-    algorithm: incremental
-    dimensions:
-    - selector: app_service.io_read_operations_per_second_total
-      name: read
-    - selector: app_service.io_write_operations_per_second_total
-      name: write
-    - selector: app_service.io_other_operations_per_second_total
-      name: other
-  - id: am_azure_app_service__threads
-    title: Azure App Service Threads
-    context: threads
-    family: Runtime
-    type: line
-    units: threads
-    algorithm: absolute
-    dimensions:
-    - selector: app_service.threads_average
-      name: average
-  - id: am_azure_app_service__handles
-    title: Azure App Service Handles
-    context: handles
-    family: Runtime
-    type: line
-    units: handles
-    algorithm: absolute
-    dimensions:
-    - selector: app_service.handles_average
-      name: average
-  - id: am_azure_app_service__gc_collections
-    title: Azure App Service .NET GC Collections
-    context: gc_collections
-    family: Runtime
-    type: line
-    units: collections/s
-    algorithm: incremental
-    dimensions:
-    - selector: app_service.gen0_collections_total
-      name: gen0
-    - selector: app_service.gen1_collections_total
-      name: gen1
-    - selector: app_service.gen2_collections_total
-      name: gen2
-  - id: am_azure_app_service__function_executions
-    title: Azure App Service Function Executions
-    context: function_executions
-    family: Functions
-    type: line
-    units: executions/s
-    algorithm: incremental
-    dimensions:
-    - selector: app_service.function_execution_count_total
-      name: total
-  - id: am_azure_app_service__function_execution_units
-    title: Azure App Service Function Execution Units
-    context: function_execution_units
-    family: Functions
-    type: line
-    units: MB-milliseconds/s
-    algorithm: incremental
-    dimensions:
-    - selector: app_service.function_execution_units_total
-      name: total
-  - id: am_azure_app_service__always_ready_function_executions
-    title: Azure App Service Always Ready Function Executions
-    context: always_ready_function_executions
-    family: Functions
-    type: line
-    units: executions/s
-    algorithm: incremental
-    dimensions:
-    - selector: app_service.always_ready_function_execution_count_total
-      name: total
-  - id: am_azure_app_service__always_ready_function_execution_units
-    title: Azure App Service Always Ready Function Execution Units
-    context: always_ready_function_execution_units
-    family: Functions
-    type: line
-    units: MB-milliseconds/s
-    algorithm: incremental
-    dimensions:
-    - selector: app_service.always_ready_function_execution_units_total
-      name: total
-  - id: am_azure_app_service__always_ready_units
-    title: Azure App Service Always Ready Units
-    context: always_ready_units
-    family: Functions
-    type: line
-    units: units
-    algorithm: absolute
-    dimensions:
-    - selector: app_service.always_ready_units_total
-      name: total
-  - id: am_azure_app_service__on_demand_function_executions
-    title: Azure App Service On Demand Function Executions
-    context: on_demand_function_executions
-    family: Functions
-    type: line
-    units: executions/s
-    algorithm: incremental
-    dimensions:
-    - selector: app_service.on_demand_function_execution_count_total
-      name: total
-  - id: am_azure_app_service__on_demand_function_execution_units
-    title: Azure App Service On Demand Function Execution Units
-    context: on_demand_function_execution_units
-    family: Functions
-    type: line
-    units: MB-milliseconds/s
-    algorithm: incremental
-    dimensions:
-    - selector: app_service.on_demand_function_execution_units_total
-      name: total
-  - id: am_azure_app_service__request_queue
-    title: Azure App Service Request Queue
-    context: request_queue
-    family: Health
-    type: line
-    units: requests
-    algorithm: absolute
-    dimensions:
-    - selector: app_service.requests_in_application_queue_average
-      name: queued
-  - id: am_azure_app_service__instances
-    title: Azure App Service Instance Count
-    context: instances
-    family: Scaling
-    type: line
-    units: instances
-    algorithm: absolute
-    dimensions:
-    - selector: app_service.instance_count_average
-      name: running
-  - id: am_azure_app_service__assemblies
-    title: Azure App Service .NET Assemblies
-    context: assemblies
-    family: Runtime
-    type: line
-    units: assemblies
-    algorithm: absolute
-    dimensions:
-    - selector: app_service.current_assemblies_average
-      name: loaded
-  - id: am_azure_app_service__app_domains
-    title: Azure App Service App Domains
-    context: app_domains
-    family: Runtime
-    type: line
-    units: domains
-    algorithm: absolute
-    dimensions:
-    - selector: app_service.total_app_domains_average
-      name: loaded
-    - selector: app_service.total_app_domains_unloaded_average
-      name: unloaded
+    - id: am_azure_app_service__requests
+      title: Azure App Service Requests
+      context: requests
+      family: HTTP
+      type: line
+      units: requests/s
+      algorithm: incremental
+      dimensions:
+        - selector: requests_total
+          name: requests
+    - id: am_azure_app_service__response_time
+      title: Azure App Service Response Time
+      context: response_time
+      family: HTTP
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: http_response_time_average
+          name: average
+    - id: am_azure_app_service__http_status
+      title: Azure App Service HTTP Status Codes
+      context: http_status
+      family: HTTP
+      type: line
+      units: responses/s
+      algorithm: incremental
+      dimensions:
+        - selector: http2xx_total
+          name: 2xx
+        - selector: http3xx_total
+          name: 3xx
+        - selector: http4xx_total
+          name: 4xx
+        - selector: http5xx_total
+          name: 5xx
+    - id: am_azure_app_service__http_error_detail
+      title: Azure App Service HTTP Error Detail
+      context: http_error_detail
+      family: HTTP
+      type: line
+      units: responses/s
+      algorithm: incremental
+      dimensions:
+        - selector: http101_total
+          name: 101_websocket
+        - selector: http401_total
+          name: 401_unauthorized
+        - selector: http403_total
+          name: 403_forbidden
+        - selector: http404_total
+          name: 404_not_found
+        - selector: http406_total
+          name: 406_not_acceptable
+    - id: am_azure_app_service__cpu
+      title: Azure App Service CPU Utilization
+      context: cpu
+      family: Compute
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_percentage_average
+          name: average
+    - id: am_azure_app_service__cpu_time
+      title: Azure App Service CPU Time
+      context: cpu_time
+      family: Compute
+      type: line
+      units: seconds
+      algorithm: incremental
+      dimensions:
+        - selector: cpu_time_total
+          name: total
+    - id: am_azure_app_service__memory_usage
+      title: Azure App Service Memory Usage
+      context: memory_usage
+      family: Compute
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: average_memory_working_set_average
+          name: average_working_set
+        - selector: memory_working_set_average
+          name: working_set
+        - selector: private_bytes_average
+          name: private
+    - id: am_azure_app_service__health
+      title: Azure App Service Health Check Status
+      context: health
+      family: Health
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: health_check_status_average
+          name: average
+    - id: am_azure_app_service__network_traffic
+      title: Azure App Service Network Traffic
+      context: network_traffic
+      family: Network
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: bytes_received_total
+          name: received
+        - selector: bytes_sent_total
+          name: sent
+    - id: am_azure_app_service__connections
+      title: Azure App Service Connections
+      context: connections
+      family: Connections
+      type: line
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: app_connections_average
+          name: average
+    - id: am_azure_app_service__io_throughput
+      title: Azure App Service IO Throughput
+      context: io_throughput
+      family: IO
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: io_read_bytes_per_second_total
+          name: read
+        - selector: io_write_bytes_per_second_total
+          name: write
+        - selector: io_other_bytes_per_second_total
+          name: other
+    - id: am_azure_app_service__io_operations
+      title: Azure App Service IO Operations
+      context: io_operations
+      family: IO
+      type: line
+      units: operations/s
+      algorithm: incremental
+      dimensions:
+        - selector: io_read_operations_per_second_total
+          name: read
+        - selector: io_write_operations_per_second_total
+          name: write
+        - selector: io_other_operations_per_second_total
+          name: other
+    - id: am_azure_app_service__threads
+      title: Azure App Service Threads
+      context: threads
+      family: Runtime
+      type: line
+      units: threads
+      algorithm: absolute
+      dimensions:
+        - selector: threads_average
+          name: average
+    - id: am_azure_app_service__handles
+      title: Azure App Service Handles
+      context: handles
+      family: Runtime
+      type: line
+      units: handles
+      algorithm: absolute
+      dimensions:
+        - selector: handles_average
+          name: average
+    - id: am_azure_app_service__gc_collections
+      title: Azure App Service .NET GC Collections
+      context: gc_collections
+      family: Runtime
+      type: line
+      units: collections/s
+      algorithm: incremental
+      dimensions:
+        - selector: gen0_collections_total
+          name: gen0
+        - selector: gen1_collections_total
+          name: gen1
+        - selector: gen2_collections_total
+          name: gen2
+    - id: am_azure_app_service__function_executions
+      title: Azure App Service Function Executions
+      context: function_executions
+      family: Functions
+      type: line
+      units: executions/s
+      algorithm: incremental
+      dimensions:
+        - selector: function_execution_count_total
+          name: total
+    - id: am_azure_app_service__function_execution_units
+      title: Azure App Service Function Execution Units
+      context: function_execution_units
+      family: Functions
+      type: line
+      units: MB-milliseconds/s
+      algorithm: incremental
+      dimensions:
+        - selector: function_execution_units_total
+          name: total
+    - id: am_azure_app_service__always_ready_function_executions
+      title: Azure App Service Always Ready Function Executions
+      context: always_ready_function_executions
+      family: Functions
+      type: line
+      units: executions/s
+      algorithm: incremental
+      dimensions:
+        - selector: always_ready_function_execution_count_total
+          name: total
+    - id: am_azure_app_service__always_ready_function_execution_units
+      title: Azure App Service Always Ready Function Execution Units
+      context: always_ready_function_execution_units
+      family: Functions
+      type: line
+      units: MB-milliseconds/s
+      algorithm: incremental
+      dimensions:
+        - selector: always_ready_function_execution_units_total
+          name: total
+    - id: am_azure_app_service__always_ready_units
+      title: Azure App Service Always Ready Units
+      context: always_ready_units
+      family: Functions
+      type: line
+      units: units
+      algorithm: absolute
+      dimensions:
+        - selector: always_ready_units_total
+          name: total
+    - id: am_azure_app_service__on_demand_function_executions
+      title: Azure App Service On Demand Function Executions
+      context: on_demand_function_executions
+      family: Functions
+      type: line
+      units: executions/s
+      algorithm: incremental
+      dimensions:
+        - selector: on_demand_function_execution_count_total
+          name: total
+    - id: am_azure_app_service__on_demand_function_execution_units
+      title: Azure App Service On Demand Function Execution Units
+      context: on_demand_function_execution_units
+      family: Functions
+      type: line
+      units: MB-milliseconds/s
+      algorithm: incremental
+      dimensions:
+        - selector: on_demand_function_execution_units_total
+          name: total
+    - id: am_azure_app_service__request_queue
+      title: Azure App Service Request Queue
+      context: request_queue
+      family: Health
+      type: line
+      units: requests
+      algorithm: absolute
+      dimensions:
+        - selector: requests_in_application_queue_average
+          name: queued
+    - id: am_azure_app_service__instances
+      title: Azure App Service Instance Count
+      context: instances
+      family: Scaling
+      type: line
+      units: instances
+      algorithm: absolute
+      dimensions:
+        - selector: instance_count_average
+          name: running
+    - id: am_azure_app_service__assemblies
+      title: Azure App Service .NET Assemblies
+      context: assemblies
+      family: Runtime
+      type: line
+      units: assemblies
+      algorithm: absolute
+      dimensions:
+        - selector: current_assemblies_average
+          name: loaded
+    - id: am_azure_app_service__app_domains
+      title: Azure App Service App Domains
+      context: app_domains
+      family: Runtime
+      type: line
+      units: domains
+      algorithm: absolute
+      dimensions:
+        - selector: total_app_domains_average
+          name: loaded
+        - selector: total_app_domains_unloaded_average
+          name: unloaded

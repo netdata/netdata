@@ -50,7 +50,7 @@ func init() {
 }
 
 func main() {
-	_, _ = maxprocs.Set(maxprocs.Logger(func(s string, args ...interface{}) {}))
+	_, _ = maxprocs.Set(maxprocs.Logger(func(s string, args ...any) {}))
 
 	opts := parseCLI()
 
@@ -78,6 +78,8 @@ func main() {
 	isInsideK8s := hostinfo.IsInsideK8sCluster()
 	moduleRegistry := moduleRegistryWithSystemdPolicy(collectorapi.DefaultRegistry, hostinfo.SystemdVersion)
 
+	runModePolicy := policy.Agent(isTerminal)
+
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,
 		PluginConfigDir:           pluginconfig.ConfigDir(),
@@ -87,11 +89,7 @@ func main() {
 		VarLibDir:                 pluginconfig.VarLibDir(),
 		ModuleRegistry:            moduleRegistry,
 		IsInsideK8s:               isInsideK8s,
-		RunModePolicy: policy.RunModePolicy{
-			IsTerminal:               isTerminal,
-			AutoEnableDiscovered:     isTerminal,
-			UseFileStatusPersistence: !isTerminal,
-		},
+		RunModePolicy:             runModePolicy,
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discoveryproviders.File(),
 			discoveryproviders.Dummy(),
@@ -202,13 +200,9 @@ func runFunctionCLI(opts *cli.Option) int {
 	defer cancel()
 
 	jobMgr := jobmgr.New(jobmgr.Config{
-		PluginName: executable.Name,
-		Out:        io.Discard,
-		RunModePolicy: policy.RunModePolicy{
-			IsTerminal:               false,
-			AutoEnableDiscovered:     true,
-			UseFileStatusPersistence: true,
-		},
+		PluginName:     executable.Name,
+		Out:            io.Discard,
+		RunModePolicy:  policy.FunctionCLI(),
 		VarLibDir:      pluginconfig.VarLibDir(),
 		Modules:        collectorapi.Registry{moduleName: creator},
 		ConfigDefaults: reg,
@@ -256,8 +250,8 @@ func readFunctionPayload(raw string) ([]byte, time.Duration, error) {
 
 	var data []byte
 	var err error
-	if strings.HasPrefix(raw, "@") {
-		data, err = os.ReadFile(strings.TrimPrefix(raw, "@"))
+	if after, ok := strings.CutPrefix(raw, "@"); ok {
+		data, err = os.ReadFile(after)
 	} else {
 		data = []byte(raw)
 	}

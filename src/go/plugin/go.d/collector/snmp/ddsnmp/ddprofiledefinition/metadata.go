@@ -32,7 +32,7 @@ func (c MetadataResourceConfig) Clone() MetadataResourceConfig {
 
 // MetadataField holds configs for a metadata field
 type MetadataField struct {
-	Symbol  SymbolConfig   `yaml:"symbol,omitempty" json:"symbol,omitempty"`
+	Symbol  SymbolConfig   `yaml:"symbol,omitempty" json:"symbol"`
 	Symbols []SymbolConfig `yaml:"symbols,omitempty" json:"symbols,omitempty"`
 	Value   string         `yaml:"value,omitempty" json:"value,omitempty"`
 }

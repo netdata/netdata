@@ -13,5 +13,6 @@ func retainSeenEntries[T any](
 		}
 		kept = append(kept, bucket[i])
 	}
+	clear(bucket[len(kept):])
 	return kept
 }

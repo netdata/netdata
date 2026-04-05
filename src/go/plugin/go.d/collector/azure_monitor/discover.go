@@ -20,6 +20,19 @@ type discoveryFetchResult struct {
 	UnsupportedTypes []string
 }
 
+type normalizedTagFilter struct {
+	Key    string
+	Values []string
+}
+
+type profileResourceMatcher struct {
+	profileName    string
+	resourceType   string
+	resourceGroups map[string]struct{}
+	regions        map[string]struct{}
+	tagFilters     []normalizedTagFilter
+}
+
 func (c *Collector) refreshDiscovery(ctx context.Context, force bool) ([]resourceInfo, error) {
 	now := c.now()
 	if !force && !c.discovery.FetchedAt.IsZero() {
@@ -36,21 +49,25 @@ func (c *Collector) refreshDiscovery(ctx context.Context, force bool) ([]resourc
 		c.Warningf("ignoring unsupported discovered resource types: %v", fetched.UnsupportedTypes)
 	}
 
-	resources, byType := filterDiscoveryResourcesByTypes(fetched.Resources, runtimeResourceTypes(c.runtime))
-
-	if !slices.Equal(resources, c.discovery.Resources) {
-		c.Infof("discovered %d resources: %v", len(resources), resources)
+	state := buildDiscoveryState(fetched.Resources, c.runtime, now, c.Discovery.RefreshEvery, c.discovery.FetchCounter+1)
+	if !equalResourceSlices(state.Resources, c.discovery.Resources) {
+		c.Infof("discovered %d resources: %v", len(state.Resources), state.Resources)
 	}
 
-	c.discovery = discoveryState{
-		Resources:    resources,
+	c.discovery = state
+	return state.Resources, nil
+}
+
+func buildDiscoveryState(resources []resourceInfo, runtime *collectorRuntime, now time.Time, refreshEvery int, fetchCounter uint64) discoveryState {
+	filteredResources, byType := filterDiscoveryResourcesByTypes(resources, runtimeResourceTypes(runtime))
+	return discoveryState{
+		Resources:    filteredResources,
 		ByType:       byType,
+		ByProfile:    filterDiscoveryResourcesByProfiles(filteredResources, runtime),
 		FetchedAt:    now,
-		ExpiresAt:    discoveryExpiresAt(now, c.Discovery.RefreshEvery),
-		FetchCounter: c.discovery.FetchCounter + 1,
+		ExpiresAt:    discoveryExpiresAt(now, refreshEvery),
+		FetchCounter: fetchCounter,
 	}
-
-	return resources, nil
 }
 
 func discoveryExpiresAt(now time.Time, refreshEvery int) time.Time {
@@ -109,7 +126,7 @@ func runtimeResourceTypes(runtime *collectorRuntime) []string {
 	return resourceTypes
 }
 
-func discoverResources(ctx context.Context, subscriptionIDs []string, timeout time.Duration, resourceGraph resourceGraphClient, resourceTypes []string, filters *DiscoveryFiltersConfig) ([]resourceInfo, map[string][]resourceInfo, error) {
+func discoverResources(ctx context.Context, subscriptionIDs []string, timeout time.Duration, resourceGraph resourceGraphClient, resourceTypes []string, filters *ResourceFiltersConfig) ([]resourceInfo, map[string][]resourceInfo, error) {
 	if len(resourceTypes) == 0 {
 		return nil, map[string][]resourceInfo{}, nil
 	}
@@ -119,11 +136,11 @@ func discoverResources(ctx context.Context, subscriptionIDs []string, timeout ti
 		return nil, nil, fmt.Errorf("failed to build resource discovery query")
 	}
 
-	resourceGroupsFilter := normalizedDiscoveryFilterSet(nil)
-	regionsFilter := normalizedDiscoveryFilterSet(nil)
+	resourceGroupsFilter := normalizedFilterSet(nil)
+	regionsFilter := normalizedFilterSet(nil)
 	if filters != nil {
-		resourceGroupsFilter = normalizedDiscoveryFilterSet(filters.ResourceGroups)
-		regionsFilter = normalizedDiscoveryFilterSet(filters.Regions)
+		resourceGroupsFilter = normalizedFilterSet(filters.ResourceGroups)
+		regionsFilter = normalizedFilterSet(filters.Regions)
 	}
 
 	result := make([]resourceInfo, 0, 256)
@@ -149,15 +166,15 @@ func discoverResources(ctx context.Context, subscriptionIDs []string, timeout ti
 			if id == "" {
 				continue
 			}
-			if _, ok := seenIDs[id]; ok {
+			idKey := stringsLowerTrim(id)
+			if _, ok := seenIDs[idKey]; ok {
 				continue
 			}
-			seenIDs[id] = struct{}{}
+			seenIDs[idKey] = struct{}{}
 
 			rg := stringsTrim(asString(row["resourceGroup"]))
-			rgLower := stringsLowerTrim(rg)
 			if len(resourceGroupsFilter) > 0 {
-				if _, ok := resourceGroupsFilter[rgLower]; !ok {
+				if _, ok := resourceGroupsFilter[stringsLowerTrim(rg)]; !ok {
 					continue
 				}
 			}
@@ -167,6 +184,7 @@ func discoverResources(ctx context.Context, subscriptionIDs []string, timeout ti
 			if resourceType == "" || !ok {
 				continue
 			}
+
 			region := stringsLowerTrim(asString(row["location"]))
 			if region == "" {
 				region = "global"
@@ -185,6 +203,7 @@ func discoverResources(ctx context.Context, subscriptionIDs []string, timeout ti
 				Type:           resourceType,
 				ResourceGroup:  rg,
 				Region:         region,
+				Tags:           normalizeResourceTags(row["tags"]),
 			})
 		}
 
@@ -195,13 +214,8 @@ func discoverResources(ctx context.Context, subscriptionIDs []string, timeout ti
 		skipToken = &token
 	}
 
-	byType := make(map[string][]resourceInfo)
-	for _, r := range result {
-		key := stringsLowerTrim(r.Type)
-		byType[key] = append(byType[key], r)
-	}
-
-	return result, byType, nil
+	sortResourceInfos(result)
+	return result, indexResourcesByType(result), nil
 }
 
 func discoverResourcesFromQuery(ctx context.Context, subscriptionIDs []string, timeout time.Duration, resourceGraph resourceGraphClient, kql string, supportedTypes map[string]struct{}) (discoveryFetchResult, error) {
@@ -211,7 +225,6 @@ func discoverResourcesFromQuery(ctx context.Context, subscriptionIDs []string, t
 	}
 
 	result := make([]resourceInfo, 0, 256)
-	byType := make(map[string][]resourceInfo)
 	unsupported := make(map[string]struct{})
 	seenIDs := make(map[string]struct{})
 
@@ -244,7 +257,6 @@ func discoverResourcesFromQuery(ctx context.Context, subscriptionIDs []string, t
 
 			result = append(result, resource)
 			typeKey := stringsLowerTrim(resource.Type)
-			byType[typeKey] = append(byType[typeKey], resource)
 			if _, ok := supportedTypes[typeKey]; !ok {
 				unsupported[typeKey] = struct{}{}
 			}
@@ -257,6 +269,8 @@ func discoverResourcesFromQuery(ctx context.Context, subscriptionIDs []string, t
 		skipToken = &token
 	}
 
+	sortResourceInfos(result)
+
 	unsupportedTypes := make([]string, 0, len(unsupported))
 	for resourceType := range unsupported {
 		unsupportedTypes = append(unsupportedTypes, resourceType)
@@ -265,7 +279,7 @@ func discoverResourcesFromQuery(ctx context.Context, subscriptionIDs []string, t
 
 	return discoveryFetchResult{
 		Resources:        result,
-		ByType:           byType,
+		ByType:           indexResourcesByType(result),
 		UnsupportedTypes: unsupportedTypes,
 	}, nil
 }
@@ -329,10 +343,11 @@ func parseARMResourceID(resourceID string) (string, bool) {
 	return stringsTrim(parts[1]), true
 }
 
-func buildDiscoveryQuery(resourceTypes []string, filters *DiscoveryFiltersConfig) string {
+func buildDiscoveryQuery(resourceTypes []string, filters *ResourceFiltersConfig) string {
 	if len(resourceTypes) == 0 {
 		return ""
 	}
+
 	quotedTypes := make([]string, 0, len(resourceTypes))
 	for _, rt := range resourceTypes {
 		rt = stringsTrim(rt)
@@ -351,10 +366,10 @@ func buildDiscoveryQuery(resourceTypes []string, filters *DiscoveryFiltersConfig
 	query := "resources | where type in~ (" + strings.Join(quotedTypes, ", ") + ")"
 
 	if filters == nil {
-		return query + " | project id, name, type, resourceGroup, location"
+		return query + " | project id, name, type, resourceGroup, location, tags"
 	}
 
-	if groups := normalizeDiscoveryFilterValues(filters.ResourceGroups); len(groups) > 0 {
+	if groups := normalizeFilterValues(filters.ResourceGroups); len(groups) > 0 {
 		quotedGroups := make([]string, 0, len(groups))
 		for _, rg := range groups {
 			quotedGroups = append(quotedGroups, quoteKQLString(rg))
@@ -362,7 +377,7 @@ func buildDiscoveryQuery(resourceTypes []string, filters *DiscoveryFiltersConfig
 		query += " | where resourceGroup in~ (" + strings.Join(quotedGroups, ", ") + ")"
 	}
 
-	if regions := normalizeDiscoveryFilterValues(filters.Regions); len(regions) > 0 {
+	if regions := normalizeFilterValues(filters.Regions); len(regions) > 0 {
 		quotedRegions := make([]string, 0, len(regions))
 		for _, region := range regions {
 			quotedRegions = append(quotedRegions, quoteKQLString(region))
@@ -370,20 +385,20 @@ func buildDiscoveryQuery(resourceTypes []string, filters *DiscoveryFiltersConfig
 		query += " | where location in~ (" + strings.Join(quotedRegions, ", ") + ")"
 	}
 
-	if tagFilters := normalizeDiscoveryTagFilters(filters.Tags); len(tagFilters) > 0 {
+	if tagFilters := normalizeTagFilters(filters.Tags); len(tagFilters) > 0 {
+		query += " | extend tagsBag = tags"
 		query += " | mv-expand bagexpansion=array tags"
 		query += " | where isnotempty(tags)"
 		query += " | extend tagKey = tostring(tags[0]), tagValue = tostring(tags[1])"
-		query += " | where " + buildDiscoveryTagPredicate(tagFilters)
-		query += " | summarize by id, name, type, resourceGroup, location, matchedTagKey = tolower(tagKey)"
-		query += " | summarize matchedTagKeys = count() by id, name, type, resourceGroup, location"
+		query += " | where " + buildTagPredicate(tagFilters)
+		query += " | summarize tags = take_any(tagsBag), matchedTagKeys = dcount(tolower(tagKey)) by id, name, type, resourceGroup, location"
 		query += fmt.Sprintf(" | where matchedTagKeys == %d", len(tagFilters))
 	}
 
-	return query + " | project id, name, type, resourceGroup, location"
+	return query + " | project id, name, type, resourceGroup, location, tags"
 }
 
-func normalizeDiscoveryFilterValues(values []string) []string {
+func normalizeFilterValues(values []string) []string {
 	seen := make(map[string]struct{}, len(values))
 	out := make([]string, 0, len(values))
 
@@ -403,17 +418,12 @@ func normalizeDiscoveryFilterValues(values []string) []string {
 	return out
 }
 
-type discoveryTagFilter struct {
-	Key    string
-	Values []string
-}
-
-func normalizeDiscoveryTagFilters(tags map[string][]string) []discoveryTagFilter {
+func normalizeTagFilters(tags map[string][]string) []normalizedTagFilter {
 	if len(tags) == 0 {
 		return nil
 	}
 
-	out := make([]discoveryTagFilter, 0, len(tags))
+	out := make([]normalizedTagFilter, 0, len(tags))
 	for key, values := range tags {
 		normalizedKey := stringsLowerTrim(key)
 		if normalizedKey == "" {
@@ -438,10 +448,10 @@ func normalizeDiscoveryTagFilters(tags map[string][]string) []discoveryTagFilter
 		}
 
 		slices.Sort(normalizedValues)
-		out = append(out, discoveryTagFilter{Key: normalizedKey, Values: normalizedValues})
+		out = append(out, normalizedTagFilter{Key: normalizedKey, Values: normalizedValues})
 	}
 
-	slices.SortFunc(out, func(a, b discoveryTagFilter) int {
+	slices.SortFunc(out, func(a, b normalizedTagFilter) int {
 		switch {
 		case a.Key < b.Key:
 			return -1
@@ -454,17 +464,17 @@ func normalizeDiscoveryTagFilters(tags map[string][]string) []discoveryTagFilter
 	return out
 }
 
-func buildDiscoveryTagPredicate(filters []discoveryTagFilter) string {
+func buildTagPredicate(filters []normalizedTagFilter) string {
 	clauses := make([]string, 0, len(filters))
 	for _, filter := range filters {
 		keyClause := "tagKey =~ " + quoteKQLString(filter.Key)
-		valueClause := buildDiscoveryTagValueClause(filter.Values)
+		valueClause := buildTagValueClause(filter.Values)
 		clauses = append(clauses, "("+keyClause+" and "+valueClause+")")
 	}
 	return strings.Join(clauses, " or ")
 }
 
-func buildDiscoveryTagValueClause(values []string) string {
+func buildTagValueClause(values []string) string {
 	if len(values) == 1 {
 		return "tagValue == " + quoteKQLString(values[0])
 	}
@@ -476,13 +486,13 @@ func buildDiscoveryTagValueClause(values []string) string {
 	return "tagValue in (" + strings.Join(quoted, ", ") + ")"
 }
 
-func normalizedDiscoveryFilterSet(values []string) map[string]struct{} {
+func normalizedFilterSet(values []string) map[string]struct{} {
 	if len(values) == 0 {
 		return nil
 	}
 
 	set := make(map[string]struct{}, len(values))
-	for _, value := range normalizeDiscoveryFilterValues(values) {
+	for _, value := range normalizeFilterValues(values) {
 		set[value] = struct{}{}
 	}
 	return set
@@ -561,17 +571,89 @@ func filterDiscoveryResourcesByTypes(resources []resourceInfo, allowedTypes []st
 	}
 
 	filtered := make([]resourceInfo, 0, len(resources))
-	byType := make(map[string][]resourceInfo)
 	for _, resource := range resources {
 		typeKey := stringsLowerTrim(resource.Type)
 		if _, ok := allowed[typeKey]; !ok {
 			continue
 		}
 		filtered = append(filtered, resource)
-		byType[typeKey] = append(byType[typeKey], resource)
 	}
 
-	return filtered, byType
+	return filtered, indexResourcesByType(filtered)
+}
+
+func filterDiscoveryResourcesByProfiles(resources []resourceInfo, runtime *collectorRuntime) map[string][]resourceInfo {
+	if runtime == nil || len(runtime.Profiles) == 0 {
+		return map[string][]resourceInfo{}
+	}
+
+	result := make(map[string][]resourceInfo, len(runtime.Profiles))
+	for _, profile := range runtime.Profiles {
+		matcher := newProfileResourceMatcher(profile)
+		for _, resource := range resources {
+			if !matcher.matches(resource) {
+				continue
+			}
+			result[profile.Name] = append(result[profile.Name], resource)
+		}
+	}
+	return result
+}
+
+func newProfileResourceMatcher(profile *profileRuntime) profileResourceMatcher {
+	matcher := profileResourceMatcher{
+		resourceType: stringsLowerTrim(profile.ResourceType),
+		profileName:  profile.Name,
+	}
+	if profile.Filters == nil {
+		return matcher
+	}
+
+	matcher.resourceGroups = normalizedFilterSet(profile.Filters.ResourceGroups)
+	matcher.regions = normalizedFilterSet(profile.Filters.Regions)
+	matcher.tagFilters = normalizeTagFilters(profile.Filters.Tags)
+	return matcher
+}
+
+func (m profileResourceMatcher) matches(resource resourceInfo) bool {
+	if stringsLowerTrim(resource.Type) != m.resourceType {
+		return false
+	}
+	if len(m.resourceGroups) > 0 {
+		if _, ok := m.resourceGroups[stringsLowerTrim(resource.ResourceGroup)]; !ok {
+			return false
+		}
+	}
+	if len(m.regions) > 0 {
+		if _, ok := m.regions[normalizeRegion(resource.Region)]; !ok {
+			return false
+		}
+	}
+	for _, tagFilter := range m.tagFilters {
+		if !resourceMatchesTag(resource, tagFilter) {
+			return false
+		}
+	}
+	return true
+}
+
+func resourceMatchesTag(resource resourceInfo, filter normalizedTagFilter) bool {
+	for _, tag := range resource.Tags {
+		if tag.Key != filter.Key {
+			continue
+		}
+		return slices.Contains(filter.Values, tag.Value)
+	}
+	return false
+}
+
+func indexResourcesByType(resources []resourceInfo) map[string][]resourceInfo {
+	result := make(map[string][]resourceInfo)
+	for _, resource := range resources {
+		key := stringsLowerTrim(resource.Type)
+		result[key] = append(result[key], resource)
+	}
+	return result
 }
 
 func catalogResourceTypeSet(catalog azureprofiles.Catalog) map[string]struct{} {
@@ -611,4 +693,107 @@ func asString(v any) string {
 	default:
 		return ""
 	}
+}
+
+func normalizeResourceTags(v any) []resourceTag {
+	rawTags, ok := v.(map[string]any)
+	if !ok {
+		if typed, ok := v.(map[string]string); ok {
+			rawTags = make(map[string]any, len(typed))
+			for key, value := range typed {
+				rawTags[key] = value
+			}
+		} else {
+			return nil
+		}
+	}
+
+	tags := make([]resourceTag, 0, len(rawTags))
+	for key, value := range rawTags {
+		tagKey := stringsLowerTrim(key)
+		if tagKey == "" {
+			continue
+		}
+		tags = append(tags, resourceTag{
+			Key:   tagKey,
+			Value: normalizeResourceTagValue(value),
+		})
+	}
+
+	slices.SortFunc(tags, func(a, b resourceTag) int {
+		switch {
+		case a.Key < b.Key:
+			return -1
+		case a.Key > b.Key:
+			return 1
+		case a.Value < b.Value:
+			return -1
+		case a.Value > b.Value:
+			return 1
+		default:
+			return 0
+		}
+	})
+	return tags
+}
+
+func normalizeResourceTagValue(v any) string {
+	switch x := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return stringsTrim(x)
+	case fmt.Stringer:
+		return stringsTrim(x.String())
+	default:
+		return stringsTrim(fmt.Sprint(x))
+	}
+}
+
+func sortResourceInfos(resources []resourceInfo) {
+	slices.SortFunc(resources, func(a, b resourceInfo) int {
+		switch {
+		case stringsLowerTrim(a.ID) < stringsLowerTrim(b.ID):
+			return -1
+		case stringsLowerTrim(a.ID) > stringsLowerTrim(b.ID):
+			return 1
+		default:
+			return 0
+		}
+	})
+}
+
+func equalResourceSlices(a, b []resourceInfo) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !equalResourceInfo(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func equalResourceInfo(a, b resourceInfo) bool {
+	return a.SubscriptionID == b.SubscriptionID &&
+		a.ID == b.ID &&
+		a.UID == b.UID &&
+		a.Name == b.Name &&
+		a.Type == b.Type &&
+		a.ResourceGroup == b.ResourceGroup &&
+		a.Region == b.Region &&
+		equalResourceTags(a.Tags, b.Tags)
+}
+
+func equalResourceTags(a, b []resourceTag) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

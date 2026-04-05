@@ -32,12 +32,11 @@ var SupportedTimeGrains = map[string]time.Duration{
 }
 
 type Profile struct {
-	ID              string         `yaml:"id" json:"id,omitempty"`
-	DisplayName     string         `yaml:"name" json:"name,omitempty"`
+	DisplayName     string         `yaml:"display_name" json:"display_name,omitempty"`
 	ResourceType    string         `yaml:"resource_type" json:"resource_type,omitempty"`
 	MetricNamespace string         `yaml:"metric_namespace,omitempty" json:"metric_namespace,omitempty"`
 	Metrics         []Metric       `yaml:"metrics" json:"metrics,omitempty"`
-	Template        charttpl.Group `yaml:"template" json:"template,omitempty"`
+	Template        charttpl.Group `yaml:"template" json:"template"`
 }
 
 type Metric struct {
@@ -52,14 +51,20 @@ type MetricSeries struct {
 	Kind        string `yaml:"kind" json:"kind,omitempty"`
 }
 
-func (p Profile) Validate(prefix string) error {
+func (p *Profile) Normalize(baseName string) error {
+	visibleMetrics := visibleMetricsForProfile(baseName, p.Metrics)
+	normalizeGroupSelectors(baseName, visibleMetrics, &p.Template)
+	return nil
+}
+
+func (p Profile) Validate(prefix, baseName string) error {
 	var errs []error
 
-	if !IsValidIdentityID(p.ID) {
-		errs = append(errs, fmt.Errorf("%s: 'id' must match %q", prefix, reIdentityID.String()))
+	if !IsValidProfileName(baseName) {
+		errs = append(errs, fmt.Errorf("%s: profile basename must match %q", prefix, reIdentityID.String()))
 	}
 	if strings.TrimSpace(p.DisplayName) == "" {
-		errs = append(errs, fmt.Errorf("%s: 'name' is required", prefix))
+		errs = append(errs, fmt.Errorf("%s: 'display_name' is required", prefix))
 	}
 	if !IsValidResourceType(p.ResourceType) {
 		errs = append(errs, fmt.Errorf("%s: 'resource_type' is invalid", prefix))
@@ -102,7 +107,7 @@ func (p Profile) Validate(prefix string) error {
 	}
 
 	if len(errs) == 0 {
-		if err := validateTemplate(prefix, p); err != nil {
+		if err := validateTemplate(prefix, baseName, p); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -162,8 +167,8 @@ func (s MetricSeries) validate(metricPrefix string, idx int) error {
 	return errors.Join(errs...)
 }
 
-func ExportedSeriesName(profileID, metricID, aggregation string) string {
-	return strings.TrimSpace(profileID) + "." + strings.TrimSpace(metricID) + "_" + NormalizeAggregation(aggregation)
+func ExportedSeriesName(profileName, metricID, aggregation string) string {
+	return strings.TrimSpace(profileName) + "." + strings.TrimSpace(metricID) + "_" + NormalizeAggregation(aggregation)
 }
 
 func NormalizeAggregation(v string) string {
@@ -198,21 +203,24 @@ func IsValidIdentityID(v string) bool {
 	return reIdentityID.MatchString(strings.TrimSpace(v))
 }
 
+func IsValidProfileName(v string) bool {
+	return reIdentityID.MatchString(strings.TrimSpace(v))
+}
+
 func IsValidResourceType(v string) bool {
 	return reResourceType.MatchString(strings.TrimSpace(v))
 }
 
-func validateTemplate(prefix string, profile Profile) error {
-	visibleMetrics := make([]string, 0)
-	for _, metric := range profile.Metrics {
-		for _, series := range metric.Series {
-			visibleMetrics = append(visibleMetrics, ExportedSeriesName(profile.ID, metric.ID, series.Aggregation))
-		}
+func validateTemplate(prefix, baseName string, profile Profile) error {
+	visibleMetrics := visibleMetricsForProfile(baseName, profile.Metrics)
+	visibleList := make([]string, 0, len(visibleMetrics))
+	for metric := range visibleMetrics {
+		visibleList = append(visibleList, metric)
 	}
-	sort.Strings(visibleMetrics)
+	sort.Strings(visibleList)
 
 	root := profile.Template
-	root.Metrics = visibleMetrics
+	root.Metrics = visibleList
 
 	spec := charttpl.Spec{
 		Version:          charttpl.VersionV1,
@@ -223,6 +231,69 @@ func validateTemplate(prefix string, profile Profile) error {
 		return fmt.Errorf("%s.template: %w", prefix, err)
 	}
 	return nil
+}
+
+func visibleMetricsForProfile(baseName string, metrics []Metric) map[string]struct{} {
+	visible := make(map[string]struct{})
+	for _, metric := range metrics {
+		for _, series := range metric.Series {
+			visible[ExportedSeriesName(baseName, metric.ID, series.Aggregation)] = struct{}{}
+		}
+	}
+	return visible
+}
+
+func normalizeGroupSelectors(baseName string, visible map[string]struct{}, group *charttpl.Group) {
+	if group == nil {
+		return
+	}
+
+	for i := range group.Charts {
+		normalizeChartSelectors(baseName, visible, &group.Charts[i])
+	}
+	for i := range group.Groups {
+		normalizeGroupSelectors(baseName, visible, &group.Groups[i])
+	}
+}
+
+func normalizeChartSelectors(baseName string, visible map[string]struct{}, chart *charttpl.Chart) {
+	if chart == nil {
+		return
+	}
+
+	for i := range chart.Dimensions {
+		chart.Dimensions[i].Selector = normalizeSelector(baseName, visible, chart.Dimensions[i].Selector)
+	}
+}
+
+func normalizeSelector(baseName string, visible map[string]struct{}, selector string) string {
+	metricName, suffix, ok := splitSelectorMetric(selector)
+	if !ok || strings.Contains(metricName, ".") {
+		return selector
+	}
+
+	candidate := baseName + "." + metricName
+	if _, ok := visible[candidate]; !ok {
+		return selector
+	}
+	return candidate + suffix
+}
+
+func splitSelectorMetric(selector string) (metricName, suffix string, ok bool) {
+	selector = strings.TrimSpace(selector)
+	if selector == "" || strings.HasPrefix(selector, "{") {
+		return "", "", false
+	}
+
+	if idx := strings.Index(selector, "{"); idx >= 0 {
+		metricName = strings.TrimSpace(selector[:idx])
+		if metricName == "" {
+			return "", "", false
+		}
+		return metricName, selector[idx:], true
+	}
+
+	return selector, "", true
 }
 
 func countChartsInGroup(group charttpl.Group) int {
