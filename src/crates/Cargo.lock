@@ -5137,16 +5137,19 @@ dependencies = [
  "chrono",
  "clap",
  "flatten_otel",
+ "fst-index",
  "hashbrown 0.15.5",
  "log-index",
  "opentelemetry-proto",
  "otap-df-pdata",
  "otel-flatten",
+ "pco",
  "roaring 0.11.2",
  "serde",
  "serde_json",
  "split-fst",
  "wal",
+ "zstd",
 ]
 
 [[package]]

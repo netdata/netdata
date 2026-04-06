@@ -18,9 +18,12 @@ bincode = { workspace = true }
 bumpalo = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
+fst-index = { workspace = true }
 hashbrown = { workspace = true }
 log-index = { workspace = true }
+pco = { workspace = true }
 split-fst = { workspace = true }
+zstd = { workspace = true }
 otel-flatten = { workspace = true }
 roaring = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
