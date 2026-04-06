@@ -37,10 +37,14 @@ static inline bool ml_sqlite_int64_fits_time_t(sqlite3_int64 value)
 {
     if constexpr (!std::numeric_limits<time_t>::is_signed ||
                   std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits) {
+        // coverity[CONSTANT_EXPRESSION_RESULT] - on 64-bit, Coverity still analyzes
+        // this dead branch; reachable only on 32-bit or unsigned time_t builds.
         if (value < (sqlite3_int64) std::numeric_limits<time_t>::min())
             return false;
     }
     if constexpr (std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits) {
+        // coverity[CONSTANT_EXPRESSION_RESULT] - same as above: dead on 64-bit,
+        // Coverity does not elide if constexpr branches during analysis.
         if (value > (sqlite3_int64) std::numeric_limits<time_t>::max())
             return false;
     }
