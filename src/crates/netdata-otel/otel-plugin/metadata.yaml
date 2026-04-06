@@ -238,6 +238,62 @@ modules:
                   max_new_charts_per_request: 100
                 logs:
                   journal_dir: /var/log/netdata/otel-journals
+            - name: Docker Compose integration
+              description: |
+                Receive OTLP metrics from a service running in Docker Compose.
+                The Netdata container uses `network_mode: host` for full system access,
+                and the OTLP endpoint binds to `0.0.0.0:4317` to accept external connections.
+                Environment variables override config file values for Docker volume mounts.
+              config: |
+                endpoint:
+                  path: "0.0.0.0:4317"
+                metrics:
+                  chart_configs_dir: /etc/netdata/otel.d/v1/metrics/
+                  interval_secs: 10
+                logs:
+                  journal_dir: /var/log/netdata/otel-journals
+              environment_vars: |
+                NETDATA_OTEL_ENDPOINT_PATH="0.0.0.0:4317"
+                NETDATA_OTEL_LOGS_JOURNAL_DIR="/var/log/netdata/otel-journals"
+              docker_compose: |
+                services:
+                  netdata:
+                    image: netdata/netdata
+                    container_name: netdata
+                    pid: host
+                    network_mode: host
+                    restart: unless-stopped
+                    volumes:
+                      - netdataconfig:/etc/netdata
+                      - netdatalib:/var/lib/netdata
+                      - netdatacache:/var/cache/netdata
+
+                  otel-collector:
+                    image: otel/opentelemetry-collector-contrib
+                    container_name: otel-collector
+                    restart: unless-stopped
+                    command:
+                      - "--config=/etc/otelcol-contrib/config.yaml"
+                    volumes:
+                      - ./otelcol-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+
+                volumes:
+                  netdataconfig:
+                  netdatalib:
+                  netdatacache:
+              otel_collector_config: |
+                receivers:
+                  hostmetrics:
+                    collection_interval: 10s
+                exporters:
+                  otlp:
+                    endpoint: "http://host.docker.internal:4317"
+                    tls: false
+                service:
+                  pipelines:
+                    metrics:
+                      receivers: [hostmetrics]
+                      exporters: [otlp]
     troubleshooting:
       problems:
         list: []
