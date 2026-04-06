@@ -100,4 +100,4 @@ The debug output will show:
 - Permission errors
 - Other potential failures
 
-Need help interpreting the results? Join our [Discord community](https://discord.com/invite/2mEmfW735j) for expert assistance.
+Need help interpreting the results? Join our [Discord community](https://discord.com/invite/mPZ6WZKKG2) for expert assistance.

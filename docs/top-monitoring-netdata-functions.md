@@ -41,4 +41,4 @@ If you have ideas or requests for other functions:
 
 - Participate in the relevant [GitHub discussion](https://github.com/netdata/netdata/discussions/14412)
 - Open a [feature request](https://github.com/netdata/netdata-cloud/issues/new?assignees=&labels=feature+request%2Cneeds+triage&template=FEAT_REQUEST.yml&title=%5BFeat%5D%3A+) on Netdata Cloud repo
-- Join the Netdata community on [Discord](https://discord.com/invite/2mEmfW735j) and let us know.
+- Join the Netdata community on [Discord](https://discord.com/invite/mPZ6WZKKG2) and let us know.
