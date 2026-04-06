@@ -43,8 +43,9 @@ static inline bool ml_sqlite_int64_fits_time_t(sqlite3_int64 value)
             return false;
     }
     if constexpr (std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits) {
-        // coverity[CONSTANT_EXPRESSION_RESULT] - same as above: dead on 64-bit,
-        // Coverity does not elide if constexpr branches during analysis.
+        // coverity[CONSTANT_EXPRESSION_RESULT] - dead on same-width 64-bit time_t;
+        // reachable only when time_t is narrower than sqlite3_int64, but Coverity
+        // still analyzes this discarded if constexpr branch.
         if (value > (sqlite3_int64) std::numeric_limits<time_t>::max())
             return false;
     }
