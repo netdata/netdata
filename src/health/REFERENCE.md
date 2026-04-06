@@ -1619,7 +1619,7 @@ The following variables are available in alert notification templates and custom
 | `${color}`                  | A color in #AABBCC format for the alarm                                                          |
 | `${goto_url}`               | The URL the user can click to see the netdata dashboard                                          |
 | `${calc_expression}`        | The expression evaluated to provide the value for the alarm                                       |
-| `${calc_param_values}`      | The value of the variables in the evaluated expression                                            |
+| `${calc_param_values}`      | The values of the variables in the evaluated expression                                           |
 | `${total_warnings}`         | The total number of alarms in WARNING state on the host                                          |
 | `${total_critical}`         | The total number of alarms in CRITICAL state on the host                                         |
 
