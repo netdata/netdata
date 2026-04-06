@@ -15,6 +15,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 )
@@ -22,6 +23,8 @@ import (
 const (
 	profilesDirName = "azure_monitor.profiles"
 )
+
+var log = logger.New().With("component", "azure_monitor/azureprofiles")
 
 type Catalog struct {
 	byBaseName            map[string]Profile
@@ -81,7 +84,7 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 
 		err := filepath.WalkDir(spec.Path, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
-				return err
+				return handleProfileLoadError(spec, path, err)
 			}
 			if d.IsDir() {
 				return nil
@@ -98,12 +101,12 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 
 			baseName := strings.TrimSpace(profileBaseName(path))
 			if !IsValidProfileName(baseName) {
-				return fmt.Errorf("profile %q: basename must match %q", path, reIdentityID.String())
+				return handleProfileLoadError(spec, path, fmt.Errorf("profile %q: basename must match %q", path, reIdentityID.String()))
 			}
 
 			cfg, err := loadProfileFile(path, baseName)
 			if err != nil {
-				return err
+				return handleProfileLoadError(spec, path, err)
 			}
 			if spec.IsStock {
 				catalog.stockProfileBaseNames[baseName] = struct{}{}
@@ -117,11 +120,11 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 
 			switch {
 			case prev.IsStock == spec.IsStock:
-				scope := "user"
-				if spec.IsStock {
-					scope = "stock"
+				if !spec.IsStock {
+					log.Warningf("ignoring duplicate user profile basename %q in %q; already loaded from %q", baseName, path, prev.Path)
+					return nil
 				}
-				return fmt.Errorf("duplicate %s profile basename %q in %q and %q", scope, baseName, prev.Path, path)
+				return fmt.Errorf("duplicate stock profile basename %q in %q and %q", baseName, prev.Path, path)
 			case prev.IsStock && !spec.IsStock:
 				seen[baseName] = catalogEntry{Config: cfg, Path: path, BaseName: baseName, IsStock: false}
 			case !prev.IsStock && spec.IsStock:
@@ -154,7 +157,6 @@ func loadProfileFile(path, baseName string) (Profile, error) {
 
 	var cfg Profile
 	dec := yaml.NewDecoder(bytes.NewReader(data))
-	dec.KnownFields(true)
 	if err := dec.Decode(&cfg); err != nil {
 		return Profile{}, fmt.Errorf("unmarshal profile %q: %w", path, err)
 	}
@@ -167,6 +169,15 @@ func loadProfileFile(path, baseName string) (Profile, error) {
 	}
 
 	return cfg, nil
+}
+
+func handleProfileLoadError(spec DirSpec, path string, err error) error {
+	if spec.IsStock {
+		return err
+	}
+
+	log.Warningf("ignoring invalid user profile %q: %v", path, err)
+	return nil
 }
 
 func (c Catalog) Resolve(profileNames []string) ([]ResolvedProfile, error) {
