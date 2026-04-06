@@ -51,6 +51,9 @@ enum ml_worker_result {
 
     // Chart is under replication
     ML_WORKER_RESULT_CHART_UNDER_REPLICATION,
+
+    // This dimension is now supplied by downstream ML models; stop local requeueing
+    ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED,
 };
 
 const char *ml_worker_result_to_string(enum ml_worker_result tr);
