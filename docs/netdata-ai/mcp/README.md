@@ -46,7 +46,7 @@ no local setup, no bridges, no firewall changes.
 
 ### Prerequisites
 
-1. **Netdata Cloud account** with a **Business plan**
+1. **Netdata Cloud account** with a **Business or Homelab plan**
 2. **API token** with `scope:mcp` — [Create one in API Tokens settings](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md)
 3. **Nodes claimed to Netdata Cloud** —
    The Cloud MCP server can only access nodes
