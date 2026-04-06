@@ -22,6 +22,9 @@ static inline bool ml_int64_fits_nonnegative_time_t(int64_t value)
     if (value < 0)
         return false;
     if constexpr (sizeof(time_t) < sizeof(int64_t)) {
+        // coverity[CONSTANT_EXPRESSION_RESULT] - on 64-bit, Coverity still analyzes
+        // this dead branch; the check is genuinely reachable only on 32-bit builds
+        // where time_t is narrower than int64_t.
         if (value > (int64_t) std::numeric_limits<time_t>::max())
             return false;
     }
