@@ -49,7 +49,7 @@ func TestNagiosCollectorJobV2(t *testing.T) {
 						},
 					},
 				}
-				coll := New()
+				coll := newTestCollector()
 				coll.runner = runner
 				coll.now = func() time.Time { return now }
 				coll.Config.JobConfig = JobConfig{
@@ -89,7 +89,7 @@ func TestNagiosCollectorJobV2(t *testing.T) {
 				scriptPath := filepath.Join(dir, "check_slow.sh")
 				writeExecutable(t, scriptPath, "#!/bin/sh\nset -eu\nstarted_file=\"$1\"\necho started > \"$started_file\"\ntrap 'exit 0' TERM INT\nsleep 30\n")
 
-				coll := New()
+				coll := newTestCollector()
 				coll.Config.JobConfig = JobConfig{
 					Name:          "cancel_job",
 					Plugin:        scriptPath,

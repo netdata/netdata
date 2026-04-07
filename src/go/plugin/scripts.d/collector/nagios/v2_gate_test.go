@@ -433,7 +433,7 @@ func assertPlanHasNoRemoveForTarget(t *testing.T, plan chartengine.Plan, removeM
 }
 
 func TestV2Gate_SmokeCollect(t *testing.T) {
-	coll := New()
+	coll := newTestCollector()
 	coll.runner = &fakeRunner{}
 	coll.Config.JobConfig.Plugin = writeTestPluginFile(t, "true")
 	coll.Config.JobConfig.Name = "smoke"

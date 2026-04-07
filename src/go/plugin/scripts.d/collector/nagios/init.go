@@ -4,8 +4,9 @@ package nagios
 
 import (
 	"fmt"
-	"os"
-	"runtime"
+	"path/filepath"
+	"slices"
+	"strings"
 )
 
 func (c *Collector) initCollector() error {
@@ -28,9 +29,20 @@ func (c *Collector) compileConfiguredJob() (compiledJob, error) {
 	if err != nil {
 		return compiledJob{}, err
 	}
-	if err := validateConfiguredPlugin(job.config); err != nil {
-		return compiledJob{}, err
+
+	validatedPath, err := c.validatePlugin(job.config.Plugin)
+	if err != nil {
+		return compiledJob{}, fmt.Errorf("job '%s': %w", job.config.Name, err)
 	}
+	job.config.Plugin = validatedPath
+
+	if isKnownInterpreter(job.config.Plugin) {
+		c.Warningf("job '%s': plugin '%s' appears to be an interpreter; "+
+			"Netdata validates the interpreter binary but cannot verify scripts passed in args — "+
+			"ensure scripts are root-owned and not writable by group/others",
+			job.config.Name, job.config.Plugin)
+	}
+
 	c.warnCadenceResolution(job)
 	return job, nil
 }
@@ -43,16 +55,20 @@ func (c *Collector) warnCadenceResolution(job compiledJob) {
 	c.cadenceWarning = job.cadenceWarning
 }
 
-func validateConfiguredPlugin(job JobConfig) error {
-	info, err := os.Stat(job.Plugin)
-	if err != nil {
-		return fmt.Errorf("job '%s': plugin path '%s' stat error: %w", job.Name, job.Plugin, err)
-	}
-	if !info.Mode().IsRegular() {
-		return fmt.Errorf("job '%s': plugin path '%s' must be a regular file", job.Name, job.Plugin)
-	}
-	if runtime.GOOS != "windows" && info.Mode().Perm()&0o111 == 0 {
-		return fmt.Errorf("job '%s': plugin path '%s' must be executable", job.Name, job.Plugin)
-	}
-	return nil
+var knownInterpreters = []string{
+	"bash", "sh", "dash", "zsh", "ksh", "csh", "tcsh", "fish",
+	"python", "python2", "python3",
+	"perl", "ruby", "lua",
+	"powershell", "pwsh",
+	"cmd",
+	"node",
+	"env",
+	"php",
+	"tclsh", "wish", "expect",
+}
+
+func isKnownInterpreter(pluginPath string) bool {
+	base := filepath.Base(pluginPath)
+	name := strings.TrimSuffix(base, filepath.Ext(base))
+	return slices.Contains(knownInterpreters, strings.ToLower(name))
 }

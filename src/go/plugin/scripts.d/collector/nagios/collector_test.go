@@ -168,26 +168,6 @@ func TestCollector_Check(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		"plugin path does not exist": {
-			config: Config{
-				JobConfig: JobConfig{
-					Name:   "missing-plugin",
-					Plugin: filepath.Join(t.TempDir(), "missing-check"),
-				},
-			},
-			wantErr:  true,
-			errMatch: "stat error",
-		},
-		"plugin path must be a regular file": {
-			config: Config{
-				JobConfig: JobConfig{
-					Name:   "plugin-dir",
-					Plugin: t.TempDir(),
-				},
-			},
-			wantErr:  true,
-			errMatch: "must be a regular file",
-		},
 		"valid config": {
 			config: Config{
 				UpdateEvery: 1,
@@ -203,7 +183,7 @@ func TestCollector_Check(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			coll := New()
+			coll := newTestCollector()
 			coll.runner = &fakeRunner{}
 			coll.Config = tc.config
 
@@ -220,59 +200,33 @@ func TestCollector_Check(t *testing.T) {
 	}
 }
 
-func TestCollector_CheckRevalidatesConfiguredPlugin(t *testing.T) {
-	dir := t.TempDir()
-	pluginPath := filepath.Join(dir, "check_mock.sh")
-	mode := os.FileMode(0o644)
-	if runtime.GOOS != "windows" {
-		mode = 0o755
-	}
-	require.NoError(t, os.WriteFile(pluginPath, []byte("#!/bin/sh\nexit 0\n"), mode))
-
-	coll := New()
-	coll.runner = &fakeRunner{}
-	coll.Config = Config{
-		UpdateEvery: 1,
-		JobConfig: JobConfig{
-			Name:          "revalidate",
-			Plugin:        pluginPath,
-			CheckInterval: confDuration(5 * time.Second),
-			RetryInterval: confDuration(5 * time.Second),
-		},
-	}
-
-	require.NoError(t, coll.Init(context.Background()))
-	require.NoError(t, os.Remove(pluginPath))
-
-	err := coll.Check(context.Background())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "stat error")
-}
-
-func TestCollector_CheckRejectsNonExecutablePlugin(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("windows does not use unix executable bits")
+func TestIsKnownInterpreter(t *testing.T) {
+	tests := map[string]struct {
+		path string
+		want bool
+	}{
+		"bash":                {path: "/bin/bash", want: true},
+		"sh":                  {path: "/bin/sh", want: true},
+		"python3":             {path: "/usr/bin/python3", want: true},
+		"python3 versioned":   {path: "/usr/bin/python3.11", want: true},
+		"powershell":          {path: "/usr/bin/powershell", want: true},
+		"powershell.exe":      {path: "/powershell.exe", want: true},
+		"pwsh":                {path: "/usr/bin/pwsh", want: true},
+		"env":                 {path: "/usr/bin/env", want: true},
+		"node":                {path: "/usr/bin/node", want: true},
+		"cmd.exe":             {path: "/cmd.exe", want: true},
+		"php":                 {path: "/usr/bin/php", want: true},
+		"check_ping":          {path: "/usr/lib/nagios/plugins/check_ping", want: false},
+		"check_http":          {path: "/usr/lib/nagios/plugins/check_http", want: false},
+		"custom script":       {path: "/opt/netdata/checks/check_api.sh", want: false},
+		"custom exe":          {path: "/opt/checks/check_service.exe", want: false},
 	}
 
-	dir := t.TempDir()
-	pluginPath := filepath.Join(dir, "check_mock.sh")
-	require.NoError(t, os.WriteFile(pluginPath, []byte("#!/bin/sh\nexit 0\n"), 0o644))
-
-	coll := New()
-	coll.runner = &fakeRunner{}
-	coll.Config = Config{
-		UpdateEvery: 1,
-		JobConfig: JobConfig{
-			Name:          "not-executable",
-			Plugin:        pluginPath,
-			CheckInterval: confDuration(5 * time.Second),
-			RetryInterval: confDuration(5 * time.Second),
-		},
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, isKnownInterpreter(tc.path))
+		})
 	}
-
-	err := coll.Check(context.Background())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "must be executable")
 }
 
 func TestCompileCollectorConfig_CadenceWarning(t *testing.T) {
@@ -351,7 +305,7 @@ func TestCollector_Init(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			coll := New()
+			coll := newTestCollector()
 			coll.runner = &fakeRunner{}
 			coll.Config = tc.config
 			require.NoError(t, coll.Init(context.Background()))
@@ -930,7 +884,7 @@ func TestCollector_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			now := time.Date(2026, 3, 21, 12, 0, 0, 0, time.UTC)
 			runner := &fakeRunner{results: tc.results}
-			coll := New()
+			coll := newTestCollector()
 			coll.runner = runner
 			coll.now = func() time.Time { return now }
 			coll.Config = tc.config
@@ -1268,6 +1222,12 @@ func writeTestPluginFile(t *testing.T, name string) string {
 	}
 	require.NoError(t, os.WriteFile(path, []byte(content), mode))
 	return path
+}
+
+func newTestCollector() *Collector {
+	coll := New()
+	coll.validatePlugin = func(path string) (string, error) { return path, nil }
+	return coll
 }
 
 func confDuration(d time.Duration) confopt.Duration { return confopt.Duration(d) }
