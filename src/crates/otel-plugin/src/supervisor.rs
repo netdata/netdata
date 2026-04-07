@@ -427,6 +427,11 @@ where
 /// Entry point for the supervisor mode.
 pub async fn run() -> anyhow::Result<()> {
     tracing::info!("starting otel-plugin");
+    let nd_env = rt::NetdataEnv::from_environment();
+    match serde_json::to_string(&nd_env) {
+        Ok(json) => tracing::info!("netdata environment: {json}"),
+        Err(e) => tracing::warn!("failed to serialize netdata environment: {e}"),
+    }
 
     let self_exe = std::env::current_exe().context("failed to resolve current executable")?;
 

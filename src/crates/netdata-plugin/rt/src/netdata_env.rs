@@ -3,7 +3,7 @@
 use std::env;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct NetdataEnv {
     pub user_config_dir: Option<PathBuf>,
     pub stock_config_dir: Option<PathBuf>,
@@ -26,7 +26,7 @@ pub struct NetdataEnv {
     pub systemd_journal_path: Option<PathBuf>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum LogMethod {
     Syslog,
     Journal,
@@ -34,14 +34,14 @@ pub enum LogMethod {
     None,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum LogFormat {
     Journal,
     Logfmt,
     Json,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum LogLevel {
     Emergency,
     Alert,
@@ -53,7 +53,7 @@ pub enum LogLevel {
     Debug,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum SyslogFacility {
     Auth,
     Authpriv,
