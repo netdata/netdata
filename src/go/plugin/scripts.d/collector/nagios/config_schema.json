@@ -20,12 +20,12 @@
       },
       "check_name": {
         "title": "Check name",
-        "description": "Name that identifies this check type for chart grouping and metric naming. Charts appear under Perfdata/<check_name> in the dashboard. When plugin points to an interpreter, set this to the actual check identity — otherwise all interpreter-based jobs share a single chart section. If omitted, derived from the plugin basename.",
+        "description": "Name that identifies this check type for chart grouping and metric naming. Charts appear under `Perfdata/<check_name>` in the dashboard. When `plugin` points to an interpreter, set this to the actual check identity — otherwise all interpreter-based jobs share a single chart section. If omitted, derived from the `plugin` basename.",
         "type": "string"
       },
       "plugin": {
         "title": "Plugin path",
-        "description": "Absolute path to the Nagios-compatible command entry point. This can be a packaged plugin, your own executable, or an interpreter. When plugin points to an interpreter, pass the script path in args and set check_name to the actual check identity. The command should return exit code 0, 1, 2, or 3 and may print performance data after |.",
+        "description": "Absolute path to the Nagios-compatible command entry point. This can be a packaged plugin, your own executable, or an interpreter. When `plugin` points to an interpreter, pass the script path in `args` and set `check_name` to the actual check identity. The command should return exit code 0, 1, 2, or 3 and may print performance data after `|`.",
         "type": "string"
       },
       "args": {
