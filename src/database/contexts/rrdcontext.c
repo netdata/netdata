@@ -208,6 +208,9 @@ static bool rrdcontext_checkpoint_save_pending(RRDHOST *host, struct ctxs_checkp
     if(!aclk_host_config)
         return false;
 
+    // Pause incremental context streaming until the deferred checkpoint is replayed.
+    rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
+
     spinlock_lock(&aclk_host_config->pending_ctx_spinlock);
     freez(aclk_host_config->pending_ctx_claim_id);
     freez(aclk_host_config->pending_ctx_node_id);
@@ -360,6 +363,7 @@ void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host) {
     if(!aclk_host_config || !__atomic_load_n(&aclk_host_config->pending_ctx_checkpoint, __ATOMIC_ACQUIRE))
         return;
 
+    bool pending_context_load = rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD);
     bool pp_queue_empty = rrdcontext_queue_entries(&host->rrdctx.pp_queue) <= 0;
 
     spinlock_lock(&aclk_host_config->pending_ctx_spinlock);
@@ -371,7 +375,7 @@ void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host) {
     // replay when pp_queue is empty, or force replay on timeout
     time_t now_s = now_realtime_sec();
     bool timed_out = (now_s - aclk_host_config->pending_ctx_saved_time_s >= PENDING_CTX_CHECKPOINT_MAX_AGE_S);
-    if(!pp_queue_empty && !timed_out) {
+    if((pending_context_load || !pp_queue_empty) && !timed_out) {
         spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
         return;
     }
@@ -387,9 +391,9 @@ void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host) {
     __atomic_store_n(&aclk_host_config->pending_ctx_checkpoint, false, __ATOMIC_RELEASE);
     spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
 
-    if(timed_out && !pp_queue_empty)
+    if(timed_out && (pending_context_load || !pp_queue_empty))
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "RRDCONTEXT: pending checkpoint for host '%s' timed out after %d sec with pp_queue still active. Forcing replay.",
+               "RRDCONTEXT: pending checkpoint for host '%s' timed out after %d sec with context work still active. Forcing replay.",
                rrdhost_hostname(host), PENDING_CTX_CHECKPOINT_MAX_AGE_S);
 
     if(!claim_id || !node_id) {
