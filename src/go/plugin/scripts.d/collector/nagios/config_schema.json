@@ -18,9 +18,14 @@
         "minimum": 0,
         "default": 0
       },
+      "check_name": {
+        "title": "Check name",
+        "description": "Logical check identity used for perfdata metric names and chart families. Set this when `plugin` points to an interpreter, or when multiple jobs should share the same perfdata namespace. If omitted, Netdata derives it from the basename of `plugin`, removing any file extension.",
+        "type": "string"
+      },
       "plugin": {
         "title": "Plugin path",
-        "description": "Absolute path to the Nagios-compatible check executable to run. If you need a script interpreter, point this to the interpreter executable and pass the script path in `args`. The command should return exit code 0, 1, 2, or 3 and may print performance data after `|`.",
+        "description": "Absolute path to the Nagios-compatible command entry point to run. This can be a packaged plugin, your own executable, or an interpreter executable. When `plugin` points to an interpreter, pass the real script path in `args` and set `check_name` if you want perfdata grouped under the script identity instead of the interpreter basename. The command should return exit code 0, 1, 2, or 3 and may print performance data after `|`.",
         "type": "string"
       },
       "args": {

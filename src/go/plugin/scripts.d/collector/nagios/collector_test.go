@@ -84,10 +84,12 @@ func TestCollector_ConfigSchema(t *testing.T) {
 				t.Helper()
 				assert.NotEmpty(t, doc.JSONSchema.Schema)
 				_, hasPlugin := doc.JSONSchema.Properties["plugin"]
+				_, hasCheckName := doc.JSONSchema.Properties["check_name"]
 				_, hasName := doc.JSONSchema.Properties["name"]
 				_, hasTimeoutState := doc.JSONSchema.Properties["timeout_state"]
 				_, hasUIOptions := doc.UISchema["uiOptions"]
 				assert.True(t, hasPlugin)
+				assert.True(t, hasCheckName)
 				assert.False(t, hasName)
 				assert.False(t, hasTimeoutState)
 				assert.True(t, hasUIOptions)
@@ -355,6 +357,46 @@ func TestCollector_Collect(t *testing.T) {
 					assertMetricMissing(t, flat, "nagios.job.execution_max_rss", metrix.Labels{"nagios_job": "check_disk"})
 				}
 				assertMetricValue(t, flat, "nagios.perfdata.true.bytes_used_value", metrix.Labels{"nagios_job": "check_disk", metrix.MeasureSetFieldLabel: "value"}, 30000)
+			},
+		},
+		"uses explicit check name for perfdata namespace": {
+			results: []fakeRun{
+				{
+					result: checkRunResult{
+						ServiceState: "OK",
+						JobState:     "OK",
+						Parsed: output.ParsedOutput{
+							Perfdata: []output.PerfDatum{
+								{Label: "used", Unit: "KB", Value: 30},
+							},
+						},
+					},
+				},
+			},
+			config: Config{
+				UpdateEvery: 1,
+				JobConfig: JobConfig{
+					Name:          "check_service_job",
+					CheckName:     "check_service",
+					Plugin:        "/usr/bin/pwsh",
+					Args:          []string{"-NoProfile", "-File", "/opt/netdata/check_service.ps1"},
+					CheckInterval: confDuration(5 * time.Minute),
+					RetryInterval: confDuration(1 * time.Minute),
+				},
+			},
+			run: func(t *testing.T, coll *Collector, runner *fakeRunner, now *time.Time) {
+				t.Helper()
+				runCollectCycle(t, coll)
+				assert.Equal(t, 1, runner.calls)
+
+				flat := coll.MetricStore().Read(metrix.ReadFlatten())
+				assertMetricValue(t, flat, "nagios.perfdata.check_service.job.execution_state", metrix.Labels{"nagios_job": "check_service_job", "nagios.perfdata.check_service.job.execution_state": "ok"}, 1)
+				assertMetricChartFamily(t, flat, "nagios.perfdata.check_service.job.execution_state", "Perfdata/check_service")
+				assertMetricValue(t, flat, "nagios.perfdata.check_service.bytes_used_value", metrix.Labels{"nagios_job": "check_service_job", metrix.MeasureSetFieldLabel: "value"}, 30000)
+				assertMetricMissing(t, flat, "nagios.perfdata.pwsh.job.execution_state", metrix.Labels{"nagios_job": "check_service_job", "nagios.perfdata.pwsh.job.execution_state": "ok"})
+				assertMetricMissing(t, flat, "nagios.perfdata.pwsh.bytes_used_value", metrix.Labels{"nagios_job": "check_service_job", metrix.MeasureSetFieldLabel: "value"})
+
+				*now = now.Add(1 * time.Second)
 			},
 		},
 		"check period blocked cycles pause job state and zero threshold states": {

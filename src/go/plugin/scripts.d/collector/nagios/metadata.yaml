@@ -207,8 +207,13 @@ modules:
               required: false
               group: Collection
 
+            - name: check_name
+              description: Logical check identity used for perfdata metric names and chart families. Set this when `plugin` points to an interpreter, or when multiple jobs should share the same perfdata namespace. If omitted, Netdata derives it from the basename of `plugin`, removing any file extension.
+              default_value: ""
+              required: false
+              group: Target
             - name: plugin
-              description: Absolute path to the Nagios-compatible executable to run. This can be a packaged Nagios plugin or your own executable. If you need a script interpreter, point `plugin` to that interpreter and pass the script path in `args`. The command should return exit code `0`, `1`, `2`, or `3` and may print performance data after <code>&#124;</code>.
+              description: Absolute path to the Nagios-compatible command entry point to run. This can be a packaged Nagios plugin, your own executable, or an interpreter executable. When `plugin` points to an interpreter, pass the real script path in `args` and set `check_name` if you want perfdata grouped under the script identity instead of the interpreter basename. The command should return exit code `0`, `1`, `2`, or `3` and may print performance data after <code>&#124;</code>.
               default_value: ""
               required: true
               group: Target
@@ -379,6 +384,16 @@ modules:
                     plugin: /opt/netdata/check_memory.sh
                     timeout: 5s
                     check_interval: 1m
+            - name: Interpreter-launched script
+              description: Run a script through an interpreter while keeping perfdata charts grouped under the real check identity.
+              config: |
+                jobs:
+                  - name: check_mock_ok
+                    check_name: check_mock_ok
+                    plugin: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+                    args: ["-NoProfile", "-File", "C:\\checks\\check_mock_ok.ps1"]
+                    timeout: 10s
+                    check_interval: 1m
             - name: Check with a job-local schedule
               description: Run a check only during selected hours by defining time periods inside the job.
               config: |
@@ -439,7 +454,7 @@ modules:
               Netdata captures the check's standard output for status and performance data parsing. Standard error (stderr) is logged by the collector but not used for state or charts. If your script writes errors to stderr, check the Netdata error log for details.
           - name: Windows checks need an executable entry point
             description: |
-              The collector runs the command named in `plugin` directly. On Windows, point `plugin` to an executable or to an interpreter such as `powershell.exe` and pass the script path in `args`.
+              The collector runs the command named in `plugin` directly. On Windows, point `plugin` to an executable or to an interpreter such as `powershell.exe` and pass the script path in `args`. If you want perfdata charts grouped by the underlying script rather than the interpreter, set `check_name` explicitly.
     alerts:
       - name: nagios_job_execution_state_warn
         metric: nagios.job.execution_state

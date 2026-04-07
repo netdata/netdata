@@ -65,7 +65,7 @@ func (c *Collector) executeDueCheck(ctx context.Context, now time.Time) (checkRu
 }
 
 func (c *Collector) completeDueCheck(now time.Time, res checkRunResult) {
-	c.state.completeRun(now, res.ServiceState, res.JobState, c.router.route(c.job.config.Plugin, res.Parsed.Perfdata), c.job.config)
+	c.state.completeRun(now, res.ServiceState, res.JobState, c.router.route(c.job.config.CheckName, res.Parsed.Perfdata), c.job.config)
 }
 
 func (c *Collector) emitMetrics(execMetrics executionMetrics) {
@@ -87,12 +87,12 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 		metrix.WithUnit("state"),
 	).ObserveStateSet(jobStatePoint)
 
-	scriptName := perfSourceFromPlugin(c.job.config.Plugin)
+	checkName := perfSourceFromCheckName(c.job.config.CheckName)
 	jobMeter.StateSet(
-		"perfdata."+scriptName+".job.execution_state",
+		"perfdata."+checkName+".job.execution_state",
 		metrix.WithStateSetMode(metrix.ModeBitSet),
 		metrix.WithStateSetStates(jobExecutionStateNames...),
-		metrix.WithChartFamily(perfdataFamily(scriptName)),
+		metrix.WithChartFamily(perfdataFamily(checkName)),
 		metrix.WithChartPriority(chartengine.Priority-10),
 		metrix.WithUnit("state"),
 	).ObserveStateSet(jobStatePoint)
@@ -122,7 +122,7 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 			jobMeter.MeasureSetCounter(
 				measureSet.name,
 				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-				metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
+				metrix.WithChartFamily(perfdataFamily(measureSet.checkName)),
 				metrix.WithUnit(measureSet.unit),
 				metrix.WithFloat(true),
 			).ObserveTotalFields(fields)
@@ -130,7 +130,7 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 			jobMeter.MeasureSetGauge(
 				measureSet.name,
 				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-				metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
+				metrix.WithChartFamily(perfdataFamily(measureSet.checkName)),
 				metrix.WithUnit(measureSet.unit),
 				metrix.WithFloat(true),
 			).ObserveFields(fields)
@@ -142,7 +142,7 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 			thresholdState.name,
 			metrix.WithStateSetMode(metrix.ModeBitSet),
 			metrix.WithStateSetStates(perfThresholdStateNames...),
-			metrix.WithChartFamily(perfdataFamily(thresholdState.scriptName)),
+			metrix.WithChartFamily(perfdataFamily(thresholdState.checkName)),
 			metrix.WithUnit("state"),
 		)
 		if thresholdState.state == "" {
@@ -163,6 +163,6 @@ func (c *Collector) emitMetrics(execMetrics executionMetrics) {
 	}
 }
 
-func perfdataFamily(scriptName string) string {
-	return "Perfdata/" + scriptName
+func perfdataFamily(checkName string) string {
+	return "Perfdata/" + checkName
 }

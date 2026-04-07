@@ -23,6 +23,7 @@ const (
 // JobConfig is the user-facing Nagios job configuration surface.
 type JobConfig struct {
 	Name             string            `yaml:"name" json:"name"`
+	CheckName        string            `yaml:"check_name,omitempty" json:"check_name"`
 	Vnode            string            `yaml:"vnode,omitempty" json:"vnode"`
 	Plugin           string            `yaml:"plugin" json:"plugin"`
 	Args             []string          `yaml:"args,omitempty" json:"args"`
@@ -99,6 +100,7 @@ func (cfg JobConfig) normalized() (JobConfig, error) {
 	if err := cfg.validate(); err != nil {
 		return JobConfig{}, err
 	}
+	cfg.CheckName = normalizedCheckName(cfg.CheckName, cfg.Plugin)
 
 	cfg.Args = append([]string{}, cfg.Args...)
 	cfg.ArgValues = append([]string{}, cfg.ArgValues...)
