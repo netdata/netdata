@@ -42,10 +42,10 @@ logs:
     dir: @logdir_POST@/otel/v1/wal
 
     # Maximum size per WAL file (e.g., "100MB", "1.5GB").
-    max_file_size: "100MB"
+    max_file_size: "250MB"
 
     # Maximum log entries per WAL file.
-    max_log_entries: 50000
+    max_log_entries: 100000
 
     # Maximum time span per WAL file (e.g., "2 hours", "1h", "30m").
     max_file_duration: "2 hours"
@@ -70,10 +70,10 @@ logs:
 
   retention:
     # Maximum number of index files to retain.
-    max_files: 10
+    max_files: 100
 
     # Maximum total size of all index files (e.g., "1GB", "500MB").
-    max_total_size: "1GB"
+    max_total_size: "10GB"
 
     # Maximum age of index files (e.g., "7 days", "1 week", "168h").
     max_age: "7 days"
