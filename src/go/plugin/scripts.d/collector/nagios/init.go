@@ -31,6 +31,13 @@ func (c *Collector) compileConfiguredJob() (compiledJob, error) {
 		return compiledJob{}, err
 	}
 
+	pluginPath, args, err := rewriteScriptCommand(job.config.Plugin, job.config.Args)
+	if err != nil {
+		return compiledJob{}, fmt.Errorf("job '%s': %w", job.config.Name, err)
+	}
+	job.config.Plugin = pluginPath
+	job.config.Args = args
+
 	validatedPath, err := c.validatePlugin(job.config.Plugin)
 	if err != nil {
 		return compiledJob{}, fmt.Errorf("job '%s': %w", job.config.Name, err)
