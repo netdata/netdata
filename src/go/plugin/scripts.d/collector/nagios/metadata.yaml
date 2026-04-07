@@ -5,7 +5,7 @@ modules:
       plugin_name: scripts.d.plugin
       module_name: nagios
       monitored_instance:
-        name: Nagios Plugins
+        name: Nagios Plugins and Custom Scripts
         link: https://www.nagios-plugins.org/
         categories:
           - data-collection.synthetic-testing
@@ -25,7 +25,7 @@ modules:
       multi_instance: true
       data_collection:
         metrics_description: |
-          This collector runs [Nagios-compatible plugins](https://www.nagios-plugins.org/) and custom scripts. It provides:
+          This collector runs [Nagios-compatible plugins](https://www.nagios-plugins.org/) and custom scripts in any language (Bash, PowerShell, Python, Go, etc.). It provides:
 
           - **Check state monitoring** — tracks whether each check returns OK, WARNING, CRITICAL, or UNKNOWN
           - **Execution metrics** — measures run duration, CPU time, and memory usage of each check
@@ -202,18 +202,25 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: How often the collector's internal scheduler ticks, in seconds. Controls chart granularity. In most cases you only need to set `check_interval`.
+              description: Minimum resolution of the collector's scheduler, in seconds. `check_interval` and `retry_interval` are rounded up to the nearest multiple of this value. For example, if `update_every` is 10 and `check_interval` is 25s, the check actually runs every 30s. In most cases the default is fine — just set `check_interval`.
               default_value: 10
               required: false
               group: Collection
 
             - name: check_name
-              description: Logical check identity used for perfdata metric names and chart families. Set this when `plugin` points to an interpreter, or when multiple jobs should share the same perfdata namespace. If omitted, Netdata derives it from the basename of `plugin`, removing any file extension.
+              description: |
+                Name that identifies this check type for chart grouping and metric naming. If omitted, Netdata derives it from the basename of `plugin` (removing any file extension). Set this when `plugin` points to an interpreter (e.g. `powershell.exe`, `/bin/bash`) — otherwise all jobs using the same interpreter share the same chart section.
+
+                In the dashboard, charts appear under `Synthetic > Nagios > Perfdata > <check_name>`. For example, with `check_name: check_memory` and a script that outputs `caches=2380912KB`, Netdata creates:
+
+                - `nagios.perfdata.check_memory.job.execution_state` — check state (ok, warning, critical, unknown, timeout, paused, retry)
+                - `nagios.perfdata.check_memory.bytes_caches` — perfdata value chart
+                - `nagios.perfdata.check_memory.bytes_caches_threshold_state` — threshold state (if warn/crit thresholds are present)
               default_value: ""
               required: false
               group: Target
             - name: plugin
-              description: Absolute path to the Nagios-compatible command entry point to run. This can be a packaged Nagios plugin, your own executable, or an interpreter executable. When `plugin` points to an interpreter, pass the real script path in `args` and set `check_name` if you want perfdata grouped under the script identity instead of the interpreter basename. The command should return exit code `0`, `1`, `2`, or `3` and may print performance data after <code>&#124;</code>.
+              description: Absolute path to the Nagios-compatible command entry point to run. This can be a packaged Nagios plugin, your own executable, or an interpreter executable. When `plugin` points to an interpreter, pass the script path in `args` and set `check_name` to the actual check identity — otherwise all jobs using the same interpreter share the same chart section. The command should return exit code `0`, `1`, `2`, or `3` and may print performance data after <code>&#124;</code>.
               default_value: ""
               required: true
               group: Target
@@ -384,16 +391,69 @@ modules:
                     plugin: /opt/netdata/check_memory.sh
                     timeout: 5s
                     check_interval: 1m
-            - name: Interpreter-launched script
-              description: Run a script through an interpreter while keeping perfdata charts grouped under the real check identity.
+            - name: End-to-end custom script (Windows PowerShell)
+              description: |
+                Write a PowerShell check script, then configure Netdata to run it. Because `plugin` points to the PowerShell interpreter, `check_name` is required to keep charts grouped under the script identity instead of `powershell`.
+
+                **1. Create the script** (e.g., `C:\Netdata\checks\check_service.ps1`):
+
+                ```powershell
+                # Check if a Windows service is running
+                param([string]$ServiceName = "W3SVC")
+
+                $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+
+                if (-not $svc) {
+                    Write-Host "UNKNOWN - Service $ServiceName not found | running=0;;;0;1"
+                    exit 3
+                }
+
+                if ($svc.Status -eq 'Running') {
+                    Write-Host "OK - $ServiceName is running | running=1;;;0;1"
+                    exit 0
+                } else {
+                    Write-Host "CRITICAL - $ServiceName is $($svc.Status) | running=0;;;0;1"
+                    exit 2
+                }
+                ```
+
+                **2. Test from PowerShell** (run as the user the Netdata service runs under):
+
+                ```powershell
+                powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Netdata\checks\check_service.ps1"
+                echo "Exit code: $LASTEXITCODE"
+                ```
+
+                **3. Add the configuration below, then restart Netdata** (`Restart-Service netdata`).
               config: |
                 jobs:
-                  - name: check_mock_ok
-                    check_name: check_mock_ok
+                  - name: service_health_win
+                    check_name: check_service
                     plugin: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
-                    args: ["-NoProfile", "-File", "C:\\checks\\check_mock_ok.ps1"]
+                    args: ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:\\Netdata\\checks\\check_service.ps1"]
                     timeout: 10s
                     check_interval: 1m
+            - name: Interpreter-launched script (Bash)
+              description: |
+                Run a Bash script through an interpreter. Without `check_name`, charts would be grouped under `bash`.
+              config: |
+                jobs:
+                  - name: db_health
+                    check_name: check_postgres
+                    plugin: /bin/bash
+                    args: ["/opt/netdata/checks/check_postgres.sh", "--host", "db.example.com"]
+                    timeout: 10s
+                    check_interval: 5m
+            - name: Remote check via NRPE
+              description: |
+                Run a check on a remote host using `check_nrpe`. This works exactly like a Nagios NRPE configuration — install `nagios-nrpe-plugin` and point to the remote NRPE agent. Increase `timeout` if the remote host is slow to respond.
+              config: |
+                jobs:
+                  - name: remote_disk
+                    plugin: /usr/lib/nagios/plugins/check_nrpe
+                    args: ["-H", "192.168.1.10", "-c", "check_disk", "-a", "20% 10% /"]
+                    timeout: 30s
+                    check_interval: 5m
             - name: Check with a job-local schedule
               description: Run a check only during selected hours by defining time periods inside the job.
               config: |
@@ -452,9 +512,15 @@ modules:
           - name: Script stderr output is not visible
             description: |
               Netdata captures the check's standard output for status and performance data parsing. Standard error (stderr) is logged by the collector but not used for state or charts. If your script writes errors to stderr, check the Netdata error log for details.
+          - name: Job state is always timeout
+            description: |
+              The default timeout is 5 seconds, which is too short for many checks — especially remote checks (`check_nrpe`, `check_ssh`) or HTTP checks with SSL negotiation. Increase the `timeout` value in your job configuration (e.g. `timeout: 30s`).
+          - name: Check works as root but fails under Netdata
+            description: |
+              The Netdata Agent runs as the `netdata` user. If a check needs to read protected files, access SNMP, or connect to local sockets, it must be accessible to the `netdata` user. Test as that user first: `sudo -u netdata /path/to/check`. Common fixes include adding the `netdata` user to the required system group or using `sudo` with a specific NOPASSWD rule for the check command.
           - name: Windows checks need an executable entry point
             description: |
-              The collector runs the command named in `plugin` directly. On Windows, point `plugin` to an executable or to an interpreter such as `powershell.exe` and pass the script path in `args`. If you want perfdata charts grouped by the underlying script rather than the interpreter, set `check_name` explicitly.
+              The collector runs the command named in `plugin` directly. On Windows, point `plugin` to an interpreter such as `powershell.exe` and pass the script path in `args`. Always set `check_name` when using an interpreter — without it, all jobs using the same interpreter share the same chart section (e.g. `Perfdata/powershell`).
     alerts:
       - name: nagios_job_execution_state_warn
         metric: nagios.job.execution_state

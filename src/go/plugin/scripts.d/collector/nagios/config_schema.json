@@ -20,12 +20,12 @@
       },
       "check_name": {
         "title": "Check name",
-        "description": "Logical check identity used for perfdata metric names and chart families. Set this when `plugin` points to an interpreter, or when multiple jobs should share the same perfdata namespace. If omitted, Netdata derives it from the basename of `plugin`, removing any file extension.",
+        "description": "Name that identifies this check type for chart grouping and metric naming. Charts appear under Perfdata/<check_name> in the dashboard. When plugin points to an interpreter, set this to the actual check identity — otherwise all interpreter-based jobs share a single chart section. If omitted, derived from the plugin basename.",
         "type": "string"
       },
       "plugin": {
         "title": "Plugin path",
-        "description": "Absolute path to the Nagios-compatible command entry point to run. This can be a packaged plugin, your own executable, or an interpreter executable. When `plugin` points to an interpreter, pass the real script path in `args` and set `check_name` if you want perfdata grouped under the script identity instead of the interpreter basename. The command should return exit code 0, 1, 2, or 3 and may print performance data after `|`.",
+        "description": "Absolute path to the Nagios-compatible command entry point. This can be a packaged plugin, your own executable, or an interpreter. When plugin points to an interpreter, pass the script path in args and set check_name to the actual check identity. The command should return exit code 0, 1, 2, or 3 and may print performance data after |.",
         "type": "string"
       },
       "args": {
@@ -256,6 +256,10 @@
     "uiOptions": {
       "fullPage": true
     },
+    "check_name": {
+      "ui:placeholder": "check_ping",
+      "ui:help": "Controls the chart section name and metric context for performance data. Required when plugin is an interpreter."
+    },
     "plugin": {
       "ui:placeholder": "/usr/lib/nagios/plugins/check_ping"
     },
@@ -292,6 +296,7 @@
           "fields": [
             "update_every",
             "plugin",
+            "check_name",
             "args",
             "arg_values",
             "timeout",
