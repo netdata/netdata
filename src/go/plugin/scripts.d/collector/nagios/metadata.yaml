@@ -185,8 +185,9 @@ modules:
 
               :::caution
 
-              - **Linux/macOS:** Using an interpreter (e.g. `/bin/bash`) as `plugin` with a script path in `args` is **discouraged**. Netdata validates the interpreter binary but **cannot verify scripts passed via `args`**. A writable script in `args` is a privilege escalation vector. Instead, make scripts directly executable and point `plugin` to the script itself.
-              - **Windows:** Since `.ps1` scripts cannot be executed directly, use `powershell.exe` as `plugin` and pass the script in `args`. Path validation is not enforced on Windows — ensure scripts are stored in directories with appropriate ACLs.
+              **Linux/macOS:** Using an interpreter (e.g. `/bin/bash`) as `plugin` with a script path in `args` is **discouraged**. Netdata validates the interpreter binary but **cannot verify scripts passed via `args`**. A writable script in `args` is a privilege escalation vector. Instead, make scripts directly executable and point `plugin` to the script itself.
+
+              **Windows:** Point `plugin` directly to a `.ps1`, `.bat`, or `.cmd` script — Netdata invokes the correct interpreter automatically. Path validation is not enforced on Windows — ensure scripts are stored in directories with appropriate ACLs.
 
               :::
           - title: Install check commands
@@ -416,7 +417,7 @@ modules:
                     check_interval: 1m
             - name: Windows PowerShell check
               description: |
-                On Windows, `.ps1` scripts cannot be executed directly. Point `plugin` to `powershell.exe` and pass the script in `args`. Set `check_name` so that charts are grouped under the script identity instead of `powershell`.
+                On Windows, point `plugin` directly to a `.ps1` script. Netdata automatically invokes it through `powershell.exe` with `-NoProfile -ExecutionPolicy Bypass -File`. The `.bat` and `.cmd` scripts are also supported (invoked via `cmd.exe /c`).
 
                 **1. Create the script** (e.g., `C:\Netdata\checks\check_service.ps1`):
 
@@ -451,9 +452,7 @@ modules:
               config: |
                 jobs:
                   - name: service_health_win
-                    check_name: check_service
-                    plugin: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
-                    args: ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:\\Netdata\\checks\\check_service.ps1"]
+                    plugin: "C:\\Netdata\\checks\\check_service.ps1"
                     timeout: 10s
                     check_interval: 1m
             - name: Remote check via NRPE
@@ -530,9 +529,9 @@ modules:
           - name: Check works as root but fails under Netdata
             description: |
               The Netdata Agent runs as the `netdata` user. If a check needs to read protected files, access SNMP, or connect to local sockets, it must be accessible to the `netdata` user. Test as that user first: `sudo -u netdata /path/to/check`. Common fixes include adding the `netdata` user to the required system group or using `sudo` with a specific NOPASSWD rule for the check command.
-          - name: Windows checks need an executable entry point
+          - name: Windows script support
             description: |
-              The collector runs the command named in `plugin` directly. On Windows, `.ps1` scripts cannot be executed directly — point `plugin` to the absolute path of `powershell.exe` and pass the script in `args`. Always set `check_name` when using an interpreter so charts are grouped under the script identity instead of `powershell`. Ensure scripts are stored in directories with appropriate ACLs.
+              On Windows, point `plugin` directly to a `.ps1`, `.bat`, or `.cmd` script. Netdata automatically invokes `.ps1` scripts through `powershell.exe` and `.bat`/`.cmd` scripts through `cmd.exe`. Ensure scripts are stored in directories with appropriate ACLs.
     alerts:
       - name: nagios_job_execution_state_warn
         metric: nagios.job.execution_state

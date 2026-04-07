@@ -54,6 +54,11 @@ func (systemCheckRunner) Run(ctx context.Context, req checkRunRequest) (checkRun
 	}
 	defer cancel()
 
+	pluginPath, args, err := rewriteScriptCommand(req.Job.Plugin, args)
+	if err != nil {
+		return checkRunResult{}, err
+	}
+
 	startedAt := time.Now()
 	// Temporary branch-specific direct execution path:
 	// Nagios checks need job environment values and NAGIOS_* macros to reach the
@@ -66,7 +71,7 @@ func (systemCheckRunner) Run(ctx context.Context, req checkRunRequest) (checkRun
 		req.Log,
 		0,
 		opts,
-		req.Job.Plugin,
+		pluginPath,
 		args...,
 	)
 
