@@ -176,6 +176,31 @@ Each job starts an external command. The impact depends mostly on how often the 
 
 ### Prerequisites
 
+#### Security requirements for plugin executables
+
+Netdata validates the `plugin` path before execution. On Linux/macOS, the executable must meet these requirements:
+
+- Must be a regular file (not a directory or device node)
+- Must be executable (at least one execute bit set)
+- Owned by **root**
+- Not writable by group or others (no `g+w` or `o+w`)
+- All ancestor directories (up to and including `/`) owned by **root**
+- All ancestor directories not writable by group or others
+- Symlinks are resolved — the target must meet these rules
+
+On Windows, path validation is not enforced. Ensure executables are stored in directories with appropriate ACLs.
+
+This prevents local privilege escalation through a modified check script. If validation fails, the job will not start and an error is logged.
+
+:::caution
+
+**Linux/macOS:** Using an interpreter (e.g. `/bin/bash`) as `plugin` with a script path in `args` is **discouraged**. Netdata validates the interpreter binary but **cannot verify scripts passed via `args`**. A writable script in `args` is a privilege escalation vector. Instead, make scripts directly executable and point `plugin` to the script itself.
+
+**Windows:** Point `plugin` directly to a `.ps1`, `.bat`, or `.cmd` script — Netdata invokes the correct interpreter automatically. Path validation is not enforced on Windows — ensure scripts are stored in directories with appropriate ACLs.
+
+:::
+
+
 #### Install check commands
 
 Install the Nagios plugins or other Nagios-compatible scripts that you want Netdata to run.
@@ -190,15 +215,15 @@ apt install nagios-plugins
 dnf install nagios-plugins-all
 ```
 
-Make sure the configured command path exists and is executable by the `netdata` user.
+Packaged Nagios plugins are typically installed as root-owned executables, which satisfies the security requirements above.
 
 
 #### Prepare custom check scripts
 
 If you are writing your own check scripts instead of using packaged Nagios plugins:
 
-- Place scripts anywhere accessible to the `netdata` user (e.g., `/usr/local/lib/netdata/checks/`)
-- Make scripts executable: `chmod +x /path/to/script.sh`
+- Place scripts in a root-owned directory (e.g., `/usr/local/lib/netdata/checks/`)
+- Set ownership and permissions: `sudo chown root:root /path/to/script.sh && sudo chmod 755 /path/to/script.sh`
 - Test as the `netdata` user to verify permissions and environment: `sudo -u netdata /path/to/script.sh`
 - Verify the exit code: `echo $?` (must be 0, 1, 2, or 3)
 - Verify the output matches the Nagios plugin output format described in the Overview above
@@ -219,8 +244,8 @@ Add jobs under `jobs:`. Each job runs one Nagios-compatible check command.
 | Group | Option | Description | Default | Required |
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Minimum resolution of the collector's scheduler, in seconds. `check_interval` and `retry_interval` are rounded up to the nearest multiple of this value. For example, if `update_every` is 10 and `check_interval` is 25s, the check actually runs every 30s. In most cases the default is fine — just set `check_interval`. | 10 | no |
-| **Target** | check_name | Name that identifies this check type for chart grouping and metric naming. If omitted, Netdata derives it from the basename of `plugin` (removing any file extension). Set this when `plugin` points to an interpreter (e.g. `powershell.exe`, `/bin/bash`) — otherwise all jobs using the same interpreter share the same chart section. In the dashboard, charts appear under `Synthetic > Nagios > Perfdata > <check_name>`. For example, with `check_name: check_memory` and a script that outputs `caches=2380912KB`, Netdata creates: - `nagios.perfdata.check_memory.job.execution_state` — check state (ok, warning, critical, unknown, timeout, paused, retry) - `nagios.perfdata.check_memory.bytes_caches` — perfdata value chart - `nagios.perfdata.check_memory.bytes_caches_threshold_state` — threshold state (if warn/crit thresholds are present) |  | no |
-|  | plugin | Absolute path to the Nagios-compatible command entry point to run. This can be a packaged Nagios plugin, your own executable, or an interpreter executable. When `plugin` points to an interpreter, pass the script path in `args` and set `check_name` to the actual check identity — otherwise all jobs using the same interpreter share the same chart section. The command should return exit code `0`, `1`, `2`, or `3` and may print performance data after <code>&#124;</code>. |  | yes |
+| **Target** | check_name | Name that identifies this check type for chart grouping and metric naming. If omitted, Netdata derives it from the basename of `plugin` (removing any file extension). Use this when the plugin filename is generic and you want a more descriptive chart section — for example, when multiple jobs run `check_nrpe` against different remote checks, set `check_name` to distinguish them (`check_disk`, `check_load`, etc.). In the dashboard, charts appear under `Synthetic > Nagios > Perfdata > <check_name>`. For example, with `check_name: check_memory` and a script that outputs `caches=2380912KB`, Netdata creates: - `nagios.perfdata.check_memory.job.execution_state` — check state (ok, warning, critical, unknown, timeout, paused, retry) - `nagios.perfdata.check_memory.bytes_caches` — perfdata value chart - `nagios.perfdata.check_memory.bytes_caches_threshold_state` — threshold state (if warn/crit thresholds are present) |  | no |
+|  | plugin | Absolute path to the Nagios-compatible check command to run. This can be a packaged Nagios plugin or your own executable script. The executable must be root-owned and not writable by group or others (see prerequisites). The command should return exit code `0`, `1`, `2`, or `3` and may print performance data after <code>&#124;</code>. |  | yes |
 |  | args | Arguments passed to the command. |  | no |
 |  | arg_values | Values exposed to `$ARG1$` through `$ARG32$` for macro expansion. The first value maps to `$ARG1$`, the second to `$ARG2$`, and so on. |  | no |
 |  | working_directory | Working directory used when running the command. |  | no |
@@ -339,10 +364,11 @@ echo "OK - $URL returned HTTP $http_code | response_time=${response_time}s;2;5;0
 exit 0
 ```
 
-**2. Make it executable and test it:**
+**2. Set ownership, permissions, and test it:**
 
 ```bash
-chmod +x /usr/local/lib/netdata/checks/check_api.sh
+sudo chown root:root /usr/local/lib/netdata/checks/check_api.sh
+sudo chmod 755 /usr/local/lib/netdata/checks/check_api.sh
 sudo -u netdata /usr/local/lib/netdata/checks/check_api.sh
 echo "Exit code: $?"
 ```
@@ -380,9 +406,9 @@ jobs:
 ```
 </details>
 
-###### End-to-end custom script (Windows PowerShell)
+###### Windows PowerShell check
 
-Write a PowerShell check script, then configure Netdata to run it. Because `plugin` points to the PowerShell interpreter, `check_name` is required to keep charts grouped under the script identity instead of `powershell`.
+On Windows, point `plugin` directly to a `.ps1` script. Netdata automatically invokes it through `powershell.exe` with `-NoProfile -ExecutionPolicy Bypass -File`. The `.bat` and `.cmd` scripts are also supported (invoked via `cmd.exe /c`).
 
 **1. Create the script** (e.g., `C:\Netdata\checks\check_service.ps1`):
 
@@ -421,30 +447,9 @@ echo "Exit code: $LASTEXITCODE"
 ```yaml
 jobs:
   - name: service_health_win
-    check_name: check_service
-    plugin: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
-    args: ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:\\Netdata\\checks\\check_service.ps1"]
+    plugin: C:\Netdata\checks\check_service.ps1
     timeout: 10s
     check_interval: 1m
-
-```
-</details>
-
-###### Interpreter-launched script (Bash)
-
-Run a Bash script through an interpreter. Without `check_name`, charts would be grouped under `bash`.
-
-
-<details open><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: db_health
-    check_name: check_postgres
-    plugin: /bin/bash
-    args: ["/opt/netdata/checks/check_postgres.sh", "--host", "db.example.com"]
-    timeout: 10s
-    check_interval: 5m
 
 ```
 </details>
@@ -617,9 +622,9 @@ The default timeout is 5 seconds, which is too short for many checks — especia
 The Netdata Agent runs as the `netdata` user. If a check needs to read protected files, access SNMP, or connect to local sockets, it must be accessible to the `netdata` user. Test as that user first: `sudo -u netdata /path/to/check`. Common fixes include adding the `netdata` user to the required system group or using `sudo` with a specific NOPASSWD rule for the check command.
 
 
-### Windows checks need an executable entry point
+### Windows script support
 
-The collector runs the command named in `plugin` directly. On Windows, point `plugin` to the absolute path of a compiled executable or an interpreter (e.g. `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`). When using an interpreter, pass the script path in `args` and always set `check_name` — without it, all jobs using the same interpreter share the same chart section (e.g. `Perfdata/powershell`).
+On Windows, point `plugin` directly to a `.ps1`, `.bat`, or `.cmd` script. Netdata automatically invokes `.ps1` scripts through `powershell.exe` and `.bat`/`.cmd` scripts through `cmd.exe`. Ensure scripts are stored in directories with appropriate ACLs.
 
 
 
