@@ -175,8 +175,8 @@ modules:
               - Must be executable (at least one execute bit set)
               - Owned by **root**
               - Not writable by group or others (no `g+w` or `o+w`)
-              - Parent directory owned by **root**
-              - Parent directory not writable by group or others
+              - All ancestor directories (up to and including `/`) owned by **root**
+              - All ancestor directories not writable by group or others
               - Symlinks are resolved — the target must meet these rules
 
               On Windows, path validation is not enforced. Ensure executables are stored in directories with appropriate ACLs.

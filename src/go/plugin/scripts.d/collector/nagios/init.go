@@ -5,6 +5,7 @@ package nagios
 import (
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 )
@@ -36,7 +37,7 @@ func (c *Collector) compileConfiguredJob() (compiledJob, error) {
 	}
 	job.config.Plugin = validatedPath
 
-	if isKnownInterpreter(job.config.Plugin) {
+	if runtime.GOOS != "windows" && isKnownInterpreter(job.config.Plugin) {
 		c.Warningf("job '%s': plugin '%s' appears to be an interpreter; "+
 			"Netdata validates the interpreter binary but cannot verify scripts passed in args — "+
 			"ensure scripts are root-owned and not writable by group/others",
