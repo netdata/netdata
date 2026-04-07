@@ -1,1 +1,1 @@
-integrations/nagios_plugins.md
+integrations/nagios_plugins_and_custom_scripts.md

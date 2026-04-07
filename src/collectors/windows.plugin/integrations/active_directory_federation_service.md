@@ -129,6 +129,7 @@ Metrics:
 | adfs.db_config_failures | connection | failures/s |
 | adfs.db_config_query_time_seconds | query_time | seconds/s |
 | adfs.device_authentications | authentications | authentications/s |
+| adfs.extranet_account_lockouts | lockouts | lockouts/s |
 | adfs.external_authentications | success, failure | authentications/s |
 | adfs.federated_authentications | authentications | authentications/s |
 | adfs.federation_metadata_requests | requests | requests/s |
