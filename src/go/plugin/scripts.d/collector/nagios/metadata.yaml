@@ -452,7 +452,7 @@ modules:
               config: |
                 jobs:
                   - name: service_health_win
-                    plugin: "C:\\Netdata\\checks\\check_service.ps1"
+                    plugin: C:\Netdata\checks\check_service.ps1
                     timeout: 10s
                     check_interval: 1m
             - name: Remote check via NRPE
