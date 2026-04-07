@@ -205,21 +205,21 @@ func TestIsKnownInterpreter(t *testing.T) {
 		path string
 		want bool
 	}{
-		"bash":                {path: "/bin/bash", want: true},
-		"sh":                  {path: "/bin/sh", want: true},
-		"python3":             {path: "/usr/bin/python3", want: true},
-		"python3 versioned":   {path: "/usr/bin/python3.11", want: true},
-		"powershell":          {path: "/usr/bin/powershell", want: true},
-		"powershell.exe":      {path: "/powershell.exe", want: true},
-		"pwsh":                {path: "/usr/bin/pwsh", want: true},
-		"env":                 {path: "/usr/bin/env", want: true},
-		"node":                {path: "/usr/bin/node", want: true},
-		"cmd.exe":             {path: "/cmd.exe", want: true},
-		"php":                 {path: "/usr/bin/php", want: true},
-		"check_ping":          {path: "/usr/lib/nagios/plugins/check_ping", want: false},
-		"check_http":          {path: "/usr/lib/nagios/plugins/check_http", want: false},
-		"custom script":       {path: "/opt/netdata/checks/check_api.sh", want: false},
-		"custom exe":          {path: "/opt/checks/check_service.exe", want: false},
+		"bash":              {path: "/bin/bash", want: true},
+		"sh":                {path: "/bin/sh", want: true},
+		"python3":           {path: "/usr/bin/python3", want: true},
+		"python3 versioned": {path: "/usr/bin/python3.11", want: true},
+		"powershell":        {path: "/usr/bin/powershell", want: true},
+		"powershell.exe":    {path: "/powershell.exe", want: true},
+		"pwsh":              {path: "/usr/bin/pwsh", want: true},
+		"env":               {path: "/usr/bin/env", want: true},
+		"node":              {path: "/usr/bin/node", want: true},
+		"cmd.exe":           {path: "/cmd.exe", want: true},
+		"php":               {path: "/usr/bin/php", want: true},
+		"check_ping":        {path: "/usr/lib/nagios/plugins/check_ping", want: false},
+		"check_http":        {path: "/usr/lib/nagios/plugins/check_http", want: false},
+		"custom script":     {path: "/opt/netdata/checks/check_api.sh", want: false},
+		"custom exe":        {path: "/opt/checks/check_service.exe", want: false},
 	}
 
 	for name, tc := range tests {
