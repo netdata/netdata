@@ -59,7 +59,7 @@ func TestLoadFromDefaultDirs_StockProfilesUseSelectorShorthand(t *testing.T) {
 		data, err := os.ReadFile(filepath.Join(dir, name))
 		require.NoError(t, err)
 
-		for _, line := range strings.Split(string(data), "\n") {
+		for line := range strings.SplitSeq(string(data), "\n") {
 			line = strings.TrimSpace(line)
 			if !strings.HasPrefix(line, "- selector:") {
 				continue
