@@ -65,21 +65,21 @@
         "title": "Timeout",
         "description": "Maximum time allowed for one check execution, in seconds. If the check exceeds this limit, the job state becomes `timeout`.",
         "type": "number",
-        "minimum": 0.001,
+        "minimum": 1,
         "default": 5
       },
       "check_interval": {
         "title": "Check interval",
         "description": "Requested interval between regular checks, in seconds.",
         "type": "number",
-        "minimum": 0.001,
+        "minimum": 1,
         "default": 300
       },
       "retry_interval": {
         "title": "Retry interval",
         "description": "Requested interval between retry attempts while the check is in a soft non-OK state, in seconds.",
         "type": "number",
-        "minimum": 0.001,
+        "minimum": 1,
         "default": 60
       },
       "max_check_attempts": {
