@@ -140,7 +140,7 @@ AutoReqProv: yes
 %endif
 
 # Skip MongoDB exporter on known problem platforms
-%if 0%{?oraclelinux} || 0%{?suse_version} || 0%{?amzn}
+%if 0%{?oraclelinux} || 0%{?suse_version} || 0%{?amzn} || 0%{?centos_ver} >= 10
 %global _have_mongo_exporter 0
 %else
 %global _have_mongo_exporter 1
