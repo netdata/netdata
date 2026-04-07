@@ -2,6 +2,12 @@
 
 package nagios
 
+import (
+	"fmt"
+	"os"
+	"runtime"
+)
+
 func (c *Collector) initCollector() error {
 	job, err := c.compileConfiguredJob()
 	if err != nil {
@@ -13,10 +19,6 @@ func (c *Collector) initCollector() error {
 }
 
 func (c *Collector) checkCollector() error {
-	if c.job.configured() {
-		return nil
-	}
-
 	_, err := c.compileConfiguredJob()
 	return err
 }
@@ -24,6 +26,9 @@ func (c *Collector) checkCollector() error {
 func (c *Collector) compileConfiguredJob() (compiledJob, error) {
 	job, err := compileCollectorConfig(c.Config)
 	if err != nil {
+		return compiledJob{}, err
+	}
+	if err := validateConfiguredPlugin(job.config); err != nil {
 		return compiledJob{}, err
 	}
 	c.warnCadenceResolution(job)
@@ -36,4 +41,18 @@ func (c *Collector) warnCadenceResolution(job compiledJob) {
 	}
 	c.Warningf("%s", job.cadenceWarning)
 	c.cadenceWarning = job.cadenceWarning
+}
+
+func validateConfiguredPlugin(job JobConfig) error {
+	info, err := os.Stat(job.Plugin)
+	if err != nil {
+		return fmt.Errorf("job '%s': plugin path '%s' stat error: %w", job.Name, job.Plugin, err)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("job '%s': plugin path '%s' must be a regular file", job.Name, job.Plugin)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o111 == 0 {
+		return fmt.Errorf("job '%s': plugin path '%s' must be executable", job.Name, job.Plugin)
+	}
+	return nil
 }

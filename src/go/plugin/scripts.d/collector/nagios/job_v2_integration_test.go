@@ -18,6 +18,8 @@ import (
 )
 
 func TestNagiosCollectorJobV2(t *testing.T) {
+	truePluginPath := writeTestPluginFile(t, "true")
+
 	type jobCaseState struct {
 		job         *jobruntime.JobV2
 		out         *lockedBuffer
@@ -52,7 +54,7 @@ func TestNagiosCollectorJobV2(t *testing.T) {
 				coll.now = func() time.Time { return now }
 				coll.Config.JobConfig = JobConfig{
 					Name:          "jobv2",
-					Plugin:        "/bin/true",
+					Plugin:        truePluginPath,
 					CheckInterval: confDuration(5 * time.Minute),
 					RetryInterval: confDuration(1 * time.Minute),
 				}

@@ -144,6 +144,8 @@ type nagiosConfigSchemaDoc struct {
 }
 
 func TestCollector_Check(t *testing.T) {
+	truePluginPath := writeTestPluginFile(t, "true")
+
 	tests := map[string]struct {
 		config   Config
 		wantErr  bool
@@ -159,19 +161,39 @@ func TestCollector_Check(t *testing.T) {
 				UpdateEvery: 10,
 				JobConfig: JobConfig{
 					Name:          "cadence",
-					Plugin:        "/bin/true",
+					Plugin:        truePluginPath,
 					CheckInterval: confDuration(5 * time.Second),
 					RetryInterval: confDuration(5 * time.Second),
 				},
 			},
 			wantErr: false,
 		},
+		"plugin path does not exist": {
+			config: Config{
+				JobConfig: JobConfig{
+					Name:   "missing-plugin",
+					Plugin: filepath.Join(t.TempDir(), "missing-check"),
+				},
+			},
+			wantErr:  true,
+			errMatch: "stat error",
+		},
+		"plugin path must be a regular file": {
+			config: Config{
+				JobConfig: JobConfig{
+					Name:   "plugin-dir",
+					Plugin: t.TempDir(),
+				},
+			},
+			wantErr:  true,
+			errMatch: "must be a regular file",
+		},
 		"valid config": {
 			config: Config{
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:          "valid",
-					Plugin:        "/bin/true",
+					Plugin:        truePluginPath,
 					CheckInterval: confDuration(5 * time.Second),
 					RetryInterval: confDuration(5 * time.Second),
 				},
@@ -196,6 +218,61 @@ func TestCollector_Check(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestCollector_CheckRevalidatesConfiguredPlugin(t *testing.T) {
+	dir := t.TempDir()
+	pluginPath := filepath.Join(dir, "check_mock.sh")
+	mode := os.FileMode(0o644)
+	if runtime.GOOS != "windows" {
+		mode = 0o755
+	}
+	require.NoError(t, os.WriteFile(pluginPath, []byte("#!/bin/sh\nexit 0\n"), mode))
+
+	coll := New()
+	coll.runner = &fakeRunner{}
+	coll.Config = Config{
+		UpdateEvery: 1,
+		JobConfig: JobConfig{
+			Name:          "revalidate",
+			Plugin:        pluginPath,
+			CheckInterval: confDuration(5 * time.Second),
+			RetryInterval: confDuration(5 * time.Second),
+		},
+	}
+
+	require.NoError(t, coll.Init(context.Background()))
+	require.NoError(t, os.Remove(pluginPath))
+
+	err := coll.Check(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "stat error")
+}
+
+func TestCollector_CheckRejectsNonExecutablePlugin(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows does not use unix executable bits")
+	}
+
+	dir := t.TempDir()
+	pluginPath := filepath.Join(dir, "check_mock.sh")
+	require.NoError(t, os.WriteFile(pluginPath, []byte("#!/bin/sh\nexit 0\n"), 0o644))
+
+	coll := New()
+	coll.runner = &fakeRunner{}
+	coll.Config = Config{
+		UpdateEvery: 1,
+		JobConfig: JobConfig{
+			Name:          "not-executable",
+			Plugin:        pluginPath,
+			CheckInterval: confDuration(5 * time.Second),
+			RetryInterval: confDuration(5 * time.Second),
+		},
+	}
+
+	err := coll.Check(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must be executable")
 }
 
 func TestCompileCollectorConfig_CadenceWarning(t *testing.T) {
@@ -251,6 +328,8 @@ func TestCompileCollectorConfig_CadenceWarning(t *testing.T) {
 }
 
 func TestCollector_Init(t *testing.T) {
+	truePluginPath := writeTestPluginFile(t, "true")
+
 	tests := map[string]struct {
 		config Config
 		assert func(*testing.T, *Collector)
@@ -259,7 +338,7 @@ func TestCollector_Init(t *testing.T) {
 			config: Config{
 				JobConfig: JobConfig{
 					Name:   "defaults",
-					Plugin: "/bin/true",
+					Plugin: truePluginPath,
 				},
 			},
 			assert: func(t *testing.T, coll *Collector) {
@@ -282,6 +361,9 @@ func TestCollector_Init(t *testing.T) {
 }
 
 func TestCollector_Collect(t *testing.T) {
+	truePluginPath := writeTestPluginFile(t, "true")
+	pwshPluginPath := writeTestPluginFile(t, "pwsh")
+
 	tests := map[string]struct {
 		results []fakeRun
 		config  Config
@@ -312,7 +394,7 @@ func TestCollector_Collect(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:          "check_disk",
-					Plugin:        "/bin/true",
+					Plugin:        truePluginPath,
 					CheckInterval: confDuration(5 * time.Minute),
 					RetryInterval: confDuration(1 * time.Minute),
 				},
@@ -378,7 +460,7 @@ func TestCollector_Collect(t *testing.T) {
 				JobConfig: JobConfig{
 					Name:          "check_service_job",
 					CheckName:     "check_service",
-					Plugin:        "/usr/bin/pwsh",
+					Plugin:        pwshPluginPath,
 					Args:          []string{"-NoProfile", "-File", "/opt/netdata/check_service.ps1"},
 					CheckInterval: confDuration(5 * time.Minute),
 					RetryInterval: confDuration(1 * time.Minute),
@@ -446,7 +528,7 @@ func TestCollector_Collect(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:          "period_job",
-					Plugin:        "/bin/true",
+					Plugin:        truePluginPath,
 					CheckInterval: confDuration(1 * time.Hour),
 					RetryInterval: confDuration(1 * time.Minute),
 					CheckPeriod:   "business",
@@ -599,7 +681,7 @@ func TestCollector_Collect(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:             "retry_job",
-					Plugin:           "/bin/true",
+					Plugin:           truePluginPath,
 					CheckInterval:    confDuration(5 * time.Minute),
 					RetryInterval:    confDuration(10 * time.Second),
 					MaxCheckAttempts: 3,
@@ -678,7 +760,7 @@ func TestCollector_Collect(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:             "paused_retry_job",
-					Plugin:           "/bin/true",
+					Plugin:           truePluginPath,
 					CheckInterval:    confDuration(1 * time.Hour),
 					RetryInterval:    confDuration(10 * time.Second),
 					MaxCheckAttempts: 3,
@@ -758,7 +840,7 @@ func TestCollector_Collect(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:             "timeout_job",
-					Plugin:           "/bin/true",
+					Plugin:           truePluginPath,
 					CheckInterval:    confDuration(5 * time.Minute),
 					RetryInterval:    confDuration(10 * time.Second),
 					MaxCheckAttempts: 3,
@@ -795,7 +877,7 @@ func TestCollector_Collect(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:   "infra_fail",
-					Plugin: "/bin/true",
+					Plugin: truePluginPath,
 				},
 			},
 			run: func(t *testing.T, coll *Collector, runner *fakeRunner, _ *time.Time) {
@@ -818,7 +900,7 @@ func TestCollector_Collect(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:   "with_vnode",
-					Plugin: "/bin/true",
+					Plugin: truePluginPath,
 				},
 			},
 			setup: func(coll *Collector, _ *fakeRunner, _ *time.Time) {
@@ -1173,6 +1255,19 @@ func assertMetricMissing(t *testing.T, r metrix.Reader, name string, labels metr
 	t.Helper()
 	_, ok := r.Value(name, labels)
 	assert.False(t, ok, "unexpected metric %s labels=%v", name, labels)
+}
+
+func writeTestPluginFile(t *testing.T, name string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
+	mode := os.FileMode(0o644)
+	content := "placeholder\n"
+	if runtime.GOOS != "windows" {
+		mode = 0o755
+		content = "#!/bin/sh\nexit 0\n"
+	}
+	require.NoError(t, os.WriteFile(path, []byte(content), mode))
+	return path
 }
 
 func confDuration(d time.Duration) confopt.Duration { return confopt.Duration(d) }
