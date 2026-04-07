@@ -520,7 +520,7 @@ modules:
               The Netdata Agent runs as the `netdata` user. If a check needs to read protected files, access SNMP, or connect to local sockets, it must be accessible to the `netdata` user. Test as that user first: `sudo -u netdata /path/to/check`. Common fixes include adding the `netdata` user to the required system group or using `sudo` with a specific NOPASSWD rule for the check command.
           - name: Windows checks need an executable entry point
             description: |
-              The collector runs the command named in `plugin` directly. On Windows, point `plugin` to an interpreter such as `powershell.exe` and pass the script path in `args`. Always set `check_name` when using an interpreter — without it, all jobs using the same interpreter share the same chart section (e.g. `Perfdata/powershell`).
+              The collector runs the command named in `plugin` directly. On Windows, point `plugin` to the absolute path of a compiled executable or an interpreter (e.g. `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`). When using an interpreter, pass the script path in `args` and always set `check_name` — without it, all jobs using the same interpreter share the same chart section (e.g. `Perfdata/powershell`).
     alerts:
       - name: nagios_job_execution_state_warn
         metric: nagios.job.execution_state
