@@ -61,9 +61,6 @@ install_centos() {
   # Install EPEL (needed for `jq`
   "${PKGMGR}" install -y epel-release || exit 1
 
-  # Enable CRB repo (needed for dependencies like mongo-c-driver)
-  "${PKGMGR}" config-manager --set-enabled crb || true
-
   # Install Netdata
   # Strange quoting is required here so that glob matching works.
   "${PKGMGR}" install -y /netdata/artifacts/netdata*.rpm || exit 1
