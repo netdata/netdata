@@ -143,7 +143,7 @@ static time_t bearer_create_token_internal(nd_uuid_t token, HTTP_USER_ROLE user_
         bt->access = access;
 
         uuid_copy(bt->cloud_account_id, cloud_account_id);
-        strncpyz(bt->client_name, client_name, sizeof(bt->cloud_account_id) - 1);
+        strncpyz(bt->client_name, client_name, sizeof(bt->client_name) - 1);
 
         if(save)
             bearer_token_save_to_file(token, bt);
@@ -168,7 +168,7 @@ time_t bearer_create_token(nd_uuid_t *uuid, HTTP_USER_ROLE user_role, HTTP_ACCES
             uuid_eq(cloud_account_id, bt->cloud_account_id) &&                          // the cloud_account_id matches
             strncmp(client_name, bt->client_name, sizeof(bt->client_name) - 1) == 0 &&  // the client_name matches
             uuid_parse_flexi(bt_dfe.name, *uuid) == 0)                               // the token can be parsed
-            return expires_s; /* dfe will cleanup automatically */
+            return bt->expires_s; /* dfe will cleanup automatically */
     }
     dfe_done(bt);
 
