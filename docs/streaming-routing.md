@@ -198,7 +198,7 @@ The **Netdata Streaming** function (under the "Functions" tab) provides:
 
 ```bash
 # Check journal for streaming-related messages
-journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep stream
+journalctl -u netdata --grep stream
 ```
 
 ### Verify Parent Connectivity
