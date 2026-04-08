@@ -1578,7 +1578,7 @@ When seeking help, include:
 
 - [Netdata GitHub Issues](https://github.com/netdata/netdata/issues)
 - [Netdata Community Forum](https://community.netdata.cloud)
-- [Netdata Discord](https://discord.gg/mPZ6WZKKG2)
+- [Netdata Discord](https://discord.com/invite/2mEmfW735j)
 
 ## Related Pages
 

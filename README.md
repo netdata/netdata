@@ -470,7 +470,7 @@ Visit [Netdata Learn](https://learn.netdata.cloud) for full documentation and gu
 
 Join the Netdata community:
 
-* [Discord](https://discord.com/invite/mPZ6WZKKG2)
+* [Discord](https://discord.com/invite/2mEmfW735j)
 * [Forum](https://community.netdata.cloud)
 * [GitHub Discussions](https://github.com/netdata/netdata/discussions)
 
