@@ -57,7 +57,7 @@
             description: "Set `AWSSNS_MESSAGE_FORMAT` to to the string that you want the alert to be sent into."
             required: true
             detailed_description: |
-              For the complete list of supported notification variables, see the [Alert Notification Variables](../REFERENCE.md#alert-notification-variables) section in the Health Reference.
+              For the complete list of supported notification variables, see the [Alert Notification Variables](../../REFERENCE.md#alert-notification-variables) section in the Health Reference.
 
           - name: 'DEFAULT_RECIPIENT_AWSSNS'
             default_value: ''

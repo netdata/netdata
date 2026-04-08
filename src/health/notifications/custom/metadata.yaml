@@ -81,7 +81,7 @@
               }
               ```
 
-              For the complete list of supported notification variables, see the [Alert Notification Variables](../REFERENCE.md#alert-notification-variables) section in the Health Reference.
+              For the complete list of supported notification variables, see the [Alert Notification Variables](../../REFERENCE.md#alert-notification-variables) section in the Health Reference.
 
       examples:
         folding:
