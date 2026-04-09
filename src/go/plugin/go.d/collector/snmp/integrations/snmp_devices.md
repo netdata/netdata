@@ -161,6 +161,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | user.auth_key | Authentication protocol pass phrase for SNMPv3 messages. |  | no |
 |  | [user.priv_proto](#option-snmpv3-user-priv-proto) | Privacy protocol for SNMPv3 messages. |  | no |
 |  | user.priv_key | Privacy protocol pass phrase for SNMPv3 messages. |  | no |
+|  | user.context_name | SNMPv3 context name used to address a specific MIB view on multi-context agents (e.g. virtual routers, logical partitions, snmpsim-simulated devices). Leave empty to use the default context. |  | no |
 | **SNMP transport** | options.version | SNMP version. Available versions: 1, 2, 3. | 2 | no |
 |  | options.port | Target port. | 161 | no |
 |  | options.retries | Retries to attempt. | 1 | no |
