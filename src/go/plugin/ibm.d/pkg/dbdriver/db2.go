@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //go:build disable_ibm_direct_driver
-// +build disable_ibm_direct_driver
 
 package dbdriver
 
