@@ -454,9 +454,6 @@ func parseTextDate(raw string) (int64, bool) {
 		if t, err := time.Parse(layout, raw); err == nil {
 			return t.Unix(), true
 		}
-		if t, err := time.ParseInLocation(layout, raw, time.UTC); err == nil {
-			return t.Unix(), true
-		}
 	}
 	return 0, false
 }
