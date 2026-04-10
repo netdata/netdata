@@ -7,8 +7,14 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
+	probing "github.com/prometheus-community/pro-bing"
+
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -185,6 +191,58 @@ func TestCollector_Check(t *testing.T) {
 				return c
 			},
 		},
+
+		"success: ping_only with successful ping": {
+			wantErr: false,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpect(m)
+				setMockClientSysInfoExpect(m)
+
+				c := New()
+				c.Config = prepareV2Config()
+				c.PingOnly = true
+				c.CreateVnode = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				c.newProber = func(cfg ping.ProberConfig, log *logger.Logger) ping.Prober { return &mockProber{} }
+				return c
+			},
+		},
+
+		"success: ping_only with recoverable ping error": {
+			wantErr: false,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpect(m)
+				setMockClientSysInfoExpect(m)
+
+				c := New()
+				c.Config = prepareV2Config()
+				c.PingOnly = true
+				c.CreateVnode = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				c.newProber = func(cfg ping.ProberConfig, log *logger.Logger) ping.Prober {
+					return &mockProber{pingErr: errors.New("host unreachable")}
+				}
+				return c
+			},
+		},
+
+		"failure: ping_only with unrecoverable ping error": {
+			wantErr: true,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpect(m)
+				setMockClientSysInfoExpect(m)
+
+				c := New()
+				c.Config = prepareV2Config()
+				c.PingOnly = true
+				c.CreateVnode = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				c.newProber = func(cfg ping.ProberConfig, log *logger.Logger) ping.Prober {
+					return &mockProber{pingErr: syscall.EPERM}
+				}
+				return c
+			},
+		},
 	}
 
 	for name, tc := range tests {
@@ -326,6 +384,30 @@ func TestCollector_Collect(t *testing.T) {
 			},
 		},
 	}
+	tests["collects ping only metrics"] = struct {
+		prepare func(m *snmpmock.MockHandler) *Collector
+		want    map[string]int64
+	}{
+		prepare: func(m *snmpmock.MockHandler) *Collector {
+			setMockClientInitExpect(m)
+			setMockClientSysInfoExpect(m)
+
+			collr := New()
+			collr.Config = prepareV2Config()
+			collr.PingOnly = true
+			collr.CreateVnode = false
+			collr.newSnmpClient = func() gosnmp.Handler { return m }
+			collr.newProber = func(cfg ping.ProberConfig, log *logger.Logger) ping.Prober { return &mockProber{} }
+
+			return collr
+		},
+		want: map[string]int64{
+			"ping_rtt_min":    (10 * time.Millisecond).Microseconds(),
+			"ping_rtt_max":    (20 * time.Millisecond).Microseconds(),
+			"ping_rtt_avg":    (15 * time.Millisecond).Microseconds(),
+			"ping_rtt_stddev": (5 * time.Millisecond).Microseconds(),
+		},
+	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -343,6 +425,30 @@ func TestCollector_Collect(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
+}
+
+type mockProber struct {
+	pingErr error
+}
+
+func (m *mockProber) Ping(host string) (*probing.Statistics, error) {
+	if m.pingErr != nil {
+		return nil, m.pingErr
+	}
+
+	stats := probing.Statistics{
+		PacketsRecv:           5,
+		PacketsSent:           5,
+		PacketsRecvDuplicates: 0,
+		PacketLoss:            0,
+		Addr:                  host,
+		MinRtt:                time.Millisecond * 10,
+		MaxRtt:                time.Millisecond * 20,
+		AvgRtt:                time.Millisecond * 15,
+		StdDevRtt:             time.Millisecond * 5,
+	}
+
+	return &stats, nil
 }
 
 type mockDdSnmpCollector struct {

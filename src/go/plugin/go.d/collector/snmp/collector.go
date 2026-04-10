@@ -135,7 +135,7 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("failed to initialize SNMP client: %v", err)
 	}
 
-	if c.Ping.Enabled {
+	if c.PingOnly || c.Ping.Enabled {
 		pr, err := c.initProber()
 		if err != nil {
 			return fmt.Errorf("failed to initialize ping prober: %v", err)
@@ -157,6 +157,12 @@ func (c *Collector) Check(context.Context) error {
 
 	if _, err := snmputils.GetSysInfo(c.snmpClient); err != nil {
 		return err
+	}
+
+	if c.PingOnly && c.prober != nil {
+		if _, err := c.prober.Ping(c.Hostname); err != nil && isPingUnrecoverableError(err) {
+			return fmt.Errorf("ping check failed: %v", err)
+		}
 	}
 
 	return nil

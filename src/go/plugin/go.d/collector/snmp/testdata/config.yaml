@@ -30,6 +30,7 @@ options:
   max_request_size: 123
   max_repetitions: 123
 
+ping_only: yes
 ping:
   enabled: yes
   network: ip

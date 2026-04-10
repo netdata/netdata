@@ -202,6 +202,12 @@
         },
         "uniqueItems": true
       },
+      "ping_only": {
+        "title": "Ping only",
+        "description": "Collect only ICMP round-trip time and skip SNMP profile metrics. Implies ping is enabled regardless of the ping.enabled setting.",
+        "type": "boolean",
+        "default": false
+      },
       "ping": {
         "title": "Ping",
         "type": [
@@ -312,6 +318,9 @@
         "ui:widget": "password"
       }
     },
+    "ping_only": {
+      "ui:help": "A minimal SNMP sysInfo query still runs at startup for device identification, profile matching, and metadata."
+    },
     "ping": {
       "interface": {
         "ui:widget": "hidden"
@@ -335,6 +344,7 @@
         {
           "title": "Ping",
           "fields": [
+            "ping_only",
             "ping"
           ]
         },
