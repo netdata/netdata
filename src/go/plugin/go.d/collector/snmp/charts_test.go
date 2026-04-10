@@ -26,6 +26,7 @@ func TestCollector_AddProfileScalarMetricChart_LabelsIncludeMetricTags(t *testin
 		Value: 1,
 		Tags: map[string]string{
 			"component":          "vpn",
+			"_component":         "private-vpn",
 			"_license_state_raw": "active",
 		},
 		Profile: &ddsnmp.ProfileMetrics{
@@ -44,6 +45,24 @@ func TestCollector_AddProfileScalarMetricChart_LabelsIncludeMetricTags(t *testin
 		"sysName":           "test-device",
 		"vendor":            "test-vendor",
 	}, chartLabels(chart))
+}
+
+func TestAddMetricTagLabels_PrefersUnprefixedTags(t *testing.T) {
+	labels := map[string]string{"vendor": "device-vendor"}
+
+	addMetricTagLabels(labels, map[string]string{
+		"component":          "vpn",
+		"_component":         "private-vpn",
+		"_license_state_raw": "active",
+		"_vendor":            "private-vendor",
+		"_":                  "ignored",
+	})
+
+	assert.Equal(t, map[string]string{
+		"component":         "vpn",
+		"license_state_raw": "active",
+		"vendor":            "device-vendor",
+	}, labels)
 }
 
 func chartLabels(chart *collectorapi.Chart) map[string]string {

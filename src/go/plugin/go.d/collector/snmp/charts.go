@@ -211,10 +211,7 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 	tags := c.chartBaseLabels()
 
 	maps.Copy(tags, m.Profile.Tags)
-	for k, v := range m.Tags {
-		newKey := strings.TrimPrefix(k, "_")
-		tags[newKey] = v
-	}
+	addMetricTagLabels(tags, m.Tags)
 	for k, v := range tags {
 		chart.Labels = append(chart.Labels, collectorapi.Label{Key: k, Value: v})
 	}
@@ -271,10 +268,7 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 	tags := c.chartBaseLabels()
 
 	maps.Copy(tags, m.Profile.Tags)
-	for k, v := range m.Tags {
-		newKey := strings.TrimPrefix(k, "_")
-		tags[newKey] = v
-	}
+	addMetricTagLabels(tags, m.Tags)
 
 	for k, v := range tags {
 		chart.Labels = append(chart.Labels, collectorapi.Label{Key: k, Value: v})
@@ -330,6 +324,27 @@ func (c *Collector) chartBaseLabels() map[string]string {
 	}
 
 	return labels
+}
+
+func addMetricTagLabels(labels, tags map[string]string) {
+	for k, v := range tags {
+		if strings.HasPrefix(k, "_") {
+			continue
+		}
+		labels[k] = v
+	}
+	for k, v := range tags {
+		if !strings.HasPrefix(k, "_") {
+			continue
+		}
+		key := strings.TrimPrefix(k, "_")
+		if key == "" {
+			continue
+		}
+		if _, ok := labels[key]; !ok {
+			labels[key] = v
+		}
+	}
 }
 
 func dimAlgoFromDdSnmpType(m ddsnmp.Metric) collectorapi.DimAlgo {
