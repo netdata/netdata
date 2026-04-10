@@ -1599,7 +1599,9 @@ Supported formats:
 - `ip_address`: decodes IP address values.
 - `mac_address`: decodes MAC address values.
 - `snmp_dateandtime`: decodes SNMPv2-TC `DateAndTime` OCTET STRING values
-  into unix timestamps.
+  into unix timestamps. The 11-octet form uses its embedded UTC offset. The
+  8-octet form has no timezone fields, so the collector interprets it as UTC
+  because the device timezone is unavailable.
 - `text_date`: parses common textual date strings and epoch strings into
   unix timestamps. Vendor no-value sentinels such as `0`, `4294967295`,
   `never`, and `n/a` are treated as missing values.

@@ -114,3 +114,27 @@ func TestNumericValueProcessor_ProcessValue_Uint32Format(t *testing.T) {
 		})
 	}
 }
+
+func TestValueProcessor_ProcessValue_TextDateFormatOnNumericPDU(t *testing.T) {
+	processor := newValueProcessor()
+	symbol := ddprofiledefinition.SymbolConfig{
+		OID:    "1.3.6.1.4.1.99999.1.1.0",
+		Name:   "licenseExpiry",
+		Format: "text_date",
+	}
+
+	value, err := processor.processValue(symbol, gosnmp.SnmpPDU{
+		Name:  "1.3.6.1.4.1.99999.1.1.0",
+		Type:  gosnmp.Gauge32,
+		Value: uint32(1798675200),
+	})
+	require.NoError(t, err)
+	require.EqualValues(t, 1798675200, value)
+
+	_, err = processor.processValue(symbol, gosnmp.SnmpPDU{
+		Name:  "1.3.6.1.4.1.99999.1.1.0",
+		Type:  gosnmp.Gauge32,
+		Value: uint32(4294967295),
+	})
+	require.ErrorIs(t, err, errNoTextDateValue)
+}

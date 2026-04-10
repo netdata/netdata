@@ -16,23 +16,29 @@ import (
 // boundaries just for the test.
 func runLicenseTransform(t *testing.T, body string, m *Metric) {
 	t.Helper()
-	tmpl, err := compileTransform(body)
-	require.NoError(t, err)
-	var buf bytes.Buffer
-	require.NoError(t, tmpl.Execute(&buf, struct{ Metric *Metric }{Metric: m}))
+	require.NoError(t, executeLicenseTransform(body, m))
 }
 
-func TestLicenseRowTransform_StampsValueKindOnTagsMap(t *testing.T) {
+func executeLicenseTransform(body string, m *Metric) error {
+	tmpl, err := compileTransform(body)
+	if err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	return tmpl.Execute(&buf, struct{ Metric *Metric }{Metric: m})
+}
+
+func TestSetTagTransform_StampsValueKindOnTagsMap(t *testing.T) {
 	m := &Metric{Value: 42, Tags: map[string]string{}}
-	runLicenseTransform(t, `{{- licenseRow .Metric "expiry_timestamp" -}}`, m)
+	runLicenseTransform(t, `{{- setTag .Metric "_license_value_kind" "expiry_timestamp" -}}`, m)
 
 	assert.Equal(t, "expiry_timestamp", m.Tags["_license_value_kind"])
 	assert.EqualValues(t, 42, m.Value)
 }
 
-func TestLicenseRowTransform_AllocatesTagsWhenNil(t *testing.T) {
+func TestSetTagTransform_AllocatesTagsWhenNil(t *testing.T) {
 	m := &Metric{Value: 1}
-	runLicenseTransform(t, `{{- licenseRow .Metric "state_severity" -}}`, m)
+	runLicenseTransform(t, `{{- setTag .Metric "_license_value_kind" "state_severity" -}}`, m)
 
 	require.NotNil(t, m.Tags)
 	assert.Equal(t, "state_severity", m.Tags["_license_value_kind"])
@@ -91,6 +97,18 @@ func TestLicenseDateFromTagTransform_RejectsSentinels(t *testing.T) {
 		// Untouched: no value_kind stamp, original value preserved.
 		assert.Empty(t, m.Tags["_license_value_kind"], "raw=%q", raw)
 		assert.EqualValues(t, 999, m.Value, "raw=%q", raw)
+	}
+}
+
+func TestLicenseDateFromTagTransform_RejectsUnsupportedKind(t *testing.T) {
+	for _, kind := range []string{"usage", "expiry_remaining", "not_a_kind"} {
+		m := &Metric{Value: 999, Tags: map[string]string{"x": "2026-12-31"}}
+		err := executeLicenseTransform(`{{- licenseDateFromTag .Metric "x" "`+kind+`" -}}`, m)
+
+		require.Error(t, err, "kind=%q", kind)
+		assert.Contains(t, err.Error(), `licenseDateFromTag: unsupported value kind`, "kind=%q", kind)
+		assert.Empty(t, m.Tags["_license_value_kind"], "kind=%q", kind)
+		assert.EqualValues(t, 999, m.Value, "kind=%q", kind)
 	}
 }
 

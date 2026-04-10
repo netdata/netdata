@@ -25,10 +25,22 @@ func newValueProcessor() *valueProcessor {
 }
 
 func (p *valueProcessor) processValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) (int64, error) {
+	if isStringValueFormat(sym.Format) {
+		return p.stringProcessor.processValue(sym, pdu)
+	}
 	if isPduNumericType(pdu) {
 		return p.numericProcessor.processValue(sym, pdu)
 	}
 	return p.stringProcessor.processValue(sym, pdu)
+}
+
+func isStringValueFormat(format string) bool {
+	switch format {
+	case "hex", "ip_address", "mac_address", "snmp_dateandtime", "text_date":
+		return true
+	default:
+		return false
+	}
 }
 
 // numericValueProcessor handles numeric PDU types

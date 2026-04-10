@@ -323,70 +323,29 @@ func newMetricTransformFuncMap() template.FuncMap {
 
 			return ""
 		},
-		"licenseDateFromTag": func(m *Metric, tagName, kind string) string {
-			/*
-				licenseDateFromTag parses a vendor date string carried in a metric tag,
-				replaces the metric value with its unix epoch, and stamps the licensing
-				value kind. Use it when the SNMP OID returns a textual date (e.g.,
-				Checkpoint's "1Jan2030", Sophos' "2026-03-15", Blue Coat's "Mar 15 2026")
-				and snmp_dateandtime cannot be applied.
-
-				kind must be one of the timestamp value kinds accepted by licenseRow:
-				expiry_timestamp, authorization_timestamp, certificate_timestamp,
-				grace_timestamp.
-
-				If parsing fails the metric is left untouched and no licensing kind is
-				stamped, so collector-level consumers can ignore the row signal.
-			*/
+		"licenseDateFromTag": func(m *Metric, tagName, kind string) (string, error) {
+			// licenseDateFromTag parses a vendor date string carried in a metric tag,
+			// replaces the metric value with its unix epoch, and stamps the licensing
+			// value kind. It is intentionally limited to timestamp value kinds; other
+			// licensing row kinds can use the generic setTag transform directly.
+			if !isLicenseDateValueKind(kind) {
+				return "", fmt.Errorf("licenseDateFromTag: unsupported value kind %q", kind)
+			}
 			if m.Tags == nil {
-				return ""
+				return "", nil
 			}
 			raw := strings.TrimSpace(m.Tags[tagName])
 			if raw == "" {
-				return ""
+				return "", nil
 			}
 
 			ts, ok := parseTextDate(raw)
 			if !ok {
-				return ""
+				return "", nil
 			}
 			m.Value = ts
 			m.Tags["_license_value_kind"] = kind
-			return ""
-		},
-		"licenseRow": func(m *Metric, kind string) string {
-			/*
-				licenseRow marks a metric as a licensing row carrier for a collector-level
-				licensing consumer.
-
-				Profiles describe each licensing signal as a hidden ("_"-prefixed) metric
-				whose value corresponds to the signal itself (expiry epoch, used count,
-				severity, etc). The transform stamps a "value kind" tag so the collector
-				knows how to interpret the integer value.
-
-				Supported kinds:
-				  - "expiry_timestamp"           absolute unix-epoch expiry
-				  - "expiry_remaining"           seconds-from-now until expiry
-				  - "authorization_timestamp"    absolute unix-epoch auth expiry
-				  - "authorization_remaining"    seconds-from-now auth expiry
-				  - "certificate_timestamp"      absolute unix-epoch cert expiry
-				  - "certificate_remaining"      seconds-from-now cert expiry
-				  - "grace_timestamp"            absolute unix-epoch grace/eval end
-				  - "grace_remaining"            seconds-from-now grace/eval end
-				  - "usage"                      used license units (integer)
-				  - "capacity"                   total license capacity (integer)
-				  - "available"                  available license units (integer)
-				  - "usage_percent"              usage pressure in percent (0-100)
-				  - "state_severity"             normalized severity (0 healthy, 1 degraded, 2 broken)
-
-				Multiple signals for the same logical license can be merged by the
-				collector-level licensing consumer.
-			*/
-			if m.Tags == nil {
-				m.Tags = make(map[string]string)
-			}
-			m.Tags["_license_value_kind"] = kind
-			return ""
+			return "", nil
 		},
 	}
 
@@ -432,6 +391,15 @@ func ParseTextDate(raw string) (int64, bool) {
 // accepted by ParseTextDate.
 func IsTextDateNoValue(raw string) bool {
 	return isTextDateNoValue(raw)
+}
+
+func isLicenseDateValueKind(kind string) bool {
+	switch kind {
+	case "expiry_timestamp", "authorization_timestamp", "certificate_timestamp", "grace_timestamp":
+		return true
+	default:
+		return false
+	}
 }
 
 func parseTextDate(raw string) (int64, bool) {

@@ -211,6 +211,10 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 	tags := c.chartBaseLabels()
 
 	maps.Copy(tags, m.Profile.Tags)
+	for k, v := range m.Tags {
+		newKey := strings.TrimPrefix(k, "_")
+		tags[newKey] = v
+	}
 	for k, v := range tags {
 		chart.Labels = append(chart.Labels, collectorapi.Label{Key: k, Value: v})
 	}

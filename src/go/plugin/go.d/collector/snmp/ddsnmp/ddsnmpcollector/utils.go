@@ -143,6 +143,10 @@ func convPduToDateAndTimeUnix(pdu gosnmp.SnmpPDU) (int64, error) {
 	second := int(bs[6])
 	deci := int(bs[7])
 
+	// The 8-octet SNMPv2-TC DateAndTime form omits timezone fields when
+	// only local time is known. The collector does not know the device's
+	// timezone, so it uses UTC as a deterministic fallback; 11-octet values
+	// use their embedded UTC offset below.
 	loc := time.UTC
 	if len(bs) == 11 {
 		sign := bs[8]
