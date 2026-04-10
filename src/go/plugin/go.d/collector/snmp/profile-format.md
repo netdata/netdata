@@ -1447,9 +1447,15 @@ metric_tags:
 
 ## Value Transformation
 
-Value transformations let you **process or normalize raw SNMP metric values** before they are stored and charted.
+Value transformations let you **decode, process, or normalize raw SNMP symbol values** before they are stored and charted.
 
-They are applied **per symbol (per OID)** during SNMP data collection. They modify only **metric values**, not tags or metadata, and are **not applied to virtual metrics**.
+For metrics, they are applied **per symbol (per OID)** during SNMP data
+collection and are **not applied to virtual metrics**.
+
+`format` is the exception to the "metric values only" rule: it is symbol
+decoding, so it also applies when the same symbol is used for metric tags or
+device metadata. After decoding, metric tags and device metadata follow their
+own supported transformation rules.
 
 These transformations are typically used to:
 
@@ -1465,19 +1471,19 @@ These transformations are typically used to:
 | `extract_value`                 | Extract a numeric substring via regex.                            | `"23.8 °C" → "23"`                  |
 | `format`                        | Decode raw SNMP data into a value shape before other processing.  | DateAndTime bytes → unix timestamp  |
 | `scale_factor`                  | Multiply values by a constant to adjust units.                    | `"1.5" (MBps) × 8 → 12 (Mbps)`      |
-| `match_pattern` + `match_value` | *Not applicable* for metric values (use `extract_value` instead). | —                                   |
+| `match_pattern` + `match_value` | Replace string metric values using regex groups or static text before numeric parsing. | `"state=2" → "2"`        |
 
 **Combination & Behavior**:
 
 | Rule                      | Description                                                                                                               |
 |---------------------------|---------------------------------------------------------------------------------------------------------------------------|
-| **Where**                 | Value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`.                                      |
-| **Order of application**  | 1️⃣ `extract_value` (if present) → 2️⃣ `mapping` → 3️⃣ `scale_factor`.                                                    |
-| **Scale factor position** | `scale_factor` is always applied **last**, after all other transformations.                                               |
+| **Where**                 | Metric value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`; `format` also applies when symbols are used for metric tags or device metadata. |
+| **Order of application**  | 1️⃣ `format` (if present) → 2️⃣ `extract_value` (if present) → 3️⃣ `match_pattern` + `match_value` (if present) → 4️⃣ `mapping` → 5️⃣ numeric parsing → 6️⃣ `scale_factor`. |
+| **Scale factor position** | `scale_factor` is always applied **last**, after all other metric value transformations.                                 |
 | **String base parsing**   | String-like values are parsed as base-10 by default. If `format: hex` is set, extracted values are parsed as base-16.   |
 | **Data type handling**    | Transformations preserve numeric type (integer/float) unless the mapping converts it to a multi-value metric.             |
-| **Error handling**        | If a transformation fails (e.g., regex doesn’t match), the collector keeps the original value.                            |
-| **Applicability**         | Transformations affect metric values only — not metadata or tags.                                                         |
+| **Error handling**        | `extract_value` keeps the original value when it does not match; `match_pattern` fails the metric value when it does not match; no-value `format` sentinels are treated as missing. |
+| **Applicability**         | Metric value transformations affect metric values only; `format` also decodes tag and metadata symbol values.             |
 | **Mapping behavior**      | Always produces a multi-value metric where each mapped entry becomes a dimension; the active one reports `1`, others `0`. |
 
 **Quick Syntax Recap**:
@@ -1590,8 +1596,19 @@ metrics:
 
 ### Format
 
-Use `format` to decode raw SNMP values before the rest of the value
-processor runs.
+Use `format` to decode raw SNMP values as a symbol is converted into its
+textual or numeric representation.
+
+For metric values, `format` runs before the rest of the value-processing
+pipeline. For metric tags and device metadata, `format` runs before their own
+supported extraction, match, and mapping rules. `scale_factor` remains
+metric-value-only.
+
+If a format yields no value (for example, `text_date` encounters a vendor
+sentinel such as `0`, `4294967295`, `never`, or `n/a`), the result is treated
+as missing. For metrics, no metric value is produced from that symbol. For
+metric tags and device metadata, no tag or metadata value is produced from that
+symbol.
 
 Supported formats:
 
