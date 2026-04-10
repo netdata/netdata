@@ -757,18 +757,16 @@ They let you distinguish between instances (for example, which interface, disk, 
 - Attaches tags to each metric as labels.
 - Uses tags to differentiate rows when building charts.
 - Requires at least one tag for every **table metric** (to identify each row).
-- Supports optional **scalar metric_tags** when a scalar metric needs
-  descriptive dynamic labels from other scalar OIDs.
 
 **Key Concepts**:
 
-| Concept                            | Description                                                                                                                                   |
-|------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| **Table metrics must have tags**   | Each table row must be uniquely identified by at least one tag (for example, interface name or index). Without tags, only one row is emitted. |
-| **Scalar metrics don’t need tags for identity** | Scalars represent one value for the entire device, so tags are optional context rather than row identifiers.                      |
-| **Static tags**                    | Fixed values that never change (for example, datacenter, environment).                                                                        |
-| **Dynamic tags**                   | Extracted from SNMP data — from table columns, related tables, or row indexes.                                                                |
-| **Global tags**                    | Defined in the profile’s top-level `metric_tags` section and applied to all metrics.                                                          |
+| Concept                                         | Description                                                                                                                                   |
+|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| **Table metrics must have tags**                | Each table row must be uniquely identified by at least one tag (for example, interface name or index). Without tags, only one row is emitted. |
+| **Scalar metrics don’t need tags for identity** | Scalars represent one value for the entire device, so tags are not part of their normal public identity contract.                             |
+| **Static tags**                                 | Fixed values that never change (for example, datacenter, environment).                                                                        |
+| **Dynamic tags**                                | Extracted from SNMP data — from table columns, related tables, or row indexes.                                                                |
+| **Global tags**                                 | Defined in the profile’s top-level `metric_tags` section and applied to all metrics.                                                          |
 
 **Tag Types and Available Transformations**:
 
@@ -784,11 +782,15 @@ They let you distinguish between instances (for example, which interface, disk, 
 
 - Each **table metric** must define at least one **tag source** (`metric_tags`) to distinguish rows.
 - Tags can come from **the same table**, **another table**, or the **row index** itself.
-- Scalar metrics may define **symbol-based** `metric_tags` to attach
-  descriptive labels from other scalar OIDs.
+- Scalar metrics do not use tags for identity. Internal bundled profiles may
+  attach sidecar scalar values to hidden carrier metrics, but that is not a
+  stable public authoring contract.
 - Tag transformations (`mapping`, `extract_value`, `match_pattern`, `match + tags`) can modify or extract parts of raw values.
 - **Static tags** apply globally and are not transformed.
 - **Index transformations** are a special mechanism used only for aligning multi-part indexes between tables.
+- Avoid reusing built-in device label names such as `sysName`, `address`,
+  `vendor`, `model`, and `device_type` for row tags. Those keys are reserved
+  for collector-provided device metadata labels.
 
 **How the Collector Matches Values and Tags**:
 
@@ -1465,26 +1467,26 @@ These transformations are typically used to:
 
 **Available Value Transformations**:
 
-| Transformation                  | Purpose                                                           | Example Input → Output              |
-|---------------------------------|-------------------------------------------------------------------|-------------------------------------|
-| `mapping`                       | Convert numeric or string codes into state dimensions.            | `1 → up`, `2 → down`, `3 → testing` |
-| `extract_value`                 | Extract a numeric substring via regex.                            | `"23.8 °C" → "23"`                  |
-| `format`                        | Decode raw SNMP data into a value shape before other processing.  | DateAndTime bytes → unix timestamp  |
-| `scale_factor`                  | Multiply values by a constant to adjust units.                    | `"1.5" (MBps) × 8 → 12 (Mbps)`      |
-| `match_pattern` + `match_value` | Replace string metric values using regex groups or static text before numeric parsing. | `"state=2" → "2"`        |
+| Transformation                  | Purpose                                                                                | Example Input → Output              |
+|---------------------------------|----------------------------------------------------------------------------------------|-------------------------------------|
+| `mapping`                       | Convert numeric or string codes into state dimensions.                                 | `1 → up`, `2 → down`, `3 → testing` |
+| `extract_value`                 | Extract a numeric substring via regex.                                                 | `"23.8 °C" → "23"`                  |
+| `format`                        | Decode raw SNMP data into a value shape before other processing.                       | DateAndTime bytes → unix timestamp  |
+| `scale_factor`                  | Multiply values by a constant to adjust units.                                         | `"1.5" (MBps) × 8 → 12 (Mbps)`      |
+| `match_pattern` + `match_value` | Replace string metric values using regex groups or static text before numeric parsing. | `"state=2" → "2"`                   |
 
 **Combination & Behavior**:
 
-| Rule                      | Description                                                                                                               |
-|---------------------------|---------------------------------------------------------------------------------------------------------------------------|
-| **Where**                 | Metric value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`; `format` also applies when symbols are used for metric tags or device metadata. |
-| **Order of application**  | 1️⃣ `format` (if present) → 2️⃣ `extract_value` (if present) → 3️⃣ `match_pattern` + `match_value` (if present) → 4️⃣ `mapping` → 5️⃣ numeric parsing → 6️⃣ `scale_factor`. |
-| **Scale factor position** | `scale_factor` is always applied **last**, after all other metric value transformations.                                 |
-| **String base parsing**   | String-like values are parsed as base-10 by default. If `format: hex` is set, extracted values are parsed as base-16.   |
-| **Data type handling**    | Transformations preserve numeric type (integer/float) unless the mapping converts it to a multi-value metric.             |
-| **Error handling**        | `extract_value` keeps the original value when it does not match; `match_pattern` fails the metric value when it does not match; no-value `format` sentinels are treated as missing. |
-| **Applicability**         | Metric value transformations affect metric values only; `format` also decodes tag and metadata symbol values.             |
-| **Mapping behavior**      | Always produces a multi-value metric where each mapped entry becomes a dimension; the active one reports `1`, others `0`. |
+| Rule                      | Description                                                                                                                                                                                                                                                                                                                                              |
+|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Where**                 | Metric value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`; `format` also applies when symbols are used for metric tags or device metadata.                                                                                                                                                                              |
+| **Order of application**  | For string-decoded metric values: 1️⃣ `format` (if present) → 2️⃣ `extract_value` (if present) → 3️⃣ `match_pattern` + `match_value` (if present) → 4️⃣ `mapping` → 5️⃣ numeric parsing → 6️⃣ `scale_factor`. Ordinary numeric PDUs skip the string-only `extract_value` and `match_pattern` steps and use numeric parsing → `mapping` → `scale_factor`. |
+| **Scale factor position** | `scale_factor` is always applied **last**, after all other metric value transformations.                                                                                                                                                                                                                                                                 |
+| **String base parsing**   | String-like values are parsed as base-10 by default. If `format: hex` is set, extracted values are parsed as base-16.                                                                                                                                                                                                                                    |
+| **Data type handling**    | Transformations preserve numeric type (integer/float) unless the mapping converts it to a multi-value metric.                                                                                                                                                                                                                                            |
+| **Error handling**        | `extract_value` keeps the original value when it does not match; `match_pattern` fails the metric value when it does not match; no-value `format` sentinels are treated as missing.                                                                                                                                                                      |
+| **Applicability**         | Metric value transformations affect metric values only; `format` also decodes tag and metadata symbol values.                                                                                                                                                                                                                                            |
+| **Mapping behavior**      | Always produces a multi-value metric where each mapped entry becomes a dimension; the active one reports `1`, others `0`.                                                                                                                                                                                                                                |
 
 **Quick Syntax Recap**:
 
@@ -1602,7 +1604,9 @@ textual or numeric representation.
 For metric values, `format` runs before the rest of the value-processing
 pipeline. For metric tags and device metadata, `format` runs before their own
 supported extraction, match, and mapping rules. `scale_factor` remains
-metric-value-only.
+metric-value-only. Ordinary numeric PDUs do not pass through string-only
+processing such as `extract_value` or `match_pattern` unless an explicit
+string-decoding `format` routes them through the string processor first.
 
 If a format yields no value (for example, `text_date` encounters a vendor
 sentinel such as `0`, `4294967295`, `never`, or `n/a`), the result is treated
@@ -1732,40 +1736,40 @@ The collector evaluates alternatives **in order** and uses the **first** set tha
 
 ### Config reference
 
-| Item               | Field          | Type                 | Required | Default | Applies to               | Description                                                                                                                                                                     |
-|--------------------|----------------|----------------------|----------|---------|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Virtual Metric** | `name`         | string               | yes      | —       | all                      | Unique within the profile. Used as metric/chart base name.                                                                                                                      |
-|                    | `sources`      | array\<Source\>      | no*      | —       | totals, per_row, grouped | Direct source set. Ignored if `alternatives` exist (alternatives take precedence).                                                                                              |
-|                    | `alternatives` | array\<Alternative\> | no*      | —       | totals, per_row, grouped | Ordered fallback sets. The first alternative whose sources produce data is used.                                                                                                |
-|                    | `per_row`      | bool                 | no       | false   | per-row/grouped          | When `true`, emits one output per input row; sources become dimensions; row tags attach.                                                                                        |
+| Item               | Field          | Type                 | Required | Default | Applies to               | Description                                                                                                                                                                                                     |
+|--------------------|----------------|----------------------|----------|---------|--------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Virtual Metric** | `name`         | string               | yes      | —       | all                      | Unique within the profile. Used as metric/chart base name.                                                                                                                                                      |
+|                    | `sources`      | array\<Source\>      | no*      | —       | totals, per_row, grouped | Direct source set. Ignored if `alternatives` exist (alternatives take precedence).                                                                                                                              |
+|                    | `alternatives` | array\<Alternative\> | no*      | —       | totals, per_row, grouped | Ordered fallback sets. The first alternative whose sources produce data is used.                                                                                                                                |
+|                    | `per_row`      | bool                 | no       | false   | per-row/grouped          | When `true`, emits one output per input row; sources become dimensions; row tags attach.                                                                                                                        |
 |                    | `group_by`     | array\<string\>      | no       | —       | per-row/grouped          | Label(s) used as row-key hints (in order). With `per_row:true`, missing/empty hints fall back to a stable key built from all non-underscore tags. With `per_row:false`, this acts like PromQL’s `sum by (...)`. |
-|                    | `emit_tags`    | array\<EmitTag\>     | no       | —       | per-row/grouped          | Renames or selects which source tags are emitted on the resulting virtual metric. Useful when grouping by private tags such as `_neighbor` but exporting standard tags such as `neighbor`. |
-|                    | `chart_meta`   | object               | no       | —       | all                      | Presentation metadata (`description`, `family`, `unit`, `type`).                                                                                                                |
-| **Source**         | `metric`       | string               | yes      | —       | —                        | Name of an existing metric (scalar or table column metric).                                                                                                                     |
-|                    | `table`        | string               | no*      | —       | —                        | Table name for the originating metric. Required for table-derived grouped/per-row virtual metrics. Scalar sources may omit it.                                                   |
-|                    | `as`           | string               | no       | —       | —                        | Optional dimension name within a composite (e.g., `in`, `out`). Single-source virtual metrics do not need it.                                                                   |
-|                    | `dim`          | string               | no       | —       | —                        | Selects one dimension from a MultiValue source metric (for example `start` or `established`) before aggregation. Useful when composing virtual metrics from mapped status charts. |
-| **EmitTag**        | `tag`          | string               | yes      | —       | —                        | Output tag name to emit on the virtual metric.                                                                                                                                   |
-|                    | `from`         | string               | yes      | —       | —                        | Existing source-tag name to copy from the grouped source rows.                                                                                                                   |
-| **Alternative**    | `sources`      | array\<Source\>      | yes      | —       | —                        | All sources in an alternative are evaluated together. If none produce data, the collector tries the next alternative. Per-row/group rules apply within the winning alternative. |
+|                    | `emit_tags`    | array\<EmitTag\>     | no       | —       | per-row/grouped          | Renames or selects which source tags are emitted on the resulting virtual metric. Useful when grouping by private tags such as `_neighbor` but exporting standard tags such as `neighbor`.                      |
+|                    | `chart_meta`   | object               | no       | —       | all                      | Presentation metadata (`description`, `family`, `unit`, `type`).                                                                                                                                                |
+| **Source**         | `metric`       | string               | yes      | —       | —                        | Name of an existing metric (scalar or table column metric).                                                                                                                                                     |
+|                    | `table`        | string               | no*      | —       | —                        | Table name for the originating metric. Required for table-derived grouped/per-row virtual metrics. Scalar sources may omit it.                                                                                  |
+|                    | `as`           | string               | no       | —       | —                        | Optional dimension name within a composite (e.g., `in`, `out`). Single-source virtual metrics do not need it.                                                                                                   |
+|                    | `dim`          | string               | no       | —       | —                        | Selects one dimension from a MultiValue source metric (for example `start` or `established`) before aggregation. Useful when composing virtual metrics from mapped status charts.                               |
+| **EmitTag**        | `tag`          | string               | yes      | —       | —                        | Output tag name to emit on the virtual metric.                                                                                                                                                                  |
+|                    | `from`         | string               | yes      | —       | —                        | Existing source-tag name to copy from the grouped source rows.                                                                                                                                                  |
+| **Alternative**    | `sources`      | array\<Source\>      | yes      | —       | —                        | All sources in an alternative are evaluated together. If none produce data, the collector tries the next alternative. Per-row/group rules apply within the winning alternative.                                 |
 
 > At least one of `sources` or `alternatives` **must be defined**.
 
 #### Rules & Constraints
 
-| Rule                              | Description                                                                                                                                            |
-|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Precedence**                    | If both `sources` and `alternatives` exist, `alternatives` take precedence.                                                                            |
-| **Same-table requirement**        | When `per_row` or `group_by` is used, all sources must originate from the same table. For alternatives, this rule applies within each alternative set. |
-| **per_row: true**                 | One output per input row; multiple sources become chart dimensions (`as`); row tags attach automatically.                                              |
-| **group_by (with per_row:true)**  | Acts as row-key hints (in order). Missing or empty hints fall back to a stable key built from all non-underscore tags.                                  |
-| **group_by (with per_row:false)** | Aggregates rows by the listed labels, similar to PromQL’s `sum by (...)`.                                                                              |
+| Rule                              | Description                                                                                                                                                                                                      |
+|-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Precedence**                    | If both `sources` and `alternatives` exist, `alternatives` take precedence.                                                                                                                                      |
+| **Same-table requirement**        | When `per_row` or `group_by` is used, all sources must originate from the same table. For alternatives, this rule applies within each alternative set.                                                           |
+| **per_row: true**                 | One output per input row; multiple sources become chart dimensions (`as`); row tags attach automatically.                                                                                                        |
+| **group_by (with per_row:true)**  | Acts as row-key hints (in order). Missing or empty hints fall back to a stable key built from all non-underscore tags.                                                                                           |
+| **group_by (with per_row:false)** | Aggregates rows by the listed labels, similar to PromQL’s `sum by (...)`.                                                                                                                                        |
 | **emit_tags**                     | If omitted, `per_row:true` emits the winning row tags as-is. Grouped non-`per_row` metrics emit the `group_by` labels by default. When set, only the listed tags are emitted, using the `from` source-tag names. |
-| **Alternative evaluation**        | Alternatives are checked in order. The first whose sources produce data becomes the “winner”; others are ignored.                                      |
-| **Parent metadata**               | The virtual metric emits charts using its own `name` and `chart_meta`, even when data comes from an alternative.                                       |
-| **Dimensions**                    | Each `as` value defines a dimension in the resulting chart (e.g., `in`, `out`, `total`).                                                               |
-| **Selected source dimension**     | When `dim` is set on a source, the collector reads only that MultiValue dimension from the source metric and ignores the rest.                            |
-| **Totals vs per-row**             | Omitting both `per_row` and `group_by` produces a single total chart across all rows (device-wide view).                                               |
+| **Alternative evaluation**        | Alternatives are checked in order. The first whose sources produce data becomes the “winner”; others are ignored.                                                                                                |
+| **Parent metadata**               | The virtual metric emits charts using its own `name` and `chart_meta`, even when data comes from an alternative.                                                                                                 |
+| **Dimensions**                    | Each `as` value defines a dimension in the resulting chart (e.g., `in`, `out`, `total`).                                                                                                                         |
+| **Selected source dimension**     | When `dim` is set on a source, the collector reads only that MultiValue dimension from the source metric and ignores the rest.                                                                                   |
+| **Totals vs per-row**             | Omitting both `per_row` and `group_by` produces a single total chart across all rows (device-wide view).                                                                                                         |
 
 ### Examples
 
