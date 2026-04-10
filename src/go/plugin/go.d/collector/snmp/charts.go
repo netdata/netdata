@@ -331,7 +331,7 @@ func addMetricTagLabels(labels, tags map[string]string) {
 		if strings.HasPrefix(k, "_") {
 			continue
 		}
-		labels[k] = v
+		addMetricTagLabel(labels, k, v)
 	}
 	for k, v := range tags {
 		if !strings.HasPrefix(k, "_") {
@@ -341,9 +341,13 @@ func addMetricTagLabels(labels, tags map[string]string) {
 		if key == "" {
 			continue
 		}
-		if existing, ok := labels[key]; !ok || existing == "" {
-			labels[key] = v
-		}
+		addMetricTagLabel(labels, key, v)
+	}
+}
+
+func addMetricTagLabel(labels map[string]string, key, value string) {
+	if existing, ok := labels[key]; !ok || existing == "" {
+		labels[key] = value
 	}
 }
 

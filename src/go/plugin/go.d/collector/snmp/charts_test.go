@@ -50,12 +50,15 @@ func TestCollector_AddProfileScalarMetricChart_LabelsIncludeMetricTags(t *testin
 func TestAddMetricTagLabels_PrefersUnprefixedTags(t *testing.T) {
 	labels := map[string]string{
 		"empty_profile_label": "",
+		"profile_tag":         "profile-value",
 		"vendor":              "device-vendor",
 	}
 
 	addMetricTagLabels(labels, map[string]string{
 		"component":            "vpn",
 		"empty_metric_label":   "",
+		"profile_tag":          "metric-profile-value",
+		"vendor":               "",
 		"_component":           "private-vpn",
 		"_empty_metric_label":  "metric-fallback",
 		"_empty_profile_label": "profile-fallback",
@@ -69,6 +72,7 @@ func TestAddMetricTagLabels_PrefersUnprefixedTags(t *testing.T) {
 		"empty_metric_label":  "metric-fallback",
 		"empty_profile_label": "profile-fallback",
 		"license_state_raw":   "active",
+		"profile_tag":         "profile-value",
 		"vendor":              "device-vendor",
 	}, labels)
 }

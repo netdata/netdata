@@ -222,8 +222,8 @@ func validateEnrichMetrics(metrics []MetricsConfig) error {
 		}
 		if metricConfig.IsScalar() {
 			errs = append(errs, validateEnrichSymbol(&metricConfig.Symbol, ScalarSymbol))
-			for i := range metricConfig.MetricTags {
-				metricTag := &metricConfig.MetricTags[i]
+			for j := range metricConfig.MetricTags {
+				metricTag := &metricConfig.MetricTags[j]
 				errs = append(errs, validateEnrichMetricTag(metricTag))
 				if metricTag.Table != "" {
 					errs = append(errs, fmt.Errorf("scalar metric_tags do not support `table` lookups (tag=%q, table=%q)", metricTag.Tag, metricTag.Table))
