@@ -22,7 +22,8 @@ type (
 
 		ManualProfiles []string `yaml:"manual_profiles,omitempty" json:"manual_profiles"`
 
-		Ping PingConfig `yaml:"ping,omitempty" json:"ping"`
+		PingOnly bool       `yaml:"ping_only,omitempty" json:"ping_only"`
+		Ping     PingConfig `yaml:"ping,omitempty" json:"ping"`
 	}
 
 	PingConfig struct {

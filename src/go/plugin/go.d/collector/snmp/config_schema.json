@@ -208,6 +208,12 @@
         },
         "uniqueItems": true
       },
+      "ping_only": {
+        "title": "Ping only",
+        "description": "Collect only ICMP round-trip time and skip SNMP profile metrics.",
+        "type": "boolean",
+        "default": false
+      },
       "ping": {
         "title": "Ping",
         "type": [
@@ -321,6 +327,9 @@
         "ui:help": "Advanced. Usually left empty. Required when targeting a specific context on multi-context agents or when driving snmpsim virtual devices."
       }
     },
+    "ping_only": {
+      "ui:help": "A minimal SNMP sysInfo query still runs during vnode setup for identification/metadata."
+    },
     "ping": {
       "interface": {
         "ui:widget": "hidden"
@@ -344,6 +353,7 @@
         {
           "title": "Ping",
           "fields": [
+            "ping_only",
             "ping"
           ]
         },
