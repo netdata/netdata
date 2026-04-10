@@ -112,7 +112,7 @@ func New(cfg Config) *Manager {
 		started:    make(chan struct{}),
 		addCh:      make(chan confgroup.Config),
 		rmCh:       make(chan confgroup.Config),
-		dyncfgCh:   make(chan dyncfg.Function),
+		dyncfgCh:   make(chan dyncfg.Function, 32),
 		cmdTestSem: make(chan struct{}, cmdTestWorkerCap),
 
 		dyncfgResponder: api,

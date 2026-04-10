@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const DefaultDownstreamHandoffCap = time.Second
+const DefaultDownstreamHandoffCap = 10 * time.Second
 
 type BoundedSendResult uint8
 
