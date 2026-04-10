@@ -231,6 +231,11 @@ func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 		return snmpClient, nil
 	}
 
+	if c.Config.Options.MaxRepetitions == 0 {
+		c.disableBulkWalk = true
+		return snmpClient, nil
+	}
+
 	if c.adjMaxRepetitions != 0 {
 		snmpClient.SetMaxRepetitions(c.adjMaxRepetitions)
 	} else {

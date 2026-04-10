@@ -41,7 +41,7 @@ type (
 	}
 	OptionsConfig struct {
 		Port           int    `yaml:"port,omitempty" json:"port"`
-		Retries        int    `yaml:"retries,omitempty" json:"retries"`
+		Retries        int    `yaml:"retries" json:"retries"`
 		Timeout        int    `yaml:"timeout,omitempty" json:"timeout"`
 		Version        string `yaml:"version,omitempty" json:"version"`
 		MaxOIDs        int    `yaml:"max_request_size,omitempty" json:"max_request_size"`
