@@ -167,14 +167,17 @@ func (sc *scalarCollector) processScalarMetric(cfg ddprofiledefinition.MetricsCo
 	}
 
 	staticTags := parseStaticTags(cfg.StaticTags)
-	tags := make(map[string]string)
-	ta := tagAdder{tags: tags}
-	for _, tagCfg := range cfg.MetricTags {
-		if tagCfg.Symbol.OID == "" {
-			continue
-		}
-		if err := sc.tagProc.processTag(tagCfg, pdus, ta); err != nil {
-			sc.log.Debugf("Error processing scalar tag '%s' for metric '%s': %v", tagCfg.Tag, cfg.Symbol.Name, err)
+	var tags map[string]string
+	if len(cfg.MetricTags) > 0 {
+		tags = make(map[string]string)
+		ta := tagAdder{tags: tags}
+		for _, tagCfg := range cfg.MetricTags {
+			if tagCfg.Symbol.OID == "" {
+				continue
+			}
+			if err := sc.tagProc.processTag(tagCfg, pdus, ta); err != nil {
+				sc.log.Debugf("Error processing scalar tag '%s' for metric '%s': %v", tagCfg.Tag, cfg.Symbol.Name, err)
+			}
 		}
 	}
 

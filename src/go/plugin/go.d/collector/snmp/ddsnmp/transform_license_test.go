@@ -62,6 +62,12 @@ func TestLicenseDateFromTagTransform_ParsesEpochMillis(t *testing.T) {
 	assert.EqualValues(t, 1798675200, m.Value)
 }
 
+func TestLicenseDateFromTagTransform_ParsesTwelveDigitEpochMillis(t *testing.T) {
+	m := &Metric{Value: 0, Tags: map[string]string{"x": "946684800000"}}
+	runLicenseTransform(t, `{{- licenseDateFromTag .Metric "x" "expiry_timestamp" -}}`, m)
+	assert.EqualValues(t, 946684800, m.Value)
+}
+
 func TestLicenseDateFromTagTransform_ParsesCheckpointShortDate(t *testing.T) {
 	// Checkpoint sends licensingExpirationDate as "2Jan2030", "1Jan2030", etc.
 	m := &Metric{Value: 0, Tags: map[string]string{"x": "1Jan2030"}}

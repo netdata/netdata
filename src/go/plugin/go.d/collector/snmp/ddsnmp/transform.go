@@ -441,8 +441,9 @@ func parseTextDate(raw string) (int64, bool) {
 	}
 
 	if n, err := strconv.ParseInt(raw, 10, 64); err == nil {
+		digits := strings.TrimLeft(raw, "+-")
 		switch {
-		case n > 1_000_000_000_000:
+		case len(digits) >= 12:
 			return n / 1000, true
 		default:
 			return n, true
