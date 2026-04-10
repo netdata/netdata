@@ -159,6 +159,12 @@ func (c *Collector) Check(context.Context) error {
 		return err
 	}
 
+	if c.PingOnly && c.prober != nil {
+		if _, err := c.prober.Ping(c.Hostname); err != nil && isPingUnrecoverableError(err) {
+			return fmt.Errorf("ping check failed: %v", err)
+		}
+	}
+
 	return nil
 }
 

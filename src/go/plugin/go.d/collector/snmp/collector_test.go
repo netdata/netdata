@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -187,6 +188,58 @@ func TestCollector_Check(t *testing.T) {
 				c.CreateVnode = false
 				c.Ping.Enabled = false
 				c.newSnmpClient = func() gosnmp.Handler { return m }
+				return c
+			},
+		},
+
+		"success: ping_only with successful ping": {
+			wantErr: false,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpect(m)
+				setMockClientSysInfoExpect(m)
+
+				c := New()
+				c.Config = prepareV2Config()
+				c.PingOnly = true
+				c.CreateVnode = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				c.newProber = func(cfg ping.ProberConfig, log *logger.Logger) ping.Prober { return &mockProber{} }
+				return c
+			},
+		},
+
+		"success: ping_only with recoverable ping error": {
+			wantErr: false,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpect(m)
+				setMockClientSysInfoExpect(m)
+
+				c := New()
+				c.Config = prepareV2Config()
+				c.PingOnly = true
+				c.CreateVnode = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				c.newProber = func(cfg ping.ProberConfig, log *logger.Logger) ping.Prober {
+					return &mockProber{pingErr: errors.New("host unreachable")}
+				}
+				return c
+			},
+		},
+
+		"failure: ping_only with unrecoverable ping error": {
+			wantErr: true,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpect(m)
+				setMockClientSysInfoExpect(m)
+
+				c := New()
+				c.Config = prepareV2Config()
+				c.PingOnly = true
+				c.CreateVnode = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				c.newProber = func(cfg ping.ProberConfig, log *logger.Logger) ping.Prober {
+					return &mockProber{pingErr: syscall.EPERM}
+				}
 				return c
 			},
 		},
@@ -375,12 +428,12 @@ func TestCollector_Collect(t *testing.T) {
 }
 
 type mockProber struct {
-	errOnPing bool
+	pingErr error
 }
 
 func (m *mockProber) Ping(host string) (*probing.Statistics, error) {
-	if m.errOnPing {
-		return nil, errors.New("mock.Ping() error")
+	if m.pingErr != nil {
+		return nil, m.pingErr
 	}
 
 	stats := probing.Statistics{
