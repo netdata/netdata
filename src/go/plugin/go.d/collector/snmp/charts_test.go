@@ -48,20 +48,28 @@ func TestCollector_AddProfileScalarMetricChart_LabelsIncludeMetricTags(t *testin
 }
 
 func TestAddMetricTagLabels_PrefersUnprefixedTags(t *testing.T) {
-	labels := map[string]string{"vendor": "device-vendor"}
+	labels := map[string]string{
+		"empty_profile_label": "",
+		"vendor":              "device-vendor",
+	}
 
 	addMetricTagLabels(labels, map[string]string{
-		"component":          "vpn",
-		"_component":         "private-vpn",
-		"_license_state_raw": "active",
-		"_vendor":            "private-vendor",
-		"_":                  "ignored",
+		"component":            "vpn",
+		"empty_metric_label":   "",
+		"_component":           "private-vpn",
+		"_empty_metric_label":  "metric-fallback",
+		"_empty_profile_label": "profile-fallback",
+		"_license_state_raw":   "active",
+		"_vendor":              "private-vendor",
+		"_":                    "ignored",
 	})
 
 	assert.Equal(t, map[string]string{
-		"component":         "vpn",
-		"license_state_raw": "active",
-		"vendor":            "device-vendor",
+		"component":           "vpn",
+		"empty_metric_label":  "metric-fallback",
+		"empty_profile_label": "profile-fallback",
+		"license_state_raw":   "active",
+		"vendor":              "device-vendor",
 	}, labels)
 }
 

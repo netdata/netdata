@@ -341,7 +341,7 @@ func addMetricTagLabels(labels, tags map[string]string) {
 		if key == "" {
 			continue
 		}
-		if _, ok := labels[key]; !ok {
+		if existing, ok := labels[key]; !ok || existing == "" {
 			labels[key] = v
 		}
 	}
