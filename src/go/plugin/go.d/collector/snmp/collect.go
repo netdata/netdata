@@ -25,36 +25,34 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	if err := c.ensureInitialized(); err != nil {
 		return nil, err
 	}
 
 	if c.PingOnly {
-		return c.collectPingOnly()
+		return c.collectPingOnly(ctx)
 	}
-	return c.collectDeviceMetrics()
+	return c.collectDeviceMetrics(ctx)
 }
 
-func (c *Collector) collectPingOnly() (map[string]int64, error) {
+func (c *Collector) collectPingOnly(ctx context.Context) (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := c.collectPing(mx); err != nil {
+	if err := c.collectPing(ctx, mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (c *Collector) collectDeviceMetrics() (map[string]int64, error) {
+func (c *Collector) collectDeviceMetrics(ctx context.Context) (map[string]int64, error) {
 	var (
 		snmpMx map[string]int64
 		pingMx map[string]int64
 	)
 
-	ctx := context.Background()
-
-	g, _ := errgroup.WithContext(ctx)
+	g, groupCtx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		m := make(map[string]int64)
@@ -65,13 +63,13 @@ func (c *Collector) collectDeviceMetrics() (map[string]int64, error) {
 		return nil
 	})
 
-	if c.Ping.Enabled && c.prober != nil {
+	if c.Ping.Enabled && c.pingClient != nil {
 		g.Go(func() error {
 			m := make(map[string]int64)
-			if err := c.collectPing(m); err != nil {
+			if err := c.collectPing(groupCtx, m); err != nil {
 				c.Errorf("ping: %v", err)
 				if isPingUnrecoverableError(err) {
-					c.prober = nil
+					c.pingClient = nil
 				}
 				return nil
 			}

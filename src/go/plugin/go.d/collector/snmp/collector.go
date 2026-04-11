@@ -14,9 +14,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
@@ -57,7 +57,7 @@ func New() *Collector {
 			},
 			Ping: PingConfig{
 				Enabled: true,
-				ProberConfig: ping.ProberConfig{
+				ProbeConfig: pinger.ProbeConfig{
 					Privileged: true,
 					Packets:    3,
 					Interval:   confopt.Duration(time.Millisecond * 100),
@@ -73,7 +73,7 @@ func New() *Collector {
 
 		ifaceCache: newIfaceCache(),
 
-		newProber:     ping.NewProber,
+		newPinger:     pinger.New,
 		newSnmpClient: gosnmp.NewHandler,
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
 			return ddsnmpcollector.New(cfg)
@@ -100,8 +100,8 @@ type (
 		ifaceCache *ifaceCache // interface metrics cache for functions
 		funcRouter *funcRouter // function router for method handlers
 
-		prober    ping.Prober
-		newProber func(ping.ProberConfig, *logger.Logger) ping.Prober
+		pingClient pinger.Client
+		newPinger  func(pinger.Config, *logger.Logger) (pinger.Client, error)
 
 		snmpClient    gosnmp.Handler
 		newSnmpClient func() gosnmp.Handler
@@ -136,17 +136,17 @@ func (c *Collector) Init(context.Context) error {
 	}
 
 	if c.PingOnly || c.Ping.Enabled {
-		pr, err := c.initProber()
+		pr, err := c.initPinger()
 		if err != nil {
-			return fmt.Errorf("failed to initialize ping prober: %v", err)
+			return fmt.Errorf("failed to initialize ping client: %v", err)
 		}
-		c.prober = pr
+		c.pingClient = pr
 	}
 
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
+func (c *Collector) Check(ctx context.Context) error {
 	if c.snmpClient == nil {
 		snmpClient, err := c.initAndConnectSNMPClient()
 		if err != nil {
@@ -159,8 +159,8 @@ func (c *Collector) Check(context.Context) error {
 		return err
 	}
 
-	if c.PingOnly && c.prober != nil {
-		if _, err := c.prober.Ping(c.Hostname); err != nil && isPingUnrecoverableError(err) {
+	if c.PingOnly && c.pingClient != nil {
+		if _, err := c.pingClient.Probe(ctx, c.Hostname); err != nil && isPingUnrecoverableError(err) {
 			return fmt.Errorf("ping check failed: %v", err)
 		}
 	}
@@ -173,7 +173,7 @@ func (c *Collector) Charts() *collectorapi.Charts {
 }
 
 func (c *Collector) Collect(ctx context.Context) map[string]int64 {
-	mx, err := c.collect()
+	mx, err := c.collect(ctx)
 	if err != nil {
 		c.Error(err)
 	}

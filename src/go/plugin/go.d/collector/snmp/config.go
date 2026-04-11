@@ -4,7 +4,7 @@ package snmp
 
 import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 )
 
 type (
@@ -27,8 +27,8 @@ type (
 	}
 
 	PingConfig struct {
-		Enabled           bool `yaml:"enabled" json:"enabled"`
-		ping.ProberConfig `yaml:",inline" json:",inline"`
+		Enabled            bool `yaml:"enabled" json:"enabled"`
+		pinger.ProbeConfig `yaml:",inline" json:",inline"`
 	}
 
 	UserConfig struct {

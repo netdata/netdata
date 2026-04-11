@@ -6,18 +6,19 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
 
-	probing "github.com/prometheus-community/pro-bing"
-
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 
 	"github.com/golang/mock/gomock"
@@ -102,6 +103,36 @@ func TestCollector_Init(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCollector_InitPassesSharedPingerConfig(t *testing.T) {
+	var gotCfg pinger.Config
+
+	collr := New()
+	collr.Config = prepareV2Config()
+	collr.PingOnly = true
+	collr.Ping.Network = "ip6"
+	collr.Ping.Interface = "eth0"
+	collr.Ping.Privileged = false
+	collr.Ping.Packets = 4
+	collr.Ping.Interval = confopt.Duration(250 * time.Millisecond)
+	collr.newPinger = func(cfg pinger.Config, _ *logger.Logger) (pinger.Client, error) {
+		gotCfg = cfg
+		return &mockPingClient{}, nil
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+
+	assert.Equal(t, pinger.Config{
+		Probe: pinger.ProbeConfig{
+			Network:    "ip6",
+			Interface:  "eth0",
+			Privileged: false,
+			Packets:    4,
+			Interval:   confopt.Duration(250 * time.Millisecond),
+			Timeout:    time.Second,
+		},
+	}, gotCfg)
 }
 
 func TestCollector_Cleanup(t *testing.T) {
@@ -203,7 +234,9 @@ func TestCollector_Check(t *testing.T) {
 				c.PingOnly = true
 				c.CreateVnode = false
 				c.newSnmpClient = func() gosnmp.Handler { return m }
-				c.newProber = func(cfg ping.ProberConfig, log *logger.Logger) ping.Prober { return &mockProber{} }
+				c.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
+					return &mockPingClient{sample: pingSuccessSample(c.Hostname)}, nil
+				}
 				return c
 			},
 		},
@@ -219,8 +252,8 @@ func TestCollector_Check(t *testing.T) {
 				c.PingOnly = true
 				c.CreateVnode = false
 				c.newSnmpClient = func() gosnmp.Handler { return m }
-				c.newProber = func(cfg ping.ProberConfig, log *logger.Logger) ping.Prober {
-					return &mockProber{pingErr: errors.New("host unreachable")}
+				c.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
+					return &mockPingClient{probeErr: errors.New("host unreachable")}, nil
 				}
 				return c
 			},
@@ -237,8 +270,10 @@ func TestCollector_Check(t *testing.T) {
 				c.PingOnly = true
 				c.CreateVnode = false
 				c.newSnmpClient = func() gosnmp.Handler { return m }
-				c.newProber = func(cfg ping.ProberConfig, log *logger.Logger) ping.Prober {
-					return &mockProber{pingErr: syscall.EPERM}
+				c.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
+					return &mockPingClient{
+						probeErr: &pinger.ProbeError{Host: c.Hostname, Stage: "run", Err: syscall.EPERM},
+					}, nil
 				}
 				return c
 			},
@@ -263,6 +298,36 @@ func TestCollector_Check(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCollector_CheckPingOnlyUsesReadOnlyProbing(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	setMockClientInitExpect(mockSNMP)
+	setMockClientSysInfoExpect(mockSNMP)
+
+	pingClient := &mockPingClient{sample: pingSuccessSample("192.0.2.1")}
+
+	collr := New()
+	collr.Config = prepareV2Config()
+	collr.PingOnly = true
+	collr.CreateVnode = false
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
+		return pingClient, nil
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+	type ctxKey struct{}
+	ctx := context.WithValue(context.Background(), ctxKey{}, "check")
+	require.NoError(t, collr.Check(ctx))
+
+	calls := pingClient.probeCalls()
+	require.Len(t, calls, 1)
+	assert.Equal(t, "probe", calls[0].method)
+	assert.Equal(t, "check", calls[0].ctx.Value(ctxKey{}))
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -397,7 +462,9 @@ func TestCollector_Collect(t *testing.T) {
 			collr.PingOnly = true
 			collr.CreateVnode = false
 			collr.newSnmpClient = func() gosnmp.Handler { return m }
-			collr.newProber = func(cfg ping.ProberConfig, log *logger.Logger) ping.Prober { return &mockProber{} }
+			collr.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
+				return &mockPingClient{sample: pingSuccessSample(collr.Hostname)}, nil
+			}
 
 			return collr
 		},
@@ -407,6 +474,27 @@ func TestCollector_Collect(t *testing.T) {
 			"ping_rtt_avg":    (15 * time.Millisecond).Microseconds(),
 			"ping_rtt_stddev": (5 * time.Millisecond).Microseconds(),
 		},
+	}
+	tests["collects no ping metrics when probe gets no replies"] = struct {
+		prepare func(m *snmpmock.MockHandler) *Collector
+		want    map[string]int64
+	}{
+		prepare: func(m *snmpmock.MockHandler) *Collector {
+			setMockClientInitExpect(m)
+			setMockClientSysInfoExpect(m)
+
+			collr := New()
+			collr.Config = prepareV2Config()
+			collr.PingOnly = true
+			collr.CreateVnode = false
+			collr.newSnmpClient = func() gosnmp.Handler { return m }
+			collr.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
+				return &mockPingClient{sample: pingNoReplySample(collr.Hostname)}, nil
+			}
+
+			return collr
+		},
+		want: nil,
 	}
 
 	for name, tc := range tests {
@@ -427,28 +515,112 @@ func TestCollector_Collect(t *testing.T) {
 	}
 }
 
-type mockProber struct {
-	pingErr error
+func TestCollector_CollectPingOnlyUsesTrackingProbing(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	setMockClientInitExpect(mockSNMP)
+	setMockClientSysInfoExpect(mockSNMP)
+
+	pingClient := &mockPingClient{sample: pingSuccessSample("192.0.2.1")}
+
+	collr := New()
+	collr.Config = prepareV2Config()
+	collr.PingOnly = true
+	collr.CreateVnode = false
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
+		return pingClient, nil
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+	type checkKey struct{}
+	type collectKey struct{}
+	checkCtx := context.WithValue(context.Background(), checkKey{}, "check")
+	collectCtx := context.WithValue(context.Background(), collectKey{}, "collect")
+	_ = collr.Check(checkCtx)
+	got := collr.Collect(collectCtx)
+
+	assert.Equal(t, map[string]int64{
+		"ping_rtt_min":    (10 * time.Millisecond).Microseconds(),
+		"ping_rtt_max":    (20 * time.Millisecond).Microseconds(),
+		"ping_rtt_avg":    (15 * time.Millisecond).Microseconds(),
+		"ping_rtt_stddev": (5 * time.Millisecond).Microseconds(),
+	}, got)
+
+	calls := pingClient.probeCalls()
+	require.Len(t, calls, 2)
+	assert.Equal(t, "probe", calls[0].method)
+	assert.Equal(t, "check", calls[0].ctx.Value(checkKey{}))
+	assert.Equal(t, "probe_and_track", calls[1].method)
+	assert.Equal(t, "collect", calls[1].ctx.Value(collectKey{}))
 }
 
-func (m *mockProber) Ping(host string) (*probing.Statistics, error) {
-	if m.pingErr != nil {
-		return nil, m.pingErr
+type probeCall struct {
+	host   string
+	method string
+	ctx    context.Context
+}
+
+type mockPingClient struct {
+	mu       sync.Mutex
+	sample   pinger.Sample
+	probeErr error
+	calls    []probeCall
+}
+
+func (m *mockPingClient) Probe(ctx context.Context, host string) (pinger.Sample, error) {
+	return m.recordedProbe(ctx, host, "probe")
+}
+
+func (m *mockPingClient) ProbeAndTrack(ctx context.Context, host string) (pinger.Sample, error) {
+	return m.recordedProbe(ctx, host, "probe_and_track")
+}
+
+func (m *mockPingClient) recordedProbe(ctx context.Context, host, method string) (pinger.Sample, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.calls = append(m.calls, probeCall{host: host, method: method, ctx: ctx})
+	if m.probeErr != nil {
+		return pinger.Sample{}, m.probeErr
 	}
 
-	stats := probing.Statistics{
-		PacketsRecv:           5,
-		PacketsSent:           5,
-		PacketsRecvDuplicates: 0,
-		PacketLoss:            0,
-		Addr:                  host,
-		MinRtt:                time.Millisecond * 10,
-		MaxRtt:                time.Millisecond * 20,
-		AvgRtt:                time.Millisecond * 15,
-		StdDevRtt:             time.Millisecond * 5,
+	sample := m.sample
+	if sample.Host == "" {
+		sample.Host = host
 	}
+	return sample, nil
+}
 
-	return &stats, nil
+func (m *mockPingClient) probeCalls() []probeCall {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.calls)
+}
+
+func pingSuccessSample(host string) pinger.Sample {
+	return pinger.Sample{
+		Host:        host,
+		PacketsRecv: 5,
+		PacketsSent: 5,
+		RTT: pinger.RTTSummary{
+			Valid:  true,
+			Min:    10 * time.Millisecond,
+			Max:    20 * time.Millisecond,
+			Avg:    15 * time.Millisecond,
+			StdDev: 5 * time.Millisecond,
+		},
+	}
+}
+
+func pingNoReplySample(host string) pinger.Sample {
+	return pinger.Sample{
+		Host:        host,
+		PacketsRecv: 0,
+		PacketsSent: 5,
+	}
 }
 
 type mockDdSnmpCollector struct {
