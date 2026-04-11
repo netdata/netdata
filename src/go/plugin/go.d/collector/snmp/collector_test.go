@@ -557,6 +557,76 @@ func TestCollector_CollectPingOnlyUsesTrackingProbing(t *testing.T) {
 	assert.Equal(t, "collect", calls[1].ctx.Value(collectKey{}))
 }
 
+func TestCollector_CollectMixedModeAllowsNilContext(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	setMockClientInitExpect(mockSNMP)
+	setMockClientSysInfoExpect(mockSNMP)
+
+	pingClient := &mockPingClient{sample: pingSuccessSample("192.0.2.1")}
+
+	collr := New()
+	collr.Config = prepareV2Config()
+	collr.CreateVnode = false
+	collr.Ping.Enabled = true
+	collr.snmpProfiles = []*ddsnmp.Profile{{}}
+	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newPinger = func(cfg pinger.Config, log *logger.Logger) (pinger.Client, error) {
+		return pingClient, nil
+	}
+	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+		return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{
+			{
+				Source: "test",
+				Metrics: []ddsnmp.Metric{
+					{
+						Name:    "uptime",
+						IsTable: false,
+						Value:   123,
+						Unit:    "s",
+						Tags:    map[string]string{},
+						Profile: &ddsnmp.ProfileMetrics{Tags: map[string]string{}},
+					},
+				},
+			},
+		}}
+	}
+
+	require.NoError(t, collr.Init(context.Background()))
+	require.NoError(t, collr.Check(context.Background()))
+
+	got := collr.Collect(nil)
+
+	assert.Equal(t, map[string]int64{
+		"snmp_device_prof_test_stats_errors_processing_scalar": 0,
+		"snmp_device_prof_test_stats_errors_processing_table":  0,
+		"snmp_device_prof_test_stats_errors_snmp":              0,
+		"snmp_device_prof_test_stats_metrics_rows":             0,
+		"snmp_device_prof_test_stats_metrics_scalar":           0,
+		"snmp_device_prof_test_stats_metrics_table":            0,
+		"snmp_device_prof_test_stats_metrics_tables":           0,
+		"snmp_device_prof_test_stats_metrics_virtual":          0,
+		"snmp_device_prof_test_stats_snmp_get_oids":            0,
+		"snmp_device_prof_test_stats_snmp_get_requests":        0,
+		"snmp_device_prof_test_stats_snmp_tables_cached":       0,
+		"snmp_device_prof_test_stats_snmp_tables_walked":       0,
+		"snmp_device_prof_test_stats_snmp_walk_pdus":           0,
+		"snmp_device_prof_test_stats_snmp_walk_requests":       0,
+		"snmp_device_prof_test_stats_table_cache_hits":         0,
+		"snmp_device_prof_test_stats_table_cache_misses":       0,
+		"snmp_device_prof_test_stats_timings_scalar":           0,
+		"snmp_device_prof_test_stats_timings_table":            0,
+		"snmp_device_prof_test_stats_timings_virtual":          0,
+		"snmp_device_prof_uptime":                              123,
+		"ping_rtt_min":                                         (10 * time.Millisecond).Microseconds(),
+		"ping_rtt_max":                                         (20 * time.Millisecond).Microseconds(),
+		"ping_rtt_avg":                                         (15 * time.Millisecond).Microseconds(),
+		"ping_rtt_stddev":                                      (5 * time.Millisecond).Microseconds(),
+	}, got)
+}
+
 type probeCall struct {
 	host   string
 	method string

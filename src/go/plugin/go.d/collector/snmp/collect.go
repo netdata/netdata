@@ -26,6 +26,10 @@ import (
 )
 
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	if err := c.ensureInitialized(); err != nil {
 		return nil, err
 	}
