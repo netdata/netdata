@@ -56,6 +56,7 @@ typedef enum __attribute__((packed)) {
     BIB_FEATURE_TIERING,
     BIB_FEATURE_ML,
     BIB_FEATURE_ALLOCATOR,
+    BIB_DB_SQLITE,
     BIB_DB_DBENGINE,
     BIB_DB_ALLOC,
     BIB_DB_RAM,
@@ -550,6 +551,14 @@ static struct {
                 .print = "Memory Allocator",
                 .json = "allocator",
                 .value = NULL,
+        },
+        [BIB_DB_SQLITE] = {
+                .category = BIC_DATABASE,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "sqlite",
+                .json = "sqlite",
+                .value = "unknown",
         },
         [BIB_DB_DBENGINE] = {
                 .category = BIC_DATABASE,
@@ -1223,6 +1232,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_value(BIB_FEATURE_ALLOCATOR, "system");
 #endif
 
+    build_info_set_value(BIB_DB_SQLITE, sqlite3_libversion());
 
 #ifdef ENABLE_DBENGINE
     build_info_set_status(BIB_DB_DBENGINE, true);

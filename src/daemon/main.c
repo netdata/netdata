@@ -1174,8 +1174,9 @@ int netdata_main(int argc, char **argv) {
     add_agent_event(EVENT_AGENT_START_TIME, (int64_t ) (ready_ut - started_ut));
     usec_t median_start_time = get_agent_event_time_median(EVENT_AGENT_START_TIME);
     netdata_log_info(
-        "NETDATA STARTUP: completed in %llu ms (median start up time is %llu ms). "
+        "NETDATA STARTUP: version '%s', sqlite '%s', completed in %llu ms (median start up time is %llu ms). "
         "Enjoy X-Ray Vision for your infrastructure!",
+        NETDATA_VERSION, sqlite3_libversion(),
         (ready_ut - started_ut) / USEC_PER_MS, median_start_time / USEC_PER_MS);
 
     cleanup_agent_event_log();
