@@ -181,13 +181,10 @@ func TestClient_ProbeConcurrentDifferentHosts(t *testing.T) {
 	errCh := make(chan error, 2)
 
 	for _, host := range []string{"host1", "host2"} {
-		host := host
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := c.ProbeAndTrack(context.Background(), host)
 			errCh <- err
-		}()
+		})
 	}
 
 	wg.Wait()

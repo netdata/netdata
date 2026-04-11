@@ -151,7 +151,7 @@ func TestCrossTableResolver_ResolveLookupIndexByValue_DoesNotCacheLookupErrorsAs
 	}
 	ctx := &crossTableContext{lookupIndexCache: map[crossTableLookupKey]string{}}
 
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		_, err := resolver.resolveLookupIndexByValue(
 			tagCfg,
 			"0.0.4.10.45.2.2",

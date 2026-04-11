@@ -65,7 +65,6 @@ func (c *Collector) collectSamples(ctx context.Context, track bool) []pinger.Sam
 	)
 
 	for _, host := range c.Hosts {
-		host := host
 		wg.Go(func() {
 			sample, err := c.probeHost(ctx, host, track)
 			if err != nil {

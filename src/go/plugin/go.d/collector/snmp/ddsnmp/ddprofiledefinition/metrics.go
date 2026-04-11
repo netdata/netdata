@@ -179,7 +179,7 @@ type MetricTagConfig struct {
 	// LookupSymbol optionally resolves cross-table tags by matching a value from the
 	// current row index against a column in the referenced table, then reading Symbol
 	// from the matched row in that table.
-	LookupSymbol SymbolConfigCompat `yaml:"lookup_symbol,omitempty" json:"lookup_symbol,omitempty"`
+	LookupSymbol SymbolConfigCompat `yaml:"lookup_symbol,omitempty" json:"lookup_symbol"`
 
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
 

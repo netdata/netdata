@@ -290,10 +290,7 @@ func longestCommonPrefix(oids []string) string {
 	prefixParts := splitOIDParts(oids[0])
 	for i := 1; i < len(oids); i++ {
 		parts := splitOIDParts(oids[i])
-		n := len(prefixParts)
-		if len(parts) < n {
-			n = len(parts)
-		}
+		n := min(len(parts), len(prefixParts))
 
 		j := 0
 		for j < n && prefixParts[j] == parts[j] {

@@ -3,6 +3,7 @@
 package ddsnmpcollector
 
 import (
+	"maps"
 	"slices"
 	"strings"
 
@@ -355,12 +356,8 @@ func vmMetricTags(m ddsnmp.Metric) map[string]string {
 	for k, v := range m.StaticTags {
 		if m.Tags[k] != v {
 			out := make(map[string]string, len(m.Tags)+len(m.StaticTags))
-			for key, value := range m.StaticTags {
-				out[key] = value
-			}
-			for key, value := range m.Tags {
-				out[key] = value
-			}
+			maps.Copy(out, m.StaticTags)
+			maps.Copy(out, m.Tags)
 			return out
 		}
 	}
