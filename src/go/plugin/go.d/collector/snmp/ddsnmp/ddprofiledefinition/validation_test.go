@@ -670,6 +670,40 @@ func Test_validateEnrichMetadata_BitmaskMappingUnsupported(t *testing.T) {
 	}
 }
 
+func Test_validateEnrichSymbol_BitmaskMappingRejectsScaleFactor(t *testing.T) {
+	sym := SymbolConfig{
+		OID:         "1.2.3",
+		Name:        "processorStatus",
+		ScaleFactor: 2,
+		Mapping: NewBitmaskMapping(map[string]string{
+			"1":   "internalError",
+			"128": "processorPresent",
+		}),
+	}
+
+	err := validateEnrichSymbol(&sym, ScalarSymbol)
+
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "`scale_factor` cannot be used with `mapping.mode: bitmask`")
+	}
+}
+
+func Test_validateEnrichSymbol_MappingModeRequiresItems(t *testing.T) {
+	sym := SymbolConfig{
+		OID:  "1.2.3",
+		Name: "processorStatus",
+		Mapping: MappingConfig{
+			Mode: MappingModeBitmask,
+		},
+	}
+
+	err := validateEnrichSymbol(&sym, ScalarSymbol)
+
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "`mapping.mode` requires `mapping.items`")
+	}
+}
+
 func Test_validateEnrichVirtualMetrics(t *testing.T) {
 	baseMetrics := []MetricsConfig{
 		{

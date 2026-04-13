@@ -153,3 +153,20 @@ mapping:
 
 	assert.Equal(t, expected, myStruct)
 }
+
+func TestMappingConfig_UnmarshalYAML_structuredModeWithoutItems(t *testing.T) {
+	myStruct := MyMappingStruct{}
+	expected := MyMappingStruct{
+		Mapping: MappingConfig{
+			Mode: MappingModeBitmask,
+		},
+	}
+
+	err := yaml.Unmarshal([]byte(`
+mapping:
+  mode: bitmask
+`), &myStruct)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, myStruct)
+}

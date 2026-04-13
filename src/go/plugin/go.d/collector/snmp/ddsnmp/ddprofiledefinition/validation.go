@@ -298,6 +298,9 @@ func validateEnrichSymbol(symbol *SymbolConfig, symbolContext SymbolContext) err
 		}
 	}
 	errs = append(errs, validateMapping(symbol.Mapping, symbolContext))
+	if symbol.Mapping.EffectiveMode() == MappingModeBitmask && symbol.Mapping.HasItems() && symbol.ScaleFactor != 0 {
+		errs = append(errs, errors.New("`scale_factor` cannot be used with `mapping.mode: bitmask`"))
+	}
 	if symbolContext != ColumnSymbol && symbol.ConstantValueOne {
 		errs = append(errs, errors.New("`constant_value_one` cannot be used outside of tables"))
 	}

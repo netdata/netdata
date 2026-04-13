@@ -173,6 +173,8 @@ func buildBitmaskMultiValue(value int64, mappings map[string]string) map[string]
 		}
 
 		active := false
+		// Bitmask mappings are intended for non-negative flag values. If multiple
+		// bits map to the same dimension, we OR them by keeping the active state.
 		switch {
 		case bit == 0:
 			active = value == 0

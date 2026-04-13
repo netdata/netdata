@@ -29,3 +29,21 @@ func TestBuildMultiValue_BitmaskZeroKeyMatchesOnlyZero(t *testing.T) {
 		"failure":  0,
 	}, buildMultiValue(1, mapping))
 }
+
+func TestBuildMultiValue_BitmaskDuplicateDimsAreCombined(t *testing.T) {
+	mapping := ddprofiledefinition.NewBitmaskMapping(map[string]string{
+		"1": "fault",
+		"2": "fault",
+		"4": "present",
+	})
+
+	require.Equal(t, map[string]int64{
+		"fault":   1,
+		"present": 1,
+	}, buildMultiValue(5, mapping))
+
+	require.Equal(t, map[string]int64{
+		"fault":   0,
+		"present": 0,
+	}, buildMultiValue(0, mapping))
+}

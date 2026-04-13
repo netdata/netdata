@@ -991,6 +991,7 @@ metrics:
         mapping:
           mode: bitmask
           items:
+            # 0 means the device reports no active failure bits.
             0: noFaults
             1: eccSingleBitCorrectionWarningRate
             2: eccSingleBitCorrectionFailureRate

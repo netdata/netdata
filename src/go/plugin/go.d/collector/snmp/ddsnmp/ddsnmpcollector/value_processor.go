@@ -125,7 +125,7 @@ func (p *stringValueProcessor) processValue(sym ddprofiledefinition.SymbolConfig
 		s = replaceSubmatches(sym.MatchValue, sm)
 	}
 
-	if sym.Mapping.EffectiveMode() == ddprofiledefinition.MappingModeExact {
+	if sym.Mapping.EffectiveMode() == ddprofiledefinition.MappingModeExact && sym.Mapping.HasItems() {
 		if v, ok := sym.Mapping.Lookup(s); ok && isInt(v) {
 			s = v
 		}

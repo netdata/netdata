@@ -1488,7 +1488,7 @@ These transformations are typically used to:
 |---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Where**                 | Metric value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`; `format` also applies when symbols are used for metric tags or device metadata.                                                                                                                                                                              |
 | **Order of application**  | For string-decoded metric values: 1️⃣ `format` (if present) → 2️⃣ `extract_value` (if present) → 3️⃣ `match_pattern` + `match_value` (if present) → 4️⃣ `mapping` → 5️⃣ numeric parsing → 6️⃣ `scale_factor`. Ordinary numeric PDUs skip the string-only `extract_value` and `match_pattern` steps and use numeric parsing → `mapping` → `scale_factor`. |
-| **Scale factor position** | `scale_factor` is always applied **last**, after all other metric value transformations.                                                                                                                                                                                                                                                                 |
+| **Scale factor position** | `scale_factor` is always applied **last**, after all other metric value transformations. It cannot be combined with `mapping.mode: bitmask`.                                                                                                                                                                                                              |
 | **String base parsing**   | String-like values are parsed as base-10 by default. If `format: hex` is set, extracted values are parsed as base-16.                                                                                                                                                                                                                                    |
 | **Data type handling**    | Transformations preserve numeric type (integer/float) unless the mapping converts it to a multi-value metric.                                                                                                                                                                                                                                            |
 | **Error handling**        | `extract_value` keeps the original value when it does not match; `match_pattern` fails the metric value when it does not match; no-value `format` sentinels are treated as missing.                                                                                                                                                                      |
@@ -1558,7 +1558,9 @@ In exact mode, each mapping entry defines a **dimension name** and the numeric o
 - Sets that dimension to `1` if the current value matches the key, or `0` otherwise.
 - In bitmask mode, sets every mapped dimension whose bit is active to `1`, and inactive mapped bits to `0`.
 - If the value doesn’t match any exact key, all exact-mode dimensions are `0`.
-- Works only for **metric values**, not for tags or metadata.
+- `mapping.mode: bitmask` works only for **metric values**, not for tags or metadata.
+- `scale_factor` cannot be combined with `mapping.mode: bitmask`.
+- If multiple bit keys map to the same dimension, that dimension is active when any mapped bit is active.
 
 ```yaml
 metrics:

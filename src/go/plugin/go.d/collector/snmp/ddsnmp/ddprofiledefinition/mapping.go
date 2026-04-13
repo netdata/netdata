@@ -73,15 +73,32 @@ func (m MappingConfig) String() string {
 
 // UnmarshalYAML supports both the legacy flat-map syntax and the structured object syntax.
 func (m *MappingConfig) UnmarshalYAML(unmarshal func(any) error) error {
-	var items map[string]string
-	if err := unmarshal(&items); err == nil {
-		*m = MappingConfig{
-			Mode:  MappingModeExact,
-			Items: items,
+	type plain MappingConfig
+
+	var raw map[string]any
+	if err := unmarshal(&raw); err == nil {
+		if _, ok := raw["mode"]; ok {
+			return m.unmarshalStructured(unmarshal)
 		}
-		return nil
+		if _, ok := raw["items"]; ok {
+			return m.unmarshalStructured(unmarshal)
+		}
 	}
 
+	var items map[string]string
+	if err := unmarshal(&items); err != nil {
+		return err
+	}
+
+	*m = MappingConfig{
+		Mode:  MappingModeExact,
+		Items: items,
+	}
+
+	return nil
+}
+
+func (m *MappingConfig) unmarshalStructured(unmarshal func(any) error) error {
 	type plain MappingConfig
 
 	var cfg plain
@@ -90,12 +107,11 @@ func (m *MappingConfig) UnmarshalYAML(unmarshal func(any) error) error {
 	}
 
 	mode := MappingConfig(cfg).Mode
-	items = MappingConfig(cfg).Items
+	items := MappingConfig(cfg).Items
 	if len(items) > 0 && mode == "" {
 		mode = MappingModeExact
 	}
 
 	*m = MappingConfig{Mode: mode, Items: items}
-
 	return nil
 }
