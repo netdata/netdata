@@ -209,10 +209,14 @@ func TestKeyScheduler_EnqueueBlocksUntilSpace(t *testing.T) {
 					enqueued <- s.enqueue(req2)
 				}()
 
+				require.Eventually(t, func() bool {
+					return s.enqueueWaiterCount() == 1
+				}, time.Second, time.Millisecond, "second enqueue never reached blocking wait")
+
 				select {
 				case <-enqueued:
-					t.Fatal("second enqueue should block while queue is full")
-				case <-time.After(50 * time.Millisecond):
+					t.Fatal("second enqueue should still be blocked while queue is full")
+				default:
 				}
 
 				got, ok := s.next()
@@ -247,7 +251,10 @@ func TestKeyScheduler_EnqueueBlocksUntilSpace(t *testing.T) {
 					enqueued <- s.enqueue(req2)
 				}()
 
-				time.Sleep(20 * time.Millisecond)
+				require.Eventually(t, func() bool {
+					return s.enqueueWaiterCount() == 1
+				}, time.Second, time.Millisecond, "second enqueue never reached blocking wait")
+
 				s.stop()
 
 				select {

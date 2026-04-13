@@ -31,6 +31,11 @@ type keyScheduler struct {
 	pending    int
 	accepting  bool
 	stopping   bool
+
+	// enqueueWaiters counts goroutines currently blocked inside enqueue()
+	// waiting for space. Used by tests to synchronize deterministically
+	// instead of sleeping.
+	enqueueWaiters int
 }
 
 func newKeyScheduler(maxPending int) *keyScheduler {
@@ -64,7 +69,9 @@ func (s *keyScheduler) enqueue(req *invocationRequest) error {
 		if s.maxPending <= 0 || s.pending < s.maxPending {
 			break
 		}
+		s.enqueueWaiters++
 		s.cond.Wait()
+		s.enqueueWaiters--
 	}
 
 	lane := s.lanes[req.scheduleKey]
@@ -228,4 +235,12 @@ func (s *keyScheduler) pendingCount() int {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	return s.pending
+}
+
+// enqueueWaiterCount reports how many goroutines are currently blocked
+// inside enqueue() waiting for queue space. Intended for tests.
+func (s *keyScheduler) enqueueWaiterCount() int {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	return s.enqueueWaiters
 }
