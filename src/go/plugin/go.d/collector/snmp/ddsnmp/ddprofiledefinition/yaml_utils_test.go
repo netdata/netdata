@@ -21,6 +21,10 @@ type MySymbolStruct struct {
 	SymbolField SymbolConfigCompat `yaml:"my_symbol_field"`
 }
 
+type MyMappingStruct struct {
+	Mapping MappingConfig `yaml:"mapping"`
+}
+
 func Test_metricTagConfig_UnmarshalYAML(t *testing.T) {
 	myStruct := MetricsConfig{}
 	expected := MetricsConfig{MetricTags: []MetricTagConfig{{Index: 3}}}
@@ -88,6 +92,63 @@ func TestSymbolConfig_UnmarshalYAML_symbolString(t *testing.T) {
 
 	yaml.Unmarshal([]byte(`
 my_symbol_field: aSymbol
+`), &myStruct)
+
+	assert.Equal(t, expected, myStruct)
+}
+
+func TestMappingConfig_UnmarshalYAML_legacyMap(t *testing.T) {
+	myStruct := MyMappingStruct{}
+	expected := MyMappingStruct{
+		Mapping: NewExactMapping(map[string]string{
+			"1": "up",
+			"2": "down",
+		}),
+	}
+
+	yaml.Unmarshal([]byte(`
+mapping:
+  1: up
+  2: down
+`), &myStruct)
+
+	assert.Equal(t, expected, myStruct)
+}
+
+func TestMappingConfig_UnmarshalYAML_structuredExact(t *testing.T) {
+	myStruct := MyMappingStruct{}
+	expected := MyMappingStruct{
+		Mapping: NewExactMapping(map[string]string{
+			"1": "up",
+			"2": "down",
+		}),
+	}
+
+	yaml.Unmarshal([]byte(`
+mapping:
+  items:
+    1: up
+    2: down
+`), &myStruct)
+
+	assert.Equal(t, expected, myStruct)
+}
+
+func TestMappingConfig_UnmarshalYAML_structuredBitmask(t *testing.T) {
+	myStruct := MyMappingStruct{}
+	expected := MyMappingStruct{
+		Mapping: NewBitmaskMapping(map[string]string{
+			"1":   "internalError",
+			"128": "processorPresent",
+		}),
+	}
+
+	yaml.Unmarshal([]byte(`
+mapping:
+  mode: bitmask
+  items:
+    1: internalError
+    128: processorPresent
 `), &myStruct)
 
 	assert.Equal(t, expected, myStruct)

@@ -203,7 +203,7 @@ func (dc *deviceMetadataCollector) processSymbolValue(cfg ddprofiledefinition.Sy
 		val = replaceSubmatches(cfg.MatchValue, sm)
 	}
 
-	if v, ok := cfg.Mapping[val]; ok {
+	if v, ok := cfg.Mapping.Lookup(val); ok {
 		val = v
 	}
 

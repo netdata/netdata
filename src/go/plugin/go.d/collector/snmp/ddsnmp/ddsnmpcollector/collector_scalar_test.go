@@ -112,10 +112,10 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.4.1.2604.5.1.5.1.1.0",
 								Name: "_license_row",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "1",
 									"4": "2",
-								},
+								}),
 							},
 							StaticTags: []ddprofiledefinition.StaticMetricTagConfig{
 								{Tag: "_license_id", Value: "base_firewall"},
@@ -126,10 +126,10 @@ func TestScalarCollector_Collect(t *testing.T) {
 									Symbol: ddprofiledefinition.SymbolConfigCompat{
 										OID: "1.3.6.1.4.1.2604.5.1.5.1.1.0",
 									},
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1": "trial",
 										"4": "expired",
-									},
+									}),
 								},
 								{
 									Tag: "license_expiry",
@@ -423,11 +423,11 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.4.1.12124.1.1.2",
 								Name: "clusterHealth",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"OK":       "0",
 									"WARNING":  "1",
 									"CRITICAL": "2",
-								},
+								}),
 							},
 						},
 					},
@@ -461,13 +461,13 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.2.1.2.2.1.8",
 								Name: "ifOperStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "up",
 									"2": "down",
 									"3": "testing",
 									"4": "unknown",
 									"5": "dormant",
-								},
+								}),
 							},
 						},
 					},
@@ -504,11 +504,11 @@ func TestScalarCollector_Collect(t *testing.T) {
 								OID:                  "1.3.6.1.4.1.12124.1.1.8",
 								Name:                 "fanStatus",
 								ExtractValueCompiled: mustCompileRegex(`Fan(\d+)`),
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "normal",
 									"2": "warning",
 									"3": "critical",
-								},
+								}),
 							},
 						},
 					},
@@ -542,11 +542,11 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.2.1.2.2.1.7",
 								Name: "ifAdminStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "1", // up -> 1
 									"2": "0", // down -> 0
 									"3": "0", // testing -> 0
-								},
+								}),
 							},
 						},
 					},
@@ -575,11 +575,11 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.4.1.12124.1.1.2",
 								Name: "clusterHealth",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"OK":      "0",
 									"WARNING": "1",
 									// CRITICAL is not mapped
-								},
+								}),
 							},
 						},
 					},
@@ -603,11 +603,11 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.4.1.12124.1.1.2",
 								Name: "deviceStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"OK":      "0",
 									"WARNING": "1",
 									"ERROR":   "invalid", // This will cause metric to be skipped
-								},
+								}),
 							},
 						},
 					},
@@ -650,11 +650,11 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.2.1.2.2.1.7",
 								Name: "ifAdminStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "up",
 									"2": "down",
 									"3": "testing",
-								},
+								}),
 							},
 						},
 					},
@@ -679,6 +679,46 @@ func TestScalarCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
+		"metric with numeric value and bitmask mapping": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Symbol: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.674.10892.1.1100.32.1.6",
+								Name: "processorDeviceStatusReading",
+								Mapping: ddprofiledefinition.NewBitmaskMapping(map[string]string{
+									"1":    "internalError",
+									"2":    "thermalTrip",
+									"128":  "processorPresent",
+									"1024": "processorThrottled",
+								}),
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.674.10892.1.1100.32.1.6"}, []gosnmp.SnmpPDU{
+					createIntegerPDU("1.3.6.1.4.1.674.10892.1.1100.32.1.6", 129), // internalError + processorPresent
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:       "processorDeviceStatusReading",
+					Value:      129,
+					MetricType: "gauge",
+					MultiValue: map[string]int64{
+						"internalError":      1,
+						"thermalTrip":        0,
+						"processorPresent":   1,
+						"processorThrottled": 0,
+					},
+				},
+			},
+			expectedError: false,
+		},
 		"metric with string value and string to int mapping": {
 			profile: &ddsnmp.Profile{
 				SourceFile: "test-profile.yaml",
@@ -688,12 +728,12 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.4.1.318.1.1.1.2.2.1.0",
 								Name: "upsBasicBatteryStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"batteryNormal":   "0",
 									"batteryLow":      "1",
 									"batteryDepleted": "2",
 									"batteryCharging": "3",
-								},
+								}),
 							},
 						},
 					},

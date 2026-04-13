@@ -1257,6 +1257,7 @@ They work the same in **both** places:
 | **No match behavior**       | • `extract_value`: keeps the original value.<br/>• `match_pattern`: skips the value (tag not emitted).<br/>• `match` + `tags`: emits no tags. |
 | **Multiple symbols**        | If multiple `symbols` are listed for the same tag, the **first non-empty result** is used.                                                    |
 | **Mapping key consistency** | Keys in a `mapping` must all be the same type — all numeric or all string.                                                                    |
+| **Mapping modes**           | Tags and metadata support only exact-match mapping. Use `mapping.items`; `mapping.mode` is optional and defaults to exact.                     |
 | **Safety**                  | Keep regexes simple and, when possible, **anchor them** (e.g. `^pattern$`) to prevent unwanted matches.                                       |
 
 **Quick Syntax Recap**:
@@ -1264,8 +1265,9 @@ They work the same in **both** places:
 - `mapping`
     ```yaml
     mapping:
-      6: "ethernet"
-      161: "lag"
+      items:
+        6: "ethernet"
+        161: "lag"
     ```
 - `extract_value`
     ```yaml
@@ -1291,6 +1293,8 @@ They work the same in **both** places:
 
 Use `mapping` to replace raw tag values with **human-readable text labels**.
 
+`mapping.mode` is optional here and defaults to exact. `bitmask` mode is not supported for tags or metadata.
+
 **The collector**:
 
 - Looks up the raw value in the mapping table.
@@ -1314,11 +1318,12 @@ metrics:
           OID: 1.3.6.1.2.1.2.2.1.3
           name: ifType
         mapping:
-          1: "other"
-          6: "ethernet"
-          24: "loopback"
-          131: "tunnel"
-          161: "lag"
+          items:
+            1: "other"
+            6: "ethernet"
+            24: "loopback"
+            131: "tunnel"
+            161: "lag"
 ```
 
 **What this does**:
@@ -1326,6 +1331,8 @@ metrics:
 - Replaces numeric interface type codes (1, 6, 24, 131, 161) with readable names (`other`, `ethernet`, `loopback`, `tunnel`, `lag`).
 - If a device reports an unknown type, the original numeric value is used.
 - Works identically for `metadata` fields and `metric_tags`.
+- Legacy flat-map syntax remains supported for backward compatibility:
+  `mapping: { 6: "ethernet", 161: "lag" }`
 
 ### Extract Value
 
@@ -1486,17 +1493,29 @@ These transformations are typically used to:
 | **Data type handling**    | Transformations preserve numeric type (integer/float) unless the mapping converts it to a multi-value metric.                                                                                                                                                                                                                                            |
 | **Error handling**        | `extract_value` keeps the original value when it does not match; `match_pattern` fails the metric value when it does not match; no-value `format` sentinels are treated as missing.                                                                                                                                                                      |
 | **Applicability**         | Metric value transformations affect metric values only; `format` also decodes tag and metadata symbol values.                                                                                                                                                                                                                                            |
-| **Mapping behavior**      | Always produces a multi-value metric where each mapped entry becomes a dimension; the active one reports `1`, others `0`.                                                                                                                                                                                                                                |
+| **Mapping syntax**        | `mapping.items` defines the lookup table. `mapping.mode` is optional and defaults to exact. Legacy flat-map syntax remains supported for backward compatibility.                                                                                                                                                                                           |
+| **Mapping behavior**      | Exact mode preserves the legacy exact-match/remap behavior. `bitmask` mode is metric-value only: every mapped bit becomes a dimension, the raw numeric value is preserved, key `0` matches only raw value `0`, and unknown bits are ignored.                                                                                                           |
 
 **Quick Syntax Recap**:
 
 - `mapping`
     ```yaml
     mapping:
-      1: up
-      2: down
-      3: testing
-     ``` 
+      items:
+        1: up
+        2: down
+        3: testing
+    ```
+
+- `mapping` (bitmask mode)
+    ```yaml
+    mapping:
+      mode: bitmask
+      items:
+        1: internalError
+        128: processorPresent
+        1024: processorThrottled
+    ```
 
 - `extract_value`
     ```yaml
@@ -1526,16 +1545,19 @@ These transformations are typically used to:
 
 ### Mapping
 
-Use `mapping` to convert raw metric values into **state dimensions**.
+Use `mapping` to convert raw metric values into **state dimensions** or **decoded bitmask dimensions**.
 
-Each mapping entry defines a **dimension name** and the numeric or string value that triggers it.
+`mapping.mode` defaults to exact. Use `mapping.mode: bitmask` when the raw metric value is a flag field where multiple bits may be set at the same time.
+
+In exact mode, each mapping entry defines a **dimension name** and the numeric or string value that triggers it.
 
 **The collector**:
 
-- Evaluates the value against the mapping table.
-- For each mapping entry, creates a **dimension** named after the mapped key.
+- Evaluates the value against `mapping.items`.
+- In exact mode, creates a **dimension** named after the mapped value.
 - Sets that dimension to `1` if the current value matches the key, or `0` otherwise.
-- If the value doesn’t match any key, all mapped dimensions are `0`.
+- In bitmask mode, sets every mapped dimension whose bit is active to `1`, and inactive mapped bits to `0`.
+- If the value doesn’t match any exact key, all exact-mode dimensions are `0`.
 - Works only for **metric values**, not for tags or metadata.
 
 ```yaml
@@ -1547,15 +1569,46 @@ metrics:
       family: 'Network/Interface/Status/Admin'
       unit: "{status}"
     mapping:
-      1: up
-      2: down
-      3: testing
+      items:
+        1: up
+        2: down
+        3: testing
 ```
 
 **What this does**:
 
 - Converts SNMP integer values (1, 2, 3) into a **multi-value metric** with dimensions `up`, `down`, and `testing`.
 - The dimension corresponding to the current value reports `1`; all others report `0`.
+- Legacy flat-map syntax remains supported and is equivalent to exact mode.
+
+Bitmask example:
+
+```yaml
+metrics:
+  - table:
+      OID: 1.3.6.1.4.1.674.10892.1.1100.32
+      name: processorDeviceStatusTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.10892.1.1100.32.1.6
+        name: processorDeviceStatusReading
+        mapping:
+          mode: bitmask
+          items:
+            1: internalError
+            2: thermalTrip
+            32: configurationError
+            128: processorPresent
+            256: processorDisabled
+            512: terminatorPresent
+            1024: processorThrottled
+```
+
+**What this does**:
+
+- Treats the raw value as a bitmask where multiple bits can be active at once.
+- Emits a multi-value metric with one dimension per mapped bit.
+- Preserves the raw numeric metric value alongside the decoded dimensions.
+- Ignores active bits that are not declared in `mapping.items`.
 
 ### Extract Value
 

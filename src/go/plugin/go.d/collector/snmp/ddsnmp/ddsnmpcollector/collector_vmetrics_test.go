@@ -444,13 +444,13 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 							{
 								OID:  "1.3.6.1.2.1.2.2.1.8",
 								Name: "ifOperStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "up",
 									"2": "down",
 									"3": "testing",
 									"4": "unknown",
 									"5": "dormant",
-								},
+								}),
 							},
 						},
 					},
@@ -563,10 +563,10 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 							{
 								OID:  "1.3.6.1.2.1.2.2.1.8",
 								Name: "ifOperStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "up",
 									"2": "down",
-								},
+								}),
 							},
 						},
 					},

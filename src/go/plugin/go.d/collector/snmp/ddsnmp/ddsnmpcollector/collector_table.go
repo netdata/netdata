@@ -711,5 +711,5 @@ func isIndexTagConfig(tagCfg ddprofiledefinition.MetricTagConfig) bool {
 		tagCfg.Symbol.Format != "" ||
 		tagCfg.Symbol.ExtractValue != "" ||
 		tagCfg.Symbol.MatchPattern != "" ||
-		len(tagCfg.Mapping) > 0
+		tagCfg.Mapping.HasItems()
 }

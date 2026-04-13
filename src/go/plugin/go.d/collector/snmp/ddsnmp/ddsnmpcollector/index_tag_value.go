@@ -37,7 +37,7 @@ func processRawIndexTagValue(cfg ddprofiledefinition.MetricTagConfig, raw string
 		val = formatted
 	}
 
-	if mapped, ok := cfg.Mapping[val]; ok {
+	if mapped, ok := cfg.Mapping.Lookup(val); ok {
 		val = mapped
 	}
 

@@ -136,7 +136,7 @@ func (r *crossTableResolver) normalizeLookupText(sym ddprofiledefinition.SymbolC
 		}
 	}
 
-	if mapped, ok := sym.Mapping[val]; ok {
+	if mapped, ok := sym.Mapping.Lookup(val); ok {
 		val = mapped
 	}
 

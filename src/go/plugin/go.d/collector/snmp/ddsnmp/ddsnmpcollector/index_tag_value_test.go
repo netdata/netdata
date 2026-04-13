@@ -43,9 +43,9 @@ func TestTableRowProcessor_ProcessIndexTag_RegexMappedFamily(t *testing.T) {
 			Name:                 "cbgpPeer2AddrFamilySafiIndex",
 			ExtractValueCompiled: mustCompileRegex(`^(?:\d+\.)+\d+\.(\d+)$`),
 		},
-		Mapping: map[string]string{
+		Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 			"128": "vpn",
-		},
+		}),
 	}, "1.4.192.0.2.1.1.128")
 
 	require.NoError(t, err)
@@ -61,9 +61,9 @@ func TestTableRowProcessor_ProcessIndexTag_PositionUsesSymbolNameFallback(t *tes
 		Symbol: ddprofiledefinition.SymbolConfigCompat{
 			Name: "neighbor",
 		},
-		Mapping: map[string]string{
+		Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 			"42": "mapped",
-		},
+		}),
 	}, "7.42.9")
 
 	require.NoError(t, err)

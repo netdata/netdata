@@ -152,11 +152,11 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 								OID:  "1.3.6.1.2.1.1.2.0",
 								Name: "sysObjectID",
 							},
-							Mapping: map[string]string{
+							Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 								"1.3.6.1.4.1.9.1.1": "router",
 								"1.3.6.1.4.1.9.1.2": "switch",
 								"1.3.6.1.4.1.9.1.3": "firewall",
-							},
+							}),
 						},
 					},
 				},

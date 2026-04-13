@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -296,6 +297,7 @@ func validateEnrichSymbol(symbol *SymbolConfig, symbolContext SymbolContext) err
 			symbol.MatchPatternCompiled = pattern
 		}
 	}
+	errs = append(errs, validateMapping(symbol.Mapping, symbolContext))
 	if symbolContext != ColumnSymbol && symbol.ConstantValueOne {
 		errs = append(errs, errors.New("`constant_value_one` cannot be used outside of tables"))
 	}
@@ -379,7 +381,8 @@ func validateEnrichMetricTag(metricTag *MetricTagConfig) error {
 			errs = append(errs, fmt.Errorf("`tags` mapping must be provided if `match` (`%s`) is defined", metricTag.Match))
 		}
 	}
-	if len(metricTag.Mapping) > 0 && metricTag.Tag == "" && metricTag.Symbol.Name == "" {
+	errs = append(errs, validateMapping(metricTag.Mapping, MetricTagSymbol))
+	if metricTag.Mapping.HasItems() && metricTag.Tag == "" && metricTag.Symbol.Name == "" {
 		errs = append(errs, fmt.Errorf("`tag` or `symbol.name` must be provided if `mapping` (`%v`) is defined", metricTag.Mapping))
 	}
 	for _, transform := range metricTag.IndexTransform {
@@ -403,14 +406,46 @@ func isRawIndexMetricTag(metricTag MetricTagConfig) bool {
 		return metricTag.Symbol.Format != "" ||
 			metricTag.Symbol.ExtractValue != "" ||
 			metricTag.Symbol.MatchPattern != "" ||
-			len(metricTag.Mapping) > 0
+			metricTag.Mapping.HasItems()
 	}
 
 	return len(metricTag.IndexTransform) > 0 ||
 		metricTag.Symbol.Format != "" ||
 		metricTag.Symbol.ExtractValue != "" ||
 		metricTag.Symbol.MatchPattern != "" ||
-		len(metricTag.Mapping) > 0
+		metricTag.Mapping.HasItems()
+}
+
+func validateMapping(mapping MappingConfig, symbolContext SymbolContext) error {
+	if !mapping.HasItems() {
+		if mapping.Mode != "" {
+			return errors.New("`mapping.mode` requires `mapping.items`")
+		}
+		return nil
+	}
+
+	var errs []error
+
+	switch mapping.EffectiveMode() {
+	case MappingModeExact:
+	case MappingModeBitmask:
+		if symbolContext != ScalarSymbol && symbolContext != ColumnSymbol {
+			errs = append(errs, errors.New("`mapping.mode: bitmask` is only supported for scalar/table metric symbols"))
+		}
+		for key, value := range mapping.Items {
+			bit, err := strconv.ParseInt(key, 10, 64)
+			if err != nil || bit < 0 {
+				errs = append(errs, fmt.Errorf("`mapping.mode: bitmask` requires non-negative integer keys, got %q", key))
+			}
+			if value == "" {
+				errs = append(errs, fmt.Errorf("`mapping.mode: bitmask` requires non-empty values, got empty value for key %q", key))
+			}
+		}
+	default:
+		errs = append(errs, fmt.Errorf("invalid `mapping.mode` %q", mapping.Mode))
+	}
+
+	return errors.Join(errs...)
 }
 
 func validateEnrichVirtualMetrics(metrics []MetricsConfig, vmetrics []VirtualMetricConfig) error {

@@ -66,14 +66,27 @@ func buildVirtualMetricSourceSpec(sym SymbolConfig) virtualMetricSourceSpec {
 	}
 }
 
-func buildMappingVirtualMetricDimSupport(mapping map[string]string) virtualMetricDimSupport {
-	if len(mapping) == 0 {
+func buildMappingVirtualMetricDimSupport(mapping MappingConfig) virtualMetricDimSupport {
+	if !mapping.HasItems() {
 		return virtualMetricDimSupport{mode: virtualMetricDimUnsupported}
+	}
+
+	if mapping.EffectiveMode() == MappingModeBitmask {
+		dims := make(map[string]bool)
+		for _, value := range mapping.Items {
+			if value != "" {
+				dims[value] = true
+			}
+		}
+		if len(dims) == 0 {
+			return virtualMetricDimSupport{mode: virtualMetricDimUnsupported}
+		}
+		return virtualMetricDimSupport{mode: virtualMetricDimKnown, dims: dims}
 	}
 
 	keysNumeric := true
 	valuesNumeric := true
-	for key, value := range mapping {
+	for key, value := range mapping.Items {
 		if !isIntegerString(key) {
 			keysNumeric = false
 		}
@@ -87,13 +100,13 @@ func buildMappingVirtualMetricDimSupport(mapping map[string]string) virtualMetri
 		return virtualMetricDimSupport{mode: virtualMetricDimUnsupported}
 	case keysNumeric:
 		dims := make(map[string]bool)
-		for _, value := range mapping {
+		for _, value := range mapping.Items {
 			dims[value] = true
 		}
 		return virtualMetricDimSupport{mode: virtualMetricDimKnown, dims: dims}
 	default:
 		dims := make(map[string]bool)
-		for key, value := range mapping {
+		for key, value := range mapping.Items {
 			if isIntegerString(value) {
 				dims[key] = true
 			}

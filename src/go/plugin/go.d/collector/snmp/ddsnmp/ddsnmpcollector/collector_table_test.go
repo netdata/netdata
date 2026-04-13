@@ -590,11 +590,11 @@ func TestTableCollector_Collect(t *testing.T) {
 										OID:  "1.3.6.1.2.1.2.2.1.3",
 										Name: "ifType",
 									},
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1":  "other",
 										"6":  "ethernetCsmacd",
 										"24": "softwareLoopback",
-									},
+									}),
 								},
 							},
 						},
@@ -728,11 +728,11 @@ func TestTableCollector_Collect(t *testing.T) {
 										OID:  "1.3.6.1.2.1.2.2.1.7",
 										Name: "ifAdminStatus",
 									},
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1": "up",
 										"2": "down",
 										"3": "testing",
-									},
+									}),
 								},
 							},
 						},
@@ -1026,9 +1026,9 @@ func TestTableCollector_Collect(t *testing.T) {
 										OID:  "1.3.6.1.2.1.2.2.1.3",
 										Name: "ifType",
 									},
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"6": "ethernet",
-									},
+									}),
 								},
 							},
 						},
@@ -1086,10 +1086,10 @@ func TestTableCollector_Collect(t *testing.T) {
 										OID:  "1.3.6.1.2.1.2.2.1.3",
 										Name: "ifType",
 									},
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"6": "ethernet",
 										// No mapping for value 131
-									},
+									}),
 								},
 							},
 						},
@@ -1326,13 +1326,13 @@ func TestTableCollector_Collect(t *testing.T) {
 								{
 									OID:  "1.3.6.1.2.1.2.2.1.8",
 									Name: "ifOperStatus",
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1": "up",
 										"2": "down",
 										"3": "testing",
 										"4": "unknown",
 										"5": "dormant",
-									},
+									}),
 								},
 							},
 							MetricTags: []ddprofiledefinition.MetricTagConfig{
@@ -1390,6 +1390,65 @@ func TestTableCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
+		"table with bitmask value mapping": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.674.10892.1.1100.32",
+								Name: "processorDeviceStatusTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{
+									OID:  "1.3.6.1.4.1.674.10892.1.1100.32.1.6",
+									Name: "processorDeviceStatusReading",
+									Mapping: ddprofiledefinition.NewBitmaskMapping(map[string]string{
+										"1":    "internalError",
+										"2":    "thermalTrip",
+										"128":  "processorPresent",
+										"1024": "processorThrottled",
+									}),
+								},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Tag: "processor",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.4.1.674.10892.1.1100.32.1.7",
+										Name: "processorDeviceStatusLocationName",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.674.10892.1.1100.32", []gosnmp.SnmpPDU{
+					createIntegerPDU("1.3.6.1.4.1.674.10892.1.1100.32.1.6.1", 129), // internalError + processorPresent
+					createStringPDU("1.3.6.1.4.1.674.10892.1.1100.32.1.7.1", "CPU 1"),
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:       "processorDeviceStatusReading",
+					Value:      129,
+					Tags:       map[string]string{"processor": "CPU 1"},
+					MetricType: "gauge",
+					IsTable:    true,
+					Table:      "processorDeviceStatusTable",
+					MultiValue: map[string]int64{
+						"internalError":      1,
+						"thermalTrip":        0,
+						"processorPresent":   1,
+						"processorThrottled": 0,
+					},
+				},
+			},
+			expectedError: false,
+		},
 		"table with extract value and mapping": {
 			profile: &ddsnmp.Profile{
 				SourceFile: "test-profile.yaml",
@@ -1405,11 +1464,11 @@ func TestTableCollector_Collect(t *testing.T) {
 									OID:                  "1.3.6.1.4.1.12124.1.13.1.3",
 									Name:                 "fanStatus",
 									ExtractValueCompiled: mustCompileRegex(`Status(\d+)`),
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1": "normal",
 										"2": "warning",
 										"3": "critical",
-									},
+									}),
 								},
 							},
 							MetricTags: []ddprofiledefinition.MetricTagConfig{
@@ -1548,12 +1607,12 @@ func TestTableCollector_Collect(t *testing.T) {
 										OID:  "1.3.6.1.4.1.318.1.1.10.4.3.3.1.1",
 										Name: "upsPhaseInputPhaseIndex",
 									},
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1": "L1",
 										"2": "L2",
 										"3": "L3",
 										// No mapping for value 4
-									},
+									}),
 								},
 							},
 						},
@@ -1602,12 +1661,12 @@ func TestTableCollector_Collect(t *testing.T) {
 								{
 									OID:  "1.3.6.1.4.1.12124.1.1.1.5",
 									Name: "nodeHealth",
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"OK":      "0",
 										"ATTN":    "1",
 										"DOWN":    "2",
 										"INVALID": "3",
-									},
+									}),
 								},
 							},
 							MetricTags: []ddprofiledefinition.MetricTagConfig{
@@ -2098,17 +2157,17 @@ func TestTableCollector_Collect(t *testing.T) {
 								{
 									Tag:   "_address_family",
 									Index: 2,
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1":   "ipv4",
 										"2":   "ipv6",
 										"25":  "vpls",
 										"196": "l2vpn",
-									},
+									}),
 								},
 								{
 									Tag:   "_subsequent_address_family",
 									Index: 3,
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1":   "unicast",
 										"2":   "multicast",
 										"4":   "mpls",
@@ -2118,19 +2177,19 @@ func TestTableCollector_Collect(t *testing.T) {
 										"74":  "sd-wan",
 										"128": "vpn",
 										"132": "route-target",
-									},
+									}),
 								},
 								{
 									Tag:   "_neighbor_address_type",
 									Index: 4,
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"0":  "unknown",
 										"1":  "ipv4",
 										"2":  "ipv6",
 										"3":  "ipv4z",
 										"4":  "ipv6z",
 										"16": "dns",
-									},
+									}),
 								},
 							},
 						},
@@ -2272,10 +2331,10 @@ func TestTableCollector_Collect(t *testing.T) {
 										Name: "ifType",
 									},
 									Table: "ifTable",
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"6":  "ethernet",
 										"24": "loopback",
-									},
+									}),
 								},
 							},
 						},
@@ -2540,20 +2599,20 @@ func TestTableCollector_Collect(t *testing.T) {
 								{
 									Tag:   "address_family",
 									Index: 2,
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1":  "ipv4",
 										"2":  "ipv6",
 										"25": "l2vpn",
-									},
+									}),
 								},
 								{
 									Tag:   "subsequent_address_family",
 									Index: 3,
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1":   "unicast",
 										"70":  "evpn",
 										"128": "vpn",
-									},
+									}),
 								},
 							},
 						},
@@ -3281,10 +3340,10 @@ func TestTableCollector_Collect(t *testing.T) {
 								{
 									Index: 1,
 									Tag:   "ip_version",
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1": "ipv4",
 										"2": "ipv6",
-									},
+									}),
 								},
 							},
 						},

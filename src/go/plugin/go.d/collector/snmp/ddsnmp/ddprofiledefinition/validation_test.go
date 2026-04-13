@@ -450,10 +450,50 @@ func Test_validateEnrichMetrics(t *testing.T) {
 								OID:  "1.2",
 								Name: "abc",
 							},
-							Mapping: map[string]string{
+							Mapping: NewExactMapping(map[string]string{
 								"1": "abc",
 								"2": "def",
+							}),
+						},
+					},
+				},
+			},
+		},
+		"bitmask mapping usage in scalar symbol": {
+			wantError: false,
+			metrics: []MetricsConfig{
+				{
+					Symbol: SymbolConfig{
+						OID:  "1.2.3",
+						Name: "processorStatus",
+						Mapping: NewBitmaskMapping(map[string]string{
+							"1":   "internalError",
+							"128": "processorPresent",
+						}),
+					},
+				},
+			},
+		},
+		"ERROR bitmask mapping usage in metric_tags": {
+			wantError: true,
+			metrics: []MetricsConfig{
+				{
+					Symbols: []SymbolConfig{
+						{
+							OID:  "1.2",
+							Name: "abc",
+						},
+					},
+					MetricTags: MetricTagConfigList{
+						MetricTagConfig{
+							Tag: "state",
+							Symbol: SymbolConfigCompat{
+								OID:  "1.2",
+								Name: "abc",
 							},
+							Mapping: NewBitmaskMapping(map[string]string{
+								"1": "internalError",
+							}),
 						},
 					},
 				},
@@ -577,9 +617,9 @@ func Test_validateEnrichMetrics(t *testing.T) {
 
 func Test_validateEnrichMetricTag_MappingErrorUsesReadableFormat(t *testing.T) {
 	tag := MetricTagConfig{
-		Mapping: map[string]string{
+		Mapping: NewExactMapping(map[string]string{
 			"1": "up",
-		},
+		}),
 	}
 
 	err := validateEnrichMetricTag(&tag)
@@ -587,6 +627,46 @@ func Test_validateEnrichMetricTag_MappingErrorUsesReadableFormat(t *testing.T) {
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "map[1:up]")
 		assert.NotContains(t, err.Error(), "%!s")
+	}
+}
+
+func Test_validateEnrichSymbol_BitmaskMappingRequiresNumericKeys(t *testing.T) {
+	sym := SymbolConfig{
+		OID:  "1.2.3",
+		Name: "processorStatus",
+		Mapping: NewBitmaskMapping(map[string]string{
+			"internal": "internalError",
+		}),
+	}
+
+	err := validateEnrichSymbol(&sym, ScalarSymbol)
+
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "requires non-negative integer keys")
+	}
+}
+
+func Test_validateEnrichMetadata_BitmaskMappingUnsupported(t *testing.T) {
+	metadata := MetadataConfig{
+		"device": {
+			Fields: map[string]MetadataField{
+				"description": {
+					Symbol: SymbolConfig{
+						OID:  "1.2.3",
+						Name: "deviceStatus",
+						Mapping: NewBitmaskMapping(map[string]string{
+							"1": "internalError",
+						}),
+					},
+				},
+			},
+		},
+	}
+
+	err := validateEnrichMetadata(metadata)
+
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "only supported for scalar/table metric symbols")
 	}
 }
 
@@ -667,10 +747,10 @@ func Test_validateEnrichVirtualMetrics(t *testing.T) {
 					{
 						OID:  "1.3.6.1.2.1.15.3.1.2",
 						Name: "bgpPeerAdminStatus",
-						Mapping: map[string]string{
+						Mapping: NewExactMapping(map[string]string{
 							"1": "stop",
 							"2": "start",
-						},
+						}),
 					},
 				},
 				MetricTags: MetricTagConfigList{
@@ -687,6 +767,36 @@ func Test_validateEnrichVirtualMetrics(t *testing.T) {
 				},
 			},
 		},
+		"valid bitmask mapped source dim": {
+			metrics: append(baseMetrics, MetricsConfig{
+				Table: SymbolConfig{
+					OID:  "1.3.6.1.4.1.674.10892.1.1100.32",
+					Name: "processorDeviceStatusTable",
+				},
+				Symbols: []SymbolConfig{
+					{
+						OID:  "1.3.6.1.4.1.674.10892.1.1100.32.1.6",
+						Name: "processorDeviceStatusReading",
+						Mapping: NewBitmaskMapping(map[string]string{
+							"1":   "internalError",
+							"128": "processorPresent",
+						}),
+					},
+				},
+				MetricTags: MetricTagConfigList{
+					{Tag: "processor", Index: 1},
+				},
+			}),
+			virtualMetrics: []VirtualMetricConfig{
+				{
+					Name:   "processorDeviceHealth",
+					PerRow: true,
+					Sources: []VirtualMetricSourceConfig{
+						{Metric: "processorDeviceStatusReading", Table: "processorDeviceStatusTable", As: "present", Dim: "processorPresent"},
+					},
+				},
+			},
+		},
 		"invalid mapped source dim": {
 			metrics: append(baseMetrics, MetricsConfig{
 				Table: SymbolConfig{
@@ -697,10 +807,10 @@ func Test_validateEnrichVirtualMetrics(t *testing.T) {
 					{
 						OID:  "1.3.6.1.2.1.15.3.1.2",
 						Name: "bgpPeerAdminStatus",
-						Mapping: map[string]string{
+						Mapping: NewExactMapping(map[string]string{
 							"1": "stop",
 							"2": "start",
-						},
+						}),
 					},
 				},
 				MetricTags: MetricTagConfigList{

@@ -65,10 +65,10 @@ func makeMetadata() MetadataConfig {
 							End:   5,
 						},
 					},
-					Mapping: map[string]string{
+					Mapping: NewExactMapping(map[string]string{
 						"1": "on",
 						"2": "off",
-					},
+					}),
 					Match:   ".*",
 					Pattern: regexp.MustCompile(".*"),
 					Tags: map[string]string{

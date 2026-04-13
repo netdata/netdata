@@ -87,9 +87,9 @@ func (p *numericValueProcessor) processInteger(sym ddprofiledefinition.SymbolCon
 		return 0, err
 	}
 
-	if len(sym.Mapping) > 0 {
+	if sym.Mapping.EffectiveMode() == ddprofiledefinition.MappingModeExact && sym.Mapping.HasItems() {
 		s := strconv.FormatInt(value, 10)
-		if v, ok := sym.Mapping[s]; ok && isInt(v) {
+		if v, ok := sym.Mapping.Lookup(s); ok && isInt(v) {
 			value, _ = strconv.ParseInt(v, 10, 64)
 		}
 	}
@@ -125,8 +125,10 @@ func (p *stringValueProcessor) processValue(sym ddprofiledefinition.SymbolConfig
 		s = replaceSubmatches(sym.MatchValue, sm)
 	}
 
-	if v, ok := sym.Mapping[s]; ok && isInt(v) {
-		s = v
+	if sym.Mapping.EffectiveMode() == ddprofiledefinition.MappingModeExact {
+		if v, ok := sym.Mapping.Lookup(s); ok && isInt(v) {
+			s = v
+		}
 	}
 
 	value, err := parseStringMetricValue(sym, s)

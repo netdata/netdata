@@ -343,15 +343,15 @@ func enrichProfiles(profiles []*Profile) {
 			for j := range metric.MetricTags {
 				tagCfg := &metric.MetricTags[j]
 
-				if tagCfg.Mapping != nil {
+				if tagCfg.Mapping.HasItems() {
 					continue
 				}
 
 				switch tagCfg.MappingRef {
 				case "ifType":
-					tagCfg.Mapping = sharedMappings.ifType
+					tagCfg.Mapping = ddprofiledefinition.NewExactMapping(sharedMappings.ifType)
 				case "ifTypeGroup":
-					tagCfg.Mapping = sharedMappings.ifTypeGroup
+					tagCfg.Mapping = ddprofiledefinition.NewExactMapping(sharedMappings.ifTypeGroup)
 				}
 			}
 		}

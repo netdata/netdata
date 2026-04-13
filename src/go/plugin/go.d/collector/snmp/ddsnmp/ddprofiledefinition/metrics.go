@@ -137,7 +137,7 @@ type SymbolConfig struct {
 
 	ChartMeta ChartMeta `yaml:"chart_meta,omitempty" json:"chart_meta"`
 
-	Mapping           map[string]string  `yaml:"mapping,omitempty" json:"mapping,omitempty"`
+	Mapping           MappingConfig      `yaml:"mapping,omitempty" json:"mapping,omitempty"`
 	Transform         string             `yaml:"transform,omitempty" json:"transform,omitempty"`
 	TransformCompiled *template.Template `yaml:"-" json:"-"`
 }
@@ -145,7 +145,7 @@ type SymbolConfig struct {
 // Clone creates a duplicate of this SymbolConfig
 func (s SymbolConfig) Clone() SymbolConfig {
 	ss := s
-	ss.Mapping = maps.Clone(ss.Mapping)
+	ss.Mapping = ss.Mapping.Clone()
 	return ss
 }
 
@@ -183,8 +183,8 @@ type MetricTagConfig struct {
 
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
 
-	MappingRef string            `yaml:"mapping_ref,omitempty" json:"mapping_ref,omitempty"`
-	Mapping    map[string]string `yaml:"mapping,omitempty" json:"mapping,omitempty"`
+	MappingRef string        `yaml:"mapping_ref,omitempty" json:"mapping_ref,omitempty"`
+	Mapping    MappingConfig `yaml:"mapping,omitempty" json:"mapping,omitempty"`
 
 	// Regex
 	// Match/Tags are not exposed as json (UI) since ExtractValue can be used instead
@@ -203,7 +203,7 @@ func (m MetricTagConfig) Clone() MetricTagConfig {
 	m2.Symbol = m.Symbol.Clone()
 	m2.LookupSymbol = m.LookupSymbol.Clone()
 	m2.IndexTransform = slices.Clone(m.IndexTransform)
-	m2.Mapping = maps.Clone(m.Mapping)
+	m2.Mapping = m.Mapping.Clone()
 	m2.Tags = maps.Clone(m.Tags)
 	return m2
 }

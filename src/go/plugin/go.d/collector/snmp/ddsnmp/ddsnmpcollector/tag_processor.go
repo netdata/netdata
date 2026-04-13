@@ -65,8 +65,8 @@ func (p *tableTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, 
 	}
 
 	switch {
-	case len(cfg.Mapping) > 0:
-		if v, ok := cfg.Mapping[val]; ok {
+	case cfg.Mapping.HasItems():
+		if v, ok := cfg.Mapping.Lookup(val); ok {
 			val = v
 		}
 		ta.addTag(tagName, val)
