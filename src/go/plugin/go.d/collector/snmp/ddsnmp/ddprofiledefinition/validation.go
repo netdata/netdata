@@ -437,8 +437,8 @@ func validateMapping(mapping MappingConfig, symbolContext SymbolContext) error {
 		}
 		for key, value := range mapping.Items {
 			bit, err := strconv.ParseInt(key, 10, 64)
-			if err != nil || bit < 0 {
-				errs = append(errs, fmt.Errorf("`mapping.mode: bitmask` requires non-negative integer keys, got %q", key))
+			if err != nil || bit < 0 || (bit != 0 && bit&(bit-1) != 0) {
+				errs = append(errs, fmt.Errorf("`mapping.mode: bitmask` requires keys to be 0 or a single power-of-two bit, got %q", key))
 			}
 			if value == "" {
 				errs = append(errs, fmt.Errorf("`mapping.mode: bitmask` requires non-empty values, got empty value for key %q", key))

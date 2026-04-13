@@ -1563,6 +1563,7 @@ In exact mode, the emitted dimension names come from the **string side** of the 
 - In bitmask mode, sets every mapped dimension whose bit is active to `1`, and inactive mapped bits to `0`.
 - If the value doesn’t match any exact key, all exact-mode dimensions are `0`.
 - `mapping.mode: bitmask` works only for **metric values**, not for tags or metadata.
+- `mapping.mode: bitmask` keys must be `0` or a single power-of-two bit (`1`, `2`, `4`, `8`, ...).
 - `scale_factor` cannot be combined with `mapping.mode: bitmask`.
 - If multiple bit keys map to the same dimension, that dimension is active when any mapped bit is active.
 
@@ -1614,6 +1615,7 @@ metrics:
 
 - Treats the raw value as a bitmask where multiple bits can be active at once.
 - Emits a multi-value metric with one dimension per mapped bit.
+- Requires each declared key to represent either `0` or exactly one bit.
 - Preserves the raw numeric metric value alongside the decoded dimensions.
 - Ignores active bits that are not declared in `mapping.items`.
 

@@ -630,7 +630,7 @@ func Test_validateEnrichMetricTag_MappingErrorUsesReadableFormat(t *testing.T) {
 	}
 }
 
-func Test_validateEnrichSymbol_BitmaskMappingRequiresNumericKeys(t *testing.T) {
+func Test_validateEnrichSymbol_BitmaskMappingRequiresSingleBitKeys(t *testing.T) {
 	sym := SymbolConfig{
 		OID:  "1.2.3",
 		Name: "processorStatus",
@@ -642,7 +642,24 @@ func Test_validateEnrichSymbol_BitmaskMappingRequiresNumericKeys(t *testing.T) {
 	err := validateEnrichSymbol(&sym, ScalarSymbol)
 
 	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "requires non-negative integer keys")
+		assert.Contains(t, err.Error(), "requires keys to be 0 or a single power-of-two bit")
+	}
+}
+
+func Test_validateEnrichSymbol_BitmaskMappingRejectsCompositeMasks(t *testing.T) {
+	sym := SymbolConfig{
+		OID:  "1.2.3",
+		Name: "processorStatus",
+		Mapping: NewBitmaskMapping(map[string]string{
+			"3": "combinedFault",
+		}),
+	}
+
+	err := validateEnrichSymbol(&sym, ScalarSymbol)
+
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "requires keys to be 0 or a single power-of-two bit")
+		assert.Contains(t, err.Error(), "\"3\"")
 	}
 }
 
