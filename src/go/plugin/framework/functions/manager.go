@@ -340,7 +340,11 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function) {
 		case errors.Is(err, errSchedulerInvalid):
 			m.respf(fn, 500, "invalid scheduler request")
 		default:
-			m.respf(fn, 503, "scheduler error")
+			// Should be unreachable: enqueue's other return points block.
+			// If a new error variant is added in the future, surface it
+			// loudly instead of swallowing it as a generic 5xx.
+			m.Warningf("unexpected scheduler enqueue error for '%s': %v", fn.Name, err)
+			m.respf(fn, 500, "unexpected scheduler error: %v", err)
 		}
 		return
 	}

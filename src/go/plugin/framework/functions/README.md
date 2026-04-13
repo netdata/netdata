@@ -57,7 +57,7 @@ Admission checks:
 - manager stopping -> reject `503`
 - unknown/nil handler -> reject `501`
 - duplicate active/tombstoned UID -> ignore duplicate input (debug/warn log, no terminal output)
-- queue full -> blocks on `scheduler.enqueue` until space frees (back-pressures stdin reader -> netdata via OS pipe). Only the manager-stopping error is returned here.
+- queue full -> blocks on `scheduler.enqueue` until space frees (back-pressures stdin reader -> netdata via OS pipe). The only errors returned from this path are manager-stopping (`503`) on shutdown and invalid-request (`500`) for malformed input.
 
 ### Keyed scheduler + worker pool
 
