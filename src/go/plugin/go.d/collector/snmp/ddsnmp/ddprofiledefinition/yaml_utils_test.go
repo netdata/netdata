@@ -154,17 +154,44 @@ mapping:
 	assert.Equal(t, expected, myStruct)
 }
 
-func TestMappingConfig_UnmarshalYAML_structuredModeWithoutItems(t *testing.T) {
+func TestMappingConfig_UnmarshalYAML_legacyMapWithLiteralModeAndItemsKeys(t *testing.T) {
 	myStruct := MyMappingStruct{}
 	expected := MyMappingStruct{
-		Mapping: MappingConfig{
-			Mode: MappingModeBitmask,
-		},
+		Mapping: NewExactMapping(map[string]string{
+			"mode":  "active",
+			"items": "present",
+		}),
 	}
 
 	err := yaml.Unmarshal([]byte(`
 mapping:
-  mode: bitmask
+  mode: active
+  items: present
+`), &myStruct)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, myStruct)
+}
+
+func TestMappingConfig_UnmarshalYAML_emptyLegacyMapNormalizesToZeroValue(t *testing.T) {
+	myStruct := MyMappingStruct{}
+	expected := MyMappingStruct{}
+
+	err := yaml.Unmarshal([]byte(`
+mapping: {}
+`), &myStruct)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, myStruct)
+}
+
+func TestMappingConfig_UnmarshalYAML_emptyStructuredItemsNormalizesToZeroValue(t *testing.T) {
+	myStruct := MyMappingStruct{}
+	expected := MyMappingStruct{}
+
+	err := yaml.Unmarshal([]byte(`
+mapping:
+  items: {}
 `), &myStruct)
 
 	assert.NoError(t, err)

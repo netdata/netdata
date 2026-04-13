@@ -1257,7 +1257,7 @@ They work the same in **both** places:
 | **No match behavior**       | • `extract_value`: keeps the original value.<br/>• `match_pattern`: skips the value (tag not emitted).<br/>• `match` + `tags`: emits no tags. |
 | **Multiple symbols**        | If multiple `symbols` are listed for the same tag, the **first non-empty result** is used.                                                    |
 | **Mapping key consistency** | Keys in a `mapping` must all be the same type — all numeric or all string.                                                                    |
-| **Mapping modes**           | Tags and metadata support only exact-match mapping. Use `mapping.items`; `mapping.mode` is optional and defaults to exact.                     |
+| **Mapping modes**           | Tags and metadata support only exact-match mapping. Use `mapping.items`; `mapping.mode` is optional and defaults to exact.                    |
 | **Safety**                  | Keep regexes simple and, when possible, **anchor them** (e.g. `^pattern$`) to prevent unwanted matches.                                       |
 
 **Quick Syntax Recap**:
@@ -1488,13 +1488,13 @@ These transformations are typically used to:
 |---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Where**                 | Metric value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`; `format` also applies when symbols are used for metric tags or device metadata.                                                                                                                                                                              |
 | **Order of application**  | For string-decoded metric values: 1️⃣ `format` (if present) → 2️⃣ `extract_value` (if present) → 3️⃣ `match_pattern` + `match_value` (if present) → 4️⃣ `mapping` → 5️⃣ numeric parsing → 6️⃣ `scale_factor`. Ordinary numeric PDUs skip the string-only `extract_value` and `match_pattern` steps and use numeric parsing → `mapping` → `scale_factor`. |
-| **Scale factor position** | `scale_factor` is always applied **last**, after all other metric value transformations. It cannot be combined with `mapping.mode: bitmask`.                                                                                                                                                                                                              |
+| **Scale factor position** | `scale_factor` is always applied **last**, after all other metric value transformations. It cannot be combined with `mapping.mode: bitmask`.                                                                                                                                                                                                             |
 | **String base parsing**   | String-like values are parsed as base-10 by default. If `format: hex` is set, extracted values are parsed as base-16.                                                                                                                                                                                                                                    |
 | **Data type handling**    | Transformations preserve numeric type (integer/float) unless the mapping converts it to a multi-value metric.                                                                                                                                                                                                                                            |
 | **Error handling**        | `extract_value` keeps the original value when it does not match; `match_pattern` fails the metric value when it does not match; no-value `format` sentinels are treated as missing.                                                                                                                                                                      |
 | **Applicability**         | Metric value transformations affect metric values only; `format` also decodes tag and metadata symbol values.                                                                                                                                                                                                                                            |
-| **Mapping syntax**        | `mapping.items` defines the lookup table. `mapping.mode` is optional and defaults to exact. Legacy flat-map syntax remains supported for backward compatibility.                                                                                                                                                                                           |
-| **Mapping behavior**      | Exact mode preserves the legacy exact-match/remap behavior. `bitmask` mode is metric-value only: every mapped bit becomes a dimension, the raw numeric value is preserved, key `0` matches only raw value `0`, and unknown bits are ignored.                                                                                                           |
+| **Mapping syntax**        | `mapping.items` defines the lookup table. `mapping.mode` is optional and defaults to exact. Legacy flat-map syntax remains supported for backward compatibility.                                                                                                                                                                                         |
+| **Mapping behavior**      | Exact mode preserves the legacy exact-match/remap behavior. `bitmask` mode is metric-value only: every mapped bit becomes a dimension, the raw numeric value is preserved, key `0` matches only raw value `0`, and unknown bits are ignored.                                                                                                             |
 
 **Quick Syntax Recap**:
 
@@ -1549,12 +1549,16 @@ Use `mapping` to convert raw metric values into **state dimensions** or **decode
 
 `mapping.mode` defaults to exact. Use `mapping.mode: bitmask` when the raw metric value is a flag field where multiple bits may be set at the same time.
 
-In exact mode, each mapping entry defines a **dimension name** and the numeric or string value that triggers it.
+In exact mode, the emitted dimension names come from the **string side** of the mapping:
+
+- Numeric key -> string value (`1: up`) emits dimensions named after the mapped string values (`up`, `down`, ...).
+- String key -> numeric value (`OK: 0`) first normalizes the value to the numeric target, then emits dimensions named after the original string keys (`OK`, `WARNING`, ...).
+- Numeric key -> numeric value is treated as value normalization only and does not emit multi-value dimensions.
 
 **The collector**:
 
 - Evaluates the value against `mapping.items`.
-- In exact mode, creates a **dimension** named after the mapped value.
+- In exact mode, creates dimensions using the mapping's string labels, following the rules above.
 - Sets that dimension to `1` if the current value matches the key, or `0` otherwise.
 - In bitmask mode, sets every mapped dimension whose bit is active to `1`, and inactive mapped bits to `0`.
 - If the value doesn’t match any exact key, all exact-mode dimensions are `0`.
@@ -1582,6 +1586,7 @@ metrics:
 - Converts SNMP integer values (1, 2, 3) into a **multi-value metric** with dimensions `up`, `down`, and `testing`.
 - The dimension corresponding to the current value reports `1`; all others report `0`.
 - Legacy flat-map syntax remains supported and is equivalent to exact mode.
+- For string -> numeric exact mappings, the emitted dimensions use the original string keys instead of the normalized numeric values.
 
 Bitmask example:
 

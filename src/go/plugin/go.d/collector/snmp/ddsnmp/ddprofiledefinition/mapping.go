@@ -8,6 +8,7 @@ package ddprofiledefinition
 import (
 	"fmt"
 	"maps"
+	"reflect"
 )
 
 type MappingMode string
@@ -73,14 +74,9 @@ func (m MappingConfig) String() string {
 
 // UnmarshalYAML supports both the legacy flat-map syntax and the structured object syntax.
 func (m *MappingConfig) UnmarshalYAML(unmarshal func(any) error) error {
-	type plain MappingConfig
-
 	var raw map[string]any
 	if err := unmarshal(&raw); err == nil {
-		if _, ok := raw["mode"]; ok {
-			return m.unmarshalStructured(unmarshal)
-		}
-		if _, ok := raw["items"]; ok {
+		if items, ok := raw["items"]; ok && isStructuredMappingItems(items) {
 			return m.unmarshalStructured(unmarshal)
 		}
 	}
@@ -88,6 +84,11 @@ func (m *MappingConfig) UnmarshalYAML(unmarshal func(any) error) error {
 	var items map[string]string
 	if err := unmarshal(&items); err != nil {
 		return err
+	}
+
+	if len(items) == 0 {
+		*m = MappingConfig{}
+		return nil
 	}
 
 	*m = MappingConfig{
@@ -108,10 +109,18 @@ func (m *MappingConfig) unmarshalStructured(unmarshal func(any) error) error {
 
 	mode := MappingConfig(cfg).Mode
 	items := MappingConfig(cfg).Items
+	if len(items) == 0 {
+		items = nil
+	}
 	if len(items) > 0 && mode == "" {
 		mode = MappingModeExact
 	}
 
 	*m = MappingConfig{Mode: mode, Items: items}
 	return nil
+}
+
+func isStructuredMappingItems(v any) bool {
+	rv := reflect.ValueOf(v)
+	return rv.IsValid() && rv.Kind() == reflect.Map
 }
