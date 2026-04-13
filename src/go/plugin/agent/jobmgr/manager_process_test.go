@@ -17,7 +17,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
@@ -67,57 +66,6 @@ func TestRunProcessConfGroups_ChannelCloseDoesNotSpin(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestRun_WaitTimeoutClearsGateAndKeepsAccepted(t *testing.T) {
-	mgr := New(Config{PluginName: testPluginName})
-	mgr.modules = prepareMockRegistry()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	mgr.ctx = ctx
-
-	done := make(chan struct{})
-	go func() {
-		mgr.run()
-		close(done)
-	}()
-	defer func() {
-		cancel()
-		select {
-		case <-done:
-		case <-time.After(2 * time.Second):
-			t.Fatal("run did not stop after cancel")
-		}
-	}()
-
-	cfg1 := prepareStockCfg("success", "wait1")
-	cfg2 := prepareStockCfg("success", "wait2")
-
-	mgr.addCh <- cfg1
-	require.Eventually(t, mgr.collectorHandler.WaitingForDecision, time.Second, 10*time.Millisecond)
-
-	secondSent := make(chan struct{})
-	go func() {
-		mgr.addCh <- cfg2
-		close(secondSent)
-	}()
-
-	select {
-	case <-secondSent:
-		t.Fatal("second add was processed before wait timeout")
-	case <-time.After(500 * time.Millisecond):
-	}
-
-	select {
-	case <-secondSent:
-	case <-time.After(7 * time.Second):
-		t.Fatal("second add did not progress after wait timeout")
-	}
-
-	entry1, ok := mgr.collectorExposed.LookupByKey(cfg1.ExposedKey())
-	require.True(t, ok, "first config must stay exposed after timeout")
-	assert.Equal(t, dyncfg.StatusAccepted, entry1.Status)
 }
 
 func TestRunNotifyRunningJobs_TickOutsideLock(t *testing.T) {

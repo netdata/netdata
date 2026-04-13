@@ -816,7 +816,6 @@ func newCollectorTestHandler(mgr *Manager, cb dyncfg.Callbacks[confgroup.Config]
 		WaitKey: func(cfg confgroup.Config) string {
 			return cfg.FullName()
 		},
-		WaitTimeout:             waitDecisionTimeout,
 		Path:                    "/collectors/test/Jobs",
 		EnableFailCode:          200,
 		RemoveStockOnEnableFail: true,

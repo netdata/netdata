@@ -151,6 +151,22 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 
 	m.startWorkers(&workersWG)
 
+	// Wake any enqueue() blocked on a full scheduler when the parent context
+	// is canceled. Necessary because the reader loop below may itself be
+	// blocked inside dispatchInvocation -> scheduler.enqueue waiting for
+	// space, and would otherwise miss the ctx.Done signal.
+	stopWatcher := make(chan struct{})
+	defer close(stopWatcher)
+	go func() {
+		select {
+		case <-ctx.Done():
+			if m.scheduler != nil {
+				m.scheduler.stop()
+			}
+		case <-stopWatcher:
+		}
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -311,18 +327,19 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function) {
 		return
 	}
 
+	// scheduler.enqueue blocks when the queue is full; it only returns an
+	// error for invalid inputs or when the scheduler is stopping (shutdown).
+	// Blocking back-pressures the stdin reader, which back-pressures netdata
+	// via the OS pipe — this is intentional, see TODO-dyncfg-jobmgr-sync.md.
 	if err := m.scheduler.enqueue(req); err != nil {
 		cancel()
 		switch {
-		case errors.Is(err, errSchedulerQueueFull):
-			m.respf(fn, 503, "function queue is full")
-			m.observeQueueFull()
 		case errors.Is(err, errSchedulerStopping):
 			m.respf(fn, 503, "functions manager is stopping")
 		case errors.Is(err, errSchedulerInvalid):
 			m.respf(fn, 500, "invalid scheduler request")
 		default:
-			m.respf(fn, 503, "function queue is full")
+			m.respf(fn, 503, "scheduler error")
 		}
 		return
 	}

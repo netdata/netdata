@@ -50,7 +50,6 @@ type Config struct {
 }
 
 const (
-	waitDecisionTimeout    = 5 * time.Second
 	cmdTestWorkerCap       = 4
 	cmdTestDefaultTimeout  = 60 * time.Second
 	cmdTestWorkerDrainWait = 5 * time.Second
@@ -136,7 +135,6 @@ func New(cfg Config) *Manager {
 		WaitKey: func(cfg confgroup.Config) string {
 			return cfg.FullName()
 		},
-		WaitTimeout: waitDecisionTimeout,
 
 		Path:                    fmt.Sprintf(dyncfgCollectorPath, cfg.PluginName),
 		EnableFailCode:          200,
@@ -333,14 +331,6 @@ func (m *Manager) run() {
 			if step.HasCommand {
 				m.dyncfgSeqExec(step.Command)
 				continue
-			}
-			if step.TimedOut {
-				m.Errorf(
-					"dyncfg: timed out waiting for enable/disable decision for '%s' (elapsed=%s threshold=%s); keeping status 'accepted' and continuing",
-					step.Timeout.Key,
-					step.Timeout.Elapsed,
-					step.Timeout.Threshold,
-				)
 			}
 		} else {
 			select {

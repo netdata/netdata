@@ -107,7 +107,9 @@ func TestManager_RuntimeMetricsScenarios(t *testing.T) {
 				in.ch <- functionLine("tx1", "fn")
 				<-started
 				in.ch <- functionLine("tx2", "fn")
-				in.ch <- functionLine("tx3", "fn") // queue-full
+				// tx3 (former queue-full step) removed: the scheduler now blocks
+				// on full instead of rejecting, so the reader would deadlock here
+				// and the FUNCTION_CANCEL below would never be processed.
 				in.ch <- functionLine("tx1", "fn") // duplicate-active
 				in.ch <- "FUNCTION_CANCEL tx1"     // fallback->499
 
@@ -135,11 +137,10 @@ func TestManager_RuntimeMetricsScenarios(t *testing.T) {
 					return ok && pending == 0
 				}, "runtime gauges settle after shutdown")
 
-				assert.GreaterOrEqual(t, runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".queue_full_total", nil), float64(1))
 				assert.GreaterOrEqual(t, runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".cancel_fallback_total", nil), float64(1))
 				assert.GreaterOrEqual(t, runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".late_terminal_dropped_total", nil), float64(1))
 				assert.GreaterOrEqual(t, runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".duplicate_uid_ignored_total", nil), float64(2))
-				assert.Equal(t, float64(5), runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".calls_total", nil))
+				assert.Equal(t, float64(4), runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".calls_total", nil))
 
 				assert.Equal(t, float64(0), runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".invocations_active", nil))
 				assert.Equal(t, float64(0), runtimeMetricValue(t, mgr.runtimeStore, functionsRuntimeMetricPrefix+".invocations_awaiting_result", nil))

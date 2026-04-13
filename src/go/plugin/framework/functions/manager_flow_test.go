@@ -342,35 +342,6 @@ func TestManager_FlowScenarios(t *testing.T) {
 				assert.EqualValues(t, 1, calls.Load())
 			},
 		},
-		"queue full is rejected with 503": {
-			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
-				mgr.queueSize = 1
-				mgr.workerCount = 1
-				started := make(chan struct{}, 1)
-				release := make(chan struct{})
-
-				mgr.Register("fn", func(fn Function) {
-					if fn.UID == "tx1" {
-						started <- struct{}{}
-						<-release
-					}
-					mgr.respUID(fn.UID, 200, "ok")
-				})
-
-				cancel, done := startFlowManager(t, mgr)
-				defer cancel()
-
-				in.ch <- functionLine("tx1", "fn")
-				<-started
-				in.ch <- functionLine("tx2", "fn")
-				in.ch <- functionLine("tx3", "fn")
-				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx3 503", time.Second)
-
-				close(release)
-				close(in.ch)
-				waitForDone(t, done)
-			},
-		},
 		"panic in handler emits 500": {
 			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
 				mgr.Register("fn", func(Function) { panic("boom") })
