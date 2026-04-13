@@ -181,8 +181,13 @@ func TestManager_FlowScenarios(t *testing.T) {
 				assert.Contains(t, out.String(), "FUNCTION_RESULT_BEGIN tx2 200")
 			},
 		},
-		"running cancel fallback emits 499 once": {
+		"running cancel fallback tombstones silently (no emit)": {
 			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				// New semantics: the cancel fallback timer no longer emits a
+				// 499 to netdata. By the time CANCEL arrives, netdata has
+				// already 504'd and removed the inflight transaction, so any
+				// response would just produce a "transaction not found" log.
+				// We only do the bookkeeping (tombstone + lane advance).
 				mgr.cancelFallbackDelay = 50 * time.Millisecond
 				started := make(chan struct{}, 1)
 				release := make(chan struct{})
@@ -200,16 +205,18 @@ func TestManager_FlowScenarios(t *testing.T) {
 				in.ch <- functionLine("tx1", "fn")
 				<-started
 				in.ch <- "FUNCTION_CANCEL tx1"
-				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 499", time.Second)
+				// Wait long enough for the fallback timer to fire.
+				time.Sleep(150 * time.Millisecond)
 
 				close(release)
 				close(in.ch)
 				waitForDone(t, done)
 
-				assert.Equal(t, 1, strings.Count(out.String(), "FUNCTION_RESULT_BEGIN tx1 499"))
+				// No 499 should be emitted, ever.
+				assert.Equal(t, 0, strings.Count(out.String(), "FUNCTION_RESULT_BEGIN tx1 499"))
 			},
 		},
-		"repeated cancel for same uid still emits one terminal response": {
+		"repeated cancel for same uid is idempotent and silent": {
 			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
 				mgr.cancelFallbackDelay = 50 * time.Millisecond
 				started := make(chan struct{}, 1)
@@ -229,13 +236,13 @@ func TestManager_FlowScenarios(t *testing.T) {
 				<-started
 				in.ch <- "FUNCTION_CANCEL tx1"
 				in.ch <- "FUNCTION_CANCEL tx1"
-				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 499", time.Second)
+				time.Sleep(150 * time.Millisecond)
 
 				close(release)
 				close(in.ch)
 				waitForDone(t, done)
 
-				assert.Equal(t, 1, strings.Count(out.String(), "FUNCTION_RESULT_BEGIN tx1 499"))
+				assert.Equal(t, 0, strings.Count(out.String(), "FUNCTION_RESULT_BEGIN tx1 499"))
 			},
 		},
 		"running cancel drops late terminal response": {
@@ -258,14 +265,17 @@ func TestManager_FlowScenarios(t *testing.T) {
 				in.ch <- functionLine("tx1", "fn")
 				<-started
 				in.ch <- "FUNCTION_CANCEL tx1"
-				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx1 499", time.Second)
+				// Let the fallback timer fire (tombstones the UID).
+				time.Sleep(150 * time.Millisecond)
 
 				close(release)
 				close(in.ch)
 				waitForDone(t, done)
 
 				got := out.String()
-				assert.Equal(t, 1, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 499"))
+				// No 499 emitted by the fallback path.
+				assert.Equal(t, 0, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 499"))
+				// Late 200 from the handler is dropped by the tombstone.
 				assert.Equal(t, 0, strings.Count(got, "FUNCTION_RESULT_BEGIN tx1 200"))
 			},
 		},

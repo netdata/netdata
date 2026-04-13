@@ -551,6 +551,42 @@ func (m *Manager) forceFinalizeAll(code int, message string) {
 	}
 }
 
+// markCancelled performs the same bookkeeping as tryFinalize (tombstone +
+// scheduler.complete + remove from invState) but does NOT emit anything to
+// netdata. Used by the cancel fallback path: by the time CANCEL is sent,
+// netdata has already timed out the transaction and removed its inflight
+// entry, so any response we emit just produces a "transaction not found"
+// log on the netdata side. We still need the bookkeeping so the lane
+// advances and any later terminal response from the handler is dropped.
+func (m *Manager) markCancelled(uid string) {
+	if uid == "" {
+		return
+	}
+
+	m.invStateMux.Lock()
+	now := time.Now()
+	m.pruneExpiredTombstonesLocked(now)
+	if _, ok := m.tombstones[uid]; ok {
+		m.invStateMux.Unlock()
+		return
+	}
+
+	var scheduleKey string
+	if rec, ok := m.invState[uid]; ok && rec != nil {
+		m.stopTimersLocked(rec)
+		scheduleKey = rec.scheduleKey
+	}
+	delete(m.invState, uid)
+	m.tombstones[uid] = now.Add(m.tombstoneTTL)
+	m.observeInvocationsLocked()
+	m.invStateMux.Unlock()
+
+	if scheduleKey != "" && m.scheduler != nil {
+		m.scheduler.complete(scheduleKey, uid)
+		m.observeSchedulerPending()
+	}
+}
+
 // tryFinalize emits a terminal response once per transaction UID.
 // Later terminal attempts for the same UID are dropped while tombstone is active.
 func (m *Manager) tryFinalize(uid, source string, emit func()) bool {
@@ -629,7 +665,12 @@ func (m *Manager) startCancelFallbackTimerLocked(uid string, rec *invocationReco
 	uidCopy := uid
 	rec.fallbackTimer = time.AfterFunc(m.cancelFallbackDelay, func() {
 		m.observeCancelFallback()
-		m.respUID(uidCopy, 499, "request canceled")
+		// Don't emit a 499: by the time CANCEL was sent, netdata has already
+		// 504'd the transaction and removed its inflight entry, so any
+		// response we send just produces a "transaction not found" log.
+		// markCancelled does the bookkeeping (tombstone + lane advance) so
+		// the late real response from the handler is dropped.
+		m.markCancelled(uidCopy)
 	})
 }
 
