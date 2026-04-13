@@ -3,38 +3,23 @@
 package jobmgr
 
 import (
-	"context"
-
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
-const (
-	dyncfgBusyMsg         = "Job manager is busy, try again later."
-	dyncfgShuttingDownMsg = "Job manager is shutting down."
-)
+const dyncfgShuttingDownMsg = "Job manager is shutting down."
 
+// enqueueDyncfgFunction blocks until the function is accepted by the run loop
+// or the manager shuts down. We deliberately do NOT honor a per-function
+// timeout here: dropping an awaited enable/disable would wedge jobmgr's wait
+// gate (since waitDecisionTimeout was removed). Back-pressure flows upstream:
+// dyncfgCh full -> framework worker blocks here -> scheduler fills ->
+// dispatchInvocation blocks -> stdin reader pauses -> netdata's pipe write
+// blocks. This is intentional so awaited state transitions preserve ordering
+// and eventually slow the producer instead of being dropped.
 func (m *Manager) enqueueDyncfgFunction(fn dyncfg.Function) {
-	handoffCtx, cancel := m.dyncfgHandoffContext(fn)
-	defer cancel()
-
-	switch dyncfg.BoundedSend(handoffCtx, m.dyncfgCh, fn, dyncfg.DefaultDownstreamHandoffCap) {
-	case dyncfg.BoundedSendOK:
-		return
-	case dyncfg.BoundedSendContextDone:
-		if m.baseContext().Err() != nil {
-			m.dyncfgResponder.SendCodef(fn, 503, dyncfgShuttingDownMsg)
-			return
-		}
-		m.dyncfgResponder.SendCodef(fn, 503, dyncfgBusyMsg)
-	case dyncfg.BoundedSendTimeout:
-		m.dyncfgResponder.SendCodef(fn, 503, dyncfgBusyMsg)
+	select {
+	case m.dyncfgCh <- fn:
+	case <-m.baseContext().Done():
+		m.dyncfgResponder.SendCodef(fn, 503, dyncfgShuttingDownMsg)
 	}
-}
-
-func (m *Manager) dyncfgHandoffContext(fn dyncfg.Function) (context.Context, context.CancelFunc) {
-	ctx := m.baseContext()
-	if timeout := fn.Fn().Timeout; timeout > 0 {
-		return context.WithTimeout(ctx, timeout)
-	}
-	return ctx, func() {}
 }

@@ -33,8 +33,18 @@ const (
 	// queue/worker logic.
 	// TODO: establish and document a MethodHandler goroutine-safety contract
 	// before increasing this default.
-	defaultWorkerCount          = 1
-	defaultQueueSize            = 64
+	defaultWorkerCount = 1
+	// defaultQueueSize is intentionally 1 (not removed: the keyed scheduler is
+	// still the dispatch primitive, we just don't want it to absorb bursts).
+	// Rationale: every downstream stage is single-threaded today (1 worker, 1
+	// jobmgr loop, serial Check()), so admitting more than 1 extra request
+	// only buys wedge surface (a queued request that is later cancelled by
+	// netdata cannot reach jobmgr, so the dyncfg wait gate stays in
+	// 'accepted' forever). With queue=1 the stdin reader back-pressures
+	// earlier through the OS pipe instead of
+	// piling up admitted-but-unprocessed work in stateQueued. If/when we add
+	// real downstream concurrency, raise this again.
+	defaultQueueSize            = 1
 	defaultCancelFallbackDelay  = 5 * time.Second
 	defaultShutdownDrainTimeout = 8 * time.Second
 	defaultTombstoneTTL         = 60 * time.Second
@@ -150,6 +160,22 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 	var workersWG sync.WaitGroup
 
 	m.startWorkers(&workersWG)
+
+	// Wake any enqueue() blocked on a full scheduler when the parent context
+	// is canceled. Necessary because the reader loop below may itself be
+	// blocked inside dispatchInvocation -> scheduler.enqueue waiting for
+	// space, and would otherwise miss the ctx.Done signal.
+	stopWatcher := make(chan struct{})
+	defer close(stopWatcher)
+	go func() {
+		select {
+		case <-ctx.Done():
+			if m.scheduler != nil {
+				m.scheduler.stop()
+			}
+		case <-stopWatcher:
+		}
+	}()
 
 	for {
 		select {
@@ -311,18 +337,24 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function) {
 		return
 	}
 
+	// scheduler.enqueue blocks when the queue is full; it only returns an
+	// error for invalid inputs or when the scheduler is stopping (shutdown).
+	// The blocking is intentional: by stalling here, the stdin reader slows
+	// down as well, which propagates back-pressure to netdata through the OS
+	// pipe instead of allowing unbounded buffering or dropping requests.
 	if err := m.scheduler.enqueue(req); err != nil {
 		cancel()
 		switch {
-		case errors.Is(err, errSchedulerQueueFull):
-			m.respf(fn, 503, "function queue is full")
-			m.observeQueueFull()
 		case errors.Is(err, errSchedulerStopping):
 			m.respf(fn, 503, "functions manager is stopping")
 		case errors.Is(err, errSchedulerInvalid):
 			m.respf(fn, 500, "invalid scheduler request")
 		default:
-			m.respf(fn, 503, "function queue is full")
+			// Should be unreachable: enqueue's other return points block.
+			// If a new error variant is added in the future, surface it
+			// loudly instead of swallowing it as a generic 5xx.
+			m.Warningf("unexpected scheduler enqueue error for '%s': %v", fn.Name, err)
+			m.respf(fn, 500, "unexpected scheduler error: %v", err)
 		}
 		return
 	}
@@ -419,14 +451,15 @@ func (m *Manager) handleCancelEvent(event inputEvent) {
 		return
 	}
 
-	state, ok := m.requestCancellation(uid)
-	if !ok {
+	if _, ok := m.requestCancellation(uid); !ok {
 		m.Debugf("ignoring cancel for unknown transaction id: %s", uid)
 		return
 	}
-	if state == stateQueued {
-		m.respUID(uid, 499, "request canceled")
-	}
+	// No immediate terminal response. requestCancellation handled state
+	// transitions: for queued functions the cancel is intentionally ignored
+	// (function will run to completion); for running/awaiting functions a
+	// fallback timer was armed and will emit 499 + tombstone after
+	// cancelFallbackDelay.
 }
 
 func (m *Manager) requestCancellation(uid string) (invocationState, bool) {
@@ -438,6 +471,22 @@ func (m *Manager) requestCancellation(uid string) (invocationState, bool) {
 		return 0, false
 	}
 
+	// For stateQueued we deliberately ignore the cancel entirely: no
+	// cancelRequested flag, no ctx cancellation, no fallback timer, no
+	// tombstone. Reason: dyncfg commands (enable/disable/update/restart)
+	// carry side-effects that must reach jobmgr, otherwise the wait gate
+	// stays in 'accepted' forever (since the wait-decision timeout was
+	// removed). Setting cancelRequested would make startInvocation skip the
+	// handler when the worker pulls; the fallback timer's tryFinalize would
+	// also tombstone+remove from invState before the worker gets there. So
+	// either path wedges the function. We let it run to completion as if
+	// nothing happened; netdata already considers the transaction done (it
+	// 504'd before sending CANCEL), so the eventual terminal response just
+	// produces a benign "transaction not found" log on the netdata side.
+	if rec.state == stateQueued {
+		return rec.state, true
+	}
+
 	if rec.cancelRequested {
 		return rec.state, true
 	}
@@ -446,14 +495,7 @@ func (m *Manager) requestCancellation(uid string) (invocationState, bool) {
 		rec.cancel()
 	}
 
-	if rec.state == stateQueued && m.scheduler != nil {
-		m.scheduler.cancelQueued(rec.scheduleKey, uid)
-		m.observeSchedulerPending()
-	}
-
-	if rec.state == stateRunning || rec.state == stateAwaitingResult {
-		m.startCancelFallbackTimerLocked(uid, rec)
-	}
+	m.startCancelFallbackTimerLocked(uid, rec)
 
 	return rec.state, true
 }
@@ -506,6 +548,42 @@ func (m *Manager) forceFinalizeAll(code int, message string) {
 
 	for _, uid := range uids {
 		m.respUID(uid, code, "%s", message)
+	}
+}
+
+// markCancelled performs the same bookkeeping as tryFinalize (tombstone +
+// scheduler.complete + remove from invState) but does NOT emit anything to
+// netdata. Used by the cancel fallback path: by the time CANCEL is sent,
+// netdata has already timed out the transaction and removed its inflight
+// entry, so any response we emit just produces a "transaction not found"
+// log on the netdata side. We still need the bookkeeping so the lane
+// advances and any later terminal response from the handler is dropped.
+func (m *Manager) markCancelled(uid string) {
+	if uid == "" {
+		return
+	}
+
+	m.invStateMux.Lock()
+	now := time.Now()
+	m.pruneExpiredTombstonesLocked(now)
+	if _, ok := m.tombstones[uid]; ok {
+		m.invStateMux.Unlock()
+		return
+	}
+
+	var scheduleKey string
+	if rec, ok := m.invState[uid]; ok && rec != nil {
+		m.stopTimersLocked(rec)
+		scheduleKey = rec.scheduleKey
+	}
+	delete(m.invState, uid)
+	m.tombstones[uid] = now.Add(m.tombstoneTTL)
+	m.observeInvocationsLocked()
+	m.invStateMux.Unlock()
+
+	if scheduleKey != "" && m.scheduler != nil {
+		m.scheduler.complete(scheduleKey, uid)
+		m.observeSchedulerPending()
 	}
 }
 
@@ -587,7 +665,12 @@ func (m *Manager) startCancelFallbackTimerLocked(uid string, rec *invocationReco
 	uidCopy := uid
 	rec.fallbackTimer = time.AfterFunc(m.cancelFallbackDelay, func() {
 		m.observeCancelFallback()
-		m.respUID(uidCopy, 499, "request canceled")
+		// Don't emit a 499: by the time CANCEL was sent, netdata has already
+		// 504'd the transaction and removed its inflight entry, so any
+		// response we send just produces a "transaction not found" log.
+		// markCancelled does the bookkeeping (tombstone + lane advance) so
+		// the late real response from the handler is dropped.
+		m.markCancelled(uidCopy)
 	})
 }
 
