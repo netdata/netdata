@@ -329,8 +329,9 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function) {
 
 	// scheduler.enqueue blocks when the queue is full; it only returns an
 	// error for invalid inputs or when the scheduler is stopping (shutdown).
-	// Blocking back-pressures the stdin reader, which back-pressures netdata
-	// via the OS pipe — this is intentional, see TODO-dyncfg-jobmgr-sync.md.
+	// The blocking is intentional: by stalling here, the stdin reader slows
+	// down as well, which propagates back-pressure to netdata through the OS
+	// pipe instead of allowing unbounded buffering or dropping requests.
 	if err := m.scheduler.enqueue(req); err != nil {
 		cancel()
 		switch {

@@ -13,8 +13,9 @@ const sdShuttingDownMsg = "Service discovery is shutting down."
 // enqueueDyncfgFunction blocks until the function is accepted by the run loop
 // or service discovery shuts down. We deliberately do NOT honor a per-function
 // timeout here: dropping an awaited enable/disable would wedge the wait gate
-// (since waitDecisionTimeout was removed). Back-pressure flows upstream to
-// netdata via the OS pipe. See TODO-dyncfg-jobmgr-sync.md.
+// (since waitDecisionTimeout was removed) because the caller would keep
+// waiting for a decision that can never be produced. Back-pressure flows
+// upstream to netdata via the OS pipe.
 func (d *ServiceDiscovery) enqueueDyncfgFunction(fn dyncfg.Function) {
 	ctx := d.ctx
 	if ctx == nil {

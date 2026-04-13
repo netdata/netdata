@@ -53,9 +53,10 @@ func (s *keyScheduler) enqueue(req *invocationRequest) error {
 
 	// Block until there is space, or the scheduler is stopped. We must not
 	// drop dyncfg commands silently: an awaited enable/disable that is dropped
-	// here would wedge jobmgr's wait gate (see TODO-dyncfg-jobmgr-sync.md).
-	// Back-pressure flows upstream: the manager run-loop stops draining stdin,
-	// netdata's write blocks on the OS pipe.
+	// here would wedge jobmgr's wait gate by leaving it waiting for a
+	// completion that will never arrive. Back-pressure flows upstream: the
+	// manager run-loop stops draining stdin, and netdata's write blocks on
+	// the OS pipe.
 	for {
 		if s.stopping || !s.accepting {
 			return errSchedulerStopping

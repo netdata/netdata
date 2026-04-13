@@ -14,7 +14,8 @@ const dyncfgShuttingDownMsg = "Job manager is shutting down."
 // gate (since waitDecisionTimeout was removed). Back-pressure flows upstream:
 // dyncfgCh full -> framework worker blocks here -> scheduler fills ->
 // dispatchInvocation blocks -> stdin reader pauses -> netdata's pipe write
-// blocks. See TODO-dyncfg-jobmgr-sync.md.
+// blocks. This is intentional so awaited state transitions preserve ordering
+// and eventually slow the producer instead of being dropped.
 func (m *Manager) enqueueDyncfgFunction(fn dyncfg.Function) {
 	select {
 	case m.dyncfgCh <- fn:
