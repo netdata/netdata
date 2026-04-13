@@ -33,8 +33,18 @@ const (
 	// queue/worker logic.
 	// TODO: establish and document a MethodHandler goroutine-safety contract
 	// before increasing this default.
-	defaultWorkerCount          = 1
-	defaultQueueSize            = 64
+	defaultWorkerCount = 1
+	// defaultQueueSize is intentionally 1 (not removed: the keyed scheduler is
+	// still the dispatch primitive, we just don't want it to absorb bursts).
+	// Rationale: every downstream stage is single-threaded today (1 worker, 1
+	// jobmgr loop, serial Check()), so admitting more than 1 extra request
+	// only buys wedge surface (a queued request that is later cancelled by
+	// netdata cannot reach jobmgr, so the dyncfg wait gate stays in
+	// 'accepted' forever). With queue=1 the stdin reader back-pressures
+	// earlier through the OS pipe instead of
+	// piling up admitted-but-unprocessed work in stateQueued. If/when we add
+	// real downstream concurrency, raise this again.
+	defaultQueueSize            = 1
 	defaultCancelFallbackDelay  = 5 * time.Second
 	defaultShutdownDrainTimeout = 8 * time.Second
 	defaultTombstoneTTL         = 60 * time.Second
@@ -441,14 +451,15 @@ func (m *Manager) handleCancelEvent(event inputEvent) {
 		return
 	}
 
-	state, ok := m.requestCancellation(uid)
-	if !ok {
+	if _, ok := m.requestCancellation(uid); !ok {
 		m.Debugf("ignoring cancel for unknown transaction id: %s", uid)
 		return
 	}
-	if state == stateQueued {
-		m.respUID(uid, 499, "request canceled")
-	}
+	// No immediate terminal response. requestCancellation handled state
+	// transitions: for queued functions the cancel is intentionally ignored
+	// (function will run to completion); for running/awaiting functions a
+	// fallback timer was armed and will emit 499 + tombstone after
+	// cancelFallbackDelay.
 }
 
 func (m *Manager) requestCancellation(uid string) (invocationState, bool) {
@@ -460,6 +471,22 @@ func (m *Manager) requestCancellation(uid string) (invocationState, bool) {
 		return 0, false
 	}
 
+	// For stateQueued we deliberately ignore the cancel entirely: no
+	// cancelRequested flag, no ctx cancellation, no fallback timer, no
+	// tombstone. Reason: dyncfg commands (enable/disable/update/restart)
+	// carry side-effects that must reach jobmgr, otherwise the wait gate
+	// stays in 'accepted' forever (since the wait-decision timeout was
+	// removed). Setting cancelRequested would make startInvocation skip the
+	// handler when the worker pulls; the fallback timer's tryFinalize would
+	// also tombstone+remove from invState before the worker gets there. So
+	// either path wedges the function. We let it run to completion as if
+	// nothing happened; netdata already considers the transaction done (it
+	// 504'd before sending CANCEL), so the eventual terminal response just
+	// produces a benign "transaction not found" log on the netdata side.
+	if rec.state == stateQueued {
+		return rec.state, true
+	}
+
 	if rec.cancelRequested {
 		return rec.state, true
 	}
@@ -468,14 +495,7 @@ func (m *Manager) requestCancellation(uid string) (invocationState, bool) {
 		rec.cancel()
 	}
 
-	if rec.state == stateQueued && m.scheduler != nil {
-		m.scheduler.cancelQueued(rec.scheduleKey, uid)
-		m.observeSchedulerPending()
-	}
-
-	if rec.state == stateRunning || rec.state == stateAwaitingResult {
-		m.startCancelFallbackTimerLocked(uid, rec)
-	}
+	m.startCancelFallbackTimerLocked(uid, rec)
 
 	return rec.state, true
 }

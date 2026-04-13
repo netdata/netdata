@@ -114,14 +114,22 @@ func TestManager_FlowScenarios(t *testing.T) {
 	tests := map[string]struct {
 		run func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer)
 	}{
-		"queued cancel emits 499 and skips execution": {
+		"queued cancel is ignored; function still executes": {
 			run: func(t *testing.T, mgr *Manager, in *chanInput, out *safeBuffer) {
+				// New semantics: a CANCEL for a queued function is a no-op at
+				// the framework level. The function stays in the scheduler,
+				// runs to completion when its turn comes, and any terminal
+				// response goes through normally. No 499 is emitted by the
+				// framework (netdata already considers the transaction done
+				// via its own per-transaction timer, so an extra 499 would
+				// just be noise).
 				var (
 					mu       sync.Mutex
 					executed []string
 				)
 				started := make(chan struct{}, 1)
 				release := make(chan struct{})
+				tx2Done := make(chan struct{})
 
 				mgr.Register("fn", func(fn Function) {
 					mu.Lock()
@@ -130,6 +138,14 @@ func TestManager_FlowScenarios(t *testing.T) {
 					if fn.UID == "tx1" {
 						started <- struct{}{}
 						<-release
+						// Emit terminal response so the per-key lane advances
+						// to tx2; otherwise the lane stays "owned" by tx1 and
+						// tx2 never gets picked up.
+						mgr.respUID(fn.UID, 200, "ok")
+					}
+					if fn.UID == "tx2" {
+						mgr.respUID(fn.UID, 200, "ok")
+						close(tx2Done)
 					}
 				})
 
@@ -140,14 +156,29 @@ func TestManager_FlowScenarios(t *testing.T) {
 				<-started
 				in.ch <- functionLine("tx2", "fn")
 				in.ch <- "FUNCTION_CANCEL tx2"
+
+				// tx2 must NOT receive a 499 from the framework. We can't
+				// assert "no 499 ever" without waiting forever, but we can at
+				// least verify it isn't there immediately after CANCEL.
+				time.Sleep(50 * time.Millisecond)
+				assert.NotContains(t, out.String(), "FUNCTION_RESULT_BEGIN tx2 499")
+
 				close(release)
+				select {
+				case <-tx2Done:
+				case <-time.After(time.Second):
+					t.Fatal("tx2 did not execute after release")
+				}
+
 				close(in.ch)
 				waitForDone(t, done)
 
-				waitForSubstring(t, out.String, "FUNCTION_RESULT_BEGIN tx2 499", time.Second)
+				// Both tx1 and tx2 should have executed (in order).
 				mu.Lock()
 				defer mu.Unlock()
-				assert.Equal(t, []string{"tx1"}, executed)
+				assert.Equal(t, []string{"tx1", "tx2"}, executed)
+				// tx2's normal 200 response went through (no tombstone).
+				assert.Contains(t, out.String(), "FUNCTION_RESULT_BEGIN tx2 200")
 			},
 		},
 		"running cancel fallback emits 499 once": {
