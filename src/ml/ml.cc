@@ -30,33 +30,26 @@ static void __attribute__((destructor)) destroy_mutex(void) {
 
 namespace {
 
-template <bool NeedLowerBound, bool NeedUpperBound>
-inline bool ml_sqlite_int64_fits_time_t(sqlite3_int64 value)
+// Guard against silent truncation when time_t is narrower than sqlite3_int64
+// (e.g. 32-bit builds). if constexpr ensures the dead branches are elided at
+// compile time on 64-bit platforms, avoiding constant-expression warnings.
+static inline bool ml_sqlite_int64_fits_time_t(sqlite3_int64 value)
 {
-    (void)value;
+    if constexpr (!std::numeric_limits<time_t>::is_signed ||
+                  std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits) {
+        // coverity[CONSTANT_EXPRESSION_RESULT] - on 64-bit, Coverity still analyzes
+        // this dead branch; reachable only on 32-bit or unsigned time_t builds.
+        if (value < (sqlite3_int64) std::numeric_limits<time_t>::min())
+            return false;
+    }
+    if constexpr (std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits) {
+        // coverity[CONSTANT_EXPRESSION_RESULT] - dead on same-width 64-bit time_t;
+        // reachable only when time_t is narrower than sqlite3_int64, but Coverity
+        // still analyzes this discarded if constexpr branch.
+        if (value > (sqlite3_int64) std::numeric_limits<time_t>::max())
+            return false;
+    }
     return true;
-}
-
-template <>
-inline bool ml_sqlite_int64_fits_time_t<true, false>(sqlite3_int64 value)
-{
-    const sqlite3_int64 kTimeMin = (sqlite3_int64) std::numeric_limits<time_t>::min();
-    return value >= kTimeMin;
-}
-
-template <>
-inline bool ml_sqlite_int64_fits_time_t<false, true>(sqlite3_int64 value)
-{
-    const sqlite3_int64 kTimeMax = (sqlite3_int64) std::numeric_limits<time_t>::max();
-    return value <= kTimeMax;
-}
-
-template <>
-inline bool ml_sqlite_int64_fits_time_t<true, true>(sqlite3_int64 value)
-{
-    const sqlite3_int64 kTimeMin = (sqlite3_int64) std::numeric_limits<time_t>::min();
-    const sqlite3_int64 kTimeMax = (sqlite3_int64) std::numeric_limits<time_t>::max();
-    return value >= kTimeMin && value <= kTimeMax;
 }
 
 }
@@ -464,16 +457,10 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
 
         sqlite3_int64 raw_after  = sqlite3_column_int64(res, 0);
         sqlite3_int64 raw_before = sqlite3_column_int64(res, 1);
-        constexpr bool kNeedLowerBound =
-            !std::numeric_limits<time_t>::is_signed ||
-            std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits;
-        constexpr bool kNeedUpperBound =
-            std::numeric_limits<time_t>::digits < std::numeric_limits<sqlite3_int64>::digits;
-
         // Protect against silent truncation when time_t is narrower than int64_t
         // (e.g. 32-bit builds, corrupted DB, or far-future timestamps).
-        if (!ml_sqlite_int64_fits_time_t<kNeedLowerBound, kNeedUpperBound>(raw_after) ||
-            !ml_sqlite_int64_fits_time_t<kNeedLowerBound, kNeedUpperBound>(raw_before)) {
+        if (!ml_sqlite_int64_fits_time_t(raw_after) ||
+            !ml_sqlite_int64_fits_time_t(raw_before)) {
             error_report("Skipping ML model row with out-of-range timestamps: after=%" PRId64 " before=%" PRId64,
                          (int64_t) raw_after, (int64_t) raw_before);
             continue;

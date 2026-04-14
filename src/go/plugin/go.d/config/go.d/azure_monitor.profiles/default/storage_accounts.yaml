@@ -1,131 +1,130 @@
 ---
-id: storage_accounts
-name: Azure Storage Account
+display_name: Azure Storage Account
 resource_type: Microsoft.Storage/storageAccounts
 metrics:
-- id: availability
-  azure_name: Availability
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: transactions
-  azure_name: Transactions
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: ingress
-  azure_name: Ingress
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: egress
-  azure_name: Egress
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: success_e2e_latency
-  azure_name: SuccessE2ELatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: success_server_latency
-  azure_name: SuccessServerLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: used_capacity
-  azure_name: UsedCapacity
-  time_grain: PT1H
-  series:
-  - aggregation: average
-    kind: gauge
+  - id: availability
+    azure_name: Availability
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: transactions
+    azure_name: Transactions
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: ingress
+    azure_name: Ingress
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: egress
+    azure_name: Egress
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: success_e2e_latency
+    azure_name: SuccessE2ELatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: success_server_latency
+    azure_name: SuccessServerLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: used_capacity
+    azure_name: UsedCapacity
+    time_grain: PT1H
+    series:
+      - aggregation: average
+        kind: gauge
 template:
   family: Azure Storage Account
   context_namespace: storage_accounts
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_storage_accounts__availability
-    title: Azure Storage Account Availability
-    context: availability
-    family: Availability
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: storage_accounts.availability_average
-      name: average
-  - id: am_azure_storage_accounts__transactions
-    title: Azure Storage Account Transactions
-    context: transactions
-    family: Throughput
-    type: line
-    units: transactions/s
-    algorithm: incremental
-    dimensions:
-    - selector: storage_accounts.transactions_total
-      name: total
-  - id: am_azure_storage_accounts__throughput
-    title: Azure Storage Account Throughput
-    context: throughput
-    family: Throughput
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: storage_accounts.ingress_total
-      name: ingress
-    - selector: storage_accounts.egress_total
-      name: egress
-  - id: am_azure_storage_accounts__e2e_latency
-    title: Azure Storage Account End-to-End Latency
-    context: e2e_latency
-    family: Latency
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: storage_accounts.success_e2e_latency_average
-      name: average
-    - selector: storage_accounts.success_e2e_latency_maximum
-      name: maximum
-  - id: am_azure_storage_accounts__server_latency
-    title: Azure Storage Account Server Latency
-    context: server_latency
-    family: Latency
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: storage_accounts.success_server_latency_average
-      name: average
-    - selector: storage_accounts.success_server_latency_maximum
-      name: maximum
-  - id: am_azure_storage_accounts__used_capacity
-    title: Azure Storage Account Used Capacity
-    context: used_capacity
-    family: Capacity
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: storage_accounts.used_capacity_average
-      name: average
+    - id: am_azure_storage_accounts__availability
+      title: Azure Storage Account Availability
+      context: availability
+      family: Availability
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: availability_average
+          name: average
+    - id: am_azure_storage_accounts__transactions
+      title: Azure Storage Account Transactions
+      context: transactions
+      family: Throughput
+      type: line
+      units: transactions/s
+      algorithm: incremental
+      dimensions:
+        - selector: transactions_total
+          name: total
+    - id: am_azure_storage_accounts__throughput
+      title: Azure Storage Account Throughput
+      context: throughput
+      family: Throughput
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: ingress_total
+          name: ingress
+        - selector: egress_total
+          name: egress
+    - id: am_azure_storage_accounts__e2e_latency
+      title: Azure Storage Account End-to-End Latency
+      context: e2e_latency
+      family: Latency
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: success_e2e_latency_average
+          name: average
+        - selector: success_e2e_latency_maximum
+          name: maximum
+    - id: am_azure_storage_accounts__server_latency
+      title: Azure Storage Account Server Latency
+      context: server_latency
+      family: Latency
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: success_server_latency_average
+          name: average
+        - selector: success_server_latency_maximum
+          name: maximum
+    - id: am_azure_storage_accounts__used_capacity
+      title: Azure Storage Account Used Capacity
+      context: used_capacity
+      family: Capacity
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: used_capacity_average
+          name: average

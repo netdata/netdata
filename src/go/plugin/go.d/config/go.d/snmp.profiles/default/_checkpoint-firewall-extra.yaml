@@ -1,0 +1,117 @@
+# Check Point firewall extras (CHECKPOINT-MIB)
+# Complements the base checkpoint.yaml with logged packets, SIC trust,
+# overload drops, and firewall kernel memory pools.
+
+metrics:
+  # Logged packets — completes the accepted/rejected/dropped/logged quartet
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.7.0
+      name: fwLogged
+      chart_meta:
+        description: "Logged packets per second"
+        family: 'Security/Firewall/Packet/Logged'
+        unit: "{packet}/s"
+
+  # Fully-utilized drops — packets dropped because the kernel instance was saturated
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.25.26.0
+      name: fwFullyUtilizedDrops
+      chart_meta:
+        description: "Packets dropped per second due to fully utilized firewall instance"
+        family: 'Security/Firewall/Packet/OverloadDropped'
+        unit: "{packet}/s"
+
+  # SIC trust state — gateway-to-management authentication
+  # CHECKPOINT-MIB describes: Not initialized(0), Initialized but not established(1),
+  # Established(2), Error(3), Unknown(4). The OID is displaystring; devices return
+  # the numeric code as a string.
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.12.0
+      name: fwSICTrustState
+      chart_meta:
+        description: "SIC trust state between gateway and management server"
+        family: 'Security/Firewall/SIC/Trust'
+        unit: "{status}"
+      mapping:
+        0: not_initialized
+        1: init_not_established
+        2: trust_established
+        3: error
+        4: unknown
+
+  # Firewall kernel memory pool (fwKmem) — distinct from OS-level memory
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.26.2.1.0
+      name: fwKmemSystemPhysicalMem
+      chart_meta:
+        description: "Firewall kernel total system physical memory"
+        family: 'Security/Firewall/KernelMemory/Physical'
+        unit: "By"
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.26.2.2.0
+      name: fwKmemAvailablePhysicalMem
+      chart_meta:
+        description: "Firewall kernel physical memory available for allocation"
+        family: 'Security/Firewall/KernelMemory/Available'
+        unit: "By"
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.26.2.4.0
+      name: fwKmemBytesUsed
+      chart_meta:
+        description: "Firewall kernel memory bytes in use"
+        family: 'Security/Firewall/KernelMemory/Used'
+        unit: "By"
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.26.2.8.0
+      name: fwKmemBytesPeak
+      chart_meta:
+        description: "Firewall kernel memory peak bytes used"
+        family: 'Security/Firewall/KernelMemory/Peak'
+        unit: "By"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.26.2.15.0
+      name: fwKmemFailedAlloc
+      chart_meta:
+        description: "Firewall kernel memory allocation failures per second"
+        family: 'Security/Firewall/KernelMemory/FailedAlloc'
+        unit: "{failure}/s"
+
+  # Firewall heap memory pool (fwHmem)
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.26.1.11.0
+      name: fwHmemBytesUsed
+      chart_meta:
+        description: "Firewall heap memory bytes in use"
+        family: 'Security/Firewall/HeapMemory/Used'
+        unit: "By"
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.26.1.15.0
+      name: fwHmemBytesPeak
+      chart_meta:
+        description: "Firewall heap memory peak bytes used"
+        family: 'Security/Firewall/HeapMemory/Peak'
+        unit: "By"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.1.26.1.21.0
+      name: fwHmemFailedAlloc
+      chart_meta:
+        description: "Firewall heap memory allocation failures per second"
+        family: 'Security/Firewall/HeapMemory/FailedAlloc'
+        unit: "{failure}/s"

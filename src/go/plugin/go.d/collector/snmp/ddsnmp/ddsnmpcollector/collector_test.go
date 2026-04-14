@@ -149,3 +149,89 @@ func TestCollector_Collect_StatsSnapshot(t *testing.T) {
 
 	assert.Equal(t, expected, pm.Stats)
 }
+
+func TestCollector_Collect_PreservesHiddenMetrics(t *testing.T) {
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+
+	expectSNMPWalk(mockHandler,
+		gosnmp.Version2c,
+		"1.3.6.1.4.1.99999.1",
+		[]gosnmp.SnmpPDU{
+			createCounter32PDU("1.3.6.1.4.1.99999.1.1.1", 100),
+		},
+	)
+
+	profile := &ddsnmp.Profile{
+		SourceFile: "hidden-metrics-profile.yaml",
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Metrics: []ddprofiledefinition.MetricsConfig{
+				{
+					Table: ddprofiledefinition.SymbolConfig{
+						OID:  "1.3.6.1.4.1.99999.1",
+						Name: "privateTable",
+					},
+					Symbols: []ddprofiledefinition.SymbolConfig{
+						{
+							OID:  "1.3.6.1.4.1.99999.1.1",
+							Name: "_privateMetric",
+						},
+					},
+				},
+			},
+			VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+				{
+					Name: "privateMetric_total",
+					Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+						{
+							Metric: "_privateMetric",
+							Table:  "privateTable",
+						},
+					},
+				},
+				{
+					Name: "_privateMetric_total",
+					Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+						{
+							Metric: "_privateMetric",
+							Table:  "privateTable",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	handleCrossTableTagsWithoutMetrics(profile)
+	require.NoError(t, ddsnmp.CompileTransforms(profile))
+
+	collector := New(Config{
+		SnmpClient:  mockHandler,
+		Profiles:    []*ddsnmp.Profile{profile},
+		Log:         logger.New(),
+		SysObjectID: "",
+	})
+
+	results, err := collector.Collect()
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	pm := results[0]
+	require.Len(t, pm.HiddenMetrics, 2)
+	assert.Equal(t, "_privateMetric", pm.HiddenMetrics[0].Name)
+	assert.Equal(t, "_privateMetric_total", pm.HiddenMetrics[1].Name)
+	require.Len(t, pm.Metrics, 1)
+	assert.Equal(t, "privateMetric_total", pm.Metrics[0].Name)
+}
+
+func TestLongestCommonPrefix(t *testing.T) {
+	assert.Equal(t, "1.3.6.1.2.1.31.1.1.1", longestCommonPrefix([]string{
+		"1.3.6.1.2.1.31.1.1.1.1",
+		"1.3.6.1.2.1.31.1.1.1.18",
+	}))
+
+	assert.Equal(t, "1.3.6.1.4.1.2636.5.1.1.2.1.1.1", longestCommonPrefix([]string{
+		"1.3.6.1.4.1.2636.5.1.1.2.1.1.1.11",
+		"1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14",
+	}))
+}

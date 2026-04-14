@@ -8,10 +8,22 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
 
 func (s *store) init(_ context.Context) error {
-	published := &publishedStore{provider: s.provider}
+	switch {
+	case s.Config.Timeout.Duration() < 0:
+		return fmt.Errorf("timeout cannot be negative")
+	case s.Config.Timeout.Duration() == 0:
+		s.Config.Timeout = defaultTimeout
+	}
+	s.runtime = &runtime{
+		apiClient:      httpx.APIClient(s.Config.Timeout.Duration()),
+		metadataClient: httpx.NoProxyClient(s.Config.Timeout.Duration()),
+	}
+
+	published := &publishedStore{runtime: s.runtime}
 
 	switch strings.TrimSpace(s.Config.Mode) {
 	case "metadata":

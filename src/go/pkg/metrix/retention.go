@@ -40,7 +40,7 @@ func evictOldestSeries[T cmp.Ordered](
 	})
 
 	evictCount := len(series) - maxSeries
-	for i := 0; i < evictCount; i++ {
+	for i := range evictCount {
 		key := candidates[i].key
 		delete(series, key)
 		if onEvict != nil {

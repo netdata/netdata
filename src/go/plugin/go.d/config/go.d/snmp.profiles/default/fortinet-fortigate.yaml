@@ -6,6 +6,11 @@ extends:
   - _system-base.yaml
   - _std-if-mib.yaml
   - _fortinet-fortigate-vpn-tunnel.yaml
+  - _fortinet-fortigate-hardware.yaml
+  - _fortinet-fortigate-ha.yaml
+  - _fortinet-fortigate-sdwan.yaml
+  - _fortinet-fortigate-security.yaml
+  - _fortinet-fortigate-wireless.yaml
 
 # All fortinet devices have sysObjectID starting with `1.3.6.1.4.1.12356.101.1` (fgModel)
 # We only target Fortinet Fortigate devices (1.3.6.1.4.1.12356.101/fnFortiGateMib)
@@ -136,6 +141,20 @@ metrics:
         chart_meta:
           description: Processor CPU system space usage averaged over last minute
           family: 'System/Processor/Usage/System'
+          unit: "%"
+      # The processor's CPU user space usage, which is an average calculated over the last minute.
+      - OID: 1.3.6.1.4.1.12356.101.4.4.2.1.9
+        name: fgProcessorUserUsage
+        chart_meta:
+          description: Processor CPU user space usage averaged over last minute
+          family: 'System/Processor/Usage/User'
+          unit: "%"
+      # The processor's CPU usage (percentage), which is a 5-second average.
+      - OID: 1.3.6.1.4.1.12356.101.4.4.2.1.3
+        name: fgProcessorUsage5sec
+        chart_meta:
+          description: Processor CPU usage 5-second average
+          family: 'System/Processor/Usage/5sec'
           unit: "%"
     metric_tags:
       # A unique identifier within the fgProcessorTable.
@@ -328,6 +347,56 @@ metrics:
         description: Average IPv6 session setup rate over the past minute
         family: 'Security/Session/IPv6/Rate/Average'
         unit: "{session}/s"
+  # Session rate trend scalars (10/30/60 minute averages)
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12356.101.4.1.12.0
+      name: fgSysSesRate10
+      chart_meta:
+        description: Average session setup rate over the past 10 minutes
+        family: 'Security/Session/Rate/10min'
+        unit: "{session}/s"
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12356.101.4.1.13.0
+      name: fgSysSesRate30
+      chart_meta:
+        description: Average session setup rate over the past 30 minutes
+        family: 'Security/Session/Rate/30min'
+        unit: "{session}/s"
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12356.101.4.1.14.0
+      name: fgSysSesRate60
+      chart_meta:
+        description: Average session setup rate over the past 60 minutes
+        family: 'Security/Session/Rate/60min'
+        unit: "{session}/s"
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12356.101.4.1.17.0
+      name: fgSysSes6Rate10
+      chart_meta:
+        description: Average IPv6 session setup rate over the past 10 minutes
+        family: 'Security/Session/IPv6/Rate/10min'
+        unit: "{session}/s"
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12356.101.4.1.18.0
+      name: fgSysSes6Rate30
+      chart_meta:
+        description: Average IPv6 session setup rate over the past 30 minutes
+        family: 'Security/Session/IPv6/Rate/30min'
+        unit: "{session}/s"
+  - MIB: FORTINET-FORTIGATE-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.12356.101.4.1.19.0
+      name: fgSysSes6Rate60
+      chart_meta:
+        description: Average IPv6 session setup rate over the past 60 minutes
+        family: 'Security/Session/IPv6/Rate/60min'
+        unit: "{session}/s"
+
   - MIB: FORTINET-FORTIGATE-MIB
     symbol:
       # HTTP proxy current connections.
@@ -346,6 +415,10 @@ metrics:
         description: Maximum number of connections supported by HTTP proxy
         family: 'Security/Proxy/HTTP/Connection/Maximum'
         unit: "{connection}"
+
+  # NOTE: interface-to-VDOM binding (fgIntfEntVdom from fgIntfTable) is deferred.
+  # Requires engine support for adding tags to inherited table metrics.
+  # Per-VDOM monitoring is available via fgVdTable (session/CPU/memory per VDOM).
 
   ### Firewall
   # Firewall policy statistics table.
@@ -403,3 +476,40 @@ metrics:
       # Firewall policy6 ID. Only enabled policies are present in this table. Policy IDs are only unique within a virtual domain.
       - tag: policy6_index
         index: 2
+
+virtual_metrics:
+  ### Session rate trend — combined 1/10/30/60 min averages per IP version
+  - name: fgSysSesRateTrend
+    sources:
+      - {metric: fgSysSesRate1, as: 1m}
+      - {metric: fgSysSesRate10, as: 10m}
+      - {metric: fgSysSesRate30, as: 30m}
+      - {metric: fgSysSesRate60, as: 60m}
+    chart_meta:
+      description: Session setup rate trend (IPv4)
+      family: 'Security/Session/Rate/Trend'
+      unit: "{session}/s"
+
+  - name: fgSysSes6RateTrend
+    sources:
+      - {metric: fgSysSes6Rate1, as: 1m}
+      - {metric: fgSysSes6Rate10, as: 10m}
+      - {metric: fgSysSes6Rate30, as: 30m}
+      - {metric: fgSysSes6Rate60, as: 60m}
+    chart_meta:
+      description: Session setup rate trend (IPv6)
+      family: 'Security/Session/IPv6/Rate/Trend'
+      unit: "{session}/s"
+
+  ### Processor usage breakdown — user + system combined per processor
+  - name: fgProcessorUsageBreakdown
+    per_row: true
+    group_by: ["processor_index"]
+    sources:
+      - {metric: fgProcessorUserUsage, table: fgProcessorTable, as: user}
+      - {metric: fgProcessorSysUsage, table: fgProcessorTable, as: system}
+    chart_meta:
+      description: Processor CPU usage breakdown by user and system space
+      family: 'System/Processor/Usage/Breakdown'
+      unit: "%"
+      type: stacked

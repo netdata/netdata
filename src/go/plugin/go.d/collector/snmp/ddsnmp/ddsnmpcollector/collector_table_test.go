@@ -590,11 +590,11 @@ func TestTableCollector_Collect(t *testing.T) {
 										OID:  "1.3.6.1.2.1.2.2.1.3",
 										Name: "ifType",
 									},
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1":  "other",
 										"6":  "ethernetCsmacd",
 										"24": "softwareLoopback",
-									},
+									}),
 								},
 							},
 						},
@@ -728,11 +728,11 @@ func TestTableCollector_Collect(t *testing.T) {
 										OID:  "1.3.6.1.2.1.2.2.1.7",
 										Name: "ifAdminStatus",
 									},
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1": "up",
 										"2": "down",
 										"3": "testing",
-									},
+									}),
 								},
 							},
 						},
@@ -807,11 +807,15 @@ func TestTableCollector_Collect(t *testing.T) {
 				{
 					Name:  "ifInOctets",
 					Value: 1000,
+					Tags: map[string]string{
+						"interface": "eth0",
+						"source":    "interface",
+						"table":     "if",
+					},
 					StaticTags: map[string]string{
 						"source": "interface",
 						"table":  "if",
 					},
-					Tags:       map[string]string{"interface": "eth0"},
 					MetricType: "rate",
 					IsTable:    true,
 					Table:      "ifTable",
@@ -1022,9 +1026,9 @@ func TestTableCollector_Collect(t *testing.T) {
 										OID:  "1.3.6.1.2.1.2.2.1.3",
 										Name: "ifType",
 									},
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"6": "ethernet",
-									},
+									}),
 								},
 							},
 						},
@@ -1043,7 +1047,7 @@ func TestTableCollector_Collect(t *testing.T) {
 					Name:       "ifInOctets",
 					Value:      1000,
 					StaticTags: map[string]string{"source": "network"},
-					Tags:       map[string]string{"interface": "eth0", "if_type": "ethernet"},
+					Tags:       map[string]string{"interface": "eth0", "if_type": "ethernet", "source": "network"},
 					MetricType: "rate",
 					IsTable:    true,
 
@@ -1082,10 +1086,10 @@ func TestTableCollector_Collect(t *testing.T) {
 										OID:  "1.3.6.1.2.1.2.2.1.3",
 										Name: "ifType",
 									},
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"6": "ethernet",
 										// No mapping for value 131
-									},
+									}),
 								},
 							},
 						},
@@ -1322,13 +1326,13 @@ func TestTableCollector_Collect(t *testing.T) {
 								{
 									OID:  "1.3.6.1.2.1.2.2.1.8",
 									Name: "ifOperStatus",
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1": "up",
 										"2": "down",
 										"3": "testing",
 										"4": "unknown",
 										"5": "dormant",
-									},
+									}),
 								},
 							},
 							MetricTags: []ddprofiledefinition.MetricTagConfig{
@@ -1386,6 +1390,65 @@ func TestTableCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
+		"table with bitmask value mapping": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.674.10892.1.1100.32",
+								Name: "processorDeviceStatusTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{
+									OID:  "1.3.6.1.4.1.674.10892.1.1100.32.1.6",
+									Name: "processorDeviceStatusReading",
+									Mapping: ddprofiledefinition.NewBitmaskMapping(map[string]string{
+										"1":    "internalError",
+										"2":    "thermalTrip",
+										"128":  "processorPresent",
+										"1024": "processorThrottled",
+									}),
+								},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Tag: "processor",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.4.1.674.10892.1.1100.32.1.7",
+										Name: "processorDeviceStatusLocationName",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.674.10892.1.1100.32", []gosnmp.SnmpPDU{
+					createIntegerPDU("1.3.6.1.4.1.674.10892.1.1100.32.1.6.1", 129), // internalError + processorPresent
+					createStringPDU("1.3.6.1.4.1.674.10892.1.1100.32.1.7.1", "CPU 1"),
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:       "processorDeviceStatusReading",
+					Value:      129,
+					Tags:       map[string]string{"processor": "CPU 1"},
+					MetricType: "gauge",
+					IsTable:    true,
+					Table:      "processorDeviceStatusTable",
+					MultiValue: map[string]int64{
+						"internalError":      1,
+						"thermalTrip":        0,
+						"processorPresent":   1,
+						"processorThrottled": 0,
+					},
+				},
+			},
+			expectedError: false,
+		},
 		"table with extract value and mapping": {
 			profile: &ddsnmp.Profile{
 				SourceFile: "test-profile.yaml",
@@ -1401,11 +1464,11 @@ func TestTableCollector_Collect(t *testing.T) {
 									OID:                  "1.3.6.1.4.1.12124.1.13.1.3",
 									Name:                 "fanStatus",
 									ExtractValueCompiled: mustCompileRegex(`Status(\d+)`),
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1": "normal",
 										"2": "warning",
 										"3": "critical",
-									},
+									}),
 								},
 							},
 							MetricTags: []ddprofiledefinition.MetricTagConfig{
@@ -1544,12 +1607,12 @@ func TestTableCollector_Collect(t *testing.T) {
 										OID:  "1.3.6.1.4.1.318.1.1.10.4.3.3.1.1",
 										Name: "upsPhaseInputPhaseIndex",
 									},
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1": "L1",
 										"2": "L2",
 										"3": "L3",
 										// No mapping for value 4
-									},
+									}),
 								},
 							},
 						},
@@ -1598,12 +1661,12 @@ func TestTableCollector_Collect(t *testing.T) {
 								{
 									OID:  "1.3.6.1.4.1.12124.1.1.1.5",
 									Name: "nodeHealth",
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"OK":      "0",
 										"ATTN":    "1",
 										"DOWN":    "2",
 										"INVALID": "3",
-									},
+									}),
 								},
 							},
 							MetricTags: []ddprofiledefinition.MetricTagConfig{
@@ -2018,6 +2081,159 @@ func TestTableCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
+		"huawei route table cross-table tags from augmented tables": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.2011.5.25.177.1.1.3",
+								Name: "hwBgpPeerRouteTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{
+									OID:        "1.3.6.1.4.1.2011.5.25.177.1.1.3.1.1",
+									Name:       "huawei.hwBgpPeerPrefixRcvCounter",
+									MetricType: ddprofiledefinition.ProfileMetricTypeMonotonicCount,
+									ChartMeta: ddprofiledefinition.ChartMeta{
+										Description: "The number of prefixes received from the remote BGP peer",
+										Family:      "Network/Routing/BGP/Peer/Prefix/Received/Total",
+										Unit:        "{prefix}",
+									},
+								},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Tag:   "huawei_hw_bgp_peer_vrf_name",
+									Table: "hwBgpPeerAddrFamilyTable",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6",
+										Name: "huawei.hwBgpPeerVrfName",
+									},
+								},
+								{
+									Tag:   "huawei_hw_bgp_peer_remote_addr",
+									Table: "hwBgpPeerTable",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:    "1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4",
+										Name:   "huawei.hwBgpPeerRemoteAddr",
+										Format: "ip_address",
+									},
+								},
+								{
+									Tag:   "_routing_instance",
+									Table: "hwBgpPeerAddrFamilyTable",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6",
+										Name: "huawei.hwBgpPeerVrfName",
+									},
+								},
+								{
+									Tag:   "_neighbor",
+									Table: "hwBgpPeerTable",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:    "1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4",
+										Name:   "huawei.hwBgpPeerRemoteAddr",
+										Format: "ip_address",
+									},
+								},
+								{
+									Tag:   "_remote_as",
+									Table: "hwBgpPeerTable",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2",
+										Name: "huawei.hwBgpPeerRemoteAs",
+									},
+								},
+								{
+									Tag:   "_peer_description",
+									Table: "hwBgpPeerTable",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.4.1.2011.5.25.177.1.1.2.1.12",
+										Name: "huawei.hwBgpPeerDescription",
+									},
+								},
+								{
+									Tag:   "_address_family",
+									Index: 2,
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
+										"1":   "ipv4",
+										"2":   "ipv6",
+										"25":  "vpls",
+										"196": "l2vpn",
+									}),
+								},
+								{
+									Tag:   "_subsequent_address_family",
+									Index: 3,
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
+										"1":   "unicast",
+										"2":   "multicast",
+										"4":   "mpls",
+										"5":   "mcast-vpn",
+										"65":  "vpls",
+										"66":  "mdt",
+										"74":  "sd-wan",
+										"128": "vpn",
+										"132": "route-target",
+									}),
+								},
+								{
+									Tag:   "_neighbor_address_type",
+									Index: 4,
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
+										"0":  "unknown",
+										"1":  "ipv4",
+										"2":  "ipv6",
+										"3":  "ipv4z",
+										"4":  "ipv6z",
+										"16": "dns",
+									}),
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2011.5.25.177.1.1.3", []gosnmp.SnmpPDU{
+					createCounter32PDU("1.3.6.1.4.1.2011.5.25.177.1.1.3.1.1.100.1.1.1.192.0.2.1", 123),
+				})
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6", []gosnmp.SnmpPDU{
+					createStringPDU("1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6.100.1.1.1.192.0.2.1", "blue"),
+				})
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2011.5.25.177.1.1.2.1", []gosnmp.SnmpPDU{
+					createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2.100.1.1.1.192.0.2.1", 65001),
+					createPDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.100.1.1.1.192.0.2.1", gosnmp.OctetString, []byte{192, 0, 2, 1}),
+					createStringPDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.12.100.1.1.1.192.0.2.1", "Transit-1"),
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:        "huawei.hwBgpPeerPrefixRcvCounter",
+					Description: "The number of prefixes received from the remote BGP peer",
+					Family:      "Network/Routing/BGP/Peer/Prefix/Received/Total",
+					Unit:        "{prefix}",
+					Value:       123,
+					Tags: map[string]string{
+						"huawei_hw_bgp_peer_vrf_name":    "blue",
+						"huawei_hw_bgp_peer_remote_addr": "192.0.2.1",
+						"_routing_instance":              "blue",
+						"_neighbor":                      "192.0.2.1",
+						"_remote_as":                     "65001",
+						"_peer_description":              "Transit-1",
+						"_address_family":                "ipv4",
+						"_subsequent_address_family":     "unicast",
+						"_neighbor_address_type":         "ipv4",
+					},
+					MetricType: ddprofiledefinition.ProfileMetricTypeMonotonicCount,
+					IsTable:    true,
+					Table:      "hwBgpPeerRouteTable",
+				},
+			},
+			expectedError: false,
+		},
 		"cross-table tag with extract_value": {
 			profile: &ddsnmp.Profile{
 				SourceFile: "test-profile.yaml",
@@ -2115,10 +2331,10 @@ func TestTableCollector_Collect(t *testing.T) {
 										Name: "ifType",
 									},
 									Table: "ifTable",
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"6":  "ethernet",
 										"24": "loopback",
-									},
+									}),
 								},
 							},
 						},
@@ -2328,6 +2544,104 @@ func TestTableCollector_Collect(t *testing.T) {
 					IsTable:    true,
 
 					Table: "customTable",
+				},
+			},
+			expectedError: false,
+		},
+		"cross-table tag with lookup_symbol value match": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Table: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.2636.5.1.1.2.6.2",
+								Name: "jnxBgpM2PrefixCountersTable",
+							},
+							Symbols: []ddprofiledefinition.SymbolConfig{
+								{
+									OID:  "1.3.6.1.4.1.2636.5.1.1.2.6.2.1.8",
+									Name: "bgpPeerPrefixesAccepted",
+								},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Tag:   "neighbor",
+									Table: "jnxBgpM2PeerTable",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:    "1.3.6.1.4.1.2636.5.1.1.2.1.1.1.11",
+										Name:   "_jnxBgpM2PeerRemoteAddr",
+										Format: "ip_address",
+									},
+									LookupSymbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14",
+										Name: "_jnxBgpM2PeerIndex",
+									},
+									IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+										{Start: 0, End: 0},
+									},
+								},
+								{
+									Tag:   "remote_as",
+									Table: "jnxBgpM2PeerTable",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.4.1.2636.5.1.1.2.1.1.1.13",
+										Name: "_jnxBgpM2PeerRemoteAs",
+									},
+									LookupSymbol: ddprofiledefinition.SymbolConfigCompat{
+										OID:  "1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14",
+										Name: "_jnxBgpM2PeerIndex",
+									},
+									IndexTransform: []ddprofiledefinition.MetricIndexTransform{
+										{Start: 0, End: 0},
+									},
+								},
+								{
+									Tag:   "address_family",
+									Index: 2,
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
+										"1":  "ipv4",
+										"2":  "ipv6",
+										"25": "l2vpn",
+									}),
+								},
+								{
+									Tag:   "subsequent_address_family",
+									Index: 3,
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
+										"1":   "unicast",
+										"70":  "evpn",
+										"128": "vpn",
+									}),
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2636.5.1.1.2.6.2", []gosnmp.SnmpPDU{
+					createGauge32PDU("1.3.6.1.4.1.2636.5.1.1.2.6.2.1.8.100.1.1", 42),
+				})
+				expectSNMPWalk(m, gosnmp.Version2c, "1.3.6.1.4.1.2636.5.1.1.2.1.1.1", []gosnmp.SnmpPDU{
+					createPDU("1.3.6.1.4.1.2636.5.1.1.2.1.1.1.11.7.1.4.10.0.0.1.1.4.192.0.2.1", gosnmp.OctetString, []byte{192, 0, 2, 1}),
+					createGauge32PDU("1.3.6.1.4.1.2636.5.1.1.2.1.1.1.13.7.1.4.10.0.0.1.1.4.192.0.2.1", 65001),
+					createGauge32PDU("1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14.7.1.4.10.0.0.1.1.4.192.0.2.1", 100),
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:  "bgpPeerPrefixesAccepted",
+					Value: 42,
+					Tags: map[string]string{
+						"neighbor":                  "192.0.2.1",
+						"remote_as":                 "65001",
+						"address_family":            "ipv4",
+						"subsequent_address_family": "unicast",
+					},
+					MetricType: "gauge",
+					IsTable:    true,
+					Table:      "jnxBgpM2PrefixCountersTable",
 				},
 			},
 			expectedError: false,
@@ -3026,10 +3340,10 @@ func TestTableCollector_Collect(t *testing.T) {
 								{
 									Index: 1,
 									Tag:   "ip_version",
-									Mapping: map[string]string{
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 										"1": "ipv4",
 										"2": "ipv6",
-									},
+									}),
 								},
 							},
 						},

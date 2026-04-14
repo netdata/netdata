@@ -76,6 +76,7 @@ The following options can be defined for this secretstore backend.
 |:-----|:------------|:--------|:---------:|
 | [auth_mode](#option-auth-mode) | How Netdata obtains AWS credentials. | env | yes |
 | region | AWS region used for Secrets Manager requests. There is no automatic region detection — you must always set this explicitly. |  | yes |
+| timeout | Timeout in seconds for HTTP requests made by this secretstore backend. | 3 | no |
 
 <a id="option-auth-mode"></a>
 ##### auth_mode

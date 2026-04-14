@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 )
 
@@ -20,40 +20,42 @@ var (
 	reAzureSafeName = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
 )
 
-type Config = cloudauth.AzureADAuthConfig
+var defaultTimeout = confopt.Duration(3 * time.Second)
 
-type provider struct {
+type Config struct {
+	cloudauth.AzureADAuthConfig `yaml:",inline" json:",inline"`
+	Timeout                     confopt.Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+}
+
+type runtime struct {
 	apiClient  *http.Client
 	imdsClient *http.Client
 }
 
 type store struct {
 	Config    `yaml:",inline" json:""`
-	provider  *provider
+	runtime   *runtime
 	published *publishedStore
 }
 
 type publishedStore struct {
-	provider      *provider
+	runtime       *runtime
 	tokenProvider *cloudauth.TokenProvider
 }
 
 func New() secretstore.Creator {
-	p := &provider{
-		apiClient:  httpx.APIClient(10 * time.Second),
-		imdsClient: httpx.NoProxyClient(2 * time.Second),
-	}
-
 	return secretstore.Creator{
 		Kind:        secretstore.KindAzureKV,
 		DisplayName: "Azure Key Vault",
 		Schema:      configSchema,
-		Create:      p.create,
+		Create: func() secretstore.Store {
+			return &store{
+				Config: Config{
+					Timeout: defaultTimeout,
+				},
+			}
+		},
 	}
-}
-
-func (p *provider) create() secretstore.Store {
-	return &store{provider: p}
 }
 
 func (s *store) Configuration() any { return &s.Config }

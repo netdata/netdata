@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //go:build cgo
-// +build cgo
 
 package jmx
 
@@ -178,13 +177,13 @@ func (c *Client) FetchThreadPools(ctx context.Context, maxItems int) ([]ThreadPo
 	}
 
 	var pools []ThreadPool
-	items, ok := payload["threadPools"].([]interface{})
+	items, ok := payload["threadPools"].([]any)
 	if !ok {
 		return pools, nil
 	}
 
 	for _, item := range items {
-		poolMap, ok := item.(map[string]interface{})
+		poolMap, ok := item.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -220,13 +219,13 @@ func (c *Client) FetchJDBCPools(ctx context.Context, maxItems int) ([]JDBCPool, 
 	}
 
 	var pools []JDBCPool
-	items, ok := payload["jdbcPools"].([]interface{})
+	items, ok := payload["jdbcPools"].([]any)
 	if !ok {
 		return pools, nil
 	}
 
 	for _, item := range items {
-		poolMap, ok := item.(map[string]interface{})
+		poolMap, ok := item.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -267,13 +266,13 @@ func (c *Client) FetchJCAPools(ctx context.Context, maxItems int) ([]JCAPool, er
 	}
 
 	var pools []JCAPool
-	items, ok := payload["jcaPools"].([]interface{})
+	items, ok := payload["jcaPools"].([]any)
 	if !ok {
 		return pools, nil
 	}
 
 	for _, item := range items {
-		poolMap, ok := item.(map[string]interface{})
+		poolMap, ok := item.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -314,13 +313,13 @@ func (c *Client) FetchJMSDestinations(ctx context.Context, maxItems int) ([]JMSD
 	}
 
 	var dests []JMSDestination
-	items, ok := payload["jmsDestinations"].([]interface{})
+	items, ok := payload["jmsDestinations"].([]any)
 	if !ok {
 		return dests, nil
 	}
 
 	for _, item := range items {
-		destMap, ok := item.(map[string]interface{})
+		destMap, ok := item.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -362,13 +361,13 @@ func (c *Client) FetchApplications(ctx context.Context, maxItems int, includeSes
 	}
 
 	var metrics []ApplicationMetric
-	items, ok := payload["applications"].([]interface{})
+	items, ok := payload["applications"].([]any)
 	if !ok {
 		return metrics, nil
 	}
 
 	for _, item := range items {
-		appMap, ok := item.(map[string]interface{})
+		appMap, ok := item.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -396,7 +395,7 @@ func (c *Client) FetchApplications(ctx context.Context, maxItems int, includeSes
 	return metrics, nil
 }
 
-func (c *Client) send(ctx context.Context, cmd jmxbridge.Command) (map[string]interface{}, error) {
+func (c *Client) send(ctx context.Context, cmd jmxbridge.Command) (map[string]any, error) {
 	if !c.started {
 		return nil, errors.New("websphere jmx protocol: client not started")
 	}
@@ -419,18 +418,18 @@ func (c *Client) send(ctx context.Context, cmd jmxbridge.Command) (map[string]in
 	return resp.Data, nil
 }
 
-func mapValue(m map[string]interface{}, key string) map[string]interface{} {
+func mapValue(m map[string]any, key string) map[string]any {
 	if m == nil {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
-	val, _ := m[key].(map[string]interface{})
+	val, _ := m[key].(map[string]any)
 	if val == nil {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 	return val
 }
 
-func stringValue(m map[string]interface{}, key string) string {
+func stringValue(m map[string]any, key string) string {
 	if m == nil {
 		return ""
 	}
@@ -440,14 +439,14 @@ func stringValue(m map[string]interface{}, key string) string {
 	return ""
 }
 
-func floatValue(m map[string]interface{}, key string) float64 {
+func floatValue(m map[string]any, key string) float64 {
 	if m == nil {
 		return 0
 	}
 	return toFloat(m[key])
 }
 
-func toFloat(v interface{}) float64 {
+func toFloat(v any) float64 {
 	switch value := v.(type) {
 	case nil:
 		return 0

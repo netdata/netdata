@@ -164,7 +164,9 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
 
     freez(w->auth_bearer_token);
     w->auth_bearer_token = NULL;
-    
+
+    memset(w->mcp_session_id, 0, sizeof(w->mcp_session_id));
+
     // Free WebSocket resources
     freez(w->websocket.key);
     w->websocket.key = NULL;

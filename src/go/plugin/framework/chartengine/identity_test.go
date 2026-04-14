@@ -176,3 +176,37 @@ func TestRenderChartInstanceIDSanitizesLegacyLabelChars(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderChartInstanceIDExcludeWinsRegardlessOfTokenOrder(t *testing.T) {
+	tests := map[string]struct {
+		selectors []program.InstanceLabelSelector
+		wantID    string
+	}{
+		"exclude after explicit": {
+			selectors: []program.InstanceLabelSelector{
+				{Key: "host"},
+				{Exclude: true, Key: "host"},
+			},
+			wantID: "mysql_queries",
+		},
+		"exclude before explicit": {
+			selectors: []program.InstanceLabelSelector{
+				{Exclude: true, Key: "host"},
+				{Key: "host"},
+			},
+			wantID: "mysql_queries",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, ok, err := renderChartInstanceID(program.ChartIdentity{
+				IDTemplate:       program.Template{Raw: "mysql_queries"},
+				InstanceByLabels: tc.selectors,
+			}, map[string]string{"host": "db1"})
+			require.NoError(t, err)
+			assert.True(t, ok)
+			assert.Equal(t, tc.wantID, got)
+		})
+	}
+}

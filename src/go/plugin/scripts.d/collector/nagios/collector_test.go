@@ -84,10 +84,12 @@ func TestCollector_ConfigSchema(t *testing.T) {
 				t.Helper()
 				assert.NotEmpty(t, doc.JSONSchema.Schema)
 				_, hasPlugin := doc.JSONSchema.Properties["plugin"]
+				_, hasCheckName := doc.JSONSchema.Properties["check_name"]
 				_, hasName := doc.JSONSchema.Properties["name"]
 				_, hasTimeoutState := doc.JSONSchema.Properties["timeout_state"]
 				_, hasUIOptions := doc.UISchema["uiOptions"]
 				assert.True(t, hasPlugin)
+				assert.True(t, hasCheckName)
 				assert.False(t, hasName)
 				assert.False(t, hasTimeoutState)
 				assert.True(t, hasUIOptions)
@@ -142,6 +144,8 @@ type nagiosConfigSchemaDoc struct {
 }
 
 func TestCollector_Check(t *testing.T) {
+	truePluginPath := writeTestPluginFile(t, "true")
+
 	tests := map[string]struct {
 		config   Config
 		wantErr  bool
@@ -157,7 +161,7 @@ func TestCollector_Check(t *testing.T) {
 				UpdateEvery: 10,
 				JobConfig: JobConfig{
 					Name:          "cadence",
-					Plugin:        "/bin/true",
+					Plugin:        truePluginPath,
 					CheckInterval: confDuration(5 * time.Second),
 					RetryInterval: confDuration(5 * time.Second),
 				},
@@ -169,7 +173,7 @@ func TestCollector_Check(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:          "valid",
-					Plugin:        "/bin/true",
+					Plugin:        truePluginPath,
 					CheckInterval: confDuration(5 * time.Second),
 					RetryInterval: confDuration(5 * time.Second),
 				},
@@ -179,7 +183,7 @@ func TestCollector_Check(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			coll := New()
+			coll := newTestCollector()
 			coll.runner = &fakeRunner{}
 			coll.Config = tc.config
 
@@ -192,6 +196,35 @@ func TestCollector_Check(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestIsKnownInterpreter(t *testing.T) {
+	tests := map[string]struct {
+		path string
+		want bool
+	}{
+		"bash":              {path: "/bin/bash", want: true},
+		"sh":                {path: "/bin/sh", want: true},
+		"python3":           {path: "/usr/bin/python3", want: true},
+		"python3 versioned": {path: "/usr/bin/python3.11", want: true},
+		"powershell":        {path: "/usr/bin/powershell", want: true},
+		"powershell.exe":    {path: "/powershell.exe", want: true},
+		"pwsh":              {path: "/usr/bin/pwsh", want: true},
+		"env":               {path: "/usr/bin/env", want: true},
+		"node":              {path: "/usr/bin/node", want: true},
+		"cmd.exe":           {path: "/cmd.exe", want: true},
+		"php":               {path: "/usr/bin/php", want: true},
+		"check_ping":        {path: "/usr/lib/nagios/plugins/check_ping", want: false},
+		"check_http":        {path: "/usr/lib/nagios/plugins/check_http", want: false},
+		"custom script":     {path: "/opt/netdata/checks/check_api.sh", want: false},
+		"custom exe":        {path: "/opt/checks/check_service.exe", want: false},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, isKnownInterpreter(tc.path))
 		})
 	}
 }
@@ -249,6 +282,8 @@ func TestCompileCollectorConfig_CadenceWarning(t *testing.T) {
 }
 
 func TestCollector_Init(t *testing.T) {
+	truePluginPath := writeTestPluginFile(t, "true")
+
 	tests := map[string]struct {
 		config Config
 		assert func(*testing.T, *Collector)
@@ -257,7 +292,7 @@ func TestCollector_Init(t *testing.T) {
 			config: Config{
 				JobConfig: JobConfig{
 					Name:   "defaults",
-					Plugin: "/bin/true",
+					Plugin: truePluginPath,
 				},
 			},
 			assert: func(t *testing.T, coll *Collector) {
@@ -270,7 +305,7 @@ func TestCollector_Init(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			coll := New()
+			coll := newTestCollector()
 			coll.runner = &fakeRunner{}
 			coll.Config = tc.config
 			require.NoError(t, coll.Init(context.Background()))
@@ -280,6 +315,9 @@ func TestCollector_Init(t *testing.T) {
 }
 
 func TestCollector_Collect(t *testing.T) {
+	truePluginPath := writeTestPluginFile(t, "true")
+	pwshPluginPath := writeTestPluginFile(t, "pwsh")
+
 	tests := map[string]struct {
 		results []fakeRun
 		config  Config
@@ -310,7 +348,7 @@ func TestCollector_Collect(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:          "check_disk",
-					Plugin:        "/bin/true",
+					Plugin:        truePluginPath,
 					CheckInterval: confDuration(5 * time.Minute),
 					RetryInterval: confDuration(1 * time.Minute),
 				},
@@ -355,6 +393,46 @@ func TestCollector_Collect(t *testing.T) {
 					assertMetricMissing(t, flat, "nagios.job.execution_max_rss", metrix.Labels{"nagios_job": "check_disk"})
 				}
 				assertMetricValue(t, flat, "nagios.perfdata.true.bytes_used_value", metrix.Labels{"nagios_job": "check_disk", metrix.MeasureSetFieldLabel: "value"}, 30000)
+			},
+		},
+		"uses explicit check name for perfdata namespace": {
+			results: []fakeRun{
+				{
+					result: checkRunResult{
+						ServiceState: "OK",
+						JobState:     "OK",
+						Parsed: output.ParsedOutput{
+							Perfdata: []output.PerfDatum{
+								{Label: "used", Unit: "KB", Value: 30},
+							},
+						},
+					},
+				},
+			},
+			config: Config{
+				UpdateEvery: 1,
+				JobConfig: JobConfig{
+					Name:          "check_service_job",
+					CheckName:     "check_service",
+					Plugin:        pwshPluginPath,
+					Args:          []string{"-NoProfile", "-File", "/opt/netdata/check_service.ps1"},
+					CheckInterval: confDuration(5 * time.Minute),
+					RetryInterval: confDuration(1 * time.Minute),
+				},
+			},
+			run: func(t *testing.T, coll *Collector, runner *fakeRunner, now *time.Time) {
+				t.Helper()
+				runCollectCycle(t, coll)
+				assert.Equal(t, 1, runner.calls)
+
+				flat := coll.MetricStore().Read(metrix.ReadFlatten())
+				assertMetricValue(t, flat, "nagios.perfdata.check_service.job.execution_state", metrix.Labels{"nagios_job": "check_service_job", "nagios.perfdata.check_service.job.execution_state": "ok"}, 1)
+				assertMetricChartFamily(t, flat, "nagios.perfdata.check_service.job.execution_state", "Perfdata/check_service")
+				assertMetricValue(t, flat, "nagios.perfdata.check_service.bytes_used_value", metrix.Labels{"nagios_job": "check_service_job", metrix.MeasureSetFieldLabel: "value"}, 30000)
+				assertMetricMissing(t, flat, "nagios.perfdata.pwsh.job.execution_state", metrix.Labels{"nagios_job": "check_service_job", "nagios.perfdata.pwsh.job.execution_state": "ok"})
+				assertMetricMissing(t, flat, "nagios.perfdata.pwsh.bytes_used_value", metrix.Labels{"nagios_job": "check_service_job", metrix.MeasureSetFieldLabel: "value"})
+
+				*now = now.Add(1 * time.Second)
 			},
 		},
 		"check period blocked cycles pause job state and zero threshold states": {
@@ -404,7 +482,7 @@ func TestCollector_Collect(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:          "period_job",
-					Plugin:        "/bin/true",
+					Plugin:        truePluginPath,
 					CheckInterval: confDuration(1 * time.Hour),
 					RetryInterval: confDuration(1 * time.Minute),
 					CheckPeriod:   "business",
@@ -557,7 +635,7 @@ func TestCollector_Collect(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:             "retry_job",
-					Plugin:           "/bin/true",
+					Plugin:           truePluginPath,
 					CheckInterval:    confDuration(5 * time.Minute),
 					RetryInterval:    confDuration(10 * time.Second),
 					MaxCheckAttempts: 3,
@@ -636,7 +714,7 @@ func TestCollector_Collect(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:             "paused_retry_job",
-					Plugin:           "/bin/true",
+					Plugin:           truePluginPath,
 					CheckInterval:    confDuration(1 * time.Hour),
 					RetryInterval:    confDuration(10 * time.Second),
 					MaxCheckAttempts: 3,
@@ -716,7 +794,7 @@ func TestCollector_Collect(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:             "timeout_job",
-					Plugin:           "/bin/true",
+					Plugin:           truePluginPath,
 					CheckInterval:    confDuration(5 * time.Minute),
 					RetryInterval:    confDuration(10 * time.Second),
 					MaxCheckAttempts: 3,
@@ -753,7 +831,7 @@ func TestCollector_Collect(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:   "infra_fail",
-					Plugin: "/bin/true",
+					Plugin: truePluginPath,
 				},
 			},
 			run: func(t *testing.T, coll *Collector, runner *fakeRunner, _ *time.Time) {
@@ -776,7 +854,7 @@ func TestCollector_Collect(t *testing.T) {
 				UpdateEvery: 1,
 				JobConfig: JobConfig{
 					Name:   "with_vnode",
-					Plugin: "/bin/true",
+					Plugin: truePluginPath,
 				},
 			},
 			setup: func(coll *Collector, _ *fakeRunner, _ *time.Time) {
@@ -806,7 +884,7 @@ func TestCollector_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			now := time.Date(2026, 3, 21, 12, 0, 0, 0, time.UTC)
 			runner := &fakeRunner{results: tc.results}
-			coll := New()
+			coll := newTestCollector()
 			coll.runner = runner
 			coll.now = func() time.Time { return now }
 			coll.Config = tc.config
@@ -1131,6 +1209,25 @@ func assertMetricMissing(t *testing.T, r metrix.Reader, name string, labels metr
 	t.Helper()
 	_, ok := r.Value(name, labels)
 	assert.False(t, ok, "unexpected metric %s labels=%v", name, labels)
+}
+
+func writeTestPluginFile(t *testing.T, name string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
+	mode := os.FileMode(0o644)
+	content := "placeholder\n"
+	if runtime.GOOS != "windows" {
+		mode = 0o755
+		content = "#!/bin/sh\nexit 0\n"
+	}
+	require.NoError(t, os.WriteFile(path, []byte(content), mode))
+	return path
+}
+
+func newTestCollector() *Collector {
+	coll := New()
+	coll.validatePlugin = func(path string) (string, error) { return path, nil }
+	return coll
 }
 
 func confDuration(d time.Duration) confopt.Duration { return confopt.Duration(d) }

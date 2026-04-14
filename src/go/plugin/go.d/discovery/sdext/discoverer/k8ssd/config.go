@@ -15,10 +15,10 @@ type Config struct {
 	Selector   struct {
 		Label string `yaml:"label,omitempty" json:"label,omitempty"`
 		Field string `yaml:"field,omitempty" json:"field,omitempty"`
-	} `yaml:"selector,omitempty" json:"selector,omitempty"`
+	} `yaml:"selector,omitempty" json:"selector"`
 	Pod struct {
 		LocalMode bool `yaml:"local_mode,omitempty" json:"local_mode,omitempty"`
-	} `yaml:"pod,omitempty" json:"pod,omitempty"`
+	} `yaml:"pod,omitempty" json:"pod"`
 }
 
 func validateConfig(cfg Config) error {

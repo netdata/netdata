@@ -119,41 +119,27 @@ func resolveInstanceLabelValues(identity program.ChartIdentity, labels labelAcce
 		return nil, true, nil
 	}
 
-	excludeSet := make(map[string]struct{})
-	seenKeys := make(map[string]struct{})
-	keys := make([]string, 0, len(identity.InstanceByLabels))
-	includeAll := false
-	for _, token := range identity.InstanceByLabels {
-		switch {
-		case token.Exclude:
-			if token.Key != "" {
-				excludeSet[token.Key] = struct{}{}
-			}
-		case token.IncludeAll:
-			includeAll = true
-		case token.Key != "":
-			if _, excluded := excludeSet[token.Key]; excluded {
-				continue
-			}
-			if _, exists := seenKeys[token.Key]; exists {
-				continue
-			}
-			if _, ok := labels.Get(token.Key); !ok {
-				// Explicit instance key is required to materialize one instance.
-				return nil, false, nil
-			}
-			seenKeys[token.Key] = struct{}{}
-			keys = append(keys, token.Key)
+	plan := compileInstanceLabelPlan(identity)
+	out := make([]instanceLabelValue, 0, len(plan.explicitKeys))
+	for _, key := range plan.explicitKeys {
+		value, ok := labels.Get(key)
+		if !ok {
+			// Explicit instance key is required to materialize one instance.
+			return nil, false, nil
 		}
+		out = append(out, instanceLabelValue{
+			Key:   key,
+			Value: value,
+		})
 	}
 
-	if includeAll {
+	if plan.includeAll {
 		all := make([]string, 0)
 		labels.Range(func(key, _ string) bool {
-			if _, excluded := excludeSet[key]; excluded {
+			if _, excluded := plan.excludeSet[key]; excluded {
 				return true
 			}
-			if _, exists := seenKeys[key]; exists {
+			if _, exists := plan.explicitSet[key]; exists {
 				return true
 			}
 			all = append(all, key)
@@ -161,21 +147,15 @@ func resolveInstanceLabelValues(identity program.ChartIdentity, labels labelAcce
 		})
 		sort.Strings(all)
 		for _, key := range all {
-			seenKeys[key] = struct{}{}
-			keys = append(keys, key)
+			value, ok := labels.Get(key)
+			if !ok {
+				return nil, false, nil
+			}
+			out = append(out, instanceLabelValue{
+				Key:   key,
+				Value: value,
+			})
 		}
-	}
-
-	out := make([]instanceLabelValue, 0, len(keys))
-	for _, key := range keys {
-		value, ok := labels.Get(key)
-		if !ok {
-			return nil, false, nil
-		}
-		out = append(out, instanceLabelValue{
-			Key:   key,
-			Value: value,
-		})
 	}
 	return out, true, nil
 }

@@ -40,8 +40,7 @@ func TestLoadProfileCatalogFromDirs_UserOverridesStock(t *testing.T) {
 	stockDir := filepath.Join(dir, "stock")
 
 	require.NoError(t, writeProfileFile(filepath.Join(userDir, "sql_database.yaml"), `
-id: sql_database
-name: Azure SQL Database (User Override)
+display_name: Azure SQL Database (User Override)
 resource_type: Microsoft.Sql/servers/databases
 metrics:
   - id: cpu_percent
@@ -69,8 +68,7 @@ template:
           name: average
 `))
 	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "sql_database.yaml"), `
-id: sql_database
-name: Azure SQL Database (Stock)
+display_name: Azure SQL Database (Stock)
 resource_type: Microsoft.Sql/servers/databases
 metrics:
   - id: cpu_percent
@@ -98,8 +96,7 @@ template:
           name: average
 `))
 	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "postgres_flexible.yaml"), `
-id: postgres_flexible
-name: Azure PostgreSQL Flexible Server
+display_name: Azure PostgreSQL Flexible Server
 resource_type: Microsoft.DBforPostgreSQL/flexibleServers
 metrics:
   - id: cpu_percent
@@ -133,11 +130,206 @@ template:
 	})
 	require.NoError(t, err)
 
-	gotProfiles, err := catalog.ResolveBaseNames([]string{"SQL_DATABASE"})
+	gotProfiles, err := catalog.ResolveBaseNames([]string{"sql_database"})
 	require.NoError(t, err)
 	require.Len(t, gotProfiles, 1)
 	got := gotProfiles[0]
 	assert.Equal(t, "Azure SQL Database (User Override)", got.DisplayName)
+}
+
+func TestLoadProfileCatalogFromDirs_IgnoresInvalidUserOverrideAndFallsBackToStock(t *testing.T) {
+	dir := t.TempDir()
+	userDir := filepath.Join(dir, "user")
+	stockDir := filepath.Join(dir, "stock")
+
+	require.NoError(t, writeProfileFile(filepath.Join(userDir, "sql_database.yaml"), `
+id: sql_database
+name: Azure SQL Database (Old User Override)
+resource_type: Microsoft.Sql/servers/databases
+metrics:
+  - id: cpu_percent
+    azure_name: cpu_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+template:
+  family: Azure SQL Database (Old User Override)
+  context_namespace: sql_database
+  charts:
+    - id: am_test_sql_database_cpu
+      title: Azure SQL Database CPU
+      context: cpu
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      label_promotion: [resource_name, resource_group, region, resource_type, profile]
+      instances:
+        by_labels: [resource_uid]
+      dimensions:
+        - selector: sql_database.cpu_percent_average
+          name: average
+`))
+	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "sql_database.yaml"), `
+display_name: Azure SQL Database (Stock)
+resource_type: Microsoft.Sql/servers/databases
+metrics:
+  - id: cpu_percent
+    azure_name: cpu_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+template:
+  family: Azure SQL Database (Stock)
+  context_namespace: sql_database
+  charts:
+    - id: am_test_sql_database_cpu
+      title: Azure SQL Database CPU
+      context: cpu
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      label_promotion: [resource_name, resource_group, region, resource_type, profile]
+      instances:
+        by_labels: [resource_uid]
+      dimensions:
+        - selector: sql_database.cpu_percent_average
+          name: average
+`))
+
+	catalog, err := azureprofiles.LoadFromDirs([]azureprofiles.DirSpec{
+		{Path: userDir, IsStock: false},
+		{Path: stockDir, IsStock: true},
+	})
+	require.NoError(t, err)
+
+	gotProfiles, err := catalog.ResolveBaseNames([]string{"sql_database"})
+	require.NoError(t, err)
+	require.Len(t, gotProfiles, 1)
+	assert.Equal(t, "Azure SQL Database (Stock)", gotProfiles[0].DisplayName)
+}
+
+func TestLoadProfileCatalogFromDirs_IgnoresUnknownFieldsInUserProfile(t *testing.T) {
+	dir := t.TempDir()
+	userDir := filepath.Join(dir, "user")
+
+	require.NoError(t, writeProfileFile(filepath.Join(userDir, "sql_database.yaml"), `
+id: sql_database
+name: Azure SQL Database (Ignored Legacy Field)
+display_name: Azure SQL Database (User Override)
+resource_type: Microsoft.Sql/servers/databases
+metrics:
+  - id: cpu_percent
+    azure_name: cpu_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+template:
+  family: Azure SQL Database (User Override)
+  context_namespace: sql_database
+  charts:
+    - id: am_test_sql_database_cpu
+      title: Azure SQL Database CPU
+      context: cpu
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      label_promotion: [resource_name, resource_group, region, resource_type, profile]
+      instances:
+        by_labels: [resource_uid]
+      dimensions:
+        - selector: sql_database.cpu_percent_average
+          name: average
+`))
+
+	catalog, err := azureprofiles.LoadFromDirs([]azureprofiles.DirSpec{
+		{Path: userDir, IsStock: false},
+	})
+	require.NoError(t, err)
+
+	gotProfiles, err := catalog.ResolveBaseNames([]string{"sql_database"})
+	require.NoError(t, err)
+	require.Len(t, gotProfiles, 1)
+	assert.Equal(t, "Azure SQL Database (User Override)", gotProfiles[0].DisplayName)
+}
+
+func TestLoadProfileCatalogFromDirs_IgnoresDuplicateUserBasename(t *testing.T) {
+	dir := t.TempDir()
+	userDirA := filepath.Join(dir, "user-a")
+	userDirB := filepath.Join(dir, "user-b")
+
+	require.NoError(t, writeProfileFile(filepath.Join(userDirA, "sql_database.yaml"), `
+display_name: Azure SQL Database (User A)
+resource_type: Microsoft.Sql/servers/databases
+metrics:
+  - id: cpu_percent
+    azure_name: cpu_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+template:
+  family: Azure SQL Database (User A)
+  context_namespace: sql_database
+  charts:
+    - id: am_test_sql_database_user_a_cpu
+      title: Azure SQL Database CPU
+      context: cpu
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      label_promotion: [resource_name, resource_group, region, resource_type, profile]
+      instances:
+        by_labels: [resource_uid]
+      dimensions:
+        - selector: sql_database.cpu_percent_average
+          name: average
+`))
+	require.NoError(t, writeProfileFile(filepath.Join(userDirB, "sql_database.yaml"), `
+display_name: Azure SQL Database (User B)
+resource_type: Microsoft.Sql/servers/databases
+metrics:
+  - id: cpu_percent
+    azure_name: cpu_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+template:
+  family: Azure SQL Database (User B)
+  context_namespace: sql_database
+  charts:
+    - id: am_test_sql_database_user_b_cpu
+      title: Azure SQL Database CPU
+      context: cpu
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      label_promotion: [resource_name, resource_group, region, resource_type, profile]
+      instances:
+        by_labels: [resource_uid]
+      dimensions:
+        - selector: sql_database.cpu_percent_average
+          name: average
+`))
+
+	catalog, err := azureprofiles.LoadFromDirs([]azureprofiles.DirSpec{
+		{Path: userDirA, IsStock: false},
+		{Path: userDirB, IsStock: false},
+	})
+	require.NoError(t, err)
+
+	gotProfiles, err := catalog.ResolveBaseNames([]string{"sql_database"})
+	require.NoError(t, err)
+	require.Len(t, gotProfiles, 1)
+	assert.Equal(t, "Azure SQL Database (User A)", gotProfiles[0].DisplayName)
 }
 
 func TestLoadProfileCatalogFromDirs_RejectsDuplicateProfileBasenames(t *testing.T) {
@@ -145,8 +337,7 @@ func TestLoadProfileCatalogFromDirs_RejectsDuplicateProfileBasenames(t *testing.
 	stockDir := filepath.Join(dir, "stock")
 
 	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "sql_database.yaml"), `
-id: sql_database
-name: Azure SQL Database
+display_name: Azure SQL Database
 resource_type: Microsoft.Sql/servers/databases
 metrics:
   - id: cpu_percent
@@ -174,8 +365,7 @@ template:
           name: average
 `))
 	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "nested", "sql_database.yml"), `
-id: sql_database_copy
-name: azure sql database
+display_name: azure sql database
 resource_type: Microsoft.Sql/servers/databases
 metrics:
   - id: cpu_percent
@@ -199,7 +389,7 @@ template:
       instances:
         by_labels: [resource_uid]
       dimensions:
-        - selector: sql_database_copy.cpu_percent_average
+        - selector: sql_database.cpu_percent_average
           name: average
 `))
 
@@ -211,42 +401,12 @@ template:
 	assert.Contains(t, err.Error(), `"sql_database"`)
 }
 
-func TestLoadProfileCatalogFromDirs_RejectsDuplicateProfileIDsAcrossBasenames(t *testing.T) {
+func TestLoadProfileCatalogFromDirs_RejectsInvalidProfileBasename(t *testing.T) {
 	dir := t.TempDir()
 	stockDir := filepath.Join(dir, "stock")
 
-	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "sql_database.yaml"), `
-id: sql_database
-name: Azure SQL Database
-resource_type: Microsoft.Sql/servers/databases
-metrics:
-  - id: cpu_percent
-    azure_name: cpu_percent
-    time_grain: PT1M
-    series:
-      - aggregation: average
-        kind: gauge
-template:
-  family: Azure SQL Database
-  context_namespace: sql_database
-  charts:
-    - id: am_test_sql_database_cpu
-      title: Azure SQL Database CPU
-      context: cpu
-      family: Utilization
-      type: line
-      units: percentage
-      algorithm: absolute
-      label_promotion: [resource_name, resource_group, region, resource_type, profile]
-      instances:
-        by_labels: [resource_uid]
-      dimensions:
-        - selector: sql_database.cpu_percent_average
-          name: average
-`))
-	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "sql_database_copy.yaml"), `
-id: sql_database
-name: Azure SQL Database Copy
+	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "SQL_DATABASE.yaml"), `
+display_name: Azure SQL Database Copy
 resource_type: Microsoft.Sql/servers/databases
 metrics:
   - id: cpu_percent
@@ -278,9 +438,95 @@ template:
 		{Path: stockDir, IsStock: true},
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `duplicate profile id`)
-	assert.Contains(t, err.Error(), `"sql_database"`)
-	assert.Contains(t, err.Error(), `"sql_database_copy"`)
+	assert.Contains(t, err.Error(), `basename must match`)
+	assert.Contains(t, err.Error(), `SQL_DATABASE.yaml`)
+}
+
+func TestLoadProfileCatalogFromDirs_NormalizesLocalSelectorShorthand(t *testing.T) {
+	dir := t.TempDir()
+	stockDir := filepath.Join(dir, "stock")
+
+	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "sql_database.yaml"), `
+display_name: Azure SQL Database
+resource_type: Microsoft.Sql/servers/databases
+metrics:
+  - id: cpu_percent
+    azure_name: cpu_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+template:
+  family: Azure SQL Database
+  context_namespace: sql_database
+  charts:
+    - id: am_test_sql_database_cpu
+      title: Azure SQL Database CPU
+      context: cpu
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      label_promotion: [resource_name, resource_group, region, resource_type, profile]
+      instances:
+        by_labels: [resource_uid]
+      dimensions:
+        - selector: cpu_percent_average
+          name: average
+`))
+
+	catalog, err := azureprofiles.LoadFromDirs([]azureprofiles.DirSpec{
+		{Path: stockDir, IsStock: true},
+	})
+	require.NoError(t, err)
+
+	profiles, err := catalog.ResolveBaseNames([]string{"sql_database"})
+	require.NoError(t, err)
+	require.Len(t, profiles, 1)
+	require.Len(t, profiles[0].Template.Charts, 1)
+	require.Len(t, profiles[0].Template.Charts[0].Dimensions, 1)
+	assert.Equal(t, "sql_database.cpu_percent_average", profiles[0].Template.Charts[0].Dimensions[0].Selector)
+}
+
+func TestLoadProfileCatalogFromDirs_RejectsUnknownSelectorShorthand(t *testing.T) {
+	dir := t.TempDir()
+	stockDir := filepath.Join(dir, "stock")
+
+	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "sql_database.yaml"), `
+display_name: Azure SQL Database
+resource_type: Microsoft.Sql/servers/databases
+metrics:
+  - id: cpu_percent
+    azure_name: cpu_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+template:
+  family: Azure SQL Database
+  context_namespace: sql_database
+  charts:
+    - id: am_test_sql_database_cpu
+      title: Azure SQL Database CPU
+      context: cpu
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      label_promotion: [resource_name, resource_group, region, resource_type, profile]
+      instances:
+        by_labels: [resource_uid]
+      dimensions:
+        - selector: missing_average
+          name: average
+`))
+
+	_, err := azureprofiles.LoadFromDirs([]azureprofiles.DirSpec{
+		{Path: stockDir, IsStock: true},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "template")
+	assert.Contains(t, err.Error(), "missing_average")
 }
 
 func writeProfileFile(path, data string) error {
@@ -295,8 +541,7 @@ func TestLoadProfileCatalogFromDirs_RejectsLegacyProfileWithoutCharts(t *testing
 	stockDir := filepath.Join(dir, "stock")
 
 	require.NoError(t, writeProfileFile(filepath.Join(stockDir, "legacy.yaml"), `
-id: legacy
-name: Azure Legacy
+display_name: Azure Legacy
 resource_type: Microsoft.Storage/storageAccounts
 metrics:
   - id: used_capacity

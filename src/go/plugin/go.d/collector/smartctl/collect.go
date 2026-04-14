@@ -76,7 +76,6 @@ func (c *Collector) collectDevicesConcurrently(mx map[string]int64) error {
 	resultsChan := make(chan deviceInfoResult, len(c.scannedDevices))
 
 	for _, dev := range c.scannedDevices {
-		dev := dev
 		p.Go(func() {
 			resp, err := c.exec.deviceInfo(dev.name, dev.typ, c.NoCheckPowerMode)
 			resultsChan <- deviceInfoResult{

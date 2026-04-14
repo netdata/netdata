@@ -23,7 +23,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 		pullSum int
 	)
 
-	for i := 0; i < reposNum; i++ {
+	for range reposNum {
 		repo := <-ch
 		if repo == nil {
 			continue

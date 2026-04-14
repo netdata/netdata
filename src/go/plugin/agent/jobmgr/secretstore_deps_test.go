@@ -5,6 +5,7 @@ package jobmgr
 import (
 	"bytes"
 	"context"
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,9 +60,7 @@ func TestExtractSecretStoreKeys(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			cfg := prepareUserCfg("mod", "job")
-			for k, v := range tc.cfg {
-				cfg[k] = v
-			}
+			maps.Copy(cfg, tc.cfg)
 			got := extractSecretStoreKeys(cfg)
 			assert.Equal(t, tc.want, got)
 		})

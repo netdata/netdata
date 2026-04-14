@@ -514,8 +514,10 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
     while((datafile = njfv2idx_find_and_acquire_j2_header(&state))) {
         struct journal_v2_header *j2_header = state.j2_header_acquired;
 
-        if (unlikely(!j2_header))
+        if (unlikely(!j2_header)) {
+            datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
             continue;
+        }
 
         char file_path[RRDENG_PATH_MAX];
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
@@ -531,14 +533,15 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
                 (struct journal_metric_list *)((uint8_t *)j2_header + j2_header->metric_offset);
             size_t metric_offset = (uint8_t *)uuid_list - (uint8_t *)j2_header;
 
-            size_t metric_list_size = journal_metric_count * sizeof(*uuid_list);
-            if (metric_offset + metric_list_size > journal_v2_file_size) {
+            size_t metric_list_size;
+            if (__builtin_mul_overflow(journal_metric_count, sizeof(*uuid_list), &metric_list_size) ||
+                metric_offset > journal_v2_file_size ||
+                metric_list_size > journal_v2_file_size - metric_offset) {
                 nd_log_limit_static_thread_var(erl, 60, 0);
                 nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                              "DBENGINE: Metric list exceeds journal file size in journalfile %u of tier %u (metric_offset=%zu, list_size=%zu, file_size=%zu)",
                              datafile->fileno, datafile->tier, metric_offset, metric_list_size, journal_v2_file_size);
-                journalfile_v2_data_release(datafile->journalfile);
-                continue;
+                goto release_journal;
             }
 
             struct journal_metric_list *uuid_entry =
@@ -546,20 +549,18 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
 
             if (unlikely(!uuid_entry)) {
                 // our UUID is not in this datafile
-                journalfile_v2_data_release(datafile->journalfile);
-                continue;
+                goto release_journal;
             }
 
             struct journal_page_header *page_list_header =
                 (struct journal_page_header *)((uint8_t *)j2_header + uuid_entry->page_offset);
             size_t page_offset = (uint8_t *)page_list_header - (uint8_t *)j2_header;
-            if (page_offset >= journal_v2_file_size) {
+            if (page_offset > journal_v2_file_size - sizeof(*page_list_header)) {
                 nd_log_limit_static_thread_var(erl, 60, 0);
                 nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                              "DBENGINE: Invalid page list header in journalfile %u of tier %u",
                              datafile->fileno, datafile->tier);
-                journalfile_v2_data_release(datafile->journalfile);
-                continue;
+                goto release_journal;
             }
 
             struct journal_page_list *page_list =
@@ -567,6 +568,16 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
             struct journal_extent_list *extent_list = (void *)((uint8_t *)j2_header + j2_header->extent_offset);
             uint32_t extent_entries = j2_header->extent_count;
             uint32_t uuid_page_entries = page_list_header->entries;
+            size_t page_list_size;
+
+            if (__builtin_mul_overflow((size_t)uuid_page_entries, sizeof(*page_list), &page_list_size) ||
+                page_list_size > journal_v2_file_size - page_offset - sizeof(*page_list_header)) {
+                nd_log_limit_static_thread_var(erl, 60, 0);
+                nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+                             "DBENGINE: Page list exceeds journal file size in journalfile %u of tier %u",
+                             datafile->fileno, datafile->tier);
+                goto release_journal;
+            }
 
             for (uint32_t index = 0; index < uuid_page_entries; index++) {
                 struct journal_page_list *page_entry_in_journal = &page_list[index];
@@ -632,7 +643,9 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
                          datafile->fileno, datafile->ctx->config.tier);
         }
 
+release_journal:
         journalfile_v2_data_release(datafile->journalfile);
+        datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
     }
 
     return pages_found;

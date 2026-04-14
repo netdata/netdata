@@ -5,7 +5,8 @@ package secretstore
 import (
 	"context"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -305,7 +306,7 @@ func newCreatorRegistry(creators ...Creator) creatorRegistry {
 	for kind := range reg.byKind {
 		reg.kinds = append(reg.kinds, kind)
 	}
-	sort.Slice(reg.kinds, func(i, j int) bool { return reg.kinds[i] < reg.kinds[j] })
+	slices.Sort(reg.kinds)
 	return reg
 }
 
@@ -348,9 +349,7 @@ func (s *inMemoryService) prepareConfig(ctx context.Context, cfg Config) (prepar
 		return preparedStore{}, fmt.Errorf("store '%s': marshaling raw config: %w", key, err)
 	}
 	if len(resolvedPayload) != 0 {
-		for k, v := range resolvedPayload {
-			raw[k] = v
-		}
+		maps.Copy(raw, resolvedPayload)
 		bs, err = yaml.Marshal(raw)
 		if err != nil {
 			return preparedStore{}, fmt.Errorf("store '%s': marshaling resolved config: %w", key, err)

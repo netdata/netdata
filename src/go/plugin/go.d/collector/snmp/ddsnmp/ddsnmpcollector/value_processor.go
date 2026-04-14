@@ -25,10 +25,22 @@ func newValueProcessor() *valueProcessor {
 }
 
 func (p *valueProcessor) processValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) (int64, error) {
+	if isStringValueFormat(sym.Format) {
+		return p.stringProcessor.processValue(sym, pdu)
+	}
 	if isPduNumericType(pdu) {
 		return p.numericProcessor.processValue(sym, pdu)
 	}
 	return p.stringProcessor.processValue(sym, pdu)
+}
+
+func isStringValueFormat(format string) bool {
+	switch format {
+	case "hex", "ip_address", "mac_address", "snmp_dateandtime", "text_date":
+		return true
+	default:
+		return false
+	}
 }
 
 // numericValueProcessor handles numeric PDU types
@@ -70,11 +82,14 @@ func (p *numericValueProcessor) processOpaqueDouble(sym ddprofiledefinition.Symb
 }
 
 func (p *numericValueProcessor) processInteger(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) (int64, error) {
-	value := gosnmp.ToBigInt(pdu.Value).Int64()
+	value, err := convNumericPduToInt64f(pdu, sym.Format)
+	if err != nil {
+		return 0, err
+	}
 
-	if len(sym.Mapping) > 0 {
+	if sym.Mapping.EffectiveMode() == ddprofiledefinition.MappingModeExact && sym.Mapping.HasItems() {
 		s := strconv.FormatInt(value, 10)
-		if v, ok := sym.Mapping[s]; ok && isInt(v) {
+		if v, ok := sym.Mapping.Lookup(s); ok && isInt(v) {
 			value, _ = strconv.ParseInt(v, 10, 64)
 		}
 	}
@@ -110,17 +125,36 @@ func (p *stringValueProcessor) processValue(sym ddprofiledefinition.SymbolConfig
 		s = replaceSubmatches(sym.MatchValue, sm)
 	}
 
-	if v, ok := sym.Mapping[s]; ok && isInt(v) {
-		s = v
+	if sym.Mapping.EffectiveMode() == ddprofiledefinition.MappingModeExact && sym.Mapping.HasItems() {
+		if v, ok := sym.Mapping.Lookup(s); ok && isInt(v) {
+			s = v
+		}
 	}
 
-	value, err := strconv.ParseInt(s, 10, 64)
+	value, err := parseStringMetricValue(sym, s)
 	if err != nil {
-		return 0, fmt.Errorf("cannot convert '%s' to int64: %w", s, err)
+		return 0, err
 	}
 
 	if sym.ScaleFactor != 0 {
 		value = int64(float64(value) * sym.ScaleFactor)
+	}
+
+	return value, nil
+}
+
+func parseStringMetricValue(sym ddprofiledefinition.SymbolConfig, s string) (int64, error) {
+	base := 10
+	if sym.Format == "hex" {
+		base = 16
+	}
+
+	value, err := strconv.ParseInt(s, base, 64)
+	if err != nil {
+		if base == 16 {
+			return 0, fmt.Errorf("cannot convert '%s' to int64 from hex: %w", s, err)
+		}
+		return 0, fmt.Errorf("cannot convert '%s' to int64: %w", s, err)
 	}
 
 	return value, nil

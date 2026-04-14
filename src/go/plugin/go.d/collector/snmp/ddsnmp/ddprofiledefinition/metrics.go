@@ -48,10 +48,10 @@ type MetricsConfig struct {
 	MIB string `yaml:"MIB,omitempty" json:"MIB,omitempty"`
 
 	// Symbol configs
-	Symbol SymbolConfig `yaml:"symbol,omitempty" json:"symbol,omitempty"`
+	Symbol SymbolConfig `yaml:"symbol,omitempty" json:"symbol"`
 
 	// Table the table OID
-	Table SymbolConfig `yaml:"table,omitempty" json:"table,omitempty"`
+	Table SymbolConfig `yaml:"table,omitempty" json:"table"`
 	// Table configs
 	Symbols []SymbolConfig `yaml:"symbols,omitempty" json:"symbols,omitempty"`
 
@@ -59,7 +59,7 @@ type MetricsConfig struct {
 	StaticTags []StaticMetricTagConfig `yaml:"static_tags,omitempty" json:"-"`
 	MetricTags MetricTagConfigList     `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
 
-	Options MetricsConfigOption `yaml:"options,omitempty" json:"options,omitempty"`
+	Options MetricsConfigOption `yaml:"options,omitempty" json:"options"`
 
 	// DEPRECATED: Use .Symbol instead
 	OID string `yaml:"OID,omitempty" json:"OID,omitempty" jsonschema:"-"`
@@ -135,9 +135,9 @@ type SymbolConfig struct {
 	//   Deprecated types: `counter` (use `rate` instead), percent (use `scale_factor` instead)
 	MetricType ProfileMetricType `yaml:"metric_type,omitempty" json:"metric_type,omitempty"`
 
-	ChartMeta ChartMeta `yaml:"chart_meta,omitempty" json:"chart_meta,omitempty"`
+	ChartMeta ChartMeta `yaml:"chart_meta,omitempty" json:"chart_meta"`
 
-	Mapping           map[string]string  `yaml:"mapping,omitempty" json:"mapping,omitempty"`
+	Mapping           MappingConfig      `yaml:"mapping,omitempty" json:"mapping,omitempty"`
 	Transform         string             `yaml:"transform,omitempty" json:"transform,omitempty"`
 	TransformCompiled *template.Template `yaml:"-" json:"-"`
 }
@@ -145,7 +145,7 @@ type SymbolConfig struct {
 // Clone creates a duplicate of this SymbolConfig
 func (s SymbolConfig) Clone() SymbolConfig {
 	ss := s
-	ss.Mapping = maps.Clone(ss.Mapping)
+	ss.Mapping = ss.Mapping.Clone()
 	return ss
 }
 
@@ -174,12 +174,17 @@ type MetricTagConfig struct {
 	// set .Tag to specify the tag name. If a serialized Symbol is a string
 	// instead of an object, it will be treated like {name: <value>}; this use
 	// pattern is deprecated
-	Symbol SymbolConfigCompat `yaml:"symbol,omitempty" json:"symbol,omitempty"`
+	Symbol SymbolConfigCompat `yaml:"symbol,omitempty" json:"symbol"`
+
+	// LookupSymbol optionally resolves cross-table tags by matching a value from the
+	// current row index against a column in the referenced table, then reading Symbol
+	// from the matched row in that table.
+	LookupSymbol SymbolConfigCompat `yaml:"lookup_symbol,omitempty" json:"lookup_symbol"`
 
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
 
-	MappingRef string            `yaml:"mapping_ref,omitempty" json:"mapping_ref,omitempty"`
-	Mapping    map[string]string `yaml:"mapping,omitempty" json:"mapping,omitempty"`
+	MappingRef string        `yaml:"mapping_ref,omitempty" json:"mapping_ref,omitempty"`
+	Mapping    MappingConfig `yaml:"mapping,omitempty" json:"mapping,omitempty"`
 
 	// Regex
 	// Match/Tags are not exposed as json (UI) since ExtractValue can be used instead
@@ -196,8 +201,9 @@ func (m MetricTagConfig) Clone() MetricTagConfig {
 	// deep copy symbols and structures
 	m2.Column = m.Column.Clone()
 	m2.Symbol = m.Symbol.Clone()
+	m2.LookupSymbol = m.LookupSymbol.Clone()
 	m2.IndexTransform = slices.Clone(m.IndexTransform)
-	m2.Mapping = maps.Clone(m.Mapping)
+	m2.Mapping = m.Mapping.Clone()
 	m2.Tags = maps.Clone(m.Tags)
 	return m2
 }
@@ -219,8 +225,9 @@ type MetricTagConfigList []MetricTagConfig
 
 // MetricIndexTransform holds configs for metric index transform
 type MetricIndexTransform struct {
-	Start uint `yaml:"start" json:"start"`
-	End   uint `yaml:"end" json:"end"`
+	Start     uint `yaml:"start" json:"start"`
+	End       uint `yaml:"end" json:"end"`
+	DropRight uint `yaml:"drop_right,omitempty" json:"drop_right,omitempty"`
 }
 
 // MetricsConfigOption holds config for metrics options

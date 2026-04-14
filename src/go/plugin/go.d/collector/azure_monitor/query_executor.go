@@ -45,19 +45,13 @@ func (e *queryExecutor) reset() {
 }
 
 func (e *queryExecutor) runQueryBatches(ctx context.Context, batches []queryBatch, queryNow time.Time, queryOffsetSeconds int) []queryBatchResult {
-	workers := e.maxConcurrency
-	if workers < 1 {
-		workers = 1
-	}
-	if workers > len(batches) {
-		workers = len(batches)
-	}
+	workers := min(max(e.maxConcurrency, 1), len(batches))
 
 	input := make(chan queryBatch)
 	output := make(chan queryBatchResult, len(batches))
 
 	var wg sync.WaitGroup
-	for i := 0; i < workers; i++ {
+	for range workers {
 		wg.Go(func() {
 			for batch := range input {
 				samples, err := e.executeQueryBatch(ctx, batch, queryNow, queryOffsetSeconds)
@@ -109,7 +103,7 @@ func (e *queryExecutor) executeQueryBatch(ctx context.Context, batch queryBatch,
 		return nil, err
 	}
 
-	return samplesFromQueryResponse(resp.Values, batch.Profile.ID, queryBatchMetricIndex(batch.Metrics), resourceByID), nil
+	return samplesFromQueryResponse(resp.Values, batch.Profile.Name, queryBatchMetricIndex(batch.Metrics), resourceByID), nil
 }
 
 func queryBatchMetricIndex(metrics []*metricRuntime) map[string]*metricRuntime {
@@ -154,14 +148,14 @@ func effectiveQueryOffset(queryOffsetSeconds int, batchTimeGrainEvery time.Durat
 	return offset
 }
 
-func samplesFromQueryResponse(metricData []azmetrics.MetricData, profileID string, metricToRuntime map[string]*metricRuntime, resourceByID map[string]resourceInfo) []metricSample {
+func samplesFromQueryResponse(metricData []azmetrics.MetricData, profileName string, metricToRuntime map[string]*metricRuntime, resourceByID map[string]resourceInfo) []metricSample {
 	samples := make([]metricSample, 0, len(metricData))
 	for _, data := range metricData {
 		resource, ok := resourceByID[stringsLowerTrim(derefOrZero(data.ResourceID))]
 		if !ok {
 			continue
 		}
-		samples = append(samples, samplesFromMetricValues(data.Values, resourceLabels(resource, profileID), metricToRuntime)...)
+		samples = append(samples, samplesFromMetricValues(data.Values, resourceLabels(resource, profileName), metricToRuntime)...)
 	}
 	return samples
 }
@@ -189,7 +183,7 @@ func samplesFromMetricValues(metrics []azmetrics.Metric, labels metrix.Labels, m
 	return samples
 }
 
-func resourceLabels(resource resourceInfo, profileID string) metrix.Labels {
+func resourceLabels(resource resourceInfo, profileName string) metrix.Labels {
 	return metrix.Labels{
 		"resource_uid":    resource.UID,
 		"subscription_id": resource.SubscriptionID,
@@ -197,7 +191,7 @@ func resourceLabels(resource resourceInfo, profileID string) metrix.Labels {
 		"resource_group":  resource.ResourceGroup,
 		"region":          resource.Region,
 		"resource_type":   resource.Type,
-		"profile":         profileID,
+		"profile":         profileName,
 	}
 }
 

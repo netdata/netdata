@@ -18,9 +18,14 @@
         "minimum": 0,
         "default": 0
       },
+      "check_name": {
+        "title": "Check name",
+        "description": "Name that identifies this check type for chart grouping and metric naming. Charts appear under `Perfdata/<check_name>` in the dashboard. If omitted, derived from the `plugin` basename.",
+        "type": "string"
+      },
       "plugin": {
         "title": "Plugin path",
-        "description": "Absolute path to the Nagios-compatible check executable to run. If you need a script interpreter, point this to the interpreter executable and pass the script path in `args`. The command should return exit code 0, 1, 2, or 3 and may print performance data after `|`.",
+        "description": "Absolute path to the Nagios-compatible check command. On Linux/macOS, must be root-owned and not writable by group or others. The command should return exit code 0, 1, 2, or 3 and may print performance data after `|`.",
         "type": "string"
       },
       "args": {
@@ -60,21 +65,21 @@
         "title": "Timeout",
         "description": "Maximum time allowed for one check execution, in seconds. If the check exceeds this limit, the job state becomes `timeout`.",
         "type": "number",
-        "minimum": 0.001,
+        "minimum": 1,
         "default": 5
       },
       "check_interval": {
         "title": "Check interval",
         "description": "Requested interval between regular checks, in seconds.",
         "type": "number",
-        "minimum": 0.001,
+        "minimum": 1,
         "default": 300
       },
       "retry_interval": {
         "title": "Retry interval",
         "description": "Requested interval between retry attempts while the check is in a soft non-OK state, in seconds.",
         "type": "number",
-        "minimum": 0.001,
+        "minimum": 1,
         "default": 60
       },
       "max_check_attempts": {
@@ -251,11 +256,17 @@
     "uiOptions": {
       "fullPage": true
     },
+    "check_name": {
+      "ui:placeholder": "check_ping",
+      "ui:help": "**Controls chart grouping and metric naming for performance data.**\n\nCharts appear under `Synthetic > Nagios > Perfdata > <check_name>` in the dashboard.\n\nIf omitted, Netdata derives it from the `plugin` basename (e.g. `/usr/lib/nagios/plugins/check_ping` → `check_ping`, `C:\\Netdata\\checks\\check_service.ps1` → `check_service`).\n\n### When to set it\n\n- When multiple jobs run the same plugin (e.g. `check_nrpe`) against different remote checks — set `check_name` to distinguish them (`check_disk`, `check_load`, etc.)\n\n### Example metric names\n\nWith `check_name: check_memory` and a script that outputs `caches=2380912KB`:\n\n- `nagios.perfdata.check_memory.job.execution_state`\n- `nagios.perfdata.check_memory.bytes_caches`\n- `nagios.perfdata.check_memory.bytes_caches_threshold_state`"
+    },
     "plugin": {
-      "ui:placeholder": "/usr/lib/nagios/plugins/check_ping"
+      "ui:placeholder": "/usr/lib/nagios/plugins/check_ping",
+      "ui:help": "**Absolute path to the check command.**\n\n### Linux / macOS\n\nThe executable must meet these security requirements:\n- Owned by **root**\n- Not writable by group or others\n- All ancestor directories owned by root and not group/other-writable\n- Must be a regular, executable file\n- Symlinks are resolved before validation\n\nExample:\n```\n/usr/lib/nagios/plugins/check_ping\n```\n\n### Windows\n\nPoint `plugin` directly to a `.ps1`, `.bat`, or `.cmd` script. Netdata automatically invokes `.ps1` scripts through `powershell.exe` and `.bat`/`.cmd` scripts through `cmd.exe`.\n\nExample:\n```\nC:\\Netdata\\checks\\check_service.ps1\n```\nPath validation is not enforced on Windows — ensure scripts are stored in directories with appropriate ACLs.\n\n### Output format\n\nThe command should return exit code `0` (OK), `1` (WARNING), `2` (CRITICAL), or `3` (UNKNOWN) and may print performance data after `|`:\n```\nSTATUS TEXT | label=value;warn;crit;min;max\n```"
     },
     "args": {
-      "ui:listFlavour": "list"
+      "ui:listFlavour": "list",
+      "ui:help": "**Arguments passed to the check command after macro expansion.**\n\nYou can use Nagios-style macros like `$ARG1$`, `$HOSTADDRESS$`, `$_SERVICEDBHOST$` — they are expanded before execution.\n\nOn Windows, when `plugin` points to a `.ps1`/`.bat`/`.cmd` script, these arguments are appended after the script path."
     },
     "arg_values": {
       "ui:listFlavour": "list",
@@ -276,6 +287,12 @@
     "time_periods": {
       "ui:listFlavour": "list"
     },
+    "environment": {
+      "ui:help": "**Extra environment variables for the check process.**\n\nChecks run with a limited baseline environment (only `PATH`, `HOME`, `USER`, `TZ`, `TMPDIR`, `SHELL`, `LC_ALL` on Linux/macOS). If your script depends on additional variables, set them here.\n\n### Example\n```yaml\nenvironment:\n  ORACLE_HOME: /opt/oracle/product/19c\n  LD_LIBRARY_PATH: /opt/oracle/product/19c/lib\n```"
+    },
+    "custom_vars": {
+      "ui:help": "**Custom service variables exposed as Nagios-style macros.**\n\nEach entry is available as:\n- Environment variable: `NAGIOS__SERVICE<UPPERCASE_KEY>`\n- Macro in `args`: `$_SERVICE<KEY>$`\n\n### Example\n```yaml\ncustom_vars:\n  DBHOST: db.example.com\n  DBNAME: production\n```\nUse in args: `[\"-H\", \"$_SERVICEDBHOST$\", \"-d\", \"$_SERVICEDBNAME$\"]`"
+    },
     "vnode": {
       "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
@@ -287,6 +304,7 @@
           "fields": [
             "update_every",
             "plugin",
+            "check_name",
             "args",
             "arg_values",
             "timeout",

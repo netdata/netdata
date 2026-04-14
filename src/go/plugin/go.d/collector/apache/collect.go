@@ -111,7 +111,7 @@ func parseScoreboard(line string) *scoreboard {
 	// “I” Idle cleanup of worker
 	// “.” Open slot with no current process
 	var sb scoreboard
-	for _, s := range strings.Split(line, "") {
+	for s := range strings.SplitSeq(line, "") {
 		switch s {
 		case "_":
 			sb.Waiting++

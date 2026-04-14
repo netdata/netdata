@@ -4,6 +4,8 @@ extends:
   - _system-base.yaml
   - _cisco-base.yaml
   - _cisco-catalyst.yaml
+  - _cisco-catalyst-poe.yaml
+  - _std-lag-mib.yaml
 
 metadata:
   device:

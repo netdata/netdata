@@ -89,14 +89,14 @@ func TestJob_RetryAutoDetection(t *testing.T) {
 
 	assert.True(t, job.RetryAutoDetection())
 	assert.Equal(t, infTries, job.AutoDetectTries)
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		_ = job.check()
 	}
 	assert.True(t, job.RetryAutoDetection())
 	assert.Equal(t, infTries, job.AutoDetectTries)
 
 	job.AutoDetectTries = 10
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		_ = job.check()
 	}
 	assert.False(t, job.RetryAutoDetection())
@@ -304,7 +304,7 @@ func TestJob_MainLoop_Panic(t *testing.T) {
 
 func TestJob_Tick(t *testing.T) {
 	job := newTestJob()
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		job.Tick(i)
 	}
 }

@@ -535,13 +535,13 @@ lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [o
 
 **Optional Parameters:**
 
-| Parameter          | Purpose                     | Details                                                              |
-|--------------------|-----------------------------|----------------------------------------------------------------------|
+| Parameter          | Purpose                     | Details                                                                    |
+|--------------------|-----------------------------|----------------------------------------------------------------------------|
 | `GROUPING OPTIONS` | Conditional processing      | `CONDITION VALUE` where condition is `!=`, `=`, `==`, `<=`, `<`, `>`, `>=` |
-| `at BEFORE`        | End of lookup timeframe     | Default is 0 (now)                                                   |
-| `every DURATION`   | Update frequency            | Supports `s`, `m`, `h`, `d` units                                    |
-| `OPTIONS`          | Processing modifiers        | See options table below                                              |
-| `of DIMENSIONS`    | Which dimensions to include | Space-separated list, supports patterns                              |
+| `at BEFORE`        | End of lookup timeframe     | Default is 0 (now)                                                         |
+| `every DURATION`   | Update frequency            | Supports `s`, `m`, `h`, `d` units                                          |
+| `OPTIONS`          | Processing modifiers        | See options table below                                                    |
+| `of DIMENSIONS`    | Which dimensions to include | Space-separated list, supports patterns                                    |
 
 **Processing Options:**
 
@@ -802,11 +802,14 @@ chart labels: mount_point=/mnt/disk1 device=sda
 
 This requires BOTH conditions to be true (AND logic).
 
-**Important Notes:**
+:::important
 
 - Space-separated list with [simple patterns](/src/libnetdata/simple_pattern/README.md) support
 - If a specified label doesn't exist on the chart, the chart won't match
 - Multiple labels use AND logic
+- Alerts based on `chart labels` require the underlying chart to exist. For example, a `disk.space` chart is only created when a mount point is present and collected. For example, if a CIFS mount fails to mount after a system reboot, no `disk.space` chart will exist for that mount point, and the alert will not activate
+
+:::
 
 #### Alert Line `summary`
 
@@ -892,7 +895,7 @@ How to write calculations and use variables in your alert definitions. Essential
 |------------|----------------------------------------|---------------------------|
 | Arithmetic | `+`, `-`, `*`, `/`                     | Numeric values            |
 | Comparison | `<`, `==`, `<=`, `<>`, `!=`, `>`, `>=` | `1` (true) or `0` (false) |
-| Logical    | `&&`, `||`, `!`, `AND`, `OR`, `NOT`    | `1` (true) or `0` (false) |
+| Logical    | `&&`, `||`,`!`,`AND`,`OR`,`NOT`    | `1` (true) or `0` (false) |
 
 **Special Functions:**
 
@@ -1486,6 +1489,7 @@ warn: $this > (($status >= $WARNING) ? (75) : (80))
 **Debug Steps:**
 
 1. **Check Available Variables:**
+
    ```
    http://NODE:19999/api/v1/alarm_variables?chart=CHART_NAME
    ```
@@ -1504,12 +1508,14 @@ warn: $this > (($status >= $WARNING) ? (75) : (80))
 **Safe Testing Process:**
 
 1. **Create Test File:**
+
    ```bash
    sudo touch health.d/test-alert.conf
    sudo ./edit-config health.d/test-alert.conf
    ```
 
 2. **Write Simple Alert:**
+
    ```text
    alarm: test_ram
       on: system.ram
@@ -1520,12 +1526,14 @@ warn: $this > (($status >= $WARNING) ? (75) : (80))
    ```
 
 3. **Reload and Monitor:**
+
    ```bash
    sudo netdatacli reload-health
    # Watch dashboard for test alert appearance
    ```
 
 4. **Remove When Done:**
+
    ```bash
    sudo rm health.d/test-alert.conf
    sudo netdatacli reload-health
@@ -1557,16 +1565,19 @@ warn: $this > (($status >= $WARNING) ? (75) : (80))
 When seeking help, include:
 
 1. **Alert Configuration:**
+
    ```text
    # Your complete alert definition
    ```
 
 2. **Chart Information:**
+
    ```
    http://your-server:19999/api/v1/alarm_variables?chart=chart_name
    ```
 
 3. **Current Status:**
+
    ```
    http://your-server:19999/api/v1/alarms?all
    ```
@@ -1575,7 +1586,50 @@ When seeking help, include:
 
 - [Netdata GitHub Issues](https://github.com/netdata/netdata/issues)
 - [Netdata Community Forum](https://community.netdata.cloud)
-- [Netdata Discord](https://discord.gg/mPZ6WZKKG2)
+- [Netdata Discord](https://discord.com/invite/2mEmfW735j)
+
+### Alert Notification Variables
+
+The following variables are available in alert notification templates and custom notification scripts:
+
+|        Variable name        | Description                                                                                                                                  |
+|:---------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------------|
+|         `${alarm}`          | Like "name = value units"                                                                                                                    |
+|     `${status_message}`     | Like "needs attention", "recovered", "is critical"                                                                                           |
+|        `${severity}`        | Like "Escalated to CRITICAL", "Recovered from WARNING"                                                                                       |
+|       `${raised_for}`       | Like "(alarm was raised for 10 minutes)"                                                                                                     |
+|          `${host}`          | The host generated this event                                                                                                                |
+|        `${url_host}`        | Same as `${host}` but URL encoded                                                                                                            |
+|       `${unique_id}`        | The unique id of this event                                                                                                                  |
+|        `${alarm_id}`        | The unique id of the alarm that generated this event                                                                                         |
+|        `${event_id}`        | The incremental id of the event, for this alarm id                                                                                           |
+|          `${when}`          | The timestamp this event occurred                                                                                                            |
+|          `${date}`          | The date and time the event occurred (local timezone)                                                                                        |
+|        `${date_utc}`        | The date and time the event occurred (UTC)                                                                                                   |
+|          `${name}`          | The name of the alarm, as given in netdata health.d entries                                                                                  |
+|        `${url_name}`        | Same as `${name}` but URL encoded                                                                                                            |
+|         `${chart}`          | The name of the chart (type.id)                                                                                                              |
+|       `${url_chart}`        | Same as `${chart}` but URL encoded                                                                                                           |
+|         `${status}`         | The current status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL                                                              |
+|       `${old_status}`       | The previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL                                                             |
+|         `${value}`          | The current value of the alarm                                                                                                               |
+|       `${old_value}`        | The previous value of the alarm                                                                                                              |
+|          `${src}`           | The line number and file the alarm has been configured                                                                                       |
+|        `${duration}`        | The duration in seconds of the previous alarm state                                                                                          |
+|      `${duration_txt}`      | Same as `${duration}` for humans                                                                                                             |
+|   `${non_clear_duration}`   | The total duration in seconds this is/was non-clear. For repeating alerts in WARNING or CRITICAL state, Netdata sends `${duration}` instead. |
+| `${non_clear_duration_txt}` | Same as `${non_clear_duration}` for humans                                                                                                   |
+|         `${units}`          | The units of the value                                                                                                                       |
+|          `${info}`          | A short description of the alarm                                                                                                             |
+|      `${value_string}`      | Friendly value (with units)                                                                                                                  |
+|    `${old_value_string}`    | Friendly old value (with units)                                                                                                              |
+|         `${image}`          | The URL of an image to represent the status of the alarm                                                                                     |
+|         `${color}`          | A color in #AABBCC format for the alarm                                                                                                      |
+|        `${goto_url}`        | The URL the user can click to see the netdata dashboard                                                                                      |
+|    `${calc_expression}`     | The expression evaluated to provide the value for the alarm                                                                                  |
+|   `${calc_param_values}`    | The values of the variables in the evaluated expression                                                                                      |
+|     `${total_warnings}`     | The total number of alarms in WARNING state on the host                                                                                      |
+|     `${total_critical}`     | The total number of alarms in CRITICAL state on the host                                                                                     |
 
 ## Related Pages
 

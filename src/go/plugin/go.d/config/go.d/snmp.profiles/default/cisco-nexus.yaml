@@ -3,6 +3,14 @@
 extends:
   - _system-base.yaml
   - _cisco-base.yaml
+  - _cisco-nexus-vpc.yaml
+  - _cisco-nexus-system-ext.yaml
+  - _cisco-nexus-feature.yaml
+  - _cisco-nexus-nve.yaml
+  - _cisco-nexus-otv.yaml
+  - _cisco-hsrp.yaml
+  - _cisco-ntp.yaml
+  - _cisco-bfd.yaml
 
 metadata:
   device:

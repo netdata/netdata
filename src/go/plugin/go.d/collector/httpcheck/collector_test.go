@@ -464,7 +464,7 @@ func TestCollector_Collect(t *testing.T) {
 
 			var mx map[string]int64
 
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				mx = collr.Collect(context.Background())
 				time.Sleep(time.Duration(collr.UpdateEvery) * time.Second)
 			}

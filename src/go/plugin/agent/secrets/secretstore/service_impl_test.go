@@ -171,7 +171,6 @@ func TestProviderBackedAddAcrossKinds(t *testing.T) {
 	svc := secretstore.NewService(backends.Creators()...)
 
 	for _, entry := range providerBackedConfigs() {
-		entry := entry
 		t.Run(string(entry.kind), func(t *testing.T) {
 			err := svc.Add(context.Background(), newStoreFromConfig(t, svc, entry.kind, entry.config))
 			require.NoError(t, err)

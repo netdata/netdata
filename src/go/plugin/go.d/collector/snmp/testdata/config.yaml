@@ -21,6 +21,7 @@ user:
   auth_key: "ok"
   priv_proto: "ok"
   priv_key: "ok"
+  context_name: "ok"
 
 options:
   port: 123
@@ -30,6 +31,7 @@ options:
   max_request_size: 123
   max_repetitions: 123
 
+ping_only: yes
 ping:
   enabled: yes
   network: ip

@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const gatePluginPath = "/opt/nagios-scripts/check_gate.pl"
+const gateCheckName = "check_gate"
 
 func TestV2Gate_G1_TemplateCompileProof(t *testing.T) {
 	templateYAML := New().ChartTemplateYAML()
@@ -36,7 +36,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 	warnHigh := 500.0
 	critLow := 200.0
 	critHigh := 900.0
-	samples := router.route(gatePluginPath, []output.PerfDatum{
+	samples := router.route(gateCheckName, []output.PerfDatum{
 		{
 			Label: "latency", Unit: "ms", Value: 120,
 			Warn: &output.ThresholdRange{Inclusive: true, Low: &warnLow, High: &warnHigh},
@@ -89,7 +89,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 			sm.MeasureSetCounter(
 				measureSet.name,
 				metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-				metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
+				metrix.WithChartFamily(perfdataFamily(measureSet.checkName)),
 				metrix.WithUnit(measureSet.unit),
 			).ObserveTotalFields(fields, labels)
 			continue
@@ -97,7 +97,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 		sm.MeasureSetGauge(
 			measureSet.name,
 			metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-			metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
+			metrix.WithChartFamily(perfdataFamily(measureSet.checkName)),
 			metrix.WithUnit(measureSet.unit),
 		).ObserveFields(fields, labels)
 	}
@@ -106,7 +106,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 			thresholdState.name,
 			metrix.WithStateSetMode(metrix.ModeBitSet),
 			metrix.WithStateSetStates(perfThresholdStateNames...),
-			metrix.WithChartFamily(perfdataFamily(thresholdState.scriptName)),
+			metrix.WithChartFamily(perfdataFamily(thresholdState.checkName)),
 			metrix.WithUnit("state"),
 		).Enable(thresholdState.state)
 		sm.WithLabelSet(labels).WithLabels(
@@ -154,7 +154,7 @@ func TestV2Gate_G2_PerfdataRouting(t *testing.T) {
 		metrix.MeasureSetFieldLabel: perfFieldValue,
 	}, metrix.MetricKindCounter)
 
-	changedClass := router.route(gatePluginPath, []output.PerfDatum{
+	changedClass := router.route(gateCheckName, []output.PerfDatum{
 		{Label: "latency", Unit: "%", Value: 1}, // same label, different class => new identity
 	})
 	changedSamples := valueSampleMap(changedClass.values)
@@ -286,7 +286,7 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 			router := newPerfdataRouter(64)
 			displayV1 := legacyDisplayValue(tc.unit, tc.raw)
 
-			samples := router.route(gatePluginPath, []output.PerfDatum{
+			samples := router.route(gateCheckName, []output.PerfDatum{
 				{Label: "sample", Unit: tc.unit, Value: tc.raw},
 			})
 			var (
@@ -325,7 +325,7 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 					sm.MeasureSetCounter(
 						measureSet.name,
 						metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-						metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
+						metrix.WithChartFamily(perfdataFamily(measureSet.checkName)),
 						metrix.WithUnit(measureSet.unit),
 					).ObserveTotalFields(fields, sm.LabelSet())
 					continue
@@ -333,7 +333,7 @@ func TestV2Gate_G5_ScalingPrecisionEquivalence(t *testing.T) {
 				sm.MeasureSetGauge(
 					measureSet.name,
 					metrix.WithMeasureSetFields(perfMeasureSetFieldSpecs()...),
-					metrix.WithChartFamily(perfdataFamily(measureSet.scriptName)),
+					metrix.WithChartFamily(perfdataFamily(measureSet.checkName)),
 					metrix.WithUnit(measureSet.unit),
 				).ObserveFields(fields, sm.LabelSet())
 			}
@@ -433,9 +433,9 @@ func assertPlanHasNoRemoveForTarget(t *testing.T, plan chartengine.Plan, removeM
 }
 
 func TestV2Gate_SmokeCollect(t *testing.T) {
-	coll := New()
+	coll := newTestCollector()
 	coll.runner = &fakeRunner{}
-	coll.Config.JobConfig.Plugin = "/bin/true"
+	coll.Config.JobConfig.Plugin = writeTestPluginFile(t, "true")
 	coll.Config.JobConfig.Name = "smoke"
 	require.NoError(t, coll.Check(context.Background()))
 }

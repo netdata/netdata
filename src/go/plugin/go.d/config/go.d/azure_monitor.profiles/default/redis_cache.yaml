@@ -1,643 +1,642 @@
 ---
-id: redis_cache
-name: Azure Cache for Redis
+display_name: Azure Cache for Redis
 resource_type: Microsoft.Cache/redis
 metrics:
-- id: cachehits
-  azure_name: cachehits
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: cachemisses
-  azure_name: cachemisses
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: cache_read
-  azure_name: cacheRead
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: cache_write
-  azure_name: cacheWrite
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: server_load
-  azure_name: serverLoad
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: percent_processor_time
-  azure_name: percentProcessorTime
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: usedmemory
-  azure_name: usedmemory
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: usedmemorypercentage
-  azure_name: usedmemorypercentage
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: usedmemory_rss
-  azure_name: usedmemoryRss
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: connectedclients
-  azure_name: connectedclients
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: operations_per_second
-  azure_name: operationsPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: totalcommandsprocessed
-  azure_name: totalcommandsprocessed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: getcommands
-  azure_name: getcommands
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: setcommands
-  azure_name: setcommands
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: cache_latency
-  azure_name: cacheLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: totalkeys
-  azure_name: totalkeys
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: evictedkeys
-  azure_name: evictedkeys
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: expiredkeys
-  azure_name: expiredkeys
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: errors
-  azure_name: errors
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: cachemissrate
-  azure_name: cachemissrate
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: gauge
-- id: latency_p99
-  azure_name: LatencyP99
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: all_connections_closed_per_second
-  azure_name: allConnectionsClosedPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: all_connections_created_per_second
-  azure_name: allConnectionsCreatedPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: connected_clients_using_aad_token
-  azure_name: ConnectedClientsUsingAADToken
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: allcachehits
-  azure_name: allcachehits
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: allcachemisses
-  azure_name: allcachemisses
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: allcache_read
-  azure_name: allcacheRead
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: allcache_write
-  azure_name: allcacheWrite
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: allserver_load
-  azure_name: allserverLoad
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: allpercentprocessortime
-  azure_name: allpercentprocessortime
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: allusedmemory
-  azure_name: allusedmemory
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: allusedmemorypercentage
-  azure_name: allusedmemorypercentage
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: allusedmemory_rss
-  azure_name: allusedmemoryRss
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: allconnectedclients
-  azure_name: allconnectedclients
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: alloperations_per_second
-  azure_name: alloperationsPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: alltotalcommandsprocessed
-  azure_name: alltotalcommandsprocessed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: allgetcommands
-  azure_name: allgetcommands
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: allsetcommands
-  azure_name: allsetcommands
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: alltotalkeys
-  azure_name: alltotalkeys
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: allevictedkeys
-  azure_name: allevictedkeys
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: allexpiredkeys
-  azure_name: allexpiredkeys
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: geo_replication_connectivity_lag
-  azure_name: GeoReplicationConnectivityLag
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: geo_replication_data_sync_offset
-  azure_name: GeoReplicationDataSyncOffset
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: geo_replication_full_sync_event_finished
-  azure_name: GeoReplicationFullSyncEventFinished
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: geo_replication_full_sync_event_started
-  azure_name: GeoReplicationFullSyncEventStarted
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: geo_replication_healthy
-  azure_name: GeoReplicationHealthy
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
+  - id: cachehits
+    azure_name: cachehits
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: cachemisses
+    azure_name: cachemisses
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: cache_read
+    azure_name: cacheRead
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: cache_write
+    azure_name: cacheWrite
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: server_load
+    azure_name: serverLoad
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: percent_processor_time
+    azure_name: percentProcessorTime
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: usedmemory
+    azure_name: usedmemory
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: usedmemorypercentage
+    azure_name: usedmemorypercentage
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: usedmemory_rss
+    azure_name: usedmemoryRss
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: connectedclients
+    azure_name: connectedclients
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: operations_per_second
+    azure_name: operationsPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: totalcommandsprocessed
+    azure_name: totalcommandsprocessed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: getcommands
+    azure_name: getcommands
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: setcommands
+    azure_name: setcommands
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: cache_latency
+    azure_name: cacheLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: totalkeys
+    azure_name: totalkeys
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: evictedkeys
+    azure_name: evictedkeys
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: expiredkeys
+    azure_name: expiredkeys
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: errors
+    azure_name: errors
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: cachemissrate
+    azure_name: cachemissrate
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: latency_p99
+    azure_name: LatencyP99
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: all_connections_closed_per_second
+    azure_name: allConnectionsClosedPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: all_connections_created_per_second
+    azure_name: allConnectionsCreatedPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: connected_clients_using_aad_token
+    azure_name: ConnectedClientsUsingAADToken
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: allcachehits
+    azure_name: allcachehits
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: allcachemisses
+    azure_name: allcachemisses
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: allcache_read
+    azure_name: allcacheRead
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: allcache_write
+    azure_name: allcacheWrite
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: allserver_load
+    azure_name: allserverLoad
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: allpercentprocessortime
+    azure_name: allpercentprocessortime
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: allusedmemory
+    azure_name: allusedmemory
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: allusedmemorypercentage
+    azure_name: allusedmemorypercentage
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: allusedmemory_rss
+    azure_name: allusedmemoryRss
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: allconnectedclients
+    azure_name: allconnectedclients
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: alloperations_per_second
+    azure_name: alloperationsPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: alltotalcommandsprocessed
+    azure_name: alltotalcommandsprocessed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: allgetcommands
+    azure_name: allgetcommands
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: allsetcommands
+    azure_name: allsetcommands
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: alltotalkeys
+    azure_name: alltotalkeys
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: allevictedkeys
+    azure_name: allevictedkeys
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: allexpiredkeys
+    azure_name: allexpiredkeys
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: geo_replication_connectivity_lag
+    azure_name: GeoReplicationConnectivityLag
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: geo_replication_data_sync_offset
+    azure_name: GeoReplicationDataSyncOffset
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: geo_replication_full_sync_event_finished
+    azure_name: GeoReplicationFullSyncEventFinished
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: geo_replication_full_sync_event_started
+    azure_name: GeoReplicationFullSyncEventStarted
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: geo_replication_healthy
+    azure_name: GeoReplicationHealthy
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
 template:
   family: Azure Cache for Redis
   context_namespace: redis_cache
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_redis_cache__cache_hits
-    title: Azure Cache for Redis Hit Rate
-    context: cache_hits
-    family: Cache
-    type: line
-    units: operations/s
-    algorithm: incremental
-    dimensions:
-    - selector: redis_cache.cachehits_total
-      name: hits
-    - selector: redis_cache.cachemisses_total
-      name: misses
-  - id: am_azure_redis_cache__throughput
-    title: Azure Cache for Redis Throughput
-    context: throughput
-    family: Cache
-    type: line
-    units: bytes/s
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.cache_read_maximum
-      name: read
-    - selector: redis_cache.cache_write_maximum
-      name: write
-  - id: am_azure_redis_cache__server_load
-    title: Azure Cache for Redis Server Load
-    context: server_load
-    family: Server
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.server_load_maximum
-      name: maximum
-  - id: am_azure_redis_cache__cpu
-    title: Azure Cache for Redis CPU Utilization
-    context: cpu
-    family: Server
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.percent_processor_time_maximum
-      name: maximum
-  - id: am_azure_redis_cache__memory_usage
-    title: Azure Cache for Redis Memory Usage
-    context: memory_usage
-    family: Memory
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.usedmemory_maximum
-      name: used
-    - selector: redis_cache.usedmemory_rss_maximum
-      name: rss
-  - id: am_azure_redis_cache__memory_utilization
-    title: Azure Cache for Redis Memory Utilization
-    context: memory_utilization
-    family: Memory
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.usedmemorypercentage_maximum
-      name: maximum
-  - id: am_azure_redis_cache__clients
-    title: Azure Cache for Redis Connected Clients
-    context: clients
-    family: Clients
-    type: line
-    units: clients
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.connectedclients_maximum
-      name: maximum
-  - id: am_azure_redis_cache__operations
-    title: Azure Cache for Redis Operations
-    context: operations
-    family: Operations
-    type: line
-    units: operations/s
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.operations_per_second_maximum
-      name: maximum
-  - id: am_azure_redis_cache__commands
-    title: Azure Cache for Redis Commands Processed
-    context: commands
-    family: Operations
-    type: line
-    units: commands/s
-    algorithm: incremental
-    dimensions:
-    - selector: redis_cache.totalcommandsprocessed_total
-      name: total
-  - id: am_azure_redis_cache__command_types
-    title: Azure Cache for Redis Command Types
-    context: command_types
-    family: Operations
-    type: line
-    units: commands/s
-    algorithm: incremental
-    dimensions:
-    - selector: redis_cache.getcommands_total
-      name: get
-    - selector: redis_cache.setcommands_total
-      name: set
-  - id: am_azure_redis_cache__latency
-    title: Azure Cache for Redis Latency
-    context: latency
-    family: Latency
-    type: line
-    units: microseconds
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.cache_latency_average
-      name: average
-  - id: am_azure_redis_cache__key_events
-    title: Azure Cache for Redis Key Events
-    context: key_events
-    family: Keys
-    type: line
-    units: keys/s
-    algorithm: incremental
-    dimensions:
-    - selector: redis_cache.evictedkeys_total
-      name: evicted
-    - selector: redis_cache.expiredkeys_total
-      name: expired
-  - id: am_azure_redis_cache__total_keys
-    title: Azure Cache for Redis Total Keys
-    context: total_keys
-    family: Keys
-    type: line
-    units: keys
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.totalkeys_maximum
-      name: maximum
-  - id: am_azure_redis_cache__errors
-    title: Azure Cache for Redis Errors
-    context: errors
-    family: Errors
-    type: line
-    units: errors
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.errors_maximum
-      name: maximum
-  - id: am_azure_redis_cache__miss_rate
-    title: Azure Cache for Redis Miss Rate
-    context: miss_rate
-    family: Cache
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.cachemissrate_total
-      name: miss_rate
-  - id: am_azure_redis_cache__latency_p99
-    title: Azure Cache for Redis P99 Latency
-    context: latency_p99
-    family: Latency
-    type: line
-    units: microseconds
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.latency_p99_average
-      name: p99
-  - id: am_azure_redis_cache__connection_rate
-    title: Azure Cache for Redis Connection Rate
-    context: connection_rate
-    family: Clients
-    type: line
-    units: connections/s
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.all_connections_created_per_second_maximum
-      name: created
-    - selector: redis_cache.all_connections_closed_per_second_maximum
-      name: closed
-  - id: am_azure_redis_cache__aad_clients
-    title: Azure Cache for Redis Entra Token Clients
-    context: aad_clients
-    family: Clients
-    type: line
-    units: clients
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.connected_clients_using_aad_token_maximum
-      name: maximum
-  - id: am_azure_redis_cache__instance_cache_hits
-    title: Azure Cache for Redis Instance Hit Rate
-    context: instance_cache_hits
-    family: Instance Cache
-    type: line
-    units: operations/s
-    algorithm: incremental
-    dimensions:
-    - selector: redis_cache.allcachehits_total
-      name: hits
-    - selector: redis_cache.allcachemisses_total
-      name: misses
-  - id: am_azure_redis_cache__instance_throughput
-    title: Azure Cache for Redis Instance Throughput
-    context: instance_throughput
-    family: Instance Cache
-    type: line
-    units: bytes/s
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.allcache_read_maximum
-      name: read
-    - selector: redis_cache.allcache_write_maximum
-      name: write
-  - id: am_azure_redis_cache__instance_server_load
-    title: Azure Cache for Redis Instance Server Load
-    context: instance_server_load
-    family: Instance Server
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.allserver_load_maximum
-      name: server_load
-    - selector: redis_cache.allpercentprocessortime_maximum
-      name: cpu
-  - id: am_azure_redis_cache__instance_memory_usage
-    title: Azure Cache for Redis Instance Memory Usage
-    context: instance_memory_usage
-    family: Instance Memory
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.allusedmemory_maximum
-      name: used
-    - selector: redis_cache.allusedmemory_rss_maximum
-      name: rss
-  - id: am_azure_redis_cache__instance_memory_utilization
-    title: Azure Cache for Redis Instance Memory Utilization
-    context: instance_memory_utilization
-    family: Instance Memory
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.allusedmemorypercentage_maximum
-      name: maximum
-  - id: am_azure_redis_cache__instance_clients
-    title: Azure Cache for Redis Instance Connected Clients
-    context: instance_clients
-    family: Instance Clients
-    type: line
-    units: clients
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.allconnectedclients_maximum
-      name: maximum
-  - id: am_azure_redis_cache__instance_operations
-    title: Azure Cache for Redis Instance Operations
-    context: instance_operations
-    family: Instance Operations
-    type: line
-    units: operations/s
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.alloperations_per_second_maximum
-      name: maximum
-  - id: am_azure_redis_cache__instance_commands
-    title: Azure Cache for Redis Instance Commands Processed
-    context: instance_commands
-    family: Instance Operations
-    type: line
-    units: commands/s
-    algorithm: incremental
-    dimensions:
-    - selector: redis_cache.alltotalcommandsprocessed_total
-      name: total
-    - selector: redis_cache.allgetcommands_total
-      name: get
-    - selector: redis_cache.allsetcommands_total
-      name: set
-  - id: am_azure_redis_cache__instance_total_keys
-    title: Azure Cache for Redis Instance Total Keys
-    context: instance_total_keys
-    family: Instance Keys
-    type: line
-    units: keys
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.alltotalkeys_maximum
-      name: maximum
-  - id: am_azure_redis_cache__instance_key_events
-    title: Azure Cache for Redis Instance Key Events
-    context: instance_key_events
-    family: Instance Keys
-    type: line
-    units: keys/s
-    algorithm: incremental
-    dimensions:
-    - selector: redis_cache.allevictedkeys_total
-      name: evicted
-    - selector: redis_cache.allexpiredkeys_total
-      name: expired
-  - id: am_azure_redis_cache__geo_replication_lag
-    title: Azure Cache for Redis Geo-Replication Connectivity Lag
-    context: geo_replication_lag
-    family: Geo-Replication
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.geo_replication_connectivity_lag_average
-      name: average
-  - id: am_azure_redis_cache__geo_replication_sync_offset
-    title: Azure Cache for Redis Geo-Replication Data Sync Offset
-    context: geo_replication_sync_offset
-    family: Geo-Replication
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.geo_replication_data_sync_offset_average
-      name: average
-  - id: am_azure_redis_cache__geo_replication_sync_events
-    title: Azure Cache for Redis Geo-Replication Sync Events
-    context: geo_replication_sync_events
-    family: Geo-Replication
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: redis_cache.geo_replication_full_sync_event_started_count
-      name: started
-    - selector: redis_cache.geo_replication_full_sync_event_finished_count
-      name: finished
-  - id: am_azure_redis_cache__geo_replication_health
-    title: Azure Cache for Redis Geo-Replication Health
-    context: geo_replication_health
-    family: Geo-Replication
-    type: line
-    units: status
-    algorithm: absolute
-    dimensions:
-    - selector: redis_cache.geo_replication_healthy_average
-      name: average
+    - id: am_azure_redis_cache__cache_hits
+      title: Azure Cache for Redis Hit Rate
+      context: cache_hits
+      family: Cache
+      type: line
+      units: operations/s
+      algorithm: incremental
+      dimensions:
+        - selector: cachehits_total
+          name: hits
+        - selector: cachemisses_total
+          name: misses
+    - id: am_azure_redis_cache__throughput
+      title: Azure Cache for Redis Throughput
+      context: throughput
+      family: Cache
+      type: line
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: cache_read_maximum
+          name: read
+        - selector: cache_write_maximum
+          name: write
+    - id: am_azure_redis_cache__server_load
+      title: Azure Cache for Redis Server Load
+      context: server_load
+      family: Server
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: server_load_maximum
+          name: maximum
+    - id: am_azure_redis_cache__cpu
+      title: Azure Cache for Redis CPU Utilization
+      context: cpu
+      family: Server
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: percent_processor_time_maximum
+          name: maximum
+    - id: am_azure_redis_cache__memory_usage
+      title: Azure Cache for Redis Memory Usage
+      context: memory_usage
+      family: Memory
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: usedmemory_maximum
+          name: used
+        - selector: usedmemory_rss_maximum
+          name: rss
+    - id: am_azure_redis_cache__memory_utilization
+      title: Azure Cache for Redis Memory Utilization
+      context: memory_utilization
+      family: Memory
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: usedmemorypercentage_maximum
+          name: maximum
+    - id: am_azure_redis_cache__clients
+      title: Azure Cache for Redis Connected Clients
+      context: clients
+      family: Clients
+      type: line
+      units: clients
+      algorithm: absolute
+      dimensions:
+        - selector: connectedclients_maximum
+          name: maximum
+    - id: am_azure_redis_cache__operations
+      title: Azure Cache for Redis Operations
+      context: operations
+      family: Operations
+      type: line
+      units: operations/s
+      algorithm: absolute
+      dimensions:
+        - selector: operations_per_second_maximum
+          name: maximum
+    - id: am_azure_redis_cache__commands
+      title: Azure Cache for Redis Commands Processed
+      context: commands
+      family: Operations
+      type: line
+      units: commands/s
+      algorithm: incremental
+      dimensions:
+        - selector: totalcommandsprocessed_total
+          name: total
+    - id: am_azure_redis_cache__command_types
+      title: Azure Cache for Redis Command Types
+      context: command_types
+      family: Operations
+      type: line
+      units: commands/s
+      algorithm: incremental
+      dimensions:
+        - selector: getcommands_total
+          name: get
+        - selector: setcommands_total
+          name: set
+    - id: am_azure_redis_cache__latency
+      title: Azure Cache for Redis Latency
+      context: latency
+      family: Latency
+      type: line
+      units: microseconds
+      algorithm: absolute
+      dimensions:
+        - selector: cache_latency_average
+          name: average
+    - id: am_azure_redis_cache__key_events
+      title: Azure Cache for Redis Key Events
+      context: key_events
+      family: Keys
+      type: line
+      units: keys/s
+      algorithm: incremental
+      dimensions:
+        - selector: evictedkeys_total
+          name: evicted
+        - selector: expiredkeys_total
+          name: expired
+    - id: am_azure_redis_cache__total_keys
+      title: Azure Cache for Redis Total Keys
+      context: total_keys
+      family: Keys
+      type: line
+      units: keys
+      algorithm: absolute
+      dimensions:
+        - selector: totalkeys_maximum
+          name: maximum
+    - id: am_azure_redis_cache__errors
+      title: Azure Cache for Redis Errors
+      context: errors
+      family: Errors
+      type: line
+      units: errors
+      algorithm: absolute
+      dimensions:
+        - selector: errors_maximum
+          name: maximum
+    - id: am_azure_redis_cache__miss_rate
+      title: Azure Cache for Redis Miss Rate
+      context: miss_rate
+      family: Cache
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cachemissrate_total
+          name: miss_rate
+    - id: am_azure_redis_cache__latency_p99
+      title: Azure Cache for Redis P99 Latency
+      context: latency_p99
+      family: Latency
+      type: line
+      units: microseconds
+      algorithm: absolute
+      dimensions:
+        - selector: latency_p99_average
+          name: p99
+    - id: am_azure_redis_cache__connection_rate
+      title: Azure Cache for Redis Connection Rate
+      context: connection_rate
+      family: Clients
+      type: line
+      units: connections/s
+      algorithm: absolute
+      dimensions:
+        - selector: all_connections_created_per_second_maximum
+          name: created
+        - selector: all_connections_closed_per_second_maximum
+          name: closed
+    - id: am_azure_redis_cache__aad_clients
+      title: Azure Cache for Redis Entra Token Clients
+      context: aad_clients
+      family: Clients
+      type: line
+      units: clients
+      algorithm: absolute
+      dimensions:
+        - selector: connected_clients_using_aad_token_maximum
+          name: maximum
+    - id: am_azure_redis_cache__instance_cache_hits
+      title: Azure Cache for Redis Instance Hit Rate
+      context: instance_cache_hits
+      family: Instance Cache
+      type: line
+      units: operations/s
+      algorithm: incremental
+      dimensions:
+        - selector: allcachehits_total
+          name: hits
+        - selector: allcachemisses_total
+          name: misses
+    - id: am_azure_redis_cache__instance_throughput
+      title: Azure Cache for Redis Instance Throughput
+      context: instance_throughput
+      family: Instance Cache
+      type: line
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: allcache_read_maximum
+          name: read
+        - selector: allcache_write_maximum
+          name: write
+    - id: am_azure_redis_cache__instance_server_load
+      title: Azure Cache for Redis Instance Server Load
+      context: instance_server_load
+      family: Instance Server
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: allserver_load_maximum
+          name: server_load
+        - selector: allpercentprocessortime_maximum
+          name: cpu
+    - id: am_azure_redis_cache__instance_memory_usage
+      title: Azure Cache for Redis Instance Memory Usage
+      context: instance_memory_usage
+      family: Instance Memory
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: allusedmemory_maximum
+          name: used
+        - selector: allusedmemory_rss_maximum
+          name: rss
+    - id: am_azure_redis_cache__instance_memory_utilization
+      title: Azure Cache for Redis Instance Memory Utilization
+      context: instance_memory_utilization
+      family: Instance Memory
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: allusedmemorypercentage_maximum
+          name: maximum
+    - id: am_azure_redis_cache__instance_clients
+      title: Azure Cache for Redis Instance Connected Clients
+      context: instance_clients
+      family: Instance Clients
+      type: line
+      units: clients
+      algorithm: absolute
+      dimensions:
+        - selector: allconnectedclients_maximum
+          name: maximum
+    - id: am_azure_redis_cache__instance_operations
+      title: Azure Cache for Redis Instance Operations
+      context: instance_operations
+      family: Instance Operations
+      type: line
+      units: operations/s
+      algorithm: absolute
+      dimensions:
+        - selector: alloperations_per_second_maximum
+          name: maximum
+    - id: am_azure_redis_cache__instance_commands
+      title: Azure Cache for Redis Instance Commands Processed
+      context: instance_commands
+      family: Instance Operations
+      type: line
+      units: commands/s
+      algorithm: incremental
+      dimensions:
+        - selector: alltotalcommandsprocessed_total
+          name: total
+        - selector: allgetcommands_total
+          name: get
+        - selector: allsetcommands_total
+          name: set
+    - id: am_azure_redis_cache__instance_total_keys
+      title: Azure Cache for Redis Instance Total Keys
+      context: instance_total_keys
+      family: Instance Keys
+      type: line
+      units: keys
+      algorithm: absolute
+      dimensions:
+        - selector: alltotalkeys_maximum
+          name: maximum
+    - id: am_azure_redis_cache__instance_key_events
+      title: Azure Cache for Redis Instance Key Events
+      context: instance_key_events
+      family: Instance Keys
+      type: line
+      units: keys/s
+      algorithm: incremental
+      dimensions:
+        - selector: allevictedkeys_total
+          name: evicted
+        - selector: allexpiredkeys_total
+          name: expired
+    - id: am_azure_redis_cache__geo_replication_lag
+      title: Azure Cache for Redis Geo-Replication Connectivity Lag
+      context: geo_replication_lag
+      family: Geo-Replication
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: geo_replication_connectivity_lag_average
+          name: average
+    - id: am_azure_redis_cache__geo_replication_sync_offset
+      title: Azure Cache for Redis Geo-Replication Data Sync Offset
+      context: geo_replication_sync_offset
+      family: Geo-Replication
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: geo_replication_data_sync_offset_average
+          name: average
+    - id: am_azure_redis_cache__geo_replication_sync_events
+      title: Azure Cache for Redis Geo-Replication Sync Events
+      context: geo_replication_sync_events
+      family: Geo-Replication
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: geo_replication_full_sync_event_started_count
+          name: started
+        - selector: geo_replication_full_sync_event_finished_count
+          name: finished
+    - id: am_azure_redis_cache__geo_replication_health
+      title: Azure Cache for Redis Geo-Replication Health
+      context: geo_replication_health
+      family: Geo-Replication
+      type: line
+      units: status
+      algorithm: absolute
+      dimensions:
+        - selector: geo_replication_healthy_average
+          name: average

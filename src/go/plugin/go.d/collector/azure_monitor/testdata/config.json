@@ -16,8 +16,10 @@
   "profiles": {
     "mode": "exact",
     "mode_exact": {
-      "names": [
-        "sql_managed_instance"
+      "entries": [
+        {
+          "name": "sql_managed_instance"
+        }
       ]
     }
   },

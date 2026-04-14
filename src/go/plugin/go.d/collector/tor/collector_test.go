@@ -316,7 +316,7 @@ func (m *mockTorDaemon) handleGetInfo(conn io.Writer, keywords string) error {
 
 	keywords = strings.Trim(keywords, "\"")
 
-	for _, k := range strings.Fields(keywords) {
+	for k := range strings.FieldsSeq(keywords) {
 		s := fmt.Sprintf("250-%s=%d\n", k, 100)
 
 		if _, err := conn.Write([]byte(s)); err != nil {

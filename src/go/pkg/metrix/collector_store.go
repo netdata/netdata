@@ -4,6 +4,7 @@ package metrix
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"sort"
 	"strings"
@@ -262,9 +263,7 @@ func (c *storeCycleController) CommitCycleSuccess() {
 		byName:      nil,
 	}
 
-	for k, s := range oldSnap.series {
-		next.series[k] = s
-	}
+	maps.Copy(next.series, oldSnap.series)
 
 	for key, staged := range c.core.active.gauges {
 		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.labels, staged.labelsKey, staged.desc)
@@ -694,9 +693,7 @@ func cloneStateMap(in map[string]bool) map[string]bool {
 		return nil
 	}
 	out := make(map[string]bool, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
+	maps.Copy(out, in)
 	return out
 }
 

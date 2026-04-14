@@ -10,6 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pathvalidate"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/timeperiod"
 )
 
@@ -45,11 +46,12 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:",inline"`
 
-	store  metrix.CollectorStore
-	router *perfdataRouter
-	runner checkRunner
-	now    func() time.Time
-	vnode  vnodes.VirtualNode
+	store          metrix.CollectorStore
+	router         *perfdataRouter
+	runner         checkRunner
+	validatePlugin func(string) (string, error)
+	now            func() time.Time
+	vnode          vnodes.VirtualNode
 
 	job   compiledJob
 	state collectState
@@ -63,10 +65,11 @@ func New() *Collector {
 			UpdateEvery: defaultCollectorUpdateEvery,
 			JobConfig:   defaultedJobConfig(JobConfig{}),
 		},
-		store:  metrix.NewCollectorStore(),
-		router: newPerfdataRouter(defaultPerfdataMetricKeyBudget),
-		runner: systemCheckRunner{},
-		now:    time.Now,
+		store:          metrix.NewCollectorStore(),
+		router:         newPerfdataRouter(defaultPerfdataMetricKeyBudget),
+		runner:         systemCheckRunner{},
+		validatePlugin: pathvalidate.ValidateBinaryPath,
+		now:            time.Now,
 	}
 }
 

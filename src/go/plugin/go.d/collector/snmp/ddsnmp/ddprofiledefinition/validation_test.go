@@ -434,8 +434,8 @@ func Test_validateEnrichMetrics(t *testing.T) {
 				},
 			},
 		},
-		"mapping used without tag": {
-			wantError: true,
+		"mapping used with symbol.name and no explicit tag": {
+			wantError: false,
 			metrics: []MetricsConfig{
 				{
 					Symbols: []SymbolConfig{
@@ -450,9 +450,150 @@ func Test_validateEnrichMetrics(t *testing.T) {
 								OID:  "1.2",
 								Name: "abc",
 							},
-							Mapping: map[string]string{
+							Mapping: NewExactMapping(map[string]string{
 								"1": "abc",
 								"2": "def",
+							}),
+						},
+					},
+				},
+			},
+		},
+		"bitmask mapping usage in scalar symbol": {
+			wantError: false,
+			metrics: []MetricsConfig{
+				{
+					Symbol: SymbolConfig{
+						OID:  "1.2.3",
+						Name: "processorStatus",
+						Mapping: NewBitmaskMapping(map[string]string{
+							"1":   "internalError",
+							"128": "processorPresent",
+						}),
+					},
+				},
+			},
+		},
+		"ERROR bitmask mapping usage in metric_tags": {
+			wantError: true,
+			metrics: []MetricsConfig{
+				{
+					Symbols: []SymbolConfig{
+						{
+							OID:  "1.2",
+							Name: "abc",
+						},
+					},
+					MetricTags: MetricTagConfigList{
+						MetricTagConfig{
+							Tag: "state",
+							Symbol: SymbolConfigCompat{
+								OID:  "1.2",
+								Name: "abc",
+							},
+							Mapping: NewBitmaskMapping(map[string]string{
+								"1": "internalError",
+							}),
+						},
+					},
+				},
+			},
+		},
+		"scalar metric_tags with scalar OID symbol are supported": {
+			wantError: false,
+			metrics: []MetricsConfig{
+				{
+					Symbol: SymbolConfig{
+						OID:  "1.2.3",
+						Name: "myMetric",
+					},
+					MetricTags: MetricTagConfigList{
+						{
+							OID: "1.2.4",
+							Symbol: SymbolConfigCompat{
+								Name: "stateSource",
+							},
+							Tag: "state",
+						},
+					},
+				},
+			},
+			wantMetrics: []MetricsConfig{
+				{
+					Symbol: SymbolConfig{
+						OID:  "1.2.3",
+						Name: "myMetric",
+					},
+					MetricTags: MetricTagConfigList{
+						{
+							Tag: "state",
+							Symbol: SymbolConfigCompat{
+								OID:  "1.2.4",
+								Name: "stateSource",
+							},
+						},
+					},
+				},
+			},
+		},
+		"scalar metric_tags do not support index lookups": {
+			wantError: true,
+			metrics: []MetricsConfig{
+				{
+					Symbol: SymbolConfig{
+						OID:  "1.2.3",
+						Name: "myMetric",
+					},
+					MetricTags: MetricTagConfigList{
+						{
+							Tag:   "idx",
+							Index: 1,
+						},
+					},
+				},
+			},
+		},
+		"scalar metric_tags do not support table lookups": {
+			wantError: true,
+			metrics: []MetricsConfig{
+				{
+					Symbol: SymbolConfig{
+						OID:  "1.2.3",
+						Name: "myMetric",
+					},
+					MetricTags: MetricTagConfigList{
+						{
+							Tag:   "peer",
+							Table: "ifTable",
+							Symbol: SymbolConfigCompat{
+								OID:  "1.2.4",
+								Name: "ifDescr",
+							},
+						},
+					},
+				},
+			},
+		},
+		"scalar metric_tags do not support index transforms": {
+			wantError: true,
+			metrics: []MetricsConfig{
+				{
+					Symbol: SymbolConfig{
+						OID:  "1.2.3",
+						Name: "myMetric",
+					},
+					MetricTags: MetricTagConfigList{
+						{
+							Tag: "peer",
+							Symbol: SymbolConfigCompat{
+								OID:  "1.2.4",
+								Name: "peerState",
+							},
+							IndexTransform: []MetricIndexTransform{
+								{
+									Start: 1,
+									End:   1,
+								},
 							},
 						},
 					},
@@ -469,6 +610,431 @@ func Test_validateEnrichMetrics(t *testing.T) {
 			}
 			if tc.wantMetrics != nil {
 				assert.Equal(t, tc.wantMetrics, tc.metrics)
+			}
+		})
+	}
+}
+
+func Test_validateEnrichMetricTag_MappingErrorUsesReadableFormat(t *testing.T) {
+	tag := MetricTagConfig{
+		Mapping: NewExactMapping(map[string]string{
+			"1": "up",
+		}),
+	}
+
+	err := validateEnrichMetricTag(&tag)
+
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "map[1:up]")
+		assert.NotContains(t, err.Error(), "%!s")
+	}
+}
+
+func Test_validateEnrichSymbol_BitmaskMappingRequiresSingleBitKeys(t *testing.T) {
+	sym := SymbolConfig{
+		OID:  "1.2.3",
+		Name: "processorStatus",
+		Mapping: NewBitmaskMapping(map[string]string{
+			"internal": "internalError",
+		}),
+	}
+
+	err := validateEnrichSymbol(&sym, ScalarSymbol)
+
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "requires keys to be 0 or a single power-of-two bit")
+	}
+}
+
+func Test_validateEnrichSymbol_BitmaskMappingRejectsCompositeMasks(t *testing.T) {
+	sym := SymbolConfig{
+		OID:  "1.2.3",
+		Name: "processorStatus",
+		Mapping: NewBitmaskMapping(map[string]string{
+			"3": "combinedFault",
+		}),
+	}
+
+	err := validateEnrichSymbol(&sym, ScalarSymbol)
+
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "requires keys to be 0 or a single power-of-two bit")
+		assert.Contains(t, err.Error(), "\"3\"")
+	}
+}
+
+func Test_validateEnrichMetadata_BitmaskMappingUnsupported(t *testing.T) {
+	metadata := MetadataConfig{
+		"device": {
+			Fields: map[string]MetadataField{
+				"description": {
+					Symbol: SymbolConfig{
+						OID:  "1.2.3",
+						Name: "deviceStatus",
+						Mapping: NewBitmaskMapping(map[string]string{
+							"1": "internalError",
+						}),
+					},
+				},
+			},
+		},
+	}
+
+	err := validateEnrichMetadata(metadata)
+
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "only supported for scalar/table metric symbols")
+	}
+}
+
+func Test_validateEnrichSymbol_BitmaskMappingRejectsScaleFactor(t *testing.T) {
+	sym := SymbolConfig{
+		OID:         "1.2.3",
+		Name:        "processorStatus",
+		ScaleFactor: 2,
+		Mapping: NewBitmaskMapping(map[string]string{
+			"1":   "internalError",
+			"128": "processorPresent",
+		}),
+	}
+
+	err := validateEnrichSymbol(&sym, ScalarSymbol)
+
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "`scale_factor` cannot be used with `mapping.mode: bitmask`")
+	}
+}
+
+func Test_validateEnrichSymbol_MappingModeRequiresItems(t *testing.T) {
+	sym := SymbolConfig{
+		OID:  "1.2.3",
+		Name: "processorStatus",
+		Mapping: MappingConfig{
+			Mode: MappingModeBitmask,
+		},
+	}
+
+	err := validateEnrichSymbol(&sym, ScalarSymbol)
+
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "`mapping.mode` requires `mapping.items`")
+	}
+}
+
+func Test_validateEnrichVirtualMetrics(t *testing.T) {
+	baseMetrics := []MetricsConfig{
+		{
+			Table: SymbolConfig{
+				OID:  "1.3.6.1.2.1.31.1.1",
+				Name: "ifXTable",
+			},
+			Symbols: []SymbolConfig{
+				{OID: "1.3.6.1.2.1.31.1.1.1.6", Name: "ifHCInOctets"},
+				{OID: "1.3.6.1.2.1.31.1.1.1.10", Name: "ifHCOutOctets"},
+			},
+			MetricTags: MetricTagConfigList{
+				{Tag: "interface", Index: 1},
+			},
+		},
+		{
+			Table: SymbolConfig{
+				OID:  "1.3.6.1.2.1.2.2",
+				Name: "ifTable",
+			},
+			Symbols: []SymbolConfig{
+				{OID: "1.3.6.1.2.1.2.2.1.14", Name: "ifInErrors"},
+			},
+			MetricTags: MetricTagConfigList{
+				{Tag: "interface", Index: 1},
+			},
+		},
+	}
+
+	tests := map[string]struct {
+		metrics         []MetricsConfig
+		virtualMetrics  []VirtualMetricConfig
+		wantErrContains []string
+	}{
+		"valid grouped virtual metric": {
+			metrics: baseMetrics,
+			virtualMetrics: []VirtualMetricConfig{
+				{
+					Name:    "ifTraffic",
+					PerRow:  true,
+					GroupBy: []string{"interface"},
+					Sources: []VirtualMetricSourceConfig{
+						{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
+						{Metric: "ifHCOutOctets", Table: "ifXTable", As: "out"},
+					},
+					EmitTags: []VirtualMetricEmitTagConfig{
+						{Tag: "interface", From: "interface"},
+					},
+				},
+			},
+		},
+		"valid scalar total without table": {
+			metrics: append(baseMetrics, MetricsConfig{
+				Symbol: SymbolConfig{
+					OID:  "1.3.6.1.4.1.2021.11.50.0",
+					Name: "_ucd.ssCpuRawUser",
+				},
+			}),
+			virtualMetrics: []VirtualMetricConfig{
+				{
+					Name: "ucd.cpuUsage",
+					Sources: []VirtualMetricSourceConfig{
+						{Metric: "_ucd.ssCpuRawUser", As: "user"},
+					},
+				},
+			},
+		},
+		"valid mapped source dim": {
+			metrics: append(baseMetrics, MetricsConfig{
+				Table: SymbolConfig{
+					OID:  "1.3.6.1.2.1.15.3",
+					Name: "bgpPeerTable",
+				},
+				Symbols: []SymbolConfig{
+					{
+						OID:  "1.3.6.1.2.1.15.3.1.2",
+						Name: "bgpPeerAdminStatus",
+						Mapping: NewExactMapping(map[string]string{
+							"1": "stop",
+							"2": "start",
+						}),
+					},
+				},
+				MetricTags: MetricTagConfigList{
+					{Tag: "neighbor", Index: 1},
+				},
+			}),
+			virtualMetrics: []VirtualMetricConfig{
+				{
+					Name:   "bgpPeerAvailability",
+					PerRow: true,
+					Sources: []VirtualMetricSourceConfig{
+						{Metric: "bgpPeerAdminStatus", Table: "bgpPeerTable", As: "admin_enabled", Dim: "start"},
+					},
+				},
+			},
+		},
+		"valid bitmask mapped source dim": {
+			metrics: append(baseMetrics, MetricsConfig{
+				Table: SymbolConfig{
+					OID:  "1.3.6.1.4.1.674.10892.1.1100.32",
+					Name: "processorDeviceStatusTable",
+				},
+				Symbols: []SymbolConfig{
+					{
+						OID:  "1.3.6.1.4.1.674.10892.1.1100.32.1.6",
+						Name: "processorDeviceStatusReading",
+						Mapping: NewBitmaskMapping(map[string]string{
+							"1":   "internalError",
+							"128": "processorPresent",
+						}),
+					},
+				},
+				MetricTags: MetricTagConfigList{
+					{Tag: "processor", Index: 1},
+				},
+			}),
+			virtualMetrics: []VirtualMetricConfig{
+				{
+					Name:   "processorDeviceHealth",
+					PerRow: true,
+					Sources: []VirtualMetricSourceConfig{
+						{Metric: "processorDeviceStatusReading", Table: "processorDeviceStatusTable", As: "present", Dim: "processorPresent"},
+					},
+				},
+			},
+		},
+		"invalid mapped source dim": {
+			metrics: append(baseMetrics, MetricsConfig{
+				Table: SymbolConfig{
+					OID:  "1.3.6.1.2.1.15.3",
+					Name: "bgpPeerTable",
+				},
+				Symbols: []SymbolConfig{
+					{
+						OID:  "1.3.6.1.2.1.15.3.1.2",
+						Name: "bgpPeerAdminStatus",
+						Mapping: NewExactMapping(map[string]string{
+							"1": "stop",
+							"2": "start",
+						}),
+					},
+				},
+				MetricTags: MetricTagConfigList{
+					{Tag: "neighbor", Index: 1},
+				},
+			}),
+			virtualMetrics: []VirtualMetricConfig{
+				{
+					Name:   "bgpPeerAvailability",
+					PerRow: true,
+					Sources: []VirtualMetricSourceConfig{
+						{Metric: "bgpPeerAdminStatus", Table: "bgpPeerTable", As: "admin_enabled", Dim: "running"},
+					},
+				},
+			},
+			wantErrContains: []string{
+				`virtual_metrics[0].sources[0]: dim "running" is not available on metric/table "bgpPeerAdminStatus"/"bgpPeerTable" (available: start, stop)`,
+			},
+		},
+		"dim requires multivalue source": {
+			metrics: baseMetrics,
+			virtualMetrics: []VirtualMetricConfig{
+				{
+					Name:   "ifTraffic",
+					PerRow: true,
+					Sources: []VirtualMetricSourceConfig{
+						{Metric: "ifHCInOctets", Table: "ifXTable", As: "in", Dim: "up"},
+					},
+				},
+			},
+			wantErrContains: []string{
+				`virtual_metrics[0].sources[0]: dim "up" requires a MultiValue source metric (metric/table "ifHCInOctets"/"ifXTable")`,
+			},
+		},
+		"valid transform multivalue source dim": {
+			metrics: append(baseMetrics, MetricsConfig{
+				Table: SymbolConfig{
+					OID:  "1.3.6.1.4.1.14988.1.1.3.100",
+					Name: "mtxrHlTable",
+				},
+				Symbols: []SymbolConfig{
+					{
+						OID:  "1.3.6.1.4.1.14988.1.1.3.100.1.3",
+						Name: "mtxrHlSensorState",
+						Transform: `
+{{- setMultivalue .Metric (i64map 0 "down" 1 "up") -}}
+`,
+					},
+				},
+				MetricTags: MetricTagConfigList{
+					{Tag: "sensor", Index: 1},
+				},
+			}),
+			virtualMetrics: []VirtualMetricConfig{
+				{
+					Name:   "sensorAvailability",
+					PerRow: true,
+					Sources: []VirtualMetricSourceConfig{
+						{Metric: "mtxrHlSensorState", Table: "mtxrHlTable", As: "up", Dim: "up"},
+					},
+				},
+			},
+		},
+		"invalid transform multivalue source dim": {
+			metrics: append(baseMetrics, MetricsConfig{
+				Table: SymbolConfig{
+					OID:  "1.3.6.1.4.1.14988.1.1.3.100",
+					Name: "mtxrHlTable",
+				},
+				Symbols: []SymbolConfig{
+					{
+						OID:  "1.3.6.1.4.1.14988.1.1.3.100.1.3",
+						Name: "mtxrHlSensorState",
+						Transform: `
+{{- setMultivalue .Metric (i64map 0 "down" 1 "up") -}}
+`,
+					},
+				},
+				MetricTags: MetricTagConfigList{
+					{Tag: "sensor", Index: 1},
+				},
+			}),
+			virtualMetrics: []VirtualMetricConfig{
+				{
+					Name:   "sensorAvailability",
+					PerRow: true,
+					Sources: []VirtualMetricSourceConfig{
+						{Metric: "mtxrHlSensorState", Table: "mtxrHlTable", As: "up", Dim: "idle"},
+					},
+				},
+			},
+			wantErrContains: []string{
+				`virtual_metrics[0].sources[0]: dim "idle" is not available on metric/table "mtxrHlSensorState"/"mtxrHlTable" (available: down, up)`,
+			},
+		},
+		"missing name and sources": {
+			metrics: baseMetrics,
+			virtualMetrics: []VirtualMetricConfig{
+				{},
+			},
+			wantErrContains: []string{
+				"virtual_metrics[0]: missing name",
+				"virtual_metrics[0]: must define sources or alternatives",
+			},
+		},
+		"duplicate name conflicting with metric": {
+			metrics: baseMetrics,
+			virtualMetrics: []VirtualMetricConfig{
+				{Name: "ifTraffic", Sources: []VirtualMetricSourceConfig{{Metric: "ifHCInOctets", Table: "ifXTable"}}},
+				{Name: "ifTraffic", Sources: []VirtualMetricSourceConfig{{Metric: "ifHCOutOctets", Table: "ifXTable"}}},
+				{Name: "ifInErrors", Sources: []VirtualMetricSourceConfig{{Metric: "ifHCOutOctets", Table: "ifXTable"}}},
+			},
+			wantErrContains: []string{
+				`virtual_metrics[1]: duplicate name "ifTraffic"`,
+				`virtual_metrics[2]: name "ifInErrors" conflicts with an existing metric`,
+			},
+		},
+		"invalid grouped sources and emit tags": {
+			metrics: baseMetrics,
+			virtualMetrics: []VirtualMetricConfig{
+				{
+					Name:    "brokenGrouped",
+					PerRow:  true,
+					GroupBy: []string{"", "interface"},
+					Sources: []VirtualMetricSourceConfig{
+						{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
+						{Metric: "ifInErrors", Table: "ifTable", As: "out"},
+						{Metric: "", Table: "", As: "missing"},
+					},
+					EmitTags: []VirtualMetricEmitTagConfig{
+						{Tag: "", From: "interface"},
+						{Tag: "interface", From: ""},
+					},
+				},
+			},
+			wantErrContains: []string{
+				"virtual_metrics[0].group_by[0]: label cannot be empty",
+				"virtual_metrics[0].emit_tags[0]: missing tag",
+				"virtual_metrics[0].emit_tags[1]: missing from",
+				`virtual_metrics[0].sources[1]: grouped virtual metrics require all sources to use the same table`,
+				"virtual_metrics[0].sources[2]: missing metric",
+				"virtual_metrics[0].sources[2]: missing table",
+			},
+		},
+		"invalid alternatives": {
+			metrics: baseMetrics,
+			virtualMetrics: []VirtualMetricConfig{
+				{
+					Name: "ifTraffic",
+					Alternatives: []VirtualMetricAlternativeSourcesConfig{
+						{},
+						{Sources: []VirtualMetricSourceConfig{{Metric: "missingMetric", Table: "ifXTable"}}},
+					},
+				},
+			},
+			wantErrContains: []string{
+				"virtual_metrics[0].alternatives[0]: must define sources",
+				`virtual_metrics[0].alternatives[1].sources[0]: unknown metric source "missingMetric"`,
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := validateEnrichVirtualMetrics(tt.metrics, tt.virtualMetrics)
+			if len(tt.wantErrContains) == 0 {
+				assert.NoError(t, err)
+				return
+			}
+
+			assert.Error(t, err)
+			for _, msg := range tt.wantErrContains {
+				assert.ErrorContains(t, err, msg)
 			}
 		})
 	}
@@ -532,6 +1098,35 @@ func Test_validateEnrichMetricTags(t *testing.T) {
 				{
 					Symbol: SymbolConfigCompat{
 						Name: "mySymbol",
+					},
+				},
+			},
+		},
+		"raw index transform with drop_right": {
+			wantError: false,
+			metrics: []MetricTagConfig{
+				{
+					Tag: "remote_addr",
+					IndexTransform: []MetricIndexTransform{
+						{
+							Start:     2,
+							DropRight: 2,
+						},
+					},
+				},
+			},
+		},
+		"raw index transform cannot combine end and drop_right": {
+			wantError: true,
+			metrics: []MetricTagConfig{
+				{
+					Tag: "remote_addr",
+					IndexTransform: []MetricIndexTransform{
+						{
+							Start:     2,
+							End:       6,
+							DropRight: 2,
+						},
 					},
 				},
 			},

@@ -484,7 +484,7 @@ func TestCollector_Collect_RemoveHostsVMsInRuntime(t *testing.T) {
 	require.NoError(t, collr.discoverOnce())
 
 	numOfRuns := 5
-	for i := 0; i < numOfRuns; i++ {
+	for range numOfRuns {
 		collr.Collect(context.Background())
 	}
 
@@ -534,7 +534,7 @@ func TestCollector_Collect_Run(t *testing.T) {
 	require.NoError(t, collr.Check(context.Background()))
 
 	runs := 20
-	for i := 0; i < runs; i++ {
+	for i := range runs {
 		assert.True(t, len(collr.Collect(context.Background())) > 0)
 		if i < 6 {
 			time.Sleep(time.Second)

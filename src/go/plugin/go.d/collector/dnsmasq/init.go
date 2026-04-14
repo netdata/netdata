@@ -5,6 +5,7 @@ package dnsmasq
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -28,12 +29,7 @@ func (c *Collector) initCharts() (*collectorapi.Charts, error) {
 }
 
 func isProtocolValid(protocol string) bool {
-	for _, v := range validProtocols {
-		if protocol == v {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(validProtocols, protocol)
 }
 
 var validProtocols = []string{

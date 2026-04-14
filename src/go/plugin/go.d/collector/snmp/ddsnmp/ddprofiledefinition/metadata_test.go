@@ -53,16 +53,22 @@ func makeMetadata() MetadataConfig {
 						ExtractValue:         ".*",
 						ExtractValueCompiled: regexp.MustCompile(".*"),
 					},
+					LookupSymbol: SymbolConfigCompat{
+						OID:                  "9.8.7",
+						Name:                 "lookupSymbol",
+						ExtractValue:         ".*",
+						ExtractValueCompiled: regexp.MustCompile(".*"),
+					},
 					IndexTransform: []MetricIndexTransform{
 						{
 							Start: 1,
 							End:   5,
 						},
 					},
-					Mapping: map[string]string{
+					Mapping: NewExactMapping(map[string]string{
 						"1": "on",
 						"2": "off",
-					},
+					}),
 					Match:   ".*",
 					Pattern: regexp.MustCompile(".*"),
 					Tags: map[string]string{

@@ -98,7 +98,7 @@ set(CPACK_DEBIAN_NETDATA_PACKAGE_SUGGESTS
 		"netdata-plugin-cups, netdata-plugin-freeipmi, netdata-plugin-ibm")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_RECOMMENDS
 		"netdata-plugin-systemd-journal, netdata-plugin-systemd-units, \
-netdata-plugin-network-viewer")
+netdata-plugin-network-viewer, netdata-plugin-scripts")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
 		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
 

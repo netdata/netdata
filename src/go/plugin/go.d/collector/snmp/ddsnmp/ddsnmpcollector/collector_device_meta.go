@@ -176,6 +176,9 @@ func (dc *deviceMetadataCollector) processSymbolValue(cfg ddprofiledefinition.Sy
 
 	val, err := convPduToStringf(pdu, cfg.Format)
 	if err != nil {
+		if errors.Is(err, errNoTextDateValue) {
+			return "", nil
+		}
 		return "", err
 	}
 
@@ -200,7 +203,7 @@ func (dc *deviceMetadataCollector) processSymbolValue(cfg ddprofiledefinition.Sy
 		val = replaceSubmatches(cfg.MatchValue, sm)
 	}
 
-	if v, ok := cfg.Mapping[val]; ok {
+	if v, ok := cfg.Mapping.Lookup(val); ok {
 		val = v
 	}
 

@@ -186,7 +186,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 
 	// Filter and normalize dyncfg output (same approach as jobmgr sim_test.go)
 	var lines []string
-	for _, line := range strings.Split(buf.String(), "\n") {
+	for line := range strings.SplitSeq(buf.String(), "\n") {
 		// Skip template CONFIG lines (registered on startup)
 		if strings.HasPrefix(line, "CONFIG") && strings.Contains(line, " template ") {
 			continue

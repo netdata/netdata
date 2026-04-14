@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
 )
 
 //go:embed "config_schema.json"
@@ -37,42 +38,39 @@ func New() *Collector {
 
 	return &Collector{
 		Config: Config{
-			ProberConfig: ProberConfig{
+			ProbeConfig: pinger.ProbeConfig{
 				Network:    "ip",
 				Privileged: true,
 				Packets:    5,
 				Interval:   confopt.Duration(time.Millisecond * 100),
 			},
-			JitterEWMASamples: 16,
-			JitterSMAWindow:   10,
+			AnalysisConfig: pinger.AnalysisConfig{
+				JitterEWMASamples: 16,
+				JitterSMAWindow:   10,
+			},
 		},
 
-		newProber:  NewProber,
-		jitterEWMA: make(map[string]float64),
-		jitterSMA:  make(map[string][]float64),
-		store:      store,
+		newPinger: pinger.New,
+		store:     store,
 	}
 }
 
 type Config struct {
-	Vnode             string   `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery       int      `yaml:"update_every,omitempty" json:"update_every"`
-	Hosts             []string `yaml:"hosts" json:"hosts"`
-	JitterEWMASamples int      `yaml:"jitter_ewma_samples,omitempty" json:"jitter_ewma_samples"`
-	JitterSMAWindow   int      `yaml:"jitter_sma_window,omitempty" json:"jitter_sma_window"`
-	ProberConfig      `yaml:",inline" json:",inline"`
+	Vnode                 string   `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery           int      `yaml:"update_every,omitempty" json:"update_every"`
+	Hosts                 []string `yaml:"hosts" json:"hosts"`
+	pinger.ProbeConfig    `yaml:",inline" json:",inline"`
+	pinger.AnalysisConfig `yaml:",inline" json:",inline"`
 }
 
 type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	prober    Prober
-	newProber func(ProberConfig, *logger.Logger) Prober
+	client    pinger.Client
+	newPinger func(pinger.Config, *logger.Logger) (pinger.Client, error)
 
-	store      metrix.CollectorStore
-	jitterEWMA map[string]float64   // EWMA jitter state per host
-	jitterSMA  map[string][]float64 // SMA jitter window per host
+	store metrix.CollectorStore
 }
 
 func (c *Collector) Configuration() any {
@@ -85,17 +83,17 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	pr, err := c.initProber()
+	pr, err := c.initPinger()
 	if err != nil {
-		return fmt.Errorf("init ping prober: %v", err)
+		return fmt.Errorf("init ping client: %v", err)
 	}
-	c.prober = pr
+	c.client = pr
 
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	samples := c.collectSamples(false)
+func (c *Collector) Check(ctx context.Context) error {
+	samples := c.collectSamples(ctx, false)
 	if len(samples) == 0 {
 		return errors.New("no metrics collected")
 	}

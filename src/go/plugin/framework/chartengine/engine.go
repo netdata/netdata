@@ -107,15 +107,6 @@ func (e *Engine) ResetMaterialized() {
 	e.mu.Unlock()
 }
 
-// loadYAMLFile reads chart-template YAML from file, compiles and publishes it.
-func (e *Engine) loadYAMLFile(path string, revision uint64) error {
-	spec, err := charttpl.DecodeYAMLFile(path)
-	if err != nil {
-		return err
-	}
-	return e.Load(spec, revision)
-}
-
 // program returns the latest compiled immutable program snapshot.
 func (e *Engine) program() *program.Program {
 	if e == nil {

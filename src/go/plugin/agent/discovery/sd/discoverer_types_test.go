@@ -26,10 +26,10 @@ type testK8sConfig struct {
 	Namespaces []string `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`
 	Selector   struct {
 		Label string `json:"label,omitempty" yaml:"label,omitempty"`
-	} `json:"selector,omitempty" yaml:"selector,omitempty"`
+	} `json:"selector" yaml:"selector,omitempty"`
 	Pod struct {
 		LocalMode bool `json:"local_mode,omitempty" yaml:"local_mode,omitempty"`
-	} `json:"pod,omitempty" yaml:"pod,omitempty"`
+	} `json:"pod" yaml:"pod,omitempty"`
 }
 
 type testSNMPConfig struct {

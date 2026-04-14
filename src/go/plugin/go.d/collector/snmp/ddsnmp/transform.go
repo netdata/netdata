@@ -5,10 +5,13 @@ package ddsnmp
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net"
 	"strconv"
+	"strings"
 	"text/template"
+	"time"
 
 	"github.com/Masterminds/sprig/v3"
 
@@ -70,7 +73,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 	fm := sprig.TxtFuncMap()
 
 	extra := map[string]any{
-		"deleteTag": func(m *Metric, key string) interface{} {
+		"deleteTag": func(m *Metric, key string) any {
 			delete(m.Tags, key)
 			return nil
 		},
@@ -176,7 +179,7 @@ func newMetricTransformFuncMap() template.FuncMap {
 			sensorPrecision := m.Tags["rm:sensor_precision"]
 
 			famPrefix := "Hardware/Sensor/"
-			config := map[string]map[string]interface{}{
+			config := map[string]map[string]any{
 				"1":  {"name": "unspecified", "family": "Generic", "desc": "Unspecified or vendor-specific sensor"},
 				"2":  {"name": "unknown", "family": "Unknown", "desc": "Unknown sensor type"},
 				"3":  {"name": "voltage_ac", "unit": "V", "family": "Voltage/AC", "desc": "AC voltage"},
@@ -320,11 +323,123 @@ func newMetricTransformFuncMap() template.FuncMap {
 
 			return ""
 		},
+		"licenseDateFromTag": func(m *Metric, tagName, kind string) (string, error) {
+			// licenseDateFromTag parses a vendor date string carried in a metric tag,
+			// replaces the metric value with its unix epoch, and stamps the licensing
+			// value kind. It is intentionally limited to timestamp value kinds; other
+			// licensing row kinds can use the generic setTag transform directly.
+			if !isLicenseDateValueKind(kind) {
+				return "", fmt.Errorf("licenseDateFromTag: unsupported value kind %q", kind)
+			}
+			if m.Tags == nil {
+				return "", nil
+			}
+			raw := strings.TrimSpace(m.Tags[tagName])
+			if raw == "" {
+				return "", nil
+			}
+
+			ts, ok := parseTextDate(raw)
+			if !ok {
+				return "", nil
+			}
+			m.Value = ts
+			m.Tags["_license_value_kind"] = kind
+			return "", nil
+		},
 	}
 
-	for name, fn := range extra {
-		fm[name] = fn
-	}
+	maps.Copy(fm, extra)
 
 	return fm
+}
+
+// textDateLayouts is the set of vendor-friendly date formats accepted by
+// text_date and licenseDateFromTag. The list is intentionally generous:
+// vendors that publish operational dates through SNMP rarely agree on a single
+// textual format. Numeric slash-only dates are intentionally excluded because
+// dd/mm/yyyy and mm/dd/yyyy are ambiguous for values like 01/02/2024.
+var textDateLayouts = []string{
+	time.RFC3339,
+	"2006-01-02 15:04:05",
+	"2006-01-02",
+	"Mon Jan 2 15:04:05 2006",
+	"Mon Jan 2 2006",
+	"Mon 2 January 2006",
+	"2 January 2006",
+	"January 2 2006",
+	"Jan 2 2006",
+	"Jan 2 2006 15:04:05",
+	"2 Jan 2006",
+	"2 Jan 2006 15:04:05",
+	"02 Jan 2006",
+	"02 Jan 2006 15:04:05",
+	"02Jan2006",
+	"2Jan2006",
+}
+
+// ParseTextDate accepts integer- and string-encoded SNMP date shapes (epoch
+// seconds, milliseconds, decimal no-value sentinels such as 0 and 4294967295,
+// and the textual layouts above) and returns the equivalent unix timestamp. It
+// is exported so the value-processor format "text_date" in
+// ddsnmpcollector/utils.go can apply the same parsing rules.
+func ParseTextDate(raw string) (int64, bool) {
+	return parseTextDate(raw)
+}
+
+// IsTextDateNoValue reports whether raw is a vendor no-timestamp sentinel
+// accepted by ParseTextDate.
+func IsTextDateNoValue(raw string) bool {
+	return isTextDateNoValue(raw)
+}
+
+func isLicenseDateValueKind(kind string) bool {
+	switch kind {
+	case "expiry_timestamp", "authorization_timestamp", "certificate_timestamp", "grace_timestamp":
+		return true
+	default:
+		return false
+	}
+}
+
+func parseTextDate(raw string) (int64, bool) {
+	raw = strings.TrimSpace(raw)
+	if isTextDateNoValue(raw) {
+		return 0, false
+	}
+
+	if n, err := strconv.ParseInt(raw, 10, 64); err == nil {
+		digits := strings.TrimLeft(raw, "+-")
+		switch {
+		case len(digits) >= 12:
+			return n / 1000, true
+		default:
+			return n, true
+		}
+	}
+
+	for _, layout := range textDateLayouts {
+		if t, err := time.Parse(layout, raw); err == nil {
+			return t.Unix(), true
+		}
+	}
+	return 0, false
+}
+
+func isTextDateNoValue(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return true
+	}
+
+	switch strings.ToLower(raw) {
+	case "0", "none", "n/a", "na", "perpetual", "permanent", "never", "unlimited":
+		return true
+	}
+
+	if n, err := strconv.ParseInt(raw, 10, 64); err == nil {
+		return n <= 0 || n == 4_294_967_295
+	}
+
+	return false
 }

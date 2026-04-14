@@ -79,7 +79,7 @@ func (c *Collector) collectGPUInfo(mx map[string]int64) error {
 		addMetric(mx, px+"mem_clock", gpu.Clocks.MemClock, 0)
 		addGPUPowerMetricsSwitch(mx, px, gpu)
 		addMetric(mx, px+"voltage", gpu.Voltage.GraphicsVolt, 0)
-		for i := 0; i < 16; i++ {
+		for i := range 16 {
 			s := "P" + strconv.Itoa(i)
 			mx[px+"performance_state_"+s] = oldmetrix.Bool(gpu.PerformanceState == s)
 		}

@@ -1,0 +1,165 @@
+# Check Point hardware monitoring (CHECKPOINT-MIB)
+# Power supply status, voltage sensors, and RAID volume/disk state.
+# Complements the fan and temperature sensors already in checkpoint.yaml.
+
+metrics:
+  # Power supply table
+  - MIB: CHECKPOINT-MIB
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.7.9.1
+      name: powerSupplyTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.6.7.9.1.1.2
+        name: powerSupplyStatus
+        chart_meta:
+          description: "Power supply operational status"
+          family: 'Hardware/Sensor/PowerSupply/Status'
+          unit: "{status}"
+        mapping:
+          Up: 1
+          Down: 2
+          Unknown: 3
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.9.1.1.1
+          name: powerSupplyIndex
+        tag: psu_index
+
+  # Voltage sensor table
+  - MIB: CHECKPOINT-MIB
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.7.8.3
+      name: voltageSensorTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.6.7.8.3.1.3
+        name: voltageSensorValue
+        chart_meta:
+          description: "Voltage sensor reading"
+          family: 'Hardware/Sensor/Voltage/Value'
+          unit: "V"
+      - OID: 1.3.6.1.4.1.2620.1.6.7.8.3.1.6
+        name: voltageSensorStatus
+        chart_meta:
+          description: "Voltage sensor out-of-range status"
+          family: 'Hardware/Sensor/Voltage/Status'
+          unit: "{status}"
+        mapping:
+          0: ok
+          1: out_of_range
+          2: reading_error
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.8.3.1.1
+          name: voltageSensorIndex
+        tag: sensor_index
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.8.3.1.2
+          name: voltageSensorName
+        tag: sensor_name
+
+  # RAID volume table
+  - MIB: CHECKPOINT-MIB
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.7.7.1
+      name: raidVolumeTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.6.7.7.1.1.6
+        name: raidVolumeState
+        chart_meta:
+          description: "RAID volume operational state"
+          family: 'Hardware/RAID/Volume/State'
+          unit: "{status}"
+        mapping:
+          0: optimal
+          1: degraded
+          2: failed
+      - OID: 1.3.6.1.4.1.2620.1.6.7.7.1.1.4
+        name: numOfDisksOnRaid
+        metric_type: gauge
+        chart_meta:
+          description: "Number of physical disks in RAID volume"
+          family: 'Hardware/RAID/Volume/Disks'
+          unit: "{disk}"
+      - OID: 1.3.6.1.4.1.2620.1.6.7.7.1.1.8
+        name: raidVolumeSize
+        metric_type: gauge
+        chart_meta:
+          description: "RAID volume size"
+          family: 'Hardware/RAID/Volume/Size'
+          unit: "GBy"
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.7.1.1.1
+          name: raidVolumeIndex
+        tag: raid_volume_index
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.7.1.1.3
+          name: raidVolumeType
+        tag: _raid_volume_type
+        mapping:
+          0: "raid-0"
+          1: "raid-1e"
+          2: "raid-1"
+          3: "raid-10"
+          4: "raid-4"
+          5: "raid-5"
+          6: "raid-6"
+          7: "raid-60"
+          8: "raid-50"
+
+  # RAID disk table
+  - MIB: CHECKPOINT-MIB
+    table:
+      OID: 1.3.6.1.4.1.2620.1.6.7.7.2
+      name: raidDiskTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.6.7.7.2.1.9
+        name: raidDiskState
+        chart_meta:
+          description: "RAID physical disk state"
+          family: 'Hardware/RAID/Disk/State'
+          unit: "{status}"
+        mapping:
+          0: online
+          1: missing
+          2: not_compatible
+          3: disc_failed
+          4: initializing
+          5: offline_requested
+          6: failed_requested
+          7: unconfigured_good_spun_up
+          8: unconfigured_good_spun_down
+          9: unconfigured_bad
+          10: hotspare
+          11: drive_offline
+          12: rebuild
+          13: failed
+          14: copyback
+          255: other_offline
+      - OID: 1.3.6.1.4.1.2620.1.6.7.7.2.1.11
+        name: raidDiskSyncState
+        metric_type: gauge
+        chart_meta:
+          description: "RAID disk synchronization progress"
+          family: 'Hardware/RAID/Disk/SyncProgress'
+          unit: "%"
+      - OID: 1.3.6.1.4.1.2620.1.6.7.7.2.1.12
+        name: raidDiskSize
+        metric_type: gauge
+        chart_meta:
+          description: "RAID physical disk size"
+          family: 'Hardware/RAID/Disk/Size'
+          unit: "GBy"
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.7.2.1.1
+          name: raidDiskIndex
+        tag: raid_disk_index
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.7.2.1.2
+          name: raidDiskVolumeID
+        tag: _raid_disk_volume_id
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.7.7.2.1.6
+          name: raidDiskProductID
+        tag: _raid_disk_product

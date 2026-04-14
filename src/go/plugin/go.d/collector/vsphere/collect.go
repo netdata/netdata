@@ -204,10 +204,7 @@ func writeDatastoreMetrics(mx map[string]int64, ds *rs.Datastore) {
 	if ds.Accessible {
 		capacity = ds.Capacity
 		freeSpace = ds.FreeSpace
-		used = capacity - freeSpace
-		if used < 0 {
-			used = 0
-		}
+		used = max(capacity-freeSpace, 0)
 	}
 
 	mx[fmt.Sprintf("%s_capacity", ds.ID)] = capacity

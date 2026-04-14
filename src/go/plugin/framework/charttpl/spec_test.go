@@ -163,8 +163,31 @@ func TestConfigSchemaJSON(t *testing.T) {
 	schema := ConfigSchemaJSON
 	require.NotEmpty(t, schema)
 
-	var doc any
+	var doc map[string]any
 	require.NoError(t, json.Unmarshal([]byte(schema), &doc))
+
+	defs, ok := doc["$defs"].(map[string]any)
+	require.True(t, ok)
+
+	chart, ok := defs["chart"].(map[string]any)
+	require.True(t, ok)
+	chartProps, ok := chart["properties"].(map[string]any)
+	require.True(t, ok)
+	chartLabelPromotion, ok := chartProps["label_promotion"].(map[string]any)
+	require.True(t, ok)
+	chartLabelPromotionItems, ok := chartLabelPromotion["items"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, `\S`, chartLabelPromotionItems["pattern"])
+
+	chartDefaults, ok := defs["chart_defaults"].(map[string]any)
+	require.True(t, ok)
+	defaultProps, ok := chartDefaults["properties"].(map[string]any)
+	require.True(t, ok)
+	defaultLabelPromotion, ok := defaultProps["label_promotion"].(map[string]any)
+	require.True(t, ok)
+	defaultLabelPromotionItems, ok := defaultLabelPromotion["items"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, `\S`, defaultLabelPromotionItems["pattern"])
 }
 
 func TestDecodeYAMLFileScenarios(t *testing.T) {

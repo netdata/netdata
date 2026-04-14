@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -48,16 +49,12 @@ func (s *publishedStore) resolve(ctx context.Context, req secretstore.ResolveReq
 		return "", fmt.Errorf("resolving secret '%s': store '%s': %w", req.Original, req.StoreKey, err)
 	}
 
-	baseURL := s.provider.secretEndpoint
-	if baseURL == "" {
-		baseURL = "https://secretmanager.googleapis.com"
-	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/v1/projects/%s/secrets/%s/versions/%s:access", baseURL, project, secretName, version), nil)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://secretmanager.googleapis.com/v1/projects/%s/secrets/%s/versions/%s:access", project, secretName, version), nil)
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': store '%s': creating request: %w", req.Original, req.StoreKey, err)
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+token)
-	resp, err := s.provider.apiClient.Do(httpReq)
+	resp, err := s.runtime.apiClient.Do(httpReq)
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': store '%s': request failed: %w", req.Original, req.StoreKey, err)
 	}
@@ -124,7 +121,7 @@ func (s *publishedStore) metadataToken(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("creating metadata token request: %w", err)
 	}
 	req.Header.Set("Metadata-Flavor", "Google")
-	resp, err := s.provider.metadataClient.Do(req)
+	resp, err := s.runtime.metadataClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("metadata token request failed: %w", err)
 	}
@@ -164,7 +161,7 @@ func (s *publishedStore) serviceAccountToken(ctx context.Context, credFile strin
 	if sa.ClientEmail == "" || sa.PrivateKey == "" || sa.TokenURI == "" {
 		return "", fmt.Errorf("service account JSON missing required fields (client_email, private_key, token_uri)")
 	}
-	now := s.provider.now().Unix()
+	now := time.Now().Unix()
 	signedJWT, err := createSignedJWT(sa.ClientEmail, sa.TokenURI, sa.PrivateKey, now)
 	if err != nil {
 		return "", err
@@ -178,7 +175,7 @@ func (s *publishedStore) serviceAccountToken(ctx context.Context, credFile strin
 		return "", fmt.Errorf("creating token exchange request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := s.provider.apiClient.Do(httpReq)
+	resp, err := s.runtime.apiClient.Do(httpReq)
 	if err != nil {
 		return "", fmt.Errorf("token exchange request failed: %w", err)
 	}

@@ -35,7 +35,6 @@ func New(cfg Config) *Collector {
 	}
 
 	for _, prof := range cfg.Profiles {
-		prof := prof
 		handleCrossTableTagsWithoutMetrics(prof)
 		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
 	}
@@ -115,11 +114,13 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 				vmetrics[i].Profile = pm
 			}
 
-			pm.Metrics = slices.DeleteFunc(pm.Metrics, func(m ddsnmp.Metric) bool { return strings.HasPrefix(m.Name, "_") })
 			pm.Metrics = append(pm.Metrics, vmetrics...)
 			pm.Stats.Metrics.Virtual += int64(len(vmetrics))
 			pm.Stats.Timing.VirtualMetrics = time.Since(now)
 		}
+
+		pm.HiddenMetrics = collectHiddenMetrics(pm.Metrics)
+		pm.Metrics = slices.DeleteFunc(pm.Metrics, func(m ddsnmp.Metric) bool { return strings.HasPrefix(m.Name, "_") })
 	}
 
 	if len(metrics) == 0 && len(errs) > 0 {
@@ -130,6 +131,16 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	}
 
 	return metrics, nil
+}
+
+func collectHiddenMetrics(metrics []ddsnmp.Metric) []ddsnmp.Metric {
+	var hidden []ddsnmp.Metric
+	for _, metric := range metrics {
+		if strings.HasPrefix(metric.Name, "_") {
+			hidden = append(hidden, metric)
+		}
+	}
+	return hidden
 }
 
 func (c *Collector) SetSNMPClient(snmpClient gosnmp.Handler) {
@@ -225,7 +236,8 @@ var metricMetaReplacer = strings.NewReplacer(
 // are still walked during collection. Without this, if a table like ifXTable is used
 // only for cross-table tags (e.g., getting interface names) but has no metrics defined,
 // it won't be walked and the tags will be missing. This creates synthetic metric entries
-// for such tables using the longest common OID prefix of the referenced columns.
+// for such tables using the longest common OID prefix of the referenced columns, including
+// lookup columns used by value-based joins.
 func handleCrossTableTagsWithoutMetrics(prof *ddsnmp.Profile) {
 	if prof.Definition == nil {
 		return
@@ -244,11 +256,15 @@ func handleCrossTableTagsWithoutMetrics(prof *ddsnmp.Profile) {
 			continue
 		}
 		for _, tag := range m.MetricTags {
-			oid := tag.Symbol.OID
-			if tag.Table == "" || seenTableNames[tag.Table] || oid == "" {
+			if tag.Table == "" || seenTableNames[tag.Table] {
 				continue
 			}
-			tagCrossTableOnlyOIDs[tag.Table] = append(tagCrossTableOnlyOIDs[tag.Table], oid)
+			if tag.Symbol.OID != "" {
+				tagCrossTableOnlyOIDs[tag.Table] = append(tagCrossTableOnlyOIDs[tag.Table], tag.Symbol.OID)
+			}
+			if tag.LookupSymbol.OID != "" {
+				tagCrossTableOnlyOIDs[tag.Table] = append(tagCrossTableOnlyOIDs[tag.Table], tag.LookupSymbol.OID)
+			}
 		}
 	}
 
@@ -270,14 +286,29 @@ func longestCommonPrefix(oids []string) string {
 	if len(oids) == 0 {
 		return ""
 	}
-	prefix := oids[0]
+
+	prefixParts := splitOIDParts(oids[0])
 	for i := 1; i < len(oids); i++ {
-		for !strings.HasPrefix(oids[i], prefix) {
-			prefix = prefix[0 : len(prefix)-1]
-			if len(prefix) == 0 {
-				return ""
-			}
+		parts := splitOIDParts(oids[i])
+		n := min(len(parts), len(prefixParts))
+
+		j := 0
+		for j < n && prefixParts[j] == parts[j] {
+			j++
+		}
+		prefixParts = prefixParts[:j]
+		if len(prefixParts) == 0 {
+			return ""
 		}
 	}
-	return strings.TrimSuffix(prefix, ".")
+
+	return strings.Join(prefixParts, ".")
+}
+
+func splitOIDParts(oid string) []string {
+	parts := strings.Split(strings.Trim(oid, "."), ".")
+	if len(parts) == 1 && parts[0] == "" {
+		return nil
+	}
+	return parts
 }

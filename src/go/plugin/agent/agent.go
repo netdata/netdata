@@ -22,6 +22,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 )
 
 // Config is an Agent configuration.
@@ -227,9 +228,10 @@ func (a *Agent) run(ctx context.Context) {
 		return
 	}
 
-	runtimeSvc := runtimechartemit.New(a.Logger.With(slog.String("component", "runtime metrics service")))
-	runtimeSvc.Start(a.Name, a.Out)
-	defer runtimeSvc.Stop()
+	runtimeSvc, stopRuntimeSvc := a.setupRuntimeService()
+	if stopRuntimeSvc != nil {
+		defer stopRuntimeSvc()
+	}
 	fnMgr.SetRuntimeService(runtimeSvc)
 
 	var runJob []string
@@ -257,14 +259,11 @@ func (a *Agent) run(ctx context.Context) {
 	in := make(chan []*confgroup.Group)
 	var wg sync.WaitGroup
 
-	wg.Add(1)
-	go func() { defer wg.Done(); fnMgr.Run(ctx, a.quitCh) }()
+	wg.Go(func() { fnMgr.Run(ctx, a.quitCh) })
 
-	wg.Add(1)
-	go func() { defer wg.Done(); jobMgr.Run(ctx, in) }()
+	wg.Go(func() { jobMgr.Run(ctx, in) })
 
-	wg.Add(1)
-	go func() { defer wg.Done(); discMgr.Run(ctx, in) }()
+	wg.Go(func() { discMgr.Run(ctx, in) })
 
 	wg.Wait()
 	<-ctx.Done()
@@ -281,6 +280,23 @@ func (a *Agent) printMetricsAudit() {
 	} else {
 		a.auditAnalyzer.PrintReport()
 	}
+}
+
+func (a *Agent) serviceDiscoveryEnabled() bool {
+	if a == nil {
+		return false
+	}
+	return !a.DisableServiceDiscovery && a.runModePolicy.EnableServiceDiscovery
+}
+
+func (a *Agent) setupRuntimeService() (runtimecomp.Service, func()) {
+	if a == nil || !a.runModePolicy.EnableRuntimeCharts {
+		return nil, nil
+	}
+
+	svc := runtimechartemit.New(a.Logger.With(slog.String("component", "runtime metrics service")))
+	svc.Start(a.Name, a.Out)
+	return svc, svc.Stop
 }
 
 func (a *Agent) signalAuditComplete() {

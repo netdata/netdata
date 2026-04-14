@@ -161,13 +161,14 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | user.auth_key | Authentication protocol pass phrase for SNMPv3 messages. |  | no |
 |  | [user.priv_proto](#option-snmpv3-user-priv-proto) | Privacy protocol for SNMPv3 messages. |  | no |
 |  | user.priv_key | Privacy protocol pass phrase for SNMPv3 messages. |  | no |
+|  | user.context_name | SNMPv3 context name used to address a specific MIB view on multi-context agents (e.g. virtual routers, logical partitions, snmpsim-simulated devices). Leave empty to use the default context. |  | no |
 | **SNMP transport** | options.version | SNMP version. Available versions: 1, 2, 3. | 2 | no |
 |  | options.port | Target port. | 161 | no |
 |  | options.retries | Retries to attempt. | 1 | no |
 |  | options.timeout | SNMP request/response timeout. | 5 | no |
 |  | options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
 |  | options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
-| **Ping** | ping_only | Collect only ICMP round-trip metrics and skip periodic SNMP polling. A minimal SNMP sysInfo probe still runs at setup for naming/labels/metadata. | no | no |
+| **Ping** | ping_only | Collect only ICMP round-trip metrics and skip periodic SNMP polling. Implies ping is enabled regardless of the `ping.enabled` setting. A minimal SNMP sysInfo probe still runs at setup for naming/labels/metadata. | no | no |
 |  | ping.enabled | Enable ICMP round-trip measurements (runs alongside SNMP). When disabled, no ping metrics are collected. | yes | no |
 |  | ping.privileged | Use raw ICMP (privileged). If false, unprivileged mode is used. | yes | no |
 |  | ping.packets | Number of ping packets to send per iteration. | 3 | no |

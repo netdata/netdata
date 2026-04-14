@@ -82,6 +82,7 @@ The following options can be defined for this secretstore backend.
 |  | addr | Vault server address / base URL. |  | yes |
 |  | namespace | Optional Vault Enterprise namespace. Leave it empty for open-source Vault or when your Vault deployment does not use namespaces. |  | no |
 |  | [tls_skip_verify](#option-tls-skip-verify) | Disable TLS certificate verification for Vault requests. | no | no |
+|  | timeout | Timeout in seconds for HTTP requests made by this secretstore backend. | 3 | no |
 | **Token** | mode_token.token | Vault token value. Required when `mode` is `token`. |  | yes |
 | **Token File** | mode_token_file.path | Path to a file containing the Vault token. Required when `mode` is `token_file`. |  | yes |
 

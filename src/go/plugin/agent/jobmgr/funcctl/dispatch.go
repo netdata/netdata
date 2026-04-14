@@ -96,10 +96,7 @@ func (c *Controller) executeMethodRequest(in methodExecutionInput) {
 		return
 	}
 
-	updateEvery := 1
-	if in.methodCfg.UpdateEvery > 1 {
-		updateEvery = in.methodCfg.UpdateEvery
-	}
+	updateEvery := max(in.methodCfg.UpdateEvery, 1)
 
 	in.respond(dataResp, methodParams, updateEvery)
 }
@@ -185,10 +182,7 @@ func (c *Controller) handleMethodFuncInfo(moduleName, methodID string, fn functi
 		help = fmt.Sprintf("%s %s data function", moduleName, methodID)
 	}
 
-	updateEvery := 1
-	if methodCfg.UpdateEvery > 1 {
-		updateEvery = methodCfg.UpdateEvery
-	}
+	updateEvery := max(methodCfg.UpdateEvery, 1)
 
 	c.respondJSON(fn, map[string]any{
 		"v":               3,
@@ -456,10 +450,7 @@ func (c *Controller) handleJobMethodFuncInfo(moduleName, jobName, methodID strin
 		help = fmt.Sprintf("%s %s data function", moduleName, methodID)
 	}
 
-	updateEvery := 1
-	if methodCfg.UpdateEvery > 1 {
-		updateEvery = methodCfg.UpdateEvery
-	}
+	updateEvery := max(methodCfg.UpdateEvery, 1)
 
 	c.respondJSON(fn, map[string]any{
 		"v":               3,

@@ -117,16 +117,6 @@ func TestKeyScheduler_EnqueueValidation(t *testing.T) {
 			adjust: func(s *keyScheduler) { s.stopAccepting() },
 			want:   errSchedulerStopping,
 		},
-		"full scheduler returns queue full error": {
-			req: &invocationRequest{
-				fn:          &Function{UID: "tx1"},
-				scheduleKey: "k",
-			},
-			adjust: func(s *keyScheduler) {
-				s.pending = 1
-			},
-			want: errSchedulerQueueFull,
-		},
 		"valid request is admitted": {
 			req: &invocationRequest{
 				fn:          &Function{UID: "tx1"},
@@ -196,32 +186,83 @@ func TestKeyScheduler_StopPaths(t *testing.T) {
 	}
 }
 
-func TestKeyScheduler_QueueFullRecovery(t *testing.T) {
+func TestKeyScheduler_EnqueueBlocksUntilSpace(t *testing.T) {
 	tests := map[string]struct {
 		run func(t *testing.T)
 	}{
-		"full queue recovers after dequeue and completion": {
+		"enqueue blocks until next() frees space": {
 			run: func(t *testing.T) {
 				s := newKeyScheduler(1)
 				req1 := &invocationRequest{
 					fn:          &Function{UID: "tx1"},
-					scheduleKey: "k",
+					scheduleKey: "k1",
 				}
 				req2 := &invocationRequest{
 					fn:          &Function{UID: "tx2"},
-					scheduleKey: "k",
+					scheduleKey: "k2",
 				}
 
 				require.NoError(t, s.enqueue(req1))
-				require.ErrorIs(t, s.enqueue(req2), errSchedulerQueueFull)
+
+				enqueued := make(chan error, 1)
+				go func() {
+					enqueued <- s.enqueue(req2)
+				}()
+
+				require.Eventually(t, func() bool {
+					return s.enqueueWaiterCount() == 1
+				}, time.Second, time.Millisecond, "second enqueue never reached blocking wait")
+
+				select {
+				case <-enqueued:
+					t.Fatal("second enqueue should still be blocked while queue is full")
+				default:
+				}
 
 				got, ok := s.next()
 				require.True(t, ok)
 				require.NotNil(t, got)
 				require.Equal(t, "tx1", got.fn.UID)
 
-				s.complete("k", "tx1")
-				require.NoError(t, s.enqueue(req2))
+				select {
+				case err := <-enqueued:
+					require.NoError(t, err)
+				case <-time.After(time.Second):
+					t.Fatal("second enqueue did not unblock after space freed")
+				}
+			},
+		},
+		"stop unblocks waiting enqueue with stopping error": {
+			run: func(t *testing.T) {
+				s := newKeyScheduler(1)
+				req1 := &invocationRequest{
+					fn:          &Function{UID: "tx1"},
+					scheduleKey: "k1",
+				}
+				req2 := &invocationRequest{
+					fn:          &Function{UID: "tx2"},
+					scheduleKey: "k2",
+				}
+
+				require.NoError(t, s.enqueue(req1))
+
+				enqueued := make(chan error, 1)
+				go func() {
+					enqueued <- s.enqueue(req2)
+				}()
+
+				require.Eventually(t, func() bool {
+					return s.enqueueWaiterCount() == 1
+				}, time.Second, time.Millisecond, "second enqueue never reached blocking wait")
+
+				s.stop()
+
+				select {
+				case err := <-enqueued:
+					require.ErrorIs(t, err, errSchedulerStopping)
+				case <-time.After(time.Second):
+					t.Fatal("blocked enqueue did not return after stop()")
+				}
 			},
 		},
 	}

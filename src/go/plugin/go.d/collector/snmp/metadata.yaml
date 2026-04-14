@@ -351,6 +351,11 @@ modules:
               description: Privacy protocol pass phrase for SNMPv3 messages.
               default_value: ""
               required: false
+            - name: user.context_name
+              group: SNMPv3
+              description: SNMPv3 context name used to address a specific MIB view on multi-context agents (e.g. virtual routers, logical partitions, snmpsim-simulated devices). Leave empty to use the default context.
+              default_value: ""
+              required: false
 
             - name: options.version
               group: SNMP transport
@@ -385,7 +390,7 @@ modules:
 
             - name: ping_only
               group: Ping
-              description: Collect only ICMP round-trip metrics and skip periodic SNMP polling. A minimal SNMP sysInfo probe still runs at setup for naming/labels/metadata.
+              description: Collect only ICMP round-trip metrics and skip periodic SNMP polling. Implies ping is enabled regardless of the `ping.enabled` setting. A minimal SNMP sysInfo probe still runs at setup for naming/labels/metadata.
               default_value: false
               required: false
             - name: ping.enabled

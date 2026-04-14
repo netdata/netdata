@@ -140,7 +140,7 @@ AutoReqProv: yes
 %endif
 
 # Skip MongoDB exporter on known problem platforms
-%if 0%{?oraclelinux} || 0%{?suse_version} || 0%{?amzn}
+%if 0%{?oraclelinux} || 0%{?suse_version} || 0%{?amzn} || 0%{?centos_ver} >= 10
 %global _have_mongo_exporter 0
 %else
 %global _have_mongo_exporter 1
@@ -273,6 +273,7 @@ Suggests: %{name}-plugin-cups = %{version}
 Recommends: %{name}-plugin-systemd-journal = %{version}
 Recommends: %{name}-plugin-systemd-units = %{version}
 Recommends: %{name}-plugin-network-viewer = %{version}
+Recommends: %{name}-plugin-scripts = %{version}
 %else
 Requires: %{name}-plugin-systemd-journal = %{version}
 Requires: %{name}-plugin-network-viewer = %{version}
@@ -3347,6 +3348,8 @@ done
 %attr(0644,root,root) %{_sysusersdir}/%{name}.conf
 
 %changelog
+* Tue Apr 07 2026 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-40
+- Make the scripts plugin a recommended dependency of the agent package
 * Tue Feb 10 2026 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-39
 - Add scripts plugin
 - Add new otel-signal-viewer plugin

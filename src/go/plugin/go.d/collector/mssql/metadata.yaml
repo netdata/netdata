@@ -129,12 +129,26 @@ modules:
               Netdata service account access to SQL Server.
 
               By default, the Netdata service runs as `Local System`. The identity it presents to
-              SQL Server depends on your environment:
+              SQL Server depends on whether the connection is local or remote:
 
-              **Domain-joined machine (Active Directory):**
+              **Local connection (Netdata and SQL Server on the same machine):**
 
-              `Local System` authenticates as the computer account (`DOMAIN\COMPUTERNAME$`).
-              Replace `DOMAIN\COMPUTERNAME$` with your actual values
+              `Local System` always authenticates as `NT AUTHORITY\SYSTEM`, regardless of whether
+              the machine is domain-joined or in a workgroup.
+
+              ```sql
+              CREATE LOGIN [NT AUTHORITY\SYSTEM] FROM WINDOWS;
+              GRANT VIEW SERVER STATE TO [NT AUTHORITY\SYSTEM];
+              GRANT VIEW ANY DEFINITION TO [NT AUTHORITY\SYSTEM];
+              USE msdb;
+              CREATE USER [NT AUTHORITY\SYSTEM] FOR LOGIN [NT AUTHORITY\SYSTEM];
+              GRANT SELECT ON dbo.sysjobs TO [NT AUTHORITY\SYSTEM];
+              ```
+
+              **Remote connection (Netdata connects to SQL Server on another machine):**
+
+              On a domain-joined machine, `Local System` authenticates over the network as the
+              computer account (`DOMAIN\COMPUTERNAME$`). Replace with your actual values
               (e.g., `MYDOM\SQLBOX01$`).
 
               ```sql
@@ -146,19 +160,10 @@ modules:
               GRANT SELECT ON dbo.sysjobs TO [DOMAIN\COMPUTERNAME$];
               ```
 
-              **Workgroup machine (no Active Directory, localhost only):**
-
-              `Local System` authenticates as `NT AUTHORITY\SYSTEM`.
-              This only works when SQL Server runs on the same machine.
-
-              ```sql
-              CREATE LOGIN [NT AUTHORITY\SYSTEM] FROM WINDOWS;
-              GRANT VIEW SERVER STATE TO [NT AUTHORITY\SYSTEM];
-              GRANT VIEW ANY DEFINITION TO [NT AUTHORITY\SYSTEM];
-              USE msdb;
-              CREATE USER [NT AUTHORITY\SYSTEM] FOR LOGIN [NT AUTHORITY\SYSTEM];
-              GRANT SELECT ON dbo.sysjobs TO [NT AUTHORITY\SYSTEM];
-              ```
+              For the default `Local System` service account, remote Windows Authentication works
+              only on domain-joined machines, where it can authenticate as the computer account.
+              In workgroups, use a different Windows service account if you need remote Windows
+              Authentication.
 
               > **Note**: To verify which account SQL Server sees, connect with Windows Authentication
               > and run `SELECT SYSTEM_USER`.
@@ -306,7 +311,7 @@ modules:
 
                 When no username/password is provided in the DSN, the driver uses the Netdata service account's
                 Windows credentials. By default, the Netdata service runs as `Local System`, which authenticates
-                to SQL Server as the computer account (`DOMAIN\COMPUTERNAME$`).
+                to a local SQL Server as `NT AUTHORITY\SYSTEM`.
 
                 See the [Grant Windows Authentication access](#grant-windows-authentication-access-optional) prerequisite
                 to configure SQL Server for this.

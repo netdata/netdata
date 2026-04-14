@@ -80,6 +80,7 @@ The following options can be defined for this secretstore backend.
 |:------|:-----|:------------|:--------|:---------:|
 |  | [mode](#option-mode) | GCP authentication mode. | metadata | yes |
 | **Service Account File** | mode_service_account_file.path | Absolute path to a service account JSON file. Required when `mode` is `service_account_file`. The file contains a private key and should be readable only by the `netdata` user or another tightly scoped owner. |  | yes |
+|  | timeout | Timeout in seconds for HTTP requests made by this secretstore backend. | 3 | no |
 
 <a id="option-mode"></a>
 ##### mode

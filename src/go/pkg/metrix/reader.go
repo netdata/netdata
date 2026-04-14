@@ -3,6 +3,7 @@
 package metrix
 
 import (
+	"maps"
 	"math"
 	"sort"
 	"sync"
@@ -659,9 +660,7 @@ func materializeRuntimeSeries(snap *readSnapshot) map[string]*committedSeries {
 	// Chain is leaf->root; root map gives the best starting capacity hint.
 	series := make(map[string]*committedSeries, len(chain[len(chain)-1].series))
 	for i := len(chain) - 1; i >= 0; i-- {
-		for key, s := range chain[i].series {
-			series[key] = s
-		}
+		maps.Copy(series, chain[i].series)
 	}
 	return series
 }

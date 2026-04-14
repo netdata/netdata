@@ -103,6 +103,115 @@ func TestScalarCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
+		"scalar metric with dynamic metric tags": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Symbol: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.2604.5.1.5.1.1.0",
+								Name: "_license_row",
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
+									"1": "1",
+									"4": "2",
+								}),
+							},
+							StaticTags: []ddprofiledefinition.StaticMetricTagConfig{
+								{Tag: "_license_id", Value: "base_firewall"},
+							},
+							MetricTags: []ddprofiledefinition.MetricTagConfig{
+								{
+									Tag: "license_state",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID: "1.3.6.1.4.1.2604.5.1.5.1.1.0",
+									},
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
+										"1": "trial",
+										"4": "expired",
+									}),
+								},
+								{
+									Tag: "license_expiry",
+									Symbol: ddprofiledefinition.SymbolConfigCompat{
+										OID: "1.3.6.1.4.1.2604.5.1.5.1.2.0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.2604.5.1.5.1.1.0", "1.3.6.1.4.1.2604.5.1.5.1.2.0"}, []gosnmp.SnmpPDU{
+					createIntegerPDU("1.3.6.1.4.1.2604.5.1.5.1.1.0", 4),
+					createStringPDU("1.3.6.1.4.1.2604.5.1.5.1.2.0", "11 Nov 2031"),
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:       "_license_row",
+					Value:      2,
+					MetricType: "gauge",
+					Tags: map[string]string{
+						"_license_id":    "base_firewall",
+						"license_state":  "expired",
+						"license_expiry": "11 Nov 2031",
+					},
+					StaticTags: map[string]string{
+						"_license_id": "base_firewall",
+					},
+				},
+			},
+			expectedError: false,
+		},
+		"text_date sentinel skips scalar metric without processing error": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Symbol: ddprofiledefinition.SymbolConfig{
+								OID:    "1.3.6.1.4.1.999.1.1.0",
+								Name:   "license.expiry",
+								Format: "text_date",
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.999.1.1.0"}, []gosnmp.SnmpPDU{
+					createStringPDU("1.3.6.1.4.1.999.1.1.0", "never"),
+				})
+			},
+			expectedResult: []ddsnmp.Metric{},
+			expectedError:  false,
+		},
+		"invalid text_date still fails when no scalar metrics are usable": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Symbol: ddprofiledefinition.SymbolConfig{
+								OID:    "1.3.6.1.4.1.999.1.1.0",
+								Name:   "license.expiry",
+								Format: "text_date",
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.999.1.1.0"}, []gosnmp.SnmpPDU{
+					createStringPDU("1.3.6.1.4.1.999.1.1.0", "not-a-date"),
+				})
+			},
+			expectedResult: nil,
+			expectedError:  true,
+			errorContains:  `text_date: cannot parse "not-a-date"`,
+		},
 		"OID not found - returns empty metrics": {
 			profile: createTestProfile("test-profile.yaml", []ddprofiledefinition.MetricsConfig{
 				createScalarMetric("1.3.6.1.2.1.1.3.0", "sysUpTime"),
@@ -291,6 +400,10 @@ func TestScalarCollector_Collect(t *testing.T) {
 				{
 					Name:  "sysUpTime",
 					Value: 123456,
+					Tags: map[string]string{
+						"source": "system",
+						"type":   "uptime",
+					},
 					StaticTags: map[string]string{
 						"source": "system",
 						"type":   "uptime",
@@ -310,11 +423,11 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.4.1.12124.1.1.2",
 								Name: "clusterHealth",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"OK":       "0",
 									"WARNING":  "1",
 									"CRITICAL": "2",
-								},
+								}),
 							},
 						},
 					},
@@ -348,13 +461,13 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.2.1.2.2.1.8",
 								Name: "ifOperStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "up",
 									"2": "down",
 									"3": "testing",
 									"4": "unknown",
 									"5": "dormant",
-								},
+								}),
 							},
 						},
 					},
@@ -391,11 +504,11 @@ func TestScalarCollector_Collect(t *testing.T) {
 								OID:                  "1.3.6.1.4.1.12124.1.1.8",
 								Name:                 "fanStatus",
 								ExtractValueCompiled: mustCompileRegex(`Fan(\d+)`),
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "normal",
 									"2": "warning",
 									"3": "critical",
-								},
+								}),
 							},
 						},
 					},
@@ -429,11 +542,11 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.2.1.2.2.1.7",
 								Name: "ifAdminStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "1", // up -> 1
 									"2": "0", // down -> 0
 									"3": "0", // testing -> 0
-								},
+								}),
 							},
 						},
 					},
@@ -462,11 +575,11 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.4.1.12124.1.1.2",
 								Name: "clusterHealth",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"OK":      "0",
 									"WARNING": "1",
 									// CRITICAL is not mapped
-								},
+								}),
 							},
 						},
 					},
@@ -490,11 +603,11 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.4.1.12124.1.1.2",
 								Name: "deviceStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"OK":      "0",
 									"WARNING": "1",
 									"ERROR":   "invalid", // This will cause metric to be skipped
-								},
+								}),
 							},
 						},
 					},
@@ -537,11 +650,11 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.2.1.2.2.1.7",
 								Name: "ifAdminStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"1": "up",
 									"2": "down",
 									"3": "testing",
-								},
+								}),
 							},
 						},
 					},
@@ -566,6 +679,46 @@ func TestScalarCollector_Collect(t *testing.T) {
 			},
 			expectedError: false,
 		},
+		"metric with numeric value and bitmask mapping": {
+			profile: &ddsnmp.Profile{
+				SourceFile: "test-profile.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{
+							Symbol: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.4.1.674.10892.1.1100.32.1.6",
+								Name: "processorDeviceStatusReading",
+								Mapping: ddprofiledefinition.NewBitmaskMapping(map[string]string{
+									"1":    "internalError",
+									"2":    "thermalTrip",
+									"128":  "processorPresent",
+									"1024": "processorThrottled",
+								}),
+							},
+						},
+					},
+				},
+			},
+			setupMock: func(m *snmpmock.MockHandler) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.674.10892.1.1100.32.1.6"}, []gosnmp.SnmpPDU{
+					createIntegerPDU("1.3.6.1.4.1.674.10892.1.1100.32.1.6", 129), // internalError + processorPresent
+				})
+			},
+			expectedResult: []ddsnmp.Metric{
+				{
+					Name:       "processorDeviceStatusReading",
+					Value:      129,
+					MetricType: "gauge",
+					MultiValue: map[string]int64{
+						"internalError":      1,
+						"thermalTrip":        0,
+						"processorPresent":   1,
+						"processorThrottled": 0,
+					},
+				},
+			},
+			expectedError: false,
+		},
 		"metric with string value and string to int mapping": {
 			profile: &ddsnmp.Profile{
 				SourceFile: "test-profile.yaml",
@@ -575,12 +728,12 @@ func TestScalarCollector_Collect(t *testing.T) {
 							Symbol: ddprofiledefinition.SymbolConfig{
 								OID:  "1.3.6.1.4.1.318.1.1.1.2.2.1.0",
 								Name: "upsBasicBatteryStatus",
-								Mapping: map[string]string{
+								Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
 									"batteryNormal":   "0",
 									"batteryLow":      "1",
 									"batteryDepleted": "2",
 									"batteryCharging": "3",
-								},
+								}),
 							},
 						},
 					},
@@ -643,7 +796,7 @@ func TestScalarCollector_Collect(t *testing.T) {
 			profile: func() *ddsnmp.Profile {
 				// Create a profile with many metrics to force chunking
 				var metrics []ddprofiledefinition.MetricsConfig
-				for i := 0; i < 25; i++ {
+				for i := range 25 {
 					metrics = append(metrics, createScalarMetric(
 						fmt.Sprintf("1.3.6.1.2.1.1.%02d.0", i),
 						fmt.Sprintf("metric%d", i),
@@ -660,21 +813,21 @@ func TestScalarCollector_Collect(t *testing.T) {
 				// Expect 3 chunks (10 + 10 + 5)
 				chunk1OIDs := make([]string, 10)
 				chunk1PDUs := make([]gosnmp.SnmpPDU, 10)
-				for i := 0; i < 10; i++ {
+				for i := range 10 {
 					chunk1OIDs[i] = fmt.Sprintf("1.3.6.1.2.1.1.%02d.0", i)
 					chunk1PDUs[i] = createIntegerPDU(chunk1OIDs[i], i*100)
 				}
 
 				chunk2OIDs := make([]string, 10)
 				chunk2PDUs := make([]gosnmp.SnmpPDU, 10)
-				for i := 0; i < 10; i++ {
+				for i := range 10 {
 					chunk2OIDs[i] = fmt.Sprintf("1.3.6.1.2.1.1.%02d.0", i+10)
 					chunk2PDUs[i] = createIntegerPDU(chunk2OIDs[i], (i+10)*100)
 				}
 
 				chunk3OIDs := make([]string, 5)
 				chunk3PDUs := make([]gosnmp.SnmpPDU, 5)
-				for i := 0; i < 5; i++ {
+				for i := range 5 {
 					chunk3OIDs[i] = fmt.Sprintf("1.3.6.1.2.1.1.%02d.0", i+20)
 					chunk3PDUs[i] = createIntegerPDU(chunk3OIDs[i], (i+20)*100)
 				}
@@ -686,7 +839,7 @@ func TestScalarCollector_Collect(t *testing.T) {
 			expectedResult: func() []ddsnmp.Metric {
 				// Generate expected metrics
 				var metrics []ddsnmp.Metric
-				for i := 0; i < 25; i++ {
+				for i := range 25 {
 					metrics = append(metrics, ddsnmp.Metric{
 						Name:       fmt.Sprintf("metric%d", i),
 						Value:      int64(i * 100),
@@ -728,4 +881,32 @@ func TestScalarCollector_Collect(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestScalarCollector_IdentifyScalarOIDs_SkipsTagOIDsWhenPrimaryOIDIsKnownMissing(t *testing.T) {
+	sc := &scalarCollector{
+		missingOIDs: map[string]bool{
+			"1.3.6.1.4.1.2604.5.1.5.1.1.0": true,
+		},
+	}
+
+	oids, missing := sc.identifyScalarOIDs([]ddprofiledefinition.MetricsConfig{
+		{
+			Symbol: ddprofiledefinition.SymbolConfig{
+				OID:  "1.3.6.1.4.1.2604.5.1.5.1.1.0",
+				Name: "_license_row",
+			},
+			MetricTags: []ddprofiledefinition.MetricTagConfig{
+				{
+					Tag: "license_state",
+					Symbol: ddprofiledefinition.SymbolConfigCompat{
+						OID: "1.3.6.1.4.1.2604.5.1.5.1.2.0",
+					},
+				},
+			},
+		},
+	})
+
+	assert.Empty(t, oids)
+	assert.Equal(t, []string{"1.3.6.1.4.1.2604.5.1.5.1.1.0"}, missing)
 }

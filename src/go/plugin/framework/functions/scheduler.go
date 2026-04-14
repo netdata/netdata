@@ -8,9 +8,8 @@ import (
 )
 
 var (
-	errSchedulerQueueFull = errors.New("scheduler queue is full")
-	errSchedulerStopping  = errors.New("scheduler is stopping")
-	errSchedulerInvalid   = errors.New("scheduler invalid request")
+	errSchedulerStopping = errors.New("scheduler is stopping")
+	errSchedulerInvalid  = errors.New("scheduler invalid request")
 )
 
 type scheduleLane struct {
@@ -32,6 +31,11 @@ type keyScheduler struct {
 	pending    int
 	accepting  bool
 	stopping   bool
+
+	// enqueueWaiters counts goroutines currently blocked inside enqueue()
+	// waiting for space. Used by tests to synchronize deterministically
+	// instead of sleeping.
+	enqueueWaiters int
 }
 
 func newKeyScheduler(maxPending int) *keyScheduler {
@@ -52,11 +56,22 @@ func (s *keyScheduler) enqueue(req *invocationRequest) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	if s.stopping || !s.accepting {
-		return errSchedulerStopping
-	}
-	if s.maxPending > 0 && s.pending >= s.maxPending {
-		return errSchedulerQueueFull
+	// Block until there is space, or the scheduler is stopped. We must not
+	// drop dyncfg commands silently: an awaited enable/disable that is dropped
+	// here would wedge jobmgr's wait gate by leaving it waiting for a
+	// completion that will never arrive. Back-pressure flows upstream: the
+	// manager run-loop stops draining stdin, and netdata's write blocks on
+	// the OS pipe.
+	for {
+		if s.stopping || !s.accepting {
+			return errSchedulerStopping
+		}
+		if s.maxPending <= 0 || s.pending < s.maxPending {
+			break
+		}
+		s.enqueueWaiters++
+		s.cond.Wait()
+		s.enqueueWaiters--
 	}
 
 	lane := s.lanes[req.scheduleKey]
@@ -97,9 +112,8 @@ func (s *keyScheduler) next() (*invocationRequest, bool) {
 	if s.pending > 0 {
 		s.pending--
 	}
-	if s.drainedLocked() {
-		s.cond.Broadcast()
-	}
+	// Wake any enqueue() waiters blocked on a full queue.
+	s.cond.Broadcast()
 	return req, true
 }
 
@@ -130,9 +144,8 @@ func (s *keyScheduler) cancelQueued(scheduleKey, uid string) bool {
 		if lane.ownerUID == "" && len(lane.queue) == 0 {
 			delete(s.lanes, scheduleKey)
 		}
-		if s.drainedLocked() {
-			s.cond.Broadcast()
-		}
+		// Wake any enqueue() waiters blocked on a full queue.
+		s.cond.Broadcast()
 		return true
 	}
 	return false
@@ -157,9 +170,7 @@ func (s *keyScheduler) complete(scheduleKey, uid string) {
 
 	if s.stopping {
 		delete(s.lanes, scheduleKey)
-		if s.drainedLocked() {
-			s.cond.Broadcast()
-		}
+		s.cond.Broadcast()
 		return
 	}
 
@@ -175,7 +186,8 @@ func (s *keyScheduler) complete(scheduleKey, uid string) {
 
 		lane.ownerUID = next.fn.UID
 		s.ready = append(s.ready, next)
-		s.cond.Signal()
+		// Broadcast: wakes both next() consumers and enqueue() producers.
+		s.cond.Broadcast()
 		return
 	}
 
@@ -183,9 +195,7 @@ func (s *keyScheduler) complete(scheduleKey, uid string) {
 	if len(lane.queue) == 0 {
 		delete(s.lanes, scheduleKey)
 	}
-	if s.drainedLocked() {
-		s.cond.Broadcast()
-	}
+	s.cond.Broadcast()
 }
 
 func (s *keyScheduler) stopAccepting() {
@@ -225,4 +235,12 @@ func (s *keyScheduler) pendingCount() int {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	return s.pending
+}
+
+// enqueueWaiterCount reports how many goroutines are currently blocked
+// inside enqueue() waiting for queue space. Intended for tests.
+func (s *keyScheduler) enqueueWaiterCount() int {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	return s.enqueueWaiters
 }

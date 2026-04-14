@@ -5,6 +5,7 @@ package ddsnmpcollector
 import (
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
@@ -78,7 +79,7 @@ func expectSNMPWalkError(mockHandler *snmpmock.MockHandler, version gosnmp.SnmpV
 	}
 }
 
-func createPDU(name string, pduType gosnmp.Asn1BER, value interface{}) gosnmp.SnmpPDU {
+func createPDU(name string, pduType gosnmp.Asn1BER, value any) gosnmp.SnmpPDU {
 	return gosnmp.SnmpPDU{
 		Name:  name,
 		Type:  pduType,
@@ -108,6 +109,19 @@ func createGauge32PDU(name string, value uint) gosnmp.SnmpPDU {
 
 func createTimeTicksPDU(name string, value uint32) gosnmp.SnmpPDU {
 	return createPDU(name, gosnmp.TimeTicks, value)
+}
+
+func createDateAndTimePDU(name string, value time.Time) gosnmp.SnmpPDU {
+	return createPDU(name, gosnmp.OctetString, []byte{
+		byte(value.Year() >> 8),
+		byte(value.Year()),
+		byte(value.Month()),
+		byte(value.Day()),
+		byte(value.Hour()),
+		byte(value.Minute()),
+		byte(value.Second()),
+		0,
+	})
 }
 
 func createNoSuchObjectPDU(name string) gosnmp.SnmpPDU {

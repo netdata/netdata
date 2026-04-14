@@ -12,6 +12,10 @@ extends:
   - _std-udp-mib.yaml
   - _std-ip-mib.yaml
   - _checkpoint-vpn.yaml
+  - _checkpoint-firewall-extra.yaml
+  - _checkpoint-hardware.yaml
+  - _checkpoint-cluster.yaml
+  - _checkpoint-vsx.yaml
 
 selector:
   - sysobjectid:
@@ -307,4 +311,41 @@ metrics:
       chart_meta:
         description: "Peak number of connections"
         family: 'System/Activity/Connection/Peak'
-        unit: "{connection}/s"
+        unit: "{connection}"
+    # CPU global scalars (not per-core — complements multiProcTable)
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.6.7.2.5.0
+      name: procQueue
+      chart_meta:
+        description: "Processor run queue length"
+        family: 'System/CPU/RunQueue'
+        unit: "{process}"
+  - MIB: CHECKPOINT-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.6.7.2.6.0
+      name: procInterrupts
+      chart_meta:
+        description: "Processor interrupts per second"
+        family: 'System/CPU/Interrupts'
+        unit: "{interrupt}/s"
+    # Remote Access VPN users
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.9.5.0
+      name: dtpsConnectedUsers
+      chart_meta:
+        description: "Currently connected remote access VPN users"
+        family: 'Security/RemoteAccess/Users/Connected'
+        unit: "{user}"
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.9.4.0
+      name: dtpsLicensedUsers
+      chart_meta:
+        description: "Licensed remote access VPN users"
+        family: 'Security/RemoteAccess/Users/Licensed'
+        unit: "{user}"

@@ -60,6 +60,7 @@ type JobConfig struct {
 	Name            string
 	ModuleName      string
 	FullName        string
+	Source          string
 	Module          collectorapi.CollectorV1
 	Labels          map[string]string
 	Out             io.Writer
@@ -107,10 +108,7 @@ func NewJob(cfg JobConfig) *Job {
 		auditAnalyzer:        cfg.AuditAnalyzer,
 	}
 
-	log := logger.New().With(
-		slog.String("collector", j.ModuleName()),
-		slog.String("job", j.Name()),
-	)
+	log := logger.New().With(jobLoggerAttrs(j.ModuleName(), j.Name(), cfg.Source)...)
 
 	j.Logger = log
 	if j.module != nil {
@@ -761,7 +759,7 @@ func getChartType(chart *collectorapi.Chart, j *Job) string {
 	}
 	if chart.OverModule != "" {
 		cachedType := chart.CachedType()
-		if v := strings.TrimPrefix(cachedType, j.ModuleName()); v != cachedType {
+		if v, ok := strings.CutPrefix(cachedType, j.ModuleName()); ok {
 			chart.SetCachedType(chart.OverModule + v)
 		}
 	}

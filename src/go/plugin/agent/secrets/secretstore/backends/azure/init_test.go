@@ -11,6 +11,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,32 +20,51 @@ import (
 func TestStoreInit(t *testing.T) {
 	tests := map[string]struct {
 		cfg             Config
+		wantTimeout     time.Duration
 		wantErrContains string
 	}{
 		"service principal": {
 			cfg: Config{
-				Mode: cloudauth.AzureADAuthModeServicePrincipal,
-				ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
-					TenantID:     "tenant-id",
-					ClientID:     "client-id",
-					ClientSecret: "client-secret",
+				AzureADAuthConfig: cloudauth.AzureADAuthConfig{
+					Mode: cloudauth.AzureADAuthModeServicePrincipal,
+					ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
+						TenantID:     "tenant-id",
+						ClientID:     "client-id",
+						ClientSecret: "client-secret",
+					},
 				},
+				Timeout: confopt.Duration(7 * time.Second),
 			},
+			wantTimeout: 7 * time.Second,
 		},
 		"default": {
 			cfg: Config{
-				Mode: cloudauth.AzureADAuthModeDefault,
+				AzureADAuthConfig: cloudauth.AzureADAuthConfig{
+					Mode: cloudauth.AzureADAuthModeDefault,
+				},
 			},
+			wantTimeout: defaultTimeout.Duration(),
 		},
 		"service principal validation": {
 			cfg: Config{
-				Mode: cloudauth.AzureADAuthModeServicePrincipal,
-				ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
-					TenantID: "tenant-id",
-					ClientID: "client-id",
+				AzureADAuthConfig: cloudauth.AzureADAuthConfig{
+					Mode: cloudauth.AzureADAuthModeServicePrincipal,
+					ModeServicePrincipal: &cloudauth.AzureADModeServicePrincipalConfig{
+						TenantID: "tenant-id",
+						ClientID: "client-id",
+					},
 				},
 			},
 			wantErrContains: "mode_service_principal.client_secret is required",
+		},
+		"negative timeout": {
+			cfg: Config{
+				AzureADAuthConfig: cloudauth.AzureADAuthConfig{
+					Mode: cloudauth.AzureADAuthModeDefault,
+				},
+				Timeout: confopt.Duration(-time.Second),
+			},
+			wantErrContains: "timeout cannot be negative",
 		},
 	}
 
@@ -52,10 +72,6 @@ func TestStoreInit(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s := &store{
 				Config: tc.cfg,
-				provider: &provider{
-					apiClient:  &http.Client{},
-					imdsClient: &http.Client{},
-				},
 			}
 
 			err := s.init(context.Background())
@@ -68,6 +84,8 @@ func TestStoreInit(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, s.published)
 			assert.NotNil(t, s.published.tokenProvider)
+			assert.Equal(t, tc.wantTimeout, s.runtime.apiClient.Timeout)
+			assert.Equal(t, tc.wantTimeout, s.runtime.imdsClient.Timeout)
 		})
 	}
 }
@@ -100,8 +118,12 @@ func TestStoreAuthTimeout(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			s := &store{
-				Config: Config{Mode: tc.mode},
-				provider: &provider{
+				Config: Config{
+					AzureADAuthConfig: cloudauth.AzureADAuthConfig{
+						Mode: tc.mode,
+					},
+				},
+				runtime: &runtime{
 					apiClient:  &http.Client{Timeout: tc.apiTimeout},
 					imdsClient: &http.Client{Timeout: tc.imdsTimeout},
 				},
@@ -221,8 +243,12 @@ func TestDefaultCredentialTransportRouting(t *testing.T) {
 			var noProxyCalls int
 
 			s := &store{
-				Config: Config{Mode: cloudauth.AzureADAuthModeDefault},
-				provider: &provider{
+				Config: Config{
+					AzureADAuthConfig: cloudauth.AzureADAuthConfig{
+						Mode: cloudauth.AzureADAuthModeDefault,
+					},
+				},
+				runtime: &runtime{
 					apiClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 						defaultCalls++
 						return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Header: make(http.Header)}, nil
@@ -247,4 +273,28 @@ func TestDefaultCredentialTransportRouting(t *testing.T) {
 			assert.Equal(t, tc.wantNoProxyCalls, noProxyCalls)
 		})
 	}
+}
+
+func TestInitBuildsStoreScopedRuntime(t *testing.T) {
+	creator := New()
+
+	first, ok := creator.Create().(*store)
+	require.True(t, ok)
+	second, ok := creator.Create().(*store)
+	require.True(t, ok)
+
+	assert.Equal(t, defaultTimeout, first.Config.Timeout)
+	first.AzureADAuthConfig.Mode = cloudauth.AzureADAuthModeDefault
+	second.AzureADAuthConfig.Mode = cloudauth.AzureADAuthModeDefault
+
+	require.NoError(t, first.init(context.Background()))
+	require.NoError(t, second.init(context.Background()))
+
+	require.NotNil(t, first.runtime)
+	require.NotNil(t, second.runtime)
+	assert.NotSame(t, first.runtime, second.runtime)
+	assert.NotSame(t, first.runtime.apiClient, second.runtime.apiClient)
+	assert.NotSame(t, first.runtime.imdsClient, second.runtime.imdsClient)
+	assert.Equal(t, defaultTimeout.Duration(), first.runtime.apiClient.Timeout)
+	assert.Equal(t, defaultTimeout.Duration(), first.runtime.imdsClient.Timeout)
 }

@@ -2,6 +2,12 @@
 
 package program
 
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
+
 // PromotionMode defines how non-identity chart labels are selected.
 type PromotionMode string
 
@@ -45,6 +51,54 @@ func DefaultLabelPrecedence() LabelPrecedence {
 		InstanceOverJob:      true,
 		ReservedImmutable:    true,
 	}
+}
+
+func validateLabelPolicy(policy LabelPolicy) error {
+	switch policy.Mode {
+	case PromotionModeAutoIntersection, PromotionModeExplicitIntersection:
+		return nil
+	default:
+		return fmt.Errorf("invalid promotion mode %q", policy.Mode)
+	}
+}
+
+func validateInstanceLabelSelectors(selectors []InstanceLabelSelector) error {
+	if len(selectors) == 0 {
+		return nil
+	}
+
+	hasPositive := false
+	var errs []error
+	for i, selector := range selectors {
+		switch {
+		case selector.IncludeAll:
+			if selector.Exclude || selector.Key != "" {
+				errs = append(errs, fmt.Errorf("instance selector[%d]: include-all selector must not set exclude or key", i))
+				continue
+			}
+			hasPositive = true
+		case selector.Exclude:
+			if selector.Key == "" {
+				errs = append(errs, fmt.Errorf("instance selector[%d]: exclude selector key is required", i))
+				continue
+			}
+			if strings.TrimSpace(selector.Key) != selector.Key {
+				errs = append(errs, fmt.Errorf("instance selector[%d]: exclude selector key must be trimmed", i))
+			}
+		case selector.Key != "":
+			if strings.TrimSpace(selector.Key) != selector.Key {
+				errs = append(errs, fmt.Errorf("instance selector[%d]: selector key must be trimmed", i))
+			}
+			hasPositive = true
+		default:
+			errs = append(errs, fmt.Errorf("instance selector[%d]: selector is empty", i))
+		}
+	}
+
+	if !hasPositive {
+		errs = append(errs, fmt.Errorf("instance selectors must include at least one positive selector"))
+	}
+	return errors.Join(errs...)
 }
 
 // InstanceLabelSelector is a normalized token from instances.by_labels.

@@ -90,12 +90,23 @@ void rrd2rrdr_query_ops_release(QUERY_ENGINE_OPS *ops);
 time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, time_t after_wanted, time_t before_wanted, size_t points_wanted, RRDR_OPTIONS options, size_t tier);
 void rrd2rrdr_query_ops_freeall(RRDR *r);
 
+// query execution
+void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *ops);
+
 // time aggregation
 void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const RRDR_TIME_GROUPING add_flush);
 NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, const RRDR_TIME_GROUPING add_flush);
 void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method);
 
 // group by
+struct group_by_label_key {
+    DICTIONARY *values;
+};
+
+void group_by_label_key_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data);
+void group_by_label_key_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused);
+int rrdlabels_traversal_cb_to_group_by_label_key(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data);
+void rrd2rrdr_set_timestamps(RRDR *r);
 RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt);
 void rrdr2rrdr_group_by_calculate_percentage_of_group(RRDR *r);
 void rrdr2rrdr_group_by_partial_trimming(RRDR *r);

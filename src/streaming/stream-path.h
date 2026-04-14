@@ -38,4 +38,8 @@ bool stream_path_set_from_json(struct rrdhost *host, const char *json, bool from
 
 bool rrdhost_is_host_in_stream_path_before_us(struct rrdhost *host, ND_UUID remote_agent_host_id, int16_t our_hops);
 
+// copy host_ids from the streaming path, starting at position 'from', into host_ids array
+// returns the number of entries copied (up to max)
+uint16_t rrdhost_stream_path_get_host_ids(struct rrdhost *host, uint16_t from, ND_UUID *host_ids, uint16_t max);
+
 #endif //NETDATA_STREAM_PATH_H

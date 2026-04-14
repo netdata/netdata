@@ -11,6 +11,7 @@ type ProfileMetrics struct {
 	DeviceMetadata map[string]MetaTag
 	Tags           map[string]string
 	Metrics        []Metric
+	HiddenMetrics  []Metric
 	Stats          CollectionStats
 }
 

@@ -123,10 +123,7 @@ func (s *Scraper) scrape(metrics *[]performance.EntityMetric, lock *sync.Mutex, 
 
 func chunkify(pqs []types.PerfQuerySpec, chunkSize int) (chunks [][]types.PerfQuerySpec) {
 	for i := 0; i < len(pqs); i += chunkSize {
-		end := i + chunkSize
-		if end > len(pqs) {
-			end = len(pqs)
-		}
+		end := min(i+chunkSize, len(pqs))
 		chunks = append(chunks, pqs[i:end])
 	}
 	return chunks

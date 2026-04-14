@@ -25,7 +25,6 @@ type materializedChartState struct {
 
 // materializedDimensionState tracks one materialized dimension in a chart.
 type materializedDimensionState struct {
-	name               string
 	hidden             bool
 	float              bool
 	static             bool
@@ -142,7 +141,6 @@ func (c *materializedChartState) ensureDimension(name string, state dimensionSta
 		return dim, false
 	}
 	dim = &materializedDimensionState{
-		name:       name,
 		hidden:     state.hidden,
 		float:      state.float,
 		static:     state.static,

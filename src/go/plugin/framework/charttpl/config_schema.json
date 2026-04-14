@@ -170,7 +170,8 @@
         "label_promotion": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "\\S"
           }
         },
         "instances": {
@@ -195,7 +196,8 @@
         "label_promotion": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "\\S"
           }
         },
         "instances": {

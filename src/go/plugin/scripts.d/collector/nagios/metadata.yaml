@@ -5,7 +5,7 @@ modules:
       plugin_name: scripts.d.plugin
       module_name: nagios
       monitored_instance:
-        name: Nagios Plugins
+        name: Nagios Plugins and Custom Scripts
         link: https://www.nagios-plugins.org/
         categories:
           - data-collection.synthetic-testing
@@ -25,7 +25,7 @@ modules:
       multi_instance: true
       data_collection:
         metrics_description: |
-          This collector runs [Nagios-compatible plugins](https://www.nagios-plugins.org/) and custom scripts. It provides:
+          This collector runs [Nagios-compatible plugins](https://www.nagios-plugins.org/) and custom scripts in any language (Bash, PowerShell, Python, Go, etc.). It provides:
 
           - **Check state monitoring** — tracks whether each check returns OK, WARNING, CRITICAL, or UNKNOWN
           - **Execution metrics** — measures run duration, CPU time, and memory usage of each check
@@ -167,6 +167,29 @@ modules:
     setup:
       prerequisites:
         list:
+          - title: Security requirements for plugin executables
+            description: |
+              Netdata validates the `plugin` path before execution. On Linux/macOS, the executable must meet these requirements:
+
+              - Must be a regular file (not a directory or device node)
+              - Must be executable (at least one execute bit set)
+              - Owned by **root**
+              - Not writable by group or others (no `g+w` or `o+w`)
+              - All ancestor directories (up to and including `/`) owned by **root**
+              - All ancestor directories not writable by group or others
+              - Symlinks are resolved — the target must meet these rules
+
+              On Windows, path validation is not enforced. Ensure executables are stored in directories with appropriate ACLs.
+
+              This prevents local privilege escalation through a modified check script. If validation fails, the job will not start and an error is logged.
+
+              :::caution
+
+              **Linux/macOS:** Using an interpreter (e.g. `/bin/bash`) as `plugin` with a script path in `args` is **discouraged**. Netdata validates the interpreter binary but **cannot verify scripts passed via `args`**. A writable script in `args` is a privilege escalation vector. Instead, make scripts directly executable and point `plugin` to the script itself.
+
+              **Windows:** Point `plugin` directly to a `.ps1`, `.bat`, or `.cmd` script — Netdata invokes the correct interpreter automatically. Path validation is not enforced on Windows — ensure scripts are stored in directories with appropriate ACLs.
+
+              :::
           - title: Install check commands
             description: |
               Install the Nagios plugins or other Nagios-compatible scripts that you want Netdata to run.
@@ -181,13 +204,13 @@ modules:
               dnf install nagios-plugins-all
               ```
 
-              Make sure the configured command path exists and is executable by the `netdata` user.
+              Packaged Nagios plugins are typically installed as root-owned executables, which satisfies the security requirements above.
           - title: Prepare custom check scripts
             description: |
               If you are writing your own check scripts instead of using packaged Nagios plugins:
 
-              - Place scripts anywhere accessible to the `netdata` user (e.g., `/usr/local/lib/netdata/checks/`)
-              - Make scripts executable: `chmod +x /path/to/script.sh`
+              - Place scripts in a root-owned directory (e.g., `/usr/local/lib/netdata/checks/`)
+              - Set ownership and permissions: `sudo chown root:root /path/to/script.sh && sudo chmod 755 /path/to/script.sh`
               - Test as the `netdata` user to verify permissions and environment: `sudo -u netdata /path/to/script.sh`
               - Verify the exit code: `echo $?` (must be 0, 1, 2, or 3)
               - Verify the output matches the Nagios plugin output format described in the Overview above
@@ -202,13 +225,25 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: How often the collector's internal scheduler ticks, in seconds. Controls chart granularity. In most cases you only need to set `check_interval`.
+              description: Minimum resolution of the collector's scheduler, in seconds. `check_interval` and `retry_interval` are rounded up to the nearest multiple of this value. For example, if `update_every` is 10 and `check_interval` is 25s, the check actually runs every 30s. In most cases the default is fine — just set `check_interval`.
               default_value: 10
               required: false
               group: Collection
 
+            - name: check_name
+              description: |
+                Name that identifies this check type for chart grouping and metric naming. If omitted, Netdata derives it from the basename of `plugin` (removing any file extension). Use this when the plugin filename is generic and you want a more descriptive chart section — for example, when multiple jobs run `check_nrpe` against different remote checks, set `check_name` to distinguish them (`check_disk`, `check_load`, etc.).
+
+                In the dashboard, charts appear under `Synthetic > Nagios > Perfdata > <check_name>`. For example, with `check_name: check_memory` and a script that outputs `caches=2380912KB`, Netdata creates:
+
+                - `nagios.perfdata.check_memory.job.execution_state` — check state (ok, warning, critical, unknown, timeout, paused, retry)
+                - `nagios.perfdata.check_memory.bytes_caches` — perfdata value chart
+                - `nagios.perfdata.check_memory.bytes_caches_threshold_state` — threshold state (if warn/crit thresholds are present)
+              default_value: ""
+              required: false
+              group: Target
             - name: plugin
-              description: Absolute path to the Nagios-compatible executable to run. This can be a packaged Nagios plugin or your own executable. If you need a script interpreter, point `plugin` to that interpreter and pass the script path in `args`. The command should return exit code `0`, `1`, `2`, or `3` and may print performance data after <code>&#124;</code>.
+              description: Absolute path to the Nagios-compatible check command to run. This can be a packaged Nagios plugin or your own executable script. The executable must be root-owned and not writable by group or others (see prerequisites). The command should return exit code `0`, `1`, `2`, or `3` and may print performance data after <code>&#124;</code>.
               default_value: ""
               required: true
               group: Target
@@ -354,10 +389,11 @@ modules:
                 exit 0
                 ```
 
-                **2. Make it executable and test it:**
+                **2. Set ownership, permissions, and test it:**
 
                 ```bash
-                chmod +x /usr/local/lib/netdata/checks/check_api.sh
+                sudo chown root:root /usr/local/lib/netdata/checks/check_api.sh
+                sudo chmod 755 /usr/local/lib/netdata/checks/check_api.sh
                 sudo -u netdata /usr/local/lib/netdata/checks/check_api.sh
                 echo "Exit code: $?"
                 ```
@@ -379,6 +415,56 @@ modules:
                     plugin: /opt/netdata/check_memory.sh
                     timeout: 5s
                     check_interval: 1m
+            - name: Windows PowerShell check
+              description: |
+                On Windows, point `plugin` directly to a `.ps1` script. Netdata automatically invokes it through `powershell.exe` with `-NoProfile -ExecutionPolicy Bypass -File`. The `.bat` and `.cmd` scripts are also supported (invoked via `cmd.exe /c`).
+
+                **1. Create the script** (e.g., `C:\Netdata\checks\check_service.ps1`):
+
+                ```powershell
+                # Check if a Windows service is running
+                param([string]$ServiceName = "W3SVC")
+
+                $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+
+                if (-not $svc) {
+                    Write-Host "UNKNOWN - Service $ServiceName not found | running=0;;;0;1"
+                    exit 3
+                }
+
+                if ($svc.Status -eq 'Running') {
+                    Write-Host "OK - $ServiceName is running | running=1;;;0;1"
+                    exit 0
+                } else {
+                    Write-Host "CRITICAL - $ServiceName is $($svc.Status) | running=0;;;0;1"
+                    exit 2
+                }
+                ```
+
+                **2. Test from PowerShell** (run as the user the Netdata service runs under):
+
+                ```powershell
+                powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Netdata\checks\check_service.ps1"
+                echo "Exit code: $LASTEXITCODE"
+                ```
+
+                **3. Add the configuration below, then restart Netdata** (`Restart-Service netdata`).
+              config: |
+                jobs:
+                  - name: service_health_win
+                    plugin: C:\Netdata\checks\check_service.ps1
+                    timeout: 10s
+                    check_interval: 1m
+            - name: Remote check via NRPE
+              description: |
+                Run a check on a remote host using `check_nrpe`. This works exactly like a Nagios NRPE configuration — install `nagios-nrpe-plugin` and point to the remote NRPE agent. Increase `timeout` if the remote host is slow to respond.
+              config: |
+                jobs:
+                  - name: remote_disk
+                    plugin: /usr/lib/nagios/plugins/check_nrpe
+                    args: ["-H", "192.168.1.10", "-c", "check_disk", "-a", "20% 10% /"]
+                    timeout: 30s
+                    check_interval: 5m
             - name: Check with a job-local schedule
               description: Run a check only during selected hours by defining time periods inside the job.
               config: |
@@ -437,9 +523,15 @@ modules:
           - name: Script stderr output is not visible
             description: |
               Netdata captures the check's standard output for status and performance data parsing. Standard error (stderr) is logged by the collector but not used for state or charts. If your script writes errors to stderr, check the Netdata error log for details.
-          - name: Windows checks need an executable entry point
+          - name: Job state is always timeout
             description: |
-              The collector runs the command named in `plugin` directly. On Windows, point `plugin` to an executable or to an interpreter such as `powershell.exe` and pass the script path in `args`.
+              The default timeout is 5 seconds, which is too short for many checks — especially remote checks (`check_nrpe`, `check_ssh`) or HTTP checks with SSL negotiation. Increase the `timeout` value in your job configuration (e.g. `timeout: 30s`).
+          - name: Check works as root but fails under Netdata
+            description: |
+              The Netdata Agent runs as the `netdata` user. If a check needs to read protected files, access SNMP, or connect to local sockets, it must be accessible to the `netdata` user. Test as that user first: `sudo -u netdata /path/to/check`. Common fixes include adding the `netdata` user to the required system group or using `sudo` with a specific NOPASSWD rule for the check command.
+          - name: Windows script support
+            description: |
+              On Windows, point `plugin` directly to a `.ps1`, `.bat`, or `.cmd` script. Netdata automatically invokes `.ps1` scripts through `powershell.exe` and `.bat`/`.cmd` scripts through `cmd.exe`. Ensure scripts are stored in directories with appropriate ACLs.
     alerts:
       - name: nagios_job_execution_state_warn
         metric: nagios.job.execution_state

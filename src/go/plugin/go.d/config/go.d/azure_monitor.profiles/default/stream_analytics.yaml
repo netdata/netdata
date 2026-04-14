@@ -1,251 +1,250 @@
 ---
-id: stream_analytics
-name: Azure Stream Analytics Job
+display_name: Azure Stream Analytics Job
 resource_type: Microsoft.StreamAnalytics/streamingjobs
 metrics:
-- id: input_events
-  azure_name: InputEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: input_event_bytes
-  azure_name: InputEventBytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: input_events_sources_per_second
-  azure_name: InputEventsSourcesPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: output_events
-  azure_name: OutputEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: late_input_events
-  azure_name: LateInputEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: early_input_events
-  azure_name: EarlyInputEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: dropped_or_adjusted_events
-  azure_name: DroppedOrAdjustedEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: input_events_sources_backlogged
-  azure_name: InputEventsSourcesBacklogged
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-  - aggregation: minimum
-    kind: gauge
-- id: output_watermark_delay_seconds
-  azure_name: OutputWatermarkDelaySeconds
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-  - aggregation: minimum
-    kind: gauge
-- id: conversion_errors
-  azure_name: ConversionErrors
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: deserialization_error
-  azure_name: DeserializationError
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: errors
-  azure_name: Errors
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: aml_callout_requests
-  azure_name: AMLCalloutRequests
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: aml_callout_failed_requests
-  azure_name: AMLCalloutFailedRequests
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: aml_callout_input_events
-  azure_name: AMLCalloutInputEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: process_cpu_usage_percentage
-  azure_name: ProcessCPUUsagePercentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-  - aggregation: minimum
-    kind: gauge
-- id: resource_utilization
-  azure_name: ResourceUtilization
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-  - aggregation: minimum
-    kind: gauge
+  - id: input_events
+    azure_name: InputEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: input_event_bytes
+    azure_name: InputEventBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: input_events_sources_per_second
+    azure_name: InputEventsSourcesPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: output_events
+    azure_name: OutputEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: late_input_events
+    azure_name: LateInputEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: early_input_events
+    azure_name: EarlyInputEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: dropped_or_adjusted_events
+    azure_name: DroppedOrAdjustedEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: input_events_sources_backlogged
+    azure_name: InputEventsSourcesBacklogged
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+      - aggregation: minimum
+        kind: gauge
+  - id: output_watermark_delay_seconds
+    azure_name: OutputWatermarkDelaySeconds
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+      - aggregation: minimum
+        kind: gauge
+  - id: conversion_errors
+    azure_name: ConversionErrors
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: deserialization_error
+    azure_name: DeserializationError
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: errors
+    azure_name: Errors
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: aml_callout_requests
+    azure_name: AMLCalloutRequests
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: aml_callout_failed_requests
+    azure_name: AMLCalloutFailedRequests
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: aml_callout_input_events
+    azure_name: AMLCalloutInputEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: process_cpu_usage_percentage
+    azure_name: ProcessCPUUsagePercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+      - aggregation: minimum
+        kind: gauge
+  - id: resource_utilization
+    azure_name: ResourceUtilization
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+      - aggregation: minimum
+        kind: gauge
 template:
   family: Azure Stream Analytics Job
   context_namespace: stream_analytics
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_stream_analytics__event_flow
-    title: Azure Stream Analytics Event Flow
-    context: event_flow
-    family: Events
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: stream_analytics.input_events_total
-      name: in
-    - selector: stream_analytics.output_events_total
-      name: out
-  - id: am_azure_stream_analytics__input_data_throughput
-    title: Azure Stream Analytics Input Data Throughput
-    context: input_data_throughput
-    family: Events
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: stream_analytics.input_event_bytes_total
-      name: received
-  - id: am_azure_stream_analytics__input_sources_received
-    title: Azure Stream Analytics Input Sources Received
-    context: input_sources_received
-    family: Events
-    type: line
-    units: sources/s
-    algorithm: incremental
-    dimensions:
-    - selector: stream_analytics.input_events_sources_per_second_total
-      name: received
-  - id: am_azure_stream_analytics__event_timing
-    title: Azure Stream Analytics Event Timing Issues
-    context: event_timing
-    family: Events
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: stream_analytics.late_input_events_total
-      name: late
-    - selector: stream_analytics.early_input_events_total
-      name: early
-    - selector: stream_analytics.dropped_or_adjusted_events_total
-      name: out_of_order
-  - id: am_azure_stream_analytics__backlogged_events
-    title: Azure Stream Analytics Backlogged Events
-    context: backlogged_events
-    family: Backlog
-    type: line
-    units: events
-    algorithm: absolute
-    dimensions:
-    - selector: stream_analytics.input_events_sources_backlogged_average
-      name: backlogged
-  - id: am_azure_stream_analytics__watermark_delay
-    title: Azure Stream Analytics Watermark Delay
-    context: watermark_delay
-    family: Watermark
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: stream_analytics.output_watermark_delay_seconds_maximum
-      name: delay
-  - id: am_azure_stream_analytics__errors
-    title: Azure Stream Analytics Errors
-    context: errors
-    family: Errors
-    type: line
-    units: errors/s
-    algorithm: incremental
-    dimensions:
-    - selector: stream_analytics.errors_total
-      name: runtime
-    - selector: stream_analytics.conversion_errors_total
-      name: data_conversion
-    - selector: stream_analytics.deserialization_error_total
-      name: deserialization
-  - id: am_azure_stream_analytics__function_requests
-    title: Azure Stream Analytics Function Requests
-    context: function_requests
-    family: Functions
-    type: line
-    units: requests/s
-    algorithm: incremental
-    dimensions:
-    - selector: stream_analytics.aml_callout_requests_total
-      name: total
-    - selector: stream_analytics.aml_callout_failed_requests_total
-      name: failed
-  - id: am_azure_stream_analytics__function_events
-    title: Azure Stream Analytics Function Events
-    context: function_events
-    family: Functions
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: stream_analytics.aml_callout_input_events_total
-      name: input
-  - id: am_azure_stream_analytics__resource_utilization
-    title: Azure Stream Analytics Resource Utilization
-    context: resource_utilization
-    family: Resources
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: stream_analytics.process_cpu_usage_percentage_average
-      name: cpu
-    - selector: stream_analytics.resource_utilization_average
-      name: su_memory
+    - id: am_azure_stream_analytics__event_flow
+      title: Azure Stream Analytics Event Flow
+      context: event_flow
+      family: Events
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: input_events_total
+          name: in
+        - selector: output_events_total
+          name: out
+    - id: am_azure_stream_analytics__input_data_throughput
+      title: Azure Stream Analytics Input Data Throughput
+      context: input_data_throughput
+      family: Events
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: input_event_bytes_total
+          name: received
+    - id: am_azure_stream_analytics__input_sources_received
+      title: Azure Stream Analytics Input Sources Received
+      context: input_sources_received
+      family: Events
+      type: line
+      units: sources/s
+      algorithm: incremental
+      dimensions:
+        - selector: input_events_sources_per_second_total
+          name: received
+    - id: am_azure_stream_analytics__event_timing
+      title: Azure Stream Analytics Event Timing Issues
+      context: event_timing
+      family: Events
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: late_input_events_total
+          name: late
+        - selector: early_input_events_total
+          name: early
+        - selector: dropped_or_adjusted_events_total
+          name: out_of_order
+    - id: am_azure_stream_analytics__backlogged_events
+      title: Azure Stream Analytics Backlogged Events
+      context: backlogged_events
+      family: Backlog
+      type: line
+      units: events
+      algorithm: absolute
+      dimensions:
+        - selector: input_events_sources_backlogged_average
+          name: backlogged
+    - id: am_azure_stream_analytics__watermark_delay
+      title: Azure Stream Analytics Watermark Delay
+      context: watermark_delay
+      family: Watermark
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: output_watermark_delay_seconds_maximum
+          name: delay
+    - id: am_azure_stream_analytics__errors
+      title: Azure Stream Analytics Errors
+      context: errors
+      family: Errors
+      type: line
+      units: errors/s
+      algorithm: incremental
+      dimensions:
+        - selector: errors_total
+          name: runtime
+        - selector: conversion_errors_total
+          name: data_conversion
+        - selector: deserialization_error_total
+          name: deserialization
+    - id: am_azure_stream_analytics__function_requests
+      title: Azure Stream Analytics Function Requests
+      context: function_requests
+      family: Functions
+      type: line
+      units: requests/s
+      algorithm: incremental
+      dimensions:
+        - selector: aml_callout_requests_total
+          name: total
+        - selector: aml_callout_failed_requests_total
+          name: failed
+    - id: am_azure_stream_analytics__function_events
+      title: Azure Stream Analytics Function Events
+      context: function_events
+      family: Functions
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: aml_callout_input_events_total
+          name: input
+    - id: am_azure_stream_analytics__resource_utilization
+      title: Azure Stream Analytics Resource Utilization
+      context: resource_utilization
+      family: Resources
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: process_cpu_usage_percentage_average
+          name: cpu
+        - selector: resource_utilization_average
+          name: su_memory

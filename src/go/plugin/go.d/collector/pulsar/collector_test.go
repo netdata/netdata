@@ -169,7 +169,7 @@ func TestCollector_Collect(t *testing.T) {
 			collr, srv := test.prepare(t)
 			defer srv.Close()
 
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				_ = collr.Collect(context.Background())
 			}
 			mx := collr.Collect(context.Background())

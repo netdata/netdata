@@ -1,291 +1,290 @@
 ---
-id: event_hubs
-name: Azure Event Hubs Namespace
+display_name: Azure Event Hubs Namespace
 resource_type: Microsoft.EventHub/Namespaces
 metrics:
-- id: incoming_messages
-  azure_name: IncomingMessages
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: outgoing_messages
-  azure_name: OutgoingMessages
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: incoming_bytes
-  azure_name: IncomingBytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: outgoing_bytes
-  azure_name: OutgoingBytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: incoming_requests
-  azure_name: IncomingRequests
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: successful_requests
-  azure_name: SuccessfulRequests
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: throttled_requests
-  azure_name: ThrottledRequests
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: server_errors
-  azure_name: ServerErrors
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: user_errors
-  azure_name: UserErrors
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: quota_exceeded_errors
-  azure_name: QuotaExceededErrors
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: active_connections
-  azure_name: ActiveConnections
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: connections_opened
-  azure_name: ConnectionsOpened
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: connections_closed
-  azure_name: ConnectionsClosed
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: captured_messages
-  azure_name: CapturedMessages
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: captured_bytes
-  azure_name: CapturedBytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: capture_backlog
-  azure_name: CaptureBacklog
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: gauge
-- id: namespace_cpu_usage
-  azure_name: NamespaceCpuUsage
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: namespace_memory_usage
-  azure_name: NamespaceMemoryUsage
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: replication_lag_count
-  azure_name: ReplicationLagCount
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: replication_lag_duration
-  azure_name: ReplicationLagDuration
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: size
-  azure_name: Size
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
+  - id: incoming_messages
+    azure_name: IncomingMessages
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: outgoing_messages
+    azure_name: OutgoingMessages
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: incoming_bytes
+    azure_name: IncomingBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: outgoing_bytes
+    azure_name: OutgoingBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: incoming_requests
+    azure_name: IncomingRequests
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: successful_requests
+    azure_name: SuccessfulRequests
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: throttled_requests
+    azure_name: ThrottledRequests
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: server_errors
+    azure_name: ServerErrors
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: user_errors
+    azure_name: UserErrors
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: quota_exceeded_errors
+    azure_name: QuotaExceededErrors
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: active_connections
+    azure_name: ActiveConnections
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: connections_opened
+    azure_name: ConnectionsOpened
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: connections_closed
+    azure_name: ConnectionsClosed
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: captured_messages
+    azure_name: CapturedMessages
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: captured_bytes
+    azure_name: CapturedBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: capture_backlog
+    azure_name: CaptureBacklog
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: namespace_cpu_usage
+    azure_name: NamespaceCpuUsage
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: namespace_memory_usage
+    azure_name: NamespaceMemoryUsage
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: replication_lag_count
+    azure_name: ReplicationLagCount
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: replication_lag_duration
+    azure_name: ReplicationLagDuration
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: size
+    azure_name: Size
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
 template:
   family: Azure Event Hubs Namespace
   context_namespace: event_hubs
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_event_hubs__message_flow
-    title: Azure Event Hubs Message Flow
-    context: message_flow
-    family: Messages
-    type: line
-    units: messages/s
-    algorithm: incremental
-    dimensions:
-    - selector: event_hubs.incoming_messages_total
-      name: in
-    - selector: event_hubs.outgoing_messages_total
-      name: out
-  - id: am_azure_event_hubs__data_throughput
-    title: Azure Event Hubs Data Throughput
-    context: data_throughput
-    family: Messages
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: event_hubs.incoming_bytes_total
-      name: in
-    - selector: event_hubs.outgoing_bytes_total
-      name: out
-  - id: am_azure_event_hubs__requests
-    title: Azure Event Hubs Requests
-    context: requests
-    family: Requests
-    type: line
-    units: requests/s
-    algorithm: incremental
-    dimensions:
-    - selector: event_hubs.incoming_requests_total
-      name: incoming
-    - selector: event_hubs.successful_requests_total
-      name: successful
-  - id: am_azure_event_hubs__errors
-    title: Azure Event Hubs Errors
-    context: errors
-    family: Errors
-    type: line
-    units: errors/s
-    algorithm: incremental
-    dimensions:
-    - selector: event_hubs.server_errors_total
-      name: server
-    - selector: event_hubs.user_errors_total
-      name: user
-    - selector: event_hubs.throttled_requests_total
-      name: throttled
-    - selector: event_hubs.quota_exceeded_errors_total
-      name: quota_exceeded
-  - id: am_azure_event_hubs__connections
-    title: Azure Event Hubs Active Connections
-    context: connections
-    family: Connections
-    type: line
-    units: connections
-    algorithm: absolute
-    dimensions:
-    - selector: event_hubs.active_connections_average
-      name: active
-  - id: am_azure_event_hubs__connection_events
-    title: Azure Event Hubs Connection Events
-    context: connection_events
-    family: Connections
-    type: line
-    units: connections
-    algorithm: absolute
-    dimensions:
-    - selector: event_hubs.connections_opened_maximum
-      name: opened
-    - selector: event_hubs.connections_closed_maximum
-      name: closed
-  - id: am_azure_event_hubs__captured_messages
-    title: Azure Event Hubs Captured Messages
-    context: captured_messages
-    family: Capture
-    type: line
-    units: messages/s
-    algorithm: incremental
-    dimensions:
-    - selector: event_hubs.captured_messages_total
-      name: total
-  - id: am_azure_event_hubs__captured_data
-    title: Azure Event Hubs Captured Data
-    context: captured_data
-    family: Capture
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: event_hubs.captured_bytes_total
-      name: total
-  - id: am_azure_event_hubs__namespace_size
-    title: Azure Event Hubs Namespace Size
-    context: namespace_size
-    family: Capacity
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: event_hubs.size_average
-      name: average
-  - id: am_azure_event_hubs__capture_backlog
-    title: Azure Event Hubs Capture Backlog
-    context: capture_backlog
-    family: Capture
-    type: line
-    units: messages
-    algorithm: absolute
-    dimensions:
-    - selector: event_hubs.capture_backlog_total
-      name: backlog
-  - id: am_azure_event_hubs__namespace_resources
-    title: Azure Event Hubs Namespace Resources
-    context: namespace_resources
-    family: Capacity
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: event_hubs.namespace_cpu_usage_maximum
-      name: cpu
-    - selector: event_hubs.namespace_memory_usage_maximum
-      name: memory
-  - id: am_azure_event_hubs__replication_lag
-    title: Azure Event Hubs Replication Lag
-    context: replication_lag
-    family: Replication
-    type: line
-    units: messages
-    algorithm: absolute
-    dimensions:
-    - selector: event_hubs.replication_lag_count_maximum
-      name: messages
-  - id: am_azure_event_hubs__replication_lag_duration
-    title: Azure Event Hubs Replication Lag Duration
-    context: replication_lag_duration
-    family: Replication
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: event_hubs.replication_lag_duration_maximum
-      name: duration
+    - id: am_azure_event_hubs__message_flow
+      title: Azure Event Hubs Message Flow
+      context: message_flow
+      family: Messages
+      type: line
+      units: messages/s
+      algorithm: incremental
+      dimensions:
+        - selector: incoming_messages_total
+          name: in
+        - selector: outgoing_messages_total
+          name: out
+    - id: am_azure_event_hubs__data_throughput
+      title: Azure Event Hubs Data Throughput
+      context: data_throughput
+      family: Messages
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: incoming_bytes_total
+          name: in
+        - selector: outgoing_bytes_total
+          name: out
+    - id: am_azure_event_hubs__requests
+      title: Azure Event Hubs Requests
+      context: requests
+      family: Requests
+      type: line
+      units: requests/s
+      algorithm: incremental
+      dimensions:
+        - selector: incoming_requests_total
+          name: incoming
+        - selector: successful_requests_total
+          name: successful
+    - id: am_azure_event_hubs__errors
+      title: Azure Event Hubs Errors
+      context: errors
+      family: Errors
+      type: line
+      units: errors/s
+      algorithm: incremental
+      dimensions:
+        - selector: server_errors_total
+          name: server
+        - selector: user_errors_total
+          name: user
+        - selector: throttled_requests_total
+          name: throttled
+        - selector: quota_exceeded_errors_total
+          name: quota_exceeded
+    - id: am_azure_event_hubs__connections
+      title: Azure Event Hubs Active Connections
+      context: connections
+      family: Connections
+      type: line
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: active_connections_average
+          name: active
+    - id: am_azure_event_hubs__connection_events
+      title: Azure Event Hubs Connection Events
+      context: connection_events
+      family: Connections
+      type: line
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: connections_opened_maximum
+          name: opened
+        - selector: connections_closed_maximum
+          name: closed
+    - id: am_azure_event_hubs__captured_messages
+      title: Azure Event Hubs Captured Messages
+      context: captured_messages
+      family: Capture
+      type: line
+      units: messages/s
+      algorithm: incremental
+      dimensions:
+        - selector: captured_messages_total
+          name: total
+    - id: am_azure_event_hubs__captured_data
+      title: Azure Event Hubs Captured Data
+      context: captured_data
+      family: Capture
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: captured_bytes_total
+          name: total
+    - id: am_azure_event_hubs__namespace_size
+      title: Azure Event Hubs Namespace Size
+      context: namespace_size
+      family: Capacity
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: size_average
+          name: average
+    - id: am_azure_event_hubs__capture_backlog
+      title: Azure Event Hubs Capture Backlog
+      context: capture_backlog
+      family: Capture
+      type: line
+      units: messages
+      algorithm: absolute
+      dimensions:
+        - selector: capture_backlog_total
+          name: backlog
+    - id: am_azure_event_hubs__namespace_resources
+      title: Azure Event Hubs Namespace Resources
+      context: namespace_resources
+      family: Capacity
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: namespace_cpu_usage_maximum
+          name: cpu
+        - selector: namespace_memory_usage_maximum
+          name: memory
+    - id: am_azure_event_hubs__replication_lag
+      title: Azure Event Hubs Replication Lag
+      context: replication_lag
+      family: Replication
+      type: line
+      units: messages
+      algorithm: absolute
+      dimensions:
+        - selector: replication_lag_count_maximum
+          name: messages
+    - id: am_azure_event_hubs__replication_lag_duration
+      title: Azure Event Hubs Replication Lag Duration
+      context: replication_lag_duration
+      family: Replication
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: replication_lag_duration_maximum
+          name: duration

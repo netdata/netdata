@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
@@ -21,6 +22,12 @@ type initResult struct {
 	resourceGraph          resourceGraphClient
 	queryExecutor          *queryExecutor
 	supportedResourceTypes map[string]struct{}
+}
+
+type initProfileSelection struct {
+	Names     []string
+	AutoNames []string
+	Entries   map[string]ProfileEntryConfig
 }
 
 func (c *Collector) initInstruments(runtime *collectorRuntime) error {
@@ -96,12 +103,12 @@ func (c *Collector) ensureBootstrapped(ctx context.Context) error {
 		c.Warningf("ignoring unsupported discovered resource types: %v", fetched.UnsupportedTypes)
 	}
 
-	profileIDs, autoProfiles, err := resolveInitProfileIDs(c.Config, c.profileCatalog, fetched.ByType)
+	selection, err := resolveInitProfiles(c.Config, c.profileCatalog, fetched.ByType)
 	if err != nil {
 		return err
 	}
-	if len(autoProfiles) > 0 {
-		c.Infof("auto-discovery resolved profiles: %v", autoProfiles)
+	if len(selection.AutoNames) > 0 {
+		c.Infof("auto-discovery resolved profiles: %v", selection.AutoNames)
 	}
 
 	// TODO(azure_monitor): Insert bootstrap-only metric-definition validation here.
@@ -110,26 +117,18 @@ func (c *Collector) ensureBootstrapped(ctx context.Context) error {
 	// lookup errors, and prune unsupported metrics/aggregations/time grains
 	// before final runtime build. Because runtime is currently global per job,
 	// multi-subscription capability differences need an explicit merge rule first.
-	runtime, err := buildCollectorRuntimeFromConfig(profileIDs, c.profileCatalog)
+	runtime, err := buildCollectorRuntimeFromConfig(selection.Names, selection.Entries, c.profileCatalog)
 	if err != nil {
 		return fmt.Errorf("build collector runtime: %w", err)
 	}
 	if err := c.initInstruments(runtime); err != nil {
 		return err
 	}
-
-	resources, byType := filterDiscoveryResourcesByTypes(fetched.Resources, runtimeResourceTypes(runtime))
 	now := c.now()
 
 	c.runtime = runtime
 	c.observations = newObservationState(runtime.Instruments)
-	c.discovery = discoveryState{
-		Resources:    resources,
-		ByType:       byType,
-		FetchedAt:    now,
-		ExpiresAt:    discoveryExpiresAt(now, c.Discovery.RefreshEvery),
-		FetchCounter: 1,
-	}
+	c.discovery = buildDiscoveryState(fetched.Resources, runtime, now, c.Discovery.RefreshEvery, 1)
 
 	return nil
 }
@@ -145,6 +144,14 @@ func (c *Collector) prepareInitConfig() (Config, azureprofiles.Catalog, error) {
 
 	if err := cfg.validate(); err != nil {
 		return Config{}, azureprofiles.Catalog{}, fmt.Errorf("config validation: %w", err)
+	}
+	cfg, ignoredTagPaths := sanitizeIgnoredProfileTagFilters(cfg)
+	if len(ignoredTagPaths) > 0 {
+		c.Warningf(
+			"ignoring profile tag filters in discovery.mode %q; encode per-profile tag filtering in discovery.mode_query.kql: %s",
+			discoveryModeQuery,
+			strings.Join(ignoredTagPaths, ", "),
+		)
 	}
 
 	return cfg, catalog, nil
@@ -211,13 +218,13 @@ func initDiscoveryResourceTypes(cfg Config, catalog azureprofiles.Catalog) ([]st
 	case profilesModeAuto, profilesModeCombined:
 		return catalog.ResourceTypes(), nil
 	case profilesModeExact:
-		return catalog.ResourceTypesForProfileBaseNames(cfg.Profiles.explicitBaseNames())
+		return catalog.ResourceTypesForProfileBaseNames(entryNames(modeEntries(cfg.Profiles.ModeExact)))
 	default:
 		return nil, fmt.Errorf("unsupported profiles.mode %q", cfg.Profiles.Mode)
 	}
 }
 
-func resolveInitProfileIDs(cfg Config, catalog azureprofiles.Catalog, byType map[string][]resourceInfo) ([]string, []string, error) {
+func resolveInitProfiles(cfg Config, catalog azureprofiles.Catalog, byType map[string][]resourceInfo) (initProfileSelection, error) {
 	discoveredTypes := make(map[string]struct{}, len(byType))
 	for key := range byType {
 		discoveredTypes[key] = struct{}{}
@@ -227,23 +234,28 @@ func resolveInitProfileIDs(cfg Config, catalog azureprofiles.Catalog, byType map
 	switch stringsLowerTrim(cfg.Profiles.Mode) {
 	case profilesModeAuto:
 		if len(autoProfiles) == 0 {
-			return nil, nil, errors.New("auto-discovery found no Azure resources matching any known profile")
+			return initProfileSelection{}, errors.New("auto-discovery found no Azure resources matching any known profile")
 		}
-		return autoProfiles, autoProfiles, nil
+		return initProfileSelection{
+			Names:     autoProfiles,
+			AutoNames: autoProfiles,
+			Entries:   filterEntryMap(entryMap(modeEntries(cfg.Profiles.ModeAuto)), autoProfiles),
+		}, nil
 	case profilesModeExact:
-		explicitProfileIDs, err := catalog.ProfileIDsForBaseNames(cfg.Profiles.explicitBaseNames())
-		if err != nil {
-			return nil, nil, err
-		}
-		return explicitProfileIDs, nil, nil
+		explicitNames := entryNames(modeEntries(cfg.Profiles.ModeExact))
+		return initProfileSelection{
+			Names:   explicitNames,
+			Entries: entryMap(modeEntries(cfg.Profiles.ModeExact)),
+		}, nil
 	case profilesModeCombined:
-		explicitProfileIDs, err := catalog.ProfileIDsForBaseNames(cfg.Profiles.explicitBaseNames())
-		if err != nil {
-			return nil, nil, err
-		}
-		return mergeProfileIDs(explicitProfileIDs, autoProfiles), autoProfiles, nil
+		explicitNames := entryNames(modeEntries(cfg.Profiles.ModeCombined))
+		return initProfileSelection{
+			Names:     mergeProfileNames(explicitNames, autoProfiles),
+			AutoNames: autoProfiles,
+			Entries:   entryMap(modeEntries(cfg.Profiles.ModeCombined)),
+		}, nil
 	default:
-		return nil, nil, fmt.Errorf("unsupported profiles.mode %q", cfg.Profiles.Mode)
+		return initProfileSelection{}, fmt.Errorf("unsupported profiles.mode %q", cfg.Profiles.Mode)
 	}
 }
 
@@ -257,26 +269,45 @@ func createCredential(auth cloudauth.AzureADAuthConfig, cloudCfg azcloud.Configu
 	})
 }
 
-func mergeProfileIDs(explicit, discovered []string) []string {
+func mergeProfileNames(explicit, discovered []string) []string {
 	seen := make(map[string]struct{}, len(explicit)+len(discovered))
 	merged := make([]string, 0, len(explicit)+len(discovered))
-	for _, id := range explicit {
-		key := stringsLowerTrim(id)
+	for _, name := range explicit {
+		key := stringsLowerTrim(name)
 		if _, ok := seen[key]; ok {
 			continue
 		}
 		seen[key] = struct{}{}
-		merged = append(merged, id)
+		merged = append(merged, name)
 	}
-	for _, id := range discovered {
-		key := stringsLowerTrim(id)
+	for _, name := range discovered {
+		key := stringsLowerTrim(name)
 		if _, ok := seen[key]; ok {
 			continue
 		}
 		seen[key] = struct{}{}
-		merged = append(merged, id)
+		merged = append(merged, name)
 	}
 	return merged
+}
+
+func filterEntryMap(entries map[string]ProfileEntryConfig, active []string) map[string]ProfileEntryConfig {
+	if len(entries) == 0 || len(active) == 0 {
+		return nil
+	}
+
+	filtered := make(map[string]ProfileEntryConfig)
+	for _, name := range active {
+		entry, ok := entries[name]
+		if !ok {
+			continue
+		}
+		filtered[name] = entry
+	}
+	if len(filtered) == 0 {
+		return nil
+	}
+	return filtered
 }
 
 func defaultNewResourceGraphClient(subscriptionID string, cred azcore.TokenCredential, cloudCfg azcloud.Configuration) (resourceGraphClient, error) {

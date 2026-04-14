@@ -136,7 +136,7 @@ mark_as_advanced(ENABLE_DASHBOARD)
 
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" OFF)
+option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" ON)
 option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE})
 cmake_dependent_option(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER "Enable OTel signal viewer plugin" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
@@ -924,6 +924,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/nd_log.h
         src/libnetdata/os/os.c
         src/libnetdata/os/os.h
+        src/libnetdata/os/ci.c
+        src/libnetdata/os/ci.h
         src/libnetdata/os/byteorder.h
         src/libnetdata/onewayalloc/onewayalloc.c
         src/libnetdata/onewayalloc/onewayalloc.h
@@ -1388,7 +1390,12 @@ set(API_PLUGIN_FILES
         src/web/api/queries/rrdr.h
         src/web/api/queries/query.c
         src/web/api/queries/query.h
+        src/web/api/queries/query-execute.c
+        src/web/api/queries/query-window.c
         src/web/api/queries/query-group-by.c
+        src/web/api/queries/query-group-by-init.c
+        src/web/api/queries/query-group-by-finalize.c
+        src/web/api/queries/query-cardinality-limit.c
         src/web/api/queries/query-group-over-time.c
         src/web/api/queries/query-internal.h
         src/web/api/queries/query-plan.c
@@ -2988,12 +2995,28 @@ if(ENABLE_PLUGIN_LOCAL_LISTENERS)
 endif()
 
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
+        if(USE_LTO AND CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_SIZEOF_VOID_P EQUAL 4)
+                # GCC still performs LTO when linking slim LTO static archives into a
+                # non-LTO target. Build these archives as fat objects and force a
+                # regular final link to avoid exhausting the i386 linker.
+                if(TARGET judy)
+                        target_compile_options(judy PRIVATE -ffat-lto-objects)
+                endif()
+                if(TARGET libnetdata)
+                        target_compile_options(libnetdata PRIVATE -ffat-lto-objects)
+                endif()
+        endif()
+
         set(NETWORK_VIEWER_FILES
                 src/libnetdata/local-sockets/local-sockets.h
                 src/collectors/network-viewer.plugin/network-viewer.c
         )
 
         add_executable(network-viewer.plugin ${NETWORK_VIEWER_FILES})
+        if(USE_LTO AND CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_SIZEOF_VOID_P EQUAL 4)
+                set_property(TARGET network-viewer.plugin PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
+                target_link_options(network-viewer.plugin PRIVATE -fno-lto)
+        endif()
 
         target_compile_options(network-viewer.plugin PRIVATE
                                "$<$<BOOL:${MNL_FOUND}>:${MNL_CFLAGS_OTHER}>")

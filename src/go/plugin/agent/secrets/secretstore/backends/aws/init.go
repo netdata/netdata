@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
 
 func (s *store) init(_ context.Context) error {
@@ -24,8 +25,19 @@ func (s *store) init(_ context.Context) error {
 	}
 	s.Config.Region = region
 
+	switch {
+	case s.Config.Timeout.Duration() < 0:
+		return fmt.Errorf("timeout cannot be negative")
+	case s.Config.Timeout.Duration() == 0:
+		s.Config.Timeout = defaultTimeout
+	}
+	s.runtime = &runtime{
+		apiClient:  httpx.APIClient(s.Config.Timeout.Duration()),
+		imdsClient: httpx.NoProxyClient(s.Config.Timeout.Duration()),
+	}
+
 	published := &publishedStore{
-		provider:    s.provider,
+		runtime:     s.runtime,
 		mode:        s.Config.AuthMode,
 		regionValue: region,
 	}

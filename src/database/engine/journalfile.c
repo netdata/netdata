@@ -107,9 +107,16 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
 
         datafile = *PValue;
 
-        struct rrdengine_journalfile *journalfile = datafile ? datafile->journalfile : NULL;
+        if (!datafile || !datafile_acquire(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS)) {
+            datafile = NULL;
+            PValue = NULL;
+            continue;
+        }
 
-        if (!datafile || !journalfile) {
+        struct rrdengine_journalfile *journalfile = datafile->journalfile;
+
+        if (!journalfile) {
+            datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
             datafile = NULL;
             PValue = NULL;
             continue;
@@ -121,29 +128,36 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
                                                       s->wanted_end_time_s);
 
         if(rc == PAGE_IS_IN_RANGE) {
-            // this is good to return
-            break;
+            s->j2_header_acquired = journalfile_v2_data_acquire(journalfile, NULL,
+                                                                s->wanted_start_time_s,
+                                                                s->wanted_end_time_s);
+            if(s->j2_header_acquired) {
+                // this is good to return
+                break;
+            }
+
+            datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
+            datafile = NULL;
+            PValue = NULL;
+            continue;
         }
         else if(rc == PAGE_IS_IN_THE_PAST) {
             // continue to get the next
+            datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
             datafile = NULL;
             PValue = NULL;
             continue;
         }
         else /* PAGE_IS_IN_THE_FUTURE */ {
             // we finished - no more datafiles
+            datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
             datafile = NULL;
             PValue = NULL;
             break;
         }
     }
 
-    struct rrdengine_journalfile *journalfile = datafile ? datafile->journalfile : NULL;
-    if(datafile && journalfile)
-        s->j2_header_acquired = journalfile_v2_data_acquire(journalfile, NULL,
-                                                            s->wanted_start_time_s,
-                                                            s->wanted_end_time_s);
-    else
+    if(!datafile)
         s->j2_header_acquired = NULL;
 
     rw_spinlock_read_unlock(&s->ctx->njfv2idx.spinlock);

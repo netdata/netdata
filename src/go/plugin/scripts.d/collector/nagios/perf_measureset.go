@@ -32,16 +32,16 @@ var (
 )
 
 type perfValueMeasureSet struct {
-	name       string
-	scriptName string
-	unit       string
-	counter    bool
-	value      metrix.SampleValue
+	name      string
+	checkName string
+	unit      string
+	counter   bool
+	value     metrix.SampleValue
 }
 
 type perfThresholdStateSet struct {
 	name          string
-	scriptName    string
+	checkName     string
 	perfdataValue string
 	state         string
 }

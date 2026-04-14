@@ -1,351 +1,350 @@
 ---
-id: sql_elastic_pool
-name: Azure SQL Elastic Pool
+display_name: Azure SQL Elastic Pool
 resource_type: Microsoft.Sql/servers/elasticPools
 metrics:
-- id: cpu_percent
-  azure_name: cpu_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: cpu_used
-  azure_name: cpu_used
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cpu_limit
-  azure_name: cpu_limit
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: dtu_consumption_percent
-  azure_name: dtu_consumption_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: e_dtu_used
-  azure_name: eDTU_used
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: e_dtu_limit
-  azure_name: eDTU_limit
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: sql_instance_cpu_percent
-  azure_name: sql_instance_cpu_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: sql_instance_memory_percent
-  azure_name: sql_instance_memory_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: physical_data_read_percent
-  azure_name: physical_data_read_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: log_write_percent
-  azure_name: log_write_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: workers_percent
-  azure_name: workers_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: sessions_percent
-  azure_name: sessions_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: sessions_count
-  azure_name: sessions_count
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: allocated_data_storage
-  azure_name: allocated_data_storage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: allocated_data_storage_percent
-  azure_name: allocated_data_storage_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: storage_used
-  azure_name: storage_used
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: storage_percent
-  azure_name: storage_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: storage_limit
-  azure_name: storage_limit
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: xtp_storage_percent
-  azure_name: xtp_storage_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: tempdb_data_size
-  azure_name: tempdb_data_size
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: tempdb_log_size
-  azure_name: tempdb_log_size
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: tempdb_log_used_percent
-  azure_name: tempdb_log_used_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: app_cpu_percent
-  azure_name: app_cpu_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: app_memory_percent
-  azure_name: app_memory_percent
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: app_cpu_billed
-  azure_name: app_cpu_billed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
+  - id: cpu_percent
+    azure_name: cpu_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: cpu_used
+    azure_name: cpu_used
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cpu_limit
+    azure_name: cpu_limit
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: dtu_consumption_percent
+    azure_name: dtu_consumption_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: e_dtu_used
+    azure_name: eDTU_used
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: e_dtu_limit
+    azure_name: eDTU_limit
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: sql_instance_cpu_percent
+    azure_name: sql_instance_cpu_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: sql_instance_memory_percent
+    azure_name: sql_instance_memory_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: physical_data_read_percent
+    azure_name: physical_data_read_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: log_write_percent
+    azure_name: log_write_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: workers_percent
+    azure_name: workers_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: sessions_percent
+    azure_name: sessions_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: sessions_count
+    azure_name: sessions_count
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: allocated_data_storage
+    azure_name: allocated_data_storage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: allocated_data_storage_percent
+    azure_name: allocated_data_storage_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: storage_used
+    azure_name: storage_used
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: storage_percent
+    azure_name: storage_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: storage_limit
+    azure_name: storage_limit
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: xtp_storage_percent
+    azure_name: xtp_storage_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: tempdb_data_size
+    azure_name: tempdb_data_size
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: tempdb_log_size
+    azure_name: tempdb_log_size
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: tempdb_log_used_percent
+    azure_name: tempdb_log_used_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: app_cpu_percent
+    azure_name: app_cpu_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: app_memory_percent
+    azure_name: app_memory_percent
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: app_cpu_billed
+    azure_name: app_cpu_billed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
 template:
   family: Azure SQL Elastic Pool
   context_namespace: sql_elastic_pool
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_sql_elastic_pool__cpu
-    title: Azure SQL Elastic Pool CPU Utilization
-    context: cpu
-    family: Utilization
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.cpu_percent_average
-      name: average
-    - selector: sql_elastic_pool.cpu_percent_maximum
-      name: maximum
-  - id: am_azure_sql_elastic_pool__instance_cpu
-    title: Azure SQL Elastic Pool Instance CPU Utilization
-    context: instance_cpu
-    family: Utilization
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.sql_instance_cpu_percent_average
-      name: average
-  - id: am_azure_sql_elastic_pool__instance_memory
-    title: Azure SQL Elastic Pool Instance Memory Utilization
-    context: instance_memory
-    family: Utilization
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.sql_instance_memory_percent_average
-      name: average
-  - id: am_azure_sql_elastic_pool__dtu_consumption
-    title: Azure SQL Elastic Pool DTU Consumption
-    context: dtu_consumption
-    family: Utilization
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.dtu_consumption_percent_average
-      name: average
-  - id: am_azure_sql_elastic_pool__io_utilization
-    title: Azure SQL Elastic Pool I/O Utilization
-    context: io_utilization
-    family: I/O
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.physical_data_read_percent_average
-      name: data_read
-    - selector: sql_elastic_pool.log_write_percent_average
-      name: log_write
-  - id: am_azure_sql_elastic_pool__resource_utilization
-    title: Azure SQL Elastic Pool Resource Utilization
-    context: resource_utilization
-    family: Utilization
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.workers_percent_average
-      name: workers
-    - selector: sql_elastic_pool.sessions_percent_average
-      name: sessions
-  - id: am_azure_sql_elastic_pool__sessions_count
-    title: Azure SQL Elastic Pool Sessions Count
-    context: sessions_count
-    family: Capacity
-    type: line
-    units: sessions
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.sessions_count_average
-      name: average
-  - id: am_azure_sql_elastic_pool__storage
-    title: Azure SQL Elastic Pool Storage
-    context: storage
-    family: Storage
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.storage_used_average
-      name: used
-    - selector: sql_elastic_pool.allocated_data_storage_average
-      name: allocated
-    - selector: sql_elastic_pool.storage_limit_average
-      name: limit
-  - id: am_azure_sql_elastic_pool__storage_utilization
-    title: Azure SQL Elastic Pool Storage Utilization
-    context: storage_utilization
-    family: Storage
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.storage_percent_average
-      name: used
-    - selector: sql_elastic_pool.allocated_data_storage_percent_average
-      name: allocated
-  - id: am_azure_sql_elastic_pool__xtp_storage
-    title: Azure SQL Elastic Pool In-Memory OLTP Storage
-    context: xtp_storage
-    family: In-Memory OLTP
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.xtp_storage_percent_average
-      name: average
-  - id: am_azure_sql_elastic_pool__tempdb_size
-    title: Azure SQL Elastic Pool Tempdb Size
-    context: tempdb_size
-    family: Tempdb
-    type: line
-    units: KiB
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.tempdb_data_size_average
-      name: data
-    - selector: sql_elastic_pool.tempdb_log_size_average
-      name: log
-  - id: am_azure_sql_elastic_pool__tempdb_log_utilization
-    title: Azure SQL Elastic Pool Tempdb Log Utilization
-    context: tempdb_log_utilization
-    family: Tempdb
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.tempdb_log_used_percent_average
-      name: average
-  - id: am_azure_sql_elastic_pool__vcore_usage
-    title: Azure SQL Elastic Pool vCore Usage
-    context: vcore_usage
-    family: Capacity
-    type: line
-    units: vCores
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.cpu_used_average
-      name: used
-    - selector: sql_elastic_pool.cpu_limit_average
-      name: limit
-  - id: am_azure_sql_elastic_pool__edtu_usage
-    title: Azure SQL Elastic Pool eDTU Usage
-    context: edtu_usage
-    family: Capacity
-    type: line
-    units: eDTU
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.e_dtu_used_average
-      name: used
-    - selector: sql_elastic_pool.e_dtu_limit_average
-      name: limit
-  - id: am_azure_sql_elastic_pool__serverless_utilization
-    title: Azure SQL Elastic Pool Serverless Utilization
-    context: serverless_utilization
-    family: Serverless
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: sql_elastic_pool.app_cpu_percent_average
-      name: cpu
-    - selector: sql_elastic_pool.app_memory_percent_average
-      name: memory
-  - id: am_azure_sql_elastic_pool__serverless_billing
-    title: Azure SQL Elastic Pool Serverless Billing
-    context: serverless_billing
-    family: Serverless
-    type: line
-    units: vCore-seconds/s
-    algorithm: incremental
-    dimensions:
-    - selector: sql_elastic_pool.app_cpu_billed_total
-      name: total
+    - id: am_azure_sql_elastic_pool__cpu
+      title: Azure SQL Elastic Pool CPU Utilization
+      context: cpu
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_percent_average
+          name: average
+        - selector: cpu_percent_maximum
+          name: maximum
+    - id: am_azure_sql_elastic_pool__instance_cpu
+      title: Azure SQL Elastic Pool Instance CPU Utilization
+      context: instance_cpu
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: sql_instance_cpu_percent_average
+          name: average
+    - id: am_azure_sql_elastic_pool__instance_memory
+      title: Azure SQL Elastic Pool Instance Memory Utilization
+      context: instance_memory
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: sql_instance_memory_percent_average
+          name: average
+    - id: am_azure_sql_elastic_pool__dtu_consumption
+      title: Azure SQL Elastic Pool DTU Consumption
+      context: dtu_consumption
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: dtu_consumption_percent_average
+          name: average
+    - id: am_azure_sql_elastic_pool__io_utilization
+      title: Azure SQL Elastic Pool I/O Utilization
+      context: io_utilization
+      family: IO
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: physical_data_read_percent_average
+          name: data_read
+        - selector: log_write_percent_average
+          name: log_write
+    - id: am_azure_sql_elastic_pool__resource_utilization
+      title: Azure SQL Elastic Pool Resource Utilization
+      context: resource_utilization
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: workers_percent_average
+          name: workers
+        - selector: sessions_percent_average
+          name: sessions
+    - id: am_azure_sql_elastic_pool__sessions_count
+      title: Azure SQL Elastic Pool Sessions Count
+      context: sessions_count
+      family: Capacity
+      type: line
+      units: sessions
+      algorithm: absolute
+      dimensions:
+        - selector: sessions_count_average
+          name: average
+    - id: am_azure_sql_elastic_pool__storage
+      title: Azure SQL Elastic Pool Storage
+      context: storage
+      family: Storage
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: storage_used_average
+          name: used
+        - selector: allocated_data_storage_average
+          name: allocated
+        - selector: storage_limit_average
+          name: limit
+    - id: am_azure_sql_elastic_pool__storage_utilization
+      title: Azure SQL Elastic Pool Storage Utilization
+      context: storage_utilization
+      family: Storage
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: storage_percent_average
+          name: used
+        - selector: allocated_data_storage_percent_average
+          name: allocated
+    - id: am_azure_sql_elastic_pool__xtp_storage
+      title: Azure SQL Elastic Pool In-Memory OLTP Storage
+      context: xtp_storage
+      family: In-Memory OLTP
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: xtp_storage_percent_average
+          name: average
+    - id: am_azure_sql_elastic_pool__tempdb_size
+      title: Azure SQL Elastic Pool Tempdb Size
+      context: tempdb_size
+      family: Tempdb
+      type: line
+      units: KiB
+      algorithm: absolute
+      dimensions:
+        - selector: tempdb_data_size_average
+          name: data
+        - selector: tempdb_log_size_average
+          name: log
+    - id: am_azure_sql_elastic_pool__tempdb_log_utilization
+      title: Azure SQL Elastic Pool Tempdb Log Utilization
+      context: tempdb_log_utilization
+      family: Tempdb
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: tempdb_log_used_percent_average
+          name: average
+    - id: am_azure_sql_elastic_pool__vcore_usage
+      title: Azure SQL Elastic Pool vCore Usage
+      context: vcore_usage
+      family: Capacity
+      type: line
+      units: vCores
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_used_average
+          name: used
+        - selector: cpu_limit_average
+          name: limit
+    - id: am_azure_sql_elastic_pool__edtu_usage
+      title: Azure SQL Elastic Pool eDTU Usage
+      context: edtu_usage
+      family: Capacity
+      type: line
+      units: eDTU
+      algorithm: absolute
+      dimensions:
+        - selector: e_dtu_used_average
+          name: used
+        - selector: e_dtu_limit_average
+          name: limit
+    - id: am_azure_sql_elastic_pool__serverless_utilization
+      title: Azure SQL Elastic Pool Serverless Utilization
+      context: serverless_utilization
+      family: Serverless
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: app_cpu_percent_average
+          name: cpu
+        - selector: app_memory_percent_average
+          name: memory
+    - id: am_azure_sql_elastic_pool__serverless_billing
+      title: Azure SQL Elastic Pool Serverless Billing
+      context: serverless_billing
+      family: Serverless
+      type: line
+      units: vCore-seconds/s
+      algorithm: incremental
+      dimensions:
+        - selector: app_cpu_billed_total
+          name: total

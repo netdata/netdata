@@ -50,7 +50,7 @@ func (c *Collector) collectStatus(mx map[string]int64, resp []byte) error {
 	for _, v := range upsStatuses {
 		mx["status_"+v] = 0
 	}
-	for _, v := range strings.Fields(st.status) {
+	for v := range strings.FieldsSeq(st.status) {
 		mx["status_"+v] = 1
 	}
 

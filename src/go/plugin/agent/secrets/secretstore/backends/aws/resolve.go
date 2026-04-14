@@ -11,8 +11,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -124,7 +126,7 @@ func (s *publishedStore) ecsCredentials(ctx context.Context, relativeURI string)
 	if err != nil {
 		return nil, fmt.Errorf("creating ECS credentials request: %w", err)
 	}
-	resp, err := s.provider.imdsClient.Do(req)
+	resp, err := s.runtime.imdsClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("ECS credentials request failed: %w", err)
 	}
@@ -160,7 +162,7 @@ func (s *publishedStore) imdsCredentials(ctx context.Context) (*credentials, err
 		return nil, fmt.Errorf("creating IMDS token request: %w", err)
 	}
 	tokenReq.Header.Set("X-aws-ec2-metadata-token-ttl-seconds", "21600")
-	tokenResp, err := s.provider.imdsClient.Do(tokenReq)
+	tokenResp, err := s.runtime.imdsClient.Do(tokenReq)
 	if err != nil {
 		return nil, fmt.Errorf("IMDS token request failed: %w", err)
 	}
@@ -179,7 +181,7 @@ func (s *publishedStore) imdsCredentials(ctx context.Context) (*credentials, err
 		return nil, fmt.Errorf("creating IMDS role request: %w", err)
 	}
 	roleReq.Header.Set("X-aws-ec2-metadata-token", imdsToken)
-	roleResp, err := s.provider.imdsClient.Do(roleReq)
+	roleResp, err := s.runtime.imdsClient.Do(roleReq)
 	if err != nil {
 		return nil, fmt.Errorf("IMDS role request failed: %w", err)
 	}
@@ -201,7 +203,7 @@ func (s *publishedStore) imdsCredentials(ctx context.Context) (*credentials, err
 		return nil, fmt.Errorf("creating IMDS credentials request: %w", err)
 	}
 	credReq.Header.Set("X-aws-ec2-metadata-token", imdsToken)
-	credResp, err := s.provider.imdsClient.Do(credReq)
+	credResp, err := s.runtime.imdsClient.Do(credReq)
 	if err != nil {
 		return nil, fmt.Errorf("IMDS credentials request failed: %w", err)
 	}
@@ -228,17 +230,18 @@ func (s *publishedStore) imdsCredentials(ctx context.Context) (*credentials, err
 }
 
 func (s *publishedStore) secretValue(ctx context.Context, creds *credentials, region, secretName, original string) (string, error) {
-	endpoint := s.provider.endpoint
 	host := secretsManagerHost(region)
-	if endpoint == "" {
-		endpoint = "https://" + host + "/"
-	}
+	endpoint := (&url.URL{
+		Scheme: "https",
+		Host:   host,
+		Path:   "/",
+	}).String()
 	secretIDJSON, err := json.Marshal(secretName)
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': encoding secret name: %w", original, err)
 	}
 	payload := `{"SecretId":` + string(secretIDJSON) + `}`
-	now := s.provider.now().UTC()
+	now := time.Now().UTC()
 	timestamp := now.Format("20060102T150405Z")
 	datestamp := now.Format("20060102")
 	headers := map[string]string{
@@ -260,7 +263,7 @@ func (s *publishedStore) secretValue(ctx context.Context, creds *credentials, re
 	}
 	httpReq.Host = host
 	httpReq.Header.Set("Authorization", authHeader)
-	resp, err := s.provider.apiClient.Do(httpReq)
+	resp, err := s.runtime.apiClient.Do(httpReq)
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': request failed: %w", original, err)
 	}

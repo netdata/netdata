@@ -1,5 +1,4 @@
 //go:build cgo
-// +build cgo
 
 package mp
 
@@ -238,10 +237,7 @@ func (c *Collector) exportCoreMetrics(agg map[string]int64) {
 
 	used := agg["heap_used"]
 	committed := agg["heap_committed"]
-	free := committed - used
-	if free < 0 {
-		free = 0
-	}
+	free := max(committed-used, 0)
 	contexts.JVM.HeapUsage.Set(c.State, labels, contexts.JVMHeapUsageValues{
 		Used: used,
 		Free: free,
@@ -259,10 +255,7 @@ func (c *Collector) exportCoreMetrics(agg map[string]int64) {
 
 	totalThreads := agg["thread_total"]
 	daemon := agg["thread_daemon"]
-	other := totalThreads - daemon
-	if other < 0 {
-		other = 0
-	}
+	other := max(totalThreads-daemon, 0)
 	contexts.JVM.ThreadsCurrent.Set(c.State, labels, contexts.JVMThreadsCurrentValues{
 		Daemon: daemon,
 		Other:  other,
@@ -277,10 +270,7 @@ func (c *Collector) exportCoreMetrics(agg map[string]int64) {
 
 	active := agg["threadpool_active"]
 	size := agg["threadpool_size"]
-	idle := size - active
-	if idle < 0 {
-		idle = 0
-	}
+	idle := max(size-active, 0)
 	contexts.Vendor.ThreadPoolUsage.Set(c.State, labels, contexts.VendorThreadPoolUsageValues{
 		Active: active,
 		Idle:   idle,

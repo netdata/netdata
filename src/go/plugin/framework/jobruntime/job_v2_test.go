@@ -675,7 +675,7 @@ END`, chartengine.Priority, chartengine.Priority))
 					close(done)
 				}()
 
-				for i := 0; i < 3; i++ {
+				for i := range 3 {
 					job.Tick(i + 1)
 					time.Sleep(10 * time.Millisecond)
 				}

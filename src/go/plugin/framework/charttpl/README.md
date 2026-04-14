@@ -504,7 +504,7 @@ charts:
 | `algorithm`       | string        | no       | inferred from metrics  | `absolute` or `incremental`. If omitted, inferred from metric suffixes.      |
 | `type`            | string        | no       | `line`                 | `line`, `area`, `stacked`, or `heatmap`.                                     |
 | `priority`        | int           | no       | `70000`                | Chart ordering priority in the dashboard (`0` = use engine default `70000`). |
-| `label_promotion` | array[string] | no       | from `chart_defaults`  | Labels to promote as chart labels (for filtering/grouping in UI).            |
+| `label_promotion` | array[string] | no       | from `chart_defaults`  | Labels to promote as chart labels (for filtering/grouping in UI). Entries must be non-empty label keys. |
 | `instances`       | object        | no       | from `chart_defaults`  | Instance identity policy (see [instances](#instances)).                      |
 | `lifecycle`       | object        | no       |                        | Instance/dimension cap and expiry (see [lifecycle](#lifecycle)).             |
 | `dimensions`      | array         | **yes**  |                        | At least one dimension required (see [dimensions](#6-dimensions)).           |
@@ -578,6 +578,9 @@ instances:
 | `label_key`  | Include this label in instance identity.                      |
 | `*`          | Include all labels.                                           |
 | `!label_key` | Exclude this label (use with `*` to include all _except_...). |
+
+Excludes are order-independent and always win. For example, both `["host", "!host"]` and `["!host", "host"]` exclude `host`.
+When `instances` is set, `by_labels` must include at least one positive selector: `*` or `label_key`. Exclude tokens use strict `!label_key` syntax; `! host` is invalid.
 
 **Example: One chart per host**
 
@@ -1015,8 +1018,10 @@ All rules below produce semantic validation errors unless noted:
 | `name` and `name_from_label` must not be whitespace-only                                | semantic                        |
 | Duplicate dimension `name` values within the same chart are rejected                    | semantic                        |
 | `instances.by_labels` must contain at least one token when `instances` is set           | semantic                        |
-| `instances.by_labels` exclude token must include label key (e.g., `!key`, not bare `!`) | semantic                        |
+| `instances.by_labels` exclude token must use `!label_key` syntax                         | semantic                        |
+| `instances.by_labels` must include at least one positive selector (`*` or `label_key`)   | semantic                        |
 | `instances.by_labels` tokens must not be duplicated                                     | semantic                        |
+| `label_promotion[]` entries must not be empty or whitespace-only                        | semantic                        |
 | Lifecycle numeric fields must be `>= 0`                                                 | semantic                        |
 | `engine.autogen.max_type_id_len` must be `0` or `>= 4`                                  | semantic                        |
 | Unknown YAML fields                                                                     | decode error (strict unmarshal) |

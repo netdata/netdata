@@ -204,6 +204,9 @@ sidebar:
                   edit_url: https://github.com/netdata/netdata/edit/master/src/web/server/README.md
                   description: The Netdata Agent's local static-threaded web server serves dashboards and real-time visualizations with security and DDoS protection.
               - meta:
+                  label: Bearer Token Protection
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md
+              - meta:
                   label: Running the Agent behind a reverse proxy
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/README.md
                 items:

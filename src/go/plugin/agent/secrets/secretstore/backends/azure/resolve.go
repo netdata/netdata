@@ -42,7 +42,7 @@ func (s *publishedStore) resolve(ctx context.Context, req secretstore.ResolveReq
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := s.provider.apiClient.Do(httpReq)
+	resp, err := s.runtime.apiClient.Do(httpReq)
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': store '%s': request failed: %w", req.Original, req.StoreKey, err)
 	}

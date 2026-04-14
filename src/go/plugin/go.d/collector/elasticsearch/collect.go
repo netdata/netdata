@@ -135,20 +135,16 @@ func (c *Collector) scrapeElasticsearch() *esMetrics {
 	wg := &sync.WaitGroup{}
 
 	if c.DoNodeStats {
-		wg.Add(1)
-		go func() { defer wg.Done(); c.scrapeNodesStats(ms) }()
+		wg.Go(func() { c.scrapeNodesStats(ms) })
 	}
 	if c.DoClusterHealth {
-		wg.Add(1)
-		go func() { defer wg.Done(); c.scrapeClusterHealth(ms) }()
+		wg.Go(func() { c.scrapeClusterHealth(ms) })
 	}
 	if c.DoClusterStats {
-		wg.Add(1)
-		go func() { defer wg.Done(); c.scrapeClusterStats(ms) }()
+		wg.Go(func() { c.scrapeClusterStats(ms) })
 	}
 	if !c.ClusterMode && c.DoIndicesStats {
-		wg.Add(1)
-		go func() { defer wg.Done(); c.scrapeLocalIndicesStats(ms) }()
+		wg.Go(func() { c.scrapeLocalIndicesStats(ms) })
 	}
 	wg.Wait()
 

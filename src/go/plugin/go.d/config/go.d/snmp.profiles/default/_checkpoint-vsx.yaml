@@ -1,0 +1,166 @@
+# Check Point VSX (Virtual Systems) monitoring (CHECKPOINT-MIB)
+# Per-virtual-system status, CPU usage, and traffic/connection counters.
+# Tables are empty on non-VSX gateways — no harm in polling.
+
+metrics:
+  # VSX capacity scalars
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.16.11.0
+      name: vsxVsSupported
+      chart_meta:
+        description: "Maximum number of virtual systems supported"
+        family: 'Security/VSX/Capacity/Supported'
+        unit: "{vs}"
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.16.12.0
+      name: vsxVsConfigured
+      chart_meta:
+        description: "Number of virtual systems configured"
+        family: 'Security/VSX/Capacity/Configured'
+        unit: "{vs}"
+  - MIB: CHECKPOINT-MIB
+    metric_type: gauge
+    symbol:
+      OID: 1.3.6.1.4.1.2620.1.16.13.0
+      name: vsxVsInstalled
+      chart_meta:
+        description: "Number of virtual systems installed"
+        family: 'Security/VSX/Capacity/Installed'
+        unit: "{vs}"
+
+  # Per-VS status table — per-virtual-system resource weight and metadata
+  - MIB: CHECKPOINT-MIB
+    table:
+      OID: 1.3.6.1.4.1.2620.1.16.22.1
+      name: vsxStatusTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.16.22.1.1.10
+        name: vsxStatusVSWeight
+        metric_type: gauge
+        chart_meta:
+          description: "Virtual system resource control weight"
+          family: 'Security/VSX/VS/ResourceWeight'
+          unit: "{weight}"
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.16.22.1.1.1
+          name: vsxStatusVSId
+        tag: vs_id
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.16.22.1.1.3
+          name: vsxStatusVsName
+        tag: vs_name
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.16.22.1.1.4
+          name: vsxStatusVsType
+        tag: _vs_type
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.16.22.1.1.5
+          name: vsxStatusMainIP
+        tag: _vs_main_ip
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.16.22.1.1.7
+          name: vsxStatusVsPolicyType
+        tag: _vs_policy_type
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.16.22.1.1.9
+          name: vsxStatusHAState
+        tag: _vs_ha_state
+
+  # Per-VS CPU usage (1-minute average, most operationally useful window)
+  - MIB: CHECKPOINT-MIB
+    table:
+      OID: 1.3.6.1.4.1.2620.1.16.22.2
+      name: vsxStatusCPUUsageTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.16.22.2.1.3
+        name: vsxStatusCPUUsage1min
+        metric_type: gauge
+        chart_meta:
+          description: "Virtual system CPU usage (1 minute average)"
+          family: 'Security/VSX/VS/CPU/Usage'
+          unit: "%"
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.16.22.2.1.6
+          name: vsxStatusCPUUsageVSId
+        tag: vs_id
+
+  # Per-VS connection counters
+  - MIB: CHECKPOINT-MIB
+    table:
+      OID: 1.3.6.1.4.1.2620.1.16.23
+      name: vsxCountersTable
+    symbols:
+      - OID: 1.3.6.1.4.1.2620.1.16.23.1.1.2
+        name: vsxCountersConnNum
+        metric_type: gauge
+        chart_meta:
+          description: "Virtual system active connections"
+          family: 'Security/VSX/VS/Connection/Active'
+          unit: "{connection}"
+      - OID: 1.3.6.1.4.1.2620.1.16.23.1.1.3
+        name: vsxCountersConnPeakNum
+        metric_type: gauge
+        chart_meta:
+          description: "Virtual system peak connections"
+          family: 'Security/VSX/VS/Connection/Peak'
+          unit: "{connection}"
+      - OID: 1.3.6.1.4.1.2620.1.16.23.1.1.4
+        name: vsxCountersConnTableLimit
+        metric_type: gauge
+        chart_meta:
+          description: "Virtual system connection table limit"
+          family: 'Security/VSX/VS/Connection/Limit'
+          unit: "{connection}"
+      - OID: 1.3.6.1.4.1.2620.1.16.23.1.1.7
+        name: vsxCountersAcceptedTotal
+        chart_meta:
+          description: "Virtual system accepted packets per second"
+          family: 'Security/VSX/VS/Packet/Accepted'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.2620.1.16.23.1.1.6
+        name: vsxCountersDroppedTotal
+        chart_meta:
+          description: "Virtual system dropped packets per second"
+          family: 'Security/VSX/VS/Packet/Dropped'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.2620.1.16.23.1.1.8
+        name: vsxCountersRejectedTotal
+        chart_meta:
+          description: "Virtual system rejected packets per second"
+          family: 'Security/VSX/VS/Packet/Rejected'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.2620.1.16.23.1.1.12
+        name: vsxCountersLoggedTotal
+        chart_meta:
+          description: "Virtual system logged packets per second"
+          family: 'Security/VSX/VS/Packet/Logged'
+          unit: "{packet}/s"
+      - OID: 1.3.6.1.4.1.2620.1.16.23.1.1.9
+        name: vsxCountersBytesAcceptedTotal
+        chart_meta:
+          description: "Virtual system accepted bytes per second"
+          family: 'Security/VSX/VS/Traffic/Accepted'
+          unit: "By/s"
+      - OID: 1.3.6.1.4.1.2620.1.16.23.1.1.10
+        name: vsxCountersBytesDroppedTotal
+        chart_meta:
+          description: "Virtual system dropped bytes per second"
+          family: 'Security/VSX/VS/Traffic/Dropped'
+          unit: "By/s"
+      - OID: 1.3.6.1.4.1.2620.1.16.23.1.1.11
+        name: vsxCountersBytesRejectedTotal
+        chart_meta:
+          description: "Virtual system rejected bytes per second"
+          family: 'Security/VSX/VS/Traffic/Rejected'
+          unit: "By/s"
+    metric_tags:
+      - symbol:
+          OID: 1.3.6.1.4.1.2620.1.16.23.1.1.1
+          name: vsxCountersVSId
+        tag: vs_id

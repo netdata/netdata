@@ -5,6 +5,7 @@ package ddsnmpcollector
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -89,10 +90,11 @@ type (
 
 		// === Computed during processing (set by various methods) ===
 
-		// columnOIDs maps column OIDs to their symbol configurations
-		// Built from config.Symbols, used to identify which columns contain metrics
-		// Key: column OID (e.g., "1.3.6.1.2.1.2.2.1.10"), Value: symbol config
-		columnOIDs map[string]ddprofiledefinition.SymbolConfig
+		// columnOIDs maps column OIDs to all symbol configurations that read from them.
+		// A single column can back multiple metrics when profiles use different
+		// extract_value rules on the same raw OID, such as separate code/subcode fields.
+		// Key: column OID (e.g., "1.3.6.1.2.1.2.2.1.10"), Value: symbol configs
+		columnOIDs map[string][]ddprofiledefinition.SymbolConfig
 
 		// staticTags contains tags that apply to all metrics from this table
 		// Parsed from config.StaticTags (e.g., "source:network")
@@ -147,8 +149,8 @@ type cacheProcessingContext struct {
 
 	// columnOIDs identifies which columns contain metrics (not tags)
 	// Built from config.Symbols, used to filter which OIDs to GET
-	// Key: column OID, Value: symbol configuration
-	columnOIDs map[string]ddprofiledefinition.SymbolConfig
+	// Key: column OID, Value: symbol configurations
+	columnOIDs map[string][]ddprofiledefinition.SymbolConfig
 
 	// pdus contains current metric values fetched via SNMP GET
 	// Only contains metric columns (not tag columns, which are cached)
@@ -413,8 +415,8 @@ func (tc *tableCollector) organizePDUsByRow(ctx *tableProcessingContext) (rows m
 
 	for oid, pdu := range ctx.pdus {
 		for _, columnOID := range allColumnOIDs {
-			if strings.HasPrefix(oid, columnOID+".") {
-				index := strings.TrimPrefix(oid, columnOID+".")
+			if after, ok := strings.CutPrefix(oid, columnOID+"."); ok {
+				index := after
 
 				if rows[index] == nil {
 					rows[index] = make(map[string]gosnmp.SnmpPDU)
@@ -437,8 +439,9 @@ func (tc *tableCollector) processRows(ctx *tableProcessingContext, stats *ddsnmp
 	var errs []error
 
 	crossTableCtx := &crossTableContext{
-		walkedData:     ctx.walkedData,
-		tableNameToOID: ctx.tableNameToOID,
+		walkedData:       ctx.walkedData,
+		tableNameToOID:   ctx.tableNameToOID,
+		lookupIndexCache: make(map[crossTableLookupKey]string),
 	}
 
 	for index, rowPDUs := range ctx.rows {
@@ -465,9 +468,7 @@ func (tc *tableCollector) processRows(ctx *tableProcessingContext, stats *ddsnmp
 		}
 
 		// Copy processed tags to cache
-		for k, v := range row.tags {
-			ctx.tagCache[index][k] = v
-		}
+		maps.Copy(ctx.tagCache[index], row.tags)
 
 		metrics = append(metrics, rowMetrics...)
 	}
@@ -521,14 +522,12 @@ func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext, sta
 		// Get cached tags for this row
 		rowTags := make(map[string]string)
 		if tags, ok := ctx.cachedTags[index]; ok {
-			for k, v := range tags {
-				rowTags[k] = v
-			}
+			maps.Copy(rowTags, tags)
 		}
 
 		// Process each metric column
 		for columnOID, fullOID := range columns {
-			sym, isMetric := ctx.columnOIDs[columnOID]
+			syms, isMetric := ctx.columnOIDs[columnOID]
 			if !isMetric {
 				continue
 			}
@@ -539,21 +538,26 @@ func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext, sta
 				continue
 			}
 
-			value, err := tc.valProc.processValue(sym, pdu)
-			if err != nil {
-				stats.Errors.Processing.Table++
-				tc.log.Debugf("Error processing value for %s: %v", sym.Name, err)
-				continue
-			}
+			for _, sym := range syms {
+				value, err := tc.valProc.processValue(sym, pdu)
+				if err != nil {
+					if errors.Is(err, errNoTextDateValue) {
+						continue
+					}
+					stats.Errors.Processing.Table++
+					tc.log.Debugf("Error processing value for %s: %v", sym.Name, err)
+					continue
+				}
 
-			metric, err := buildTableMetric(sym, pdu, value, rowTags, staticTags, ctx.tableName)
-			if err != nil {
-				stats.Errors.Processing.Table++
-				errs = append(errs, err)
-				continue
-			}
+				metric, err := buildTableMetric(sym, pdu, value, rowTags, staticTags, ctx.tableName)
+				if err != nil {
+					stats.Errors.Processing.Table++
+					errs = append(errs, err)
+					continue
+				}
 
-			metrics = append(metrics, *metric)
+				metrics = append(metrics, *metric)
+			}
 		}
 	}
 
@@ -636,10 +640,11 @@ func parseStaticTags(staticTags []ddprofiledefinition.StaticMetricTagConfig) map
 	return tags
 }
 
-func buildColumnOIDs(cfg ddprofiledefinition.MetricsConfig) map[string]ddprofiledefinition.SymbolConfig {
-	columnOIDs := make(map[string]ddprofiledefinition.SymbolConfig)
+func buildColumnOIDs(cfg ddprofiledefinition.MetricsConfig) map[string][]ddprofiledefinition.SymbolConfig {
+	columnOIDs := make(map[string][]ddprofiledefinition.SymbolConfig)
 	for _, sym := range cfg.Symbols {
-		columnOIDs[trimOID(sym.OID)] = sym
+		columnOID := trimOID(sym.OID)
+		columnOIDs[columnOID] = append(columnOIDs[columnOID], sym)
 	}
 	return columnOIDs
 }
@@ -672,7 +677,7 @@ func buildOrderedTags(cfg ddprofiledefinition.MetricsConfig) []orderedTagConfig 
 	for _, tagCfg := range cfg.MetricTags {
 		var tt tagType
 		switch {
-		case tagCfg.Index != 0:
+		case isIndexTagConfig(tagCfg):
 			tt = tagTypeIndex
 		case tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name:
 			tt = tagTypeCrossTable
@@ -687,4 +692,24 @@ func buildOrderedTags(cfg ddprofiledefinition.MetricsConfig) []orderedTagConfig 
 	}
 
 	return ordered
+}
+
+func isIndexTagConfig(tagCfg ddprofiledefinition.MetricTagConfig) bool {
+	if tagCfg.Index != 0 {
+		return true
+	}
+
+	if tagCfg.Table != "" {
+		return false
+	}
+
+	if tagCfg.Symbol.OID != "" {
+		return false
+	}
+
+	return len(tagCfg.IndexTransform) > 0 ||
+		tagCfg.Symbol.Format != "" ||
+		tagCfg.Symbol.ExtractValue != "" ||
+		tagCfg.Symbol.MatchPattern != "" ||
+		tagCfg.Mapping.HasItems()
 }

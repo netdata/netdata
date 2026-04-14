@@ -51,9 +51,9 @@ func (s *publishedStore) resolve(ctx context.Context, req secretstore.ResolveReq
 		httpReq.Header.Set("X-Vault-Namespace", ns)
 	}
 
-	client := s.provider.httpClient
+	client := s.runtime.httpClient
 	if s.skipVerify() {
-		client = s.provider.httpClientInsecure
+		client = s.runtime.httpClientInsecure
 	}
 
 	resp, err := client.Do(httpReq)

@@ -81,7 +81,7 @@ func TestParseResponse(t *testing.T) {
 
 func TestPublishedStoreResolve_LogsDetailedResolution(t *testing.T) {
 	s := &publishedStore{
-		provider: &provider{
+		runtime: &runtime{
 			httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
 					StatusCode: http.StatusOK,

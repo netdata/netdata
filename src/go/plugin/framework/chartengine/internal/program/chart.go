@@ -2,7 +2,10 @@
 
 package program
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // Algorithm defines how Netdata interprets values on wire.
 type Algorithm string
@@ -80,30 +83,42 @@ type ChartIdentity struct {
 }
 
 func validateChart(chart Chart) error {
+	var errs []error
 	if chart.TemplateID == "" {
-		return fmt.Errorf("template_id is required")
+		errs = append(errs, fmt.Errorf("template_id is required"))
 	}
 	if chart.Meta.Context == "" {
-		return fmt.Errorf("context is required")
+		errs = append(errs, fmt.Errorf("context is required"))
 	}
 	if chart.Meta.Units == "" {
-		return fmt.Errorf("units is required")
+		errs = append(errs, fmt.Errorf("units is required"))
 	}
 	if chart.Meta.Algorithm != AlgorithmAbsolute && chart.Meta.Algorithm != AlgorithmIncremental {
-		return fmt.Errorf("invalid algorithm %q", chart.Meta.Algorithm)
+		errs = append(errs, fmt.Errorf("invalid algorithm %q", chart.Meta.Algorithm))
+	}
+	switch chart.Meta.Type {
+	case ChartTypeLine, ChartTypeArea, ChartTypeStacked, ChartTypeHeatmap:
+	default:
+		errs = append(errs, fmt.Errorf("invalid chart type %q", chart.Meta.Type))
+	}
+	if err := validateInstanceLabelSelectors(chart.Identity.InstanceByLabels); err != nil {
+		errs = append(errs, fmt.Errorf("identity: %w", err))
+	}
+	if err := validateLabelPolicy(chart.Labels); err != nil {
+		errs = append(errs, fmt.Errorf("labels: %w", err))
 	}
 	if chart.CollisionReduce == "" {
-		return fmt.Errorf("collision reduce op is required")
+		errs = append(errs, fmt.Errorf("collision reduce op is required"))
 	}
 	if len(chart.Dimensions) == 0 {
-		return fmt.Errorf("at least one dimension is required")
+		errs = append(errs, fmt.Errorf("at least one dimension is required"))
 	}
 	for i, dim := range chart.Dimensions {
 		if err := validateDimension(dim); err != nil {
-			return fmt.Errorf("dimension[%d]: %w", i, err)
+			errs = append(errs, fmt.Errorf("dimension[%d]: %w", i, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func (c Chart) clone() Chart {

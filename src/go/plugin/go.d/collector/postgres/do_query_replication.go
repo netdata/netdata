@@ -39,10 +39,7 @@ func (c *Collector) doQueryReplStandbyAppWALDelta() error {
 			// TODO: delta calculation was changed in https://github.com/netdata/netdata/go/plugins/plugin/go.d/pull/1039
 			// - 'replay_delta' (probably other deltas too?) can be negative
 			// - Also, WAL delta != WAL lag after that PR
-			v := parseInt(value)
-			if v < 0 {
-				v = 0
-			}
+			v := max(parseInt(value), 0)
 			switch column {
 			case "sent_delta":
 				c.getReplAppMetrics(app).walSentDelta += v

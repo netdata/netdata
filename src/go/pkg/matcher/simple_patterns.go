@@ -20,7 +20,7 @@ type (
 func NewSimplePatternsMatcher(expr string) (Matcher, error) {
 	ps := simplePatternsMatcher{}
 
-	for _, pattern := range strings.Fields(expr) {
+	for pattern := range strings.FieldsSeq(expr) {
 		if err := ps.add(pattern); err != nil {
 			return nil, err
 		}

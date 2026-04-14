@@ -50,7 +50,6 @@ type Config struct {
 }
 
 const (
-	waitDecisionTimeout    = 5 * time.Second
 	cmdTestWorkerCap       = 4
 	cmdTestDefaultTimeout  = 60 * time.Second
 	cmdTestWorkerDrainWait = 5 * time.Second
@@ -112,7 +111,7 @@ func New(cfg Config) *Manager {
 		started:    make(chan struct{}),
 		addCh:      make(chan confgroup.Config),
 		rmCh:       make(chan confgroup.Config),
-		dyncfgCh:   make(chan dyncfg.Function),
+		dyncfgCh:   make(chan dyncfg.Function, 32),
 		cmdTestSem: make(chan struct{}, cmdTestWorkerCap),
 
 		dyncfgResponder: api,
@@ -136,7 +135,6 @@ func New(cfg Config) *Manager {
 		WaitKey: func(cfg confgroup.Config) string {
 			return cfg.FullName()
 		},
-		WaitTimeout: waitDecisionTimeout,
 
 		Path:                    fmt.Sprintf(dyncfgCollectorPath, cfg.PluginName),
 		EnableFailCode:          200,
@@ -265,17 +263,13 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 
 	var wg sync.WaitGroup
 
-	wg.Add(1)
-	go func() { defer wg.Done(); m.runFileStatusPersistence() }()
+	wg.Go(func() { m.runFileStatusPersistence() })
 
-	wg.Add(1)
-	go func() { defer wg.Done(); m.runProcessConfGroups(in) }()
+	wg.Go(func() { m.runProcessConfGroups(in) })
 
-	wg.Add(1)
-	go func() { defer wg.Done(); m.run() }()
+	wg.Go(func() { m.run() })
 
-	wg.Add(1)
-	go func() { defer wg.Done(); m.runNotifyRunningJobs() }()
+	wg.Go(func() { m.runNotifyRunningJobs() })
 
 	close(m.started)
 
@@ -337,14 +331,6 @@ func (m *Manager) run() {
 			if step.HasCommand {
 				m.dyncfgSeqExec(step.Command)
 				continue
-			}
-			if step.TimedOut {
-				m.Errorf(
-					"dyncfg: timed out waiting for enable/disable decision for '%s' (elapsed=%s threshold=%s); keeping status 'accepted' and continuing",
-					step.Timeout.Key,
-					step.Timeout.Elapsed,
-					step.Timeout.Threshold,
-				)
 			}
 		} else {
 			select {
