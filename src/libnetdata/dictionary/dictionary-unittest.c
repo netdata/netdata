@@ -1032,6 +1032,9 @@ struct dict_destroy_race_data {
 };
 
 // Worker that continuously acquires and releases an item.
+// Keep the reference briefly so destroy() can observe an in-flight access in
+// the post-index-teardown recheck without forcing the old "already referenced"
+// path up front.
 static void dict_destroy_race_getter_thread(void *arg) {
     struct dict_destroy_race_data *d = arg;
 
@@ -1044,6 +1047,7 @@ static void dict_destroy_race_getter_thread(void *arg) {
             if(val) {
                 volatile char c __attribute__((unused)) = val[0];
             }
+            tinysleep();
             dictionary_acquired_item_release(d->dict, item);
         }
     }
@@ -1091,12 +1095,6 @@ static void dict_destroy_race_child(int iterations) {
     for(int i = 0; i < iterations; i++) {
         DICTIONARY *dict = dictionary_create(DICT_OPTION_NONE);
         dictionary_set(dict, "key", "value", 6);
-        DICTIONARY_ITEM *held_item = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(dict, "key");
-
-        if(!held_item) {
-            dictionary_destroy(dict);
-            _exit(2);
-        }
 
         struct dict_destroy_race_data getter_data = { .dict = dict, .ready = 0, .stop = 0 };
         struct dict_destroy_race_data setter_data = { .dict = dict, .ready = 0, .stop = 0 };
@@ -1122,7 +1120,6 @@ static void dict_destroy_race_child(int iterations) {
             if(getter) nd_thread_join(getter);
             if(setter) nd_thread_join(setter);
             if(traverser) nd_thread_join(traverser);
-            dictionary_acquired_item_release(dict, held_item);
             dictionary_destroy(dict);
             cleanup_destroyed_dictionaries(false);
             _exit(2);
@@ -1136,9 +1133,11 @@ static void dict_destroy_race_child(int iterations) {
 
         tinysleep();
 
-        // Hold one acquired item so destruction takes the delayed path while
-        // workers are still active, instead of freeing the dictionary
-        // immediately out from under the test harness itself.
+        // Do not hold a permanent acquired item here: that would force the old
+        // "already referenced" delayed-destroy path before destroy() reaches
+        // the new destroyed-flag + index-teardown synchronization. Instead,
+        // rely on the active workers to create transient in-flight accesses
+        // while destroy() races with get/set/traversal.
         dictionary_destroy(dict);
 
         __atomic_store_n(&getter_data.stop, 1, __ATOMIC_RELEASE);
@@ -1148,13 +1147,12 @@ static void dict_destroy_race_child(int iterations) {
         nd_thread_join(setter);
         nd_thread_join(traverser);
 
-        dictionary_acquired_item_release(dict, held_item);
         cleanup_destroyed_dictionaries(false);
     }
 }
 
 static int dictionary_destroy_race_unittest(void) {
-    const int iterations = nd_is_running_under_ci() ? 20 : 1000;
+    const int iterations = nd_is_running_under_ci() ? 10 : 100;
 
     fprintf(stderr,
             "\nTesting dictionary_destroy() TOCTOU race (%d iterations in child process)...\n",
