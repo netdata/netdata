@@ -117,7 +117,7 @@
             "description": "The maximum number of OIDs allowed in a single GET request.",
             "type": "integer",
             "minimum": 1,
-            "default": 60
+            "default": 20
           }
         },
         "required": [

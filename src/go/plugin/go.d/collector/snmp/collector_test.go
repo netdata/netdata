@@ -495,7 +495,7 @@ func prepareV1Config() Config {
 			Retries:        1,
 			Timeout:        5,
 			Version:        gosnmp.Version1.String(),
-			MaxOIDs:        60,
+			MaxOIDs:        20,
 			MaxRepetitions: 25,
 		},
 	}
