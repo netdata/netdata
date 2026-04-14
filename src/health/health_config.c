@@ -523,7 +523,7 @@ static void lookup_data_source_from_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
                                                                                                     \
     if(value) {                                                                                     \
         typeof(ax->member) _old = ax->member;                                                       \
-        char _buf[strlen(value) + string_strlen(_old) + (_label ? strlen(_label) : 0) + 3];         \
+        char _buf[HEALTH_CONF_MAX_LINE];                                                            \
         snprintfz(_buf, sizeof(_buf), "%s%s%s%s%s",                                                 \
                       _label ? _label : "",                                                         \
                       _label ? "=" : "",                                                            \

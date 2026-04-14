@@ -633,7 +633,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
 
     RRD_ALERT_PROTOTYPE *ap = dictionary_acquired_item_value(item);
 
-    char alert_name_dyncfg[strlen(DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX) + strlen(alert_name) + 10];
+    char alert_name_dyncfg[HEALTH_CONF_MAX_LINE];
     snprintfz(alert_name_dyncfg, sizeof(alert_name_dyncfg), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", alert_name);
 
     int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
@@ -745,8 +745,8 @@ int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYN
                      BUFFER *payload, usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                      BUFFER *result, HTTP_ACCESS access __maybe_unused, const char *source, void *data __maybe_unused) {
 
-    char buf[strlen(id) + 1];
-    memcpy(buf, id, sizeof(buf));
+    char buf[HEALTH_CONF_MAX_LINE];
+    strncpyz(buf, id, sizeof(buf) - 1);
 
     char *words[100] = { NULL };
     size_t num_words = quoted_strings_splitter_dyncfg_id(buf, words, 100);

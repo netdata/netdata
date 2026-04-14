@@ -380,7 +380,7 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
 
     // find the components of the variable
     {
-        char id[string_strlen(vbd.dim) + 1];
+        char id[RRD_ID_LENGTH_MAX + 1];
         memcpy(id, string2str(vbd.dim), string_strlen(vbd.dim));
         id[string_strlen(vbd.dim)] = '\0';
 
