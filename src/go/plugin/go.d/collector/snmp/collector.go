@@ -47,7 +47,7 @@ func New() *Collector {
 				Retries:        1,
 				Timeout:        5,
 				Version:        gosnmp.Version2c.String(),
-				MaxOIDs:        60,
+				MaxOIDs:        20,
 				MaxRepetitions: 25,
 			},
 			User: UserConfig{
