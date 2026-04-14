@@ -222,7 +222,7 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
             // that the collector is actively dereferencing.
             // Legitimate teardown clears collector_tid via
             // rrdhost_pluginsd_receive_chart_slots_free() after the receiver
-            // is fully stopped - cleanup will succeed on the next pass.
+            // is fully stopped, before invoking cleanup.
             nd_log_limit_static_global_var(erl, 1, 0);
             nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
                          "PLUGINSD: attempted cleanup while collector (tid %d) is still active on chart, skipping",
