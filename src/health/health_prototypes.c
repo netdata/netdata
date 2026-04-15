@@ -298,9 +298,10 @@ static inline struct pattern_array *health_config_add_key_to_values(struct patte
     size_t value_len = strlen(value);
     size_t input_key_len = input_key ? strlen(input_key) : 0;
     size_t key_len = value_len > input_key_len ? value_len : input_key_len;
+    size_t pair_len = key_len + value_len + 4;
     char *key = mallocz(key_len + 1);
     char *data = mallocz(value_len + 1);
-    char *pair = mallocz((value_len * 2) + 4);
+    char *pair = mallocz(pair_len);
 
     char *s = value;
     size_t i = 0;
@@ -319,9 +320,9 @@ static inline struct pattern_array *health_config_add_key_to_values(struct patte
         } else if (*s == ' ') {
             data[i]='\0';
             if (data[0]=='!')
-                snprintfz(pair, (value_len * 2) + 4, "!%s=%s ", key, data + 1);
+                snprintfz(pair, pair_len, "!%s=%s ", key, data + 1);
             else
-                snprintfz(pair, (value_len * 2) + 4, "%s=%s ", key, data);
+                snprintfz(pair, pair_len, "%s=%s ", key, data);
 
             pa = pattern_array_add_key_simple_pattern(pa, key, simple_pattern_create(pair, NULL, SIMPLE_PATTERN_EXACT, true));
             i=0;
@@ -333,9 +334,9 @@ static inline struct pattern_array *health_config_add_key_to_values(struct patte
     data[i]='\0';
     if (data[0]) {
         if (data[0]=='!')
-            snprintfz(pair, (value_len * 2) + 4, "!%s=%s ", key, data + 1);
+            snprintfz(pair, pair_len, "!%s=%s ", key, data + 1);
         else
-            snprintfz(pair, (value_len * 2) + 4, "%s=%s ", key, data);
+            snprintfz(pair, pair_len, "%s=%s ", key, data);
 
         pa = pattern_array_add_key_simple_pattern(pa, key, simple_pattern_create(pair, NULL, SIMPLE_PATTERN_EXACT, true));
     }
