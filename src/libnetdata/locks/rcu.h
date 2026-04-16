@@ -83,8 +83,12 @@ void rcu_read_unlock_with_trace(const char *func);
 #define rcu_read_lock() rcu_read_lock_with_trace(__FUNCTION__)
 #define rcu_read_unlock() rcu_read_unlock_with_trace(__FUNCTION__)
 
-// Writer-side: wait until all threads that were in a read-side critical
+// Writer-side: wait until all other threads that were in a read-side critical
 // section at the time of this call have left it.
+//
+// This must not be called while the calling thread is itself inside an RCU
+// read-side critical section. Callers should check rcu_thread_in_read_cs()
+// first and defer freeing if they are still traversing protected data.
 //
 // Returns true if the grace period completed successfully — the caller
 // can safely free old data. Returns false if the wait timed out — the

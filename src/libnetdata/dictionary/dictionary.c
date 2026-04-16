@@ -315,9 +315,11 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
         counted_items++;
     }
 
-    DICTIONARY_RCU_RETIRED_VALUE *retired_values = NULL;
-    item_size += dict_rcu_pending_free_free_list(dict, dict_rcu_pending_free_detach(dict, &retired_values));
-    item_size += dict_rcu_pending_value_free_list(dict, retired_values);
+    if(!is_dictionary_single_threaded(dict)) {
+        DICTIONARY_RCU_RETIRED_VALUE *retired_values = NULL;
+        item_size += dict_rcu_pending_free_free_list(dict, dict_rcu_pending_free_detach(dict, &retired_values));
+        item_size += dict_rcu_pending_value_free_list(dict, retired_values);
+    }
 
     dict_size += dictionary_locks_destroy(dict);
     dict_size += reference_counter_free(dict);

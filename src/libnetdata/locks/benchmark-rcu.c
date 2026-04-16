@@ -254,8 +254,21 @@ static void bench_print_summary(const bench_summary_t *summary) {
     fprintf(stderr, "\n");
 }
 
+static void bench_stop_threads(bench_control_t *ctl, bench_thread_ctx_t *contexts, int created_threads) {
+    for(int i = 0; i < created_threads; i++) {
+        netdata_mutex_lock(&ctl->thread_controls[i].cond_mutex);
+        __atomic_store_n(&ctl->thread_controls[i].run_flag, STOP_SIGNAL, __ATOMIC_RELEASE);
+        netdata_cond_signal(&ctl->thread_controls[i].cond);
+        netdata_mutex_unlock(&ctl->thread_controls[i].cond_mutex);
+    }
+
+    for(int i = 0; i < created_threads; i++)
+        nd_thread_join(contexts[i].thread);
+}
+
 int rcu_stress_test(void) {
     bench_summary_t summary = {0};
+    int ret = 0;
 
     RW_SPINLOCK rw_spinlock = RW_SPINLOCK_INITIALIZER;
     SPINLOCK rcu_writer_spinlock = SPINLOCK_INITIALIZER;
@@ -284,6 +297,7 @@ int rcu_stress_test(void) {
 
     bench_thread_ctx_t contexts[NUM_LOCK_TYPES][MAX_THREADS];
     memset(contexts, 0, sizeof(contexts));
+    int created_threads[NUM_LOCK_TYPES] = {0};
 
     for(int lock = 0; lock < NUM_LOCK_TYPES; lock++) {
         for(int i = 0; i < MAX_THREADS; i++) {
@@ -309,9 +323,19 @@ int rcu_stress_test(void) {
             char name[32];
             snprintf(name, sizeof(name), "%s_%d",
                      lock == BENCH_RW_SPINLOCK ? "rwsp" : "rcu", i);
-            contexts[lock][i].thread =
+            ND_THREAD *thread =
                 nd_thread_create(name, NETDATA_THREAD_OPTION_DONT_LOG,
                                  rcu_benchmark_thread, &contexts[lock][i]);
+            if(unlikely(!thread)) {
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "RCU benchmark: failed to create %s thread %d",
+                       lock == BENCH_RW_SPINLOCK ? "rw_spinlock" : "rcu", i);
+                ret = 1;
+                goto cleanup;
+            }
+
+            contexts[lock][i].thread = thread;
+            created_threads[lock]++;
         }
     }
 
@@ -345,21 +369,18 @@ int rcu_stress_test(void) {
     // Stop all threads
     fprintf(stderr, "\nStopping threads...\n");
     for(int lock = 0; lock < NUM_LOCK_TYPES; lock++) {
-        for(int i = 0; i < MAX_THREADS; i++) {
-            netdata_mutex_lock(&ctl[lock].thread_controls[i].cond_mutex);
-            __atomic_store_n(&ctl[lock].thread_controls[i].run_flag, STOP_SIGNAL, __ATOMIC_RELEASE);
-            netdata_cond_signal(&ctl[lock].thread_controls[i].cond);
-            netdata_mutex_unlock(&ctl[lock].thread_controls[i].cond_mutex);
-        }
-    }
-
-    fprintf(stderr, "\nWaiting for threads to exit...\n");
-    for(int lock = 0; lock < NUM_LOCK_TYPES; lock++) {
-        for(int i = 0; i < MAX_THREADS; i++)
-            nd_thread_join(contexts[lock][i].thread);
+        bench_stop_threads(&ctl[lock], contexts[lock], created_threads[lock]);
+        created_threads[lock] = 0;
     }
 
     // Cleanup
+cleanup:
+    if(created_threads[0] || created_threads[1]) {
+        fprintf(stderr, "\nWaiting for threads to exit...\n");
+        for(int lock = 0; lock < NUM_LOCK_TYPES; lock++)
+            bench_stop_threads(&ctl[lock], contexts[lock], created_threads[lock]);
+    }
+
     for(int lock = 0; lock < NUM_LOCK_TYPES; lock++) {
         for(int i = 0; i < MAX_THREADS; i++) {
             netdata_cond_destroy(&ctl[lock].thread_controls[i].cond);
@@ -368,5 +389,5 @@ int rcu_stress_test(void) {
     }
 
     rcu_destroy();
-    return 0;
+    return ret;
 }
