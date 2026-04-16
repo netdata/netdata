@@ -216,8 +216,8 @@ static inline void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY
 
     if(likely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE)) {
         netdata_log_debug(D_DICTIONARY, "Dictionary: linking value to '%s'", item_get_name(item));
-        dict_item_value_set(item, value);
         item->shared->value_len = value_len;
+        dict_item_value_set(item, value);
     }
     else {
         netdata_log_debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", item_get_name(item));
@@ -230,8 +230,8 @@ static inline void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY
             if(value) memcpy(new_value, value, value_len);
             else memset(new_value, 0, value_len);
         }
-        dict_item_value_set(item, new_value);
         item->shared->value_len = value_len;
+        dict_item_value_set(item, new_value);
 
         netdata_log_debug(D_DICTIONARY, "Dictionary: retiring old value of '%s' after RCU grace period", item_get_name(item));
         dict_item_retire_replaced_value(dict, old_value, old_value_len);
