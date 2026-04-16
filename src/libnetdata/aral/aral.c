@@ -280,6 +280,7 @@ static ALWAYS_INLINE void aral_page_incoming_unlock(ARAL *ar, ARAL_PAGE *page, s
 struct aral_race_unittest_hook {
     ARAL *ar;
     ARAL_PAGE *page;
+    struct aral_unittest_entry *forced_entry;
     bool enabled;
     bool first_allocator_waiting;
     bool release_first_allocator;
@@ -1488,10 +1489,31 @@ static void aral_race_unittest_allocator_thread(void *ptr) {
     ctx->entry = unittest_aral_malloc(ctx->ar, false);
 }
 
-static void aral_race_unittest_force_page_full(ARAL *ar, ARAL_PAGE *page) {
+static struct aral_unittest_entry *aral_race_unittest_force_page_full(ARAL *ar, ARAL_PAGE *page) {
+    struct aral_unittest_entry *entry;
     aral_page_lock(ar, page);
-    aral_lock(ar);
 
+    internal_fatal(!page->page_lock.free_elements,
+                   "ARAL race unittest: target page unexpectedly has no free elements");
+
+    uint64_t slot = __atomic_fetch_add(&page->elements_segmented, 1, __ATOMIC_ACQUIRE);
+    internal_fatal(slot >= page->max_elements,
+                   "ARAL race unittest: failed to reserve the last free slot");
+
+    entry = (struct aral_unittest_entry *)(page->data + (slot * ar->config.element_size));
+    aral_set_page_pointer_after_element___do_NOT_have_aral_lock(ar, page, entry, false);
+    *entry = UNITTEST_ITEM;
+    aral_element_given(ar, page);
+
+    page->page_lock.used_elements++;
+    page->page_lock.free_elements--;
+
+    REFCOUNT rf = __atomic_add_fetch(&page->refcount, 1, __ATOMIC_RELAXED);
+    internal_fatal(rf < (REFCOUNT)page->max_elements || rf > (REFCOUNT)page->max_elements + 1,
+                   "ARAL race unittest: invalid forced refcount %d for max_elements %u",
+                   rf, page->max_elements);
+
+    aral_lock(ar);
     if(page->aral_lock.head_ptr == aral_pages_head_free(ar, false)) {
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(*page->aral_lock.head_ptr, page, aral_lock.prev, aral_lock.next);
 
@@ -1499,18 +1521,13 @@ static void aral_race_unittest_force_page_full(ARAL *ar, ARAL_PAGE *page) {
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(*head_ptr_full, page, aral_lock.prev, aral_lock.next);
         page->aral_lock.head_ptr = head_ptr_full;
     }
-
     aral_unlock(ar);
 
-    page->page_lock.used_elements = page->max_elements;
-    page->page_lock.free_elements = 0;
-
-    // Keep refcount consistent with a full page plus the paused allocator's transient acquire,
-    // so the fixed path can release and retry without corrupting page lifetime accounting.
-    __atomic_store_n(&page->refcount, (REFCOUNT)page->max_elements + 2, __ATOMIC_RELAXED);
+    aral_race_unittest_hook.forced_entry = entry;
     __atomic_store_n(&aral_race_unittest_hook.page_force_fully_used, true, __ATOMIC_RELEASE);
 
     aral_page_unlock(ar, page);
+    return entry;
 }
 
 static int aral_detect_acquire_to_page_lock_race(void) {
@@ -1577,6 +1594,9 @@ static int aral_detect_acquire_to_page_lock_race(void) {
         fprintf(stderr, "ARAL race unittest: allocator did not retry onto a new page.\n");
         errors++;
     }
+
+    if(aral_race_unittest_hook.forced_entry)
+        aral_freez(ar, aral_race_unittest_hook.forced_entry);
 
     if(allocator.entry)
         aral_freez(ar, allocator.entry);
