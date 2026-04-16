@@ -250,10 +250,11 @@ static bool rrdcontext_checkpoint_save_pending(RRDHOST *host, struct ctxs_checkp
     if(!aclk_host_config)
         return false;
 
+    spinlock_lock(&aclk_host_config->pending_ctx_spinlock);
+
     // Pause incremental context streaming until the deferred checkpoint is replayed.
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 
-    spinlock_lock(&aclk_host_config->pending_ctx_spinlock);
     __atomic_add_fetch(&aclk_host_config->pending_ctx_generation, 1, __ATOMIC_RELEASE);
     rrdcontext_checkpoint_clear_pending_unsafe(aclk_host_config);
     aclk_host_config->pending_ctx_claim_id = strdupz(cmd->claim_id);
@@ -269,6 +270,8 @@ static bool rrdcontext_checkpoint_save_pending(RRDHOST *host, struct ctxs_checkp
 static void rrdcontext_checkpoint_execute(RRDHOST *host, const char *claim_id, const char *node_id, uint64_t version_hash, uint64_t generation) {
     if(!rrdcontext_checkpoint_generation_is_current(host, claim_id, node_id, generation))
         return;
+
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
@@ -318,7 +321,23 @@ static void rrdcontext_checkpoint_execute(RRDHOST *host, const char *claim_id, c
            "RRDCONTEXT: host '%s' enabling streaming of contexts",
            rrdhost_hostname(host));
 
-    rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
+    if(aclk_host_config) {
+        spinlock_lock(&aclk_host_config->pending_ctx_spinlock);
+
+        bool can_enable =
+            __atomic_load_n(&aclk_host_config->pending_ctx_generation, __ATOMIC_ACQUIRE) == generation &&
+            !__atomic_load_n(&aclk_host_config->pending_ctx_checkpoint, __ATOMIC_ACQUIRE);
+
+        if(can_enable)
+            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
+
+        spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
+
+        if(!can_enable)
+            return;
+    }
+    else
+        rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 
     char node_str[UUID_STR_LEN];
     uuid_unparse_lower(host->node_id.uuid, node_str);
