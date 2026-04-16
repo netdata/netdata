@@ -415,12 +415,13 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
     for(dict = dictionaries_waiting_to_be_destroyed; dict ; dict = next) {
         next = dict->next;
 
+        DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(dict);
         if(dictionary_free_all_resources(dict, NULL, false)) {
-            DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(dict);
             if(last) last->next = next;
             else dictionaries_waiting_to_be_destroyed = next;
         }
         else {
+            DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
 #ifdef FSANITIZE_ADDRESS
             size_t ref_items = dictionary_referenced_items(dict);
 
