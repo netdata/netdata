@@ -285,8 +285,6 @@ struct aral_race_unittest_hook {
     bool release_first_allocator;
     bool first_allocator_claimed;
     bool page_force_fully_used;
-    bool trap_old_bug;
-    bool observed_old_bug;
 };
 
 static struct aral_race_unittest_hook aral_race_unittest_hook = { 0 };
@@ -706,8 +704,10 @@ static void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOC
 ALWAYS_INLINE WARNUNUSED
 static bool aral_page_acquire(ARAL_PAGE *page) {
     REFCOUNT rf = __atomic_add_fetch(&page->refcount, 1, __ATOMIC_ACQUIRE);
-    if(rf <= 0)
+    if(rf <= 0) {
+        __atomic_sub_fetch(&page->refcount, 1, __ATOMIC_RELAXED);
         return false;
+    }
 
     if(rf > (REFCOUNT)page->max_elements) {
         __atomic_sub_fetch(&page->refcount, 1, __ATOMIC_RELAXED);
@@ -829,23 +829,13 @@ retry_acquisition:
 
     aral_page_lock(ar, page);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(!page->page_lock.free_elements &&
-                __atomic_load_n(&aral_race_unittest_hook.enabled, __ATOMIC_RELAXED) &&
-                aral_race_unittest_hook.ar == ar &&
-                __atomic_load_n(&aral_race_unittest_hook.trap_old_bug, __ATOMIC_RELAXED))) {
-        __atomic_store_n(&aral_race_unittest_hook.observed_old_bug, true, __ATOMIC_RELEASE);
+    if(unlikely(!page->page_lock.free_elements)) {
         aral_page_unlock(ar, page);
         bool deleted = aral_page_release(page);
         (void)deleted;
         page = NULL;
         goto retry_acquisition;
     }
-#endif
-
-    internal_fatal(!page->page_lock.free_elements,
-                   "ARAL: '%s' selected page does not have a free slot in it",
-                   ar->config.name);
 
     internal_fatal(page->max_elements != page->page_lock.used_elements + page->page_lock.free_elements,
                    "ARAL: '%s' page element counters do not match, "
@@ -1546,7 +1536,6 @@ static int aral_detect_acquire_to_page_lock_race(void) {
     aral_race_unittest_hook = (struct aral_race_unittest_hook) {
         .ar = ar,
         .enabled = true,
-        .trap_old_bug = true,
     };
 
     ND_THREAD *thread = nd_thread_create("ARALRACE", NETDATA_THREAD_OPTION_DONT_LOG,
@@ -1581,11 +1570,6 @@ static int aral_detect_acquire_to_page_lock_race(void) {
 
     if(!__atomic_load_n(&aral_race_unittest_hook.page_force_fully_used, __ATOMIC_ACQUIRE)) {
         fprintf(stderr, "ARAL race unittest: failed to force the page into the fully-used state.\n");
-        errors++;
-    }
-
-    if(__atomic_load_n(&aral_race_unittest_hook.observed_old_bug, __ATOMIC_ACQUIRE)) {
-        fprintf(stderr, "ARAL race unittest: allocator returned a page with no free slot.\n");
         errors++;
     }
 
@@ -1769,12 +1753,11 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
         __atomic_add_fetch(&auc.errors, 1, __ATOMIC_RELAXED);
     }
 
-    netdata_log_info("ARAL: did %zu malloc, %zu free, "
-         "using %zu threads, in %"PRIu64" usecs",
-         __atomic_load_n(&auc.ar->atomic.user_malloc_operations, __ATOMIC_RELAXED),
-         __atomic_load_n(&auc.ar->atomic.user_free_operations, __ATOMIC_RELAXED),
-         threads,
-         ended_ut - started_ut);
+    fprintf(stderr, "ARAL: did %zu malloc, %zu free, using %zu threads, in %"PRIu64" usecs\n",
+            __atomic_load_n(&auc.ar->atomic.user_malloc_operations, __ATOMIC_RELAXED),
+            __atomic_load_n(&auc.ar->atomic.user_free_operations, __ATOMIC_RELAXED),
+            threads,
+            ended_ut - started_ut);
 
     aral_destroy(auc.ar);
 
