@@ -35,11 +35,6 @@ typedef struct {
     // Shared data that readers read and writers update
     uint64_t shared_value;
 
-    // Validation: detect reader/writer overlap violations
-    volatile int readers;
-    volatile int writers;
-    volatile uint64_t violations;
-
     // Per-thread stats
     struct {
         uint64_t operations;
@@ -76,31 +71,13 @@ typedef struct {
     ND_THREAD *thread;
 } bench_thread_ctx_t;
 
-static inline void bench_check_safety(bench_control_t *ctl, bench_thread_type_t type) {
-    if(type == BENCH_THREAD_READER) {
-        __atomic_add_fetch(&ctl->readers, 1, __ATOMIC_RELAXED);
-        if(__atomic_load_n(&ctl->writers, __ATOMIC_RELAXED) > 0)
-            __atomic_add_fetch(&ctl->violations, 1, __ATOMIC_RELAXED);
-    }
-    else {
-        int w = __atomic_add_fetch(&ctl->writers, 1, __ATOMIC_RELAXED);
-        if(w > 1)
-            __atomic_add_fetch(&ctl->violations, 1, __ATOMIC_RELAXED);
-        if(__atomic_load_n(&ctl->readers, __ATOMIC_RELAXED) > 0)
-            __atomic_add_fetch(&ctl->violations, 1, __ATOMIC_RELAXED);
-    }
-}
-
-static inline void bench_release_safety(bench_control_t *ctl, bench_thread_type_t type) {
-    if(type == BENCH_THREAD_READER)
-        __atomic_sub_fetch(&ctl->readers, 1, __ATOMIC_RELAXED);
-    else
-        __atomic_sub_fetch(&ctl->writers, 1, __ATOMIC_RELAXED);
+static inline uint64_t bench_run_flag_load(uint64_t *flag) {
+    return __atomic_load_n(flag, __ATOMIC_ACQUIRE);
 }
 
 static void bench_wait_for_start(netdata_cond_t *cond, netdata_mutex_t *mutex, uint64_t *flag) {
     netdata_mutex_lock(mutex);
-    while(*flag == 0)
+    while(bench_run_flag_load(flag) == 0)
         netdata_cond_wait(cond, mutex);
     netdata_mutex_unlock(mutex);
 }
@@ -118,7 +95,7 @@ static void rcu_benchmark_thread(void *arg) {
                              &ctl->thread_controls[ctx->thread_id].cond_mutex,
                              &ctl->thread_controls[ctx->thread_id].run_flag);
 
-        if(ctl->thread_controls[ctx->thread_id].run_flag == STOP_SIGNAL)
+        if(bench_run_flag_load(&ctl->thread_controls[ctx->thread_id].run_flag) == STOP_SIGNAL)
             break;
 
         usec_t start = now_monotonic_high_precision_usec();
@@ -128,7 +105,7 @@ static void rcu_benchmark_thread(void *arg) {
             RW_SPINLOCK *lock = ctx->rw_spinlock;
 
             if(ctx->type == BENCH_THREAD_READER) {
-                while(ctl->thread_controls[ctx->thread_id].run_flag) {
+                while(bench_run_flag_load(&ctl->thread_controls[ctx->thread_id].run_flag)) {
                     rw_spinlock_read_lock(lock);
                     // Read shared data
                     uint64_t v __maybe_unused = ctl->shared_value;
@@ -138,7 +115,7 @@ static void rcu_benchmark_thread(void *arg) {
                 }
             }
             else {
-                while(ctl->thread_controls[ctx->thread_id].run_flag) {
+                while(bench_run_flag_load(&ctl->thread_controls[ctx->thread_id].run_flag)) {
                     rw_spinlock_write_lock(lock);
                     ctl->shared_value++;
                     rw_spinlock_write_unlock(lock);
@@ -148,7 +125,7 @@ static void rcu_benchmark_thread(void *arg) {
         }
         else { // BENCH_RCU
             if(ctx->type == BENCH_THREAD_READER) {
-                while(ctl->thread_controls[ctx->thread_id].run_flag) {
+                while(bench_run_flag_load(&ctl->thread_controls[ctx->thread_id].run_flag)) {
                     rcu_read_lock();
                     // Read shared data
                     uint64_t v __maybe_unused = __atomic_load_n(&ctl->shared_value, __ATOMIC_ACQUIRE);
@@ -158,7 +135,7 @@ static void rcu_benchmark_thread(void *arg) {
                 }
             }
             else {
-                while(ctl->thread_controls[ctx->thread_id].run_flag) {
+                while(bench_run_flag_load(&ctl->thread_controls[ctx->thread_id].run_flag)) {
                     // Writers still need mutual exclusion among themselves
                     spinlock_lock(ctx->writer_spinlock);
                     __atomic_add_fetch(&ctl->shared_value, 1, __ATOMIC_RELEASE);
@@ -213,12 +190,6 @@ static void bench_print_thread_stats(const char *test_name, int readers, int wri
     fprintf(stderr, "%4s %8s %12s %12.0f\n",
             "", "WRITER", "TOTAL", writer_ops_per_sec);
 
-    if(__atomic_load_n(&ctl->violations, __ATOMIC_RELAXED) > 0) {
-        fprintf(stderr, "\nFATAL: %"PRIu64" access violations detected!\n",
-                ctl->violations);
-        _exit(1);
-    }
-
     summary->reader_ops_per_sec[lock_type][config_idx] = reader_ops_per_sec;
     summary->writer_ops_per_sec[lock_type][config_idx] = writer_ops_per_sec;
     summary->readers[config_idx] = readers;
@@ -236,14 +207,11 @@ static void bench_run_test(const char *name, int readers, int writers,
     // Reset
     memset(ctl->stats, 0, sizeof(ctl->stats));
     ctl->shared_value = 0;
-    ctl->readers = 0;
-    ctl->writers = 0;
-    ctl->violations = 0;
 
     // Signal threads to start
     for(int i = 0; i < total; i++) {
         netdata_mutex_lock(&ctl->thread_controls[i].cond_mutex);
-        ctl->thread_controls[i].run_flag = 1;
+        __atomic_store_n(&ctl->thread_controls[i].run_flag, 1, __ATOMIC_RELEASE);
         netdata_cond_signal(&ctl->thread_controls[i].cond);
         netdata_mutex_unlock(&ctl->thread_controls[i].cond_mutex);
     }
@@ -321,7 +289,7 @@ int rcu_stress_test(void) {
         for(int i = 0; i < MAX_THREADS; i++) {
             netdata_cond_init(&ctl[lock].thread_controls[i].cond);
             netdata_mutex_init(&ctl[lock].thread_controls[i].cond_mutex);
-            ctl[lock].thread_controls[i].run_flag = 0;
+            __atomic_store_n(&ctl[lock].thread_controls[i].run_flag, 0, __ATOMIC_RELEASE);
 
             contexts[lock][i] = (bench_thread_ctx_t){
                 .thread_id = i,
@@ -379,7 +347,7 @@ int rcu_stress_test(void) {
     for(int lock = 0; lock < NUM_LOCK_TYPES; lock++) {
         for(int i = 0; i < MAX_THREADS; i++) {
             netdata_mutex_lock(&ctl[lock].thread_controls[i].cond_mutex);
-            ctl[lock].thread_controls[i].run_flag = STOP_SIGNAL;
+            __atomic_store_n(&ctl[lock].thread_controls[i].run_flag, STOP_SIGNAL, __ATOMIC_RELEASE);
             netdata_cond_signal(&ctl[lock].thread_controls[i].cond);
             netdata_mutex_unlock(&ctl[lock].thread_controls[i].cond_mutex);
         }
