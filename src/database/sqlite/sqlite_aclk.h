@@ -42,11 +42,12 @@ typedef struct aclk_sync_cfg_t {
     // pending context checkpoint - saved when deferred during context load or post-processing
     // protected by pending_ctx_spinlock (accessed from ACLK query thread and context worker thread)
     SPINLOCK pending_ctx_spinlock;
+    uint64_t pending_ctx_generation;
     bool pending_ctx_checkpoint;
     char *pending_ctx_claim_id;
     char *pending_ctx_node_id;
     uint64_t pending_ctx_version_hash;
-    time_t pending_ctx_saved_time_s;
+    time_t pending_ctx_saved_monotonic_s;
 
     int8_t send_snapshot;
     bool stream_alerts;

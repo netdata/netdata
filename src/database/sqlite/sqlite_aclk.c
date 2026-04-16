@@ -1231,6 +1231,8 @@ void destroy_aclk_config(RRDHOST *host)
     char *pending_node_id = old_aclk_host_config->pending_ctx_node_id;
     old_aclk_host_config->pending_ctx_claim_id = NULL;
     old_aclk_host_config->pending_ctx_node_id = NULL;
+    old_aclk_host_config->pending_ctx_version_hash = 0;
+    old_aclk_host_config->pending_ctx_saved_monotonic_s = 0;
     __atomic_store_n(&old_aclk_host_config->pending_ctx_checkpoint, false, __ATOMIC_RELEASE);
     spinlock_unlock(&old_aclk_host_config->pending_ctx_spinlock);
 

@@ -201,6 +201,48 @@ int rrdcontext_foreach_instance_with_rrdset_in_context(RRDHOST *host, const char
 // ----------------------------------------------------------------------------
 // ACLK interface
 
+static void rrdcontext_checkpoint_clear_pending_unsafe(struct aclk_sync_cfg_t *aclk_host_config) {
+    freez(aclk_host_config->pending_ctx_claim_id);
+    freez(aclk_host_config->pending_ctx_node_id);
+    aclk_host_config->pending_ctx_claim_id = NULL;
+    aclk_host_config->pending_ctx_node_id = NULL;
+    aclk_host_config->pending_ctx_version_hash = 0;
+    aclk_host_config->pending_ctx_saved_monotonic_s = 0;
+    __atomic_store_n(&aclk_host_config->pending_ctx_checkpoint, false, __ATOMIC_RELEASE);
+}
+
+static uint64_t rrdcontext_checkpoint_invalidate_pending(RRDHOST *host) {
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if(!aclk_host_config)
+        return 0;
+
+    spinlock_lock(&aclk_host_config->pending_ctx_spinlock);
+    uint64_t generation = ++aclk_host_config->pending_ctx_generation;
+    rrdcontext_checkpoint_clear_pending_unsafe(aclk_host_config);
+    spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
+
+    return generation;
+}
+
+static bool rrdcontext_checkpoint_generation_is_current(RRDHOST *host, const char *claim_id, const char *node_id, uint64_t generation) {
+    if(!generation)
+        return true;
+
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    uint64_t current_generation = aclk_host_config ?
+                                  __atomic_load_n(&aclk_host_config->pending_ctx_generation, __ATOMIC_ACQUIRE) :
+                                  0;
+
+    if(likely(aclk_host_config && current_generation == generation))
+        return true;
+
+    nd_log(NDLS_DAEMON, NDLP_NOTICE,
+           "RRDCONTEXT: skipping stale checkpoint for host '%s', claim id '%s', node id '%s' "
+           "(generation %"PRIu64", current %"PRIu64").",
+           rrdhost_hostname(host), claim_id, node_id, generation, current_generation);
+    return false;
+}
+
 // Save a pending checkpoint to be replayed when context processing completes.
 // Returns true if saved successfully, false if save failed (caller should execute immediately).
 static bool rrdcontext_checkpoint_save_pending(RRDHOST *host, struct ctxs_checkpoint *cmd) {
@@ -212,19 +254,22 @@ static bool rrdcontext_checkpoint_save_pending(RRDHOST *host, struct ctxs_checkp
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 
     spinlock_lock(&aclk_host_config->pending_ctx_spinlock);
-    freez(aclk_host_config->pending_ctx_claim_id);
-    freez(aclk_host_config->pending_ctx_node_id);
+    ++aclk_host_config->pending_ctx_generation;
+    rrdcontext_checkpoint_clear_pending_unsafe(aclk_host_config);
     aclk_host_config->pending_ctx_claim_id = strdupz(cmd->claim_id);
     aclk_host_config->pending_ctx_node_id = strdupz(cmd->node_id);
     aclk_host_config->pending_ctx_version_hash = cmd->version_hash;
-    aclk_host_config->pending_ctx_saved_time_s = now_realtime_sec();
+    aclk_host_config->pending_ctx_saved_monotonic_s = now_monotonic_sec();
     __atomic_store_n(&aclk_host_config->pending_ctx_checkpoint, true, __ATOMIC_RELEASE);
     spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
     return true;
 }
 
 // Execute the checkpoint: compare version hash, send snapshot if needed, enable streaming.
-static void rrdcontext_checkpoint_execute(RRDHOST *host, const char *claim_id, const char *node_id, uint64_t version_hash) {
+static void rrdcontext_checkpoint_execute(RRDHOST *host, const char *claim_id, const char *node_id, uint64_t version_hash, uint64_t generation) {
+    if(!rrdcontext_checkpoint_generation_is_current(host, claim_id, node_id, generation))
+        return;
+
     if(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "RRDCONTEXT: checkpoint for claim id '%s', node id '%s', "
@@ -254,12 +299,20 @@ static void rrdcontext_checkpoint_execute(RRDHOST *host, const char *claim_id, c
         // calculate version hash and pack all the messages together in one go
         our_version_hash = rrdcontext_version_hash_with_callback(host, rrdcontext_message_send_unsafe, true, bundle);
 
+        if(!rrdcontext_checkpoint_generation_is_current(host, claim_id, node_id, generation)) {
+            contexts_snapshot_delete(bundle);
+            return;
+        }
+
         // update the version
         contexts_snapshot_set_version(bundle, our_version_hash);
 
         // send it
         aclk_send_contexts_snapshot(bundle);
     }
+
+    if(!rrdcontext_checkpoint_generation_is_current(host, claim_id, node_id, generation))
+        return;
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "RRDCONTEXT: host '%s' enabling streaming of contexts",
@@ -313,7 +366,8 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
                rrdhost_hostname(host));
     }
 
-    rrdcontext_checkpoint_execute(host, cmd->claim_id, cmd->node_id, cmd->version_hash);
+    uint64_t generation = rrdcontext_checkpoint_invalidate_pending(host);
+    rrdcontext_checkpoint_execute(host, cmd->claim_id, cmd->node_id, cmd->version_hash, generation);
 }
 
 void rrdcontext_hub_stop_streaming_command(void *ptr) {
@@ -340,11 +394,19 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
         return;
     }
 
+    bool had_pending_checkpoint = false;
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if(aclk_host_config)
+        had_pending_checkpoint = __atomic_load_n(&aclk_host_config->pending_ctx_checkpoint, __ATOMIC_ACQUIRE);
+
+    rrdcontext_checkpoint_invalidate_pending(host);
+
     if(!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', "
-               "but node '%s' does not have active context streaming. Ignoring command.",
-               cmd->claim_id, cmd->node_id, rrdhost_hostname(host));
+               "but node '%s' does not have active context streaming%s.",
+               cmd->claim_id, cmd->node_id, rrdhost_hostname(host),
+               had_pending_checkpoint ? "; invalidated deferred checkpoint" : "");
 
         return;
     }
@@ -373,8 +435,8 @@ void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host) {
     }
 
     // replay when pp_queue is empty, or force replay on timeout
-    time_t now_s = now_realtime_sec();
-    bool timed_out = (now_s - aclk_host_config->pending_ctx_saved_time_s >= PENDING_CTX_CHECKPOINT_MAX_AGE_S);
+    time_t now_s = now_monotonic_sec();
+    bool timed_out = (now_s - aclk_host_config->pending_ctx_saved_monotonic_s >= PENDING_CTX_CHECKPOINT_MAX_AGE_S);
     if((pending_context_load || !pp_queue_empty) && !timed_out) {
         spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
         return;
@@ -383,11 +445,12 @@ void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host) {
     char *claim_id = aclk_host_config->pending_ctx_claim_id;
     char *node_id = aclk_host_config->pending_ctx_node_id;
     uint64_t version_hash = aclk_host_config->pending_ctx_version_hash;
+    uint64_t generation = aclk_host_config->pending_ctx_generation;
 
     aclk_host_config->pending_ctx_claim_id = NULL;
     aclk_host_config->pending_ctx_node_id = NULL;
     aclk_host_config->pending_ctx_version_hash = 0;
-    aclk_host_config->pending_ctx_saved_time_s = 0;
+    aclk_host_config->pending_ctx_saved_monotonic_s = 0;
     __atomic_store_n(&aclk_host_config->pending_ctx_checkpoint, false, __ATOMIC_RELEASE);
     spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
 
@@ -416,7 +479,7 @@ void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host) {
            "RRDCONTEXT: replaying deferred checkpoint for host '%s', claim id '%s', node id '%s'.",
            rrdhost_hostname(host), claim_id, node_id);
 
-    rrdcontext_checkpoint_execute(host, claim_id, node_id, version_hash);
+    rrdcontext_checkpoint_execute(host, claim_id, node_id, version_hash, generation);
 
     freez(claim_id);
     freez(node_id);
