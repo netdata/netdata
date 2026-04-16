@@ -271,8 +271,6 @@ static void rrdcontext_checkpoint_execute(RRDHOST *host, const char *claim_id, c
     if(!rrdcontext_checkpoint_generation_is_current(host, claim_id, node_id, generation))
         return;
 
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-
     if(rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS)) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "RRDCONTEXT: checkpoint for claim id '%s', node id '%s', "
@@ -321,6 +319,7 @@ static void rrdcontext_checkpoint_execute(RRDHOST *host, const char *claim_id, c
            "RRDCONTEXT: host '%s' enabling streaming of contexts",
            rrdhost_hostname(host));
 
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     if(aclk_host_config) {
         spinlock_lock(&aclk_host_config->pending_ctx_spinlock);
 
