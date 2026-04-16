@@ -1464,12 +1464,12 @@ static inline struct aral_unittest_entry *unittest_aral_malloc(ARAL *ar, bool ma
     return t;
 }
 
+#ifdef NETDATA_INTERNAL_CHECKS
+
 struct aral_race_unittest_allocator {
     ARAL *ar;
     struct aral_unittest_entry *entry;
 };
-
-#ifdef NETDATA_INTERNAL_CHECKS
 static bool aral_unittest_wait_for_flag(bool *flag, usec_t timeout_ut) {
     usec_t started_ut = now_monotonic_usec();
 
