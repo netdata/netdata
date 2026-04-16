@@ -23,6 +23,13 @@ static inline DICTIONARY_ITEM *dict_item_next(DICTIONARY_ITEM *item, bool rcu_mo
         return item->next;
 }
 
+static inline void *dict_item_value(DICTIONARY_ITEM *item, bool rcu_mode) {
+    if(rcu_mode)
+        return dict_item_value_get(item);
+    else
+        return dict_item_value_get(item);
+}
+
 // ----------------------------------------------------------------------------
 // traversal with loop
 
@@ -80,7 +87,7 @@ void *dictionary_foreach_start_rw(DICTFE *dfe) {
     if(likely(item)) {
         dfe->item = item;
         dfe->name = (char *)item_get_name(item);
-        dfe->value = item->shared->value;
+        dfe->value = dict_item_value(item, dfe->rcu_mode);
     }
     else {
         dfe->item = NULL;
@@ -146,7 +153,7 @@ ALWAYS_INLINE void *dictionary_foreach_next(DICTFE *dfe) {
     if(likely(item)) {
         dfe->item = item;
         dfe->name = (char *)item_get_name(item);
-        dfe->value = item->shared->value;
+        dfe->value = dict_item_value(item, dfe->rcu_mode);
         dfe->counter++;
     }
     else {
@@ -244,13 +251,15 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callba
         if(unlikely(rw == DICTIONARY_LOCK_REENTRANT))
             ll_recursive_unlock(dict, rw);
 
-        int r = walkthrough_callback(item, item->shared->value, data);
+        int r = walkthrough_callback(item, dict_item_value(item, rcu_mode), data);
 
         if(unlikely(rw == DICTIONARY_LOCK_REENTRANT))
             ll_recursive_lock(dict, rw);
 
-        // since we have a reference counter, this item cannot be deleted
-        // until we release the reference counter, so the pointers are there
+        // In RCU mode, callback-delete-current-item is safe because removal
+        // preserves item->next and deferred freeing cannot drain while this
+        // thread is still inside the read-side critical section.
+        // In legacy mode, the acquired item refcount keeps the node alive.
         item_next = dict_item_next(item, rcu_mode);
 
         if(!rcu_mode) {
@@ -328,7 +337,7 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough
         item = array[i];
 
         if(callit)
-            r = walkthrough_callback(item, item->shared->value, data);
+            r = walkthrough_callback(item, dict_item_value_get(item), data);
 
         dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dict, item, lock_mode);
         // item_release(dict, item);

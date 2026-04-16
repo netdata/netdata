@@ -1266,6 +1266,145 @@ static int dictionary_destroy_race_unittest(void) {
     return 0;
 }
 
+static int dictionary_destroy_deferred_rcu_unittest(void) {
+    int errors = 0;
+
+    fprintf(stderr, "\nTesting deferred dictionary destruction while inside an RCU read-side CS...\n");
+
+    cleanup_destroyed_dictionaries(false);
+    size_t delayed_before = dictionary_destroy_delayed_count();
+
+    DICTIONARY *guard = dictionary_create(DICT_OPTION_NONE);
+    DICTIONARY *victim = dictionary_create(DICT_OPTION_NONE);
+    dictionary_set(guard, "guard", "G", 2);
+    dictionary_set(victim, "victim", "V", 2);
+
+    void *v;
+    dfe_start_read(guard, v) {
+        size_t freed = dictionary_destroy(victim);
+        if(freed != 0) {
+            fprintf(stderr, "Deferred destroy test: expected victim destroy to queue, got %zu bytes freed\n", freed);
+            errors++;
+        }
+
+        size_t delayed_during = dictionary_destroy_delayed_count();
+        if(delayed_during != delayed_before + 1) {
+            fprintf(stderr, "Deferred destroy test: expected queued count %zu while in RCU CS, got %zu\n",
+                    delayed_before + 1, delayed_during);
+            errors++;
+        }
+
+        size_t remaining = cleanup_destroyed_dictionaries(false);
+        if(remaining != delayed_before + 1) {
+            fprintf(stderr, "Deferred destroy test: expected cleanup to keep victim queued inside RCU CS (remaining=%zu)\n",
+                    remaining);
+            errors++;
+        }
+    }
+    dfe_done(v);
+
+    size_t remaining_after = cleanup_destroyed_dictionaries(false);
+    if(remaining_after != delayed_before) {
+        fprintf(stderr, "Deferred destroy test: expected queued count %zu after leaving RCU CS, got %zu\n",
+                delayed_before, remaining_after);
+        errors++;
+    }
+
+    size_t delayed_after = dictionary_destroy_delayed_count();
+    if(delayed_after != delayed_before) {
+        fprintf(stderr, "Deferred destroy test: expected delayed destroy count %zu after cleanup, got %zu\n",
+                delayed_before, delayed_after);
+        errors++;
+    }
+
+    dictionary_destroy(guard);
+    cleanup_destroyed_dictionaries(false);
+
+    return errors;
+}
+
+static int dictionary_destroy_deferred_rcu_gc_progress_unittest(void) {
+    int errors = 0;
+
+    fprintf(stderr, "\nTesting delayed dictionary destroy progress via dictionary_garbage_collect()...\n");
+
+    cleanup_destroyed_dictionaries(false);
+    size_t delayed_before = dictionary_destroy_delayed_count();
+
+    DICTIONARY *guard = dictionary_create(DICT_OPTION_NONE);
+    DICTIONARY *victim = dictionary_create(DICT_OPTION_NONE);
+    dictionary_set(guard, "guard", "G", 2);
+    dictionary_set(victim, "victim", "V", 2);
+
+    void *v;
+    dfe_start_read(guard, v) {
+        size_t freed = dictionary_destroy(victim);
+        if(freed != 0) {
+            fprintf(stderr, "Deferred destroy GC test: expected victim destroy to queue, got %zu bytes freed\n", freed);
+            errors++;
+        }
+    }
+    dfe_done(v);
+
+    dictionary_garbage_collect(guard);
+
+    size_t delayed_after = dictionary_destroy_delayed_count();
+    if(delayed_after != delayed_before) {
+        fprintf(stderr, "Deferred destroy GC test: expected delayed destroy count %zu after garbage collection, got %zu\n",
+                delayed_before, delayed_after);
+        errors++;
+    }
+
+    dictionary_destroy(guard);
+    cleanup_destroyed_dictionaries(false);
+
+    return errors;
+}
+
+static int dictionary_rcu_value_replace_unittest(void) {
+    int errors = 0;
+
+    fprintf(stderr, "\nTesting RCU traversal value stability across overwrite...\n");
+
+    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, NULL, 64);
+
+    char initial[64];
+    memset(initial, 'A', sizeof(initial));
+    initial[sizeof(initial) - 1] = '\0';
+    dictionary_set(dict, "stable", initial, sizeof(initial));
+
+    void *v;
+    dfe_start_read(dict, v) {
+        char *snapshot = v;
+
+        for(int i = 0; i < 128; i++) {
+            char replacement[64];
+            char tmp_key[32];
+
+            memset(replacement, 'B' + (i % 20), sizeof(replacement));
+            replacement[sizeof(replacement) - 1] = '\0';
+
+            dictionary_set(dict, "stable", replacement, sizeof(replacement));
+
+            snprintfz(tmp_key, sizeof(tmp_key), "tmp-%d", i);
+            dictionary_set(dict, tmp_key, replacement, sizeof(replacement));
+            dictionary_del(dict, tmp_key);
+        }
+
+        if(memcmp(snapshot, initial, sizeof(initial)) != 0) {
+            fprintf(stderr, "RCU overwrite test: traversal value changed while still inside read-side critical section\n");
+            errors++;
+        }
+    }
+    dfe_done(v);
+
+    dictionary_garbage_collect(dict);
+    dictionary_destroy(dict);
+    cleanup_destroyed_dictionaries(false);
+
+    return errors;
+}
+
 #else
 
 static int dictionary_destroy_race_unittest(void) {
@@ -2059,6 +2198,9 @@ int dictionary_unittest(size_t entries) {
         fprintf(stderr, "Destroy on traversal test OK\n");
 
     errors += dictionary_destroy_race_unittest();
+    errors += dictionary_destroy_deferred_rcu_unittest();
+    errors += dictionary_destroy_deferred_rcu_gc_progress_unittest();
+    errors += dictionary_rcu_value_replace_unittest();
 
     cleanup_destroyed_dictionaries(false);
 

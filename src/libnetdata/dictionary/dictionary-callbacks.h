@@ -19,7 +19,7 @@ static inline void dictionary_execute_insert_callback(DICTIONARY *dict, DICTIONA
                    "DICTIONARY: Running insert callback on item '%s' of dictionary",
                    item_get_name(item));
 
-    dict->hooks->insert_callback(item, item->shared->value, constructor_data?constructor_data:dict->hooks->insert_callback_data);
+    dict->hooks->insert_callback(item, dict_item_value_get(item), constructor_data?constructor_data:dict->hooks->insert_callback_data);
     DICTIONARY_STATS_CALLBACK_INSERTS_PLUS1(dict);
 }
 
@@ -35,7 +35,7 @@ static inline bool dictionary_execute_conflict_callback(DICTIONARY *dict, DICTIO
                    item_get_name(item));
 
     bool ret = dict->hooks->conflict_callback(
-        item, item->shared->value, new_value,
+        item, dict_item_value_get(item), new_value,
         constructor_data ? constructor_data : dict->hooks->conflict_callback_data);
 
     DICTIONARY_STATS_CALLBACK_CONFLICTS_PLUS1(dict);
@@ -54,7 +54,7 @@ static inline void dictionary_execute_react_callback(DICTIONARY *dict, DICTIONAR
                    "DICTIONARY: Running react callback on item '%s' of dictionary",
                    item_get_name(item));
 
-    dict->hooks->react_callback(item, item->shared->value,
+    dict->hooks->react_callback(item, dict_item_value_get(item),
                                 constructor_data?constructor_data:dict->hooks->react_callback_data);
 
     DICTIONARY_STATS_CALLBACK_REACTS_PLUS1(dict);
@@ -72,7 +72,7 @@ static inline void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONA
                    "DICTIONARY: Running delete callback on item '%s' of dictionary",
                    item_get_name(item));
 
-    dict->hooks->delete_callback(item, item->shared->value, dict->hooks->delelte_callback_data);
+    dict->hooks->delete_callback(item, dict_item_value_get(item), dict->hooks->delelte_callback_data);
 
     DICTIONARY_STATS_CALLBACK_DELETES_PLUS1(dict);
 }

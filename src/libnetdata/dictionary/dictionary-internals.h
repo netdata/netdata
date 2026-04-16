@@ -132,6 +132,12 @@ struct dictionary_hooks {
     void *delelte_callback_data;
 };
 
+typedef struct dictionary_rcu_retired_value {
+    struct dictionary_rcu_retired_value *next;
+    void *value;
+    size_t bytes;
+} DICTIONARY_RCU_RETIRED_VALUE;
+
 struct dictionary {
 #ifdef FSANITIZE_ADDRESS
     STACKTRACE_ARRAY stacktraces;   // stack traces from all acquisition points
@@ -157,6 +163,7 @@ struct dictionary {
 
     struct {
         DICTIONARY_ITEM *head;          // items removed from linked list, pending rcu_synchronize + free
+        DICTIONARY_RCU_RETIRED_VALUE *values; // replaced values pending rcu_synchronize + free
         SPINLOCK spinlock;              // protects the pending list (accessed outside write lock)
     } rcu_pending_free;
 
@@ -191,6 +198,9 @@ void garbage_collect_pending_deletes(DICTIONARY *dict);
 static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static inline const char *item_get_name(const DICTIONARY_ITEM *item);
+static inline void dict_item_value_freez(DICTIONARY *dict, void *ptr);
+static inline void *dict_item_value_get(const DICTIONARY_ITEM *item);
+static inline void dict_item_value_set(DICTIONARY_ITEM *item, void *value);
 static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, DICTIONARY_ITEM *item);
 static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static bool dict_item_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item);
@@ -215,10 +225,28 @@ static inline void dict_rcu_pending_free_queue(DICTIONARY *dict, DICTIONARY_ITEM
     spinlock_unlock(&dict->rcu_pending_free.spinlock);
 }
 
-static inline DICTIONARY_ITEM *dict_rcu_pending_free_detach(DICTIONARY *dict) {
+static inline void dict_rcu_pending_value_queue(DICTIONARY *dict, void *value, size_t bytes) {
+    if(!value)
+        return;
+
+    DICTIONARY_RCU_RETIRED_VALUE *retired = mallocz(sizeof(*retired));
+    retired->value = value;
+    retired->bytes = bytes;
+
+    spinlock_lock(&dict->rcu_pending_free.spinlock);
+    retired->next = dict->rcu_pending_free.values;
+    dict->rcu_pending_free.values = retired;
+    spinlock_unlock(&dict->rcu_pending_free.spinlock);
+}
+
+static inline DICTIONARY_ITEM *dict_rcu_pending_free_detach(DICTIONARY *dict, DICTIONARY_RCU_RETIRED_VALUE **values) {
     spinlock_lock(&dict->rcu_pending_free.spinlock);
     DICTIONARY_ITEM *list = dict->rcu_pending_free.head;
     dict->rcu_pending_free.head = NULL;
+    if(values) {
+        *values = dict->rcu_pending_free.values;
+        dict->rcu_pending_free.values = NULL;
+    }
     spinlock_unlock(&dict->rcu_pending_free.spinlock);
 
     return list;
@@ -233,6 +261,20 @@ static inline size_t dict_rcu_pending_free_free_list(DICTIONARY *dict, DICTIONAR
         freeme->prev = NULL;
         freeme->next = NULL;
         bytes += dict_item_free_with_hooks(dict, freeme);
+    }
+
+    return bytes;
+}
+
+static inline size_t dict_rcu_pending_value_free_list(DICTIONARY *dict, DICTIONARY_RCU_RETIRED_VALUE *list) {
+    size_t bytes = 0;
+
+    while(list) {
+        DICTIONARY_RCU_RETIRED_VALUE *freeme = list;
+        list = freeme->next;
+        dict_item_value_freez(dict, freeme->value);
+        bytes += freeme->bytes + sizeof(*freeme);
+        freez(freeme);
     }
 
     return bytes;
@@ -256,9 +298,10 @@ static inline size_t dict_rcu_pending_free_drain(DICTIONARY *dict) {
         return 0;
 
     // Atomically detach the entire list under the spinlock.
-    DICTIONARY_ITEM *list = dict_rcu_pending_free_detach(dict);
+    DICTIONARY_RCU_RETIRED_VALUE *values = NULL;
+    DICTIONARY_ITEM *list = dict_rcu_pending_free_detach(dict, &values);
 
-    if(!list)
+    if(!list && !values)
         return 0;
 
     // Single grace period for all items in the batch
@@ -269,11 +312,20 @@ static inline size_t dict_rcu_pending_free_drain(DICTIONARY *dict) {
         // use-after-free which is worse.
         spinlock_lock(&dict->rcu_pending_free.spinlock);
         // Find the tail of our detached list and link it to current head
-        DICTIONARY_ITEM *tail = list;
-        while(tail->prev)
-            tail = tail->prev;
-        tail->prev = dict->rcu_pending_free.head;
-        dict->rcu_pending_free.head = list;
+        if(list) {
+            DICTIONARY_ITEM *tail = list;
+            while(tail->prev)
+                tail = tail->prev;
+            tail->prev = dict->rcu_pending_free.head;
+            dict->rcu_pending_free.head = list;
+        }
+        if(values) {
+            DICTIONARY_RCU_RETIRED_VALUE *tail = values;
+            while(tail->next)
+                tail = tail->next;
+            tail->next = dict->rcu_pending_free.values;
+            dict->rcu_pending_free.values = values;
+        }
         spinlock_unlock(&dict->rcu_pending_free.spinlock);
         return 0;
     }
@@ -284,6 +336,7 @@ static inline size_t dict_rcu_pending_free_drain(DICTIONARY *dict) {
         count++;
 
     dict_rcu_pending_free_free_list(dict, list);
+    dict_rcu_pending_value_free_list(dict, values);
     return count;
 }
 

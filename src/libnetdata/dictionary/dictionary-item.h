@@ -107,6 +107,31 @@ static inline void dict_item_value_freez(DICTIONARY *dict, void *ptr) {
         freez(ptr);
 }
 
+static inline void *dict_item_value_get(const DICTIONARY_ITEM *item) {
+    return __atomic_load_n(&item->shared->value, __ATOMIC_ACQUIRE);
+}
+
+static inline void dict_item_value_set(DICTIONARY_ITEM *item, void *value) {
+    __atomic_store_n(&item->shared->value, value, __ATOMIC_RELEASE);
+}
+
+static inline size_t dict_item_value_bytes(DICTIONARY *dict, size_t value_len) {
+    if(dict->value_aral)
+        return aral_requested_element_size(dict->value_aral);
+
+    return value_len;
+}
+
+static inline void dict_item_retire_replaced_value(DICTIONARY *dict, void *value, size_t value_len) {
+    if(!value)
+        return;
+
+    if(unlikely(is_dictionary_single_threaded(dict)))
+        dict_item_value_freez(dict, value);
+    else
+        dict_rcu_pending_value_queue(dict, value, dict_item_value_bytes(dict, value_len));
+}
+
 static inline void *dict_item_value_create(DICTIONARY *dict, void *value, size_t value_len) {
     void *ptr = NULL;
 
@@ -158,9 +183,9 @@ static inline DICTIONARY_ITEM *dict_item_create_with_hooks(DICTIONARY *dict, con
         // we are on the master dictionary
 
         if(unlikely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))
-            item->shared->value = value;
+            dict_item_value_set(item, value);
         else
-            item->shared->value = dict_item_value_create(dict, value, value_len);
+            dict_item_value_set(item, dict_item_value_create(dict, value, value_len));
 
         item->shared->value_len = value_len;
         value_size += value_len;
@@ -191,24 +216,25 @@ static inline void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY
 
     if(likely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE)) {
         netdata_log_debug(D_DICTIONARY, "Dictionary: linking value to '%s'", item_get_name(item));
-        item->shared->value = value;
+        dict_item_value_set(item, value);
         item->shared->value_len = value_len;
     }
     else {
         netdata_log_debug(D_DICTIONARY, "Dictionary: cloning value to '%s'", item_get_name(item));
 
-        void *old_value = item->shared->value;
+        void *old_value = dict_item_value_get(item);
+        size_t old_value_len = item->shared->value_len;
         void *new_value = NULL;
         if(value_len) {
             new_value = dict_item_value_mallocz(dict, value_len);
             if(value) memcpy(new_value, value, value_len);
             else memset(new_value, 0, value_len);
         }
-        item->shared->value = new_value;
+        dict_item_value_set(item, new_value);
         item->shared->value_len = value_len;
 
-        netdata_log_debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", item_get_name(item));
-        dict_item_value_freez(dict, old_value);
+        netdata_log_debug(D_DICTIONARY, "Dictionary: retiring old value of '%s' after RCU grace period", item_get_name(item));
+        dict_item_retire_replaced_value(dict, old_value, old_value_len);
     }
 
     dictionary_execute_insert_callback(dict, item, constructor_data);
@@ -229,8 +255,8 @@ static inline size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM
 
         if(unlikely(!(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))) {
             netdata_log_debug(D_DICTIONARY, "Dictionary freeing value of '%s'", item_get_name(item));
-            dict_item_value_freez(dict, item->shared->value);
-            item->shared->value = NULL;
+            dict_item_value_freez(dict, dict_item_value_get(item));
+            dict_item_value_set(item, NULL);
         }
         value_size += item->shared->value_len;
 
@@ -559,6 +585,9 @@ static inline DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONA
 
     if(unlikely(spins > 0))
         DICTIONARY_STATS_INSERT_SPINS_PLUS(dict, spins);
+
+    if(!is_dictionary_single_threaded(dict))
+        dict_rcu_pending_free_drain(dict);
 
     if(is_master_dictionary(dict) && added_or_updated)
         dictionary_execute_react_callback(dict, item, constructor_data);
