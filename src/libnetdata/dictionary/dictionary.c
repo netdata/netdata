@@ -244,6 +244,7 @@ void dictionary_garbage_collect(DICTIONARY *dict) {
     if(!dict) return;
 
     dictionary_api_enter(dict);
+    cleanup_destroyed_dictionaries(false);
     garbage_collect_pending_deletes(dict);
     dictionary_api_exit(dict);
 }
@@ -408,7 +409,9 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
         counted_items++;
     }
 
-    item_size += dict_rcu_pending_free_free_list(dict, dict_rcu_pending_free_detach(dict));
+    DICTIONARY_RCU_RETIRED_VALUE *retired_values = NULL;
+    item_size += dict_rcu_pending_free_free_list(dict, dict_rcu_pending_free_detach(dict, &retired_values));
+    item_size += dict_rcu_pending_value_free_list(dict, retired_values);
 
     dict_size += dictionary_locks_destroy(dict);
     dict_size += reference_counter_free(dict);
@@ -506,8 +509,8 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
     for(dict = dictionaries_waiting_to_be_destroyed; dict ; dict = next) {
         next = dict->next;
 
-        DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(dict);
         if(dictionary_free_all_resources(dict, NULL, false)) {
+            DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(dict);
             if(last) last->next = next;
             else dictionaries_waiting_to_be_destroyed = next;
         }
@@ -534,8 +537,6 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
                 }
             }
 #endif
-
-            DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
             last = dict;
             remaining++;
         }
@@ -939,7 +940,7 @@ void *dictionary_set_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
     DICTIONARY_ITEM *item = dictionary_set_and_acquire_item_advanced(dict, name, name_len, value, value_len, constructor_data);
 
     if(likely(item)) {
-        void *v = item->shared->value;
+        void *v = dict_item_value_get(item);
         dictionary_acquired_item_release(dict, item);
         return v;
     }
@@ -991,7 +992,7 @@ void *dictionary_view_set_advanced(DICTIONARY *dict, const char *name, ssize_t n
     DICTIONARY_ITEM *item = dictionary_view_set_and_acquire_item_advanced(dict, name, name_len, master_item);
 
     if(likely(item)) {
-        void *v = item->shared->value;
+        void *v = dict_item_value_get(item);
         dictionary_acquired_item_release(dict, item);
         return v;
     }
@@ -1026,7 +1027,7 @@ void *dictionary_get_advanced(DICTIONARY *dict, const char *name, ssize_t name_l
     DICTIONARY_ITEM *item = dictionary_get_and_acquire_item_advanced(dict, name, name_len);
 
     if(likely(item)) {
-        void *v = item->shared->value;
+        void *v = dict_item_value_get(item);
         dictionary_acquired_item_release(dict, item);
         return v;
     }
@@ -1097,7 +1098,7 @@ const char *dictionary_acquired_item_name(DICT_ITEM_CONST DICTIONARY_ITEM *item)
 ALWAYS_INLINE
 void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     if(likely(item))
-        return item->shared->value;
+        return dict_item_value_get(item);
 
     return NULL;
 }

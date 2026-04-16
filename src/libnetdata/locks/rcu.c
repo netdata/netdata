@@ -12,14 +12,15 @@
 // Per-thread epoch:
 //   - 0 means "not in a read-side critical section"
 //   - Non-zero means "in a read-side CS, entered at this epoch"
-//   - Written ONLY by the owning thread (no atomics needed for the write).
-//   - Read by writers via atomic load during rcu_synchronize().
+//   - Written only by the owning thread, using atomic release stores to
+//     publish entry/exit from the read-side critical section.
+//   - Read by writers via atomic acquire loads during rcu_synchronize().
 //
 // This design has the following cache-line properties:
 //   - rcu_global_epoch lives on its own line; readers only LOAD it (shared
 //     state, no bouncing).
-//   - Each RCU_THREAD.epoch lives on the owning thread's own cache line;
-//     the owner STOREs, the synchronizer LOADs (no bouncing between readers).
+//   - Each RCU_THREAD.epoch is per-thread state; readers do not contend on a
+//     shared counter, though allocator placement may still allow false sharing.
 //   - The only shared-write operation is the global epoch increment in
 //     rcu_synchronize(), which is the slow path.
 // ============================================================================
@@ -30,16 +31,12 @@
 // Starts at 1 so that a per-thread epoch of 0 unambiguously means "idle".
 static uint64_t rcu_global_epoch __attribute__((aligned(64))) = 1;
 
-// Global count of threads currently in a read-side critical section.
-// Used by rcu_synchronize() for fast-path: if 0 (or only self), return immediately.
-// This IS a shared-write atomic (incremented/decremented on every rcu_read_lock/unlock),
-// but it's only read by writers in rcu_synchronize() — readers don't read it.
-// The cost is one atomic add/sub per outermost rcu_read_lock/unlock, which is
-// acceptable since the fast-path avoids the much more expensive thread-list scan.
-static int32_t rcu_active_readers __attribute__((aligned(64))) = 0;
-
-// Serializes rcu_synchronize() calls and protects the thread registry.
+// Protects the thread registry.
 static SPINLOCK rcu_registry_spinlock = SPINLOCK_INITIALIZER;
+
+// Serializes rcu_synchronize() calls while allowing register/unregister to
+// proceed between snapshot polls.
+static SPINLOCK rcu_synchronize_spinlock = SPINLOCK_INITIALIZER;
 
 // Linked list of all registered threads.
 static RCU_THREAD *rcu_threads_head = NULL;
@@ -53,7 +50,6 @@ static __thread RCU_THREAD *rcu_tls = NULL;
 
 void rcu_init(void) {
     __atomic_store_n(&rcu_global_epoch, 1, __ATOMIC_RELEASE);
-    __atomic_store_n(&rcu_active_readers, 0, __ATOMIC_RELEASE);
     rcu_threads_head = NULL;
 }
 
@@ -72,12 +68,63 @@ void rcu_destroy(void) {
 // Thread registration
 // ============================================================================
 
+static void rcu_thread_release(RCU_THREAD *t) {
+    if(!t)
+        return;
+
+    if(__atomic_sub_fetch(&t->refs, 1, __ATOMIC_ACQ_REL) == 0)
+        freez(t);
+}
+
+static RCU_THREAD **rcu_snapshot_threads(RCU_THREAD *self, size_t *threads_count) {
+    *threads_count = 0;
+
+    spinlock_lock(&rcu_registry_spinlock);
+
+    size_t count = 0;
+    for(RCU_THREAD *t = rcu_threads_head; t; t = t->next) {
+        if(t != self)
+            count++;
+    }
+
+    if(!count) {
+        spinlock_unlock(&rcu_registry_spinlock);
+        return NULL;
+    }
+
+    RCU_THREAD **threads = callocz(count, sizeof(*threads));
+    size_t idx = 0;
+    for(RCU_THREAD *t = rcu_threads_head; t; t = t->next) {
+        if(t == self)
+            continue;
+
+        __atomic_add_fetch(&t->refs, 1, __ATOMIC_ACQ_REL);
+        threads[idx++] = t;
+    }
+
+    spinlock_unlock(&rcu_registry_spinlock);
+
+    *threads_count = idx;
+    return threads;
+}
+
+static void rcu_release_snapshot(RCU_THREAD **threads, size_t threads_count) {
+    if(!threads)
+        return;
+
+    for(size_t i = 0; i < threads_count; i++)
+        rcu_thread_release(threads[i]);
+
+    freez(threads);
+}
+
 void rcu_register_thread(void) {
     if(rcu_tls)
         return; // already registered
 
     RCU_THREAD *t = callocz(1, sizeof(RCU_THREAD));
     // epoch = 0 (idle), nesting = 0
+    __atomic_store_n(&t->refs, 1, __ATOMIC_RELAXED);
 
     spinlock_lock(&rcu_registry_spinlock);
 
@@ -104,7 +151,6 @@ void rcu_unregister_thread(void) {
                t->nesting);
         // Force-clear so rcu_synchronize() won't hang.
         __atomic_store_n(&t->epoch, 0, __ATOMIC_RELEASE);
-        __atomic_sub_fetch(&rcu_active_readers, 1, __ATOMIC_RELEASE);
         t->nesting = 0;
     }
 
@@ -121,7 +167,7 @@ void rcu_unregister_thread(void) {
     spinlock_unlock(&rcu_registry_spinlock);
 
     rcu_tls = NULL;
-    freez(t);
+    rcu_thread_release(t);
 }
 
 bool rcu_thread_is_registered(void) {
@@ -154,8 +200,9 @@ ALWAYS_INLINE void rcu_read_lock_with_trace(const char *func __maybe_unused) {
         // Store our epoch so writers can see we're active.
         __atomic_store_n(&t->epoch, e, __ATOMIC_RELEASE);
 
-        // Increment global active reader count for rcu_synchronize() fast-path.
-        __atomic_add_fetch(&rcu_active_readers, 1, __ATOMIC_RELEASE);
+        // Prevent protected reads in the caller's critical section from
+        // moving before the published epoch.
+        __atomic_thread_fence(__ATOMIC_ACQUIRE);
     }
 }
 
@@ -177,9 +224,6 @@ ALWAYS_INLINE void rcu_read_unlock_with_trace(const char *func __maybe_unused) {
     if(--t->nesting == 0) {
         // Outermost unlock: clear our epoch so writers know we're done.
         __atomic_store_n(&t->epoch, 0, __ATOMIC_RELEASE);
-
-        // Decrement global active reader count.
-        __atomic_sub_fetch(&rcu_active_readers, 1, __ATOMIC_RELEASE);
     }
 }
 
@@ -190,33 +234,30 @@ ALWAYS_INLINE void rcu_read_unlock_with_trace(const char *func __maybe_unused) {
 #define RCU_SYNCHRONIZE_TIMEOUT_SEC 60
 
 bool rcu_synchronize(void) {
-    // Fast path: if no thread (other than ourselves) is in an RCU read-side
-    // CS, there's nothing to wait for. Check the global active reader count.
     RCU_THREAD *self = rcu_tls;
-    int32_t self_contribution = (self && self->nesting > 0) ? 1 : 0;
-    int32_t active = __atomic_load_n(&rcu_active_readers, __ATOMIC_ACQUIRE);
-    if(active <= self_contribution)
-        return true; // no other readers active — grace period trivially complete
+    spinlock_lock(&rcu_synchronize_spinlock);
 
     // Bump the global epoch. After this, any new rcu_read_lock() will
     // snapshot the new epoch, so we only need to wait for threads that
     // hold the old epoch.
     uint64_t old_epoch = __atomic_fetch_add(&rcu_global_epoch, 1, __ATOMIC_ACQ_REL);
 
+    size_t threads_count = 0;
+    RCU_THREAD **threads = rcu_snapshot_threads(self, &threads_count);
+    if(!threads_count) {
+        spinlock_unlock(&rcu_synchronize_spinlock);
+        return true;
+    }
+
     usec_t usec = 1;
     usec_t started = now_monotonic_usec();
-
-    spinlock_lock(&rcu_registry_spinlock);
 
     bool all_clear;
     do {
         all_clear = true;
 
-        for(RCU_THREAD *t = rcu_threads_head; t; t = t->next) {
-            if(t == self)
-                continue; // skip the calling thread
-
-            uint64_t thread_epoch = __atomic_load_n(&t->epoch, __ATOMIC_ACQUIRE);
+        for(size_t i = 0; i < threads_count; i++) {
+            uint64_t thread_epoch = __atomic_load_n(&threads[i]->epoch, __ATOMIC_ACQUIRE);
             if(thread_epoch != 0 && thread_epoch <= old_epoch) {
                 all_clear = false;
                 break;
@@ -231,21 +272,17 @@ bool rcu_synchronize(void) {
                        "RCU: rcu_synchronize() timed out after %d seconds waiting for readers "
                        "(epoch %"PRIu64"). Returning false — caller will defer or retry.",
                        RCU_SYNCHRONIZE_TIMEOUT_SEC, old_epoch);
-                spinlock_unlock(&rcu_registry_spinlock);
+                rcu_release_snapshot(threads, threads_count);
+                spinlock_unlock(&rcu_synchronize_spinlock);
                 return false; // caller MUST NOT free memory
             }
 
-            // Release the spinlock while we sleep to allow threads to
-            // unregister (e.g. if they're exiting).
-            spinlock_unlock(&rcu_registry_spinlock);
-
             microsleep(usec);
             usec = usec >= RCU_MAX_USEC ? RCU_MAX_USEC : usec * 2;
-
-            spinlock_lock(&rcu_registry_spinlock);
         }
     } while(!all_clear);
 
-    spinlock_unlock(&rcu_registry_spinlock);
+    rcu_release_snapshot(threads, threads_count);
+    spinlock_unlock(&rcu_synchronize_spinlock);
     return true;
 }

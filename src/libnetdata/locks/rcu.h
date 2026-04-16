@@ -19,8 +19,7 @@
 //
 // Read-side cost:  1 atomic load (global epoch, shared-read)
 //                + 1 store to per-thread epoch
-//                + 1 shared atomic add/sub on the outermost lock/unlock pair
-//                  for the active-reader fast path in rcu_synchronize()
+//                + 1 acquire fence on the outermost lock() pair
 //
 // Write-side cost: 1 atomic increment (global epoch)
 //                + scan all registered threads (may spin-wait on slow readers)
@@ -39,6 +38,7 @@ typedef struct rcu_thread {
     // --- written by owning thread, read by writers ---
     uint64_t epoch;                     // snapshot of global epoch while in read-side CS; 0 = idle
     uint32_t nesting;                   // nesting depth (private, never read by others)
+    int32_t refs;                       // registry + synchronizer snapshots
 
     // --- registry linkage (protected by rcu_registry_spinlock) ---
     struct rcu_thread *prev;
@@ -57,8 +57,8 @@ void rcu_destroy(void);
 
 // Per-thread lifecycle — every thread that will enter rcu_read_lock() must
 // first call rcu_register_thread(), and must call rcu_unregister_thread()
-// before it exits. Failing to unregister will make rcu_synchronize() wait
-// forever for that thread.
+// before it exits. Failing to unregister will keep stale registry entries
+// around, which can delay or prevent grace periods from completing.
 void rcu_register_thread(void);
 void rcu_unregister_thread(void);
 
@@ -75,8 +75,8 @@ bool rcu_thread_in_read_cs(void);
 // that no writer will complete rcu_synchronize() — i.e. old data will not
 // be freed while the reader holds the lock.
 //
-// These are meant to be very fast, with only one shared atomic add/sub on
-// the outermost lock/unlock pair.
+// These are meant to be very fast, with only a global-epoch load and a
+// per-thread epoch publication on the outermost lock/unlock pair.
 void rcu_read_lock_with_trace(const char *func);
 void rcu_read_unlock_with_trace(const char *func);
 
