@@ -1532,6 +1532,8 @@ static struct aral_unittest_entry *aral_race_unittest_force_page_full(ARAL *ar, 
 
 static int aral_detect_acquire_to_page_lock_race(void) {
     int errors = 0;
+    bool allocator_entry_marked = false;
+    ARAL_PAGE *allocator_page = NULL;
     ARAL *ar = aral_create("aral-race-test",
                            sizeof(struct aral_unittest_entry),
                            0,
@@ -1579,6 +1581,10 @@ static int aral_detect_acquire_to_page_lock_race(void) {
         fprintf(stderr, "ARAL race unittest: paused allocator failed to complete its allocation.\n");
         errors++;
     }
+    else
+        allocator_page = aral_get_page_pointer_after_element___do_NOT_have_aral_lock(ar, allocator.entry, &allocator_entry_marked);
+
+    (void)allocator_entry_marked;
 
     if(ar->aral_lock.pages_full == NULL) {
         fprintf(stderr, "ARAL race unittest: expected the original page to become full during the race.\n");
@@ -1590,8 +1596,8 @@ static int aral_detect_acquire_to_page_lock_race(void) {
         errors++;
     }
 
-    if(errors == 0 && ar->aral_lock.pages_free == NULL) {
-        fprintf(stderr, "ARAL race unittest: allocator did not retry onto a new page.\n");
+    if(errors == 0 && allocator_page == aral_race_unittest_hook.page) {
+        fprintf(stderr, "ARAL race unittest: allocator retried on the forced-full page instead of a new page.\n");
         errors++;
     }
 
