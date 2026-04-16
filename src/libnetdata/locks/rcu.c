@@ -237,7 +237,7 @@ bool rcu_synchronize(void) {
     RCU_THREAD *self = rcu_tls;
 
     if(unlikely(self && self->nesting > 0)) {
-        fatal_assert(self->nesting == 0);
+        fatal_assert(self->nesting > 0);
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "RCU: rcu_synchronize() called while inside a read-side critical section "
                "(nesting=%u)", self->nesting);
