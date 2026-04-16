@@ -117,6 +117,16 @@ The `time_group` parameter in `aggregations.time` controls how data points withi
 | `min` | Minimum value | Find lowest values in each interval |
 | `max` | Maximum value | Find spikes or peaks |
 | `sum` | Sum of values | Total volume transferred (counters) |
+| `median` | Median value | Robust central tendency |
+| `stddev` | Standard deviation | Measure of variability |
+| `ses` | Single exponential smoothing | Trend-aware smoothing |
+| `des` | Double exponential smoothing | Trend + seasonality smoothing |
+| `incremental-sum` | Difference between last and first value | Change over interval |
+| `percentile` | Generic percentile (set value in `time_group_options`) | e.g., 95th percentile latency |
+| `countif` | Count values matching condition (set condition in `time_group_options`) | e.g., count samples above threshold |
+| `trimmed-mean` | Mean after trimming outliers (set trim % in `time_group_options`) | Robust average excluding extremes |
+| `trimmed-median` | Median after trimming outliers (set trim % in `time_group_options`) | Robust median excluding extremes |
+| `extremes` | Min and max values | Show value range per interval |
 
 :::tip
 
