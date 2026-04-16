@@ -217,7 +217,7 @@ static uint64_t rrdcontext_checkpoint_invalidate_pending(RRDHOST *host) {
         return 0;
 
     spinlock_lock(&aclk_host_config->pending_ctx_spinlock);
-    uint64_t generation = ++aclk_host_config->pending_ctx_generation;
+    uint64_t generation = __atomic_add_fetch(&aclk_host_config->pending_ctx_generation, 1, __ATOMIC_RELEASE);
     rrdcontext_checkpoint_clear_pending_unsafe(aclk_host_config);
     spinlock_unlock(&aclk_host_config->pending_ctx_spinlock);
 
@@ -254,7 +254,7 @@ static bool rrdcontext_checkpoint_save_pending(RRDHOST *host, struct ctxs_checkp
     rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_CONTEXTS);
 
     spinlock_lock(&aclk_host_config->pending_ctx_spinlock);
-    ++aclk_host_config->pending_ctx_generation;
+    __atomic_add_fetch(&aclk_host_config->pending_ctx_generation, 1, __ATOMIC_RELEASE);
     rrdcontext_checkpoint_clear_pending_unsafe(aclk_host_config);
     aclk_host_config->pending_ctx_claim_id = strdupz(cmd->claim_id);
     aclk_host_config->pending_ctx_node_id = strdupz(cmd->node_id);
@@ -445,7 +445,7 @@ void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host) {
     char *claim_id = aclk_host_config->pending_ctx_claim_id;
     char *node_id = aclk_host_config->pending_ctx_node_id;
     uint64_t version_hash = aclk_host_config->pending_ctx_version_hash;
-    uint64_t generation = aclk_host_config->pending_ctx_generation;
+    uint64_t generation = __atomic_load_n(&aclk_host_config->pending_ctx_generation, __ATOMIC_RELAXED);
 
     aclk_host_config->pending_ctx_claim_id = NULL;
     aclk_host_config->pending_ctx_node_id = NULL;
