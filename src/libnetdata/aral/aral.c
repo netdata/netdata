@@ -1560,11 +1560,16 @@ static int aral_detect_acquire_to_page_lock_race(void) {
     ND_THREAD *thread = nd_thread_create("ARALRACE", NETDATA_THREAD_OPTION_DONT_LOG,
                                          aral_race_unittest_allocator_thread, &allocator);
 
-    if(!aral_unittest_wait_for_flag(&aral_race_unittest_hook.first_allocator_waiting, 5 * USEC_PER_SEC)) {
+    if(!thread) {
+        fprintf(stderr, "ARAL race unittest: failed to create allocator thread.\n");
+        errors++;
+    }
+
+    if(thread && !aral_unittest_wait_for_flag(&aral_race_unittest_hook.first_allocator_waiting, 5 * USEC_PER_SEC)) {
         fprintf(stderr, "ARAL race unittest: timed out waiting for the first allocator to pause.\n");
         errors++;
     }
-    else {
+    else if(thread) {
         if(!aral_race_unittest_hook.page) {
             fprintf(stderr, "ARAL race unittest: paused allocator did not publish its target page.\n");
             errors++;
@@ -1574,7 +1579,8 @@ static int aral_detect_acquire_to_page_lock_race(void) {
     }
 
     __atomic_store_n(&aral_race_unittest_hook.release_first_allocator, true, __ATOMIC_RELEASE);
-    nd_thread_join(thread);
+    if(thread)
+        nd_thread_join(thread);
     __atomic_store_n(&aral_race_unittest_hook.enabled, false, __ATOMIC_RELEASE);
 
     if(!allocator.entry) {
