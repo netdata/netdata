@@ -236,7 +236,7 @@ static bool rrdcontext_checkpoint_generation_is_current(RRDHOST *host, const cha
     if(likely(aclk_host_config && current_generation == generation))
         return true;
 
-    nd_log(NDLS_DAEMON, NDLP_NOTICE,
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "RRDCONTEXT: skipping stale checkpoint for host '%s', claim id '%s', node id '%s' "
            "(generation %"PRIu64", current %"PRIu64").",
            rrdhost_hostname(host), claim_id, node_id, generation, current_generation);
