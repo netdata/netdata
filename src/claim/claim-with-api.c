@@ -9,6 +9,13 @@
 #include <openssl/pem.h>
 #include <openssl/err.h>
 
+#define CLAIM_RESPONSE_SIZE_LIMIT (10 * 1024 * 1024)
+
+struct claim_response_buffer {
+    BUFFER *wb;
+    bool too_large;
+};
+
 static bool check_and_generate_certificates() {
     FILE *fp;
     EVP_PKEY *pkey = NULL;
@@ -76,10 +83,15 @@ static bool check_and_generate_certificates() {
 }
 
 static size_t response_write_callback(void *ptr, size_t size, size_t nmemb, void *stream) {
-    BUFFER *wb = stream;
+    struct claim_response_buffer *response = stream;
     size_t real_size = size * nmemb;
 
-    buffer_memcat(wb, ptr, real_size);
+    if (unlikely(real_size > CLAIM_RESPONSE_SIZE_LIMIT - buffer_strlen(response->wb))) {
+        response->too_large = true;
+        return 0;
+    }
+
+    buffer_memcat(response->wb, ptr, real_size);
 
     return real_size;
 }
@@ -233,6 +245,10 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
 
     // we will receive the response in this
     CLEAN_BUFFER *response = buffer_create(0, NULL);
+    struct claim_response_buffer response_buffer = {
+        .wb = response,
+        .too_large = false,
+    };
 
     // configure the request
     headers = curl_slist_append(headers, "Content-Type: application/json");
@@ -241,7 +257,8 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, buffer_tostring(wb));
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, response_write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, response);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_buffer);
+    curl_easy_setopt(curl, CURLOPT_MAXFILESIZE_LARGE, (curl_off_t)CLAIM_RESPONSE_SIZE_LIMIT);
 
     if(trusted_key_file)
         curl_easy_setopt(curl, CURLOPT_CAINFO, trusted_key_file);
@@ -278,19 +295,33 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     // execute the request
     res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        claim_agent_failure_reason_set("Request failed with error: %s\n"
-                                       "proxy: '%s',\n"
-                                       "insecure: %s,\n"
-                                       "public key file: '%s',\n"
-                                       "trusted key file: '%s'",
-                                       curl_easy_strerror(res),
-                                       proxy,
-                                       insecure ? "true" : "false",
-                                       public_key_file ? public_key_file : "none",
-                                       trusted_key_file ? trusted_key_file : "none");
+        bool response_too_large = (res == CURLE_FILESIZE_EXCEEDED || response_buffer.too_large);
+
+        if (response_too_large)
+            claim_agent_failure_reason_set("Request failed: response body exceeded %zu bytes\n"
+                                           "proxy: '%s',\n"
+                                           "insecure: %s,\n"
+                                           "public key file: '%s',\n"
+                                           "trusted key file: '%s'",
+                                           (size_t)CLAIM_RESPONSE_SIZE_LIMIT,
+                                           proxy,
+                                           insecure ? "true" : "false",
+                                           public_key_file ? public_key_file : "none",
+                                           trusted_key_file ? trusted_key_file : "none");
+        else
+            claim_agent_failure_reason_set("Request failed with error: %s\n"
+                                           "proxy: '%s',\n"
+                                           "insecure: %s,\n"
+                                           "public key file: '%s',\n"
+                                           "trusted key file: '%s'",
+                                           curl_easy_strerror(res),
+                                           proxy,
+                                           insecure ? "true" : "false",
+                                           public_key_file ? public_key_file : "none",
+                                           trusted_key_file ? trusted_key_file : "none");
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
-        *can_retry = true;
+        *can_retry = !response_too_large;
         return false;
     }
 
