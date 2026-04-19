@@ -166,6 +166,18 @@ static int debug_callback(CURL *handle, curl_infotype type, char *data, size_t s
     return 0;
 }
 
+static bool cleanup_curl_request_failure(CURL *curl, struct curl_slist *headers, bool *can_retry, CURLcode res,
+                                         const char *option) {
+    claim_agent_failure_reason_set("Cannot configure request (%s failed: %s)", option, curl_easy_strerror(res));
+
+    curl_easy_cleanup(curl);
+    if(headers)
+        curl_slist_free_all(headers);
+
+    *can_retry = false;
+    return false;
+}
+
 static bool send_curl_request(const char *machine_guid, const char *hostname, const char *token, const char *rooms, const char *url, const char *proxy, bool insecure, bool *can_retry) {
     CURL *curl;
     CURLcode res;
@@ -240,8 +252,15 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
         return false;
     }
 
+#define CURL_SETOPT_OR_RETURN(option, value)                                                       \
+    do {                                                                                           \
+        res = curl_easy_setopt(curl, option, value);                                               \
+        if(unlikely(res != CURLE_OK))                                                              \
+            return cleanup_curl_request_failure(curl, headers, can_retry, res, #option);          \
+    } while(0)
+
     // curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
-    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, debug_callback);
+    CURL_SETOPT_OR_RETURN(CURLOPT_DEBUGFUNCTION, debug_callback);
 
     // we will receive the response in this
     CLEAN_BUFFER *response = buffer_create(0, NULL);
@@ -252,28 +271,28 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
 
     // configure the request
     headers = curl_slist_append(headers, "Content-Type: application/json");
-    curl_easy_setopt(curl, CURLOPT_URL, target_url);
-    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, buffer_tostring(wb));
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, response_write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_buffer);
-    curl_easy_setopt(curl, CURLOPT_MAXFILESIZE_LARGE, (curl_off_t)CLAIM_RESPONSE_SIZE_LIMIT);
+    CURL_SETOPT_OR_RETURN(CURLOPT_URL, target_url);
+    CURL_SETOPT_OR_RETURN(CURLOPT_CUSTOMREQUEST, "PUT");
+    CURL_SETOPT_OR_RETURN(CURLOPT_POSTFIELDS, buffer_tostring(wb));
+    CURL_SETOPT_OR_RETURN(CURLOPT_HTTPHEADER, headers);
+    CURL_SETOPT_OR_RETURN(CURLOPT_WRITEFUNCTION, response_write_callback);
+    CURL_SETOPT_OR_RETURN(CURLOPT_WRITEDATA, &response_buffer);
+    CURL_SETOPT_OR_RETURN(CURLOPT_MAXFILESIZE_LARGE, (curl_off_t)CLAIM_RESPONSE_SIZE_LIMIT);
 
     if(trusted_key_file)
-        curl_easy_setopt(curl, CURLOPT_CAINFO, trusted_key_file);
+        CURL_SETOPT_OR_RETURN(CURLOPT_CAINFO, trusted_key_file);
 
     // Proxy configuration
     if (proxy) {
         if (!*proxy || strcmp(proxy, "none") == 0) {
             // disable proxy configuration in libcurl
-            curl_easy_setopt(curl, CURLOPT_PROXY, "");
+            CURL_SETOPT_OR_RETURN(CURLOPT_PROXY, "");
             proxy = "none";
         }
 
         else if (strcmp(proxy, "env") != 0) {
             // set the custom proxy for libcurl
-            curl_easy_setopt(curl, CURLOPT_PROXY, proxy);
+            CURL_SETOPT_OR_RETURN(CURLOPT_PROXY, proxy);
         }
 
         else {
@@ -284,13 +303,15 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
 
     // Insecure option
     if (insecure) {
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+        CURL_SETOPT_OR_RETURN(CURLOPT_SSL_VERIFYPEER, 0L);
+        CURL_SETOPT_OR_RETURN(CURLOPT_SSL_VERIFYHOST, 0L);
     }
 
     // Set timeout options
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+    CURL_SETOPT_OR_RETURN(CURLOPT_TIMEOUT, 10L);
+    CURL_SETOPT_OR_RETURN(CURLOPT_CONNECTTIMEOUT, 5L);
+
+#undef CURL_SETOPT_OR_RETURN
 
     // execute the request
     res = curl_easy_perform(curl);
