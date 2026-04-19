@@ -321,16 +321,20 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
                 if (json_object_object_get_ex(parsed_json, "errorMsgKey", &error_key_obj))
                     error_key = json_object_get_string(error_key_obj);
 
-                if (strcmp(error_key, "ErrInvalidNodeID") == 0)
-                    claim_agent_failure_reason_set("Failed: the node id is invalid");
-                else if (strcmp(error_key, "ErrInvalidNodeName") == 0)
-                    claim_agent_failure_reason_set("Failed: the node name is invalid");
-                else if (strcmp(error_key, "ErrInvalidRoomID") == 0)
-                    claim_agent_failure_reason_set("Failed: one or more room ids are invalid");
-                else if (strcmp(error_key, "ErrInvalidPublicKey") == 0)
-                    claim_agent_failure_reason_set("Failed: the public key is invalid");
+                if(error_key) {
+                    if (strcmp(error_key, "ErrInvalidNodeID") == 0)
+                        claim_agent_failure_reason_set("Failed: the node id is invalid");
+                    else if (strcmp(error_key, "ErrInvalidNodeName") == 0)
+                        claim_agent_failure_reason_set("Failed: the node name is invalid");
+                    else if (strcmp(error_key, "ErrInvalidRoomID") == 0)
+                        claim_agent_failure_reason_set("Failed: one or more room ids are invalid");
+                    else if (strcmp(error_key, "ErrInvalidPublicKey") == 0)
+                        claim_agent_failure_reason_set("Failed: the public key is invalid");
+                    else
+                        claim_agent_failure_reason_set("Failed with description '%s'", error_key);
+                }
                 else
-                    claim_agent_failure_reason_set("Failed with description '%s'", error_key);
+                    claim_agent_failure_reason_set("Failed with a response code %ld", http_status_code);
 
                 json_object_put(parsed_json);
             }
