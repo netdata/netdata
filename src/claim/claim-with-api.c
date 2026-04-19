@@ -159,6 +159,7 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     CURLcode res;
     char target_url[2048];
     char public_key[2048] = "";
+    size_t public_key_bytes_read = 0;
     FILE *fp;
     struct curl_slist *headers = NULL;
 
@@ -175,12 +176,13 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     // Read the public key
     CLEAN_CHAR_P *public_key_file = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "public.pem");
     fp = fopen(public_key_file, "r");
-    if (!fp || fread(public_key, 1, sizeof(public_key), fp) == 0) {
+    if (!fp || (public_key_bytes_read = fread(public_key, 1, sizeof(public_key) - 1, fp)) == 0) {
         claim_agent_failure_reason_set("cannot read public key file '%s'", public_key_file);
         if (fp) fclose(fp);
         *can_retry = false;
         return false;
     }
+    public_key[public_key_bytes_read] = '\0';
     fclose(fp);
 
     // check if we have trusted.pem
