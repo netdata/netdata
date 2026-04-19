@@ -177,7 +177,6 @@ set(CPACK_DEBIAN_USER_DEBUGINFO_PACKAGE Off)
 # dashboard
 #
 
-set(CPACK_COMPONENT_DASHBOARD_DEPENDS "netdata")
 set(CPACK_COMPONENT_DASHBOARD_DESCRIPTION
     "The local dashboard for the Netdata Agent.
  This allows access to the dashboard on the local node without internet access.")
@@ -193,7 +192,6 @@ set(CPACK_DEBIAN_DASHBOARD_DEBUGINFO_PACKAGE Off)
 # apps.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-APPS_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-APPS_DESCRIPTION
 		"The per-application metrics collector plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect per-application and
@@ -213,7 +211,6 @@ set(CPACK_DEBIAN_PLUGIN-APPS_DEBUGINFO_PACKAGE On)
 # charts.d.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-CHARTSD_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-CHARTSD_DESCRIPTION
 		"The charts.d metrics collection plugin for the Netdata Agent
  This plugin adds a selection of additional collectors written in shell
@@ -254,7 +251,6 @@ set(CPACK_DEBIAN_PLUGIN-CUPS_DEBUGINFO_PACKAGE On)
 # debugfs.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-DEBUGFS_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-DEBUGFS_DESCRIPTION
 		"The debugfs metrics collector for the Netdata Agent
  This plugin allows the Netdata Agent to collect Linux kernel metrics
@@ -273,7 +269,6 @@ set(CPACK_DEBIAN_PLUGIN-DEBUGFS_DEBUGINFO_PACKAGE On)
 # ebpf.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-EBPF_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-EBPF_DESCRIPTION
 		"The eBPF metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to use eBPF code to collect more
@@ -336,7 +331,6 @@ set(CPACK_DEBIAN_PLUGIN-FREEIPMI_DEBUGINFO_PACKAGE On)
 # go.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-GO_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-GO_DESCRIPTION
 		"The go.d metrics collection plugin for the Netdata Agent
  This plugin adds a selection of additional collectors written in Go to
@@ -438,7 +432,6 @@ set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_DEBUGINFO_PACKAGE On)
 # otel.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-OTEL_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-OTEL_DESCRIPTION
 		"The OpenTelemetry collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect metrics and logs via
@@ -460,7 +453,6 @@ set(CPACK_DEBIAN_PLUGIN-OTEL_DEBUGINFO_PACKAGE Off)
 # otel-signal-viewer
 #
 
-set(CPACK_COMPONENT_PLUGIN-OTEL-SIGNAL-VIEWER_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-OTEL-SIGNAL-VIEWER_DESCRIPTION
 		"The OTel signal viewer plugin for the Netdata Agent
  This plugin provides OTel signal viewing and querying functionality
@@ -479,7 +471,6 @@ set(CPACK_DEBIAN_PLUGIN-OTEL-SIGNAL-VIEWER_DEBUGINFO_PACKAGE Off)
 # nfacct.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-NFACCT_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-NFACCT_DESCRIPTION
 		"The NFACCT metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect metrics from the firewall
@@ -499,7 +490,6 @@ set(CPACK_DEBIAN_PLUGIN-NFACCT_DEBUGINFO_PACKAGE On)
 # perf.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-PERF_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-PERF_DESCRIPTION
 		"The perf metrics collector for the Netdata Agent
  This plugin allows the Netdata to collect metrics from the Linux perf
@@ -519,7 +509,6 @@ set(CPACK_DEBIAN_PLUGIN-PERF_DEBUGINFO_PACKAGE On)
 # pythond.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-PYTHOND_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-PYTHOND_DESCRIPTION
 		"The python.d metrics collection plugin for the Netdata Agent
  Many of the collectors provided by this package are also available
@@ -543,7 +532,6 @@ set(CPACK_DEBIAN_PLUGIN-PYTHOND_DEBUGINFO_PACKAGE Off)
 # slabinfo.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-SLABINFO_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-SLABINFO_DESCRIPTION
 		"The slabinfo metrics collector for the Netdata Agent
  This plugin allows the Netdata Agent to collect perfromance and
