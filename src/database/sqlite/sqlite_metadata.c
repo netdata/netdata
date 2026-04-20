@@ -499,9 +499,9 @@ void sql_load_node_id(RRDHOST *host)
     param = 0;
     int rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW)) {
-        const nd_uuid_t *node_id = sqlite3_column_uuid_ptr(res, 0);
-        if (likely(node_id))
-            set_host_node_id(host, (nd_uuid_t *)node_id);
+        nd_uuid_t node_id;
+        if (likely(sqlite3_column_uuid_copy(res, 0, node_id)))
+            set_host_node_id(host, &node_id);
         else
             set_host_node_id(host, NULL);
     }
