@@ -81,3 +81,4 @@ curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://ap
 ```console
 curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/contexts
 ```
+
