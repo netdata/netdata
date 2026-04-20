@@ -1523,18 +1523,21 @@ run_query:;
     nd_uuid_t host_id;
     nd_uuid_t config_hash_id;
     nd_uuid_t transition_id;
+    size_t invalid_host_ids = 0;
+    size_t invalid_config_hash_ids = 0;
+    size_t invalid_transition_ids = 0;
 
     param = 0;
     while (sqlite3_step(res) == SQLITE_ROW) {
         if (unlikely(!sqlite3_column_uuid_copy(res, 0, host_id))) {
-            error_report("HEALTH: Got invalid host id while loading alert transitions. Ignoring entry.");
+            invalid_host_ids++;
             continue;
         }
 
         atd.host_id = &host_id;
         atd.alarm_id = sqlite3_column_int64(res, 1);
         if (unlikely(!sqlite3_column_uuid_copy(res, 2, config_hash_id))) {
-            error_report("HEALTH: Got invalid config hash id while loading alert transitions. Ignoring entry.");
+            invalid_config_hash_ids++;
             continue;
         }
 
@@ -1561,7 +1564,7 @@ run_query:;
         atd.old_value = (NETDATA_DOUBLE) sqlite3_column_double(res, 22);
         atd.last_repeat = sqlite3_column_int64(res, 23);
         if (unlikely(!sqlite3_column_uuid_copy(res, 24, transition_id))) {
-            error_report("HEALTH: Got invalid transition id while loading alert transitions. Ignoring entry.");
+            invalid_transition_ids++;
             continue;
         }
 
@@ -1574,6 +1577,11 @@ run_query:;
         atd.summary = (const char *) sqlite3_column_text(res, 30);
 
         cb(&atd, data);
+    }
+
+    if (unlikely(invalid_host_ids || invalid_config_hash_ids || invalid_transition_ids)) {
+        error_report("HEALTH: Ignored invalid alert transition rows (host_id=%zu, config_hash_id=%zu, transition_id=%zu).",
+                     invalid_host_ids, invalid_config_hash_ids, invalid_transition_ids);
     }
 
 done:
@@ -1660,13 +1668,14 @@ int sql_get_alert_configuration(
 
     struct sql_alert_config_data acd = {0 };
     nd_uuid_t config_hash_id;
+    size_t invalid_config_hash_ids = 0;
 
     added = 0;
     int param;
     while (sqlite3_step(res) == SQLITE_ROW) {
         param = 0;
         if (unlikely(!sqlite3_column_uuid_copy(res, param++, config_hash_id))) {
-            error_report("HEALTH: Got invalid config hash id while loading alert configuration. Ignoring entry.");
+            invalid_config_hash_ids++;
             continue;
         }
 
@@ -1709,6 +1718,11 @@ int sql_get_alert_configuration(
 
         cb(&acd, data);
         added++;
+    }
+
+    if (unlikely(invalid_config_hash_ids)) {
+        error_report("HEALTH: Ignored %zu alert configuration rows with invalid config_hash_id.",
+                     invalid_config_hash_ids);
     }
 
     SQLITE_FINALIZE(res);

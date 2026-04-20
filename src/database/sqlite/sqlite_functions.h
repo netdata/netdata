@@ -123,8 +123,9 @@ int get_database_page_count(sqlite3 *database);
 
 // Return a pointer to the UUID blob stored in column iCol when the current row
 // contains a BLOB with exactly sizeof(nd_uuid_t) bytes. The caller must pass a
-// valid statement positioned on a row. Returns NULL for NULL, non-BLOB, or
-// malformed values.
+// valid statement positioned on a row. The returned pointer refers to
+// SQLite-owned memory and is only valid until the statement is stepped, reset,
+// or finalized. Returns NULL for NULL, non-BLOB, or malformed values.
 static inline const nd_uuid_t *sqlite3_column_uuid_ptr(sqlite3_stmt *res, int iCol) {
     if (sqlite3_column_type(res, iCol) != SQLITE_BLOB)
         return NULL;
