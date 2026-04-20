@@ -270,7 +270,17 @@ static bool send_curl_request(const char *machine_guid, const char *hostname, co
     };
 
     // configure the request
-    headers = curl_slist_append(headers, "Content-Type: application/json");
+    struct curl_slist *headers_with_content_type = curl_slist_append(headers, "Content-Type: application/json");
+    if(unlikely(!headers_with_content_type)) {
+        claim_agent_failure_reason_set("Cannot append Content-Type header to the claim request");
+        curl_easy_cleanup(curl);
+        if(headers)
+            curl_slist_free_all(headers);
+        *can_retry = false;
+        return false;
+    }
+    headers = headers_with_content_type;
+
     CURL_SETOPT_OR_RETURN(CURLOPT_URL, target_url);
     CURL_SETOPT_OR_RETURN(CURLOPT_CUSTOMREQUEST, "PUT");
     CURL_SETOPT_OR_RETURN(CURLOPT_POSTFIELDS, buffer_tostring(wb));
