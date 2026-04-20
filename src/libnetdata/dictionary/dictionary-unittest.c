@@ -1026,6 +1026,7 @@ size_t dictionary_unittest_views(void) {
     }
     else if(item_flag_check(view_item2, ITEM_FLAG_DELETED) || view_item2->shared != master_item2->shared) {
         fprintf(stderr, "View replacement returned stale/deleted item\n");
+        dictionary_acquired_item_release(view, view_item2);
         errors++;
     }
     else
