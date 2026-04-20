@@ -482,6 +482,7 @@ static inline DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONA
 
             if(item_check_and_acquire_advanced(dict, item, true) != RC_ITEM_OK) {
                 spins++;
+                item = NULL;
                 continue;
             }
 

@@ -935,6 +935,9 @@ size_t dictionary_unittest_views(void) {
     struct dictionary_stats stats = {};
     DICTIONARY *master = dictionary_create_advanced(DICT_OPTION_NONE, &stats, 0);
     DICTIONARY *view = dictionary_create_view(master);
+    DICTIONARY_ITEM *master_item2 = NULL;
+    DICTIONARY_ITEM *view_item2 = NULL;
+    DICTIONARY_ITEM *lookup = NULL;
 
     fprintf(stderr, "\n\nChecking dictionary views...\n");
 
@@ -1003,6 +1006,41 @@ size_t dictionary_unittest_views(void) {
     dictionary_acquired_item_release(view, item1_on_view);
     errors += unittest_check_dictionary("master", master, 0, 0, 1, 0, 1);
     errors += unittest_check_dictionary("view", view, 0, 0, 1, 0, 1);
+
+    fprintf(stderr, "\nPASS 3: Replacing a stale view item after master deletion:\n");
+    item1_on_master = dictionary_set_and_acquire_item(master, "KEY 1", "VALUE1", strlen("VALUE1") + 1);
+    item1_on_view = dictionary_view_set_and_acquire_item(view, "KEY 1 ON VIEW", item1_on_master);
+    dictionary_acquired_item_release(view, item1_on_view);
+    dictionary_del(master, "KEY 1");
+
+    // Suppress the preflight garbage collection once so view_set() exercises
+    // the stale-entry cleanup path inside dict_item_add_or_reset_value_and_acquire().
+    __atomic_store_n(&view->last_gc_run_us, now_realtime_usec(), __ATOMIC_RELAXED);
+
+    master_item2 = dictionary_set_and_acquire_item(master, "KEY 1", "VALUE2", strlen("VALUE2") + 1);
+    view_item2 = dictionary_view_set_and_acquire_item(view, "KEY 1 ON VIEW", master_item2);
+
+    if(!view_item2) {
+        fprintf(stderr, "View replacement returned NULL\n");
+        errors++;
+    }
+    else if(item_flag_check(view_item2, ITEM_FLAG_DELETED) || view_item2->shared != master_item2->shared) {
+        fprintf(stderr, "View replacement returned stale/deleted item\n");
+        errors++;
+    }
+    else
+        dictionary_acquired_item_release(view, view_item2);
+
+    lookup = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(view, "KEY 1 ON VIEW");
+    if(!lookup || item_flag_check(lookup, ITEM_FLAG_DELETED) || lookup->shared != master_item2->shared) {
+        fprintf(stderr, "View lookup did not resolve to the replacement item\n");
+        errors++;
+    }
+    if(lookup)
+        dictionary_acquired_item_release(view, lookup);
+
+    dictionary_acquired_item_release(master, master_item2);
+    dictionary_acquired_item_release(master, item1_on_master);
 
     dictionary_destroy(master);
     dictionary_destroy(view);
