@@ -243,8 +243,10 @@ static inline char *sqlite3_uuid_unparse_strdupz(sqlite3_stmt *res, int iCol) {
 
     if(sqlite3_column_type(res, iCol) == SQLITE_NULL)
         uuid_str[0] = '\0';
-    else
-        uuid_unparse_lower(*((nd_uuid_t *) sqlite3_column_blob(res, iCol)), uuid_str);
+    else if (!sqlite3_column_uuid_unparse_lower(res, iCol, uuid_str)) {
+        error_report("ACLK ALERT: Got invalid UUID blob at column %d. Returning empty string.", iCol);
+        uuid_str[0] = '\0';
+    }
 
     return strdupz(uuid_str);
 }
