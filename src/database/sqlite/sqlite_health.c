@@ -1385,14 +1385,13 @@ bool sql_find_alert_transition(
 
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        ok = true;
         if (unlikely(!sqlite3_column_uuid_unparse_lower(res, 1, machine_guid))) {
             error_report("HEALTH: Got invalid machine guid while looking up alert transition. Ignoring it.");
-            ok = false;
             continue;
         }
 
         cb(machine_guid, (const char *) sqlite3_column_text(res, 2), sqlite3_column_int(res, 0), data);
+        ok = true;
     }
 
 done:
