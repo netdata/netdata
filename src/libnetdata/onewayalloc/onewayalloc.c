@@ -184,6 +184,48 @@ void *onewayalloc_doublesize(ONEWAYALLOC *owa, const void *src, size_t oldsize) 
     return dst;
 }
 
+void onewayalloc_reset(ONEWAYALLOC *owa) {
+#ifdef FSANITIZE_ADDRESS
+    // Under the sanitizer path, onewayalloc_mallocz goes straight to the
+    // system allocator and nothing is tracked in the owa page list — there
+    // is nothing to reset. Individual allocations are released by callers
+    // via onewayalloc_freez() (which calls freez() under the sanitizer).
+    (void)owa;
+    return;
+#endif
+
+    if (!owa) return;
+
+    OWA_PAGE *head = (OWA_PAGE *)owa;
+
+    // Free every page except the head; we keep the head so the caller can
+    // reuse the arena without another mmap.
+    size_t freed_size = 0;
+    OWA_PAGE *page = head->next;
+    while (page) {
+        OWA_PAGE *p = page;
+        page = page->next;
+        freed_size += p->size;
+        if (p->mmap)
+            nd_munmap(p, p->size);
+        else
+            freez(p);
+    }
+
+    if (freed_size)
+        __atomic_sub_fetch(&onewayalloc_total_memory, freed_size, __ATOMIC_RELAXED);
+
+    // Roll the head page's bump cursor back to the position right after the
+    // OWA_PAGE header, and rewire the single-page list so head == last.
+    head->next = NULL;
+    head->last = head;
+    head->offset = natural_alignment(sizeof(OWA_PAGE));
+    head->stats_pages = 1;
+    head->stats_pages_size = head->size;
+    // stats_mallocs_made / stats_mallocs_size are lifetime counters and
+    // intentionally left alone, to keep them useful across resets.
+}
+
 void onewayalloc_destroy(ONEWAYALLOC *owa) {
     if(!owa) return;
 
