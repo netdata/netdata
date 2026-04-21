@@ -116,6 +116,443 @@ logs:
 - When auto-derived grace exceeds expiry and expiry was not explicitly set, expiry is bumped to match grace
 - Per-metric `interval_secs` overrides also auto-derive grace period using the same `5 * interval` rule
 
+## Examples
+
+<details open><summary>View all OTel Collector configuration examples</summary>
+
+### Example: Host Metrics Receiver
+
+Complete setup for collecting system-level metrics (CPU, memory, disk, network, filesystem, load, paging, processes) from the host OS.
+
+<details open><summary>View Collector configuration</summary>
+
+```yaml
+receivers:
+  hostmetrics:
+    collection_interval: 10s
+    scrapers:
+      cpu:
+      memory:
+      disk:
+      filesystem:
+      network:
+      load:
+      paging:
+      processes:
+
+exporters:
+  otlp:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [hostmetrics]
+      exporters: [otlp]
+```
+
+</details>
+
+<details open><summary>View Netdata plugin configuration</summary>
+
+```yaml
+endpoint:
+  path: "127.0.0.1:4317"
+
+metrics:
+  chart_configs_dir: /etc/netdata/otel.d/v1/metrics/
+  interval_secs: 10
+  grace_period_secs: 60
+  expiry_duration_secs: 900
+  max_new_charts_per_request: 100
+
+logs:
+  journal_dir: /var/log/netdata/otel-journals
+```
+
+</details>
+
+**What you'll see:**
+
+- CPU time per core broken down by state (`user`, `system`, `idle`, `iowait`, etc.)
+- Memory usage by type (`used`, `free`, `cached`, `buffered`)
+- Network I/O per interface (transmit, receive, errors, dropped, packets)
+- Filesystem usage and utilization per mount point
+- Load averages (1-minute, 5-minute, 15-minute)
+- Paging faults and operations
+- Process count by status and CPU time per process
+
+</details>
+
+### Example: Prometheus Endpoint
+
+Scrape any HTTP endpoint that exposes metrics in Prometheus format. Bridges the Prometheus exporter ecosystem into OTel pipeline without running a separate Prometheus server.
+
+<details open><summary>View Collector configuration</summary>
+
+```yaml
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: "node-exporter"
+          scrape_interval: 10s
+          static_configs:
+            - targets: ["localhost:9100"]
+        - job_name: "my-application"
+          scrape_interval: 10s
+          static_configs:
+            - targets: ["localhost:8080"]
+          metrics_path: "/metrics"
+
+exporters:
+  otlp:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [prometheus]
+      exporters: [otlp]
+```
+
+</details>
+
+<details open><summary>View Netdata plugin configuration</summary>
+
+```yaml
+endpoint:
+  path: "127.0.0.1:4317"
+
+metrics:
+  chart_configs_dir: /etc/netdata/open.d/v1/metrics/
+  interval_secs: 10
+  max_new_charts_per_request: 100
+
+logs:
+  journal_dir: /var/log/netdata/otel-journals
+```
+
+</details>
+
+<details open><summary>View metric mapping for Prometheus</summary>
+
+```yaml
+metrics:
+  "prometheus_requests_total":
+    - instrumentation_scope:
+        name: .*prometheus.*
+      dimension_attribute_key: handler
+```
+
+</details>
+
+**What you'll see:**
+
+- Request rate per HTTP handler path (if labeled)
+- Prometheus counter metrics converted to per-second rates
+- Prometheus gauge metrics as instantaneous values
+
+</details>
+
+### Example: Redis
+
+Collect metrics from a Redis instance (client connections, memory usage, keyspace statistics, command throughput, replication status).
+
+<details open><summary>View Collector configuration</summary>
+
+```yaml
+receivers:
+  redis:
+    endpoint: "localhost:6379"
+    collection_interval: 10s
+
+exporters:
+  otlp:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [redis]
+      exporters: [otlp]
+```
+
+</details>
+
+<details open><summary>View Collector with authentication</summary>
+
+```yaml
+receivers:
+  redis:
+    endpoint: "localhost:6379"
+    collection_interval: 10s
+    password: "${env:REDIS_PASSWORD}"
+
+exporters:
+  otlp:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [redis]
+      exporters: [otlp]
+```
+
+</details>
+
+<details open><summary>View metric mapping</summary>
+
+```yaml
+metrics:
+  "redis.memory.used":
+    - dimension_attribute_key: db
+
+  "redis.commands.processed":
+    - dimension_attribute_key: db
+
+  "redis.keyspace.hits":
+    - dimension_attribute_key: db
+```
+
+</details>
+
+**What you'll see:**
+
+- Memory usage per database (`used`, `rss`, etc.)
+- Commands processed per database
+- Keyspace hits/misses per database
+- Network input/output per database
+- Evicted and expired keys per database
+
+**Key metrics:**
+
+- `redis.memory.used`: Total memory allocated by Redis (bytes)
+- `redis.memory.rss`: Resident set size reported by OS (bytes)
+- `redis.clients.connected`: Number of connected clients
+- `redis.commands.processed`: Total commands processed since startup
+- `redis.keyspace.hits`: Successful key lookups
+- `redis.keyspace.misses`: Failed key lookups
+- `redis.keys.expired`: Keys removed due to TTL expiration
+- `redis.keys.evicted`: Keys evicted due to memory pressure
+- `redis.net.input`: Total bytes received
+- `redis.net.output`: Total bytes sent
+- `redis.db.keys`: Number of keys per database
+
+</details>
+
+### Example: NGINX
+
+Collect metrics from NGINX's stub status module (accepted/handled connections, current connections by state, total requests).
+
+<details open><summary>View Collector configuration</summary>
+
+```yaml
+receivers:
+  nginx:
+    endpoint: "http://localhost:80/status"
+    collection_interval: 10s
+
+exporters:
+  otlp:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [nginx]
+      exporters: [otlp]
+```
+
+</details>
+
+**Prerequisite:** Enable stub status endpoint in NGINX configuration:
+
+```nginx
+server {
+    location /status {
+        stub_status;
+        allow 127.0.0.1;
+        deny all;
+    }
+}
+```
+
+**What you'll see:**
+
+- Total accepted client connections
+- Total handled connections
+- Current connections by state (`active`, `reading`, `writing`, `waiting`)
+- Total client requests served
+
+**Key metrics:**
+
+- `nginx.connections_accepted`: Total accepted client connections
+- `nginx.connections_handled`: Total handled connections
+- `nginx.connections_current`: Current connections by state
+- `nginx.requests`: Total client requests served
+
+</details>
+
+### Example: PostgreSQL
+
+Collect database performance metrics from PostgreSQL (connection counts, query throughput, table and index statistics, buffer usage).
+
+<details open><summary>View Collector configuration</summary>
+
+```yaml
+receivers:
+  postgresql:
+    endpoint: "localhost:5432"
+    username: "otel"
+    password: "${env:POSTGRESQL_PASSWORD}"
+    databases:
+      - "mydb"
+    collection_interval: 10s
+    tls:
+      insecure: true
+
+exporters:
+  otlp:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [postgresql]
+      exporters: [otlp]
+```
+
+</details>
+
+**Prerequisite:** Create dedicated monitoring user:
+
+```sql
+CREATE USER otel WITH PASSWORD 'your-secure-password';
+GRANT pg_monitor TO otel;
+```
+
+<details open><summary>View metric mapping</summary>
+
+```yaml
+metrics:
+  "postgresql.commits":
+    - dimension_attribute_key: database
+
+  "postgresql.db.size":
+    - dimension_attribute_key: database
+
+  "postgresql.operations":
+    - dimension_attribute_key: database
+```
+
+</details>
+
+**What you'll see:**
+
+- Transactions committed/rolled back per database
+- Database size in bytes
+- Row operations (inserts, updates, deletes) per database
+- Block reads by source (heap, index, toast) per database
+- Connection count and maximum allowed connections
+- Number of tables and index scans per database
+
+**Key metrics:**
+
+- `postgresql.commits`: Transactions committed per database
+- `postgresql.rollbacks`: Transactions rolled back per database
+- `postgresql.db.size`: Database size in bytes
+- `postgresql.rows`: Number of rows by state (live, dead)
+- `postgresql.operations`: Row operations (inserts, updates, deletes)
+- `postgresql.blocks_read`: Block reads by source
+- `postgresql.connection.max`: Maximum allowed connections
+- `postgresql.table.count`: Number of user tables per database
+- `postgresql.index.scans`: Number of index scans
+
+</details>
+
+### Example: Multiple Receivers
+
+Combine hostmetrics, Redis, and NGINX receivers in a single pipeline. All metrics flow to Netdata through the same OTLP exporter.
+
+<details open><summary>View Collector configuration</summary>
+
+```yaml
+receivers:
+  hostmetrics:
+    collection_interval: 10s
+    scrapers:
+      cpu:
+      memory:
+      disk:
+      network:
+      load:
+
+  redis:
+    endpoint: "localhost:6379"
+    collection_interval: 10s
+
+  nginx:
+    endpoint: "http://localhost:80/status"
+    collection_interval: 10s
+
+exporters:
+  otlp:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [hostmetrics, redis, nginx]
+      exporters: [otlp]
+```
+
+</details>
+
+<details open><summary>View Netdata plugin configuration</summary>
+
+```yaml
+endpoint:
+  path: "127.0.0.1:4317"
+
+metrics:
+  chart_configs_dir: /etc/netdata/otel.d/v1/metrics/
+  interval_secs: 10
+  max_new_charts_per_request: 100
+
+logs:
+  journal_dir: /var/log/netdata/otel-journals
+```
+
+</details>
+
+**What you'll see:**
+
+- All host metrics (CPU, memory, disk, network, load, paging, processes)
+- Redis metrics per database
+- NGINX metrics (connections, requests)
+
+**Note:** Each receiver operates independently. If one fails, the others continue to collect.
+
+</details>
+
+---
+
 ## Metric Mapping
 
 Chart configuration files in `chart_configs_dir` control how OTLP metrics map to Netdata charts.
@@ -486,6 +923,34 @@ When enabling TLS:
   2. Add chart configuration to use a lower-cardinality attribute as `dimension_attribute_key`
   3. Configure OTLP source to drop or downsample high-cardinality attributes
 
+### The Collector Reports Connection Refused
+
+**Cause:** The Netdata OTel plugin listens on `127.0.0.1:4317` by default. If the Collector runs on a different host, it cannot reach the plugin endpoint.
+
+**Solutions:**
+1. **Change Netdata endpoint to accept remote connections:**
+
+   ```yaml
+   endpoint:
+     path: "0.0.0.0:4317"
+   ```
+
+2. **Ensure firewall allows traffic on port 4317:**
+
+   ```bash
+   sudo ufw allow 4317/tcp
+   # or
+   sudo firewall-cmd --add-port=4317/tcp
+   ```
+
+3. **Verify Collector can reach the endpoint:**
+
+   ```bash
+   nc -zv <netdata-host-ip> 4317
+   ```
+
+**Security Note:** When binding to `0.0.0.0`, ensure that firewall or network policy restricts access to trusted sources. The gRPC endpoint does not require authentication by default. Consider enabling TLS for production environments.
+
 ### Logs Not Appearing
 
 1. **Check journal directory exists and is writable:**
@@ -514,3 +979,14 @@ When enabling TLS:
 3. **Ensure directory path is correct:**
    - Use absolute paths
    - Verify directory exists and is readable by netdata user
+
+## Additional Resources
+
+- [Netdata OTel plugin reference](https://github.com/netdata/netdata/tree/master/src/crates/netdata-otel/otel-plugin)
+- [OpenTelemetry Collector documentation](https://opentelemetry.io/docs/collector/)
+- [OpenTelemetry Collector Contrib receivers](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver)
+- [Host Metrics receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver)
+- [Prometheus receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver)
+- [Redis receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver)
+- [NGINX receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/nginxreceiver)
+- [PostgreSQL receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/postgresqlexreceiver)
