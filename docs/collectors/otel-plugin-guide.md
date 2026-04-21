@@ -10,10 +10,13 @@ It transforms OpenTelemetry's event-based metrics into Netdata's fixed-interval 
 
 The plugin automatically creates Netdata charts from incoming metrics with full alerting support. Logs are written to journal files and can be explored through the Netdata Logs tab.
 
-:::note
-This means charts are created automatically from incoming OTLP data points without requiring manual chart definitions.
 :::
 
+:::note
+
+This means charts are created automatically from incoming OTLP data points without requiring manual chart definitions.
+
+:::
 
 ## How It Works
 
@@ -570,8 +573,6 @@ logs:
 
 </details>
 
----
-
 ## Metric Mapping
 
 Chart configuration files in `chart_configs_dir` control how OTLP metrics map to Netdata charts.
@@ -896,11 +897,11 @@ When enabling TLS:
 
 ## Additional Resources
 
-- [Netdata OTel plugin reference](https://github.com/netdata/netdata/tree/master/src/crates/netdata-otel/otel-plugin)
+- [Netdata OTel plugin reference](/src/crates/netdata-otel/otel-plugin)
 - [OpenTelemetry Collector documentation](https://opentelemetry.io/docs/collector/)
-- [OpenTelemetry Collector Contrib receivers](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver)
-- [Host Metrics receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver)
-- [Prometheus receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver)
-- [Redis receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver)
-- [NGINX receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/nginxreceiver)
-- [PostgreSQL receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/postgresqlexreceiver)
+- [OpenTelemetry Collector Contrib receivers](/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver)
+- [Host Metrics receiver](/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver)
+- [Prometheus receiver](/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver)
+- [Redis receiver](/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver)
+- [NGINX receiver](/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/nginxreceiver)
+- [PostgreSQL receiver](/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/postgresqlexreceiver)
