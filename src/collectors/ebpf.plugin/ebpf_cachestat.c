@@ -602,6 +602,13 @@ static void ebpf_cachestat_exit(void *pptr)
     if (ebpf_read_cachestat.thread)
         nd_thread_signal_cancel(ebpf_read_cachestat.thread);
 
+    // Drop this module's bits from the shared PID pool so its slots don't
+    // stay pinned if the plugin keeps running after the module stops.
+    if (integration_shm && ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+        netdata_ebpf_sweep_shm_for_module_unsafe(NETDATA_EBPF_PIDS_CACHESTAT_IDX);
+        sem_post(shm_mutex_ebpf_integration);
+    }
+
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
@@ -834,13 +841,13 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core)
 
         netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
         if (!local_pid)
-            continue;
+            goto end_cachestat_loop;
         netdata_publish_cachestat_t *publish = &local_pid->cachestat;
 
         if (!publish->ct || publish->ct != cv->ct) {
             cachestat_save_pid_values(publish, cv);
         } else {
-            if (kill((pid_t)key, 0)) { // No PID found
+            if (kill((pid_t)key, 0) == -1 && errno == ESRCH) {
                 if (netdata_ebpf_reset_shm_pointer_unsafe(fd, key, NETDATA_EBPF_PIDS_CACHESTAT_IDX))
                     memset(publish, 0, sizeof(*publish));
             }
@@ -876,9 +883,8 @@ static void ebpf_update_cachestat_cgroup()
             uint32_t pid = pids->pid;
             netdata_publish_cachestat_t *out = &pids->cachestat;
 
-            netdata_ebpf_pid_stats_t *local_pid =
-                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
-            if (!local_pid)
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+            if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_CACHESTAT_IDX << 1))))
                 continue;
 
             netdata_publish_cachestat_t *in = &local_pid->cachestat;
@@ -916,9 +922,8 @@ static void cachestat_sum_pids_internal(netdata_publish_cachestat_t *publish, vo
                 break;
 
             uint32_t pid = r->pid;
-            netdata_ebpf_pid_stats_t *local_pid =
-                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_CACHESTAT_IDX);
-            if (!local_pid)
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+            if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_CACHESTAT_IDX << 1))))
                 continue;
             netdata_publish_cachestat_t *w = &local_pid->cachestat;
             sum_single_pid_cachestat(dst, &w->current);

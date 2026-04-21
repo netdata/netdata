@@ -930,6 +930,13 @@ static void ebpf_socket_exit(void *pptr)
         nd_thread_join(ebpf_read_socket.thread);
     }
 
+    // Drop this module's bits from the shared PID pool so its slots don't
+    // stay pinned if the plugin keeps running after the module stops.
+    if (integration_shm && ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+        netdata_ebpf_sweep_shm_for_module_unsafe(NETDATA_EBPF_PIDS_SOCKET_IDX);
+        sem_post(shm_mutex_ebpf_integration);
+    }
+
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
 
@@ -1890,17 +1897,23 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     end_socket_loop:; // the empty statement is here to allow code to be compiled by old compilers
         netdata_ebpf_pid_stats_t *local_pid =
             netdata_ebpf_get_shm_pointer_unsafe(key.pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
-        if (!local_pid)
-            continue;
-        ebpf_socket_publish_apps_t *curr = &local_pid->socket;
+        if (local_pid) {
+            ebpf_socket_publish_apps_t *curr = &local_pid->socket;
 
-        if (!deleted)
-            ebpf_socket_fill_publish_apps(curr, values);
-        else {
-            netdata_ebpf_reset_shm_pointer_unsafe(fd, key.pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
-            memset(curr, 0, sizeof(*curr));
-            bpf_map_delete_elem(fd, &key);
+            if (!deleted)
+                ebpf_socket_fill_publish_apps(curr, values);
+            else {
+                netdata_ebpf_reset_shm_pointer_unsafe(fd, key.pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
+                memset(curr, 0, sizeof(*curr));
+            }
         }
+        // The socket map is keyed by a tuple (not by pid), so the generic
+        // reset_shm_pointer_unsafe() deliberately skips bpf_map_delete_elem()
+        // for SOCKET_IDX. Delete the stale socket here regardless of whether
+        // we had a shm slot, otherwise a full shm pool would strand dead
+        // socket entries in the kernel map and we'd re-iterate them forever.
+        if (deleted)
+            bpf_map_delete_elem(fd, &key);
         memset(values, 0, length);
         memcpy(&key, &next_key, sizeof(key));
     }
@@ -1926,9 +1939,8 @@ void ebpf_socket_resume_apps_data()
         memset(&w->socket, 0, sizeof(ebpf_socket_publish_apps_t));
         for (; move; move = move->next) {
             uint32_t pid = move->pid;
-            netdata_ebpf_pid_stats_t *local_pid =
-                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
-            if (!local_pid)
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+            if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_SOCKET_IDX << 1))))
                 continue;
 
             ebpf_socket_publish_apps_t *ws = &local_pid->socket;
@@ -1965,9 +1977,8 @@ static void ebpf_update_socket_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
             ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
-            netdata_ebpf_pid_stats_t *local_pid =
-                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_SOCKET_IDX);
-            if (!local_pid)
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+            if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_SOCKET_IDX << 1))))
                 continue;
 
             ebpf_socket_publish_apps_t *in = &local_pid->socket;

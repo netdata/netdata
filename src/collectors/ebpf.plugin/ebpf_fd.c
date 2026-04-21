@@ -635,6 +635,13 @@ static void ebpf_fd_exit(void *pptr)
         nd_thread_join(ebpf_read_fd.thread);
     }
 
+    // Drop this module's bits from the shared PID pool so its slots don't
+    // stay pinned if the plugin keeps running after the module stops.
+    if (integration_shm && ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+        netdata_ebpf_sweep_shm_for_module_unsafe(NETDATA_EBPF_PIDS_FD_IDX);
+        sem_post(shm_mutex_ebpf_integration);
+    }
+
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
@@ -780,7 +787,7 @@ static void ebpf_read_fd_apps_table(int maps_per_core)
 
         netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_FD_IDX);
         if (!local_pid)
-            continue;
+            goto end_fd_loop;
         netdata_publish_fd_stat_t *publish_fd = &local_pid->fd;
 
         if (kill((pid_t)key, 0) == -1 && errno == ESRCH) {
@@ -815,8 +822,8 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
 
     for (; root; root = root->next) {
         uint32_t pid = root->pid;
-        netdata_ebpf_pid_stats_t *pid_stat = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_FD_IDX);
-        if (!pid_stat)
+        netdata_ebpf_pid_stats_t *pid_stat = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+        if (!pid_stat || !(pid_stat->threads & (1U << (NETDATA_EBPF_PIDS_FD_IDX << 1))))
             continue;
         netdata_publish_fd_stat_t *w = &pid_stat->fd;
 
@@ -868,8 +875,8 @@ static void ebpf_update_fd_cgroup(void)
             uint32_t pid = pids->pid;
             netdata_publish_fd_stat_t *out = &pids->fd;
 
-            netdata_ebpf_pid_stats_t *pid_stat = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_FD_IDX);
-            if (!pid_stat)
+            netdata_ebpf_pid_stats_t *pid_stat = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+            if (!pid_stat || !(pid_stat->threads & (1U << (NETDATA_EBPF_PIDS_FD_IDX << 1))))
                 continue;
 
             netdata_publish_fd_stat_t *in = &pid_stat->fd;

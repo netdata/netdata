@@ -498,6 +498,13 @@ static void ebpf_dcstat_exit(void *pptr)
     if (ebpf_read_dcstat.thread)
         nd_thread_signal_cancel(ebpf_read_dcstat.thread);
 
+    // Drop this module's bits from the shared PID pool so its slots don't
+    // stay pinned if the plugin keeps running after the module stops.
+    if (integration_shm && ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+        netdata_ebpf_sweep_shm_for_module_unsafe(NETDATA_EBPF_PIDS_DCSTAT_IDX);
+        sem_post(shm_mutex_ebpf_integration);
+    }
+
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
         if (em->cgroup_charts) {
@@ -588,7 +595,7 @@ static void ebpf_read_dc_apps_table(int maps_per_core)
 
         netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_DCSTAT_IDX);
         if (!local_pid)
-            continue;
+            goto end_dc_loop;
         netdata_publish_dcstat_t *publish = &local_pid->directory_cache;
         if (!publish->ct || publish->ct != cv->ct) {
             publish->ct = cv->ct;
@@ -625,8 +632,8 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
             break;
 
         uint32_t pid = root->pid;
-        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_DCSTAT_IDX);
-        if (!local_pid)
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+        if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_DCSTAT_IDX << 1))))
             continue;
         netdata_publish_dcstat_t *w = &local_pid->directory_cache;
 
@@ -680,9 +687,8 @@ static void ebpf_update_dc_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
-            netdata_ebpf_pid_stats_t *local_pid =
-                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_DCSTAT_IDX);
-            if (!local_pid)
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+            if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_DCSTAT_IDX << 1))))
                 continue;
             netdata_publish_dcstat_t *in = &local_pid->directory_cache;
 

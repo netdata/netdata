@@ -464,9 +464,8 @@ static void ebpf_update_process_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             uint32_t pid = pids->pid;
             ebpf_publish_process_t *out = &pids->ps;
-            netdata_ebpf_pid_stats_t *local_pid =
-                netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_PROCESS_IDX);
-            if (!local_pid)
+            netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+            if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_PROCESS_IDX << 1))))
                 continue;
 
             ebpf_publish_process_t *in = &local_pid->process;
@@ -970,6 +969,13 @@ static void ebpf_process_exit(void *pptr)
     netdata_mutex_lock(&lock);
     collect_pids &= ~(1 << EBPF_MODULE_PROCESS_IDX);
     netdata_mutex_unlock(&lock);
+
+    // Drop this module's bits from the shared PID pool so its slots don't
+    // stay pinned if the plugin keeps running after the module stops.
+    if (integration_shm && ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
+        netdata_ebpf_sweep_shm_for_module_unsafe(NETDATA_EBPF_PIDS_PROCESS_IDX);
+        sem_post(shm_mutex_ebpf_integration);
+    }
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
         netdata_mutex_lock(&lock);
@@ -1508,8 +1514,8 @@ void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_
             break;
 
         uint32_t pid = root->pid;
-        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_get_shm_pointer_unsafe(pid, NETDATA_EBPF_PIDS_PROCESS_IDX);
-        if (!local_pid)
+        netdata_ebpf_pid_stats_t *local_pid = netdata_ebpf_lookup_shm_pointer_unsafe(pid);
+        if (!local_pid || !(local_pid->threads & (1U << (NETDATA_EBPF_PIDS_PROCESS_IDX << 1))))
             continue;
 
         ebpf_publish_process_t *in = &local_pid->process;
@@ -1556,7 +1562,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
             netdata_ebpf_pid_stats_t *local_pid =
                 netdata_ebpf_get_shm_pointer_unsafe(key, NETDATA_EBPF_PIDS_PROCESS_IDX);
             if (!local_pid)
-                continue;
+                goto end_process_loop;
 
             ebpf_publish_process_t *w = &local_pid->process;
 
@@ -1568,7 +1574,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
                 w->release_call = process_stat_vector[0].release_call;
                 w->task_err = process_stat_vector[0].task_err;
             } else {
-                if (kill((pid_t)key, 0)) { // No PID found
+                if (kill((pid_t)key, 0) == -1 && errno == ESRCH) {
                     if (netdata_ebpf_reset_shm_pointer_unsafe(tbl_pid_stats_fd, key, NETDATA_EBPF_PIDS_PROCESS_IDX))
                         memset(w, 0, sizeof(*w));
                 }
