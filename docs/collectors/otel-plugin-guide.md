@@ -262,7 +262,7 @@ Result: One chart per process showing CPU seconds per second (delta of cumulativ
 
 ## Histogram Support
 
-Histogram metrics (both standard and exponential) are decomposed into multiple charts:
+Histogram metrics are decomposed into multiple charts:
 
 ### Bucket Chart (Heatmap)
 
