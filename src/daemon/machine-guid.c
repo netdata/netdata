@@ -211,10 +211,20 @@ static ND_MACHINE_GUID machine_guid_get_or_create(void) {
 
     // Avoid a check-then-create race; mkdir() + EEXIST is sufficient.
     errno_clear();
-    if (mkdir(pathname, 0775) != 0 && errno != EEXIST) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot create directory '%s'", pathname);
-        // Even if directory creation fails, continue with in-memory GUID.
-        return h;
+    if (mkdir(pathname, 0775) != 0) {
+        if (errno != EEXIST) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot create directory '%s'", pathname);
+            // Even if directory creation fails, continue with in-memory GUID.
+            return h;
+        }
+
+        // EEXIST — verify it is actually a directory.
+        struct stat st;
+        if (stat(pathname, &st) != 0 || !S_ISDIR(st.st_mode)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "MACHINE_GUID: path '%s' exists but is not a directory", pathname);
+            return h;
+        }
     }
 
     errno_clear();
