@@ -176,13 +176,16 @@ logs:
 
 **What you'll see:**
 
-- CPU time per core broken down by state (`user`, `system`, `idle`, `iowait`, etc.)
-- Memory usage by type (`used`, `free`, `cached`, `buffered`)
-- Network I/O per interface (transmit, receive, errors, dropped, packets)
-- Filesystem usage and utilization per mount point
-- Load averages (1-minute, 5-minute, 15-minute)
-- Paging faults and operations
-- Process count by status and CPU time per process
+| Metric | Description |
+|--------|-------------|
+| `system.cpu.time` | CPU time per core broken down by state (user, system, idle, iowait, etc.) |
+| `system.memory.usage` | Memory usage by type (used, free, cached, buffered) |
+| `system.disk.io` | Bytes read and written per disk device |
+| `system.network.io` | Bytes transmitted and received per network interface |
+| `system.filesystem.usage` | Used, free, and reserved bytes per mount point |
+| `system.cpu.load_average.1m` | 1-minute load average |
+| `system.paging.usage` | Swap usage by state (used, free) |
+| `system.processes.count` | Process count by status (running, sleeping, blocked, etc.) |
 
 </details>
 
@@ -336,17 +339,19 @@ metrics:
 
 **Key metrics:**
 
-- `redis.memory.used`: Total memory allocated by Redis (bytes)
-- `redis.memory.rss`: Resident set size reported by OS (bytes)
-- `redis.clients.connected`: Number of connected clients
-- `redis.commands.processed`: Total commands processed since startup
-- `redis.keyspace.hits`: Successful key lookups
-- `redis.keyspace.misses`: Failed key lookups
-- `redis.keys.expired`: Keys removed due to TTL expiration
-- `redis.keys.evicted`: Keys evicted due to memory pressure
-- `redis.net.input`: Total bytes received
-- `redis.net.output`: Total bytes sent
-- `redis.db.keys`: Number of keys per database
+| Metric | Description |
+|--------|-------------|
+| `redis.memory.used` | Total memory allocated by Redis (bytes) |
+| `redis.memory.rss` | Resident set size reported by OS (bytes) |
+| `redis.clients.connected` | Number of connected clients |
+| `redis.commands.processed` | Total commands processed since startup |
+| `redis.keyspace.hits` | Successful key lookups |
+| `redis.keyspace.misses` | Failed key lookups |
+| `redis.keys.expired` | Keys removed due to TTL expiration |
+| `redis.keys.evicted` | Keys evicted due to memory pressure |
+| `redis.net.input` | Total bytes received |
+| `redis.net.output` | Total bytes sent |
+| `redis.db.keys` | Number of keys per database |
 
 </details>
 
@@ -398,10 +403,12 @@ server {
 
 **Key metrics:**
 
-- `nginx.connections_accepted`: Total accepted client connections
-- `nginx.connections_handled`: Total handled connections
-- `nginx.connections_current`: Current connections by state
-- `nginx.requests`: Total client requests served
+| Metric | Description |
+|--------|-------------|
+| `nginx.connections_accepted` | Total accepted client connections |
+| `nginx.connections_handled` | Total handled connections |
+| `nginx.connections_current` | Current connections by state |
+| `nginx.requests` | Total client requests served |
 
 </details>
 
@@ -472,15 +479,17 @@ metrics:
 
 **Key metrics:**
 
-- `postgresql.commits`: Transactions committed per database
-- `postgresql.rollbacks`: Transactions rolled back per database
-- `postgresql.db.size`: Database size in bytes
-- `postgresql.rows`: Number of rows by state (live, dead)
-- `postgresql.operations`: Row operations (inserts, updates, deletes)
-- `postgresql.blocks_read`: Block reads by source
-- `postgresql.connection.max`: Maximum allowed connections
-- `postgresql.table.count`: Number of user tables per database
-- `postgresql.index.scans`: Number of index scans
+| Metric | Description |
+|--------|-------------|
+| `postgresql.commits` | Transactions committed per database |
+| `postgresql.rollbacks` | Transactions rolled back per database |
+| `postgresql.db.size` | Database size in bytes |
+| `postgresql.rows` | Number of rows by state (live, dead) |
+| `postgresql.operations` | Row operations (inserts, updates, deletes) |
+| `postgresql.blocks_read` | Block reads by source |
+| `postgresql.connection.max` | Maximum allowed connections |
+| `postgresql.table.count` | Number of user tables per database |
+| `postgresql.index.scans` | Number of index scans |
 
 </details>
 
@@ -741,12 +750,13 @@ metrics:
     - dimension_attribute_key: service_name
 ```
 
-Results in five charts for each service:
-- `http.server.duration.<hash>.bucket` - Request duration distribution (heatmap)
-- `http.server.duration.<hash>.sum` - Total request duration
-- `http.server.duration.<hash>.count` - Request count
-- `http.server.duration.<hash>.minmax` - Minimum and maximum request duration
-- `http.server.duration.<hash>.quantiles` - (if quantile values provided by source) Quantile values
+| Chart | Description |
+|-------|-------------|
+| `http.server.duration.<hash>.bucket` | Request duration distribution (heatmap) |
+| `http.server.duration.<hash>.sum` | Total request duration |
+| `http.server.duration.<hash>.count` | Request count |
+| `http.server.duration.<hash>.minmax` | Minimum and maximum request duration |
+| `http.server.duration.<hash>.quantiles` | (if quantile values provided by source) Quantile values |
 
 ## Summary Support
 
