@@ -313,7 +313,7 @@ Results in five charts for each service:
 
 ## Summary Support
 
-Summary metrics provide min, max, sum, and count statistics and are decomposed into multiple charts:
+Summary metrics provide sum and count statistics, and optional quantile values, and are decomposed into multiple charts:
 
 ### Count Chart
 
