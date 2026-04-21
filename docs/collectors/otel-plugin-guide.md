@@ -272,8 +272,6 @@ metrics:
 - Prometheus counter metrics converted to per-second rates
 - Prometheus gauge metrics as instantaneous values
 
-</details>
-
 ### Example: Redis
 
 Collect metrics from a Redis instance (client connections, memory usage, keyspace statistics, command throughput, replication status).
