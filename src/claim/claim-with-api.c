@@ -84,6 +84,11 @@ static bool check_and_generate_certificates() {
 
 static size_t response_write_callback(void *ptr, size_t size, size_t nmemb, void *stream) {
     struct claim_response_buffer *response = stream;
+
+    if (unlikely(nmemb && size > SIZE_MAX / nmemb)) {
+        response->too_large = true;
+        return 0;
+    }
     size_t real_size = size * nmemb;
 
     if (unlikely(real_size > CLAIM_RESPONSE_SIZE_LIMIT - buffer_strlen(response->wb))) {
