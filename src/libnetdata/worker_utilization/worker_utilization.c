@@ -261,7 +261,7 @@ void worker_unregister(void) {
         spinlock_unlock(&workname->spinlock);
 
         if(!workname->base) {
-            JError_t J_Error;
+            JError_t J_Error = { 0 };
 
             JudyAllocThreadPulseReset();
             int ret = JudyHSDel(&workers_globals.worknames_JudyHS, (void *)worker->workname, workname_size, &J_Error);
