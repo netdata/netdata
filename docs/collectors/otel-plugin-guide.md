@@ -709,158 +709,52 @@ Result: One chart per process showing CPU seconds per second (delta of cumulativ
 
 ## Histogram Support
 
-Histogram metrics are decomposed into multiple charts:
+Histograms capture distribution data — how values fall into bucket ranges. Each histogram becomes four charts.
 
-### Bucket Chart (Heatmap)
+The bucket heatmap visualizes distribution: each bucket dimension shows observation count within its range. Temporality determines aggregation — delta histograms aggregate counts as they arrive, cumulative histograms convert to deltas automatically.
 
-- **Metric name:** `<metric>.<chart_hash>.bucket`
-- **Type:** Heatmap
-- **Dimensions:** One per histogram bucket, named by bucket bounds
-- **Value:** Count of observations in that bucket
-- **Aggregation:** DeltaSum or CumulativeSum based on temporality
+Three line charts provide statistical summary. Sum chart tracks total observed values. Count chart shows observation count. Together these give throughput and average. If histogram includes min/max data, a fourth chart displays both extremes, updating on each observation.
 
-### Sum Chart
+| Chart | Suffix | Type | Aggregation |
+|-------|---------|------|-------------|
+| Bucket heatmap | `.bucket` | Heatmap | DeltaSum or CumulativeSum |
+| Sum | `.sum` | Line | DeltaSum or CumulativeSum |
+| Count | `.count` | Line | DeltaSum or CumulativeSum |
+| Min/Max | `.minmax` | Line | Gauge (latest) |
 
-- **Metric name:** `<metric>.<chart_hash>.sum`
-- **Type:** Line
-- **Dimensions:** Single dimension named `sum`
-- **Value:** Sum of all observed values
-- **Aggregation:** DeltaSum or CumulativeSum based on temporality
-
-### Count Chart
-
-- **Metric name:** `<metric>.<chart_hash>.count`
-- **Type:** Line
-- **Dimensions:** Single dimension named `count`
-- **Value:** Number of observations
-- **Aggregation:** DeltaSum or CumulativeSum based on temporality
-
-### Min/Max Chart
-
-- **Metric name:** `<metric>.<chart_hash>.minmax`
-- **Type:** Line
-- **Dimensions:** Two dimensions: `min` and `max`
-- **Values:** Minimum and maximum observed values
-- **Aggregation:** Gauge (latest observation)
-
-**Example:**
-
-```yaml
-metrics:
-  "http.server.duration":
-    - dimension_attribute_key: service_name
-```
-
-| Chart | Description |
-|-------|-------------|
-| `http.server.duration.<hash>.bucket` | Request duration distribution (heatmap) |
-| `http.server.duration.<hash>.sum` | Total request duration |
-| `http.server.duration.<hash>.count` | Request count |
-| `http.server.duration.<hash>.minmax` | Minimum and maximum request duration |
-| `http.server.duration.<hash>.quantiles` | (if quantile values provided by source) Quantile values |
+**Example:** `http.server.duration` metric produces `http.server.duration.<hash>.bucket` (heatmap), `sum`, `count`, and `minmax` charts.
 
 ## Summary Support
 
-Summary metrics provide sum and count statistics, and optional quantile values, and are decomposed into multiple charts:
+Summaries provide count, sum, and optional quantile statistics. The plugin treats all summaries as cumulative and converts to deltas automatically.
 
-### Count Chart
+Count and sum charts track observation frequency and total value — both using CumulativeSum aggregation. The quantiles chart exists only when source provides `quantile_values`, showing percentile thresholds as latest observations.
 
-- **Metric name:** `<metric>.<chart_hash>.count`
-- **Type:** Line
-- **Dimensions:** Single dimension named `count`
-- **Value:** Number of observations
-- **Aggregation:** CumulativeSum
-
-### Sum Chart
-
-- **Metric name:** `<metric>.<chart_hash>.sum`
-- **Type:** Line
-- **Dimensions:** Single dimension named `sum`
-- **Value:** Sum of all observed values
-- **Aggregation:** CumulativeSum
-
-### Quantiles Chart
-
-- **Metric name:** `<metric>.<chart_hash>.quantiles`
-- **Type:** Line
-- **Dimensions:** One dimension per quantile (e.g., `0.5`, `0.9`, `0.95`, `0.99`)
-- **Values:** Quantile threshold values
-- **Aggregation:** Gauge (latest observation)
-- **Note:** Only created if the source provides `quantile_values` field
+| Chart | Suffix | Type | Aggregation |
+|-------|---------|------|-------------|
+| Count | `.count` | Line | CumulativeSum |
+| Sum | `.sum` | Line | CumulativeSum |
+| Quantiles | `.quantiles` | Line | Gauge (latest) |
 
 ## Chart Lifecycle
 
-### Creation
+**Creation.** First data point triggers chart creation for each unique combination of resource attributes, instrumentation scope, metric metadata, and data point attributes. No pre-declaration required.
 
-Charts are created when the first data point arrives for a unique combination of:
+**Gap filling.** After grace period expires without new data: Gauge repeats last value, Delta and Cumulative sums return 0.
 
-- Resource attributes
-- Instrumentation scope
-- Metric name and metadata
-- Data point attributes (excluding dimension attribute)
+**Expiry.** Charts inactive for `expiry_duration_secs` are removed.
 
-The plugin creates charts automatically — no pre-declaration required.
-
-### Gap Filling
-
-After the grace period expires without new data:
-
-- **Gauge:** Repeats last emitted value
-- **Delta Sum:** Returns 0
-- **Cumulative Sum:** Returns 0 (no change observed)
-
-### Expiry
-
-Charts with no data for longer than `expiry_duration_secs` are removed and no longer emitted.
-
-**Timing Constraints:**
-
-- Must satisfy: `0 < interval <= 3600`
-- Must satisfy: `interval < grace <= expiry`
-- Violated timing falls back to hardcoded defaults with a warning
+**Timing validation.** Must satisfy `0 < interval <= 3600` and `interval < grace <= expiry`. Violations fall back to defaults with warning.
 
 ## Log Processing
 
-Logs received via OTLP are processed as follows:
+**Flattening.** OTLP records convert to systemd-compatible JSON: timestamps from nanoseconds to microseconds, attributes become key-value pairs. `OTLP_JSON` field stores original JSON when `store_otlp_json: true`.
 
-### Flattening
+**Sorting.** Entries sort by timestamp before writing to optimize structure, indexing, and compression.
 
-OTLP log records are flattened to a JSON format compatible with systemd journal format:
+**Journal storage.** Logs write to systemd-compatible files with configurable rotation (size, entry count, duration) and retention (file count, total size, age) policies.
 
-- Timestamps converted from nanoseconds to microseconds
-- Resource, scope, and log attributes become key-value pairs
-- `OTLP_JSON` field stores complete original JSON when `store_otlp_json: true`
-
-### Sorting
-
-Log entries are sorted by timestamp before writing to journal files to:
-
-- Optimize journal file structure and indexing
-- Improve query performance
-- Enhance compression efficiency
-
-### Journal Storage
-
-Logs are written to systemd-compatible journal files with configurable policies:
-
-**Rotation Policy:**
-- `size_of_journal_file`: Rotate when file exceeds this size
-- `entries_of_journal_file`: Rotate when entry count exceeds this limit
-- `duration_of_journal_file`: Rotate when time span exceeds this duration
-
-**Retention Policy:**
-- `number_of_journal_files`: Keep at most this many files
-- `size_of_journal_files`: Keep at most this total size
-- `duration_of_journal_files`: Delete files older than this age
-
-### Timestamp Selection
-
-Per OTLP spec:
-
-1. Use `time_unix_nano` if present and non-zero
-2. Otherwise use `observed_time_unix_nano`
-
-This prioritizes the explicit event time over the observation time.
+**Timestamp selection.** Prefers `time_unix_nano` if present and non-zero, otherwise `observed_time_unix_nano`.
 
 ## Default Behavior
 
