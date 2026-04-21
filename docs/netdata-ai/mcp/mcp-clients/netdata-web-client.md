@@ -89,6 +89,4 @@ node llm-proxy.js
 - **Advanced Users** - Full control over prompts and model selection
 - **Multi-Cloud Environments** - Connect to multiple Netdata instances
 
----
-
 For detailed setup instructions, configuration options, and the complete feature list, visit the [GitHub repository](https://github.com/netdata/netdata/tree/master/src/web/mcp/mcp-web-client).
