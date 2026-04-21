@@ -1194,6 +1194,9 @@ void cgroup_discovery_worker(void *ptr)
         discovery_find_all_cgroups();
     }
 
+    // Stop the netipc server first so its worker threads cannot iterate cgroup_root while we free it.
+    cgroup_netipc_cleanup();
+
     // free all cgroups
     netdata_mutex_lock(&cgroup_root_mutex);
     while(cgroup_root) {
@@ -1204,7 +1207,6 @@ void cgroup_discovery_worker(void *ptr)
     netdata_mutex_unlock(&cgroup_root_mutex);
 
     collector_info("discovery thread stopped");
-    cgroup_netipc_cleanup();
     worker_unregister();
     service_exits();
     __atomic_store_n(&discovery_thread.exited, 1, __ATOMIC_RELEASE);

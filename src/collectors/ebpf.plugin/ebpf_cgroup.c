@@ -347,11 +347,8 @@ static void ebpf_parse_cgroup_netipc_data(void)
     uint64_t generation = ebpf_cgroup_cache.generation;
     uint32_t enabled_count = 0;
 
-    // Publish the latest cgroup state before collectors read the lock-free flags.
     int systemd_enabled = (int)ebpf_cgroup_cache.systemd_enabled;
     int integration_active = (count > 0) ? 1 : 0;
-    ebpf_cgroup_systemd_enabled_set(systemd_enabled);
-    ebpf_cgroup_integration_active_set(integration_active);
 
     for (uint32_t i = 0; i < count; i++) {
         const nipc_cgroups_cache_item_t *item = &ebpf_cgroup_cache.items[i];
@@ -371,6 +368,10 @@ static void ebpf_parse_cgroup_netipc_data(void)
         netdata_mutex_lock(&mutex_cgroup_shm);
         preserved_targets = ebpf_count_cgroup_targets_unsafe();
         preserved_pids = ebpf_count_cgroup_pids_unsafe();
+        // Publish flags while holding the mutex so collectors never observe a flag
+        // change before the pid/target lists match it.
+        ebpf_cgroup_systemd_enabled_set(systemd_enabled);
+        ebpf_cgroup_integration_active_set(integration_active);
         netdata_mutex_unlock(&mutex_cgroup_shm);
 
         if (last_count != 0 ||
@@ -416,6 +417,10 @@ static void ebpf_parse_cgroup_netipc_data(void)
     int chart_refresh_needed = previous_count != count;
     ebpf_send_cgroup_chart_set(chart_refresh_needed);
     previous_count = count;
+    // Publish integration flags only after the target/pid lists have been rebuilt,
+    // so collectors never observe integration_active=1 with stale pid state.
+    ebpf_cgroup_systemd_enabled_set(systemd_enabled);
+    ebpf_cgroup_integration_active_set(integration_active);
     netdata_mutex_unlock(&mutex_cgroup_shm);
 
     if (last_count != count ||
@@ -423,8 +428,7 @@ static void ebpf_parse_cgroup_netipc_data(void)
         previous_imported_targets != imported_targets ||
         previous_total_pids != total_pids ||
         previous_integration_active != integration_active ||
-        previous_systemd_enabled != systemd_enabled ||
-        enabled_count == 0 || imported_targets == 0 || total_pids == 0) {
+        previous_systemd_enabled != systemd_enabled) {
         collector_info(
             "EBPF CGROUP: netipc snapshot generation=%llu items=%u enabled=%u imported_targets=%zu total_pids=%zu "
             "send_cgroup_chart=%d integration_active=%d systemd_enabled=%d refresh_failures=%d",
