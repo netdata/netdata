@@ -10,7 +10,10 @@ It transforms OpenTelemetry's event-based metrics into Netdata's fixed-interval 
 
 The plugin automatically creates Netdata charts from incoming metrics with full alerting support. Logs are written to journal files and can be explored through the Netdata Logs tab.
 
+:::note
+This means charts are created automatically from incoming OTLP data points without requiring manual chart definitions.
 :::
+
 
 ## How It Works
 
@@ -118,13 +121,11 @@ logs:
 
 ## Examples
 
-<details open><summary>View all OTel Collector configuration examples</summary>
-
 ### Example: Host Metrics Receiver
 
 Complete setup for collecting system-level metrics (CPU, memory, disk, network, filesystem, load, paging, processes) from the host OS.
 
-<details open><summary>View Collector configuration</summary>
+<details><summary>View Collector configuration</summary>
 
 ```yaml
 receivers:
@@ -155,7 +156,7 @@ service:
 
 </details>
 
-<details open><summary>View Netdata plugin configuration</summary>
+<details><summary>View Netdata plugin configuration</summary>
 
 ```yaml
 endpoint:
@@ -193,7 +194,7 @@ logs:
 
 Scrape any HTTP endpoint that exposes metrics in Prometheus format. Bridges the Prometheus exporter ecosystem into OTel pipeline without running a separate Prometheus server.
 
-<details open><summary>View Collector configuration</summary>
+<details><summary>View Collector configuration</summary>
 
 ```yaml
 receivers:
@@ -225,7 +226,7 @@ service:
 
 </details>
 
-<details open><summary>View Netdata plugin configuration</summary>
+<details><summary>View Netdata plugin configuration</summary>
 
 ```yaml
 endpoint:
@@ -242,7 +243,7 @@ logs:
 
 </details>
 
-<details open><summary>View metric mapping for Prometheus</summary>
+<details><summary>View metric mapping for Prometheus</summary>
 
 ```yaml
 metrics:
@@ -266,7 +267,7 @@ metrics:
 
 Collect metrics from a Redis instance (client connections, memory usage, keyspace statistics, command throughput, replication status).
 
-<details open><summary>View Collector configuration</summary>
+<details><summary>View Collector configuration</summary>
 
 ```yaml
 receivers:
@@ -289,7 +290,7 @@ service:
 
 </details>
 
-<details open><summary>View Collector with authentication</summary>
+<details><summary>View Collector with authentication</summary>
 
 ```yaml
 receivers:
@@ -313,7 +314,7 @@ service:
 
 </details>
 
-<details open><summary>View metric mapping</summary>
+<details><summary>View metric mapping</summary>
 
 ```yaml
 metrics:
@@ -359,7 +360,7 @@ metrics:
 
 Collect metrics from NGINX's stub status module (accepted/handled connections, current connections by state, total requests).
 
-<details open><summary>View Collector configuration</summary>
+<details><summary>View Collector configuration</summary>
 
 ```yaml
 receivers:
@@ -416,7 +417,7 @@ server {
 
 Collect database performance metrics from PostgreSQL (connection counts, query throughput, table and index statistics, buffer usage).
 
-<details open><summary>View Collector configuration</summary>
+<details><summary>View Collector configuration</summary>
 
 ```yaml
 receivers:
@@ -452,7 +453,7 @@ CREATE USER otel WITH PASSWORD 'your-secure-password';
 GRANT pg_monitor TO otel;
 ```
 
-<details open><summary>View metric mapping</summary>
+<details><summary>View metric mapping</summary>
 
 ```yaml
 metrics:
@@ -497,7 +498,7 @@ metrics:
 
 Combine hostmetrics, Redis, and NGINX receivers in a single pipeline. All metrics flow to Netdata through the same OTLP exporter.
 
-<details open><summary>View Collector configuration</summary>
+<details><summary>View Collector configuration</summary>
 
 ```yaml
 receivers:
@@ -533,7 +534,7 @@ service:
 
 </details>
 
-<details open><summary>View Netdata plugin configuration</summary>
+<details><summary>View Netdata plugin configuration</summary>
 
 ```yaml
 endpoint:
