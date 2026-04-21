@@ -1098,6 +1098,14 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name
         goto cleanup;
     }
 
+    if((size_t)path_length >= sizeof(path)) {
+        errno = ENAMETOOLONG;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: socket path for '%s' in runtime directory '%s' was truncated (needed %d bytes, buffer is %zu)",
+               server->name, runtime_directory, path_length, sizeof(path));
+        goto cleanup;
+    }
+
     if((size_t)path_length > max_path_length) {
         errno = ENAMETOOLONG;
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
