@@ -288,20 +288,12 @@ Histogram metrics (both standard and exponential) are decomposed into multiple c
 - **Value:** Number of observations
 - **Aggregation:** DeltaSum or CumulativeSum based on temporality
 
-### Min Chart
+### Min/Max Chart
 
-- **Metric name:** `<metric>.<chart_hash>.min`
+- **Metric name:** `<metric>.<chart_hash>.minmax`
 - **Type:** Line
-- **Dimensions:** Single dimension named `min`
-- **Value:** Minimum observed value
-- **Aggregation:** Gauge (latest observation)
-
-### Max Chart
-
-- **Metric name:** `<metric>.<chart_hash>.max`
-- **Type:** Line
-- **Dimensions:** Single dimension named `max`
-- **Value:** Maximum observed value
+- **Dimensions:** Two dimensions: `min` and `max`
+- **Values:** Minimum and maximum observed values
 - **Aggregation:** Gauge (latest observation)
 
 **Example:**
@@ -312,13 +304,41 @@ metrics:
     - dimension_attribute_key: service_name
 ```
 
-Results in six charts for each service:
+Results in five charts for each service:
 - `http.server.duration.<hash>.bucket` - Request duration distribution (heatmap)
 - `http.server.duration.<hash>.sum` - Total request duration
 - `http.server.duration.<hash>.count` - Request count
-- `http.server.duration.<hash>.min` - Minimum request duration
-- `http.server.duration.<hash>.max` - Maximum request duration
-- `http.server.duration.<hash>.mean` - (if provided by source) Average request duration
+- `http.server.duration.<hash>.minmax` - Minimum and maximum request duration
+- `http.server.duration.<hash>.quantiles` - (if quantile values provided by source) Quantile values
+
+## Summary Support
+
+Summary metrics provide min, max, sum, and count statistics and are decomposed into multiple charts:
+
+### Count Chart
+
+- **Metric name:** `<metric>.<chart_hash>.count`
+- **Type:** Line
+- **Dimensions:** Single dimension named `count`
+- **Value:** Number of observations
+- **Aggregation:** CumulativeSum
+
+### Sum Chart
+
+- **Metric name:** `<metric>.<chart_hash>.sum`
+- **Type:** Line
+- **Dimensions:** Single dimension named `sum`
+- **Value:** Sum of all observed values
+- **Aggregation:** CumulativeSum
+
+### Quantiles Chart
+
+- **Metric name:** `<metric>.<chart_hash>.quantiles`
+- **Type:** Line
+- **Dimensions:** One dimension per quantile (e.g., `0.5`, `0.9`, `0.95`, `0.99`)
+- **Values:** Quantile threshold values
+- **Aggregation:** Gauge (latest observation)
+- **Note:** Only created if the source provides `quantile_values` field
 
 ## Chart Lifecycle
 
