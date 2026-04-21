@@ -625,7 +625,12 @@ void nd_journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, 
 
     bool existing = false;
     bool *found = dictionary_set(dirs, dirname, &existing, sizeof(existing));
-    if (unlikely(!found) || *found) {
+    if (unlikely(!found)) {
+        netdata_log_error("Cannot track visited directory '%s' (dictionary_set failed); stopping recursion", dirname);
+        closedir(dir);
+        return;
+    }
+    if (*found) {
         closedir(dir);
         return;
     }
