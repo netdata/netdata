@@ -74,6 +74,17 @@ logs:
   journal_dir: /var/log/netdata/otel-journals
 ```
 
+### Common Configuration Options
+
+The most commonly adjusted options:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `endpoint.path` | `127.0.0.1:4317` | gRPC listen address. Change to `0.0.0.0:4317` to accept remote connections. |
+| `metrics.interval_secs` | `10` | Chart update frequency in seconds (1–3600). |
+| `metrics.chart_configs_dir` | `/etc/netdata/otel.d/v1/metrics/` | Directory for metric mapping files. |
+| `metrics.expiry_duration_secs` | `900` | Remove charts with no data after this many seconds. |
+
 ### TLS Configuration
 
 ```yaml
