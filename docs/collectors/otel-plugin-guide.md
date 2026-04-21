@@ -232,7 +232,7 @@ endpoint:
   path: "127.0.0.1:4317"
 
 metrics:
-  chart_configs_dir: /etc/netdata/open.d/v1/metrics/
+  chart_configs_dir: /etc/netdata/otel.d/v1/metrics/
   interval_secs: 10
   max_new_charts_per_request: 100
 
