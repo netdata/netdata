@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **OpenTelemetry (OTel) plugin** enables Netdata Agent to receive OpenTelemetry metrics and logs via OTLP/gRPC protocol from any compatible source — collectors, SDKs, or instrumented applications.
+The **OpenTelemetry (OTel) plugin** enables Netdata Agent to receive OpenTelemetry metrics and logs via OTLP/gRPC protocol from any compatible source (collectors, SDKs, or instrumented applications).
 
 It transforms OpenTelemetry's event-based metrics into Netdata's fixed-interval collection model and stores logs in systemd-compatible journal files.
 
@@ -569,7 +569,11 @@ logs:
 - Redis metrics per database
 - NGINX metrics (connections, requests)
 
-**Note:** Each receiver operates independently. If one fails, the others continue to collect.
+:::note
+
+Each receiver operates independently. If one fails, the others continue to collect.
+
+:::
 
 </details>
 
@@ -864,7 +868,11 @@ When enabling TLS:
    nc -zv <netdata-host-ip> 4317
    ```
 
-**Security Note:** When binding to `0.0.0.0`, ensure that firewall or network policy restricts access to trusted sources. The gRPC endpoint does not require authentication by default. Consider enabling TLS for production environments.
+:::note
+
+When binding to `0.0.0.0`, ensure that firewall or network policy restricts access to trusted sources. The gRPC endpoint does not require authentication by default. Consider enabling TLS for production environments.
+
+:::
 
 ### Logs Not Appearing
 
