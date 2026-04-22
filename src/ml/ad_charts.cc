@@ -250,7 +250,7 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
     }
 }
 
-void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number AnomalyRate, ONEWAYALLOC *owa) {
+void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number anomaly_rate, ONEWAYALLOC *owa) {
     /*
      * Host anomaly rate
     */
@@ -283,7 +283,7 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
                 rrddim_add(host->anomaly_rate_rs, "anomaly_rate", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        rrddim_set_by_pointer(host->anomaly_rate_rs, host->anomaly_rate_rd, AnomalyRate);
+        rrddim_set_by_pointer(host->anomaly_rate_rs, host->anomaly_rate_rd, anomaly_rate);
 
         rrdset_done(host->anomaly_rate_rs);
     }
