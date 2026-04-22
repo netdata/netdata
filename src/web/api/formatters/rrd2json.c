@@ -35,6 +35,8 @@ int rrdset2value_api_v1_with_owa(
         , QUERY_SOURCE query_source
         , STORAGE_PRIORITY priority
 ) {
+    internal_fatal(!owa, "rrdset2value_api_v1_with_owa(): owa must be non-NULL");
+
     int ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
     RRDR *r = rrd2rrdr_legacy(

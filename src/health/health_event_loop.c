@@ -385,7 +385,10 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
         // Reclaim the previous alert's query scratch before starting the
-        // next one. Cheap no-op on the first iteration of a fresh arena.
+        // next one. The arena is reused across every alert of every host in
+        // this iteration, so this reset trims trailing pages left by the
+        // previous alert (same host or prior host). No-op only on the very
+        // first alert after the arena was created.
         onewayalloc_reset(owa);
 
         if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host))) {
