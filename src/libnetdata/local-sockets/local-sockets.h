@@ -1579,6 +1579,12 @@ static inline bool local_sockets_get_namespace_sockets_with_pid(LS_STATE *ls, st
         if(read(spawn_server_instance_read_fd(si), &len, sizeof(len)) != sizeof(len))
             local_sockets_log(ls, "failed to read cmdline length from pipe");
 
+        if(len > 8192) {
+            // matches the writer-side cmdline[8192] stack buffer; exceeding it means a broken pipe protocol
+            local_sockets_log(ls, "cmdline length %zu from child exceeds limit (8192), aborting namespace socket collection", len);
+            break;
+        }
+
         if(len) {
             CLEAN_CHAR_P *cmdline = mallocz(len + 1);
             if(read(spawn_server_instance_read_fd(si), cmdline, len) != (ssize_t)len)
