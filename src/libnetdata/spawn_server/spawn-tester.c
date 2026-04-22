@@ -45,6 +45,78 @@ void child_check_fds(void) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+
+static void test_int_fds_echo_loop(SPAWN_INSTANCE *si, const char *msg, size_t iterations) {
+    ssize_t len = (ssize_t)strlen(msg);
+    size_t buffer_size = (size_t)len * 2;
+    CLEAN_CHAR_P *buffer = mallocz(buffer_size);
+
+    for(size_t j = 0; j < iterations; j++) {
+        fprintf(stderr, "-");
+        memset(buffer, 0, buffer_size);
+
+        ssize_t rc = write(spawn_server_instance_write_fd(si), msg, len);
+        if (rc != len) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "Cannot write to plugin. Expected to write %zd bytes, wrote %zd bytes",
+                   len, rc);
+            exit(1);
+        }
+
+        rc = read(spawn_server_instance_read_fd(si), buffer, buffer_size);
+        if (rc != len) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "Cannot read from plugin. Expected to read %zd bytes, read %zd bytes",
+                   len, rc);
+            exit(1);
+        }
+
+        if (memcmp(msg, buffer, len) != 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "Read corrupted data. Expected '%s', Read '%s'",
+                   msg, buffer);
+            exit(1);
+        }
+    }
+    fprintf(stderr, "\n");
+}
+
+static void test_popen_echo_loop(POPEN_INSTANCE *pi, const char *msg, size_t iterations) {
+    size_t len = strlen(msg);
+    size_t buffer_size = len * 2;
+    CLEAN_CHAR_P *buffer = mallocz(buffer_size);
+
+    for(size_t j = 0; j < iterations; j++) {
+        fprintf(stderr, "-");
+        memset(buffer, 0, buffer_size);
+
+        size_t rc = fwrite(msg, 1, len, spawn_popen_stdin(pi));
+        if (rc != len) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "Cannot write to plugin. Expected to write %zu bytes, wrote %zu bytes",
+                   len, rc);
+            exit(1);
+        }
+        fflush(spawn_popen_stdin(pi));
+
+        char *s = fgets(buffer, (int)buffer_size, spawn_popen_stdout(pi));
+        if (!s || strlen(s) != len) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "Cannot read from plugin. Expected to read %zu bytes, read %zu bytes",
+                   len, (size_t)(s ? strlen(s) : 0));
+            exit(1);
+        }
+        if (memcmp(msg, buffer, len) != 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "Read corrupted data. Expected '%s', Read '%s'",
+                   msg, buffer);
+            exit(1);
+        }
+    }
+    fprintf(stderr, "\n");
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // kill to stop
 
 int plugin_kill_to_stop() {
@@ -74,40 +146,7 @@ void test_int_fds_plugin_kill_to_stop(SPAWN_SERVER *server, const char *argv0) {
         exit(1);
     }
 
-    const char *msg = "Hello World!\n";
-    ssize_t len = strlen(msg);
-    CLEAN_CHAR_P *buffer = mallocz((size_t)len * 2);
-    size_t buffer_size = (size_t)len * 2;
-
-    for(size_t j = 0; j < 30 ;j++) {
-        fprintf(stderr, "-");
-        memset(buffer, 0, buffer_size);
-
-        ssize_t rc = write(spawn_server_instance_write_fd(si), msg, len);
-
-        if (rc != len) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Cannot write to plugin. Expected to write %zd bytes, wrote %zd bytes",
-                   len, rc);
-            exit(1);
-        }
-
-        rc = read(spawn_server_instance_read_fd(si), buffer, buffer_size);
-        if (rc != len) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Cannot read from plugin. Expected to read %zd bytes, read %zd bytes",
-                   len, rc);
-            exit(1);
-        }
-
-        if (memcmp(msg, buffer, len) != 0) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Read corrupted data. Expected '%s', Read '%s'",
-                   msg, buffer);
-            exit(1);
-        }
-    }
-    fprintf(stderr, "\n");
+    test_int_fds_echo_loop(si, "Hello World!\n", 30);
 
     int code = spawn_server_exec_kill(server, si, 0);
 
@@ -130,39 +169,7 @@ void test_popen_plugin_kill_to_stop(const char *argv0) {
         exit(1);
     }
 
-    const char *msg = "Hello World!\n";
-    size_t len = strlen(msg);
-    CLEAN_CHAR_P *buffer = mallocz(len * 2);
-    size_t buffer_size = len * 2;
-
-    for(size_t j = 0; j < 30 ;j++) {
-        fprintf(stderr, "-");
-        memset(buffer, 0, buffer_size);
-
-        size_t rc = fwrite(msg, 1, len, spawn_popen_stdin(pi));
-        if (rc != len) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Cannot write to plugin. Expected to write %zu bytes, wrote %zu bytes",
-                   len, rc);
-            exit(1);
-        }
-        fflush(spawn_popen_stdin(pi));
-
-        char *s = fgets(buffer, (int)buffer_size, spawn_popen_stdout(pi));
-        if (!s || strlen(s) != len) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Cannot read from plugin. Expected to read %zu bytes, read %zu bytes",
-                   len, (size_t)(s ? strlen(s) : 0));
-            exit(1);
-        }
-        if (memcmp(msg, buffer, len) != 0) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Read corrupted data. Expected '%s', Read '%s'",
-                   msg, buffer);
-            exit(1);
-        }
-    }
-    fprintf(stderr, "\n");
+    test_popen_echo_loop(pi, "Hello World!\n", 30);
 
     int code = spawn_popen_kill(pi, 0);
 
@@ -207,40 +214,7 @@ void test_int_fds_plugin_close_to_stop(SPAWN_SERVER *server, const char *argv0) 
         exit(1);
     }
 
-    const char *msg = "Hello World!\n";
-    ssize_t len = strlen(msg);
-    CLEAN_CHAR_P *buffer = mallocz((size_t)len * 2);
-    size_t buffer_size = (size_t)len * 2;
-
-    for(size_t j = 0; j < 30 ;j++) {
-        fprintf(stderr, "-");
-        memset(buffer, 0, buffer_size);
-
-        ssize_t rc = write(spawn_server_instance_write_fd(si), msg, len);
-        if (rc != len) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Cannot write to plugin. Expected to write %zd bytes, wrote %zd bytes",
-                   len, rc);
-            exit(1);
-        }
-
-        rc = read(spawn_server_instance_read_fd(si), buffer, buffer_size);
-        if (rc != len) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Cannot read from plugin. Expected to read %zd bytes, read %zd bytes",
-                   len, rc);
-            exit(1);
-        }
-        if (memcmp(msg, buffer, len) != 0) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Read corrupted data. Expected '%s', Read '%s'",
-                   msg, buffer);
-            exit(1);
-        }
-
-        break;
-    }
-    fprintf(stderr, "\n");
+    test_int_fds_echo_loop(si, "Hello World!\n", 1);
 
     int code = spawn_server_exec_wait(server, si);
 
@@ -263,41 +237,7 @@ void test_popen_plugin_close_to_stop(const char *argv0) {
         exit(1);
     }
 
-    const char *msg = "Hello World!\n";
-    size_t len = strlen(msg);
-    CLEAN_CHAR_P *buffer = mallocz(len * 2);
-    size_t buffer_size = len * 2;
-
-    for(size_t j = 0; j < 30 ;j++) {
-        fprintf(stderr, "-");
-        memset(buffer, 0, buffer_size);
-
-        size_t rc = fwrite(msg, 1, len, spawn_popen_stdin(pi));
-        if (rc != len) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Cannot write to plugin. Expected to write %zu bytes, wrote %zu bytes",
-                   len, rc);
-            exit(1);
-        }
-        fflush(spawn_popen_stdin(pi));
-
-        char *s = fgets(buffer, (int)buffer_size, spawn_popen_stdout(pi));
-        if (!s || strlen(s) != len) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Cannot read from plugin. Expected to read %zu bytes, read %zu bytes",
-                   len, (size_t)(s ? strlen(s) : 0));
-            exit(1);
-        }
-        if (memcmp(msg, buffer, len) != 0) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "Read corrupted data. Expected '%s', Read '%s'",
-                   msg, buffer);
-            exit(1);
-        }
-
-        break;
-    }
-    fprintf(stderr, "\n");
+    test_popen_echo_loop(pi, "Hello World!\n", 1);
 
     int code = spawn_popen_wait(pi);
 
