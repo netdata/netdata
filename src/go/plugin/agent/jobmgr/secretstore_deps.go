@@ -289,7 +289,7 @@ func extractSecretStoreKeysFromString(value string, seen map[string]struct{}) {
 		if !kind.IsValid() {
 			continue
 		}
-		if err := dyncfg.ValidateJobName(name); err != nil {
+		if err := dyncfg.JobNameRuleAllowDots(name); err != nil {
 			continue
 		}
 		seen[secretstore.StoreKey(kind, name)] = struct{}{}
