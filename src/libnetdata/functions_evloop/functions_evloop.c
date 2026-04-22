@@ -79,7 +79,7 @@ struct functions_evloop_globals {
 static void rrd_functions_worker_canceller(void *data) {
     struct functions_evloop_globals *wg = data;
     netdata_mutex_lock(&wg->worker_mutex);
-    wg->workers_exit = true;
+    __atomic_store_n(&wg->workers_exit, true, __ATOMIC_RELAXED);
     netdata_cond_signal(&wg->worker_cond_var);
     netdata_mutex_unlock(&wg->worker_mutex);
 }
@@ -93,7 +93,7 @@ static void rrd_functions_worker_globals_worker_main(void *arg) {
     while (true) {
         netdata_mutex_lock(&wg->worker_mutex);
 
-        if(wg->workers_exit || nd_thread_signaled_to_cancel()) {
+        if(__atomic_load_n(&wg->workers_exit, __ATOMIC_RELAXED) || nd_thread_signaled_to_cancel()) {
             netdata_mutex_unlock(&wg->worker_mutex);
             break;
         }
@@ -115,7 +115,7 @@ static void rrd_functions_worker_globals_worker_main(void *arg) {
 
         netdata_mutex_unlock(&wg->worker_mutex);
 
-        if(wg->workers_exit || nd_thread_signaled_to_cancel()) {
+        if(__atomic_load_n(&wg->workers_exit, __ATOMIC_RELAXED) || nd_thread_signaled_to_cancel()) {
             if(acquired)
                 dictionary_acquired_item_release(wg->worker_queue, acquired);
 
