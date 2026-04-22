@@ -897,11 +897,11 @@ When enabling TLS:
 
 ## Additional Resources
 
-- [Netdata OTel plugin reference](/src/crates/netdata-otel/otel-plugin)
+- [Netdata OTel plugin reference](https://github.com/netdata/netdata/tree/master/src/crates/netdata-otel/otel-plugin)
 - [OpenTelemetry Collector documentation](https://opentelemetry.io/docs/collector/)
-- [OpenTelemetry Collector Contrib receivers](/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver)
-- [Host Metrics receiver](/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver)
-- [Prometheus receiver](/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver)
-- [Redis receiver](/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver)
-- [NGINX receiver](/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/nginxreceiver)
-- [PostgreSQL receiver](/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/postgresqlexreceiver)
+- [OpenTelemetry Collector Contrib receivers](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver)
+- [Host Metrics receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver)
+- [Prometheus receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver)
+- [Redis receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver)
+- [NGINX receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/nginxreceiver)
+- [PostgreSQL receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/postgresqlexreceiver)
