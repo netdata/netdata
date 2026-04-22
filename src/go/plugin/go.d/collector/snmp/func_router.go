@@ -23,6 +23,7 @@ func newFuncRouter(cache *ifaceCache) *funcRouter {
 		handlers:   make(map[string]funcapi.MethodHandler),
 	}
 	r.handlers[ifacesMethodID] = newFuncInterfaces(r)
+	addTopologyFunctionHandler(r.handlers)
 	return r
 }
 
@@ -50,9 +51,10 @@ func (r *funcRouter) Cleanup(ctx context.Context) {
 }
 
 func snmpMethods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
+	methods := []funcapi.MethodConfig{
 		ifacesMethodConfig(),
 	}
+	return appendTopologyMethodConfig(methods)
 }
 
 func snmpFunctionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {

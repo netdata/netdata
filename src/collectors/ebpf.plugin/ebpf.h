@@ -6,6 +6,7 @@
 #ifndef __FreeBSD__
 #include <linux/perf_event.h>
 #endif
+#include <stdatomic.h>
 #include <stdint.h>
 #include <errno.h>
 #include <signal.h>
@@ -23,6 +24,7 @@
 #include "libbpf_api/ebpf.h"
 
 #include "collectors/cgroups.plugin/sys_fs_cgroup.h"
+#include "libnetdata/netipc/netipc_netdata.h"
 
 #include "ebpf_apps.h"
 #include "ebpf_functions.h"
@@ -269,9 +271,9 @@ extern struct ebpf_pid_stat *ebpf_root_of_pids;
 extern ebpf_cgroup_target_t *ebpf_cgroup_pids;
 extern char *ebpf_algorithms[];
 extern struct config collector_config;
-extern netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup;
-extern int shm_fd_ebpf_cgroup;
-extern sem_t *shm_sem_ebpf_cgroup;
+extern _Atomic int ebpf_cgroup_systemd_enabled;
+extern _Atomic int ebpf_cgroup_integration_active;
+extern _Atomic int send_cgroup_chart;
 extern netdata_mutex_t mutex_cgroup_shm;
 extern size_t ebpf_all_pids_count;
 extern ebpf_plugin_stats_t plugin_statistics;
@@ -327,6 +329,36 @@ extern ebpf_sync_syscalls_t local_syscalls[];
 extern volatile sig_atomic_t ebpf_stop_signal;
 extern bool ebpf_plugin_exit;
 extern uint64_t collect_pids;
+
+static inline void ebpf_cgroup_systemd_enabled_set(int value)
+{
+    atomic_store_explicit(&ebpf_cgroup_systemd_enabled, value, memory_order_release);
+}
+
+static inline int ebpf_cgroup_systemd_enabled_get(void)
+{
+    return atomic_load_explicit(&ebpf_cgroup_systemd_enabled, memory_order_acquire);
+}
+
+static inline void ebpf_cgroup_integration_active_set(int value)
+{
+    atomic_store_explicit(&ebpf_cgroup_integration_active, value, memory_order_release);
+}
+
+static inline int ebpf_cgroup_integration_active_get(void)
+{
+    return atomic_load_explicit(&ebpf_cgroup_integration_active, memory_order_acquire);
+}
+
+static inline void ebpf_send_cgroup_chart_set(int value)
+{
+    atomic_store_explicit(&send_cgroup_chart, value, memory_order_release);
+}
+
+static inline int ebpf_send_cgroup_chart_get(void)
+{
+    return atomic_load_explicit(&send_cgroup_chart, memory_order_acquire);
+}
 
 static inline bool ebpf_plugin_stop(void)
 {

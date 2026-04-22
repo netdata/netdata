@@ -1072,6 +1072,9 @@ void rrdcontext_main(void *ptr) {
         dfe_start_reentrant(rrdhost_root_index, host) {
             if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
+            // Allow timed-out deferred checkpoints to replay even if context loading is stuck.
+            rrdcontext_hub_pending_checkpoint_replay(host);
+
             if(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
                 continue;
 
@@ -1084,6 +1087,9 @@ void rrdcontext_main(void *ptr) {
 
             pp_queued_contexts_for_all_hosts += rrdcontext_queue_entries(&host->rrdctx.pp_queue);
             rrdcontext_post_process_queued_contexts(host);
+
+            // replay deferred checkpoint if post-processing drained the queue, or on timeout
+            rrdcontext_hub_pending_checkpoint_replay(host);
 
             hub_queued_contexts_for_all_hosts += rrdcontext_queue_entries(&host->rrdctx.hub_queue);
             rrdcontext_dispatch_queued_contexts_to_hub(host, now_ut);

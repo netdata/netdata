@@ -132,6 +132,10 @@ func (cb *secretStoreCallbacks) ExtractKey(fn dyncfg.Function) (key, name string
 	return key, name, true
 }
 
+func (cb *secretStoreCallbacks) ValidateJobName(name string) error {
+	return dyncfg.JobNameRuleAllowDots(name)
+}
+
 func (cb *secretStoreCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (secretstore.Config, error) {
 	var kind secretstore.StoreKind
 	if fn.Command() == dyncfg.CommandAdd {

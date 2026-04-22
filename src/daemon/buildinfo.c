@@ -14,6 +14,7 @@ typedef enum __attribute__((packed)) {
     BIB_PACKAGING_CONFIGURE_OPTIONS,
     BIB_DIR_USER_CONFIG,
     BIB_DIR_STOCK_CONFIG,
+    BIB_DIR_STOCK_DATA,
     BIB_DIR_CACHE,
     BIB_DIR_LIB,
     BIB_DIR_PLUGINS,
@@ -56,6 +57,7 @@ typedef enum __attribute__((packed)) {
     BIB_FEATURE_TIERING,
     BIB_FEATURE_ML,
     BIB_FEATURE_ALLOCATOR,
+    BIB_DB_SQLITE,
     BIB_DB_DBENGINE,
     BIB_DB_ALLOC,
     BIB_DB_RAM,
@@ -214,6 +216,14 @@ static struct {
                 .print = "Stock Configurations",
                 .json = "stock_config",
                 .value = LIBCONFIG_DIR,
+        },
+        [BIB_DIR_STOCK_DATA] = {
+                .category = BIC_DIRECTORIES,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Stock Data Files",
+                .json = "stock_data",
+                .value = STOCK_DATA_DIR,
         },
         [BIB_DIR_CACHE] = {
                 .category = BIC_DIRECTORIES,
@@ -550,6 +560,14 @@ static struct {
                 .print = "Memory Allocator",
                 .json = "allocator",
                 .value = NULL,
+        },
+        [BIB_DB_SQLITE] = {
+                .category = BIC_DATABASE,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "sqlite",
+                .json = "sqlite",
+                .value = "unknown",
         },
         [BIB_DB_DBENGINE] = {
                 .category = BIC_DATABASE,
@@ -1113,7 +1131,7 @@ static void build_info_set_value(BUILD_INFO_SLOT slot, const char *value) {
 static void build_info_append_value(BUILD_INFO_SLOT slot, const char *value) {
     size_t size = BUILD_INFO[slot].value ? strlen(BUILD_INFO[slot].value) + 1 : 0;
     size += strlen(value);
-    char buf[size + 1];
+    CLEAN_CHAR_P *buf = mallocz(size + 1);
 
     if(BUILD_INFO[slot].value) {
         strcpy(buf, BUILD_INFO[slot].value);
@@ -1223,6 +1241,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_value(BIB_FEATURE_ALLOCATOR, "system");
 #endif
 
+    build_info_set_value(BIB_DB_SQLITE, sqlite3_libversion());
 
 #ifdef ENABLE_DBENGINE
     build_info_set_status(BIB_DB_DBENGINE, true);
@@ -1532,6 +1551,7 @@ static void populate_packaging_info() {
 static void populate_directories(void) {
     build_info_set_value(BIB_DIR_USER_CONFIG, netdata_configured_user_config_dir);
     build_info_set_value(BIB_DIR_STOCK_CONFIG, netdata_configured_stock_config_dir);
+    build_info_set_value(BIB_DIR_STOCK_DATA, netdata_configured_stock_data_dir);
     build_info_set_value(BIB_DIR_CACHE, netdata_configured_cache_dir);
     build_info_set_value(BIB_DIR_LIB, netdata_configured_varlib_dir);
     build_info_set_value(BIB_DIR_PLUGINS, netdata_configured_primary_plugins_dir);
@@ -1566,7 +1586,7 @@ static void print_build_info_category_to_console(BUILD_INFO_CATEGORY category, c
             int padding_length = 60 - strlen(k) - 1;
             if (padding_length < 0) padding_length = 0;
 
-            char padding[padding_length + 1];
+            char padding[61];
             memset(padding, '_', padding_length);
             padding[padding_length] = '\0';
 

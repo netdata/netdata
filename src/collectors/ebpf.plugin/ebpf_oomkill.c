@@ -328,8 +328,8 @@ void ebpf_oomkill_send_cgroup_data(int update_every)
     netdata_mutex_lock(&mutex_cgroup_shm);
     ebpf_cgroup_target_t *ect;
 
-    if (shm_ebpf_cgroup.header->systemd_enabled) {
-        if (send_cgroup_chart) {
+    if (ebpf_cgroup_systemd_enabled_get()) {
+        if (ebpf_send_cgroup_chart_get()) {
             ebpf_create_systemd_oomkill_charts(update_every);
         }
         ebpf_send_systemd_oomkill_charts();
@@ -479,7 +479,7 @@ static void oomkill_collector(ebpf_module_t *em)
         stats[NETDATA_CONTROLLER_PID_TABLE_ADD] += (uint64_t)count;
         stats[NETDATA_CONTROLLER_PID_TABLE_DEL] += (uint64_t)count;
 
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active_get())
             ebpf_update_oomkill_cgroup(keys, count);
 
         if (ebpf_plugin_stop())
@@ -488,7 +488,7 @@ static void oomkill_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         netdata_mutex_lock(&lock);
         // write everything from the ebpf map.
-        if (cgroups && shm_ebpf_cgroup.header)
+        if (cgroups && ebpf_cgroup_integration_active_get())
             ebpf_oomkill_send_cgroup_data(update_every);
 
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)

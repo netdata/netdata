@@ -64,7 +64,7 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb, bool anonymou
 static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, const char *id, bool anonymous) {
     size_t entries = dictionary_entries(dyncfg_globals.nodes);
     size_t used = 0;
-    const DICTIONARY_ITEM *items[entries];
+    const DICTIONARY_ITEM **items = entries ? callocz(entries, sizeof(*items)) : NULL;
     size_t restart_required = 0, plugin_rejected = 0, status_incomplete = 0, status_failed = 0;
 
     STRING *template = NULL;
@@ -150,14 +150,15 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
 
     for(size_t i = 0; i < used ;i++)
         dictionary_acquired_item_release(dyncfg_globals.nodes, items[i]);
+
+    freez(items);
 }
 
 static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data) {
     RRDHOST *host = data;
     int code;
 
-    char buf[strlen(rfe->function) + 1];
-    memcpy(buf, rfe->function, sizeof(buf));
+    CLEAN_CHAR_P *buf = strdupz(rfe->function);
 
     char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, MAX_FUNCTION_PARAMETERS);

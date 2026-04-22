@@ -13,3 +13,7 @@ exclude_paths:
   - build_external/**
   - packaging/**
   - src/aclk/mqtt_websockets/**
+  - TODO-netflow-code-organization.md
+  - TODO-netflow-plugin-refactor.md
+  - src/go/pkg/topology/engine/parity/README.md
+  - src/go/pkg/topology/engine/parity/evidence/**

@@ -89,8 +89,9 @@ bool dyncfg_unittest_parse_payload(BUFFER *payload, TEST *t, DYNCFG_CMDS cmd, co
         t->current.value.bln = value_boolean;
     }
     else if(cmd == DYNCFG_CMD_ADD) {
-        char buf[strlen(t->id) + strlen(add_name) + 20];
-        snprintfz(buf, sizeof(buf), "%s:%s", t->id, add_name);
+        size_t buf_size = strlen(t->id) + strlen(add_name) + 20;
+        CLEAN_CHAR_P *buf = mallocz(buf_size);
+        snprintfz(buf, buf_size, "%s:%s", t->id, add_name);
         TEST tmp = {
             .id = strdupz(buf),
             .source = strdupz(source),
@@ -189,8 +190,7 @@ static int dyncfg_unittest_execute_cb(struct rrd_function_execute *rfe, void *da
 
     t->received = true;
 
-    char buf[strlen(rfe->function) + 1];
-    memcpy(buf, rfe->function, sizeof(buf));
+    CLEAN_CHAR_P *buf = strdupz(rfe->function);
 
     char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, MAX_FUNCTION_PARAMETERS);
@@ -420,8 +420,7 @@ void should_be_saved(TEST *t, DYNCFG_CMDS c) {
 static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload, const char *source) {
     dyncfg_unittest_reset();
 
-    char buf[strlen(cmd) + 1];
-    memcpy(buf, cmd, sizeof(buf));
+    CLEAN_CHAR_P *buf = strdupz(cmd);
 
     char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
     size_t num_words = quoted_strings_splitter_whitespace(buf, words, MAX_FUNCTION_PARAMETERS);
@@ -481,8 +480,9 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
 
     if(rc == HTTP_RESP_OK && t->type == DYNCFG_TYPE_TEMPLATE) {
         if(c == DYNCFG_CMD_ADD) {
-            char buf2[strlen(id) + strlen(add_name) + 2];
-            snprintfz(buf2, sizeof(buf2), "%s:%s", id, add_name);
+            size_t buf2_size = strlen(id) + strlen(add_name) + 2;
+            CLEAN_CHAR_P *buf2 = mallocz(buf2_size);
+            snprintfz(buf2, buf2_size, "%s:%s", id, add_name);
             TEST *tt = dictionary_get(dyncfg_unittest_data.nodes, buf2);
             if (!tt) {
                 nd_log(NDLS_DAEMON, NDLP_ERR,

@@ -1243,6 +1243,7 @@ They work the same in **both** places:
 
 | Transformation                   | Purpose                                         | Example Input → Output                                           |
 |----------------------------------|-------------------------------------------------|------------------------------------------------------------------|
+| `format`                         | Convert the raw SNMP value before tag parsing.  | `0x18fd74331a9c → "18fd74331a9c"`                                |
 | `mapping`                        | Replace numeric/string codes with names.        | `1 → "ethernet"`, `161 → "lag"`                                  |
 | `extract_value`                  | Extract a substring via regex (first group).    | `"RouterOS CCR2004-16G-2S+" → "CCR2004-16G-2S+"`                 |
 | `match_pattern` + `match_value`  | Replace the value using regex groups or static. | `"Palo Alto Networks VM-Series firewall" → "VM-Series firewall"` |
@@ -1288,6 +1289,50 @@ They work the same in **both** places:
       pic: $3
       port: $4
     ```
+
+- `format`
+    ```yaml
+    symbol:
+      OID: 1.3.6.1.2.1.17.1.1
+      name: dot1dBaseBridgeAddress
+      format: hex
+    ```
+
+### Format
+
+Use `format` when the raw SNMP value must be converted before tag or metadata processing.
+
+**The collector**:
+
+- Applies `format` when converting the raw SNMP value to a string.
+- Then applies the configured tag or metadata transformations to that formatted string.
+- Supports the same `format` values accepted by `symbol` definitions elsewhere in the profile.
+
+**Where it can be used**:
+
+- `metadata.device.fields.<field>.symbol`
+- `metadata.device.fields.<field>.symbols[]`
+- `metric_tags[].symbol`
+
+**Currently used by this profile set**:
+
+- `format: hex` for octet-string values such as:
+  - MAC addresses
+  - binary management-address values
+  - capability bitmaps
+
+**Example**:
+
+```yaml
+metadata:
+  device:
+    fields:
+      bridge_base_address:
+        symbol:
+          OID: 1.3.6.1.2.1.17.1.1
+          name: dot1dBaseBridgeAddress
+          format: hex
+```
 
 ### Mapping
 

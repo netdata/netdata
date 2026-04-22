@@ -566,6 +566,7 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                 buffer_json_member_add_string(wb, "color_slot", "primary");
                 buffer_json_member_add_double(wb, "opacity", 1.0);
                 buffer_json_member_add_boolean(wb, "border", true);
+                buffer_json_member_add_string(wb, "role", "actor");
                 buffer_json_member_add_boolean(wb, "size_by_links", true);
                 buffer_json_member_add_boolean(wb, "show_port_bullets", true);
                 streaming_topology_parent_presentation(wb);
@@ -578,6 +579,7 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                 buffer_json_member_add_string(wb, "color_slot", "primary");
                 buffer_json_member_add_double(wb, "opacity", 1.0);
                 buffer_json_member_add_boolean(wb, "border", false);
+                buffer_json_member_add_string(wb, "role", "actor");
                 buffer_json_member_add_boolean(wb, "size_by_links", false);
                 buffer_json_member_add_boolean(wb, "show_port_bullets", false);
                 streaming_topology_child_presentation(wb);
@@ -590,6 +592,7 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                 buffer_json_member_add_string(wb, "color_slot", "warning");
                 buffer_json_member_add_double(wb, "opacity", 1.0);
                 buffer_json_member_add_boolean(wb, "border", false);
+                buffer_json_member_add_string(wb, "role", "actor");
                 buffer_json_member_add_boolean(wb, "size_by_links", false);
                 buffer_json_member_add_boolean(wb, "show_port_bullets", false);
                 streaming_topology_vnode_presentation(wb);
@@ -602,6 +605,7 @@ int function_streaming_topology(BUFFER *wb, const char *function, BUFFER *payloa
                 buffer_json_member_add_string(wb, "color_slot", "dim");
                 buffer_json_member_add_double(wb, "opacity", 0.5);
                 buffer_json_member_add_boolean(wb, "border", false);
+                buffer_json_member_add_string(wb, "role", "actor");
                 buffer_json_member_add_boolean(wb, "size_by_links", false);
                 buffer_json_member_add_boolean(wb, "show_port_bullets", false);
                 streaming_topology_stale_presentation(wb);
