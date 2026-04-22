@@ -35,6 +35,21 @@
 - Remove VLA (variable-length arrays) (claim and daemon) ([#22114](https://github.com/netdata/netdata/issues/22114))
 - Fix pluginsd cleanup race with active collector ([#22207](https://github.com/netdata/netdata/issues/22207))
 - Add SQLite version to build details and startup log message ([#22208](https://github.com/netdata/netdata/issues/22208))
+- Remove VLA (variable-length arrays)  (dbengine and health) ([#22209](https://github.com/netdata/netdata/issues/22209))
+- Add test for ARAL race condition and fix ([#22212](https://github.com/netdata/netdata/issues/22212))
+- Chore(go/snmp/topology): add MAC OUI vendor lookup table ([#22215](https://github.com/netdata/netdata/issues/22215))
+- Feat(topology): add role field to presentation actor types ([#22217](https://github.com/netdata/netdata/issues/22217))
+- Fix complilation / enforce size check ([#22216](https://github.com/netdata/netdata/issues/22216))
+- Properly sync our CI with the versions of Alpine we officially support. ([#22211](https://github.com/netdata/netdata/issues/22211))
+- Docs(mcp): add Claude Code one-liner setup to Cloud MCP page ([#22220](https://github.com/netdata/netdata/issues/22220))
+- Build(deps): bump github.com/jackc/pgx/v5 from 5.9.1 to 5.9.2 in /src/go ([#22226](https://github.com/netdata/netdata/issues/22226))
+- Build(deps): bump github.com/Azure/azure-sdk-for-go/sdk/azcore from 1.21.0 to 1.21.1 in /src/go ([#22230](https://github.com/netdata/netdata/issues/22230))
+- Fix(go.d/snmp): use snmpEngineTime as primary uptime source ([#22231](https://github.com/netdata/netdata/issues/22231))
+- Improve UUID handling in SQLite functions and error reporting ([#22233](https://github.com/netdata/netdata/issues/22233))
+- Ebpf.plugin: fix PID accounting shared-memory pool leak and 100% CPU spin ([#22232](https://github.com/netdata/netdata/issues/22232))
+- Feat: replace cgroups-ebpf SHM transport with netipc IPC ([#22221](https://github.com/netdata/netdata/issues/22221))
+- Feat(topology/snmp): SNMP L2/L3 topology engine and collector ([#22109](https://github.com/netdata/netdata/issues/22109))
+- Feat(netflow): NetFlow/IPFIX/sFlow flow analysis plugin ([#22111](https://github.com/netdata/netdata/issues/22111))
 
 ## [2.10.0] - 2026-04-09
 

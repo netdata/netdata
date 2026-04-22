@@ -1715,6 +1715,7 @@ static void topology_write_presentation(BUFFER *wb) {
                 buffer_json_member_add_string(wb, "label", "This host");
                 buffer_json_member_add_string(wb, "color_slot", "self");
                 buffer_json_member_add_boolean(wb, "border", true);
+                buffer_json_member_add_string(wb, "role", "actor");
                 buffer_json_member_add_boolean(wb, "size_by_links", true);
 
                 buffer_json_member_add_array(wb, "summary_fields");
@@ -1791,6 +1792,7 @@ static void topology_write_presentation(BUFFER *wb) {
                 buffer_json_member_add_string(wb, "label", "Process");
                 buffer_json_member_add_string(wb, "color_slot", "primary");
                 buffer_json_member_add_boolean(wb, "border", true);
+                buffer_json_member_add_string(wb, "role", "actor");
                 buffer_json_member_add_boolean(wb, "size_by_links", true);
                 buffer_json_member_add_boolean(wb, "show_port_bullets", true);
 
@@ -1925,6 +1927,7 @@ static void topology_write_presentation(BUFFER *wb) {
                 buffer_json_member_add_string(wb, "label", "Endpoint");
                 buffer_json_member_add_string(wb, "color_slot", "derived");
                 buffer_json_member_add_boolean(wb, "border", true);
+                buffer_json_member_add_string(wb, "role", "endpoint");
 
                 buffer_json_member_add_array(wb, "summary_fields");
                 {

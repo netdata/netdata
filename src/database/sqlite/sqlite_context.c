@@ -98,10 +98,17 @@ void ctx_get_chart_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
 
+    char host_guid[UUID_STR_LEN];
+    uuid_unparse_lower(*host_uuid, host_guid);
+
     param = 0;
     SQL_CHART_DATA chart_data = { 0 };
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        uuid_copy(chart_data.chart_id, *((nd_uuid_t *)sqlite3_column_blob(res, 0)));
+        if (unlikely(!sqlite3_column_uuid_copy(res, 0, chart_data.chart_id))) {
+            error_report("CTX [%s]: Got invalid chart id in column 0. Ignoring it.", host_guid);
+            continue;
+        }
+
         chart_data.id = (char *) sqlite3_column_text(res, 1);
         chart_data.name = (char *) sqlite3_column_text(res, 2);
         chart_data.context = (char *) sqlite3_column_text(res, 3);
@@ -132,11 +139,18 @@ void ctx_get_dimension_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_DIMENSION_
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
 
+    char host_guid[UUID_STR_LEN];
+    uuid_unparse_lower(*host_uuid, host_guid);
+
     SQL_DIMENSION_DATA dimension_data;
 
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        uuid_copy(dimension_data.dim_id, *((nd_uuid_t *)sqlite3_column_blob(res, 0)));
+        if (unlikely(!sqlite3_column_uuid_copy(res, 0, dimension_data.dim_id))) {
+            error_report("CTX [%s]: Got invalid dimension id in column 0. Ignoring it.", host_guid);
+            continue;
+        }
+
         dimension_data.id = (char *) sqlite3_column_text(res, 1);
         dimension_data.name = (char *) sqlite3_column_text(res, 2);
         dimension_data.hidden = sqlite3_column_int(res, 3);
@@ -426,4 +440,3 @@ int ctx_unittest(void)
 
     return 0;
 }
-

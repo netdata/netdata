@@ -60,7 +60,7 @@ func (c *Controller) dyncfgCmdAdd(fn dyncfg.Function) {
 		c.api.SendCodef(fn, 400, "%v", err)
 		return
 	}
-	if err := dyncfg.ValidateJobName(name); err != nil {
+	if err := dyncfg.JobNameRuleAllowDots(name); err != nil {
 		c.api.SendCodef(fn, 400, "invalid job name '%s': %v.", name, err)
 		return
 	}

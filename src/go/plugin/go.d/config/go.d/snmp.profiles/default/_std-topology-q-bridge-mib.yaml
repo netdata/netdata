@@ -1,0 +1,59 @@
+# Supplemental topology profile for VLAN-aware bridge/FDB enrichment.
+# Source: Q-BRIDGE-MIB.
+#
+# Why:
+# - dot1qTpFdbTable provides per-FDB-domain MAC learning entries.
+# - dot1qVlanCurrentTable maps FDB domain IDs to VLAN IDs where available.
+
+metrics:
+  # Q-BRIDGE-MIB: VLAN/FDB-domain forwarding table (MAC -> bridge port).
+  - MIB: Q-BRIDGE-MIB
+    table:
+      OID: 1.3.6.1.2.1.17.7.1.2.2.1
+      name: dot1qTpFdbTable
+    symbols:
+      # Use port column as numeric row anchor.
+      - OID: 1.3.6.1.2.1.17.7.1.2.2.1.2
+        name: _topology_qbridge_fdb_entry
+    metric_tags:
+      - tag: dot1q_fdb_id
+        index: 1
+      - tag: dot1q_fdb_mac
+        symbol:
+          OID: 1.3.6.1.2.1.17.7.1.2.2.1.1
+          name: dot1qTpFdbAddress
+          format: hex
+      - tag: dot1q_fdb_bridge_port
+        symbol:
+          OID: 1.3.6.1.2.1.17.7.1.2.2.1.2
+          name: dot1qTpFdbPort
+      - tag: dot1q_fdb_status
+        symbol:
+          OID: 1.3.6.1.2.1.17.7.1.2.2.1.3
+          name: dot1qTpFdbStatus
+          mapping:
+            1: other
+            2: invalid
+            3: learned
+            4: self
+            5: mgmt
+
+  # Q-BRIDGE-MIB: maps FDB domain ID to VLAN ID.
+  - MIB: Q-BRIDGE-MIB
+    table:
+      OID: 1.3.6.1.2.1.17.7.1.4.2.1
+      name: dot1qVlanCurrentTable
+    symbols:
+      - OID: 1.3.6.1.2.1.17.7.1.4.2.1.3
+        name: _topology_qbridge_vlan_entry
+    metric_tags:
+      # Some devices expose timemark+vlan index, others only vlan.
+      # Keep both and resolve in code.
+      - tag: dot1q_vlan_id_idx1
+        index: 1
+      - tag: dot1q_vlan_id
+        index: 2
+      - tag: dot1q_vlan_fdb_id
+        symbol:
+          OID: 1.3.6.1.2.1.17.7.1.4.2.1.3
+          name: dot1qVlanCurrentFdbId

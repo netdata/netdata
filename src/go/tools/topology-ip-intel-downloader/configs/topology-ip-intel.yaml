@@ -1,0 +1,50 @@
+# Shared Topology IP intelligence configuration.
+#
+# Lookup order used by downloader and consumers:
+# 1. /etc/netdata/topology-ip-intel.yaml
+# 2. /usr/lib/netdata/conf.d/topology-ip-intel.yaml
+#
+# Source ordering is per family:
+# - earlier ASN sources win over later ASN sources
+# - earlier GEO sources win over later GEO sources
+
+sources:
+  - name: dbip-asn
+    family: asn
+    provider: dbip
+    artifact: asn-lite
+    format: mmdb
+
+  - name: dbip-geo
+    family: geo
+    provider: dbip
+    artifact: city-lite
+    format: mmdb
+
+output:
+  # Destination directory for generated databases.
+  directory: /var/cache/netdata/topology-ip-intel
+  asn_file: topology-ip-asn.mmdb
+  geo_file: topology-ip-geo.mmdb
+  metadata_file: topology-ip-intel.json
+
+policy:
+  # All plugins must use the same CIDR classes.
+  localhost_cidrs:
+    - 127.0.0.0/8
+    - ::1/128
+  private_cidrs:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+    - 100.64.0.0/10
+    - fc00::/7
+    - fe80::/10
+
+  # Additional public CIDRs to track individually.
+  # Keep empty by default.
+  interesting_cidrs: []
+
+http:
+  timeout: 2m
+  user_agent: netdata-topology-ip-intel-downloader/1.0

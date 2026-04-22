@@ -73,6 +73,10 @@ func (m *mockCallbacks) ParseAndValidate(fn Function, name string) (testConfig, 
 	return testConfig{uid: "dyncfg:" + name, key: name, sourceType: "dyncfg", source: "test"}, nil
 }
 
+func (m *mockCallbacks) ValidateJobName(name string) error {
+	return JobNameRuleStrict(name)
+}
+
 func (m *mockCallbacks) Start(cfg testConfig) error {
 	m.startCalls = append(m.startCalls, cfg)
 	if m.startFn != nil {
@@ -1187,31 +1191,58 @@ func TestNotifyJobCreate_SupportedCommands(t *testing.T) {
 	}
 }
 
-// --- ValidateJobName Tests ---
+// --- Job-name rule tests ---
 
-func TestValidateJobName(t *testing.T) {
-	tests := []struct {
-		name    string
+func TestJobNameRuleStrict(t *testing.T) {
+	tests := map[string]struct {
 		input   string
 		wantErr bool
 	}{
-		{"valid", "my_job", false},
-		{"valid with numbers", "job123", false},
-		{"valid with dashes", "my-job", false},
-		{"space", "my job", true},
-		{"tab", "my\tjob", true},
-		{"dot", "my.job", true},
-		{"colon", "my:job", true},
-		{"empty", "", false},
+		"valid":              {input: "my_job"},
+		"valid with numbers": {input: "job123"},
+		"valid with dashes":  {input: "my-job"},
+		"space":              {input: "my job", wantErr: true},
+		"tab":                {input: "my\tjob", wantErr: true},
+		"dot":                {input: "my.job", wantErr: true},
+		"colon":              {input: "my:job", wantErr: true},
+		"empty":              {input: ""},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateJobName(tt.input)
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := JobNameRuleStrict(tt.input)
 			if tt.wantErr {
-				assert.Error(t, err, fmt.Sprintf("ValidateJobName(%q) should fail", tt.input))
+				assert.Error(t, err, fmt.Sprintf("JobNameRuleStrict(%q) should fail", tt.input))
 			} else {
-				assert.NoError(t, err, fmt.Sprintf("ValidateJobName(%q) should pass", tt.input))
+				assert.NoError(t, err, fmt.Sprintf("JobNameRuleStrict(%q) should pass", tt.input))
+			}
+		})
+	}
+}
+
+func TestJobNameRuleAllowDots(t *testing.T) {
+	tests := map[string]struct {
+		input   string
+		wantErr bool
+	}{
+		"valid":              {input: "my_job"},
+		"valid with numbers": {input: "job123"},
+		"valid with dashes":  {input: "my-job"},
+		"dotted name":        {input: "my.job"},
+		"fqdn":               {input: "host.example.com"},
+		"space":              {input: "my job", wantErr: true},
+		"tab":                {input: "my\tjob", wantErr: true},
+		"colon":              {input: "my:job", wantErr: true},
+		"empty":              {input: ""},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := JobNameRuleAllowDots(tt.input)
+			if tt.wantErr {
+				assert.Error(t, err, fmt.Sprintf("JobNameRuleAllowDots(%q) should fail", tt.input))
+			} else {
+				assert.NoError(t, err, fmt.Sprintf("JobNameRuleAllowDots(%q) should pass", tt.input))
 			}
 		})
 	}

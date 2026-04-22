@@ -137,7 +137,7 @@ type SymbolConfig struct {
 
 	ChartMeta ChartMeta `yaml:"chart_meta,omitempty" json:"chart_meta"`
 
-	Mapping           MappingConfig      `yaml:"mapping,omitempty" json:"mapping,omitempty"`
+	Mapping           MappingConfig      `yaml:"mapping,omitempty" json:"mapping"`
 	Transform         string             `yaml:"transform,omitempty" json:"transform,omitempty"`
 	TransformCompiled *template.Template `yaml:"-" json:"-"`
 }
@@ -184,7 +184,7 @@ type MetricTagConfig struct {
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
 
 	MappingRef string        `yaml:"mapping_ref,omitempty" json:"mapping_ref,omitempty"`
-	Mapping    MappingConfig `yaml:"mapping,omitempty" json:"mapping,omitempty"`
+	Mapping    MappingConfig `yaml:"mapping,omitempty" json:"mapping"`
 
 	// Regex
 	// Match/Tags are not exposed as json (UI) since ExtractValue can be used instead
