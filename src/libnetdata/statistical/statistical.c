@@ -50,7 +50,7 @@ inline NETDATA_DOUBLE average(const NETDATA_DOUBLE *series, size_t entries) {
 // --------------------------------------------------------------------------------------------------------------------
 
 NETDATA_DOUBLE moving_average(const NETDATA_DOUBLE *series, size_t entries, size_t period) {
-    if(unlikely(period <= 0))
+    if(unlikely(period == 0))
         return 0.0;
 
     size_t i, count;

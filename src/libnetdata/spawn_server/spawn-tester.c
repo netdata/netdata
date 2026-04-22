@@ -47,8 +47,11 @@ void child_check_fds(void) {
 // --------------------------------------------------------------------------------------------------------------------
 
 static void test_int_fds_echo_loop(SPAWN_INSTANCE *si, const char *msg, size_t iterations) {
-    ssize_t len = (ssize_t)strlen(msg);
-    size_t buffer_size = (size_t)len * 2;
+    if(!msg || !*msg) return;
+
+    size_t ulen = strlen(msg);
+    ssize_t len = (ssize_t)ulen;
+    size_t buffer_size = ulen * 2;
     CLEAN_CHAR_P *buffer = mallocz(buffer_size);
 
     for(size_t j = 0; j < iterations; j++) {
