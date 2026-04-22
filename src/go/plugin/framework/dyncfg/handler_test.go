@@ -1198,14 +1198,14 @@ func TestJobNameRuleStrict(t *testing.T) {
 		input   string
 		wantErr bool
 	}{
-		"valid":               {input: "my_job"},
-		"valid with numbers":  {input: "job123"},
-		"valid with dashes":   {input: "my-job"},
-		"space":               {input: "my job", wantErr: true},
-		"tab":                 {input: "my\tjob", wantErr: true},
-		"dot":                 {input: "my.job", wantErr: true},
-		"colon":               {input: "my:job", wantErr: true},
-		"empty":               {input: ""},
+		"valid":              {input: "my_job"},
+		"valid with numbers": {input: "job123"},
+		"valid with dashes":  {input: "my-job"},
+		"space":              {input: "my job", wantErr: true},
+		"tab":                {input: "my\tjob", wantErr: true},
+		"dot":                {input: "my.job", wantErr: true},
+		"colon":              {input: "my:job", wantErr: true},
+		"empty":              {input: ""},
 	}
 
 	for name, tt := range tests {
