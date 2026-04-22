@@ -1430,7 +1430,7 @@ func TestCgroupsResponseLargeSnapshot(t *testing.T) {
 	buf := make([]byte, 1024*1024)
 	b := NewCgroupsBuilder(buf, n, 1, 12345)
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		name := []byte("cgroup-" + string(rune('A'+i%26)))
 		path := []byte("/sys/fs/cgroup/system.slice/cgroup-" + string(rune('A'+i%26)))
 		if err := b.Add(uint32(i), uint32(i%4), uint32(i%2), name, path); err != nil {
@@ -1448,7 +1448,7 @@ func TestCgroupsResponseLargeSnapshot(t *testing.T) {
 		t.Fatalf("ItemCount = %d, want %d", view.ItemCount, n)
 	}
 
-	for i := uint32(0); i < n; i++ {
+	for i := range uint32(n) {
 		item, err := view.Item(i)
 		if err != nil {
 			t.Fatalf("item %d: %v", i, err)

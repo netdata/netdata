@@ -341,10 +341,7 @@ func ShmClientAttach(runDir, serviceName string, sessionID uint64) (*ShmContext,
 	// Validate region size
 	reqEnd := int(reqOff) + int(reqCap)
 	respEnd := int(respOff) + int(respCap)
-	needed := reqEnd
-	if respEnd > needed {
-		needed = respEnd
-	}
+	needed := max(respEnd, reqEnd)
 	if fileSize < needed {
 		syscall.Munmap(data)
 		f.Close()
@@ -496,10 +493,7 @@ func (c *ShmContext) ShmReceive(buf []byte, timeoutMs uint32) (int, error) {
 	}
 
 	// Limit copy to the smaller of caller buffer and SHM area capacity
-	maxCopy := len(buf)
-	if int(areaCap) < maxCopy {
-		maxCopy = int(areaCap)
-	}
+	maxCopy := min(int(areaCap), len(buf))
 
 	// Phase 1: spin. Copy immediately on observing the advance.
 	observed := false

@@ -202,7 +202,7 @@ func TestMultiClient(t *testing.T) {
 	clients := make([]*Session, numClients)
 	servers := make([]*Session, numClients)
 
-	for i := 0; i < numClients; i++ {
+	for i := range numClients {
 		acceptCh := acceptAsync(listener)
 
 		cCfg := defaultClientConfig()
@@ -220,15 +220,15 @@ func TestMultiClient(t *testing.T) {
 	}
 
 	defer func() {
-		for i := 0; i < numClients; i++ {
+		for i := range numClients {
 			clients[i].Close()
 			servers[i].Close()
 		}
 	}()
 
 	// Each client sends a unique message
-	for i := 0; i < numClients; i++ {
-		payload := []byte(fmt.Sprintf("client_%d", i))
+	for i := range numClients {
+		payload := fmt.Appendf(nil, "client_%d", i)
 		hdr := protocol.Header{
 			Kind:      protocol.KindRequest,
 			Code:      protocol.MethodIncrement,
@@ -242,13 +242,13 @@ func TestMultiClient(t *testing.T) {
 
 	// Each server receives and echoes
 	buf := make([]byte, 4096)
-	for i := 0; i < numClients; i++ {
+	for i := range numClients {
 		rHdr, rPayload, err := servers[i].Receive(buf)
 		if err != nil {
 			t.Fatalf("server[%d] Receive: %v", i, err)
 		}
 
-		expected := []byte(fmt.Sprintf("client_%d", i))
+		expected := fmt.Appendf(nil, "client_%d", i)
 		if !bytes.Equal(rPayload, expected) {
 			t.Errorf("server[%d] payload = %q, want %q", i, rPayload, expected)
 		}
@@ -265,7 +265,7 @@ func TestMultiClient(t *testing.T) {
 	}
 
 	// Each client receives its echo
-	for i := 0; i < numClients; i++ {
+	for i := range numClients {
 		rHdr, rPayload, err := clients[i].Receive(buf)
 		if err != nil {
 			t.Fatalf("client[%d] Receive: %v", i, err)
@@ -273,7 +273,7 @@ func TestMultiClient(t *testing.T) {
 		if rHdr.MessageID != uint64(100+i) {
 			t.Errorf("client[%d] message_id = %d, want %d", i, rHdr.MessageID, 100+i)
 		}
-		expected := []byte(fmt.Sprintf("client_%d", i))
+		expected := fmt.Appendf(nil, "client_%d", i)
 		if !bytes.Equal(rPayload, expected) {
 			t.Errorf("client[%d] response payload = %q, want %q", i, rPayload, expected)
 		}
@@ -318,7 +318,7 @@ func TestPipelining(t *testing.T) {
 			ItemCount: 1,
 			MessageID: mid,
 		}
-		payload := []byte(fmt.Sprintf("req_%d", mid))
+		payload := fmt.Appendf(nil, "req_%d", mid)
 		if err := client.Send(&hdr, payload); err != nil {
 			t.Fatalf("client Send(%d): %v", mid, err)
 		}
@@ -332,7 +332,7 @@ func TestPipelining(t *testing.T) {
 	}
 	reqs := make([]reqInfo, 0, 3)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		rHdr, rPayload, err := server.Receive(buf)
 		if err != nil {
 			t.Fatalf("server Receive[%d]: %v", i, err)
@@ -356,7 +356,7 @@ func TestPipelining(t *testing.T) {
 
 	// Client receives 3 responses (should arrive in reverse order)
 	received := make(map[uint64][]byte)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		rHdr, rPayload, err := client.Receive(buf)
 		if err != nil {
 			t.Fatalf("client Receive[%d]: %v", i, err)
@@ -374,7 +374,7 @@ func TestPipelining(t *testing.T) {
 			t.Errorf("missing response for message_id %d", mid)
 			continue
 		}
-		expected := []byte(fmt.Sprintf("resp_req_%d", mid))
+		expected := fmt.Appendf(nil, "resp_req_%d", mid)
 		if !bytes.Equal(payload, expected) {
 			t.Errorf("message_id %d: payload = %q, want %q", mid, payload, expected)
 		}
@@ -938,11 +938,9 @@ func TestConcurrentSendReceive(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Server goroutine: receive and echo
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		buf := make([]byte, 65600)
-		for i := 0; i < numMessages; i++ {
+		for i := range numMessages {
 			rHdr, rPayload, err := server.Receive(buf)
 			if err != nil {
 				t.Errorf("server Receive[%d]: %v", i, err)
@@ -959,11 +957,11 @@ func TestConcurrentSendReceive(t *testing.T) {
 				return
 			}
 		}
-	}()
+	})
 
 	// Client: send all, then receive all
-	for i := 0; i < numMessages; i++ {
-		payload := []byte(fmt.Sprintf("message_%d", i))
+	for i := range numMessages {
+		payload := fmt.Appendf(nil, "message_%d", i)
 		hdr := protocol.Header{
 			Kind:      protocol.KindRequest,
 			Code:      protocol.MethodIncrement,
@@ -977,7 +975,7 @@ func TestConcurrentSendReceive(t *testing.T) {
 
 	received := make(map[uint64]bool)
 	buf := make([]byte, 65600)
-	for i := 0; i < numMessages; i++ {
+	for i := range numMessages {
 		rHdr, _, err := client.Receive(buf)
 		if err != nil {
 			t.Fatalf("client Receive[%d]: %v", i, err)
@@ -987,7 +985,7 @@ func TestConcurrentSendReceive(t *testing.T) {
 
 	wg.Wait()
 
-	for i := 0; i < numMessages; i++ {
+	for i := range numMessages {
 		if !received[uint64(i)] {
 			t.Errorf("missing response for message_id %d", i)
 		}
@@ -1199,7 +1197,7 @@ func TestMultipleChunkedMessages(t *testing.T) {
 	defer server.Close()
 
 	// Send 3 chunked messages sequentially
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		size := 500 + i*200
 		payload := make([]byte, size)
 		for j := range payload {
@@ -1367,11 +1365,9 @@ func TestPipeline10(t *testing.T) {
 
 	// Server goroutine: receive and echo
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		buf := make([]byte, 4096)
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rHdr, rPayload, err := server.Receive(buf)
 			if err != nil {
 				t.Errorf("server Receive[%d]: %v", i, err)
@@ -1388,7 +1384,7 @@ func TestPipeline10(t *testing.T) {
 				return
 			}
 		}
-	}()
+	})
 
 	// Client sends 10 requests before reading any
 	for i := uint64(1); i <= count; i++ {
@@ -1465,11 +1461,9 @@ func TestPipeline100(t *testing.T) {
 
 	// Server goroutine
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		buf := make([]byte, 4096)
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rHdr, rPayload, err := server.Receive(buf)
 			if err != nil {
 				t.Errorf("server Receive[%d]: %v", i, err)
@@ -1486,7 +1480,7 @@ func TestPipeline100(t *testing.T) {
 				return
 			}
 		}
-	}()
+	})
 
 	// Client sends 100 requests
 	for i := uint64(1); i <= count; i++ {
@@ -1560,11 +1554,9 @@ func TestPipelineMixedSizes(t *testing.T) {
 
 	// Server goroutine
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		buf := make([]byte, 8192)
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rHdr, rPayload, err := server.Receive(buf)
 			if err != nil {
 				t.Errorf("server Receive[%d]: %v", i, err)
@@ -1581,7 +1573,7 @@ func TestPipelineMixedSizes(t *testing.T) {
 				return
 			}
 		}
-	}()
+	})
 
 	// Client sends all messages
 	for i, sz := range sizes {
@@ -1668,11 +1660,9 @@ func TestPipelineChunked(t *testing.T) {
 
 	// Server goroutine
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		buf := make([]byte, forcedPacketSize)
-		for i := 0; i < count; i++ {
+		for i := range count {
 			rHdr, rPayload, err := server.Receive(buf)
 			if err != nil {
 				t.Errorf("server Receive[%d]: %v", i, err)
@@ -1689,7 +1679,7 @@ func TestPipelineChunked(t *testing.T) {
 				return
 			}
 		}
-	}()
+	})
 
 	// Client sends all chunked messages
 	for i, sz := range sizes {
